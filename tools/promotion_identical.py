@@ -704,6 +704,12 @@ def main():
         if a.batch and not a.compare_only:
             while _running() >= 2 * a.batch:
                 time.sleep(45)
+            # SETTLE BEFORE THE NEXT POLL. `bsub` returns as soon as the scheduler accepts the job,
+            # and `bjobs` does not list it for a few seconds -- so a tight loop reads a stale count
+            # and submits past the cap. The first ECM run overshot to twelve pairs against a limit
+            # of eight for exactly this reason. Two seconds is longer than the lag and shorter than
+            # anything it delays.
+            time.sleep(3)
         frames = a.frames if a.frames is not None else nfr
         try:
             names, pd = run_pair(phase, spec, sa, sb, what, frames, submit=not a.compare_only)
