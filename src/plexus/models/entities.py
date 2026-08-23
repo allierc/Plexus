@@ -248,6 +248,16 @@ def neuron_schema(dim: int) -> StateSchema:
         Block("voltage", 1, role="coordinate", integration=FIRST_ORDER, boundary=BOUNDARY_FREE),
         Block("omega", 1, role="modulation", integration=NONE, boundary=BOUNDARY_FREE,
               record=False),
+        # THE PRINCIPAL NEURITE DIRECTION: the axis along which this cell's arbour is most
+        # extended, as a unit vector, pointing away from the soma. It is GEOMETRY, like `pos`
+        # -- a fixed property of the cell, `none`-integrated, never advanced. It is here rather
+        # than in a renderer because it is a fact about the neuron: two cells at the same place
+        # with opposite projection axes are different cells, and an operator that cared about
+        # anisotropy (a direction-dependent connection rule, a polarised conductance) would read
+        # this block. `record=False` because it is static -- storing 2,001 identical copies per
+        # run buys nothing, and a consumer reads it from the region's `neurons.npz`.
+        Block("neurite_dir", dim, role="orientation", integration=NONE,
+              boundary=BOUNDARY_FREE, record=False),
     ])
 
 
