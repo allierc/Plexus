@@ -124,6 +124,25 @@ clean throughout.
 **What this costs the record:** every gate row and every twin row graded before 23 August was
 produced with the broken renumber, and none of them counts until it is re-run.
 
+## NO NEW RECORDED ARRAYS UNTIL THE PROMOTION IS DONE
+
+The pristine side of every row is a worktree at `0da57dd0`. It runs the code of that commit, so it
+can only ever write the arrays that commit knew about. **Add a recorded quantity to the core and the
+two sides stop being comparable** — not "differ", but *uncomparable*: one side has a key the other
+cannot produce, and the harness has nothing to hold it against. The byte-identity gate is the only
+instrument that can see a regression here, and a change like this switches it off.
+
+So any change that adds to `MeshTable.FACE_RECORD`, `EDGE_RECORD`, `SCALAR_RECORD`, `snapshot()` or
+`topo_record`'s `hist` waits until the promotion's rows are green and the gate is retired or re-based
+onto a new pristine commit. **This is a sequencing rule, not a judgement about the change.**
+
+The live case, deferred on 23 August: a persistent per-cell `uid` + `parent_uid`, so a cell can be
+followed across the renumbering that `cell_die` and `edge_flip` perform. It is wanted — without it,
+"plot the mother's area and her daughters' areas over time" needs the permutation reconstructed from
+the recorded `apop` flag, and that reconstruction is unsound because `edge_flip` drops faces without
+setting `apop`. It is still deferred, because it would cost the gate that is currently the only thing
+standing between this promotion and another silent `renumber_set`.
+
 ## The floor
 
 Byte-identity is the criterion because the platform delivers it: two runs of one spec, same code,
