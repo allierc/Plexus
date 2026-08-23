@@ -1335,17 +1335,21 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                 _put(mg, "Nv", np.asarray([m["Nv"] for m in ms], np.int64))
                 for col in ("E_srce", "E_trgt", "E_face"):
                     _put(mg, col, np.concatenate([m[col] for m in ms]).astype(np.int64))
-                _cols = set.intersection(*[{k for k in m if k not in
-                                            ("E_srce", "E_trgt", "E_face", "nF", "Nv")} for m in ms])
-                for col in sorted(c for c in _cols if c.startswith("scalar_")):
-                    _put(mg, col, np.asarray([m[col] for m in ms], np.float64))
-                for col in sorted(c for c in _cols if c.startswith("e_")):
-                    _put(mg, col, np.concatenate([m[col] for m in ms]).astype(np.float32))
+                from plexus.models.mesh import mesh_row_columns
+                # THE UNION, zero-filled -- see `plexus.models.mesh.mesh_row_columns`. The
+                # intersection this replaced deleted any column absent from row 0, which is nearly
+                # all of them: `age`/`ndiv` appear when division is first allowed, `apop` when a
+                # cell is first sentenced, `scalar_n_apop` when one is first extruded.
+                _scal, _edge, _face, _fill = mesh_row_columns(ms)
+                for col in _scal:
+                    _put(mg, col, np.asarray([_fill(m, col) for m in ms], np.float64))
+                for col in _edge:
+                    _vals = [_fill(m, col) for m in ms]
+                    _put(mg, col, np.concatenate(_vals).astype(np.float32))
                     _put(mg, col + "_offsets",
-                         np.cumsum([0] + [len(m[col]) for m in ms]).astype(np.int64))
-                for col in sorted(c for c in _cols
-                                  if not c.startswith("scalar_") and not c.startswith("e_")):
-                    _put(mg, col, np.concatenate([m[col] for m in ms]).astype(np.float32))
+                         np.cumsum([0] + [len(v) for v in _vals]).astype(np.int64))
+                for col in _face:
+                    _put(mg, col, np.concatenate([_fill(m, col) for m in ms]).astype(np.float32))
         for fn, fd in out["fields"].items():
             g = root.create_group(fn)
             _put(g, "grid", fd["grid"])

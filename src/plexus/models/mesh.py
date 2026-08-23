@@ -134,6 +134,21 @@ class MeshTable(dict):
     # `topo_record`'s `cp()` has always had.
     FACE_RECORD = ("A0", "P0", "V0f", "age", "ndiv", "apop", "inhib", "myo_med")
 
+    # THE RECORDED NAME IS NOT ALWAYS THE LIVE ONE, and two of the four colours above were lost to
+    # exactly that. The operators write `m["apop_flag"]` (`cell_die`) and `m["inhib_frac"]`
+    # (`cell_chem_react`); `FACE_RECORD` calls them `apop` and `inhib`, which is what the renderer
+    # and every offline reader ask for. `topo_record` bridges the two by hand -- `apop=cp(...)`,
+    # `inhib=cp("inhib_frac")` -- but `snapshot` did a bare `self.get(nm)`, got None for both, and
+    # skipped them. So the core recorded NEITHER the dying-cell flag NOR the growth inhibitor,
+    # ever: `log/promotion/MINISITE_apop_patch_big` is an apoptosis scene whose trajectory contains
+    # no record that any cell was sentenced, and its movie is a plain ball with the one mechanism
+    # it exists to show invisible.
+    #
+    # An alias rather than a rename because both live names are load-bearing: `apop_flag` is
+    # carried across renumbering by `cell_die` and `edge_flip`, and `ecm_gate_growth`'s entry
+    # condition is a key TEST on this table, so the namespace is not free to be tidied.
+    FACE_ALIAS = {"apop": "apop_flag", "inhib": "inhib_frac"}
+
     # THE OPERATORS' OWN COUNTERS, which are scalars on the table and not per-face arrays -- so
     # `FACE_RECORD` cannot carry them, and without them a gate has to INFER what an operator already
     # knows.
@@ -182,7 +197,7 @@ class MeshTable(dict):
                    E_face=_np(self["E_face"]), nF=int(self["nF"]), Nv=int(self["Nv"]))
         nF = out["nF"]
         for nm in (face_record if face_record is not None else self.FACE_RECORD):
-            v = self.get(nm)
+            v = self.get(self.FACE_ALIAS.get(nm, nm), self.get(nm))
             if v is None:
                 continue
             a = _np(v).ravel()
@@ -202,6 +217,62 @@ class MeshTable(dict):
             if v is not None and np.ndim(v) == 0:
                 out["scalar_" + nm] = float(v)
         return out
+
+
+def mesh_row_columns(ms):
+    """Every mesh column ANY recorded row carries, with a filler for the rows that do not.
+
+    Returns `(scalars, edge_cols, face_cols, fill)` -- three sorted name lists and
+    `fill(m, col)` giving that row's values, zero-filled when the row lacks the name.
+
+    THE UNION, NOT THE INTERSECTION, AND THIS IS A BUG FIX. Both writers used to take
+
+        cols = set.intersection(*[{k for k in m if k not in RESERVED} for m in ms])
+
+    so a column that did not exist in EVERY row was deleted from the whole trajectory. Almost
+    nothing on this mesh exists at row 0: `cell_divide` is `after_frame`-gated in most specs, so
+    `age` and `ndiv` are created a few frames in; `apop` is created when the first cell is
+    sentenced; `scalar_n_apop` when the first one is extruded. Measured on the promotion's own runs:
+    `apop_patch_big` and `grow_divide` recorded NONE of `apop`, `age`, `ndiv` -- an apoptosis scene
+    with no record that anything died, and a division scene with no record that anything divided.
+    The renderer colours dying cells from `apop` and the mother/daughter pair from `age`, so both
+    movies came out a plain blue ball, and the mechanism each clip exists to show was invisible.
+
+    IT ALSO BLINDED THE GATES, which is worse than a dull movie. `tools/gate_measures.py` returns
+    None for a missing key and substitutes 0.0, so a run that extruded hundreds of cells reported
+    `n_apop = 0.0` on every frame and the row asserting `apop_spill` stays near zero could not fail.
+    `renumber_failed` -- added so a silent renumber failure would be assertable rather than merely
+    printed -- would have been deleted the same way, in exactly the case it exists to catch, since
+    it is created only WHEN a renumber fails.
+
+    ZERO IS THE TRUTHFUL FILL, not a placeholder. A row before the first division genuinely has age
+    0 and ndiv 0; a row before anything is sentenced genuinely has apop 0; the counters are
+    genuinely 0 before they count anything. `_marks` already documents that an unmarked new cell is
+    the truthful default, and this makes the record agree with it.
+
+    PER-FACE COLUMNS ARE FILLED TO `nF` because they ride the shared `mesh_face_offsets` and a short
+    row would slide every later frame. PER-HALF-EDGE columns keep their OWN offsets and a missing
+    row contributes nothing: `snapshot` deliberately records a short myosin array as short, so that
+    the alignment check can see it, and padding here would defeat that on the frames it exists for.
+    """
+    names = set()
+    for m in ms:
+        names |= {k for k in m if k not in RESERVED}
+    scal = sorted(c for c in names if c.startswith("scalar_"))
+    edge = sorted(c for c in names if c.startswith("e_"))
+    face = sorted(c for c in names if not c.startswith(("scalar_", "e_")))
+
+    def fill(m, col):
+        v = m.get(col)
+        if col.startswith("scalar_"):
+            return 0.0 if v is None else float(v)
+        if v is not None:
+            return np.asarray(v).ravel()
+        if col.startswith("e_"):
+            return np.zeros(0, np.float32)
+        return np.zeros(int(m["nF"]), np.float32)
+
+    return scal, edge, face, fill
 
 
 def is_mesh(obj) -> bool:

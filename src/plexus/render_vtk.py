@@ -94,6 +94,25 @@ GREEN = (44, 160, 44)
 GREEN_A = 0.5              # how much of the cell's own colour the division mark keeps
 BLUE = (31, 119, 180)
 
+# THE DYING CELL GETS ITS OWN COLOUR, and not the mother's blue. `BLUE` is both the suppression
+# tint and, at (31,119,180), exactly `MOTHER` -- so on a sheet where cells divide AND die the same
+# blue meant two opposite things, and `mesh_of` had to paint death last purely to break the tie.
+# Electric blue is far enough from the mother's mid-blue to be read at a glance and far enough from
+# the grey body to survive the shading.
+#
+# IT IS PAINTED OUTRIGHT, NOT BLENDED. A sentenced cell is a discrete event on a handful of faces;
+# blending it at PAIR_A over a white body gave a pale wash that vanished at the silhouette, which
+# is where most of the dying patch is in `apop_patch_big`.
+KILL = (0, 153, 255)       # electric blue: a cell sentenced to die
+
+# THE BODY IS GREY WHEN THERE IS NO CHEMISTRY TO SHOW, not colormap-white. An all-zero activator is
+# not missing -- `cell__chem` exists and is identically 0 on every apoptosis scene -- so `act` is
+# not None, the colormap runs, and every cell takes `cm(0)`, which is WHITE. A white body says
+# "activator at the bottom of its range" when the truth is "there is no activator here", and it
+# leaves the death mark to carry the entire picture against the brightest possible background.
+# Grey says the same thing honestly and gives the electric blue something to read against.
+BODY_GREY = (176, 176, 176)
+
 # THE DIVISION PAIR, AS TWO COLOURS RATHER THAN ONE. A just-divided cell used to be tinted green --
 # which says "a division happened here" and cannot say WHICH TWO CELLS it produced. On a sheet where
 # several cells divide in the same four-frame window the green patches merge and the pairing is
@@ -325,9 +344,22 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None):
     if not idx:
         return None
     m = pv.PolyData(pos, faces=np.asarray(faces, np.int64))
-    if act is None:
-        rgb = np.full((len(idx), 3), 235, np.uint8)
-    if act is not None:
+    # A FLAT ACTIVATOR IS NOT AN ACTIVATOR. `act` is non-None on every mesh run because the `cell`
+    # set always carries a `chem` block, so the apoptosis scenes -- which have no chemistry at all
+    # and whose `cell__chem` is identically 0 over 601 frames -- were being colour-mapped to a
+    # single value. See `BODY_GREY`.
+    #
+    # AN ALL-NaN FRAME IS NOT FLAT. It has to keep reaching the colormap branch, because that is
+    # where `rgb[~ok] = magenta` marks "not a cell any more" -- and a run going non-finite is
+    # exactly what that mark exists to make visible (`r023_07` was half NaN from frame 889). So
+    # "flat" requires that finite values EXIST and are all zero, not merely that none is nonzero.
+    _a = None if act is None else np.asarray(act, float)[:nF][idx]
+    _fin = None if _a is None else np.isfinite(_a)
+    flat = _a is not None and bool(_fin.any()) and not bool(np.any(_a[_fin] != 0.0))
+    if act is None or flat:
+        rgb = np.full((len(idx), 3), BODY_GREY, np.uint8)
+        x = np.zeros(len(idx))
+    if act is not None and not flat:
         a = np.asarray(act, float)[:nF][idx]
         ok = np.isfinite(a)
         # THE RANGE IS THE RUN'S, NOT THE FRAME'S, on a movie -- otherwise every frame renormalises
@@ -364,7 +396,7 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None):
     # see. Suppression is not in this class -- it tints a whole REGION and reads with or without
     # the outlines -- so it stays in both styles.
     if show_div and kills is not None and kills.any():
-        rgb[kills] = BLUE
+        rgb[kills] = KILL
     # GREEN ONLY WHERE BOTH ITS AXES EXIST. It marks ONE CELL that divided in the last four calls,
     # so it needs a before and an after -- which `kburns` does not have, being one frame held still
     # while the camera moves -- and it needs the cell to be visible, which `nomesh` does not give:
