@@ -339,7 +339,14 @@ _MINISITE = [
     # section on the front page                     spec
     ("Turing -- Gray-Scott",                        "atlas/turing_coral"),
     ("Epithelial mechanics -- a vertex model",      "atlas/vertex_spheroid"),
-    ("Epithelial mechanics -- a vertex model",      "cellfix_B_new"),
+    # THE SCENE IS THE BUILT TISSUE, NOT ITS PARENT SPEC. The front page's "grow & divide" clip is
+    # what `tissue.build(frames=401, buffer_x=4, myosin=1.0)` produced from `cellfix_B_new.yaml`,
+    # and `build` makes three edits: both reservoirs x4, `junction_myosin` before `cell_mechanics`,
+    # `junction_sync` after the topology operators. Running the bare parent instead is a different
+    # run and it shows -- at buffer_x=1 the vertex array is pinned at 6,396, divisions are refused
+    # for want of room, and the clip is a reservoir, not a tissue. `gates/gate_00_spheroid` IS that
+    # built spec, lifted to a file, and it already runs pristine-identical.
+    ("Epithelial mechanics -- a vertex model",      "gates/gate_00_spheroid"),
     ("Cell death -- sculpting an epithelial surface", "apop_patch_big"),
     ("Cell death -- sculpting an epithelial surface", "apop_rings9"),
     ("Cell death -- sculpting an epithelial surface", "apopgeo_half"),
