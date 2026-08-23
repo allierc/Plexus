@@ -225,7 +225,6 @@ window.Quarto = {
 <li><strong>Seed</strong> — the initial state, written once and never again.</li>
 </ul>
 <p>The first four kinds transform the state of a set and Field that of a field, all while preserving the underlying organization; Rewire modifies the interaction graph; Structural modifies the entities themselves; Seed writes what the others evolve. The full algebra — with typed signatures and the reference implementation — is on <strong><a href="./language.html">The language</a></strong>.</p>
-<p>Because the language is explicit, a model is a <strong>plain-text file and nothing else</strong>: the spec behind every clip on this page <em>is</em> the simulation — its sets, its fields, its operators and the order they run in — and running it means handing that file to an engine that interprets it. No part of the mechanism hides in code. That separation between the language and its implementation is the point: the same spec can be executed by different numerical realizations without rewriting the biology, and a mechanism can be swapped, compared or fitted as text. It also changes who can write one — composing a model from a small set of bricks asks for no simulator engineering — and because a spec is text with a fixed grammar, a language model can draft one from a description written in plain English.</p>
 </section>
 <section id="composing-mechanisms" class="level2">
 <h2 class="anchored" data-anchor-id="composing-mechanisms">Composing mechanisms</h2>
