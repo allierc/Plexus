@@ -38,29 +38,22 @@ modern compilers separate programming languages from their implementations throu
 an intermediate representation, Plexus separates biological mechanisms from their
 numerical implementations.
 
-This viewpoint defines a broader research program. First, Plexus seeks to construct
-an algebra of biological operators whose elements can be composed into complex
-dynamical systems, compared through their observable consequences, and expanded as
-new mechanisms are discovered. Second, Plexus aims to extract this operator algebra
-from the existing corpus of biological simulation models. Rather than viewing
-current frameworks as competing simulators, we regard them as repositories of
-reusable mechanisms. By decomposing these models into a common language, we seek to
-identify a compact vocabulary capable of expressing a wide range of biological
-dynamics across scales. Third, Plexus constructs differentiable counterparts of
-these operator compositions. Differentiability allows mechanistic models to be
-fitted directly to biological data, residuals to be interpreted mechanistically,
-and missing operators intuited.
+Biological systems must be decomposed not only into operators, but also into the
+entities on which those operators act. These entities are heterogeneous — receptors,
+signalling proteins, cells, extracellular matrices, tissues, fields — and are organized
+across biological levels. Plexus makes this organization explicit as a compositional
+hierarchy: each level carries its own entities and states, operators act between entities
+within a level, and **Aggregate ↑** and **Broadcast ↓** connect levels by mapping state
+upward and downward. Decomposition therefore does not flatten biology into a single
+collection of variables; it preserves the organization through which mechanisms at one
+level are composed with mechanisms at another.
 
-Finally, because biological mechanisms are represented in a formal language rather
-than embedded in simulator-specific code, they become amenable to automated
-reasoning. The explicit separation between biological semantics and numerical
-implementations allows agentic systems to operate directly on the language itself,
-composing, comparing and optimizing mechanistic models without modifying simulator
-code. The search for biological explanations therefore becomes a search over model
-structures rather than simulator implementations. In sum, mechanistic discovery can
-proceed by iteratively assembling operator compositions, fitting them to
-observations, and extending the language whenever existing operators prove
-insufficient.
+The purpose of this decomposition is ultimately recomposition: to construct complete
+mechanistic models from reusable entities and operators. Making such compositions
+executable requires strong structural choices. Plexus separates the language that
+specifies the biological model from the code that interprets and executes it. The language
+declares entities, states, relations, hierarchy and operators; the interpreter resolves
+this description into concrete numerical implementations and schedules their execution.
 
 ## The language
 
