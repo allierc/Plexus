@@ -64,6 +64,14 @@ KB_SECONDS = 18.0          # one revolution; the length IS the speed
 KB_ZOOM = 0.55
 EV_FPS = 12                # ~60 recorded frames -> a 5 s clip
 
+# THE NEURAL CLIPS RUN AT THEIR OWN RATE, and it is 8x `EV_FPS` rather than a tweak to it. A
+# mesh `evolve` draws ~60 subsampled frames of a morphogenesis run, where 12 fps is a slideshow
+# of distinct shapes and slower is more readable. A neural clip draws EVERY recorded frame of a
+# 2,000-step run of a circuit whose membrane time constant is a handful of steps, so at 12 fps
+# it is a 3-minute crawl through dynamics that look static frame to frame. 96 fps puts 2,001
+# frames in 21 s, which is the timescale the activity actually moves on.
+NEURAL_FPS = 96
+
 # HOW MANY FRAMES AN `evolve` CLIP DRAWS, AND WHY IT IS CAPPED. okuda's archive keeps ~60 of a run's
 # rows; the core's trajectory keeps every one -- 1,801 on `r023_07`. Uncapped, the two sides of a
 # promotion pair produce a 5-second clip and a 2.5-minute one of the same run, which cannot be
@@ -998,7 +1006,7 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     name = label or os.path.basename(run_dir.rstrip("/"))
     ss = max(1, int(supersample))
     W = SIZE
-    writer = imageio_ffmpeg.write_frames(out, (W, W), fps=fps or EV_FPS, quality=8)
+    writer = imageio_ffmpeg.write_frames(out, (W, W), fps=fps or NEURAL_FPS, quality=8)
     writer.send(None)
     cam = None
     for t in range(n_frames):
