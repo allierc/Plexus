@@ -419,6 +419,42 @@ penalty, a force proportional to depth, so a steady load always produces a stead
 \code{k\_frac} is already at $0.15$ of the explicit stability ceiling. A barrier formulation removes
 the overlap by construction --- a change to the operator, in its own commit, with its own twin run.
 
+\paragraph{And the gates are twinned against okuda, not only against their own thresholds.}
+A gate grades the CORE against numbers a human wrote down; that is worth having and it does not say
+core and okuda agree. \code{--phase G} runs every lifted gate spec through both runners, fresh and in
+parallel, and \code{--phase REP} does the same for three specs the CAMPAIGN wrote --- 14 to 15
+operators apiece, emitted by \code{round.py} from its own search. A promotion that reproduces its own
+test set and not the corpus it was built from has reproduced the tests. Nineteen twin rows on record,
+nineteen identical.
+
+Two of the six gate rows compare core against core across a commit rather than against okuda, and
+that is a fact about okuda's runner: \code{run\_one.py} reads \code{H.level("vertex")} in three
+places, so a mesh-free spec dies with \code{KeyError: 'vertex'} before frame 0. okuda is a mesh
+harness and gates 02 and 04-pass-2 are pure MPM. The rows are labelled as regression checks rather
+than dressed up as agreement.
+
+\paragraph{One row came back DIFFER and the model was right.} \code{r023\_07} --- the only one of the
+three with \code{cell\_die}, whose \code{stalled} selector is a float threshold and therefore exactly
+where a last-bit difference would become a one-cell difference --- reported
+\code{act\_20: shape (2529,) vs (2530,)}. Reading the core trajectory at okuda's own ticks gives
+\code{nF} identical at every recorded row. The fault was the comparison's crop: okuda slices
+\code{chemf[t][:nF]} and the bridge sliced by \code{cell\_\_occ[t].sum()}, which are the same number
+except around a death. It crops by the mesh now.
+
+The one-cell gap is real and is recorded rather than waved away: \code{cell\_\_occ.sum()} leads
+\code{nF} by exactly one on 23 of 1{,}801 rows, always at a death, never by more, while
+\code{vertex\_\_occ.sum()} matches \code{Nv} on all 1{,}801. Gate 00 carries that check and passes
+it, because gate 00 has no death operator and never reaches the path --- a green row on a spec that
+cannot exercise it is not evidence.
+
+\paragraph{And that run is half NaN, and its own diagnostics say so and pass it.}
+\code{r023\_07}'s activator goes non-finite at frame 889 and stays there: 2{,}995 of 2{,}995 cells,
+on both sides of the twin. The campaign's \code{diag.json} records \code{act\_extinct\_frame: 889}
+and \code{act\_max\_final: nan} and stamps \code{valid\_evidence: True} anyway, because the validity
+check asks whether operators ACTED, not whether the state stayed finite. The VTK renderer says it
+without being asked --- magenta means ``not a cell any more'' and the final frame is solid magenta.
+A \code{no\_nan} row of the kind gates 00, 02 and 04 carry would have failed it at frame 889.
+
 \gatetable
 
 \section{Status}
@@ -435,9 +471,10 @@ D  & \code{ecm\_ops.py}, \code{membrane\_ops.py}, \code{contact\_ops.py} & \dn\\
 0b & MPM regrouped into \code{mpm\_ops.py} & \ns\\
 gates 00, 01, 02, 04 & lifted into \code{config/gates/}, run from core, \textbf{44 pass, 1 known-red} & \dn\\
 gate 03 & not liftable: needs a seeder, four operators and massed vertex dynamics & \ns\\
+F  & three minisite scenes in \code{config/atlas/}, all three run end to end & \dn\\
+G  & replication: three CAMPAIGN specs, okuda vs core, identical & \dn\\
 0b/E & core regrouped into ten modules; VTK is the engine's renderer & \dn\\
-F  & the three minisite scenes under \code{config/atlas/} & \ns\\
-G  & replication: \code{r010\_00\_ctrl} and \code{b\_star} as twin runs & \ns\\
+
 \bottomrule
 \end{tabular}
 \end{center}

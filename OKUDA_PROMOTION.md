@@ -176,6 +176,25 @@ form the paper prescribes -- one name, one contract, several bodies.
   failed with *not in registry*, and now they fail with *supports dims [3], not dim=2* -- a better
   message for the same broken spec. They almost certainly mean `agent_grow`, the core's 2D
   growth operator, but "almost certainly" is not a migration and whoever wrote them should say.
+* **`r023_07`'S ACTIVATOR GOES NON-FINITE AT FRAME 889 AND THE RUN IS STAMPED
+  `valid_evidence: True`.** Half of a 1,800-frame campaign run is NaN -- 2,995 of 2,995 cells from
+  frame ~889 on, on BOTH sides of the twin (they are bit-identical, so this is the model and not the
+  promotion). The campaign's own `diag.json` records it exactly: `act_extinct_frame: 889`,
+  `act_max_final: nan`, `act_alive_frac: 0.4931`. It records it and passes it anyway, because the
+  validity check tests whether operators ACTED, not whether the state stayed finite. The renderer
+  says it plainly -- magenta means "not a cell any more" and the final frame is solid magenta -- and
+  a `no_nan` row of the kind gates 00, 02 and 04 carry would have failed it at frame 889. Nothing in
+  the campaign's own reporting distinguishes this run from one that worked.
+* **`cell__occ.sum()` LEADS THE MESH'S `nF` BY ONE ON THE TICK A CELL IS EXTRUDED.** Measured on
+  `r023_07` (1,801 recorded rows, 15 operators, `cell_die[stalled]`): the gap is nonzero on 23 rows,
+  is always exactly 1, and always sits at a death; `vertex__occ.sum()` matches `Nv` on all 1,801. So
+  the cell set's occupancy and the mesh's face count are updated in a different ORDER when
+  `cell_die` extrudes, and for one tick a reader that trusts `occ` counts a cell the mesh has
+  already removed. Gate 00 carries exactly this check (`occupancy_matches_topology`) and passes it,
+  because gate 00 has no death operator and never reaches the path -- which is itself worth noting:
+  a green row on a spec that cannot exercise it is not evidence. FIXING IT MOVES `occ`, so it needs
+  its own commit and its own twin run, and until then every comparison crops by `nF` (okuda's own
+  definition, and the one the mesh is authoritative for).
 * **`plexus.operators.<one-operator-module>` is imported by name from five prototype scripts** --
   `prototype/eye/muscle_ops.py`, three files under `prototype/cardio_cells/`, and
   `prototype/inverse_slime/operators.py` reach for `mpm_grid`, `deposit` and `diffuse`. That is why
