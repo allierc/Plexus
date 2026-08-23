@@ -28,7 +28,7 @@ def data_generate(
     device: str = "cpu",
     erase: bool = False,
     save: bool = True,
-    live_every_frac: float | None = 0.1,
+    live_every_frac: float | None = 0.05,
 ) -> tuple[str, dict]:
     """forward-simulate `sim` and write its trajectory under
     graphs_data/<pre_folder>/<sim.name>/. Returns (data_dir, out).
@@ -48,7 +48,11 @@ def data_generate(
           f"sets={ {k: int(v.get('n', 0)) for k, v in sim.sets.items() if 'n' in v} } -> {data_dir}",
           flush=True)
     # THE LIVE SNAPSHOT, ON BY DEFAULT. A 1,800-frame run writes nothing anyone can look at for
-    # half an hour; this rewrites `3d.png` in the data directory every 10% of the frames, with the
+    # half an hour; this rewrites `2d.png`/`3d.png` in the data directory every 5% of the frames --
+    # TWENTY pictures over a run rather than ten. At 10% a 6,000-frame Turing run showed nothing for
+    # the first ten minutes and then jumped 600 frames at a time, which is too coarse to catch a
+    # pattern forming or a run going non-finite while there is still time to kill it. The cost is a
+    # matplotlib figure per snapshot, a fraction of a second against the minutes between them.
     # frame number on it, so the run can be watched rather than only waited for. Off with
     # `live_every_frac=None`. The matplotlib import is inside `plexus.live.snapshot`, so this module
     # still imports no plotting stack -- see its own docstring on why that matters.
