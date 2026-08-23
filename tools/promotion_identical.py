@@ -415,7 +415,10 @@ def suite_turing():
         ("turing2d_gs_theta",  "GS Pearson theta: worms and loops with spots"),
         ("turing2d_rps_a0p2",  "RPS a=0.2: weak dominance, broad slow domains"),
         ("turing2d_rps_a1p2",  "RPS a=1.2: strong dominance, tight spirals"),
-        ("turing2d_rps_a2p0",  "RPS a=2.0: invasion fronts outrun the spiral cores"))]
+        ("turing2d_rps_a2p0",  "RPS a=2.0: invasion fronts outrun the spiral cores"),
+        # ---- the 3D twin: the same May-Leonard working point on a CLOSED surface, where a wave
+        # has no boundary to die against and a spiral core has no edge to anchor to.
+        ("turing_rps",         "May-Leonard on the closed vertex mesh: the 3D twin of turing2d_rps"))]
 
 
 SUITES = {"ECM": suite_ecm, "BASE": suite_base, "MINISITE": suite_minisite,
