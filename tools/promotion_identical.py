@@ -376,7 +376,23 @@ def suite_minisite():
             for section, spec in _MINISITE]
 
 
-SUITES = {"ECM": suite_ecm, "BASE": suite_base, "MINISITE": suite_minisite}
+def suite_turing():
+    """The two-species Gray-Scott exploration -- CORE ONLY, and not a gate.
+
+    These four are not promotion rows: there is nothing to compare them against, because the second
+    species does not exist in the archive. Side A is named only because a row is a pair; run them
+    with `--sides B` and side A is never submitted. They live here rather than in a one-off script
+    so they archive into `log/promotion/` like everything else and can be re-run by name.
+    """
+    return [("TURING", f"atlas/{n}", None, 0.0, "core", "core", what) for n, what in (
+        ("turing_coral",      "the one-species baseline: chem width 2, F 0.046 / kk 0.062"),
+        ("turing_two_scale",  "two species, SAME reaction, activator range 32x apart"),
+        ("turing_two_regime", "two species, SAME diffusion, coral point vs self-replicating spots"),
+        ("turing_two_both",   "two species differing in scale AND regime"))]
+
+
+SUITES = {"ECM": suite_ecm, "BASE": suite_base, "MINISITE": suite_minisite,
+          "TURING": suite_turing}
 
 
 def _spec_src(spec):
