@@ -52,6 +52,49 @@ def _live_pos(H, sname):
     return pos[lvl.active.detach().cpu().numpy()], None
 
 
+def _face_colours(H, nF):
+    """Per-face RGB from the cell set's activator, or None when there is no chemistry to show.
+
+    WHY THE LIVE PICTURE NEEDS THIS. The faces were drawn `facecolor="#dcdcdc"`, a constant, so the
+    snapshot showed GEOMETRY ONLY. On a reaction-diffusion run the geometry barely moves -- a coral
+    spheroid at frame 600 looks like a coral spheroid at frame 6000 -- and the one question worth
+    asking during the twenty-five minutes it takes is whether the pattern is forming. The answer
+    was not in the picture: every `3d.png` of every Turing run came out a plain white ball, and the
+    only way to find out was to wait for the movie.
+
+    TWO SPECIES GET TWO CHANNELS. A four-wide `chem` is two independent Gray-Scott pairs (columns
+    0,1 and 2,3 -- see `_chan`), so species A drives RED and species B drives BLUE and a cell where
+    both are present goes magenta. With one pair it is red alone. That makes the two-species runs
+    legible at a glance, which is the whole reason they exist.
+
+    PER-FRAME NORMALISATION, DELIBERATELY, and it is the opposite of what the movie does. `evolve`
+    fixes its range over the whole run so a strengthening pattern does not look static. A live
+    snapshot has no whole run yet -- it cannot know the final maximum -- and a fixed guess would
+    render the first snapshots black. So each frame is scaled to its own range and the range is
+    printed in the caption, which says what the colour means instead of implying a constant scale.
+    """
+    for s, l in H.levels.items():
+        if "chem" not in getattr(l, "state_schema", {}):
+            continue
+        c = l.get("chem")
+        if c is None or c.shape[0] < nF:
+            continue
+        a = c[:nF].detach().cpu().numpy()
+        cols = np.zeros((nF, 3), float)
+        hi = []
+        for ch, band in ((0, 0), (2, 2)):                 # species A -> red, species B -> blue
+            if a.shape[1] > ch:
+                v = a[:, ch]
+                v = np.where(np.isfinite(v), v, 0.0)
+                top = float(v.max())
+                hi.append(top)
+                if top > 1e-9:
+                    cols[:, band] = np.clip(v / top, 0, 1)
+        cols = 0.16 + 0.84 * cols                          # a floor, so an inactive cell is still a cell
+        return np.clip(cols, 0, 1), hi
+    return None, []
+
+
 def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
     """Draw the current state to `<out_dir>/3d.png`. Never raises: a failed picture must not take
     down a run that is otherwise fine, which is exactly what a 3D-axes `text` signature once did to
@@ -68,6 +111,7 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
                 return None
             sname = max(cand)[1]
         pos, m = _live_pos(H, sname)
+        _clim = []
         if pos is None or len(pos) == 0:
             return None
         D = pos.shape[1]
@@ -89,9 +133,12 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
                 es, et, ef = (np.asarray(_np(m[k])) for k in ("E_srce", "E_trgt", "E_face"))
                 rings = rings_from_flat_3d(es, et, ef, int(m["nF"]))
                 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-                polys = [pos[np.asarray(rg, int), :3] for rg in rings if len(rg) >= 3]
-                pc = Poly3DCollection(polys, facecolor="#dcdcdc", edgecolor="#5a5a5a",
-                                      linewidths=0.15, alpha=1.0)
+                keep = [i for i, rg in enumerate(rings) if len(rg) >= 3]
+                polys = [pos[np.asarray(rings[i], int), :3] for i in keep]
+                fc, _clim = _face_colours(H, int(m["nF"]))
+                pc = Poly3DCollection(
+                    polys, facecolor=(fc[keep] if fc is not None else "#dcdcdc"),
+                    edgecolor="#5a5a5a", linewidths=0.15, alpha=1.0)
                 ax.add_collection3d(pc)
             else:
                 ax.scatter(pos[:, 0], pos[:, 1], pos[:, 2], s=1.0, c="#dcdcdc", depthshade=False)
@@ -108,6 +155,12 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
         unit = "cells" if m is not None else "elements"
         put(0.02, 0.97, f"{name}  frame {tick} / {n_frames}   {n_live} {unit}   [live]",
             transform=ax.transAxes, color="white", fontsize=11, va="top")
+        if _clim:
+            # THE SCALE, STATED. The colours are normalised per frame (see `_face_colours`), so the
+            # picture is meaningless without the number it was divided by.
+            ax.text2D(0.02, 0.94, "  ".join(
+                f"{'AB'[i]} max {v:.4g}" for i, v in enumerate(_clim)),
+                transform=ax.transAxes, color="#b0b0b0", fontsize=8, va="top")
         fig.subplots_adjust(0, 0, 1, 1)
         # `.tmp` LAST WOULD PICK THE FORMAT FROM THE EXTENSION and matplotlib refuses "tmp"; the
         # temporary name has to keep the `.png` suffix.
