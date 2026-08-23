@@ -397,7 +397,12 @@ def suite_turing():
         ("turing2d_disc",      "flat disc, 4000 cells, chi 1.3"),
         ("turing2d_disc_chi4", "the same disc at chi 4.0 -- the right value on THIS graph is not "
                                "yet measured, so both are run rather than one guessed"),
-        ("turing2d_two",       "two species on the flat disc: the 2D twin of turing_two_both"))]
+        ("turing2d_two",       "two species on the flat disc: the 2D twin of turing_two_both"),
+        # ---- the two new reaction MODELS. Both need a span that is not a pair, which is why the
+        # `chan`-must-be-even rule had to become "a multiple of this model's own width" first.
+        ("turing2d_rps",       "May-Leonard cyclic competition: THREE species, travelling domains"),
+        ("turing2d_coupled",   "FOUR species: two Gray-Scott systems suppressing each other "
+                               "(gamma 1.0). At gamma 0 it reduces to turing2d_two bit for bit."))]
 
 
 SUITES = {"ECM": suite_ecm, "BASE": suite_base, "MINISITE": suite_minisite,
