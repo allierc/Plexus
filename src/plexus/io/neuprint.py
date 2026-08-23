@@ -155,13 +155,20 @@ def region_path(name: str) -> str:
     from plexus.paths import graphs_data_path
     return graphs_data_path(REGION_ROOT, name)
 
-def soma_query(prof: dict) -> str:
+def soma_query(prof: dict, roi: str | None = None) -> str:
     """The Cypher that defines "a neuron with a place", for this dataset.
 
     A body with no soma has no cell body to put anywhere, so it can never be a point in a
     cube. Beyond that the rule is dataset-specific (see the DATASETS table): a `status` filter
     where the dataset traces bodies, a synapse-count floor where it does not."""
     where = ["n.somaLocation IS NOT NULL"]
+    if roi:
+        # AN ANATOMICAL REGION, not just a dense corner. A neuron's ROI membership is a boolean
+        # property named after the region, so "in the tectum" is `n.\`Tectum\` IS NOT NULL`. The
+        # cube is still a cube and is still bisected to the target count -- the ROI only says
+        # WHICH neurons are eligible, so the result is "a 45 um cube of tectum" rather than "a
+        # 45 um cube of wherever the somas happen to be densest".
+        where.append(f"n.`{roi}` IS NOT NULL")
     if prof.get("status"):
         where.append(f"n.status = '{prof['status']}'")
     if int(prof.get("min_synapses", 0)) > 0:
@@ -249,10 +256,10 @@ def select_cube(xyz: np.ndarray, target: int = 1000, center=None,
 # --------------------------------------------------------------------------- #
 #  the fetch
 # --------------------------------------------------------------------------- #
-def fetch_somas(client, prof: dict):
+def fetch_somas(client, prof: dict, roi: str | None = None):
     """Every neuron with a soma that passes this dataset's rule. One query."""
     t = time.time()
-    q = soma_query(prof)
+    q = soma_query(prof, roi)
     df = client.fetch_custom(q)
     print(f"[neuprint] {len(df)} neurons with a soma pass the rule  ({time.time() - t:.1f}s)")
     return df, q
@@ -315,7 +322,7 @@ def fetch_meshes(client, body_ids, out_dir, lod: int = 2, threads: int = 8,
 #  the manifest
 # --------------------------------------------------------------------------- #
 def write_manifest(out: str, dataset: str, server: str, prof: dict, query: str,
-                   lo_nm, L_nm, df, skels, meshes) -> str:
+                   lo_nm, L_nm, df, skels, meshes, roi=None) -> str:
     """The frozen region: `manifest.json` (what and where) + `neurons.npz` (the arrays).
 
     TWO FILES AND NOT ONE. The manifest is meant to be READ BY A HUMAN deciding whether a
@@ -356,6 +363,7 @@ def write_manifest(out: str, dataset: str, server: str, prof: dict, query: str,
                    "note": prof.get("note"),
                    "fetched_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
         "region": {
+            "roi": roi,
             # THE CUBE IS DEFINED IN NANOMETRES. On an anisotropic dataset the voxel bounds
             # below are a CUBOID -- they are recorded for provenance, and `side_um` is the one
             # number that describes the region's actual size.
@@ -405,6 +413,9 @@ def main(argv=None) -> int:
     p.add_argument("--server", default=None,
                    help="default: the server in the DATASETS table for --dataset")
     p.add_argument("--dataset", default=DEFAULT_DATASET)
+    p.add_argument("--roi", default=None,
+                   help="restrict to an anatomical ROI (fish2: Tectum, Midbrain, Forebrain, "
+                        "Hindbrain, Diencephalon, ...)")
     p.add_argument("--center", default=None,
                    help="fix the cube centre, 'x,y,z' in dataset voxels (default: densest)")
     p.add_argument("--skeletons", action="store_true", help="also fetch SWC skeletons")
@@ -427,9 +438,10 @@ def main(argv=None) -> int:
     print(f"[neuprint] {server}  dataset={a.dataset}")
     print(f"[neuprint] voxel -> nm: scale {prof['scale_nm']} ({iso})  offset {prof['offset_nm']}")
     print(f"[neuprint] selection: status={prof.get('status')}  "
-          f"min_synapses={prof.get('min_synapses', 0)}")
+          f"min_synapses={prof.get('min_synapses', 0)}"
+          + (f"  roi={a.roi}" if a.roi else ""))
 
-    df, query = fetch_somas(client, prof)
+    df, query = fetch_somas(client, prof, a.roi)
     xyz_nm = to_nm(df[["x", "y", "z"]].to_numpy(float), prof)
     ext = xyz_nm.max(0) - xyz_nm.min(0)
     print(f"[neuprint] soma extent: {ext[0] / 1000:.0f} x {ext[1] / 1000:.0f} x "
@@ -452,7 +464,8 @@ def main(argv=None) -> int:
     meshes = fetch_meshes(client, sub.bodyId, os.path.join(out, "meshes"),
                           lod=a.lod, threads=a.threads) \
         if (a.meshes and prof.get("meshes", True)) else {}
-    path = write_manifest(out, a.dataset, server, prof, query, lo_nm, L_nm, sub, skels, meshes)
+    path = write_manifest(out, a.dataset, server, prof, query, lo_nm, L_nm, sub, skels, meshes,
+                          roi=a.roi)
     print(f"[neuprint] wrote {path}")
     print(json.dumps(json.load(open(path))["region"], indent=2))
     return 0
