@@ -236,7 +236,7 @@ window.Quarto = {
 <p>A set may be contained in another — proteins in a cell, cells in a tissue, tissues in an organism — through an explicit child → parent map. Importantly, a parent may contain several distinct sets: the same cell can contain receptors, signalling proteins, cytoskeletal elements and particles. These sets remain distinct objects, with their own state and operators, while sharing the same parent. Each level can also run at its own rate: no level is reduced to a parameter of the one above it.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_hier.png" class="img-fluid figure-img" style="width:80.0%"></p>
+<p><img src="figures/fig_hier.png" class="img-fluid figure-img" style="width:70.0%"></p>
 </figure>
 </div>
 <p>Operators can act within a level or across levels. Within a cell, for example, operators may couple receptors → signalling proteins → cytoskeleton. Across the containment map, <strong>Aggregate ↑</strong> builds parent state from children — a cell position from its particles, or a neuron input from its synapses — while <strong>Broadcast ↓</strong> propagates parent state to children — a material property to every particle owned by a cell, or a constraint imposed by the parent.</p>
