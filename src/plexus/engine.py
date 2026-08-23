@@ -1274,8 +1274,26 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     if name in rec_state:                            # non-pos recorded state blocks (voltage, ...)
                         for bname, arr in rec_state[name].items():
                             arr[ri] = lvl.get(bname).detach().cpu().numpy()
-                    if name in rec_mesh and lvl.mesh:                # the half-edge table, per row
-                        rec_mesh[name].append(lvl.mesh.snapshot())
+                    # THE MESH IS RECORDED IF ONE EXISTS, not only if the SPEC SAID SO. `rec_mesh`
+                    # is keyed at setup from `lvl.mesh`, which `_provision_mesh` creates only when
+                    # the set declares `mesh: half_edge`. But `seed_mesh` builds its table
+                    # regardless, on the legacy private `_mesh`, so an archived spec that predates
+                    # the declaration -- most of `config/okuda/_superseded_*` -- runs a full vertex
+                    # model whose topology is NEVER RECORDED. Nothing said so: `seed_mesh` ran,
+                    # `topo_record` ran, the trajectory came out with no `__mesh_*` column at all,
+                    # the renderer fell back to a matplotlib point cloud (a drifting blue blob
+                    # where the run is a spheroid), and the twin comparison had no nF/Nv to crop by
+                    # and reported `pos_0: shape (3996, 3) vs (130004, 3)` on two runs that agree.
+                    # r021_06 and cellfix_B_new both failed exactly this way.
+                    _m = getattr(lvl, "mesh", None) or getattr(lvl, "_mesh", None)
+                    if _m is not None and getattr(_m, "snapshot", None) is not None:
+                        if name not in rec_mesh:
+                            rec_mesh[name] = []
+                            print(f"[engine] set {name!r} has a half-edge mesh but does not declare "
+                                  f"`mesh: half_edge`; recording it anyway. Add the declaration to "
+                                  f"the spec -- an undeclared mesh used to be dropped silently.",
+                                  flush=True)
+                        rec_mesh[name].append(_m.snapshot())
             if H.fields and (tick % fstride == 0 or tick == sim.n_frames):
                 for fn, fld in H.fields.items():
                     if not getattr(fld, "RECORD", True):     # transient scratch fields (e.g. mpm_grid) are not recorded
