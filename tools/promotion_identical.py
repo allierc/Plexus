@@ -567,7 +567,16 @@ def _bsub_lines(pair_dir, spec, side, run_name, frames):
                 # THE DETERMINISM ASSERTION travels with the job, not with the submitter: the run
                 # happens on another machine and a flag set here would not reach it.
                 "export PLEXUS_STRICT_DETERMINISM=1",
-                f"conda run -n {C.ENV} python {C.cpath(entry)} {run_name}"
+                # `cpath` TRANSLATES A DEVCONTAINER PATH TO ITS CLUSTER PATH -- it is not a
+                # general "make absolute". `_okuda_entry` returns the BARE NAME `run_one.py` when
+                # the spec needs no launcher, and the script has already `cd`-ed into the okuda
+                # directory, so that name must stay relative; passing it through `cpath` rewrote it
+                # to `<repo>/run_one.py`, which does not exist, and seventeen of eighteen A sides
+                # died in five seconds with `can't open file`. The one that worked was the one that
+                # NEEDED a launcher -- an absolute path, where `cpath` is right. The fix took out
+                # every row it was not needed for.
+                f"conda run -n {C.ENV} python "
+                f"{C.cpath(entry) if os.path.isabs(entry) else entry} {run_name}"
                 + (f" --frames {frames}" if frames is not None else "")
                 + " --device cuda:0 --campaign promotion",
             ]) + "\n")
@@ -745,7 +754,7 @@ def _ptag(phase):
     return str(phase).replace(".", "p").replace("-", "_")
 
 
-def run_pair(phase, spec, side_a, side_b, what, frames, submit=True):
+def run_pair(phase, spec, side_a, side_b, what, frames, submit=True, sides=None):
     """THE PHASE IS PART OF THE NAME, and it has to be. `--phase R` runs `b_star` with BOTH sides on
     the working tree, while `--phase B` runs the same spec with side A on a worktree: the two would
     write into `log/okuda/promo_b_star_B` and into `log/promotion/b_star/` together, and the second
@@ -766,15 +775,27 @@ def run_pair(phase, spec, side_a, side_b, what, frames, submit=True):
                 _side_paths(side)[1] if side.startswith("okuda")
                 else os.path.join(_side_root(side), "config", "promotion")))
     if submit:
-        lines = [_bsub_lines(pair_dir, spec, side, rn, frames) for side, rn in names.values()]
-        runner = os.path.join(pair_dir, "_submit.sh")
+        # NORMALLY BOTH SIDES, TOGETHER -- that is the protocol and `sides` defaults to both.
+        # `--sides A` exists for ONE situation: a bug that killed one side of a phase while the
+        # other side's runs are still legitimately in flight. Resubmitting the pair would collide
+        # with them in the same output directory and throw away hours of correct compute, and
+        # killing them to keep the submission tidy is a worse trade. The runs are still both fresh
+        # -- what the protocol forbids is reusing a STALE ARCHIVE, not a sibling submitted an hour
+        # ago from the same code.
+        want = [t for t in ("A", "B") if t in (sides or "AB")]
+        lines = [_bsub_lines(pair_dir, spec, names[t][0], names[t][1], frames) for t in want]
+        runner = os.path.join(pair_dir, f"_submit{'' if len(want) == 2 else '_' + ''.join(want)}.sh")
         with open(runner, "w") as f:
             f.write("#!/bin/bash -l\n" + "\n".join(lines) + "\n")
         os.chmod(runner, 0o755)
         C._ssh(f"nohup bash {C.cpath(runner)} > {C.cpath(runner)}.log 2>&1 < /dev/null &",
                timeout=30)
-        print(f"  [{spec}] submitted BOTH sides together: "
-              f"{names['A'][1]} ({side_a}) | {names['B'][1]} ({side_b})", flush=True)
+        if len(want) == 2:
+            print(f"  [{spec}] submitted BOTH sides together: "
+                  f"{names['A'][1]} ({side_a}) | {names['B'][1]} ({side_b})", flush=True)
+        else:
+            t = want[0]
+            print(f"  [{spec}] submitted SIDE {t} ONLY: {names[t][1]} ({names[t][0]})", flush=True)
     return names, pair_dir
 
 
@@ -837,6 +858,9 @@ def main():
                     help="submit at most this many PAIRS at once (2 jobs each) and wait for a "
                          "slot before the next; 0 = all at once")
     ap.add_argument("--n-base", type=int, default=20, help="how many rows `--phase BASE` picks")
+    ap.add_argument("--sides", default=None,
+                    help="submit only side A or only side B (default: both, which is the protocol). "
+                         "For repairing one dead side while the other is still in flight.")
     ap.add_argument("--only", default=None,
                     help="keep only rows whose spec name contains this substring, so one row can be "
                          "re-run without re-running its whole phase")
@@ -908,7 +932,8 @@ def main():
             time.sleep(3)
         frames = a.frames if a.frames is not None else nfr
         try:
-            names, pd = run_pair(phase, spec, sa, sb, what, frames, submit=not a.compare_only)
+            names, pd = run_pair(phase, spec, sa, sb, what, frames,
+                                 submit=not a.compare_only, sides=a.sides)
         except FileNotFoundError as e:
             print(f"  [{spec}] SKIPPED: {e}")
             continue
