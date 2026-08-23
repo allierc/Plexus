@@ -473,3 +473,80 @@ def main(argv=None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# --------------------------------------------------------------------------- #
+#  the principal neurite direction
+# --------------------------------------------------------------------------- #
+def compute_neurite_directions(region: str, min_nodes: int = 8) -> dict:
+    """Per-neuron PRINCIPAL NEURITE DIRECTION, added to an existing region's `neurons.npz`.
+
+    THE DIRECTION IS A PROPERTY OF THE CELL, not of the render, which is why it is computed
+    once here and stored beside the soma position rather than derived in a plotting routine.
+    It is the first principal axis of the neuron's own skeleton nodes taken relative to its
+    soma -- i.e. the axis along which the arbour is most extended.
+
+    SIGN IS FIXED, and it has to be: an eigenvector is defined up to a sign, so an unfixed one
+    would flip arbitrarily between neurons and any glyph oriented by it would point half the
+    population backwards. The convention is to point AWAY from the soma, toward the arbour's
+    centroid, which is the direction the cell actually projects.
+
+    THIS IS DEFENSIBLE ONLY BECAUSE THE ARBOURS ARE ELONGATED, and that is measured rather than
+    assumed: on `zf_Tectum_1000` the first axis carries a median 82% of the arbour's variance
+    (p10 0.63, p90 0.94). For a neuron whose arbour were isotropic the axis would be noise, so
+    the fraction is stored per neuron as `neurite_elong` and a consumer can ignore the ones
+    where it is low.
+
+    Works from the CACHED SWCs -- no network, no token. A neuron with no skeleton, or fewer
+    than `min_nodes` nodes, gets a zero vector, which a renderer must treat as "no direction".
+    """
+    import glob
+    root = region_path(region)
+    man = json.load(open(os.path.join(root, "manifest.json")))
+    vx = man["source"]["voxel_to_nm"]
+    sc, of = np.asarray(vx["scale_nm"], float), np.asarray(vx["offset_nm"], float)
+    z = dict(np.load(os.path.join(root, "neurons.npz"), allow_pickle=True))
+    xyz, bid = np.asarray(z["xyz_nm"], float), np.asarray(z["body_id"])
+    pos_of = {int(b): i for i, b in enumerate(bid)}
+    dirs = np.zeros((len(bid), 3), np.float32)
+    elong = np.zeros(len(bid), np.float32)
+    span = np.zeros(len(bid), np.float32)
+    n_ok = 0
+    for f in sorted(glob.glob(os.path.join(root, "skeletons", "*.swc"))):
+        i = pos_of.get(int(os.path.splitext(os.path.basename(f))[0]))
+        if i is None:
+            continue
+        a = np.loadtxt(f, comments="#", ndmin=2)
+        if len(a) < min_nodes:
+            continue
+        P = a[:, 2:5] * sc + of - xyz[i]                 # arbour relative to ITS OWN soma, nm
+        C = P - P.mean(0)
+        w, V = np.linalg.eigh(C.T @ C / len(C))
+        d = V[:, -1]
+        if np.dot(d, P.mean(0)) < 0:                     # away from the soma, not toward it
+            d = -d
+        n = np.linalg.norm(d)
+        if n < 1e-9:
+            continue
+        dirs[i] = d / n
+        elong[i] = w[-1] / max(w.sum(), 1e-12)
+        t = P @ dirs[i]
+        span[i] = (t.max() - t.min()) / 1000.0        # extent along its OWN axis, in um
+        n_ok += 1
+    z["neurite_dir"] = dirs
+    z["neurite_elong"] = elong
+    # THE ARBOUR'S EXTENT ALONG ITS OWN AXIS, on the FULL skeleton and never the cropped one --
+    # the crop keeps a median 6% of the nodes, so a span measured inside the cube would measure
+    # the cube, not the cell. Recorded so a consumer can ask "is this direction worth trusting?"
+    # in micrometres rather than by eye. (On zf_Forebrain_1000 it does NOT predict direction
+    # quality: span vs elongation correlates at 0.20 and the shortest decile is as axial as the
+    # median, so a length threshold is not the gate one might expect it to be.)
+    z["neurite_span_um"] = span
+    np.savez_compressed(os.path.join(root, "neurons.npz"), **z)
+    D = dirs[dirs.any(1)]
+    meta = {"n_with_direction": int(n_ok), "n_neurons": int(len(bid)),
+            "elong_median": float(np.median(elong[elong > 0])) if n_ok else 0.0,
+            "mean_abs_xyz": [float(v) for v in np.abs(D).mean(0)] if n_ok else [0, 0, 0]}
+    man.setdefault("morphology", {})["neurite_direction"] = meta
+    json.dump(man, open(os.path.join(root, "manifest.json"), "w"), indent=2)
+    return meta

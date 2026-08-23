@@ -389,7 +389,7 @@ class NeuralSeed(Seed):
     INPUTS = ["neuron"]
     OUTPUTS = ["neuron"]
     READS = []                         # reads a file, not state
-    WRITES = ["pos", "voltage"]
+    WRITES = ["pos", "voltage", "neurite_dir"]
     MAPS = []
     SUPPORTED_DIMS = [2, 3]            # the manifest is 3D; a 2D world takes the first two axes
     DIFFERENTIABLE = False             # establishes x_0 from data; nothing to differentiate
@@ -439,6 +439,10 @@ class NeuralSeed(Seed):
         st = lvl.state.clone()                                     # clone-and-reassign: autograd-safe
         px0, px1 = lvl.state_schema["pos"]
         st[:, px0:px1] = torch.as_tensor(unit[:, :D], dtype=st.dtype, device=dev)
+        if "neurite_dir" in lvl.state_schema and "neurite_dir" in z.files:
+            nd = np.asarray(z["neurite_dir"], np.float64)[:, :D]
+            d0, d1 = lvl.state_schema["neurite_dir"]
+            st[:, d0:d1] = torch.as_tensor(nd, dtype=st.dtype, device=dev)
         vx0, vx1 = lvl.state_schema["voltage"]
         v0 = self.v0_mean + self.v0_sd * torch.randn(
             (n, vx1 - vx0), generator=getattr(H, "rng", None), device=dev, dtype=st.dtype)
@@ -461,7 +465,9 @@ class NeuralSeed(Seed):
         self._check_units(H, r)                     # (2) against the spec's own declaration.
         print(f"[neural_seed] {n} neurons from {man['source']['dataset']} -- cube of "
               f"{r['side_um']:.3f} um at {np.round(lo).astype(int).tolist()} nm, "
-              f"{len(lvl.cell_type_names)} cell types", flush=True)
+              f"{len(lvl.cell_type_names)} cell types"
+              + (f", {int((np.abs(np.asarray(z['neurite_dir'])).sum(1) > 0).sum())} "
+                 f"neurite directions" if "neurite_dir" in z.files else ""), flush=True)
         return {}
 
     @staticmethod
