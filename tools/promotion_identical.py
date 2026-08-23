@@ -704,6 +704,9 @@ def main():
                     help="submit at most this many PAIRS at once (2 jobs each) and wait for a "
                          "slot before the next; 0 = all at once")
     ap.add_argument("--n-base", type=int, default=20, help="how many rows `--phase BASE` picks")
+    ap.add_argument("--only", default=None,
+                    help="keep only rows whose spec name contains this substring, so one row can be "
+                         "re-run without re-running its whole phase")
     ap.add_argument("--no-compare-render", action="store_true",
                     help="skip the side-by-side compare.png / compare.mp4")
     ap.add_argument("--tol", type=float, default=None,
@@ -716,6 +719,14 @@ def main():
         print(f"  suite {a.phase}: {len(pairs)} pair(s) generated from the archive")
     else:
         pairs = [p for p in PAIRS if a.all or (a.phase is not None and str(p[0]) == str(a.phase))]
+    # ONE ROW, BY NAME. A phase is the unit the promotion advances in, but it is not the unit
+    # DEBUGGING works in: re-running six gate rows to look at one of them costs twelve jobs on a
+    # shared queue and buries the row that was asked about. `--only` filters whatever `--phase` or
+    # `--all` selected, by substring against the spec name, so the row keeps its own tolerance,
+    # frame count and pinned side A rather than being retyped as a one-off.
+    if a.only:
+        pairs = [p for p in pairs if a.only in str(p[1])]
+        print(f"  --only {a.only!r}: {len(pairs)} row(s) kept")
     if not pairs:
         print("  no pair selected -- use --phase or --all"); return 2
 
