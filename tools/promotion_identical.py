@@ -418,7 +418,17 @@ def suite_turing():
         ("turing2d_rps_a2p0",  "RPS a=2.0: invasion fronts outrun the spiral cores"),
         # ---- the 3D twin: the same May-Leonard working point on a CLOSED surface, where a wave
         # has no boundary to die against and a spiral core has no edge to anchor to.
-        ("turing_rps",         "May-Leonard on the closed vertex mesh: the 3D twin of turing2d_rps"))]
+        ("turing_rps",         "May-Leonard on the closed vertex mesh: the 3D twin of turing2d_rps"),
+        # ---- the TWO-SYSTEM twin of the Pearson sweep: system A fixed, system B walking the
+        # diagram, so each motif is asked whether it survives being laid over another on the same
+        # cells. Independent spans, no cross term -- what differs from the solo run is competition
+        # for space, not chemistry.
+        ("turing2d_two_delta",   "two systems, B at Pearson delta: the twin of turing2d_gs_delta"),
+        ("turing2d_two_beta",    "two systems, B at Pearson beta: the twin of turing2d_gs_beta"),
+        ("turing2d_two_eta",     "two systems, B at Pearson eta: the twin of turing2d_gs_eta"),
+        ("turing2d_two_kappa",   "two systems, B at Pearson kappa: the twin of turing2d_gs_kappa"),
+        ("turing2d_two_lambda",  "two systems, B at Pearson lambda: the twin of turing2d_gs_lambda"),
+        ("turing2d_two_theta",   "two systems, B at Pearson theta: the twin of turing2d_gs_theta"),)]
 
 
 SUITES = {"ECM": suite_ecm, "BASE": suite_base, "MINISITE": suite_minisite,
