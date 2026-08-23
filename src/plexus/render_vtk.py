@@ -93,6 +93,36 @@ BLUE = (31, 119, 180)
 MOTHER = (31, 119, 180)    # blue
 DAUGHTER = (214, 39, 40)   # red
 PAIR_A = 0.62              # how much of the pair colour is laid over the cell's own
+# DIVIDED (4) division calls x `cell_divide.every` (4) ticks = the window a mother stays marked.
+PAIR_TICKS = 16
+
+
+class _frames_ticks:
+    """Set by `frames_of` to the recorded tick numbers, when the writer kept them.
+
+    A module cell rather than a return value because `frames_of` has three callers and two of them
+    do not want it; the ticks are only needed to convert the pair window from TICKS into rows, and
+    a trajectory recorded at stride 1 does not need the conversion at all.
+    """
+    value = None
+
+
+def _pair_reference(t, nFs, ticks, window_ticks):
+    """The face count `window_ticks` ago, as a daughter threshold for row `t`.
+
+    Returns None at the start of a run, where there is no `before` and nothing should be drawn.
+    """
+    if t == 0:
+        return None
+    if ticks is None:                       # stride 1: a row IS a tick
+        return nFs[max(0, t - window_ticks)]
+    cut = ticks[t] - window_ticks
+    j = 0
+    for k in range(t, -1, -1):
+        if ticks[k] <= cut:
+            j = k
+            break
+    return nFs[j]
 
 
 # --------------------------------------------------------------------------- reading a run
@@ -159,7 +189,10 @@ def frames_of(run_dir, traj=None):
                 else _core_frames(traj))
     p = os.path.join(run_dir, "traj.npz")
     if os.path.exists(p):
+        z = np.load(p, allow_pickle=True)
+        _frames_ticks.value = (np.asarray(z["ticks"]).tolist() if "ticks" in z.files else None)
         return _okuda_frames(p)
+    _frames_ticks.value = None                    # a core trajectory records every tick
     for root, _d, files in os.walk(run_dir):
         if "trajectory.npz" in files:
             return _core_frames(os.path.join(root, "trajectory.npz"))
@@ -193,11 +226,18 @@ def _cmap():
 def _marks(mt, idx, nF, prev_nF=None):
     """(mother, daughter, kills, suppresses) masks over the drawn faces, None where unrecorded.
 
-    `mother`/`daughter` SPLIT WHAT WAS ONE `divided` MASK, using the previous frame's face count:
-    every face at or beyond `prev_nF` was appended this frame and is therefore a daughter, and the
-    rest of the just-divided set are the mothers they came from. With `prev_nF=None` -- a single
-    held frame, which is all `kburns` and `still` have -- both come back None and nothing is drawn,
-    because a pair cannot be identified without a before.
+    `mother`/`daughter` SPLIT WHAT WAS ONE `divided` MASK. A face at or beyond `prev_nF` was
+    appended since that reference and is a daughter; the rest of the just-divided set are the
+    mothers. With `prev_nF=None` -- a single held frame, which is all `kburns` and `still` have --
+    both come back None and nothing is drawn, because a pair cannot be identified without a before.
+
+    `prev_nF` IS NOT THE PREVIOUS FRAME'S COUNT, and using it that way is the bug this argument
+    replaced. The two masks are on DIFFERENT CLOCKS: `age <= DIVIDED` counts division CALLS, and
+    `cell_divide` runs every 4 ticks, so a mother stays blue for about 16 ticks -- while "appended
+    since the previous frame" is one row. On a stride-1 trajectory divisions fire on one row in
+    four, so three rows out of four drew 372 mothers and ZERO daughters and the pair was almost
+    never shown together. The caller passes the face count from far enough back to cover the SAME
+    window the mothers are drawn over.
 
     THE SECOND FIELD IS TWO DIFFERENT MARKS and they cannot share a rule. `apop` is rare and is the
     event -- a cell sentenced to die -- so it takes the colour outright. `inhib` is nearly the whole
@@ -409,11 +449,17 @@ def evolve(run_dir, style, out, fill=1.0, label=None):
     hi = float(max(np.nanmax(v) for v in vals)) if vals else 1.0
     p = _plotter()
     p.open_movie(out, framerate=EV_FPS, quality=8)
+    # THE PAIR WINDOW, IN TICKS, matched to how long a mother stays marked: `age <= DIVIDED` is four
+    # division CALLS and `cell_divide` runs every four ticks, so a mother is blue for about sixteen
+    # ticks. The daughter threshold is therefore the face count from sixteen ticks ago, not from the
+    # previous frame -- with the previous frame, three rows in four of a stride-1 trajectory drew
+    # hundreds of mothers and no daughters at all.
+    ticks = getattr(_frames_ticks, "value", None)
+    nFs = [int(m_["nF"]) for _p, m_, _a in fr]
     actor = txt = None
-    prev_nF = None
     for t, (pos, mt, act) in enumerate(fr):
-        m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"), prev_nF=prev_nF)
-        prev_nF = int(mt["nF"])
+        back = _pair_reference(t, nFs, ticks, PAIR_TICKS)
+        m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"), prev_nF=back)
         if m is None:
             continue
         if actor is not None:
@@ -798,10 +844,10 @@ def evolve_skeleton_activity(run_dir, out, region, field="neural_activity", n_ar
 
 
 def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
-                  soma=True, volume=True, cmap="viridis", line_width=0.15, point_size=2.5,
-                  dendrite_opacity=0.30, soma_spheres=False,
+                  soma=True, volume=True, cmap="viridis", line_width=1.0,
+                  dendrite_opacity=0.30, dendrite_stride=8, soma_radius_um=2.5,
                   fill=0.92, label=None, fps=None,
-                  vol_opacity=(0, 0.01, 0.03, 0.07, 0.16)):
+                  vol_opacity=(0, 0.006, 0.018, 0.045, 0.10)):
     """Soma, dendrites and the rendered volume, in one clip -- by COMPOSITING TWO PASSES.
 
     ONE SCENE, and the story of why that took three tries is worth keeping. The skeletons at
@@ -841,7 +887,7 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     def _rgb(v, a, b):
         return (np.asarray(cm(np.clip((v - a) / max(b - a, 1e-12), 0, 1)))[:, :3] * 255).astype(np.uint8)
 
-    poly, meta = skeleton_lines(region, max_neurons=n_arbours)
+    poly, meta = skeleton_lines(region, max_neurons=n_arbours, stride=dendrite_stride)
     own = np.asarray(poly["owner"])                         # which neuron each node belongs to
 
     root = region_path(region)
@@ -859,6 +905,15 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     else:
         sv_s = sv
     vlo, vhi = _range(np.abs(sv), 0.0, 99.5)                # ONE clim, both layers
+    # SOMAS ARE WORLD-SIZED SPHERES, not screen-space points: a point of "size 4" is 4 pixels
+    # whatever the zoom, which is not a cell body. `soma_radius_um` is a STATED CONSTANT here --
+    # fish2 populates `somaRadius` on 0 bodies and the SWC radius is unusable (its per-neuron
+    # max implies a 54 um diameter, larger than the cube). hemibrain, by contrast, measures it
+    # on all 23,008 bodies at a 2.38 um median. At 2.5 um these fill 70% of the cube, which is
+    # what the tissue actually looks like: median soma spacing here is 3.97 um.
+    side_um = float(man["side_um"])
+    _cloud = pv.PolyData(np.ascontiguousarray(spos))
+    _ball = pv.Sphere(radius=soma_radius_um / side_um, theta_resolution=10, phi_resolution=10)
 
     name = label or os.path.basename(run_dir.rstrip("/"))
     W = SIZE
@@ -873,16 +928,17 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
         p.add_mesh(poly, scalars="rgb", rgb=True, opacity=dendrite_opacity,
                    line_width=line_width, lighting=False)
         if soma:
-            c = pv.PolyData(np.ascontiguousarray(spos))
-            c["rgb"] = _rgb(sv_s[tv[t]], vlo, vhi)
-            p.add_points(c, scalars="rgb", rgb=True, render_points_as_spheres=soma_spheres,
-                         point_size=point_size, lighting=soma_spheres)
+            _cloud["rgb"] = _rgb(sv_s[tv[t]], vlo, vhi)
+            balls = _cloud.glyph(geom=_ball, scale=False, orient=False)
+            p.add_mesh(balls, scalars="rgb", rgb=True, lighting=True, smooth_shading=True,
+                       ambient=0.35, diffuse=0.75, specular=0.15)
         if volume:
             p.add_volume(_grid(np.abs(g[t])), scalars="a", cmap=cmap,
                          opacity=list(vol_opacity), clim=[lo, hi], show_scalar_bar=False)
         p.add_text(f"{name}  soma + dendrites{' + 128^3 volume' if volume else ''}   "
                    f"frame {t + 1}/{g.shape[0]}   {meta['neurons']} arbours, "
-                   f"{meta['segments'] // 1000}k segments in cube   "
+                   f"{meta['segments'] // 1000}k segments (1/{dendrite_stride})   "
+                   f"soma r={soma_radius_um} um   "
                    f"|voltage| clim [{vlo:.2f}, {vhi:.2f}] on both layers",
                    position="upper_left", font_size=10, color="white")
         if cam is None:
