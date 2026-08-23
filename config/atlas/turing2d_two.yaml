@@ -29,6 +29,11 @@
 # converts it for whatever canvas it is drawing on, so the same value holds at 1,000 cells and at
 # 16,000, on the live snapshot and in the movie. `point_size` still overrides it absolutely, but
 # an absolute size is a promise about a population count that a growing tissue breaks every frame.
+# SPECIES B's d_a IS 0.03, NOT 0.005. At 0.005 with chi 4.0 the activator's diffusion number is
+# 0.02 -- it cannot reach the next cell -- so B pinned to isolated single-cell spikes: a2 reached
+# 1.72 against species A's 0.39 while its mean stayed at 0.15. That reads as "the blue species is
+# not doing much" when in fact it is doing too much in one cell at a time. 0.03 gives d_a*chi =
+# 0.12, an activator that spans cells, and still leaves the ratio d_h/d_a at 5.3 against A's 2.0.
 general:
   name: turing2d_two
   seed: 0
@@ -83,7 +88,7 @@ operators:
 - op: cell_chem_diffuse
   at: cell
   implementation: graph_laplacian
-  d_a: 0.005
+  d_a: 0.03
   d_h: 0.16
   chi: 1.3
   chan: 2

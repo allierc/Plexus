@@ -57,9 +57,14 @@ def data_generate(
         from plexus.live import every_n, snapshot
         _stride = every_n(sim.n_frames, live_every_frac)
 
-        def on_frame(H, tick, _d=data_dir, _n=sim.n_frames, _name=sim.name, _s=_stride):
+        def on_frame(H, tick, _d=data_dir, _n=sim.n_frames, _name=sim.name, _s=_stride,
+                     _st=(sim.plotting or {})):
             if tick % _s == 0 or tick == _n:
-                snapshot(H, tick, _n, _d, name=_name)
+                # THE SPEC'S OWN COLOUR TABLE. Which chem column is drawn in which colour is a
+                # property of the model (a Gray-Scott substrate is usually not drawn; May-Leonard's
+                # three species are a partition and want RGB), so it travels with the spec rather
+                # than being guessed by the renderer.
+                snapshot(H, tick, _n, _d, name=_name, style=_st)
 
     H, out = run(sim, out_path=out_path, device=device, progress=True, on_frame=on_frame)
 

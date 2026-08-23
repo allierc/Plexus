@@ -30,6 +30,15 @@
 # converts it for whatever canvas it is drawing on, so the same value holds at 1,000 cells and at
 # 16,000, on the live snapshot and in the movie. `point_size` still overrides it absolutely, but
 # an absolute size is a promise about a population count that a growing tissue breaks every frame.
+# THE SEED IS `simplex`, NOT `scatter`. Every other mode writes a Gray-Scott initial condition --
+# activator in column 0, SUBSTRATE = 1 in column 1 -- and column 1 here is just the second
+# competitor, so the run began with v at 0.906 against u and w at 0.076. Measured: v dominated, w
+# cyclically beat v, and the field collapsed to w = 1 everywhere with zero spatial variance. Not a
+# competition, a landslide, and no motif can emerge from it.
+#
+# ADDITIVE RGB, because u+v+w is a PARTITION: the barycentric mix is the honest picture and it is
+# what ParticleGraph's RD_RPS renders. Subtractive-from-white is the Gray-Scott look and would say
+# nothing here -- every cell carries all three species at once.
 general:
   name: turing2d_rps
   seed: 0
@@ -61,8 +70,7 @@ operators:
   at: cell
   seed: 0
   before_frame: 3
-  mode: scatter
-  seed_frac: 0.12
+  mode: simplex
   n_species: 3
 - op: radius_graph
   at: cell
@@ -88,3 +96,8 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9
+  blend: additive
+  species:
+  - '#ff0000'
+  - '#00ff00'
+  - '#0000ff'
