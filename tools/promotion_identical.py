@@ -60,6 +60,7 @@ a comparison it never earned.
 from __future__ import annotations
 
 import argparse
+import glob
 import hashlib
 import json
 import os
@@ -212,6 +213,83 @@ def _side_paths(side):
     return home, os.path.join(root, "config", "okuda"), os.path.join(root, "log", "okuda")
 
 
+# =============================================================================================
+#  SUITES: rows generated from an ARCHIVE rather than typed. `--suite ecm` compares every runnable
+#  spec under `log/okuda_ECM/`, `--suite base` a ladder through `log/okuda/`. Generated because
+#  there are 13 and 408 of them and a hand-typed list of either would be out of date by Friday.
+# =============================================================================================
+def _loadable(path):
+    try:
+        import plexus.operators                                       # noqa: F401
+        import plexus.schema as S
+        S.load(path)
+        return True
+    except Exception:
+        return False
+
+
+def suite_ecm():
+    """Every `log/okuda_ECM/<run>/spec.yaml` that is a SPEC and loads.
+
+    THERE ARE 96 DIRECTORIES AND 13 SPECS. The rest are prose records: 43 carry only
+    `what`/`measures`/`operators_exercised`, and 37 more have an `operators:` list whose entries are
+    SENTENCES ("bm_elastic (StVK on the rest metric)"). Those rigs were driven from Python and never
+    wrote a machine-readable spec, so they cannot be replayed -- only RECONSTRUCTED, which is what
+    `config/gates/` is. The 13 that can be replayed are replayed.
+    """
+    import yaml as _y
+    out = []
+    for d in sorted(glob.glob(os.path.join(ROOT, "log", "okuda_ECM", "*", "spec.yaml"))):
+        n = os.path.basename(os.path.dirname(d))
+        if n.startswith("_") or not _loadable(d):
+            continue
+        # THE SIDES ARE CHOSEN BY THE SPEC, not by hand. `run_one.py` reads `H.level("vertex")` in
+        # three places, so okuda cannot run a mesh-free spec at all -- and all thirteen of these are
+        # `cell` + `mpm_particle`, the pure-MPM half of the prototype. Asking okuda anyway would
+        # burn thirteen GPU slots to collect thirteen identical KeyErrors. They compare core against
+        # core across the commit where every operator had landed, which is a real regression check
+        # and is labelled as one.
+        try:
+            has_mesh = "vertex" in (_y.safe_load(open(d)).get("sets") or {})
+        except Exception:
+            has_mesh = False
+        A = "okuda" if has_mesh else "core@cc52f512"
+        out.append(("ECM", f"ecm/{n}", None, 0.0, A, "core",
+                    f"archived rig {n}" + ("" if has_mesh else " (mesh-free: no okuda twin)")))
+    return out
+
+
+def suite_base(n_want=20):
+    """A ladder through `log/okuda/`, simple to complex, by operator count then frame count.
+
+    408 of the 408 archived `spec_run.yaml` load, so the constraint is GPU rather than
+    availability. Twenty spread across the range says more than twenty of the same size: the
+    cheapest rows catch a broken import in minutes and the dearest exercise fifteen operators over
+    1,800 frames.
+    """
+    import yaml as _y
+    cand = []
+    for d in sorted(glob.glob(os.path.join(ROOT, "log", "okuda", "*", "spec_run.yaml"))):
+        n = os.path.basename(os.path.dirname(d))
+        if n.startswith("promo_"):
+            continue
+        try:
+            c = _y.safe_load(open(d))
+            cand.append((len(c.get("operators") or []), int(c["general"]["n_frames"]), n))
+        except Exception:
+            continue
+    cand.sort()
+    if not cand:
+        return []
+    step = max(1, len(cand) // n_want)
+    pick = cand[::step][:n_want]
+    return [("BASE", f"base/{n}", None, 0.0, "okuda", "core",
+             f"{k} operators, {f} frames") for k, f, n in pick]
+
+
+SUITES = {"ECM": suite_ecm, "BASE": suite_base}
+
+
 def _spec_src(spec):
     """The source yaml for a PAIRS row, and the stem its run names are built from.
 
@@ -219,6 +297,12 @@ def _spec_src(spec):
     okuda corpus -- the four lifted gates live in `config/gates/`. A bare name is an okuda spec,
     which is what every row was until the gates arrived, so nothing existing changes.
     """
+    if spec.startswith("ecm/"):
+        n = spec.split("/", 1)[1]
+        return os.path.join(ROOT, "log", "okuda_ECM", n, "spec.yaml"), n
+    if spec.startswith("base/"):
+        n = spec.split("/", 1)[1]
+        return os.path.join(ROOT, "log", "okuda", n, "spec_run.yaml"), n
     if "/" in spec:
         folder, name = spec.split("/", 1)
         return os.path.join(ROOT, "config", folder, f"{name}.yaml"), name
@@ -564,12 +648,22 @@ def main():
     ap.add_argument("--compare-only", action="store_true",
                     help="do not submit; compare what is already in log/promotion/")
     ap.add_argument("--wait-min", type=float, default=90.0)
+    ap.add_argument("--batch", type=int, default=0,
+                    help="submit at most this many PAIRS at once (2 jobs each) and wait for a "
+                         "slot before the next; 0 = all at once")
+    ap.add_argument("--n-base", type=int, default=20, help="how many rows `--phase BASE` picks")
+    ap.add_argument("--no-compare-render", action="store_true",
+                    help="skip the side-by-side compare.png / compare.mp4")
     ap.add_argument("--tol", type=float, default=None,
                     help="override every row's absolute position tolerance "
                          "(0 = byte-identical, which is every row's default)")
     a = ap.parse_args()
 
-    pairs = [p for p in PAIRS if a.all or (a.phase is not None and str(p[0]) == str(a.phase))]
+    if a.phase in SUITES:
+        pairs = SUITES[a.phase]() if a.phase != "BASE" else SUITES[a.phase](a.n_base)
+        print(f"  suite {a.phase}: {len(pairs)} pair(s) generated from the archive")
+    else:
+        pairs = [p for p in PAIRS if a.all or (a.phase is not None and str(p[0]) == str(a.phase))]
     if not pairs:
         print("  no pair selected -- use --phase or --all"); return 2
 
@@ -590,10 +684,26 @@ def main():
 
     sys.stdout = _Tee()
     print(f"\n=== phase {_tag}: {len(pairs)} pair(s)", flush=True)
+
+    def _running():
+        """How many of THIS run's jobs are still in the queue."""
+        import cluster as C
+        st = C._ssh("bjobs -w 2>/dev/null | grep -c promo_ || true", timeout=30)
+        try:
+            return int((st.stdout or "0").strip().split()[0])
+        except Exception:
+            return 99                      # an unreachable login node is not an empty queue
+
     jobs = []
     for phase, spec, nfr, tol, sa, sb, what in pairs:
-        # --frames on the command line overrides every row; otherwise the row decides, and
-        # `None` on the row means the spec's own `general.n_frames`.
+        # BATCHED, BECAUSE THE QUEUE IS NOT INFINITE. Cedric: "you can run batch of 8 on l4". Forty
+        # pairs is eighty jobs; submitted at once they queue behind each other anyway and the first
+        # failure is invisible until the last one lands. A slot is a PAIR (two jobs), so `--batch 8`
+        # is sixteen jobs in flight -- and both sides of a pair still go in together, which is the
+        # protocol: the two sides must not be separated by an hour of drift in the tree they read.
+        if a.batch and not a.compare_only:
+            while _running() >= 2 * a.batch:
+                time.sleep(45)
         frames = a.frames if a.frames is not None else nfr
         try:
             names, pd = run_pair(phase, spec, sa, sb, what, frames, submit=not a.compare_only)
@@ -652,6 +762,24 @@ def main():
         bad += 0 if ok else 1
         rows.append(dict(phase=str(phase), spec=spec, a=sa, b=sb, ok=bool(ok), tol=rep["tol"],
                          digest_a=da, digest_b=db, why=rep["why"], report=rep, what=what))
+        # THE COMPARISON ITSELF, as one picture and one clip. Two directories each holding a movie
+        # is not a comparison: it is two movies, and telling them apart means opening both and
+        # holding one in your head. The digest says WHETHER they agree; this says where and how when
+        # they do not, which is the only reason to keep the pixels.
+        if not a.no_compare_render:
+            try:
+                sys.path.insert(0, os.path.join(ROOT, "src"))
+                import plexus.render_vtk as _R
+                if _R.available():
+                    ttl = (f"{spec}   A={sa}  B={sb}   {da} vs {db}   "
+                           + ("IDENTICAL" if ok else f"DIFFER: {rep['why'][:60]}"))
+                    lab = (f"A  {sa}", f"B  {sb}")
+                    _R.compare_still(dirs["A"], dirs["B"], os.path.join(pd, "compare.png"),
+                                     labels=lab, title=ttl)
+                    _R.compare(dirs["A"], dirs["B"], os.path.join(pd, "compare.mp4"),
+                               labels=lab, title=ttl)
+            except Exception as e:
+                print(f"  [{spec}] comparison render skipped ({type(e).__name__}: {str(e)[:60]})")
     print(f"\n  {'phase':6s} {'spec':26s} {'A':12s} {'B':8s} {'A digest':18s} {'B digest':18s} result")
     for r in rows:
         print(f"  {r['phase']:6s} {r['spec']:26s} {r['a']:12s} {r['b']:8s} "
