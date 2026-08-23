@@ -53,6 +53,24 @@ a comparison it never earned.
                      regenerated rather than remembered
     core             Plexus_Main.py -o generate, the promoted registry
 
+    SIDE A IS `okuda@0da57dd0` ON EVERY ROW THAT IS NOT MEASURING THE FLOOR
+    ----------------------------------------------------------------------
+`discovery_okuda/ops` is now 315 lines of re-export shims: its `cell_die`, `edge_flip` and the rest
+ARE the core's classes. So a row reading `okuda` vs `core` -- or `okuda@HEAD` vs `okuda` -- runs the
+SAME CODE ON BOTH SIDES and can only ever detect a divergence between two copies of one bug. It
+cannot detect a regression, because a regression moves both sides together.
+
+That is not hypothetical. `Hierarchy.renumber_set` guarded on `hasattr(self.levels, "get")`, and
+`levels` is an `nn.ModuleDict` WITH NO `.get`, so the method returned False having touched nothing on
+every call for the whole promotion; the cell chemistry of every run with a death in it was scrambled
+from the first extrusion, and NINETEEN ROWS WERE GREEN THROUGHOUT. The only row that caught it was
+the one pinned to a commit.
+
+`0da57dd0` is the last commit before the promotion touched an operator -- the code the archive in
+`log/okuda` was actually produced by. It is the reference. The `R` rows are the deliberate exception:
+they run one tree against itself because they measure the repeatability floor, and same-tree is the
+whole point of them.
+
     python tools/promotion_identical.py --phase 0        the pairs for one phase
     python tools/promotion_identical.py --all            everything in PAIRS
     python tools/promotion_identical.py --compare-only   skip submission, compare what is on disk
@@ -103,31 +121,31 @@ PAIRS = [
     # `tol` IS AN ABSOLUTE TOLERANCE ON POSITION in the spec's own units (world 80.0, cells of
     # radius ~5); 0 means byte-identical. It is set from the MEASURED repeatability floor -- the
     # `R` rows below -- and not from a number that looked reasonable.
-    (0,  "b_null_plain",         None, 0.0, "okuda@HEAD",  "okuda",  "mesh_seed, cell_mechanics, edge_flip, topo_record"),
+    (0,  "b_null_plain",         None, 0.0, "okuda@0da57dd0",  "okuda",  "mesh_seed, cell_mechanics, edge_flip, topo_record"),
     # A DEATH SPEC, because `b_null_plain` never calls `cell_die`. Removal is the first operation in
     # this engine that MOVES A ROW, so a renumber change gated only on that spec passes without
     # executing a line of what changed.
-    (0,  "apop_one",             None, 0.0, "okuda@HEAD",  "okuda",  "+ cell_die -> H.renumber_set: ONE row moves"),
+    (0,  "apop_one",             None, 0.0, "okuda@0da57dd0",  "okuda",  "+ cell_die -> H.renumber_set: ONE row moves"),
     # ---- the death scenes. One row moved is the correctness case and it is not the hard case.
     # `renumber_set` is a GATHER through `keep`, and these four ask progressively more of it: 200
     # rows out of order, then a patch, then nine bands, then most of the sheet. Each is an existing
     # okuda spec and each is a figure on the minisite, so `log/promotion/<spec>/` is both the gate's
     # evidence and the scene itself.
-    (0,  "apop_many",            None, 0.0, "okuda@HEAD",  "okuda",  "200 SCATTERED deaths -- an interleaved `keep`, not a truncation"),
-    (0,  "apop_patch_big",       None, 0.0, "okuda@HEAD",  "okuda",  "293 of 2000 in a 45-deg cap -> the surface is drawn INWARD (invagination 0.0369)"),
-    (0,  "apop_rings9",          None, 0.0, "okuda@HEAD",  "okuda",  "895 of 2000 in nine bands -> closes over every gap, stays a sphere (red_vol 0.9813)"),
-    (0,  "apopgeo_half",         None, 0.0, "okuda@HEAD",  "okuda",  "285 of 400 above the equator -> topology survives, sphere -> ellipsoid (gyr_prolate 1.869)"),
-    (0.5, "ecm_block",           None, 0.0, "okuda@HEAD",  "okuda",  "mpm_scatter/gather/grid_update/strain, ecm_seed, ecm_stress"),
+    (0,  "apop_many",            None, 0.0, "okuda@0da57dd0",  "okuda",  "200 SCATTERED deaths -- an interleaved `keep`, not a truncation"),
+    (0,  "apop_patch_big",       None, 0.0, "okuda@0da57dd0",  "okuda",  "293 of 2000 in a 45-deg cap -> the surface is drawn INWARD (invagination 0.0369)"),
+    (0,  "apop_rings9",          None, 0.0, "okuda@0da57dd0",  "okuda",  "895 of 2000 in nine bands -> closes over every gap, stays a sphere (red_vol 0.9813)"),
+    (0,  "apopgeo_half",         None, 0.0, "okuda@0da57dd0",  "okuda",  "285 of 400 above the equator -> topology survives, sphere -> ellipsoid (gyr_prolate 1.869)"),
+    (0.5, "ecm_block",           None, 0.0, "okuda@0da57dd0",  "okuda",  "mpm_scatter/gather/grid_update/strain, ecm_seed, ecm_stress"),
     # ---- Phase B: nine okuda operator files became two modules in `src/plexus/operators/`. Side A
     # is okuda BEFORE the move, side B okuda AFTER it, so what is under test is the MOVE, through
     # the runner that has always driven these operators. That is a necessary step and NOT the claim
     # the promotion is making -- `B-core` below is.
-    ("B", "b_gs_plain_soft_lo",  None, 0.0, "okuda@HEAD",  "okuda",  "+ seed_cell_chem/diffuse/react, cell_geometry, cell_neighbours"),
-    ("B", "b_star",              None, 0.0, "okuda@HEAD",  "okuda",  "+ cell_grow, cell_divide, interface_tension, cell_chem_from_shape"),
+    ("B", "b_gs_plain_soft_lo",  None, 0.0, "okuda@0da57dd0",  "okuda",  "+ seed_cell_chem/diffuse/react, cell_geometry, cell_neighbours"),
+    ("B", "b_star",              None, 0.0, "okuda@0da57dd0",  "okuda",  "+ cell_grow, cell_divide, interface_tension, cell_chem_from_shape"),
     # ---- B-core: THE ACTUAL CLAIM. `Plexus_Main.py -o generate` against `run_one.py`. Different
     # runner, different recorder, different writer -- the same numbers.
-    ("B-core", "b_gs_plain_soft_lo", None, 0.0, "okuda",   "core",   "the same run, from the core registry, no okuda import"),
-    ("B-core", "b_star",             None, 0.0, "okuda",   "core",   "the same run, from the core registry, no okuda import"),
+    ("B-core", "b_gs_plain_soft_lo", None, 0.0, "okuda@0da57dd0",   "core",   "the same run, from the core registry, no okuda import"),
+    ("B-core", "b_star",             None, 0.0, "okuda@0da57dd0",   "core",   "the same run, from the core registry, no okuda import"),
     # ---- R: THE REPEATABILITY FLOOR. Same spec, same code, same commit, same queue -- twice. Any
     # tolerance above must be set from what this measures, because a gate tighter than the platform's
     # own noise fails on runs that are correct, and a gate looser than it passes runs that are not.
@@ -138,9 +156,9 @@ PAIRS = [
     # okuda agree. These rows are the missing half: the same gate spec through `run_one.py` and
     # through `Plexus_Main.py`, both fresh, both on gpu_l4, compared array by array. A gate is only
     # promoted when both are true.
-    ("G", "gates/gate_00_spheroid",     None, 0.0, "okuda", "core", "the growth line: seed, geometry, grow, belt, mechanics, T1, divide, sync"),
-    ("G", "gates/gate_01_nosync",       None, 0.0, "okuda", "core", "gate 01's own arm: the belt WITHOUT the re-keying operator"),
-    ("G", "gates/gate_01_nomyosin",     None, 0.0, "okuda", "core", "gate 01's contrast arm: the same tissue with no belt"),
+    ("G", "gates/gate_00_spheroid",     None, 0.0, "okuda@0da57dd0", "core", "the growth line: seed, geometry, grow, belt, mechanics, T1, divide, sync"),
+    ("G", "gates/gate_01_nosync",       None, 0.0, "okuda@0da57dd0", "core", "gate 01's own arm: the belt WITHOUT the re-keying operator"),
+    ("G", "gates/gate_01_nomyosin",     None, 0.0, "okuda@0da57dd0", "core", "gate 01's contrast arm: the same tissue with no belt"),
     # ---- THE TWO MPM GATES HAVE NO OKUDA TWIN, and that is a fact about okuda's runner rather
     # than a gap in the promotion. `run_one.py` reads `H.level("vertex")` in three places -- the
     # heartbeat, the live snapshot and the cell ceiling -- so a spec with no mesh set dies with
@@ -149,7 +167,7 @@ PAIRS = [
     # real regression check, and it is labelled as that instead of being dressed up as agreement
     # with okuda. `cc52f512` is the commit at which every operator had landed in core.
     ("G", "gates/gate_02_ecm_block",    None, 0.0, "core@cc52f512", "core", "MLS-MPM: ecm_seed, the four-step cycle, ecm_stress, gravity (no okuda twin: mesh-free)"),
-    ("G", "gates/gate_04_tissue",       None, 0.0, "okuda", "core", "two-pool myosin + cytokinetic ring -- gate 04's regenerated pass 1"),
+    ("G", "gates/gate_04_tissue",       None, 0.0, "okuda@0da57dd0", "core", "two-pool myosin + cytokinetic ring -- gate 04's regenerated pass 1"),
     ("G", "gates/gate_04_spheroid_ecm", None, 0.0, "core@cc52f512", "core", "mesh_contact + mesh_inside on a prescribed surface (no okuda twin: mesh-free)"),
     # ---- REP: REPLICATION, on specs the CAMPAIGN wrote rather than specs a human did.
     # Every row above tests a spec somebody chose for the promotion; these three were emitted by
@@ -157,9 +175,9 @@ PAIRS = [
     # okuda work actually produced. A promotion that reproduces its own test set and not the corpus
     # it was built from has reproduced the tests. They also exercise the two RENAMED seed operators
     # (`seed_mesh`, `seed_cell_chem`) on the corpus that uses them, which is 324 of the 461 specs.
-    ("REP", "r010_00_ctrl",      None, 0.0, "okuda",       "core",   "a campaign control: 14 operators, 1800 frames"),
-    ("REP", "r020_00_ctrl",      None, 0.0, "okuda",       "core",   "round 20's control -- the best composition the search produced"),
-    ("REP", "r023_07",           None, 0.0, "okuda",       "core",   "15 operators; the run whose rerun reproduced it exactly (n_tubes 12, protr 1.765)"),
+    ("REP", "r010_00_ctrl",      None, 0.0, "okuda@0da57dd0",       "core",   "a campaign control: 14 operators, 1800 frames"),
+    ("REP", "r020_00_ctrl",      None, 0.0, "okuda@0da57dd0",       "core",   "round 20's control -- the best composition the search produced"),
+    ("REP", "r023_07",           None, 0.0, "okuda@0da57dd0",       "core",   "15 operators; the run whose rerun reproduced it exactly (n_tubes 12, protr 1.765)"),
     # ---- BISECT: r023_07 against okuda BEFORE the promotion. The REP row compared current-okuda
     # to current-core and they agreed -- but the archived run of the same spec is healthy (12,608
     # cells, no extinction) and both of mine are NaN from frame 889 (2,995 cells). A twin where both
@@ -169,8 +187,8 @@ PAIRS = [
     # can say so -- every other comparison has both sides on the current tree, which is exactly how
     # a change that moved BOTH sides stayed invisible for nineteen green rows.
     ("BISECT", "r023_07",        None, 0.0, "okuda@0da57dd0", "core", "pristine baseline vs the fixed core"),
-    ("C", "01c_tissue",          None, 0.0, "okuda",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
-    ("D", "04_spheroid_ecm_pass2", None, 0.0, "okuda",     "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
+    ("C", "01c_tissue",          None, 0.0, "okuda@0da57dd0",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
+    ("D", "04_spheroid_ecm_pass2", None, 0.0, "okuda@0da57dd0",     "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
 ]
 
 # The default for a row that asks for neither: short enough to sit in a per-phase loop, long enough
@@ -292,7 +310,13 @@ def suite_base(n_want=20):
         return []
     step = max(1, len(cand) // n_want)
     pick = cand[::step][:n_want]
-    return [("BASE", f"base/{n}", None, 0.0, "okuda", "core",
+    # SIDE A IS THE PRISTINE BASELINE, NOT THE LIVE OKUDA TREE. `discovery_okuda/ops` is now 315
+    # lines of re-export shims: its `cell_die` and `edge_flip` ARE the core's, so a row comparing
+    # `okuda` against `core` runs the same code twice and can only detect a divergence between two
+    # copies of one bug. That is exactly how the broken `renumber_set` stayed green for nineteen
+    # rows. `0da57dd0` is the last commit before the promotion touched an operator, and it is the
+    # reference the archive was produced by -- it is the only side A that can catch a regression.
+    return [("BASE", f"base/{n}", None, 0.0, "okuda@0da57dd0", "core",
              f"{k} operators, {f} frames") for k, f, n in pick]
 
 
