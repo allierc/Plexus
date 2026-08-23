@@ -1,5 +1,5 @@
 ---
-title: "The language"
+title: "Language"
 subtitle: "A typed intermediate representation for biological mechanisms"
 ---
 

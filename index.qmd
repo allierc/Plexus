@@ -61,8 +61,7 @@ operator kinds. The proposed algebra consists of **eight**:
 
 The first four kinds transform the state of a set and Field that of a field, all while
 preserving the underlying organization; Rewire modifies the interaction graph; Structural
-modifies the entities themselves; Seed writes what the others evolve. The full algebra — with typed signatures and the reference
-implementation — is on **[The language](language.qmd)**.
+modifies the entities themselves; Seed writes what the others evolve. Details in **[Language](language.qmd)**.
 
 ## Composing mechanisms
 
@@ -4923,7 +4922,7 @@ descriptions:
 
 ## Read the blueprint
 
-- **[The language](language.qmd)** — the full framework mirrored section by section:
+- **[Language](language.qmd)** — the full framework mirrored section by section:
   the four concepts, the eight-kind operator algebra, numerical implementations,
   mechanistic inverse modelling, agentic discovery, and the operator atlas.
 - **[Optimization](optimization.qmd)** — a slime-style foraging colony tuned end-to-end
