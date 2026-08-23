@@ -110,7 +110,13 @@ def test_snapshot_is_topology_only():
     print("\nsnapshot records topology and nothing else")
     m = _mesh(3)
     s = m.snapshot()
-    check(sorted(s) == ["E_face", "E_srce", "E_trgt", "Nv", "nF"], f"keys: {sorted(s)}")
+    # TOPOLOGY PLUS THE DECLARED PER-FACE NAMES. `snapshot` was topology-only until Phase E; it now
+    # also carries `MeshTable.FACE_RECORD` (A0, P0, V0f, age, ndiv, apop, inhib, myo_med) because a
+    # renderer cannot colour by a quantity that existed only inside one frame's forward pass. The
+    # assertion is the CONTRACT, not the shape of one fixture: reserved keys always, plus exactly
+    # those FACE_RECORD names the table actually holds.
+    want = {"E_srce", "E_trgt", "E_face", "nF", "Nv"} | (set(MeshTable.FACE_RECORD) & set(m))
+    check(set(s) == want, f"keys: {sorted(s)} vs expected {sorted(want)}")
     check(isinstance(s["nF"], int) and isinstance(s["E_srce"], np.ndarray),
           "counts are ints, arrays are numpy -- the shape every offline reader expects")
 
@@ -125,16 +131,23 @@ def test_renumber_set_moves_every_store():
     """
     print("\nrenumber_set moves state, occ, delta and block deltas")
     import torch as T
+    import torch.nn as nn
     from plexus.models.base import Hierarchy
-    H = Hierarchy.__new__(Hierarchy)          # no engine needed: only the stores are exercised
+    # THE REAL CONSTRUCTOR, so `levels` is the real `nn.ModuleDict`. The previous fixture did
+    # `Hierarchy.__new__` + `H.levels = {"cell": lvl}` -- a PLAIN DICT, which has `.get` where a
+    # ModuleDict does not. `renumber_set` guarded on `hasattr(levels, "get")`, so this test
+    # exercised the live branch while every real call took the dead one and returned False. It
+    # passed for the whole promotion while the chemistry of every run with a death in it was
+    # silently scrambled. A fixture that cannot reproduce production is not a test.
+    H = Hierarchy()
     H._delta, H._delta_blocks = {}, {}
 
-    class _L:
+    class _L(nn.Module):
         pass
     lvl = _L()
     lvl.state = T.tensor([[0.0], [1.0], [2.0], [3.0]])
     lvl.occ = T.ones(4)
-    H.levels = {"cell": lvl}
+    H.levels["cell"] = lvl
     H._delta["cell"] = T.tensor([[10.0], [11.0], [12.0], [13.0]])
     H._delta_blocks["cell"] = {"myo": T.tensor([[20.0], [21.0], [22.0], [23.0]])}
 

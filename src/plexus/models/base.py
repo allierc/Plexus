@@ -546,7 +546,23 @@ class Hierarchy(nn.Module):
         be a different behaviour, and the promotion is gated on bit-equality.
         """
         import numpy as _np
-        lvl = self.levels.get(level_name) if hasattr(self.levels, "get") else None
+        # `nn.ModuleDict` HAS NO `.get`, AND THIS LINE USED TO CALL IT. `Hierarchy.levels` is an
+        # `nn.ModuleDict`; `hasattr(levels, "get")` is False; so `lvl` was None on EVERY call and
+        # this method returned False having touched nothing. The promotion did not move the
+        # renumber into the engine -- IT DELETED IT, and it deleted more than the pending deltas:
+        # the `state` and `occ` permutes went with them.
+        #
+        # HOW IT SURVIVED THE TESTS. `tools/test_mesh_carry.py` built its fixture as
+        # `H.levels = {"cell": lvl}` -- a plain dict, which DOES have `.get`. The test exercised the
+        # live branch while production took the dead one, and passed. The fixture is a real
+        # `ModuleDict` now, so the two cannot diverge again.
+        #
+        # WHAT IT COST. From the first death, the cell set's `chem` no longer lines up with the
+        # faces. `cell_geometry` rewrites `cen`, `area` and `occ` from `nF` every tick, so those
+        # self-heal a tick later; `chem` has no rewriter and stays permanently mis-indexed. On
+        # r023_07 the two sides run bit-identical through the first two extrusions and diverge at
+        # the third, and the activator goes non-finite at frame 889.
+        lvl = self.levels[level_name] if level_name in self.levels else None
         if lvl is None or getattr(lvl, "state", None) is None:
             return False
         n = int(len(keep) if n_new is None else n_new)
