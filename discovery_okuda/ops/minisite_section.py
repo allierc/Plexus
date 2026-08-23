@@ -495,10 +495,7 @@ def build(runs):
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
     return f"""{BEGIN}
 <h3>Vertex + MPM</h3>
-<p class="opk">Two Levels, two solvers, one interface: a <b>triangulated surface</b> with mass and
-springs, pressed into a <b>block of MPM material</b> and coupled particle-to-face, so the reaction
-returns to the mesh and not only to the material. Three loadings — <b>press</b>, <b>drag</b>,
-<b>breach</b>. Each clip plays the 3D view, then a cross-section.</p>
+<p class="opk">The previous representations can themselves be composed. A <b>triangulated surface</b> and an <b>MPM material</b> remain distinct entities, with different states and different mechanical implementations, but interact through an explicit interface that transfers contact forces in both directions. Pressing, dragging and breaching therefore couple two mechanical descriptions without collapsing them into a common solver. This is the computational pattern needed to compose heterogeneous biological structures.</p>
 <p class="opk-ref">Reference — contact:
 <a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over
 grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>),
@@ -554,7 +551,7 @@ def build4(runs):
 
 
 def build3(runs, runs2=()):
-    """Spheroid + basement membrane + matrix, and the second row when there is one to show."""
+    """Cell tissue + basement membrane + matrix, and the second row when there is one to show."""
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
     row2 = "" if not runs2 else f"""
 <p class="opk">And with a random source rather than a cap \u2014 arrested, then not:</p>
@@ -562,8 +559,8 @@ def build3(runs, runs2=()):
 {chr(10).join(card(v, n, sp, c) for _, v, n, sp, c in runs2)}
 </div>"""
     return f"""{BEGIN3}
-<h3>Spheroid + basement membrane + extracellular matrix</h3>
-<p class="opk">Cells grow a spheroid, deform its basement membrane, and interact with the surrounding matrix. At the lowest level, these interactions are governed by proteases, integrins and myosins dynamics.</p>
+<h3>Cell tissue + basement membrane + extracellular matrix</h3>
+<p class="opk">The pieces are finally recomposed into a <b>hierarchical biological model</b>. Cells grow and divide to form a cell tissue; the tissue deforms a distinct basement membrane; the membrane and cells interact mechanically with the surrounding extracellular matrix. At a lower level, proteases, integrins and myosins regulate these interactions. Mechanisms therefore act both <b>within levels and across levels</b>, while cells, membrane, matrix and molecular states retain their own representations and dynamics. Plexus composes these heterogeneous pieces into one differentiable system rather than requiring them to become one kind of entity or one numerical solver.</p>
 <p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
