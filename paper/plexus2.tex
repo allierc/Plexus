@@ -51,12 +51,27 @@
 % extend and fit to experimental observations.
 
 We introduce \emph{Plexus}, a typed intermediate representation for biological
-mechanisms. Rather than defining yet another simulator, Plexus defines a common
-language whose primary objects are biological operators. Every operator
-specifies the biological entities it acts upon, the states it requires, the
-relations between these entities, and one or more numerical implementations.
-The Plexus research program has three objectives. First, to define an algebra of biological operators. Second, to decompose the existing corpus of
-simulation models into this common language. Third, to construct differentiable implementations of these operators so that mechanistic models can be directly inferred from biological data.
+models. Rather than defining yet another simulator, Plexus defines a common
+language that decomposes a biological system along two axes at once: \emph{what
+exists} --- heterogeneous entities, the states they carry, the relations between
+them and the levels that organize them --- and \emph{what happens} --- the
+mechanisms acting on them. Neither axis is subordinate to the other. A mechanism
+such as adhesion has no meaning apart from what is adhering to what, and a model
+of a tissue, its basement membrane and the surrounding matrix is informative
+precisely because those remain distinct kinds of entity rather than being
+flattened into variables of one universal object. Every operator therefore
+declares the entities it acts upon, the states it requires, the relations it
+needs, and one or more numerical implementations, while a hierarchy of levels
+keeps heterogeneous entities, fields and relations organized rather than merged.
+Decomposition serves recomposition: the purpose is to take existing models apart
+into reusable pieces and to build new biological compositions from them, which
+in turn requires the language that specifies a model to be separated from the
+interpreter that executes it. The Plexus research program has three objectives.
+First, to define an algebra of biological operators over these organized
+entities. Second, to decompose the existing corpus of simulation models into this
+common language. Third, to construct differentiable implementations of these
+operators so that mechanistic models can be directly inferred from biological
+data.
 
 \end{abstract}
 
@@ -68,10 +83,38 @@ chemical transport, particle and continuum methods model mechanics, while
 vertex, Cellular Potts and active-matter models describe multicellular tissues.
 These frameworks remain however largely incompatible. Combining electrical signalling, mechanics, metabolism and development often requires coupling multiple specialized simulators whose underlying abstractions differ fundamentally. Each simulator introduces its own representation of biological mechanisms, making models difficult to compare, compose and extend. This fragmentation is not primarily a numerical problem but more a language problem.
 
-Instead of treating simulation frameworks as fundamental, we treat biological mechanisms as the primary objects. To this aim, Plexus introduces an intermediate representation whose central elements are biological operators. Operators describe mechanisms such as adhesion, diffusion, division, chemotaxis, electrical propagation or active stress independently of their numerical implementation. In this perspective, biological modeling becomes analogous to compiler design.
-Just as modern compilers separate programming languages from their
-implementations through an intermediate representation, Plexus separates
-biological mechanisms from their numerical implementations.
+Instead of treating simulation frameworks as fundamental, we treat the biological
+system itself as the object to be decomposed. A biological system must be
+decomposed not only into mechanisms, but also into the entities those mechanisms
+act upon. These entities are heterogeneous --- receptors, signalling proteins,
+cells, extracellular matrices, tissues, fields --- and they are organized across
+biological levels. Plexus makes that organization explicit as a compositional
+hierarchy: each level carries its own entities and states, operators act between
+entities within a level, and Aggregate and Broadcast connect levels by mapping
+state upward and downward. Decomposition therefore does not flatten biology into
+a single collection of variables; it preserves the organization through which
+mechanisms at one level are composed with mechanisms at another.
+
+On the mechanism side, Plexus introduces biological operators: adhesion,
+diffusion, division, chemotaxis, electrical propagation or active stress,
+described independently of their numerical implementation. Entities and operators
+are the two halves of one decomposition, and neither is primary. An operator is
+typed by the entities, states and relations it requires, and a set of entities is
+inert until operators act on it.
+
+The purpose of this decomposition is ultimately recomposition: to construct
+complete mechanistic models from reusable entities and operators, rather than
+merely to classify the mechanisms of existing simulators. Making such
+compositions executable requires a strong structural choice --- the language that
+specifies a biological model must be separated from the code that interprets and
+executes it. The language declares entities, states, relations, hierarchy and
+operators; the interpreter resolves that description into concrete numerical
+implementations and schedules their execution. In this perspective, biological
+modelling becomes analogous to compiler design: just as modern compilers separate
+programming languages from their implementations through an intermediate
+representation, Plexus separates biological mechanisms and their organization
+from the numerical methods that realize them. The analogy is a consequence of
+wanting free recomposition, not the premise it starts from.
 
 This viewpoint defines a broader research program. First, Plexus seeks to construct an algebra of biological operators whose elements can be composed into complex dynamical systems, compared through their observable consequences, and expanded as new mechanisms are discovered. Second, Plexus aims to extract this operator algebra from the existing corpus of biological simulation models. Rather than viewing current frameworks as competing simulators, we regard them as repositories of reusable mechanisms. By decomposing these models into a common language, we seek to identify a compact vocabulary capable of expressing a wide range of biological dynamics across scales. Third, Plexus constructs differentiable counterparts of these operator compositions. Differentiability allows mechanistic models to be fitted directly to biological data, residuals to be interpreted mechanistically, and missing operators intuited. 
 
@@ -81,11 +124,15 @@ Finally, because biological mechanisms are represented in a formal language rath
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{The language}
 
-Plexus defines a typed language for expressing biological mechanisms
-independently of their numerical realization. The language is built around four
-fundamental concepts: \emph{operators}, \emph{sets}, \emph{states}, and
-\emph{fields}. Biological models are therefore represented as compositions of
-operators acting on discrete and continuous biological objects rather than simulator-specific algorithms.
+Plexus defines a typed language for expressing biological models independently of
+their numerical realization. The language names \emph{what exists} --- the
+\emph{sets} of entities, the \emph{states} they carry, the \emph{fields} they live
+in, the \emph{relations} between them and the \emph{hierarchy} that organizes them
+--- and \emph{what happens} --- the \emph{operators} that transform them.
+Biological models are therefore represented as compositions of operators acting on
+organized discrete and continuous biological objects rather than as
+simulator-specific algorithms. The following subsections take these in turn:
+operators, sets, states, fields, and the hierarchy that holds them.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Operators}
@@ -112,13 +159,31 @@ neurons, or how cells relate to a continuous field. Plexus incorporates maps int
 \subsection{Sets}
 
 Sets represent collections of biological entities. Examples include genes,
-proteins, cells, neurons, synapses, tissues, organs and organisms.
-Sets naturally organize into hierarchies reflecting biological organization.
-Genes regulate proteins, proteins determine cellular behaviour, cells assemble
-into tissues, tissues form organs, and organs compose organisms. Each level is
-represented uniformly as a set, allowing the same language to describe
-intracellular signalling, multicellular mechanics, developmental processes and
-organ-level physiology.
+proteins, cells, neurons, synapses, tissues, organs and organisms. A set is
+homogeneous in kind: its elements share one state schema and one biological
+interpretation.
+
+Sets organize into hierarchies reflecting biological organization, but a level of
+that hierarchy is \emph{not} a single set, and this is the point at which a
+familiar simplification has to be resisted. Writing the hierarchy as a chain
+$S_0 \to S_1 \to S_2 \to S_3$ --- molecules, then cells, then tissues, then
+organism --- suggests one biological category per level. Biology is not so
+uniform. A cell contains receptors, signalling proteins, cytoskeletal elements
+and, in a mechanical model, material points; a tissue contains cells, a basement
+membrane and an extracellular matrix. Each of those is a distinct set with its own
+state and its own operators, and all of them share a parent. A level is therefore
+a heterogeneous collection
+
+\[
+L_k = \{\, S_k^1, S_k^2, \ldots,\; F_k^1, F_k^2, \ldots,\; R_k^1, R_k^2, \ldots \,\},
+\]
+
+of sets $S_k^i$, fields $F_k^j$ bound to that level, and relations $R_k^l$ among
+them. The hierarchy organizes these objects; it does not define them by a single
+molecule/cell/tissue label. Each level is expressed in the same language,
+allowing intracellular signalling, multicellular mechanics, developmental
+processes and organ-level physiology to be described without translation between
+formalisms.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{States}
@@ -140,6 +205,54 @@ Fields complement sets. While sets describe discrete biological entities,
 fields describe the continuous environment in which these entities evolve.
 Operators couple sets and fields through explicit maps relating discrete
 entities to continuous spatial representations.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Hierarchy}\label{sec:hierarchy}
+
+Containment is declared, not implied. A set may be contained in another ---
+proteins in a cell, cells in a tissue, tissues in an organism --- through an
+explicit map $\pi$ from children to parent. A parent may contain several distinct
+sets at once: the same cell can hold receptors, signalling proteins, cytoskeletal
+elements and material points, each remaining a distinct object with its own state
+and its own operators while sharing that parent. Every level carries its own
+state, its own operators and its own rate, so no level is reduced to a parameter
+of the level above it.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.92\textwidth]{fig_hier.pdf}
+\caption{The hierarchy. Each level holds several \emph{distinct} sets (blue) and
+may carry its own fields (green); operators (red) act between entities within a
+level, and exactly two families cross a level --- Aggregate, $\sum_\pi$, and
+Broadcast, $\pi^{*}$.}
+\label{fig:hier}
+\end{figure}
+
+Operators act within a level or across levels. Within a cell, operators may
+couple receptors to signalling proteins to cytoskeleton. Across the containment
+map, exactly two families apply: \textbf{Aggregate} builds parent state from
+children --- a cell position from its material points, a neuron input from its
+synapses --- and \textbf{Broadcast} propagates parent state to children --- a
+material property to every point a cell owns, or a constraint imposed by the
+parent. Formally,
+
+\[
+L_k \;\xrightarrow{\ \text{Aggregate}\ }\; L_{k+1},
+\qquad
+L_{k+1} \;\xrightarrow{\ \text{Broadcast}\ }\; L_k .
+\]
+
+Fields are level-specific in the same way. Exchange couples a set to a field at
+its own level, so a molecular concentration field, a cellular morphogen field and
+a tissue-scale mechanical grid coexist as distinct objects rather than being
+merged into one grid.
+
+The consequence is that molecules, cells and tissues are not a pipeline of
+separate simulators handing results to one another. They are one compositional
+graph: several sets may coexist inside each parent, operators connect them
+locally, and Aggregate and Broadcast connect the levels. The same operator
+families are reused throughout, so adding a biological scale adds no machinery to
+the engine.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -289,13 +402,45 @@ biological entities, whereas Die removes existing ones. These operators modify
 the biological organization itself rather than only its state.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Composing biological mechanisms}
+\section{Composition}
 
-Biological models are expressed as compositions of elementary operators.
+A biological model is built by composition, and composition happens in four
+distinct ways. Each answers a different question, and a model is complete only
+when all four are answered.
+
+\begin{enumerate}
+\item \textbf{Entities compose into structures.} Sets, the states they carry and
+the relations declared between them form the objects a model is about: a
+membrane is a set of faces with an incidence relation, a connectome is a neuron
+set with an edge-set over it, a tissue is a cell set with a containment map to
+its molecules. This composition is structural and is fixed by the specification
+before any dynamics run.
+
+\item \textbf{Mechanisms compose within a level.} Several operators may act on
+the same set, each contributing its own increment: adhesion and active stress on
+one cell set, diffusion and reaction on one chemical field. Because operators are
+typed by what they read and write rather than by the simulator they came from,
+mechanisms from different modelling traditions may act side by side on the same
+entities.
+
+\item \textbf{Levels compose through Aggregate and Broadcast.} A mechanism
+written at one level reaches another only through the containment map of
+Section~\ref{sec:hierarchy}, $L_k \to L_{k+1}$ upward and $L_{k+1} \to L_k$
+downward. This is what allows a molecular mechanism and a tissue-scale mechanism
+to belong to one model without either being rewritten in the other's terms.
+
+\item \textbf{Mechanisms compose in time.} The three compositions above say what
+acts on what; the \emph{schedule} says in which order and how often.
+\end{enumerate}
+
+The first three are the subject of the preceding sections. The remainder of this
+section formalizes the fourth.
+
 Rather than embedding all mechanisms within a monolithic simulator, Plexus
-represents a model as an ordered sequence of operator applications. This sequence, called the \emph{schedule}, specifies both the order and the
-frequency with which operators are evaluated. Formally, one simulation step is
-the composition
+represents a model as an ordered sequence of operator applications. This
+sequence, called the \emph{schedule}, specifies both the order and the frequency
+with which operators are evaluated. Formally, one simulation step is the
+composition
 
 \[
 \Phi
@@ -934,6 +1079,19 @@ a comprehensive atlas of biological operators by systematically analysing the
 existing corpus of biological simulation models. Rather than cataloguing
 simulators, the atlas catalogues reusable biological mechanisms together with
 their numerical implementations.
+
+Decomposition is not the objective; it is the first half of one. Taking
+PhysiCell, Tyssue, a material-point solver or a neural simulator apart into
+operators, entities and relations is worth doing because those pieces can then be
+put back together in combinations none of the original frameworks could express
+--- a growing cell tissue that deforms a basement membrane embedded in an
+extracellular matrix, with molecular mechanisms regulating the interface, is
+exactly such a recomposition, and none of its parts had to be rewritten in
+another part's terms. The atlas is therefore read as
+\[
+\text{existing models}\;\longrightarrow\;\text{common pieces}\;\longrightarrow\;\text{new biological compositions},
+\]
+with the second arrow, not the first, as the point of the exercise.
 
 This atlas serves two complementary purposes. First, it provides the biological
 vocabulary from which new models are assembled. Second, it defines the search
