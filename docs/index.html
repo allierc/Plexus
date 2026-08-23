@@ -394,10 +394,10 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_two_chem.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_two_beta.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">two chemistries<span class="sim-spec"><pre>general:
-  name: promo_TURING_atlas_turing2d_coupled_B
+  name: promo_TURING_atlas_turing2d_two_beta_B
   seed: 0
   n_frames: 6000
   record_cap: 602
@@ -456,14 +456,18 @@ operators:
   chan: 2
 - op: cell_chem_react
   at: cell
-  model: gray_scott_coupled
-  chan: 0
+  model: gray_scott
   F: 0.046
   kk: 0.062
-  F2: 0.026
-  kk2: 0.055
-  gamma: 0.2
   rate: 1.0
+  chan: 0
+- op: cell_chem_react
+  at: cell
+  model: gray_scott
+  F: 0.026
+  kk: 0.051
+  rate: 1.0
+  chan: 2
 schedule:
 - cell_chem_seed
 - cell_chem_seed
@@ -471,10 +475,11 @@ schedule:
 - cell_chem_diffuse
 - cell_chem_diffuse
 - cell_chem_react
+- cell_chem_react
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">two chemistries on the same cells, each with its own seed, diffusion and reaction, coupled through the reaction term</span>
+      <span class="sim-cap">two chemistries on the same cells, each with its own seed, diffusion and reaction — two Gray–Scott systems side by side rather than one</span>
     </figcaption>
   </figure>
 </div>
