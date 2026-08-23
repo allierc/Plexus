@@ -81,6 +81,49 @@ Check the comparison before blaming the model. Three of the DIFFERs so far were 
 And check the run before blaming the promotion: `r023_07` is half NaN from frame 889 **on both
 sides**, and its own `diag.json` records that and stamps `valid_evidence: True` anyway.
 
+## What a green row does not prove — the renumber_set defect, 23 August
+
+Nineteen rows were green while the promotion was silently scrambling the chemistry of every run
+that killed a cell. The defect is written up here rather than only in a commit message because
+**the code fix landed in `7347c4d2`, whose subject is about a figure** — a concurrent session ran a
+broad `git add -A` and swept the staged files into its own commit. `git log --oneline` will not
+lead anyone here.
+
+`Hierarchy.renumber_set` opened with
+
+```python
+lvl = self.levels.get(level_name) if hasattr(self.levels, "get") else None
+```
+
+and `Hierarchy.levels` is an **`nn.ModuleDict`, which has no `.get`**. The guard was False on every
+call, so the method returned False having touched nothing, and both call sites discarded the bool.
+Promotion step 3 did not move the per-death renumber into the engine — it deleted it, and with it
+all three permutes: `state`, `occ`, and the pending deltas.
+
+**Why one spec and not the others.** It needs a death operator *and* chemistry. `cell_geometry`
+rewrites `cen`, `area` and `occ` from `nF` every tick, so those self-heal a tick later; `chem` has
+no rewriter and stays mis-indexed for good. `r023_07` went non-finite at frame 889 and froze at
+2,995 cells against the archive's 12,608. `r020_00_ctrl` is the same spec minus `cell_die`, and was
+clean throughout.
+
+**Three things that should have caught it, and why none did.**
+
+* **The unit test** built its fixture as `H.levels = {"cell": lvl}` — a plain dict, **which does
+  have `.get`**. It drove the live branch while production drove the dead one. *A fixture that
+  cannot reproduce production is not a test:* `tools/test_mesh_carry.py` now constructs a real
+  `Hierarchy()`, and fails without the fix.
+* **The twin rows.** Every row but phase 0 had *both sides on the current tree*, so a change that
+  moved both sides identically was invisible. **A suite of same-tree rows cannot detect a
+  regression, only a divergence.** At least one row per phase must pin side A to a commit — the
+  `BISECT` row (`okuda@0da57dd0` vs `core`) is that row, and it is the one that proved the fix.
+* **The return value.** `renumber_set` reported failure by returning False and nobody looked. Both
+  call sites now check it, print what a silent failure means, and increment `renumber_failed`,
+  which is in `MeshTable.SCALAR_RECORD` — **so a gate can assert it is 0 instead of a human having
+  to notice a printed line.**
+
+**What this costs the record:** every gate row and every twin row graded before 23 August was
+produced with the broken renumber, and none of them counts until it is re-run.
+
 ## The floor
 
 Byte-identity is the criterion because the platform delivers it: two runs of one spec, same code,
