@@ -934,6 +934,9 @@ def main():
     ap.add_argument("--sides", default=None,
                     help="submit only side A or only side B (default: both, which is the protocol). "
                          "For repairing one dead side while the other is still in flight.")
+    ap.add_argument("--skip", default=None,
+                    help="drop rows whose spec name contains any of these comma-separated "
+                         "substrings (the inverse of --only)")
     ap.add_argument("--only", default=None,
                     help="keep only rows whose spec name contains this substring, so one row can be "
                          "re-run without re-running its whole phase")
@@ -957,6 +960,14 @@ def main():
     if a.only:
         pairs = [p for p in pairs if a.only in str(p[1])]
         print(f"  --only {a.only!r}: {len(pairs)} row(s) kept")
+    # THE INVERSE, for the case `--only` cannot express: re-verifying a whole phase while a couple
+    # of its rows are already in flight. Resubmitting those would collide in the same output
+    # directory and discard the runs under way, and the rows left over share no substring.
+    if a.skip:
+        _drop = [x.strip() for x in a.skip.split(",") if x.strip()]
+        before = len(pairs)
+        pairs = [p for p in pairs if not any(d in str(p[1]) for d in _drop)]
+        print(f"  --skip {a.skip!r}: {before - len(pairs)} row(s) dropped, {len(pairs)} kept")
     if not pairs:
         print("  no pair selected -- use --phase or --all"); return 2
 
