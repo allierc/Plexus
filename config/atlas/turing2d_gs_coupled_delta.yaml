@@ -1,0 +1,95 @@
+# turing2d_gs_coupled_delta -- `turing2d_two_delta` WITH the cross term. The coupled twin of the independent run.
+#
+# Derived from `turing2d_coupled`, with system B moved to Pearson's delta point (0.03, 0.055) --
+# the same point `turing2d_two_delta` runs it at independently and `turing2d_gs_delta` runs it
+# at alone. Three specs, one reaction point, three degrees of company:
+#
+#     turing2d_gs_delta      B's motif by itself
+#     turing2d_two_delta     B's motif sharing the cells with A, no chemistry between them
+#     turing2d_gs_coupled_delta   B's motif with A actively suppressing its activator
+#
+# so the difference between the first two is competition for SPACE and between the last two is
+# competition for CHEMISTRY. Neither is separable from a single run.
+#
+# gamma is 0.2. At the equilibrium the uncoupled pair settles into, the autocatalysis u*a^2 is
+# about 0.020 and gamma*a1*a2 is about 0.029*gamma, so this puts the cross term near 30% of growth
+# -- enough to exclude, not enough to sterilise. At gamma 1.0 both systems went extinct by frame
+# 600, which is the measurement that set this number.
+general:
+  name: turing2d_gs_coupled_delta
+  seed: 0
+  n_frames: 6000
+  record_cap: 602
+  dt: 1.0
+  dim: 2
+  boundary: free
+  world:
+  - 49.4
+  - 49.4
+sets:
+  cell:
+    n: 4000
+    spawn: sunflower
+    spawn_radius: 19.0
+    state:
+      pos:
+        width: 2
+        integration: none
+        boundary: free
+      chem:
+        width: 4
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: cell_chem_seed
+  at: cell
+  seed: 0
+  before_frame: 3
+  mode: scatter
+  seed_frac: 0.12
+  chan: 0
+- op: cell_chem_seed
+  at: cell
+  seed: 2
+  before_frame: 3
+  mode: scatter
+  seed_frac: 0.12
+  chan: 2
+- op: radius_graph
+  at: cell
+  radius: 0.95
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.3
+  chan: 0
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.03
+  d_h: 0.16
+  chi: 1.3
+  chan: 2
+- op: cell_chem_react
+  at: cell
+  model: gray_scott_coupled
+  chan: 0
+  F: 0.046
+  kk: 0.062
+  F2: 0.03
+  kk2: 0.055
+  gamma: 0.2
+  rate: 1.0
+schedule:
+- cell_chem_seed
+- cell_chem_seed
+- radius_graph
+- cell_chem_diffuse
+- cell_chem_diffuse
+- cell_chem_react
+plotting:
+  background: black
+  dot_fill: 0.9
