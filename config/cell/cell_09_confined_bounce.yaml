@@ -153,6 +153,8 @@ schedule:
   - mpm_gather
   - mpm_gather
   - mpm_gather
+  capture: true
+  compile: true
 plotting:
   background: black
   colors:
