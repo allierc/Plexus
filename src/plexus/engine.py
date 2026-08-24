@@ -60,6 +60,7 @@ import plexus.operators        # noqa: F401  self-registers the operator library
 import plexus.models.entities  # noqa: F401  self-registers entity state-schemas
 from plexus.models.entities import DEFAULT_STATE_SCHEMA, DEFAULT_RENDER
 from plexus.schema import Spec, Selector
+from plexus.paths import warn
 
 # per-species display colours when the spec's plotting block names none (Lague's RGBA)
 _DEFAULT_FIELD_COLORS = [
@@ -1166,6 +1167,28 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
              o.on,
              _gate(o))                                   # multi-rate cadence: run only when tick % every == 0
             for o in sim.operators]
+
+    # WHICH SCATTER CLEARS THE SHARED GRID, decided once, here, instead of every substep.
+    #
+    # Several particle sets can scatter into one `mpm_grid` -- that is what makes a composed cell
+    # one body rather than several passing through each other -- so the FIRST scatter of a substep
+    # must zero the grid and every later one must add to it. That question used to be answered at
+    # run time by comparing a counter on the Hierarchy against a stamp on the field. It worked, but
+    # it is a per-substep side effect, and a side effect is exactly what a replayed CUDA graph
+    # cannot reproduce: the replay would re-run whichever branch was live at capture time.
+    #
+    # It never needed to be dynamic. The engine binds the i-th OCCURRENCE of a schedule token to
+    # the i-th INSTANCE of that operator, and instance order is declaration order, so "the first
+    # scatter into grid G" is a fixed property of the spec. Stamped on the instance, it is a python
+    # constant the graph can bake in.
+    _first_into = set()
+    for _nm, _ob, _sel, _g in inst:
+        if _nm not in ("mpm_scatter", "p2g"):
+            continue
+        _grid = getattr(_ob, "to", "mpm_grid")
+        _ob._zeroes_grid = _grid not in _first_into
+        _first_into.add(_grid)
+
     rec_index, rec_sets, occ_sets, rec_state, rec_mesh, fstride, rec_fields = _setup_recording(sim, H)
     # LIVE BUFFERS ON H, so an interrupted run can still be assembled -- see _assemble.
     # THE SALVAGE HANDLE. `run_one.py:576` does `_E._assemble(Hf, *Hf._rec, n_rows=_rows)` when a
@@ -1197,6 +1220,90 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     for _i, (_nm, *_rest) in enumerate(inst):
         _by_token.setdefault(_nm, []).append(_i)
     _seen_this_tick = {}
+
+    # ------------------------------------------------------------------ torch.compile, opt-in
+    # `{substep_dt: X, steps: [...], compile: true}` -- the flag lives on the SUBSTEP BLOCK because
+    # that is the only schedule entry that is a dict, and because it is where the cost is. A
+    # profiled MPM cell (13,500 particles, 96^3 grid, 15 substeps) spent 153 ms a frame of which
+    # 148 was the four operators in that block, and almost none of it was arithmetic: the batched
+    # 3x3 SVD was 18 ms, every grid allocation and index_add_ together under 2 ms, and the rest was
+    # roughly sixty individually-launched CUDA kernels per operator call, paid 30 times a frame.
+    # That is precisely the cost a fusing compiler removes, and precisely the cost that no amount
+    # of shrinking the grid or the particle count touches.
+    #
+    # OPT-IN, AND IT MUST STAY OPT-IN. Dynamo fuses and reorders floating-point work, so a compiled
+    # run is NOT bit-identical to the same spec uncompiled. The promotion suite's whole gate is
+    # byte-identity, so a spec carrying this flag can never be a twin; the warning says so out loud
+    # rather than leaving it to be discovered by a red row.
+    _compiled = []
+    for _step in sim.schedule:
+        if not (isinstance(_step, dict) and _step.get("compile")):
+            continue
+        _mode = str(_step.get("compile_mode", "default"))
+        # THE THREE THINGS DYNAMO ASKS FOR BY NAME when it traces this operator set. Left at their
+        # defaults, compiling was SLOWER than eager (164 vs 156 ms/frame measured), because none of
+        # what follows is a fusion failure -- it is the tracer bailing out and re-tracing.
+        #
+        #   (capture_scalar_outputs IS NOT SET, and that is deliberate. `mpm_gather` reads the
+        #   domain box with `[float(b) for b in H.world_size]`; `float()` on a tensor element is
+        #   `.item()` and dynamo breaks the graph there. Turning the flag on makes it an UNBACKED
+        #   SYMBOLIC FLOAT, and inductor in this torch/triton then emits a Triton kernel that
+        #   references a symbol it never defined -- `NameError('zuf0 is not defined')`, a hard
+        #   compile failure, not a slowdown. The cause is fixed at the source instead: the box is
+        #   constant for a run, so `mpm_gather` caches it on the instance and the `float()` is
+        #   traced once rather than every call.)
+        #
+        #   allow_unspec_int_on_nn_module -- dynamo treats an INTEGER ATTRIBUTE of an nn.Module as
+        #   a compile-time constant. `mpm_scatter` reads `H.micro`, the shared-grid stamp, which
+        #   advances every substep, so every substep looked like a new constant and triggered a
+        #   fresh compile: `last reason: H.micro == 9`. This is a self-inflicted wound from the
+        #   accumulate fix and this flag is its cure -- the counter becomes an input, not a
+        #   constant.
+        #
+        #   recompile_limit -- the polar decomposition does `U[det(U) < 0, :, -1] *= -1`, a boolean
+        #   mask whose length is DATA-DEPENDENT (how many matrices are improper rotations, which
+        #   changes as the body deforms). Every new count is a new shape: `___stack2 size mismatch
+        #   at index 0, expected 13, actual 15`. Eight of those exhausts the default limit and the
+        #   function falls back to eager FOREVER, having paid for eight compiles first. Raising the
+        #   limit lets the common counts settle into a cache instead.
+        import torch._dynamo as _dyn
+        _dyn.config.allow_unspec_int_on_nn_module = True
+        _dyn.config.recompile_limit = max(int(getattr(_dyn.config, "recompile_limit", 8)),
+                                          int(_step.get("compile_recompile_limit", 64)))
+        if _step.get("compile_verbose"):
+            _dyn.config.verbose = True                        # full graph-break provenance
+        else:
+            # THE WARNINGS ARE NOT ACTIONABLE ONCE THE FLAGS ABOVE ARE SET, and they printed
+            # thirty lines of stack over the progress bar on every run. `compile_verbose: true`
+            # brings them back when the question is why a graph broke.
+            import logging
+            for _lg in ("torch._dynamo", "torch._inductor", "torch._dynamo.convert_frame"):
+                logging.getLogger(_lg).setLevel(logging.ERROR)
+            import warnings as _w
+            _w.filterwarnings("ignore", message=".*TensorFloat32.*")
+            _w.filterwarnings("ignore", message=".*fp32_precision.*")
+        for _tok in _step.get("steps", []):
+            for _j in _by_token.get(_tok, []):
+                if _j in [c[0] for c in _compiled]:
+                    continue
+                _ob = inst[_j][1]
+                try:
+                    # THE BOUND METHOD, not the module. `torch.compile(module)` returns a NEW
+                    # OptimizedModule, which would have to be substituted back into `inst` and
+                    # would break every `getattr(ob, ...)` the loop does on the original (EMIT,
+                    # INTEGRAND, MAY_MUTATE_INTEGRATED_STATE). Compiling `ob.forward` and storing
+                    # it as an instance attribute leaves the object itself untouched, and
+                    # `nn.Module.__call__` looks `self.forward` up on the instance first.
+                    _ob.forward = torch.compile(_ob.forward, mode=_mode, dynamic=False)
+                    _compiled.append((_j, _tok))
+                except Exception as _e:                      # no triton, unsupported backend, ...
+                    warn(f"torch.compile unavailable for {_tok!r} ({type(_e).__name__}: {_e}); "
+                         f"running it eager")
+    if _compiled:
+        warn(f"torch.compile ON for {len(_compiled)} operator instance(s): "
+             f"{', '.join(t for _i, t in _compiled)} (mode={_mode}). Compiled arithmetic is fused "
+             f"and reordered, so this run is NOT bit-identical to the same spec uncompiled -- it "
+             f"cannot be used as a promotion twin. The first few frames pay compilation.")
 
     def _run_token(token, tick):
         """Run the operator instance this schedule position names, enforcing the first-tick
@@ -1248,6 +1355,12 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     with (contextlib.nullcontext() if grad else torch.no_grad()):
         for tick in ticks:                           # one tick = one pass of the schedule + integrate
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
+            # THE MICRO-STEP COUNTER. A shared accumulator field -- the MPM grid is the one in the
+            # library -- has to know when a fresh solve begins, because the FIRST operator writing
+            # into it must clear it and every later one must add. Neither the tick nor the substep
+            # index alone says that (a flat schedule has no substeps; a substep block has many per
+            # tick), so what the field compares against is a single number that advances at both.
+            H.micro = getattr(H, "micro", 0) + 1
             H.zero_delta()
             _seen_this_tick.clear()                  # token occurrence -> instance, per tick
             for step in sim.schedule:                # operators accumulate per-set deltas
@@ -1296,6 +1409,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                         # one. Only specs declaring the SAME operator more than once inside a
                         # substep block change, which is exactly the set that was wrong.
                         _seen_this_tick.clear()
+                        H.micro = H.micro + 1        # a new solve: the next scatter clears the grid
                         if _s:
                             H._delta = {k: v.clone() for k, v in _d0.items()}
                             H._delta_blocks = {k: {b: t.clone() for b, t in d.items()}
