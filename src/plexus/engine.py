@@ -795,7 +795,16 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             vcell = float(s.get("vel_init", s.get("vel_init_cell", s.get("vel_init_cube", 0.0))))
             if vcell > 0 and "vel" in schema:
                 vx0, vx1 = schema["vel"]
-                vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcell)
+                # DRAWN ONCE PER PARENT, SHARED BY EVERY CHILD SET. The launch velocity is a
+                # property of the CELL, not of each of its substrates: a composed cell whose
+                # nucleus, cytosol and membrane each drew their own random vector would not
+                # translate, it would come apart in the first frame. Cached on the parent Level so
+                # the second and third child set reuse the first one's draw. (Any spec with a
+                # single child set is unaffected -- it makes the first draw and nothing reuses it.)
+                vc = getattr(parent, "_launch_v", None)
+                if vc is None or vc.shape != (parent.n, D):
+                    vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcell)
+                    parent._launch_v = vc
                 state[:, vx0:vx1] = vc[parent_idx]
         occ = parent.occ[parent_idx].clone()                      # a child is live iff its parent is
         if reserve > 0:                                           # the `reserve` tail of each parent block starts DORMANT
