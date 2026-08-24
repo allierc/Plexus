@@ -35,7 +35,13 @@ def submit(name, frames=None):
     """One bsub, writing to the default data root -- i.e. graphs_data/cell/<name>."""
     import cluster as C
     _spec(name)
-    out_dir = os.path.join(ROOT, "log", "cell")
+    # THE SAME PLACE `Plexus_Main` PUTS ITS RUN LOG. `log_path` resolves to
+    # `{data_root}/log/<folder>/`, and data_root is GNN_OUTPUT_ROOT -- so every other Plexus folder
+    # (atlas, gates, material, neural, promotion) already logs to GraphData/log. Putting the bsub
+    # stdout under the REPO's log/ instead split one run's records across two trees for no reason:
+    # the job's own log in GraphData, the scheduler's output in Graph/Plexus.
+    from plexus.paths import log_path
+    out_dir = log_path(FOLDER)
     os.makedirs(out_dir, exist_ok=True)
     sh = os.path.join(out_dir, f"{name}.sh")
     with open(sh, "w") as f:
