@@ -52,6 +52,33 @@ def _live_pos(H, sname):
     return pos[lvl.active.detach().cpu().numpy()], None
 
 
+def cutaway_mask(pos, cutaway):
+    """Which elements to KEEP -- True everywhere unless `cutaway` names a wedge to drop.
+
+    THE PARTICLE TWIN OF THE MESH CUTAWAY in `render_vtk.mesh_of`, and it exists because a FILLED
+    body has no faces to drop. An epithelium is a closed surface: removing a wedge of its faces
+    opens a window onto the far wall. A solid spheroid of cells is a point cloud, and the only way
+    to see its interior is to remove the points that are in front of it.
+
+    `cutaway: ["x", "y"]` drops the quadrant where both coordinates exceed the cloud's own
+    CENTROID -- its own, not the world origin, because a growing aggregate drifts and a cut taken
+    against a fixed origin would slide off the body. One axis halves it, two take a quadrant,
+    three an octant. A leading "-" flips that axis.
+    """
+    q = np.asarray(pos, float)
+    if not cutaway or q.ndim != 2 or q.shape[1] < 2:
+        return None
+    ax = {"x": 0, "y": 1, "z": 2}
+    sel = [(ax[a.lower().lstrip("+-")], a.startswith("-"))
+           for a in cutaway if a.lower().lstrip("+-") in ax and ax[a.lower().lstrip("+-")] < q.shape[1]]
+    if not sel:
+        return None
+    c = q.mean(0)
+    inside = np.ones(len(q), bool)
+    for i, neg in sel:
+        inside &= (q[:, i] < c[i]) if neg else (q[:, i] > c[i])
+    return ~inside
+
 def dot_area_pt2(pos, span_data, fig_px, dpi, fill=0.9, cap=(1.0, 400.0)):
     """Scatter `s` (an AREA in points^2) such that a dot spans `fill` of the LOCAL SPACING.
 
@@ -226,7 +253,14 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None, style=None):
                     edgecolor="#5a5a5a", linewidths=0.15, alpha=1.0)
                 ax.add_collection3d(pc)
             else:
-                ax.scatter(pos[:, 0], pos[:, 1], pos[:, 2], s=1.0, c="#dcdcdc", depthshade=False)
+                _k = cutaway_mask(pos[:, :3], (style or {}).get("cutaway"))
+                _p = pos if _k is None else pos[_k]
+                _fc, _clim = _face_colours(H, len(pos), style)
+                if _fc is not None and _k is not None:
+                    _fc = _fc[_k]
+                ax.scatter(_p[:, 0], _p[:, 1], _p[:, 2], depthshade=False,
+                           s=dot_area_pt2(_p[:, :3], 2.0 * r or 1.0, 6.2 * 110, 110),
+                           c=(_fc if _fc is not None else "#dcdcdc"), linewidths=0)
             ax.set_xlim(c3[0] - r, c3[0] + r); ax.set_ylim(c3[1] - r, c3[1] + r)
             ax.set_zlim(c3[2] - r, c3[2] + r)
             ax.set_axis_off(); ax.set_box_aspect((1, 1, 1))
