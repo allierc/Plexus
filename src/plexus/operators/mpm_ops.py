@@ -5,6 +5,7 @@
     mpm_grid_update     grid -> grid: the solve, gravity, and the wall conditions
     mpm_gather (g2p)    grid -> particle: velocity, the affine C, and advection
     mpm_strain          particle -> particle: F update and the material's response
+    mpm_turgor          particle -> particle: an isotropic outward pressure (a cell against its cortex)
     mpm_anchor          a spring to a rest position, for a body that must not drift
     mpm_spin            a prescribed angular velocity
     apply_material_map  a per-particle material assignment from a map
@@ -23,6 +24,7 @@ TWO REJECTED NEIGHBOURS ARE NOT HERE. `mpm_boundary` (kinematic, momentum not co
 set by the stencil width) and `bm_strain` stay in discovery_okuda; see membrane_ops and AUDIT.md.
 """
 from __future__ import annotations
+import functools
 import itertools
 import torch
 from plexus.models.base import Field
@@ -42,12 +44,55 @@ from plexus.paths import graphs_data_path
 # ==========================================================================================================
 # FROM `discovery_okuda/ops/mpm_grid.py` -- mpm_grid -- the Eulerian background grid FIELD + the shared transfer kernel for the
 # ==========================================================================================================
+@functools.lru_cache(maxsize=None)
+def _perm_index(device, perm) -> torch.Tensor:
+    """A constant column permutation as a DEVICE tensor, built once. See `_polar_higham`."""
+    return torch.tensor(list(perm), dtype=torch.long, device=device)
+
+
+@functools.lru_cache(maxsize=None)
+def _stencil_cached(dim: int, devstr: str) -> torch.Tensor:
+    return torch.tensor(list(itertools.product(range(3), repeat=dim)),
+                        dtype=torch.float32, device=devstr)
+
+
+def _const_any(ob, attr, t) -> bool:
+    """A RUN-CONSTANT tensor predicate, resolved ONCE per operator instance.
+
+    `bool(t.any())` inside a python `if` is `.item()`: a GPU->CPU round trip that drains the
+    launch queue and stalls the CPU that should be running ahead queueing kernels. There are
+    seven of them across the four MPM operators -- "does this set contain liquid / snow /
+    viscoelastic particles", "are there wall obstacles" -- and every one asks a question whose
+    answer is fixed for the whole run: the material masks are written once at seeding
+    (models/entities.py) and the obstacle set does not move.
+
+    Twelve evaluations per substep on a two-set spec, measured at 19.7 ms of a 156 ms frame.
+    They are also, on their own, the reason a substep cannot be stream-captured at all.
+
+    FIRST-CALL CACHE rather than a constructor argument, because the operator is built before
+    the level it acts on has been seeded. The first call still syncs; every later one does not,
+    and the answer is identical either way -- so the eager path stays bit-for-bit unchanged.
+    """
+    v = getattr(ob, attr, None)
+    if v is None:
+        v = bool(t is not None and bool(t.any()))
+        setattr(ob, attr, v)
+    return v
+
+
 def stencil_offsets(dim: int, device="cpu") -> torch.Tensor:
     """The 3^dim quadratic-B-spline stencil offsets, row-major (last axis fastest).
     2D -> [9,2] == `[[i,j] for i in 0..2 for j in 0..2]`; 3D -> [27,3] (matches the
     MPM_3D offset ordering: idx//9, (idx%9)//3, idx%3)."""
-    return torch.tensor(list(itertools.product(range(3), repeat=dim)),
-                        dtype=torch.float32, device=device)
+    # MEMOISED. Built from a python list, this is a PAGEABLE HOST->DEVICE COPY -- a host sync in
+    # eager, and outright illegal inside a CUDA stream capture. It depends only on (dim, device)
+    # and is called four times per substep, so it was rebuilding a constant 27x3 table 90 times a
+    # frame. Measured at 19 ms of a 156 ms frame, by leaving THIS ONE call unmemoised with every
+    # other host sync already gone -- which is the only way to measure it, because removing syncs
+    # is all-or-nothing: any single survivor drains the launch queue and hides the rest.
+    # The returned tensor is SHARED and must be treated as read-only; today every caller only
+    # reads it (`offsets.long()`, arithmetic) and none mutates it in place.
+    return _stencil_cached(int(dim), str(device))
 
 
 # 2D stencil kept as a module constant for back-compat (p2g/g2p now build per-dim)
@@ -152,7 +197,15 @@ def _polar_higham(F, iters=6):
             # degenerate particle with a finite (meaningless) rotation instead of taking
             # the simulation down with it. A collapsed deformation gradient is a failure
             # to report, not a reason to lose the other 58,199.
-            c = torch.cross(R[:, :, [1, 2, 0]], R[:, :, [2, 0, 1]], dim=1)
+            # `R[:, :, [1, 2, 0]]` LOOKS free and is not: a python list index builds a CPU
+            # int tensor and copies it to the device, six times per call. In eager that is a
+            # pageable H2D per iteration; inside a stream capture it is fatal, and measured as
+            # exactly that -- list index FAILS with cudaErrorStreamCaptureInvalidated where a
+            # cached device index tensor captures cleanly. index_select on a memoised index is
+            # the same gather with the constant hoisted out.
+            _i1 = _perm_index(R.device, (1, 2, 0))
+            _i2 = _perm_index(R.device, (2, 0, 1))
+            c = torch.cross(R.index_select(2, _i1), R.index_select(2, _i2), dim=1)
             det = (R[:, :, 0] * c[:, :, 0]).sum(1)[:, None, None]
             det = torch.where(det.abs() < 1e-12, torch.full_like(det, 1e-12), det)
             R = 0.5 * (R + c / det)
@@ -169,7 +222,7 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []        # no required params — `to` defaults to mpm_grid, all knobs optional
     REQUIRES_TYPE_PROPS = ["youngs"]
-    MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress"]
+    MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate"]
     PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt", "drag": "Stokes drag coefficient",
                    "a_max": "external-acceleration clamp",
                    "store_stress": "cache Cauchy stress to a per-particle buffer"}
@@ -248,7 +301,7 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
             J = torch.linalg.det(F)
         mu, la = p.mu, p.la
         snow = getattr(p, "is_snow", None)
-        if snow is not None and snow.any():                        # snow hardening from the plastic ratio Jp
+        if _const_any(self, "_c_snow", snow):                      # snow hardening from the plastic ratio Jp
             h = torch.exp((10.0 * (1.0 - p.Jp)).clamp(-6.0, 6.0))
             mu = torch.where(snow, p.mu * h, p.mu)
             la = torch.where(snow, p.la * h, p.la)
@@ -260,10 +313,28 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         elif self.polar == "higham":                               # Newton polar iteration
             R = _polar_higham(F, self.polar_iters)
         else:                                                      # SVD polar rotation R = U Vh (proper rotation)
+            # THE SIGN FLIP IS A MULTIPLY, NOT A BOOLEAN MASK, and the two are bit-for-bit the
+            # same: `torch.equal` True, max|diff| 0.000e+00 over 1,500 matrices. What changes is
+            # the SHAPE of the work. `U[det(U) < 0, :, -1] *= -1` is `aten.nonzero` -- the number
+            # of rows it writes depends on how many matrices are improper rotations, which is
+            # ~50% here and drifts as the body deforms. Under torch.compile that is a
+            # data-dependent shape: dynamo cuts the graph in half at this line and then recompiles
+            # on every new count until it hits the recompile limit and falls back to eager for the
+            # rest of the run ("___stack2 size mismatch at index 0, expected 13, actual 15").
+            # Multiplying the last column by +-1 touches every row unconditionally, so the shape
+            # is static and the scatter can be one graph -- which is also the precondition for
+            # capturing the substep as a CUDA graph.
+            #
+            # IN PLACE ON THE CLONE, not `torch.cat` of the columns. Reassembling with `cat`
+            # changes the memory layout, the following matmul picks a different kernel, and the
+            # result moves by 6e-8 -- small, but enough to break the promotion suite's
+            # byte-identity gate for no gain. Writing the column back keeps U contiguous.
             U, sig, Vh = torch.linalg.svd(F)
             U = U.clone(); Vh = Vh.clone()
-            negU = torch.det(U) < 0; U[negU, :, -1] *= -1
-            negV = torch.det(Vh) < 0; Vh[negV, -1, :] *= -1
+            sgnU = torch.where(torch.det(U) < 0, -1.0, 1.0)
+            sgnV = torch.where(torch.det(Vh) < 0, -1.0, 1.0)
+            U[:, :, -1] = U[:, :, -1] * sgnU[:, None]
+            Vh[:, -1, :] = Vh[:, -1, :] * sgnV[:, None]
             R = U @ Vh
         stress = 2 * mu[:, None, None] * ((F - R) @ F.transpose(-2, -1)) \
             + eye * (la * J * (J - 1))[:, None, None]
@@ -274,6 +345,17 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         act = getattr(H, "active_stress", None)
         if act is not None:
             stress = stress + act
+        # TURGOR / OSMOTIC PRESSURE (optional, default OFF): an isotropic OUTWARD pressure carried
+        # by this set, written as a per-particle `turgor` buffer by the `mpm_turgor` operator. The
+        # sign is the one that makes a cell a cell: tau here is Kirchhoff (positive = tension), a
+        # fluid at pressure P has sigma = -P.I, so a POSITIVE `turgor` SUBTRACTS from tau and pushes
+        # the material outward -- the same sign the liquid's own `la*J*(J-1)` takes when J < 1
+        # (compressed -> pushes out). Absent buffer -> byte-identical; the buffer lives on the LEVEL,
+        # so `mpm_turgor at: cytosol` pressurises the cytosol and leaves nucleus/membrane untouched
+        # even though all three scatter into the same grid.
+        turg = getattr(p, "turgor", None)
+        if turg is not None:
+            stress = stress - eye * turg[:, None, None]
         if self.store_stress:
             # CAUCHY, NOT KIRCHHOFF. What the lines above build is tau = J.sigma (the fixed-corotated
             # first Piola P times F^T), which is the form MLS-MPM scatters; sigma = tau / J is the
@@ -296,15 +378,49 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
             weight = weight * (occ > 0).to(weight.dtype)[:, None]
         dpos_phys = (offsets[None] - fx[:, None, :]) * dx
         mom = mass[:, None, None] * V[:, None, :] + (affine[:, None] @ dpos_phys[..., None]).squeeze(-1)
-        gm = torch.zeros(g.n_cells, device=dev); gmv = torch.zeros(g.n_cells, D, device=dev)
+        # THE GRID IS SHARED BY EVERY SET THAT SCATTERS INTO IT, so only the FIRST scatter of a
+        # micro-step may zero it. This used to allocate fresh zeros unconditionally and assign
+        # them, which meant a spec with two particle sets kept only the LAST one: nucleus momentum
+        # was deposited, then thrown away by the cytosol's scatter, and the grid solve ran on the
+        # cytosol alone.
+        #
+        # WHAT IT LOOKED LIKE, because like the substep-binding defect it does not announce itself.
+        # A nucleus falling inside a cytosol shell fell SLOWER than gravity (z = 0.7061 at the tick
+        # free-fall puts at 0.6835) and was crushed from an rms thickness of 0.0248 to 0.0093 while
+        # still in mid-air, where nothing was touching it. The same nucleus with no cytosol tracked
+        # free-fall to four decimals and held 0.0248 exactly. It reads as "the nucleus is too soft"
+        # and it is actually "the nucleus is gathering a velocity field it never contributed to":
+        # inside the cavity the cytosol deposits no mass, so `gmv / gm.clamp(1e-10)` there is the
+        # B-spline tails divided by nearly nothing.
+        #
+        # WHY IT SURVIVED THIS LONG. Every MPM spec in the corpus scatters ONE set -- multi-material
+        # is done with `types:` inside a single `mpm_particle` set (see
+        # config/material/material_3d_multimaterial.yaml: jelly + water + snow, one set, one
+        # scatter). Multi-SET MPM is what the composed cell introduced, and it is the only thing
+        # this ever affected. With one set the stamp is always stale and the zeros are always
+        # fresh, so single-set runs stay bit-identical.
+        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. This used to read
+        # `H.micro`, a python int the engine advances every substep, and compare it to a stamp on
+        # the field. That works, but it is a per-substep side effect no CUDA-graph replay can
+        # reproduce -- and it made dynamo recompile on every substep, because it specialises on
+        # integer attributes of an nn.Module. The engine binds the i-th OCCURRENCE of a token to
+        # the i-th INSTANCE, so occurrence 0 of `mpm_scatter` for a given grid is ALWAYS the first
+        # one in a substep: the engine stamps `_zeroes_grid` on it when `inst` is built.
+        _fresh = getattr(self, "_zeroes_grid", True)
+        # STEP 2: WRITE INTO THE FIELD'S OWN BUFFERS, never a fresh allocation. Assigning
+        # `g.m = torch.zeros(...)` rebinds the attribute to new storage every substep; a captured
+        # graph holds the address it saw at capture time, so the replay silently writes somewhere
+        # the rest of the run no longer reads. Measured: capture SUCCEEDS with this left as it was,
+        # raises nothing, and produces a 6-tick checksum of 22816.79 against the correct 22132.22.
+        gm, gmv, gc = g.m, g.mv, g.c
+        if _fresh:
+            gm.zero_(); gmv.zero_(); gc.zero_()
         gm.index_add_(0, flat, (weight * mass[:, None]).reshape(-1))
         gmv.index_add_(0, flat, (weight[..., None] * mom).reshape(-1, D))
-        gc = torch.zeros(g.n_cells, device=dev)
         liquid = getattr(p, "is_liquid", None)
-        if liquid is not None and liquid.any():                    # liquid colour for the CSF surface tension
+        if _const_any(self, "_c_liquid", liquid):                  # liquid colour for the CSF surface tension
             lw = (weight * (mass * liquid.to(mass.dtype))[:, None]).reshape(-1)
             gc.index_add_(0, flat, lw)
-        g.m, g.mv, g.c = gm, gmv, gc
         return {}
 
 
@@ -409,7 +525,13 @@ class MPMGridUpdate(FieldUpdate):
 
         if D == 2:                                                  # --- 2D: verbatim (bit-identical) ---
             surf = self.surface_tension
-            if surf > 0.0 and bool((gc > 0).any()):                # CSF continuum surface force
+            # CACHED, not dropped. Unlike the material masks this one is not run-constant in
+            # PRINCIPLE -- gc is rebuilt every substep -- but it is settled by the first grid
+            # solve, which always runs after every scatter of the substep. Deleting the guard
+            # instead would turn gv into gv + 0.0 on a no-liquid spec and flip -0.0 to +0.0.
+            if getattr(self, "_c_csf", None) is None:
+                self._c_csf = bool(surf > 0.0 and bool((gc > 0).any()))
+            if self._c_csf:                                        # CSF continuum surface force
                 c = gc.view(nx, ny)
                 cx = (torch.roll(c, -1, 0) - torch.roll(c, 1, 0)) * (0.5 * inv_dx)
                 cy = (torch.roll(c, -1, 1) - torch.roll(c, 1, 1)) * (0.5 * inv_dx)
@@ -436,7 +558,7 @@ class MPMGridUpdate(FieldUpdate):
                     gv[:, hiy, 0] = gv[:, hiy, 0] * wd
                 gv = gv.view(nx * ny, 2)
             walls = self._walls(H, g, dev)
-            if wd != 1.0 and walls.any():                          # friction in fluid cells touching obstacles
+            if wd != 1.0 and _const_any(self, "_c_walls2d", walls):  # friction in cells touching obstacles
                 w2 = walls.view(nx, ny)
                 near = (torch.roll(w2, 1, 0) | torch.roll(w2, -1, 0)
                         | torch.roll(w2, 1, 1) | torch.roll(w2, -1, 1)) & ~w2
@@ -445,21 +567,42 @@ class MPMGridUpdate(FieldUpdate):
                 gvv[..., 1] = torch.where(near & (gy_ > 0), gy_ * wd, gy_)
                 gv = gvv.view(nx * ny, 2)
             gv = torch.where(walls[:, None], torch.zeros_like(gv), gv)  # interior wall BC
-        if self.buoyancy != 0.0:
-            # rho at each node from the mass the particles deposited there. `gm` is a node mass and
-            # dx^D its volume, so this is a genuine density and the comparison with `rho_ref` is
-            # dimensionally honest rather than a tuned ratio.
-            _rho = gm / (dx ** D)
-            _act = _rho > 1e-9                                  # empty nodes have no buoyancy
-            _f = torch.zeros_like(_rho)
-            _f[_act] = (_rho[_act] - self.rho_ref) / _rho[_act]
-            _dir = torch.zeros(D, device=dev, dtype=gv.dtype)
-            if self.buoy_dir is not None:
-                _dir[:len(self.buoy_dir)] = torch.as_tensor(self.buoy_dir, device=dev, dtype=gv.dtype)
-            else:
-                _dir[1 if D == 2 else 2] = -1.0                 # "down" is -y in 2D, -z in 3D
-            gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
-        else:                                                       # --- 3D: reflective box walls + friction ---
+        else:                                                       # --- 3D: CSF + reflective box walls ---
+            # SURFACE TENSION IN 3D. Until now this whole term lived inside the `D == 2` branch
+            # above, so `surface_tension: 60.0` in a `dim: 3` spec was read, stored, and never
+            # used. It cost a rung of the cell ladder: a liquid cytosol dropped onto the floor
+            # spread into a one-particle-thick puddle covering the entire domain, which reads as
+            # "the liquid is too soft" and is actually "there is no cohesion term at all". A liquid
+            # in MLS-MPM has mu = 0 by construction -- it resists volume change and nothing else --
+            # so surface tension is not a refinement on top of the constitutive model, it is the
+            # ONLY thing that makes a droplet a droplet.
+            #
+            # SAME CSF AS 2D, WRITTEN OVER D AXES. Brackbill's continuum surface force: the liquid
+            # colour `gc` deposited by the scatter is smooth across the interface, its gradient is
+            # the interface normal times the interface's sharpness, and the divergence of the unit
+            # normal is the curvature. f = sigma * kappa * grad(c) then pulls a bulge in and pushes
+            # a dimple out. The 2D code above is left untouched rather than generalised, because it
+            # is on the promotion path and must stay bit-identical.
+            surf = self.surface_tension
+            if getattr(self, "_c_csf", None) is None:
+                self._c_csf = bool(surf > 0.0 and bool((gc > 0).any()))
+            if self._c_csf:
+                c = gc.view(*g.shape)
+                grad = [(torch.roll(c, -1, k) - torch.roll(c, 1, k)) * (0.5 * inv_dx)
+                        for k in range(D)]
+                gmag = torch.sqrt(sum(gk * gk for gk in grad))
+                eps = 1e-6
+                nrm = [gk / (gmag + eps) for gk in grad]
+                kappa = -sum((torch.roll(nrm[k], -1, k) - torch.roll(nrm[k], 1, k)) * (0.5 * inv_dx)
+                             for k in range(D))
+                # ONLY WHERE THERE IS AN INTERFACE. In the bulk `grad(c)` is numerical noise and
+                # the unit normal built from it is a random direction, so an unmasked curvature
+                # injects a random force into every interior node. The 2% of the peak gradient is
+                # the 2D threshold, kept.
+                fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
+                inv_m = (dx ** D) / gm.clamp(min=1e-8)              # force -> acceleration on the node
+                gv = gv + dt * torch.stack(
+                    [(surf * kappa * grad[k] * fmask).view(-1) * inv_m for k in range(D)], dim=1)
             if not periodic:
                 shape = g.shape; bnd = 3
                 gv = gv.view(*shape, D)
@@ -481,9 +624,30 @@ class MPMGridUpdate(FieldUpdate):
                             gv[..., j] = torch.where(slab, cj * wd, cj)
                 gv = gv.view(g.n_cells, D)
             walls = self._walls3d(H, g, dev)                        # solid 3D obstacles (box / sphere)
-            if walls.any():
+            if _const_any(self, "_c_walls3d", walls):
                 gv = torch.where(walls[:, None], torch.zeros_like(gv), gv)   # no-slip: zero grid velocity inside
-        g.v = gv
+        # BUOYANCY IS NOT A DIMENSION BRANCH, and putting it here made it look like one. Inserted
+        # in 40e1d0c9 between `if D == 2:` and its `else:`, it STOLE THAT ELSE: the 3D wall code
+        # then ran whenever buoyancy was zero -- for a 2D spec too, where `_walls3d` unpacks
+        # `nx, ny, nz = g.shape` and dies -- and was SKIPPED whenever buoyancy was on, so every 3D
+        # buoyant run had no wall boundary condition at all. Both halves of that were invisible
+        # until a 2D spec was written without buoyancy. It now sits after the branch, in both
+        # dimensions, which is what a body force on the grid is.
+        if self.buoyancy != 0.0:
+            # rho at each node from the mass the particles deposited there. `gm` is a node mass and
+            # dx^D its volume, so this is a genuine density and the comparison with `rho_ref` is
+            # dimensionally honest rather than a tuned ratio.
+            _rho = gm / (dx ** D)
+            _act = _rho > 1e-9                                  # empty nodes have no buoyancy
+            _f = torch.zeros_like(_rho)
+            _f[_act] = (_rho[_act] - self.rho_ref) / _rho[_act]
+            _dir = torch.zeros(D, device=dev, dtype=gv.dtype)
+            if self.buoy_dir is not None:
+                _dir[:len(self.buoy_dir)] = torch.as_tensor(self.buoy_dir, device=dev, dtype=gv.dtype)
+            else:
+                _dir[1 if D == 2 else 2] = -1.0                 # "down" is -y in 2D, -z in 3D
+            gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
+        g.v.copy_(gv)                       # in place: a captured graph holds this address
         return {}
 
 
@@ -516,7 +680,14 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
         inv_dx, dx = g.inv_dx, g.dx
         D = p.F.shape[-1]
         periodic = bool(getattr(H, "periodic", False))
-        box = [float(b) for b in getattr(H, "world_size", torch.tensor([g.width, 1.0]))][:D]
+        # CACHED, because it is constant for the whole run and `float()` on a tensor element is a
+        # host sync. Read fresh every call it cost a GPU->CPU round trip per substep, and under
+        # torch.compile it broke the graph in the middle of the gather on every single call.
+        # Computed once, the branch is False on every later call and never enters the traced graph.
+        if getattr(self, "_box", None) is None:
+            self._box = [float(b) for b in
+                         getattr(H, "world_size", torch.tensor([g.width, 1.0]))][:D]
+        box = self._box
         offsets = stencil_offsets(D, dev); S = offsets.shape[0]
         X, V = p.get("pos"), p.get("vel")
         fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
@@ -551,11 +722,13 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
             Xn = torch.where(live[:, None], Xn, X)
             new_V = torch.where(live[:, None], new_V, V)
             new_C = torch.where(live[:, None, None], new_C, p.C)
-        new = p.state.clone()
+        # IN PLACE. Every read of X / V above happens before this write, and this operator declares
+        # MAY_MUTATE_INTEGRATED_STATE, so the engine's tick-0 integration-invariant guard does not
+        # apply to it. The clone-and-rebind it replaces gave `p.state` a new address every substep.
         pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
-        new[:, pa:pb] = Xn; new[:, va:vb] = new_V
-        p.state = new
-        p.C = new_C
+        p.state[:, pa:pb] = Xn
+        p.state[:, va:vb] = new_V
+        p.C.copy_(new_C)
         return {}
 
 
@@ -588,12 +761,12 @@ class MPMStrain(Lateral):
         else:
             J = torch.linalg.det(F)
         liquid = getattr(p, "is_liquid", None)
-        if liquid is not None and liquid.any():                    # LIQUID: drop shape memory
+        if _const_any(self, "_c_liquid", liquid):                  # LIQUID: drop shape memory
             Jc = J.clamp(min=1e-6)
             Jl = torch.sqrt(Jc) if D == 2 else Jc.pow(1.0 / D)     # volume-preserving isotropic reset
             F = torch.where(liquid[:, None, None], eye * Jl[:, None, None], F)
         visco = getattr(p, "is_visco", None)
-        if visco is not None and visco.any():                      # VISCOELASTIC (Maxwell): PARTIAL shape reset
+        if _const_any(self, "_c_visco", visco):                    # VISCOELASTIC (Maxwell): PARTIAL shape reset
             vm = visco                                             # relax F toward isotropic with time-constant tau,
             Fv = F[vm]                                             # keeping VOLUME (J) -> stress builds then decays
             U, sig, Vh = torch.linalg.svd(Fv)                      # SVD: sig = principal stretches
@@ -603,7 +776,7 @@ class MPMStrain(Lateral):
             F = F.clone()
             F[vm] = U @ torch.diag_embed(sig) @ Vh
         snow = getattr(p, "is_snow", None)
-        if snow is not None and snow.any():                        # SNOW: clamp singular values, harden via Jp
+        if _const_any(self, "_c_snow", snow):                      # SNOW: clamp singular values, harden via Jp
             sm = snow; Fs = F[sm]
             if Fs.shape[0] > 0:
                 U, sig, Vh = torch.linalg.svd(Fs)
@@ -617,7 +790,7 @@ class MPMStrain(Lateral):
                 F = F.clone(); F[sm] = U @ torch.diag_embed(sig_c) @ Vh
                 ratio = sig.prod(-1) / sig_c.prod(-1).clamp(min=1e-6)
                 Jp = p.Jp.clone(); Jp[sm] = (Jp[sm] * ratio).clamp(0.6, 20.0)
-                p.Jp = Jp
+                p.Jp.copy_(Jp)
         # DORMANT PARTICLES DO NOT DEFORM. `mpm_scatter` masks its weights by occupancy and
         # `mpm_gather` freezes occ==0 rather than advecting it, but this operator integrated F for the
         # reserve regardless -- so a particle waiting to be spawned accumulated an arbitrary deformation
@@ -627,7 +800,85 @@ class MPMStrain(Lateral):
         if occ is not None:
             live = (occ > 0)[:, None, None]
             F = torch.where(live, F, p.F)
-        p.F = F
+        p.F.copy_(F)                        # in place; every read of p.F above precedes it
+        return {}
+
+
+# ==========================================================================================================
+# mpm_turgor -- the isotropic outward pressure a cell's interior holds against its cortex.
+# ==========================================================================================================
+@register_operator("mpm_turgor", "osmotic_pressure", family="mpm", set="particle", kind="lateral")
+class MPMTurgor(Lateral):
+    """Give a set an isotropic OUTWARD pressure -- turgor / excess osmotic pressure -- by writing a
+    per-particle `turgor` buffer that `mpm_scatter` subtracts from the Kirchhoff stress.
+
+    WHY THIS IS A MECHANISM AND NOT A TUNING KNOB. An MLS-MPM liquid has `mu = 0` by construction, so
+    its whole constitutive law is `tau = la*J*(J-1)*I`: it resists departures from the volume it was
+    BORN at, and nothing else. A cytosol built that way sits at `J = 1` forever -- it has no reason to
+    press on anything -- so a membrane drawn around it carries zero tension and is a floppy bag that
+    the interior drains out of. Real cells are not like that: the interior is held above the outside
+    pressure by the solutes trapped in it, the cortex is in tension because of it, and the two are
+    related by Laplace, `P = 2*gamma/R`. Turgor is the term that makes a membrane a membrane.
+
+    WHY IT IS NOT SURFACE TENSION. `mpm_grid_update`'s CSF term (`surface_tension:`) minimises
+    interface AREA -- `f = sigma * kappa * grad(c)` pulls a bulge in and pushes a dimple out. It can
+    round a droplet up and it can hold one together, but its sign is inward everywhere the interface
+    is convex, so it can never inflate a cell against a shell. The two are complementary, not
+    alternatives: surface tension is the cortex pulling in, turgor is the cytosol pushing out, and a
+    cell at rest is the balance of them.
+
+    WHY IT IS A REST-VOLUME SHIFT AND THEREFORE SELF-LIMITING. Adding `-P.I` to `tau` moves the zero
+    of the liquid's own equation of state: the material stops expanding at the `J*` that solves
+    `la*J*(J-1) = P`, which for the small strains a cell runs at is `J* ~= 1 + P/la`. So `pressure` is
+    NOT an unbounded body force that blows the cell up -- it names an inflated rest volume, and the
+    liquid's bulk modulus is what holds it there. Sizing it is one division: to swell a cytosol by a
+    fraction `eps` of ITS OWN INITIAL VOLUME, ask for `pressure ~= la*eps`, where
+    `la = E*nu/((1+nu)(1-2nu))`, which at the shared `nu = 0.2` is `la = E/3.6`.
+
+    THE UNITS ARE THE STRESS UNITS OF THE SPEC, the same ones `youngs` is in. The number that matters
+    is the RATIO to two other pressures in the same run: the liquid's bulk modulus `la` (which sets
+    how far it swells) and the hydrostatic head `rho*g*R` of the cell's own weight (which is what the
+    turgor has to beat for the interior not to puddle in the bottom of the membrane).
+
+    `mode: constant` (the default) holds `P` fixed -- the osmotic exchange across a real membrane is
+    orders of magnitude slower than the mechanics, so over a run of this length the solute count, not
+    the pressure, is what a van 't Hoff term would have to carry; that form is a strictly larger
+    operator and is deliberately not built until something needs a cell to shrink in hypertonic
+    medium.
+    """
+
+    EMIT = None                 # particle->particle: writes the `turgor` buffer in place; no delta
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["pressure"]
+    MECHANISM_TAGS = ["osmotic_pressure", "turgor", "volume_regulation"]
+    PARAM_ROLES = {"pressure": "isotropic_outward_pressure", "mode": "pressure_law"}
+    REFERENCE = ("Stewart, M.P. et al. (2011). Nature 469:226-230 (hydrostatic pressure and the "
+                 "actomyosin cortex in mitotic rounding); Jiang, H. & Sun, S.X. (2013). Biophys. J. "
+                 "105:609-619 (cell volume and osmotic pressure).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.pressure = float(params["pressure"])           # excess of interior over exterior pressure
+        self.mode = str(params.get("mode", "constant"))
+        self.at = params.get("_at", "mpm_particle")
+        if self.mode != "constant":
+            raise ValueError(f"mpm_turgor: unknown mode {self.mode!r} (only 'constant' is built)")
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        P = torch.full((p.n,), self.pressure, device=p.state.device)
+        # DORMANT PARTICLES CARRY NO PRESSURE. `mpm_scatter` masks a reserve particle's weights to
+        # zero so it deposits nothing, but `store_stress` and any diagnostic reading `turgor` would
+        # otherwise report a pressurised particle that is not in the material yet.
+        occ = getattr(p, "occ", None)
+        if occ is not None:
+            P = P * (occ > 0).to(P.dtype)
+        if mask is not None:
+            P = P * mask.to(P.dtype)
+        if getattr(p, "turgor", None) is None or p.turgor.shape != P.shape:
+            p.register_buffer("turgor", P)
+        else:
+            p.turgor.copy_(P)
         return {}
 
 

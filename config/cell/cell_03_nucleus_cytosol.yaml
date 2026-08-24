@@ -24,8 +24,8 @@ sets:
         boundary: free
     start:
     - - 0.5
-      - 0.72
       - 0.5
+      - 0.72
   nucleus:
     parent: cell
     per_parent: 1500
@@ -34,12 +34,13 @@ sets:
     types:
       n:
         fraction: 1.0
-        youngs: 4000
+        youngs: 300
         material: elastic
   cytosol:
     parent: cell
     per_parent: 12000
     radius: 0.16
+    radius_inner: 0.065
     density: 1.0
     types:
       light:
@@ -52,7 +53,6 @@ sets:
         youngs: 15
         material: liquid
         density: 1.8
-    radius_inner: 0.065
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -62,7 +62,8 @@ operators:
   at: cell
 - op: gravity
   at: cell
-  g: 9.0
+  gy: 0.0
+  gz: -9.0
 - op: mpm_strain
   at: nucleus
 - op: mpm_strain
@@ -79,7 +80,7 @@ operators:
   a_max: 200
 - op: mpm_grid_update
   at: mpm_grid
-  surface_tension: 0.0
+  surface_tension: 60.0
   wall_damp: 1.0
 - op: mpm_gather
   at: nucleus
@@ -124,7 +125,7 @@ plotting:
     - 0.45
   fps: 30
   movie_max_frames: 600
-  up_axis: 1
+  up_axis: 2
   camera_elev: 1.18
   camera_zoom: 0.0
   camera_turns: 0.0
@@ -137,3 +138,17 @@ plotting:
   splat_res: 560
   panels: true
   panels_thick: 0.1
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of particles initially suspended in a 3D domain begins to descend
+      toward the bottom boundary. As it makes contact with the surface, it flattens out and spreads horizontally
+      into a thin layer. The central core of the cluster remains more compact while the outer particles
+      migrate outward to cover a larger area. By the final frames, the cluster has almost completely transitioned
+      into a two-dimensional distribution across the floor of the domain.
+    objects: 'The scene contains two distinct sets of particles: a central core and a surrounding outer
+      shell. The central core is composed of small yellow particles arranged in a dense, roughly spherical
+      cluster. The outer shell consists of numerous small blue particles that initially form a larger
+      sphere around the yellow core. Over time, the blue particles spread out significantly while the
+      yellow core maintains a more localized, compact shape.'

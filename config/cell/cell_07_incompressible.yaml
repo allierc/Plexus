@@ -1,5 +1,5 @@
 general:
-  name: cell_01_bounce
+  name: cell_07_incompressible
   seed: 0
   n_frames: 1500
   record_cap: 602
@@ -40,29 +40,29 @@ sets:
     parent: cell
     per_parent: 12000
     radius: 0.16
+    radius_inner: 0.065
     density: 1.0
     types:
       light:
         fraction: 0.5
-        youngs: 15
+        youngs: 1000
         material: liquid
         density: 0.6
       heavy:
         fraction: 0.5
-        youngs: 15
+        youngs: 1000
         material: liquid
         density: 1.8
-    radius_inner: 0.065
   membrane:
     parent: cell
-    per_parent: 4000
-    radius: 0.168
+    per_parent: 16000
+    radius: 0.184
     radius_inner: 0.16
     density: 1.1
     types:
       m:
         fraction: 1.0
-        youngs: 900
+        youngs: 1500
         material: elastic
 fields:
   mpm_grid:
@@ -76,11 +76,16 @@ operators:
   gy: 0.0
   gz: -9.0
 - op: mpm_strain
+  at: nucleus
+- op: mpm_strain
   at: cytosol
 - op: mpm_strain
   at: membrane
-- op: mpm_strain
+- op: mpm_scatter
   at: nucleus
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
 - op: mpm_scatter
   at: cytosol
   to: mpm_grid
@@ -88,18 +93,18 @@ operators:
   a_max: 200
 - op: mpm_scatter
   at: membrane
-  to: mpm_grid
-  drag: 0.02
-  a_max: 200
-- op: mpm_scatter
-  at: nucleus
   to: mpm_grid
   drag: 0.02
   a_max: 200
 - op: mpm_grid_update
   at: mpm_grid
-  surface_tension: 60.0
+  surface_tension: 1000.0
   wall_damp: 1.0
+- op: mpm_gather
+  at: nucleus
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
 - op: mpm_gather
   at: cytosol
   from: mpm_grid
@@ -107,11 +112,6 @@ operators:
   wall_contact: 0.04
 - op: mpm_gather
   at: membrane
-  from: mpm_grid
-  wall_damp: 1.0
-  wall_contact: 0.04
-- op: mpm_gather
-  at: nucleus
   from: mpm_grid
   wall_damp: 1.0
   wall_contact: 0.04
@@ -146,9 +146,9 @@ plotting:
     - 0.82
     - 0.29
     m:
-    - 0.95
-    - 0.35
-    - 0.45
+    - 0.1
+    - 0.1
+    - 0.9
   fps: 30
   movie_max_frames: 600
   up_axis: 2
@@ -164,3 +164,29 @@ plotting:
   splat_res: 560
   panels: true
   panels_thick: 0.1
+descriptions:
+  movie:
+    description: The simulation shows a spherical cell structure undergoing a significant
+      morphological deformation over time. Initially, the cell is perfectly spherical
+      and centered within the domain. As the simulation progresses, the bottom portion
+      of the cell begins to flatten and expand outward. By the final frames, the cell
+      has transformed into a flattened, asymmetrical shape with a distinct indentation
+      on the upper side.
+    objects: The scene contains three distinct types of particles representing different
+      cellular components. Yellow particles form a dense, central spherical cluster
+      representing the nucleus. Blue particles are distributed throughout the interior
+      of the cell, representing the cytosol. Red particles form a thick outer shell
+      or membrane surrounding the blue and yellow components.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cell-like structure initially sits in the center of a cubic domain. Over
+      time, the sphere moves downward and toward the right side of the bounding box. As it moves, the
+      internal structure undergoes a significant deformation, flattening against the bottom surface. The
+      cross-sectional view shows the internal nucleus shifting and the cytoplasm compressing as the cell
+      settles.
+    objects: The scene contains a large spherical body composed of many small blue particles. Inside this
+      body is a smaller, dense cluster of yellow particles representing a nucleus. The blue particles
+      are arranged in a thick outer membrane and a lighter inner cytosol. The entire system is contained
+      within a large, transparent white wireframe cube.

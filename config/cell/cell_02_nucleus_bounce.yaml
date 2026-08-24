@@ -24,8 +24,8 @@ sets:
         boundary: free
     start:
     - - 0.5
-      - 0.72
       - 0.5
+      - 0.72
   nucleus:
     parent: cell
     per_parent: 1500
@@ -45,7 +45,8 @@ operators:
   at: cell
 - op: gravity
   at: cell
-  g: 9.0
+  gy: 0.0
+  gz: -9.0
 - op: mpm_strain
   at: nucleus
 - op: mpm_scatter
@@ -92,7 +93,7 @@ plotting:
     - 0.45
   fps: 30
   movie_max_frames: 600
-  up_axis: 1
+  up_axis: 2
   camera_elev: 1.18
   camera_zoom: 0.0
   camera_turns: 0.0
@@ -105,14 +106,3 @@ plotting:
   splat_res: 560
   panels: true
   panels_thick: 0.1
-descriptions:
-  movie_nucleus:
-    description: A small cluster of golden particles is positioned at the center of
-      a wireframe cube. Over the course of the simulation, the cluster moves steadily
-      downward along the vertical axis. It eventually reaches the bottom face of the
-      cube. The particles maintain their compact, spherical shape throughout the entire
-      motion.
-    objects: The scene contains a single cluster of small, golden-colored particles.
-      These particles are densely packed together to form a spherical shape. A large,
-      white wireframe cube surrounds the particles, defining the spatial boundaries.
-      The cube is composed of thin lines and occupies the majority of the frame.

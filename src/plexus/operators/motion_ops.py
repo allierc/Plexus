@@ -362,7 +362,8 @@ class GravityOperator(Lateral):
     # enters H.emit_order and the engine never advects it under gravity.
     SUPPORTED_DIMS = [2, 3]                           # uniform body force is dimension-generic
     REQUIRES_PARAMS = []                              # no required params — direction/magnitude optional (default -y down)
-    PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y"}
+    PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y",
+                   "gz": "gravity_z"}
     REFERENCE = "Newton, I. (1687). Philosophiae Naturalis Principia Mathematica."
     MECHANISM_TAGS = ["body_force", "uniform_acceleration"]
 
@@ -372,14 +373,23 @@ class GravityOperator(Lateral):
         self.g = float(params.get("g", 10.0))            # magnitude (world units / time^2)
         self.gx = float(params.get("gx", 0.0))           # x-component (default 0)
         self.gy = float(params.get("gy", -self.g))       # y-component (default -g: down)
+        # z-COMPONENT, DEFAULT ZERO -- so every spec written before this line keeps the -y fall it
+        # had, bit for bit, and the promotion twins stay comparable. The default is -y because in 2D
+        # that IS the screen's vertical; in 3D the screen's vertical is z (mplot3d and VTK both put
+        # their own z up), so a 3D spec that wants a visible fall writes `gy: 0.0, gz: -9.0` and the
+        # drop is vertical in the picture as well as in the numbers. Two rungs of the cell ladder
+        # were read as "bouncing diagonally" for exactly this mismatch.
+        self.gz = float(params.get("gz", 0.0))
 
     def forward(self, H, mask=None):
         cell = H.level(self.at)
         dev = cell.state.device
-        D = int(getattr(H, "dim", 2))                    # gravity is a D-vector; -y (axis 1) is "down"
+        D = int(getattr(H, "dim", 2))                    # gravity is a D-vector
         accel = torch.zeros(cell.n, D, device=dev)
         accel[:, 0] = self.gx
         accel[:, 1] = self.gy
+        if D > 2:
+            accel[:, 2] = self.gz
         if mask is not None:
             accel = accel * mask.float()[:, None]
         return {cell.name: accel}
