@@ -416,6 +416,13 @@ def load(path: str) -> Spec:
         if isinstance(step, dict) and "substep_dt" in step:
             if not isinstance(step.get("steps"), list):
                 raise ValueError("a `{substep_dt: …}` schedule step needs a `steps:` list")
+            # THE KEY SET IS CLOSED, so `complie: true` is an error and not a silently ignored
+            # line. A performance flag that does nothing looks exactly like a performance flag
+            # that does not help, and the run it was measured against is then meaningless.
+            _bad = set(step) - {"substep_dt", "steps", "compile", "compile_mode"}
+            if _bad:
+                raise ValueError(f"unknown key(s) {sorted(_bad)} on a `{{substep_dt: …}}` step; "
+                                 f"allowed: substep_dt, steps, compile, compile_mode")
             tokens = step["steps"]
         else:
             tokens = step if isinstance(step, list) else [step]
