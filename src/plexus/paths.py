@@ -92,7 +92,7 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # "Making a cell in Plexus"). No trigger substrings, for the same reason the three above have
     # none: `cell` appears in the name of half the corpus, and inferring this folder from it would
     # sweep every vertex-model spec into a directory nobody chose.
-    ("cell",        ()),
+    ("cell",        ("^cell_",)),
     # THE NEURAL FOLDER. Recurrent circuits: a `neuron` set, a `synapse` edge-set carrying the
     # connectivity matrix, and the assemblies that contain them (`operators/neural.py`). Trigger
     # substrings are given because these specs are named for what they model -- `ctrnn_*`,
@@ -122,9 +122,15 @@ def add_pre_folder(config_name: str) -> tuple[str, str]:
     low = config_name.lower()
     # leftmost trigger wins: the type keyword leads the name, so `slime_two_attract`
     # routes to slime (`slime` at pos 0), not attraction_repulsion (`attract` at pos 10).
+    # A TRIGGER STARTING WITH `^` IS ANCHORED: it matches only at position 0. Substring matching
+    # alone cannot express "this folder owns names that BEGIN with this", and for `cell` it has to:
+    # a bare `cell_` trigger also matches `saturating_cell_growth`, where it sits at position 11 and
+    # beats that spec's real trigger `grow` at 16, so leftmost-wins would route a division spec into
+    # the cell folder. `^cell_` matches the ladder's `cell_00_...` names and nothing else.
     best = None                                    # (position, folder)
     for folder, triggers in _PRE_FOLDER_RULES:
-        hits = [low.find(t) for t in triggers if t in low]
+        hits = [0 for t in triggers if t.startswith("^") and low.startswith(t[1:])]
+        hits += [low.find(t) for t in triggers if not t.startswith("^") and t in low]
         if hits and (best is None or min(hits) < best[0]):
             best = (min(hits), folder)
     if best is not None:
