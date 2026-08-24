@@ -56,7 +56,8 @@ MEMBRANE_STRAIN: list = []       # per-particle bond strain, for the renderer
     # `spatial_schema` (a `dim -> StateSchema` callable), NOT the legacy 2D dict this used to
     # carry: the registry is now consulted, and the basement-membrane specs are `dim: 3`.
     # See `models/entities.py` for the contract.
-    "basement_membrane_particle", depth=0,
+    # `membrane` is the biological name; the long one stays first and stays valid.
+    "basement_membrane_particle", "membrane", depth=0,
     state_schema=spatial_schema,
     render={"color_by": "node_type", "arrows": None},
 )
@@ -1931,7 +1932,8 @@ class BasementMembraneCrosslink(Rewire):
 # ==========================================================================================================
 @register_entity(
     # `spatial_schema`, not the legacy 2D dict -- see `basement_membrane_particle` above.
-    "integrin_particle", depth=0,
+    # `receptor` is the biological name; the long one stays first and stays valid.
+    "integrin_particle", "receptor", depth=0,
     state_schema=spatial_schema,
     render={"color_by": "node_type", "arrows": None},
 )

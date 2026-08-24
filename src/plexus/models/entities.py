@@ -73,7 +73,13 @@ def _lame(E, nu: float = _NU):
 
 
 @register_entity(
-    "mpm_particle", depth=0,
+    # THE SET IS NAMED FOR WHAT IT IS, NOT FOR HOW IT IS COMPUTED. `mpm_particle` names a
+    # numerical method, which is exactly the separation the paper rests on -- semantics in the
+    # language, discretisation in the implementation. `cytosol` and `nucleus` are two different
+    # biological objects that happen to share a substrate, and naming them apart is what makes a
+    # cell a COMPOSITION rather than one material at several stiffnesses. The old name stays first
+    # and stays valid: 461 specs use it.
+    "mpm_particle", "cytosol", "nucleus", "protein", depth=0,
     state_schema=spatial_schema,                 # dim -> StateSchema; MLS-MPM runs in 2D and 3D
     render={"color_by": "node_type", "arrows": None},
 )
@@ -98,6 +104,22 @@ class MPMParticle:
         Np = lvl.n
         pidx = lvl.parent                                        # [Np] parent cell per particle
         rho = float(s.get("density", 1.0)); rad = float(s.get("radius", 0.02))
+        # DENSITY MAY VARY BY TYPE, and it has to for buoyancy to mean anything. It was a single
+        # set-level scalar, so two species of different density needed two SETS -- two particle
+        # clouds scattering to one grid, when what the physics wants is one cloud whose particles
+        # differ. `youngs` and `material` were already per type; density is the third property of
+        # the same kind and was the one left behind.
+        # THE PARTICLE'S OWN TYPE, NOT ITS PARENT'S. `type_list` above is the PARENT's types --
+        # it is what `youngs`/`layers`/`core` read, because those describe the CELL. Density is
+        # different: two protein species of different density live inside ONE cell, so the
+        # variation is between particles, not between their parents. The child set declares its
+        # own `types` and the engine already assigns it a `node_type`; this reads that.
+        _ct = list((s.get("types") or {}).values())
+        _nt = getattr(lvl, "node_type", None)
+        rho_p = rho
+        if _ct and _nt is not None and len(_ct) > 1:
+            rho_p = torch.as_tensor([float(t.get("density", rho)) for t in _ct],
+                                    device=device, dtype=torch.float32)[_nt]
         ppc = int(s["per_parent"])
         px0, px1 = lvl.state_schema["pos"]
         D = H.dim                                                # particle dimension (2D or 3D; the global dim contract)
@@ -196,7 +218,9 @@ class MPMParticle:
         lvl.register_buffer("visco_tau", visco_tau)
         lvl.register_buffer("Jp", torch.ones(Np, device=device))
         lvl.register_buffer("p_vol", p_vol)
-        lvl.register_buffer("mass", p_vol * rho)
+        lvl.register_buffer("mass", p_vol * rho_p)          # volume x the particle's own density
+        lvl.register_buffer("density", rho_p if torch.is_tensor(rho_p)
+                            else torch.full_like(p_vol, float(rho_p)))
 
 
 @register_entity(
@@ -257,6 +281,15 @@ def neuron_schema(dim: int) -> StateSchema:
         # this block. `record=False` because it is static -- storing 2,001 identical copies per
         # run buys nothing, and a consumer reads it from the region's `neurons.npz`.
         Block("neurite_dir", dim, role="orientation", integration=NONE,
+              boundary=BOUNDARY_FREE, record=False),
+        # THE SOMA RADIUS, MEASURED FROM THE TISSUE rather than assumed. fish2 populates
+        # `somaRadius` on 0 of 177,513 bodies, so the size of a cell body has until now been a
+        # stated literature constant applied to every neuron alike. It does not have to be:
+        # dense EM tracing cannot route a neurite through a soma, so the largest ball around a
+        # soma centre containing no OTHER neuron's traced neurite is an upper bound on that
+        # soma, and it is per-cell. Geometry like `pos` and `neurite_dir` -- fixed, never
+        # advanced, unrecorded because it does not change over a run.
+        Block("soma_radius", 1, role="geometry", integration=NONE,
               boundary=BOUNDARY_FREE, record=False),
     ])
 
