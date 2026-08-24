@@ -8,6 +8,13 @@
 # The two systems remain INDEPENDENT here -- separate `chan` spans, no cross term -- so anything
 # that changes between this and the solo run is competition for space and neighbours, not
 # chemistry. `turing2d_coupled` is where they are given a cross term.
+# SYSTEM B DIFFUSES AT PEARSON'S RATIO, d = [0.08, 0.16] -- the same as system A. It used to
+# inherit turing2d_two's B, where d_a is 0.03 so the two systems differ in SCALE; that puts B's
+# ratio at 0.16/0.03 = 5.3, and Pearson's (F, k) labels only name distinct motifs at Du/Dv = 2.
+# Measured: at 5.3 the six points gave ONE field at six amplitudes -- species B correlated 0.86 to
+# 0.95 between eta, kappa, lambda and theta. The diffusion length was setting the pattern and the
+# reaction point was decorating it. At ratio 2 the labels mean what they say, and B then differs
+# from A in (F, kk) ALONE, which is what a regime sweep is supposed to vary.
 general:
   name: turing2d_two_beta
   seed: 0
@@ -62,7 +69,7 @@ operators:
 - op: cell_chem_diffuse
   at: cell
   implementation: graph_laplacian
-  d_a: 0.03
+  d_a: 0.08
   d_h: 0.16
   chi: 1.3
   chan: 2
