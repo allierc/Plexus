@@ -430,6 +430,8 @@ def suite_turing():
         ("turing2d_gs_coupled_theta",  "coupled twin of turing2d_two_theta: same B point, cross term on"),
         ("turing_rps_growth",  "r013_05 x turing_rps: the RED species gates cell_grow, so the "
                                "growth front travels with the rotating wave"),
+        ("turing_eta_growth",  "r013_05 x turing2d_gs_eta: growth switched on inside isolated "
+                               "STATIONARY spots rather than along a maze"),
         # ---- the TWO-SYSTEM twin of the Pearson sweep: system A fixed, system B walking the
         # diagram, so each motif is asked whether it survives being laid over another on the same
         # cells. Independent spans, no cross term -- what differs from the solo run is competition

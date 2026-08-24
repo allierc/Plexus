@@ -1,0 +1,184 @@
+# turing_eta_growth -- Pearson's eta SPOTS on a growing epithelium: `turing2d_gs_eta` x `r013_05`.
+#
+# r013_05's growing 3D mesh, mechanics, division, edge-flips AND its purse-string, with the
+# chemistry moved to Pearson's eta point (F 0.034, kk 0.063) -- isolated stationary spots. The
+# question the mix asks: what does a tissue become when growth is switched on inside a set of
+# fixed, well-separated spots rather than along a maze?
+#
+# THREE THINGS HAD TO BE MADE CONSISTENT, and each was wrong in the straight fork.
+#
+# d_a IS 0.08, NOT r013_05's 0.04. Its ratio d_h/d_a is 4; Pearson's diagram is drawn at Du/Dv = 2
+# and his (F, k) labels name motifs only at that ratio. The coupled sweep already paid for this
+# lesson -- at ratio 5.3 six distinct points collapsed to one field at six amplitudes, species B
+# correlating 0.86-0.95 across them.
+#
+# from_shape's F0 IS 0.034, MATCHED TO react's F. The operator's own docstring says "match
+# cell_chem_react's feed, or it fights it", and r013_05 does not: react runs F = 0.023 while
+# from_shape drives toward F0 = 0.046. Inheriting that would have pulled the chemistry off the eta
+# point in the direction of a different regime, at a strength set by local curvature.
+#
+# a_sw IS 0.25, NOT 0.35. At eta the activator peaks near 0.38 with a mean of 0.12, so 0.35 gates
+# on the very tips of the spots and 0.25 gates on their bodies -- growth in the spot, not at its
+# summit. r013_05's 0.35 was calibrated against its own F = 0.023 chemistry, which has a different
+# amplitude.
+#
+# THE PURSE-STRING STAYS, unlike in `turing_rps_growth` where it was dropped. There the domains
+# TRAVEL, so growth and interface tension would act on the same moving field and no run could say
+# which shaped the surface. Eta's spots are STATIONARY and well separated, so the two mechanisms
+# are attributable: growth changes a cell's volume, the purse-string contracts the interface
+# between the spot and its surroundings, and on a fixed spot those are separable in the geometry.
+general:
+  name: turing_eta_growth
+  seed: 819657
+  n_frames: 2150
+  dt: 1.0
+  record_cap: 2152
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 50000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 130004
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 65004
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: mesh_seed
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  radius: 5.0
+  jitter: 0.15
+  seed: 819657
+  vseed_cv: 0.15
+  p0: 3.5
+- op: cell_geometry
+  at: cell
+- op: cell_chem_seed
+  at: cell
+  mode: scatter
+  n_spots: 1
+  cone_deg: 8.0
+  seed: 819657
+  before_frame: 3
+  seed_frac: 0.06
+- op: cell_neighbours
+  at: cell
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.3
+- op: cell_chem_react
+  at: cell
+  model: gray_scott
+  rate: 0.5
+  F: 0.034
+  kk: 0.063
+- op: cell_chem_from_shape
+  at: cell
+  model: curvature
+  vertex_set: vertex
+  beta: 0.5
+  F0: 0.034
+  rate: 1.0
+- op: cell_shape_probe
+  at: cell
+  vertex_set: vertex
+  model: shape_index
+  field: elong
+- op: cell_grow
+  at: vertex
+  cell_set: cell
+  rate: 0.001732
+  a_sw: 0.25
+  hill: 8.0
+  rho: 0.1
+  vth_frac: 2.5
+  after_frame: 450
+  conserve_amount: false
+- op: cell_mechanics
+  at: vertex
+  p0: 3.5
+  K_A: 1.0
+  K_P: 1.0
+  Gamma: 0.4
+  Lambda: 0.5
+  K_V: 40.0
+  K_R: 0.0
+  K_bend: 0.0
+  K_lumen: 0.0
+  antiinv: 0.0
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: interface_tension
+  at: vertex
+  cell_set: cell
+  K_purse: 1.0
+  a_sw: 0.6
+  eta: 0.05
+  iters: 4
+  after_frame: 450
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: cell_divide
+  at: vertex
+  factor: 2.0
+  reset_noise: 0.12
+  cycle_cv: 0.15
+  p0: 3.5
+  every: 4
+  cell_set: cell
+  min_cycle: 4
+  max_cycle: 1000000000
+  after_frame: 450
+  orient_iface: false
+  orient_asw: 0.6
+  g1_ramp: false
+  engine_clock: true
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- mesh_seed
+- cell_geometry
+- cell_chem_seed
+- cell_neighbours
+- cell_chem_diffuse
+- cell_chem_react
+- cell_chem_from_shape
+- cell_shape_probe
+- cell_grow
+- cell_mechanics
+- interface_tension
+- edge_flip
+- cell_divide
+- topo_record
+plotting:
+  background: black
+  dot_fill: 0.9
