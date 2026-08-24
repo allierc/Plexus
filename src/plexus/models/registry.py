@@ -27,6 +27,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+
+def _warn(msg: str) -> None:
+    """`plexus.paths.warn`, imported lazily so the registry keeps no import-time dependency."""
+    from plexus.paths import warn
+    warn(msg)
+
 _ENTITY_REGISTRY: dict[str, type] = {}
 _OPERATOR_REGISTRY: dict[str, type] = {}    # name -> DEFAULT implementation class (enumeration / back-compat)
 _FIELD_REGISTRY: dict[str, type] = {}
@@ -170,7 +176,7 @@ def register_operator(*names: str, implementation: str | None = None,
         # (e.g. integrin_seed) already have this mismatch and that codebase is not in
         # scope for this refactor yet, so import must not break on them.
         if tags.get("family") == "seed" and tags.get("kind") != "seed":
-            print(
+            _warn(
                 f"[warn] operator {names[0]!r}: family=\"seed\" claims this establishes "
                 f"the initial state, but kind={tags.get('kind')!r} -- a seed masquerading "
                 f"as a dynamics kind. Should be registered with kind=\"seed\".")
