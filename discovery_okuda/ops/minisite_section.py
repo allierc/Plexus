@@ -175,6 +175,20 @@ def _nframes(src):
     return max(1, int(out.split(",")[0]))
 
 
+def _crop_square(src, dst, crop, side=552, fps=12):
+    """One panel of a single-view movie, cropped to `crop` = (w, h, x, y) and squared to `side`.
+
+    `split_concat` is for the TWO-view movies okuda writes (3D then cross-section); a promotion run
+    writes one square panel with its label printed across the top, and all that is needed is to cut
+    the label off without cutting the tissue.
+    """
+    subprocess.check_call([
+        _exe("ffmpeg"), "-y", "-loglevel", "error", "-i", src, "-vf",
+        f"crop={crop[0]}:{crop[1]}:{crop[2]}:{crop[3]},scale={side}:{side}:flags=lanczos,fps={fps}",
+        "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "23", "-movflags", "+faststart",
+        dst])
+
+
 def split_concat(src, dst, recentre=True, skip_top=0.0):
     """Cut the two-panel movie in half and play the halves in SEQUENCE: 3D first, then the section.
 
@@ -877,22 +891,26 @@ def main():
         _patch4(tgt, build4(runs4), rendered=rendered)
         _patch5(tgt, build5(runs5r), rendered=rendered)
         _patch3(tgt, build3(runs5, runs5b), rendered=rendered)
-    # AND THE ONE HAND-WRITTEN CARD THIS SESSION REPLACED: "grow & divide" now plays the vertex
-    # model on its own (`00_spheroid`), cropped to the tissue so the printed label is out of frame,
-    # 3D first and the true cross-section second.
-    gd = os.path.join(LOG, "00_spheroid")
+    # THE "grow & divide" CARD plays `G_gates_gate_00_spheroid/A`, the promotion run of the vertex
+    # model on its own. Its `movie.mp4` is ONE square panel with a printed label across the top, so
+    # the crop takes the top 40 px off and leaves the rest: the body grows to 757 of 896 px by the
+    # last frame, so a tighter square would clip the very thing the clip is about. Green faces are
+    # the renderer's division mark -- cells that divided in the last few calls.
+    gd = os.path.join(ROOT, "log", "promotion", "G_gates_gate_00_spheroid", "A")
     if os.path.exists(os.path.join(gd, "movie.mp4")):
-        split_concat(os.path.join(gd, "movie.mp4"), os.path.join(GAL, "tyssue_spheroid_00.mp4"),
-                     skip_top=0.16)
-        print(f"[minisite] gallery/tyssue_spheroid_00.mp4 <- 00_spheroid/movie.mp4 "
-              f"({os.path.getsize(os.path.join(GAL, 'tyssue_spheroid_00.mp4')) / 1e6:.1f} MB)")
-        replace_card("tyssue_grow_divide.mp4", "grow &amp; divide", os.path.join(gd, "spec.yaml"),
-                     "the vertex model on its own: 200 cells and 396 vertices to 6,076 and ~12,000 "
-                     "over 402 frames, the apical radius x3.56 and the shell still round "
-                     "(aspect 1.02), through 1,384 T1 neighbour exchanges. 3D first, then the true "
-                     "cross-section -- one cell deep, hollow",
+        _crop_square(os.path.join(gd, "movie.mp4"), os.path.join(GAL, "tyssue_spheroid_gate00.mp4"),
+                     crop=(856, 856, 20, 40))
+        print(f"[minisite] gallery/tyssue_spheroid_gate00.mp4 <- G_gates_gate_00_spheroid/A "
+              f"({os.path.getsize(os.path.join(GAL, 'tyssue_spheroid_gate00.mp4')) / 1e6:.1f} MB)")
+        _n = json.load(open(os.path.join(gd, "progress.json")))["n_cells"]
+        _sm = json.load(open(os.path.join(gd, "diag.json")))["summary"]
+        replace_card("tyssue_spheroid_00.mp4", "grow &amp; divide",
+                     os.path.join(gd, "spec_run.yaml"),
+                     f"the vertex model on its own: 200 cells grow and divide into {_n:,} over 401 "
+                     f"frames, and the shell stays round (elongation "
+                     f"{_sm['elongation_at_end']:.2f}, where 1.00 is a sphere)",
                      files=((QMD, False), (DOCS, True)),
-                     new_video="tyssue_spheroid_00.mp4")
+                     new_video="tyssue_spheroid_gate00.mp4")
         import shutil as _sh
         # THREE CARDS THAT NEVER HAD A SPEC. `apop_patch_big`, `apop_rings9` and `apop_half` were
     # written by hand with a bare <span class="sim-name">: no `tabindex`, no spec, so their titles
