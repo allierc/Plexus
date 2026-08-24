@@ -1221,6 +1221,24 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         _by_token.setdefault(_nm, []).append(_i)
     _seen_this_tick = {}
 
+    # STATIC STORAGE FOR THE SUBSTEP'S DELTA SNAPSHOT.
+    #
+    # The delta accumulator is rebound constantly: `zero_delta` builds fresh zeros every TICK
+    # (models/base.py:501), `add_delta` does `self._delta[k] = self._delta[k] + d` (:517), and the
+    # substep loop below used to clone the whole dict again on every SUBSTEP. Values were always
+    # right; addresses were never stable.
+    #
+    # That is fine for eager and fatal for a captured CUDA graph, which bakes in the address it saw
+    # at capture time -- `mpm_scatter` reads the parent's delta through `H.delta(pn)` on every
+    # substep, so a replay would read whatever tensor the capture happened to see and quietly
+    # ignore gravity thereafter. These two dicts are allocated once and refilled in place, so the
+    # tensor a captured region reads is the tensor the engine keeps writing.
+    #
+    # BYTE-IDENTICAL, because it changes storage and not values: the substep still sees exactly the
+    # frame-level delta snapshot it saw before, restored before each substep.
+    _static_d: dict = {}
+    _static_b: dict = {}
+
     # ------------------------------------------------------------------ torch.compile, opt-in
     # `{substep_dt: X, steps: [...], compile: true}` -- the flag lives on the SUBSTEP BLOCK because
     # that is the only schedule entry that is a dict, and because it is where the cost is. A
@@ -1386,6 +1404,23 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     _d0 = {k: v.clone() for k, v in H._delta.items()}
                     _b0 = {k: {b: t.clone() for b, t in d.items()}
                            for k, d in H._delta_blocks.items()}
+                    # install the persistent buffers, refilled from this tick's snapshot
+                    for _k, _v in _d0.items():
+                        _t = _static_d.get(_k)
+                        if _t is None or _t.shape != _v.shape or _t.device != _v.device:
+                            _t = _static_d[_k] = torch.empty_like(_v)
+                        _t.copy_(_v)
+                    for _k in [k for k in _static_d if k not in _d0]:
+                        del _static_d[_k]                       # a set that stopped emitting
+                    for _k, _d in _b0.items():
+                        _sb = _static_b.setdefault(_k, {})
+                        for _b, _t2 in _d.items():
+                            _c = _sb.get(_b)
+                            if _c is None or _c.shape != _t2.shape or _c.device != _t2.device:
+                                _c = _sb[_b] = torch.empty_like(_t2)
+                            _c.copy_(_t2)
+                    H._delta = _static_d
+                    H._delta_blocks = _static_b
                     for _s in range(count):
                         # THE OCCURRENCE COUNTER RESETS EVERY SUBSTEP, not every tick. `_run_token`
                         # binds the i-th OCCURRENCE of a token to the i-th INSTANCE of that
@@ -1411,9 +1446,15 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                         _seen_this_tick.clear()
                         H.micro = H.micro + 1        # a new solve: the next scatter clears the grid
                         if _s:
-                            H._delta = {k: v.clone() for k, v in _d0.items()}
-                            H._delta_blocks = {k: {b: t.clone() for b, t in d.items()}
-                                               for k, d in _b0.items()}
+                            # REFILL, DO NOT REBIND. Same values as the clone this replaces; the
+                            # storage survives, which is what a captured graph requires.
+                            for _k, _v in _d0.items():
+                                _static_d[_k].copy_(_v)
+                            for _k, _d in _b0.items():
+                                for _b, _t2 in _d.items():
+                                    _static_b[_k][_b].copy_(_t2)
+                            H._delta = _static_d
+                            H._delta_blocks = _static_b
                         for token in step["steps"]:
                             _run_token(token, tick)
                     H.sub_dt = None
