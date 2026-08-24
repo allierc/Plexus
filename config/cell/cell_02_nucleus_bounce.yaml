@@ -103,3 +103,16 @@ plotting:
   dot_size: 1.2
   splat_size: 2.6
   splat_res: 560
+  panels: true
+  panels_thick: 0.1
+descriptions:
+  movie_nucleus:
+    description: A small cluster of golden particles is positioned at the center of
+      a wireframe cube. Over the course of the simulation, the cluster moves steadily
+      downward along the vertical axis. It eventually reaches the bottom face of the
+      cube. The particles maintain their compact, spherical shape throughout the entire
+      motion.
+    objects: The scene contains a single cluster of small, golden-colored particles.
+      These particles are densely packed together to form a spherical shape. A large,
+      white wireframe cube surrounds the particles, defining the spatial boundaries.
+      The cube is composed of thin lines and occupies the majority of the frame.

@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import PolyCollection
 
 from plexus.schema import Spec
-from plexus.paths import graphs_data_path
+from plexus.paths import get_repo_root, graphs_data_path
 from plexus.models.registry import get_entity
 import plexus.models.entities  # noqa: F401  register entity render hints
 from plexus.models.entities import DEFAULT_RENDER
@@ -136,6 +136,25 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
     if not os.path.isfile(npz_path):
         raise FileNotFoundError(f"no trajectory at {npz_path} (run `-o generate` first)")
     d = np.load(npz_path)
+
+    # ONE FIGURE INSTEAD OF A PILE, when the spec asks for it. `plotting.panels: true` renders the
+    # two-panel composition view and returns -- no per-set movies, no per-set figures.
+    #
+    # WHY A COMPOSITION NEEDS THIS. The default path draws one mp4 and two figures PER SET: for a
+    # nucleus + cytosol + membrane that is nine files, and not one of them shows the cell, because
+    # each draws a single compartment alone while the entire claim is how they relate. The two
+    # panels are the domain (where the cell is, in its box) and the cell zoomed with a cross
+    # section (what it is made of) -- a filled body tells you nothing from outside.
+    if (sim.plotting or {}).get("panels"):
+        import sys as _sys
+        _t = os.path.join(get_repo_root(), "tools")
+        if _t not in _sys.path:
+            _sys.path.insert(0, _t)
+        from cell_panels import panels as _panels
+        _panels(data_dir, axis=(sim.plotting or {}).get("panels_axis", "z"),
+                thick=float((sim.plotting or {}).get("panels_thick", 0.10)))
+        print(f"[plot] panels -> {data_dir}", flush=True)
+        return data_dir
 
     # VTK IS THE RENDERER FOR A MESH SET, and this is the whole of the switch. `mpl_toolkits.mplot3d`
     # has no depth buffer -- it sorts polygons by mean z and paints back to front -- and a closed

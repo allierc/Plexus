@@ -1237,7 +1237,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             from tqdm import tqdm
             # `dynamic_ncols` OVERRIDES `ncols`: it re-reads the terminal width on every refresh, so a
             # fixed width set beside it is silently ignored and the bar fills the window.
-            ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", ncols=100, leave=False)
+            # `leave=True` because the finished bar is the record of how long the run took and how
+            # many frames it got through; erasing it on completion throws that away and leaves the
+            # log with no evidence the loop ran at all.
+            ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", ncols=100, leave=True)
         except ImportError:
             pass
     # the tape is OFF unless the caller asked for it (see the docstring): generation pays no

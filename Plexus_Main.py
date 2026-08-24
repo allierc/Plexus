@@ -154,8 +154,14 @@ def _describe(data_dir: str, out_file: str | None, device: str = "cuda:0") -> No
     # a caption that did not happen must SAY SO. check=False keeps a broken VLM from killing a run,
     # which is right, but on its own it also let an out-of-memory captioner pass for a successful one.
     before = os.path.getsize(out_file) if os.path.exists(out_file) else 0
+    # NO `Loading weights: 100%|####...| 677/677`. It is a full terminal width of blocks, redrawn,
+    # for a load the line above already announced, and it reports nothing anyone can act on -- the
+    # load either finishes or the caption says UNAVAILABLE. `discovery_okuda/caption_wave.py`
+    # disables it in-process for the same reason; this path runs the captioner as a SUBPROCESS, so
+    # the switch has to travel in its environment instead.
+    _env = {**os.environ, "HF_HUB_DISABLE_PROGRESS_BARS": "1", "TRANSFORMERS_VERBOSITY": "error"}
     r = subprocess.run([sys.executable, script, *movies, "--root", gd,
-                        "--out", out_file, "--append", "--device", device], check=False)
+                        "--out", out_file, "--append", "--device", device], check=False, env=_env)
     after = os.path.getsize(out_file) if os.path.exists(out_file) else 0
     if r.returncode != 0 or after <= before:
         print(f"[describe] *** NO CAPTIONS WERE WRITTEN *** (exit {r.returncode}, "
