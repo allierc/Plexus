@@ -54,9 +54,20 @@ def submit(name, frames=None):
             # NO `--output_root`. That flag is what redirected the promotion runs into their pair
             # directories; leaving it off lets `graphs_data_path` resolve the ordinary data root,
             # which is the whole point of this script.
+            # `--no-describe` SUPPRESSES THE PER-SET MOVIES. `describe` defaults on, and
+            # Plexus_Main renders `plot_dataset(movie=True)` whenever it is set -- which for a
+            # composition means one mp4 and two figures PER SET: movie_nucleus, movie_cytosol,
+            # movie_membrane, fig_*_evolution, fig_*_final. Six or nine files, none of which shows
+            # the cell, because each draws one compartment alone and the whole claim is how they
+            # relate. The captioning rule that keeps describe on elsewhere is about the minisite
+            # scenes, where one set IS the scene.
             f"conda run -n {C.ENV} python Plexus_Main.py -o generate {FOLDER}/{name}"
             + (f" --frames {frames}" if frames else "")
-            + " --device cuda:0 --force",
+            + " --device cuda:0 --force --no-describe",
+            # ONE VIZ, RENDERED IN THE SAME JOB so the run is not finished until it can be looked
+            # at. Two panels: the domain, and the cell zoomed with a cross section.
+            f"conda run -n {C.ENV} python tools/cell_panels.py "
+            f"{C.cpath(os.path.join(ROOT, 'graphs_data', FOLDER, name))} --axis z --thick 0.10",
         ]) + "\n")
     os.chmod(sh, 0o755)
     log = C.cpath(os.path.join(out_dir, f"{name}.out"))

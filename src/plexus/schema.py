@@ -385,7 +385,14 @@ def load(path: str) -> Spec:
         used_props |= set(getattr(cls, "REQUIRES_TYPE_PROPS", []))
         used_props |= set(getattr(cls, "OPTIONAL_TYPE_PROPS", []))   # read only in some modes (e.g. alignment per_type)
     # core/layers/block: consumed by an entity provision hook (e.g. mpm_particle), not by an operator
-    _KNOWN_TYPE_KEYS = {"fraction", "core", "layers", "block"} | used_props
+    #
+    # `material`, `density` and `tau` join them, and the warning that flagged their absence was
+    # RIGHT until now: a child set declaring `material: liquid` was read by nothing, so a cytosol
+    # asking to be a fluid silently built as whatever its parent cell was. The provision hook reads
+    # all three today -- per the PARTICLE's own type, not its parent's -- so the warning would now
+    # be false where it used to be the only notice anyone got.
+    _KNOWN_TYPE_KEYS = {"fraction", "core", "layers", "block",
+                        "material", "density", "tau"} | used_props
     for sname, s in raw["sets"].items():
         for tname, t in s.get("types", {}).items():
             for k in t:
