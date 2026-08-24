@@ -87,6 +87,12 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("promotion",   ()),
     ("gates",       ()),
     ("atlas",       ()),
+    # THE COMPOSED-CELL LADDER. A cell built from heterogeneous substrates -- a nucleus, a cytosol
+    # of two protein species, a membrane -- each its own contained set (`config/cell/`, appendix
+    # "Making a cell in Plexus"). No trigger substrings, for the same reason the three above have
+    # none: `cell` appears in the name of half the corpus, and inferring this folder from it would
+    # sweep every vertex-model spec into a directory nobody chose.
+    ("cell",        ()),
     # THE NEURAL FOLDER. Recurrent circuits: a `neuron` set, a `synapse` edge-set carrying the
     # connectivity matrix, and the assemblies that contain them (`operators/neural.py`). Trigger
     # substrings are given because these specs are named for what they model -- `ctrnn_*`,
