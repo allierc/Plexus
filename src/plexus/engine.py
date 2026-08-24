@@ -1235,7 +1235,9 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     if progress:                                     # live progress bar over the simulated frames
         try:
             from tqdm import tqdm
-            ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", dynamic_ncols=True, ncols=140, leave=False)
+            # `dynamic_ncols` OVERRIDES `ncols`: it re-reads the terminal width on every refresh, so a
+            # fixed width set beside it is silently ignored and the bar fills the window.
+            ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", ncols=100, leave=False)
         except ImportError:
             pass
     # the tape is OFF unless the caller asked for it (see the docstring): generation pays no
