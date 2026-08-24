@@ -23,6 +23,24 @@ _DEFAULT_DATA_ROOT = "/groups/saalfeld/home/allierc/GraphData"
 _data_root = os.environ.get("PLEXUS_OUTPUT_ROOT") or os.environ.get("GNN_OUTPUT_ROOT") or _DEFAULT_DATA_ROOT
 
 
+def warn(msg: str) -> None:
+    """Print a `[warn]` line in yellow, so it is not read as ordinary progress.
+
+    WHY IT MATTERS HERE. The warning "property 'material' on nucleus.n is read by no operator" was
+    correct for weeks and was the ONLY notice that a child set asking to be a liquid was silently
+    building as whatever its parent cell was. It scrolled past in the same white as the banner, the
+    operator list and the progress bar, and nobody read it -- the bug was eventually found by
+    measuring `mu` and `is_liquid` by hand. A warning that looks like progress is not a warning.
+
+    COLOUR ONLY ON A TERMINAL. `sys.stdout.isatty()` is False for a cluster job's redirected
+    output, and an escape sequence in a log file is noise a grep has to strip.
+    """
+    import sys
+    on = "\033[33m" if sys.stdout.isatty() else ""
+    off = "\033[0m" if sys.stdout.isatty() else ""
+    print(f"{on}{msg}{off}", flush=True)
+
+
 def get_data_root() -> str:
     return _data_root
 

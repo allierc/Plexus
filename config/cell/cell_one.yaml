@@ -1,37 +1,3 @@
-# cell_one -- ONE CELL, composed rather than simulated.
-#
-# The cell is a PARENT holding two distinct child sets, each in the substrate its own biology asks
-# for. Nothing here is a cell simulator: `cell` is an ordinary set, the interior is the material
-# point method, and the composition is containment plus the ordinary operators.
-#
-# WHAT DRIVES THE MOTION IS DENSITY, AND NOTHING ELSE. A liquid of uniform density under gravity
-# just sits, so a circulating interior has to come from a density difference. There are two here:
-#   * the cytosol carries two protein species, light (0.6) and heavy (1.8), mixed at the seed, so
-#     the light one rises through the heavy one and the interior overturns;
-#   * the nucleus is denser than either (2.6) and sediments, pushing cytosol around itself.
-# Neither flow is imposed. A prescribed stirring would prove nothing about composition.
-#
-# TWO CHILD SETS, ONE GRID. `cytosol` and `nucleus` are separate sets that both alias the MPM
-# particle entity -- same substrate, different objects, different densities. Both scatter to the
-# same grid and both gather from it, which is why `mpm_scatter` and `mpm_gather` are each named
-# TWICE in the schedule: the engine binds the i-th occurrence of a token to the i-th instance, and
-# an instance with no occurrence is constructed, listed in the run banner, and never called.
-#
-# THE PROTEINS NEED NO ADVECTION OPERATOR. They ARE particles, so `g2p` carries them with the grid
-# velocity by construction. An advection operator is only needed for a species held as a FIELD.
-#
-# THE CAMERA IS DECLARED, and it has to be. `material_3d_ball_drop` -- the 3D drop that reads
-# correctly -- sets `up_axis: 1`, and without it the renderer does not know which way is up: a fall
-# straight down the y axis is drawn as a diagonal, and the box edge it lands on is drawn as a
-# diagonal wall. The trajectory was never wrong. Measured on cell_02: dx = -0.0000, dz = +0.0000,
-# dy = -0.6583 -- a pure vertical fall, rendered as a diagonal one.
-#
-# `hide_sets: [cell]` IS WHY THERE IS NO movie_cell.mp4. The parent is one point at the centre of
-# the composition; a movie of it is a single dot crossing an empty frame. The key already exists and
-# is what the material specs use -- the renderer did not need changing.
-#
-# `box_frame: true` draws the domain, so which surface the body struck is not a matter of inference,
-# and `camera_turns: 0.0` holds the view still: an orbiting camera makes a straight fall look curved.
 general:
   name: cell_one
   seed: 0

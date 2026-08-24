@@ -19,6 +19,8 @@ already be imported by the caller so the registry is populated.
 
 from __future__ import annotations
 
+from plexus.paths import warn
+
 import re
 from dataclasses import dataclass, field
 from typing import Optional
@@ -374,7 +376,7 @@ def load(path: str) -> Spec:
     # SEED_MIGRATION.md), but warned about, and it is exactly what the next check
     # (seed in schedule:) would reject if that operator is ALSO scheduled.
     if _legacy_seed_ops:
-        print(f"[warn] deprecated: {sorted(_legacy_seed_ops)} declared in operators: with "
+        warn(f"[warn] deprecated: {sorted(_legacy_seed_ops)} declared in operators: with "
               f"kind=\"seed\" -- move to the seed: section (see SEED_MIGRATION.md). Still "
               f"accepted for now via the legacy engine seed-window path.")
 
@@ -397,7 +399,7 @@ def load(path: str) -> Spec:
         for tname, t in s.get("types", {}).items():
             for k in t:
                 if k not in _KNOWN_TYPE_KEYS:
-                    print(f"[warn] property {k!r} on {sname}.{tname} is read by no operator "
+                    warn(f"[warn] property {k!r} on {sname}.{tname} is read by no operator "
                           f"(known: {sorted(_KNOWN_TYPE_KEYS)})")
 
     # --- schedule: every token resolves to an operator or a builtin --------- #

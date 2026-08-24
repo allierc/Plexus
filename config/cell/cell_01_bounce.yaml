@@ -1,37 +1,3 @@
-# cell_01_bounce -- RUNG TWO: drop the composed cell and watch each compartment deform differently.
-#
-# The composition is `cell_00_hierarchy`'s, unchanged: a nucleus at the core, a cytosol of two
-# protein species around it, a membrane shell containing both. The only additions are gravity and a
-# starting height. Nothing about the cell is retuned for the impact, because a rung that changes the
-# object AND the forcing cannot say which produced the deformation.
-#
-# WHAT THIS RUNG IS FOR, and it is the first thing in the ladder a single-substrate model could not
-# produce. The three compartments are made of different materials, so they must respond differently
-# to the same impact: the cytosol is `liquid` and should flow and slosh, the nucleus is stiff
-# `elastic` and should keep its shape while being displaced, and the membrane is a stiffer shell
-# that should flatten against the floor and recover. A model in which the cell is one material at
-# three stiffnesses gives three versions of the same response; this should give three different
-# ones. If it does not, the composition is decorative.
-#
-# THE DROP. The cell starts at z = 0.72 with an outer radius of 0.168, so it falls about 0.55 before
-# the membrane touches the floor -- roughly 230 frames at g = 9 and dt = 0.0015 -- and 1,500 frames
-# leaves room for several bounces. `boundary: wall` gives it a floor to hit.
-#
-# GRAVITY IS AT THE CELL, one uniform acceleration for the whole body, so nothing here sorts by
-# density. Buoyancy is rung four and needs the grid term; this rung is about MECHANICS.
-#
-# THE CAMERA IS DECLARED, and it has to be. `material_3d_ball_drop` -- the 3D drop that reads
-# correctly -- sets `up_axis: 1`, and without it the renderer does not know which way is up: a fall
-# straight down the y axis is drawn as a diagonal, and the box edge it lands on is drawn as a
-# diagonal wall. The trajectory was never wrong. Measured on cell_02: dx = -0.0000, dz = +0.0000,
-# dy = -0.6583 -- a pure vertical fall, rendered as a diagonal one.
-#
-# `hide_sets: [cell]` IS WHY THERE IS NO movie_cell.mp4. The parent is one point at the centre of
-# the composition; a movie of it is a single dot crossing an empty frame. The key already exists and
-# is what the material specs use -- the renderer did not need changing.
-#
-# `box_frame: true` draws the domain, so which surface the body struck is not a matter of inference,
-# and `camera_turns: 0.0` holds the view still: an orbiting camera makes a straight fall look curved.
 general:
   name: cell_01_bounce
   seed: 0
