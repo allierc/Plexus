@@ -1,0 +1,109 @@
+# cell_02_nucleus_bounce -- RUNG 2a: the nucleus ALONE, dropped. The control.
+#
+# GRAVITY PULLS ALONG -Y IN 3D, NOT -Z, and `cell_01_bounce` did not know that. The operator sets
+# `accel[:, 1] = gy` and its own comment says "-y (axis 1) is down"; that spec started the cell high
+# in Z, so it fell sideways in y while holding its height -- the diagonal drift into the corner and
+# the bounce off a side wall. The cell here starts high in Y and falls straight down.
+#
+# ONE PARTICLE SET AND NOTHING ELSE. This is the simplest thing that can bounce, and it exists to
+# separate two failures that looked like one. `cell_01_bounce` showed a nucleus drifting diagonally
+# through a membrane that never moved, which could have been bad mechanics, a bad membrane, or bad
+# scheduling; with one set there is no membrane to blame and no second instance to mis-bind, so
+# whatever this does is the mechanics.
+#
+# IT SHOULD LOOK LIKE THE MINISITE'S BOUNCING BALL: fall, flatten on impact, recover, rise, repeat.
+# If it does not, nothing further up the ladder is worth running.
+general:
+  name: cell_02_nucleus_bounce
+  seed: 0
+  n_frames: 1500
+  record_cap: 602
+  dt: 0.0015
+  dim: 3
+  boundary: wall
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    types:
+      c:
+        fraction: 1.0
+        youngs: 40
+    state:
+      pos:
+        width: 3
+        integration: none
+        boundary: free
+    start:
+    - - 0.5
+      - 0.72
+      - 0.5
+  nucleus:
+    parent: cell
+    per_parent: 1500
+    radius: 0.055
+    density: 2.6
+    types:
+      n:
+        fraction: 1.0
+        youngs: 300
+        material: elastic
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.0
+- op: mpm_strain
+  at: nucleus
+- op: mpm_scatter
+  at: nucleus
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  surface_tension: 60.0
+  wall_damp: 1.0
+- op: mpm_gather
+  at: nucleus
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+schedule:
+- aggregate
+- gravity
+- substep_dt: 0.0001
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  colors:
+    light:
+    - 0.25
+    - 0.69
+    - 1.0
+    heavy:
+    - 0.12
+    - 0.31
+    - 0.66
+    n:
+    - 1.0
+    - 0.82
+    - 0.29
+    m:
+    - 0.95
+    - 0.35
+    - 0.45
+  fps: 30
+  movie_max_frames: 600

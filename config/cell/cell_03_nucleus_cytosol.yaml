@@ -1,0 +1,144 @@
+# cell_03_nucleus_cytosol -- RUNG 2b: nucleus plus cytosol, no membrane.
+#
+# GRAVITY PULLS ALONG -Y IN 3D, NOT -Z, and `cell_01_bounce` did not know that. The operator sets
+# `accel[:, 1] = gy` and its own comment says "-y (axis 1) is down"; that spec started the cell high
+# in Z, so it fell sideways in y while holding its height -- the diagonal drift into the corner and
+# the bounce off a side wall. The cell here starts high in Y and falls straight down.
+#
+# TWO SETS, AND THE SECOND INSTANCE IS THE POINT. With one operator instance per token the engine's
+# occurrence-to-instance binding cannot go wrong; with two it could, and did -- the counter reset
+# once per TICK while the substep block ran fifteen times per tick, so every substep after the first
+# fell back to running all instances for every occurrence. That is fixed, and this rung is the
+# smallest spec that exercises the fix.
+#
+# WHAT TO EXPECT, and it is the first genuinely composed behaviour in the ladder: the cytosol is a
+# LIQUID with no membrane holding it, so on impact it should spread across the floor like water,
+# while the nucleus is stiff and should stay a ball, sink through the puddle it is making, and
+# bounce off the floor beneath it. Two materials, one impact, two responses. If the cytosol bounces
+# as a body, it is not behaving as a liquid; if the nucleus smears, it is not behaving as a solid.
+general:
+  name: cell_03_nucleus_cytosol
+  seed: 0
+  n_frames: 1500
+  record_cap: 602
+  dt: 0.0015
+  dim: 3
+  boundary: wall
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    types:
+      c:
+        fraction: 1.0
+        youngs: 40
+    state:
+      pos:
+        width: 3
+        integration: none
+        boundary: free
+    start:
+    - - 0.5
+      - 0.72
+      - 0.5
+  nucleus:
+    parent: cell
+    per_parent: 1500
+    radius: 0.055
+    density: 2.6
+    types:
+      n:
+        fraction: 1.0
+        youngs: 300
+        material: elastic
+  cytosol:
+    parent: cell
+    per_parent: 12000
+    radius: 0.16
+    density: 1.0
+    types:
+      light:
+        fraction: 0.5
+        youngs: 15
+        material: liquid
+        density: 0.6
+      heavy:
+        fraction: 0.5
+        youngs: 15
+        material: liquid
+        density: 1.8
+    radius_inner: 0.065
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.0
+- op: mpm_strain
+  at: nucleus
+- op: mpm_strain
+  at: cytosol
+- op: mpm_scatter
+  at: nucleus
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_scatter
+  at: cytosol
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  surface_tension: 60.0
+  wall_damp: 1.0
+- op: mpm_gather
+  at: nucleus
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+- op: mpm_gather
+  at: cytosol
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+schedule:
+- aggregate
+- gravity
+- substep_dt: 0.0001
+  steps:
+  - mpm_strain
+  - mpm_strain
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  - mpm_gather
+plotting:
+  background: black
+  colors:
+    light:
+    - 0.25
+    - 0.69
+    - 1.0
+    heavy:
+    - 0.12
+    - 0.31
+    - 0.66
+    n:
+    - 1.0
+    - 0.82
+    - 0.29
+    m:
+    - 0.95
+    - 0.35
+    - 0.45
+  fps: 30
+  movie_max_frames: 600

@@ -1269,6 +1269,28 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     _b0 = {k: {b: t.clone() for b, t in d.items()}
                            for k, d in H._delta_blocks.items()}
                     for _s in range(count):
+                        # THE OCCURRENCE COUNTER RESETS EVERY SUBSTEP, not every tick. `_run_token`
+                        # binds the i-th OCCURRENCE of a token to the i-th INSTANCE of that
+                        # operator, and `_seen_this_tick` is cleared once per tick -- outside this
+                        # loop. So a substep block naming `mpm_scatter` three times for three
+                        # particle sets bound correctly on substep 0 and then ran off the end of
+                        # the instance list on every substep after it, where `_want` falls back to
+                        # ALL instances and each of the three occurrences scattered all three sets:
+                        # nine scatters per substep instead of three, on fourteen of fifteen
+                        # substeps.
+                        #
+                        # WHAT IT LOOKED LIKE, because it does not announce itself. A composed cell
+                        # of nucleus + cytosol + membrane ran with the nucleus moving and the other
+                        # two standing still while it passed through them -- the grid was being
+                        # scattered into repeatedly with duplicated momentum, so the solve was
+                        # meaningless, and the picture read as "the membrane is too weak" rather
+                        # than as a scheduling fault.
+                        #
+                        # A single-instance token is unaffected either way: with one instance,
+                        # occurrence 0 selects it and every later occurrence falls back to the same
+                        # one. Only specs declaring the SAME operator more than once inside a
+                        # substep block change, which is exactly the set that was wrong.
+                        _seen_this_tick.clear()
                         if _s:
                             H._delta = {k: v.clone() for k, v in _d0.items()}
                             H._delta_blocks = {k: {b: t.clone() for b, t in d.items()}
