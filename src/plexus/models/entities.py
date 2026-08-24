@@ -162,6 +162,26 @@ class MPMParticle:
         # per-particle stiffness + material masks (inner->outer radial bands)
         is_core = (core_y[pidx] > 0) & (r < core_f[pidx] * rad)
         p_y = torch.where(is_core, core_y[pidx], youngs_c[pidx])
+        # A CHILD SET'S OWN TYPES SET ITS OWN MATERIAL, and until now they did not. Everything
+        # above reads `type_list`, which is the PARENT's types -- correct for `layers` and `core`,
+        # which describe how a CELL is built in radial bands, and wrong for a composition of
+        # several distinct child sets, where each set IS a material.
+        #
+        # MEASURED: a spec declaring nucleus youngs 4000 / elastic beside cytosol youngs 15 /
+        # liquid produced mu = 16.67 and is_liquid = 0.00 for BOTH -- the cell type's youngs 40,
+        # twice. The cytosol was never a liquid and the nucleus was never stiff, so three
+        # compartments that were supposed to be three substrates were one material wearing three
+        # colours. It is why changing either value changed nothing: two runs of cell_03 with
+        # youngs 300 and 4000 gave bit-identical shape statistics.
+        _ct = list((s.get("types") or {}).values())
+        _cnt = getattr(lvl, "node_type", None)
+        _own_mat = {}
+        if _ct and _cnt is not None:
+            _cy = torch.as_tensor([float(t.get("youngs", 100.0)) for t in _ct],
+                                  device=device, dtype=p_y.dtype)[_cnt]
+            p_y = torch.where(is_core, core_y[pidx], _cy)     # `core` still overrides, per parent
+            for _tid, _t in enumerate(_ct):
+                _own_mat[_tid] = (_t.get("material", "elastic"), float(_t.get("tau", 0.0)))
         is_liquid = torch.zeros(Np, dtype=torch.bool, device=device)
         is_snow = torch.zeros(Np, dtype=torch.bool, device=device)
         is_visco = torch.zeros(Np, dtype=torch.bool, device=device)          # viscoelastic (Maxwell) band
@@ -177,6 +197,12 @@ class MPMParticle:
                 is_visco = is_visco | sel_band
                 visco_tau = torch.where(sel_band, torch.full_like(visco_tau, max(tau, 1e-6)), visco_tau)
 
+        # the child's own `material`, applied per type -- the same precedence as its `youngs`.
+        # `layers` still wins where a parent declares them, because a layered CELL is a statement
+        # about radial structure that a flat per-set material cannot express.
+        for _tid, (_mat, _tau) in _own_mat.items():
+            if _mat and _mat != "elastic":
+                _mark(_mat, (_cnt == _tid), _tau)
         if type_layers:
             rnorm = r / max(rad, 1e-9)
             nt = ntp[pidx]
