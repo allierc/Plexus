@@ -169,7 +169,9 @@ def _okuda_frames(path):
         mt = z[f"mesh_{t}"]
         mt = mt.item() if hasattr(mt, "item") else mt
         act = z[f"act_{t}"] if f"act_{t}" in z.files else None
-        out.append((np.asarray(z[f"pos_{t}"], float), mt, act))
+        # okuda's traj.npz stores the activator column only, so there is no LUT colouring to do
+        # from it: the fourth slot is None and `mesh_of` falls back to white -> red, unchanged.
+        out.append((np.asarray(z[f"pos_{t}"], float), mt, act, None))
     return out
 
 
@@ -214,8 +216,34 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
         for c, arr in face_cols.items():
             mt[c] = arr[fa:fb]
         act = None if chem is None else np.asarray(chem[t][:int(nF[t]), chan], float)
-        out.append((np.asarray(pos[t][:int(Nv[t])], float), mt, act))
+        # THE WHOLE CHEM ROW TRAVELS WITH THE FRAME, not only the column `chan` names. A
+        # three-species run (May-Leonard u,v,w) has no single activator: colouring it from one
+        # column is why a rock-paper-scissors mesh rendered white-to-red and threw two species
+        # away. `act` stays what it was -- the scalar the range and the metrics are taken from --
+        # and the extra element is what `mesh_of` colours from when the spec declares a LUT.
+        rows = None if chem is None else np.asarray(chem[t][:int(nF[t])], float)
+        out.append((np.asarray(pos[t][:int(Nv[t])], float), mt, act, rows))
     return out
+
+
+def style_of(run_dir):
+    """`(lut, blend)` from the run's own `spec.yaml` -- the colour table is part of the MODEL.
+
+    Returns `(None, None)` when the spec declares no `plotting.species`, which is every
+    Gray-Scott run: those keep the white -> red activator map they were built with.
+    """
+    for nm in ("spec.yaml", "spec_run.yaml"):
+        f = os.path.join(run_dir, nm)
+        if not os.path.exists(f):
+            continue
+        try:
+            import yaml
+            pl = (yaml.safe_load(open(f)) or {}).get("plotting") or {}
+        except Exception:
+            return None, None
+        lut = pl.get("species")
+        return (list(lut) if lut else None), pl.get("blend")
+    return None, None
 
 
 def frames_of(run_dir, traj=None):
@@ -255,7 +283,7 @@ def box_of(run_dir, fr):
                 return float(L)
         except Exception:
             pass
-    return float(max(np.abs(np.asarray(p)).max() for p, _m, _a in fr)) * 1.12
+    return float(max(np.abs(np.asarray(p)).max() for p, _m, _a, _c in fr)) * 1.12
 
 
 def _cmap():
@@ -328,7 +356,8 @@ def _marks(mt, idx, nF, prev_nF=None):
             (None if kills is None else kills > 0), (None if sup is None else sup > 0))
 
 
-def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None):
+def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=None, lut=None,
+            blend=None):
     """The apical shell as PolyData with per-cell RGB. Rebuilt per frame: cells divide."""
     import pyvista as pv
     from plexus.models.topology import rings_from_flat_3d
@@ -356,10 +385,26 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None):
     _a = None if act is None else np.asarray(act, float)[:nF][idx]
     _fin = None if _a is None else np.isfinite(_a)
     flat = _a is not None and bool(_fin.any()) and not bool(np.any(_a[_fin] != 0.0))
-    if act is None or flat:
+    # A DECLARED LUT WINS. `plotting.species` is a column-to-colour table and it is a property of
+    # the MODEL: Gray-Scott draws its activator and hides its substrate, May-Leonard's three
+    # species are a partition and want red/green/blue. The 2D path has honoured it since
+    # `live.chem_rgb` existed; the mesh path did not, so a spec that already declared
+    # `species: [red, green, blue]` still got one column through a white -> red colormap.
+    rgb = x = None
+    if chem is not None and lut and not flat:
+        from plexus.live import chem_rgb
+        _cols, _ = chem_rgb(np.asarray(chem, float)[:nF][idx], lut=lut, blend=blend)
+        if _cols is not None:
+            rgb = (np.clip(_cols, 0, 1) * 255).astype(np.uint8)
+            # `x` is what the suppression tint weighs itself by, so it still has to be the
+            # activator's own 0..1 position and not something derived from the colour.
+            _lo = float(np.nanmin(_a)) if lo is None else lo
+            _hi = float(np.nanmax(_a)) if hi is None else hi
+            x = np.clip((_a - _lo) / (_hi - _lo + 1e-9), 0, 1)
+    if rgb is None and (act is None or flat):
         rgb = np.full((len(idx), 3), BODY_GREY, np.uint8)
         x = np.zeros(len(idx))
-    if act is not None and not flat:
+    if rgb is None and act is not None and not flat:
         a = np.asarray(act, float)[:nF][idx]
         ok = np.isfinite(a)
         # THE RANGE IS THE RUN'S, NOT THE FRAME'S, on a movie -- otherwise every frame renormalises
@@ -468,12 +513,13 @@ def _plotter(size=None):
 def kburns(run_dir, style, out, fill=1.0, label=None):
     """The finished specimen, turned once and zoomed in. Geometry fixed, camera moving."""
     fr = frames_of(run_dir)
+    _lut, _blend = style_of(run_dir)
     if not fr:
         return "no trajectory"
     L0 = box_of(run_dir, fr)
     name = label or os.path.basename(run_dir.rstrip("/"))
-    pos, mt, act = fr[-1]
-    m = mesh_of(pos, mt, act, show_div=False)
+    pos, mt, act, _chem = fr[-1]
+    m = mesh_of(pos, mt, act, show_div=False, chem=_chem, lut=_lut, blend=_blend)
     n = int(KB_SECONDS * FPS)
     p = _plotter(); add(p, m, style)
     p.add_text(f"{name}  {style}", position="upper_left", font_size=11, color="white")
@@ -491,6 +537,7 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
 def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     """The run through time, camera nailed down."""
     fr = frames_of(run_dir)
+    _lut, _blend = style_of(run_dir)
     if not fr:
         return "no trajectory"
     ticks_all = _frames_ticks.value
@@ -504,7 +551,7 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     name = label or os.path.basename(run_dir.rstrip("/"))
     # ONE ACTIVATOR RANGE FOR THE WHOLE CLIP, taken over every recorded frame. Per-frame
     # normalisation would make a strengthening pattern look constant.
-    vals = [np.asarray(a, float) for _p, _m, a in fr if a is not None]
+    vals = [np.asarray(a, float) for _p, _m, a, _c in fr if a is not None]
     lo = float(min(np.nanmin(v) for v in vals)) if vals else 0.0
     hi = float(max(np.nanmax(v) for v in vals)) if vals else 1.0
     p = _plotter()
@@ -515,11 +562,12 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     # previous frame -- with the previous frame, three rows in four of a stride-1 trajectory drew
     # hundreds of mothers and no daughters at all.
     ticks = getattr(_frames_ticks, "value", None)
-    nFs = [int(m_["nF"]) for _p, m_, _a in fr]
+    nFs = [int(m_["nF"]) for _p, m_, _a, _c in fr]
     actor = txt = None
-    for t, (pos, mt, act) in enumerate(fr):
+    for t, (pos, mt, act, _chem) in enumerate(fr):
         back = _pair_reference(t, nFs, ticks, PAIR_TICKS)
-        m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"), prev_nF=back)
+        m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"), prev_nF=back,
+                    chem=_chem, lut=_lut, blend=_blend)
         if m is None:
             continue
         if actor is not None:
@@ -549,8 +597,9 @@ def still(run_dir, style="flat", out=None, fill=1.0, frame=-1, label=True, traj=
         return "no trajectory"
     L = box_of(run_dir, fr)
     nm = name or os.path.basename(run_dir.rstrip("/"))
-    pos, mt, act = fr[frame][:3]
-    m = mesh_of(pos, mt, act, show_div=(style == "mesh"))
+    pos, mt, act, _chem = fr[frame][:4]
+    m = mesh_of(pos, mt, act, show_div=(style == "mesh"), chem=_chem,
+                lut=style_of(run_dir)[0], blend=style_of(run_dir)[1])
     p = _plotter()
     add(p, m, style)
     if label:
@@ -615,7 +664,7 @@ def compare(dir_a, dir_b, out, style="mesh", fill=1.0, labels=("A", "B"), title=
             p.subplot(0, col)
             if keep[col] is not None:
                 p.remove_actor(keep[col])
-            pos, mt, act = fr[t]
+            pos, mt, act, _chem = fr[t]
             m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"),
                         prev_nF=_pair_reference(t, nFs, tk, PAIR_TICKS))
             if m is None:
@@ -679,7 +728,7 @@ def compare_still(dir_a, dir_b, out, style="flat", fill=1.0, labels=("A", "B"), 
     when = _when(_lab_tk, _lab_n - 1, _lab_n)
     for col, (fr, lab) in enumerate(((fa, labels[0]), (fb, labels[1]))):
         p.subplot(0, col)
-        pos, mt, act = fr[-1]
+        pos, mt, act, _chem = fr[-1]
         add(p, mesh_of(pos, mt, act, show_div=False), style)
         p.add_text(f"{lab}   {when}   {int(mt['nF'])} cells",
                    position="upper_left", font_size=10, color="white")
@@ -1127,25 +1176,33 @@ def evolve_skeleton_activity(run_dir, out, region, field="neural_activity", n_ar
 def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
                   soma=True, volume=True, cmap="viridis", line_width=1.0,
                   neurites=True, neurite_opacity=0.30, neurite_stride=8,
-                  # 3.0 um for the TETRA and it is not a soma size. A regular tetrahedron of
-                  # circumradius r has ~12% of the volume of a sphere of radius r, so 3.0 is
-                  # roughly the volume-match to the 1.5 um sphere this replaced -- and a tetra
-                  # pointing at the camera collapses to a small triangle, so the number is
-                  # chosen for legibility, not as a claim about how big a cell body is. The
-                  # 2.5 um sphere WAS such a claim; this is not.
-                  soma_radius_um=2.4, soma_elong=2.5,
-                  supersample=1, palette="grey_green", soma_glyph="tetra",
+                  # None MEANS "USE THE MEASURED PER-NEURON RADIUS". fish2 records no soma size
+                  # (`somaRadius` is 0 on all 177,513 bodies), so this used to be one literature
+                  # constant drawn on every cell alike; `compute_soma_radii` now sizes each
+                  # soma from the ball around it that no other neuron's neurite enters, and the
+                  # renderer scales each glyph by its own value. Pass a float to force a
+                  # constant instead -- which is what a size sweep wants, and the fallback when
+                  # a region predates the measurement.
+                  soma_radius_um=None, soma_elong=2.5,
+                  supersample=1, palette="grey_green", soma_glyph="sphere",
                   # a_lo = 0 and a HARD gamma: a quiet soma is fully transparent rather than
                   # faintly drawn. ~200 spheres at alpha 0.06 accumulate along a ray into
                   # exactly the haze that made solid spheres look Gaussian; at alpha 0 they
                   # contribute nothing and what is left in the frame is spheres.
-                  neurite_alpha=(0.02, 0.85, 1.8), soma_alpha=(0.0, 1.0, 5.0),
+                  # NEURITE CEILING QUARTERED, 0.85 -> 0.2125, FLOOR HELD AT 0.02. The alpha ramp
+                  # is a_lo + (a_hi - a_lo) * u**gamma, so lowering only a_hi divides the
+                  # brightest neurites by ~4 while a quiet one keeps the 0.02 it had -- the
+                  # arbours stay as context and stop out-shouting the somas. Raising a_lo
+                  # instead, or scaling both, would have faded the faint neurites to nothing,
+                  # which is the one thing this change must not do: the point is to rebalance
+                  # the two layers, not to delete one.
+                  neurite_alpha=(0.02, 0.2125, 1.8), soma_alpha=(0.0, 1.0, 5.0),
                   # HARDCODED SOMA KNEE. u = 0.35 is the 75th percentile of |voltage| on these
                   # runs and u = 0.80 is about the 98th, so three quarters of the cell bodies
                   # are invisible and the top few per cent are solid -- which is the contrast
                   # the power law could not produce (it left the 90th percentile at alpha 0.05).
                   soma_knee=(0.35, 0.80),
-                  fill=0.92, label=None, fps=None,
+                  fill=0.92, label=None, fps=None, n_frames_max=None,
                   vol_opacity=(0, 0.006, 0.018, 0.045, 0.10)):
     """Soma, neurites and the rendered volume, in one clip -- by COMPOSITING TWO PASSES.
 
@@ -1208,6 +1265,16 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     sv = sv_all
     tv = (np.linspace(0, sv.shape[0] - 1, n_frames).round().astype(int)
           if volume else np.arange(n_frames))                                  # row -> set row
+    # A LOOK CHECK IS NOT A CLIP. Deciding a glyph or an alpha ramp needs a handful of frames,
+    # and rendering 2,001 to look at one is 20 minutes to answer a question that takes seconds.
+    # SPREAD ACROSS THE RUN, NOT TRUNCATED TO ITS START: these networks begin near their initial
+    # condition and the activity develops over the first few hundred steps, so the first six
+    # frames are six pictures of a resting network -- which is what a truncating cap showed, and
+    # it said nothing about the glyph it was rendered to check. The clim is still computed from
+    # the whole trajectory, so the check is directly comparable to the full clip.
+    if n_frames_max and n_frames_max < n_frames:
+        tv = tv[np.linspace(0, n_frames - 1, int(n_frames_max)).round().astype(int)]
+        n_frames = len(tv)
     pos_of = {int(b): i for i, b in enumerate(bid)}
     arbour_row = np.array([pos_of[int(b)] for b in np.asarray(meta["body_ids"])])
     if n_arbours:
@@ -1227,26 +1294,38 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     # 24 SEGMENTS, NOT 10. At 10 the silhouette is a visible decagon once a soma covers more
     # than a few pixels, and a faceted ball under a low alpha reads as a soft blob rather than
     # a sphere -- which is what "a mix of sphere and gaussian" was.
-    # THE SOMA GLYPH CARRIES A DIRECTION, so it is a tetrahedron and not a ball. The neuron's
-    # `neurite_dir` -- the axis its arbour is most extended along, computed once by
-    # `plexus.io.neuprint.compute_neurite_directions` and stored in the neuron state -- is
-    # real, measured, per-cell information that a sphere throws away. On these regions the
-    # first principal axis carries a median 82-91% of each arbour's variance, and the axes are
-    # far from isotropic (Tectum's mean |component| is 0.24 / 0.85 / 0.29 against the 0.58 of
-    # isotropy), so the orientations are a signal and not noise.
-    if soma_glyph == "tetra":
-        _ball = _tetra(soma_radius_um / side_um, elong=soma_elong)
-        # ELONGATION IS GATED ON HOW AXIAL THE ARBOUR ACTUALLY IS, so the dart's length is its
-        # own confidence. `neurite_elong` is the fraction of the arbour's variance carried by
-        # the axis being drawn: at 0.95 the cell is essentially a line and the direction means
-        # what it says; at 0.70 the arbour is a bush and the axis is the best of several poor
-        # answers. Drawing both as the same needle asserts a precision only one of them has.
-        # 26% of these neurons sit below 0.75. Binned rather than per-glyph because vtkGlyph3D
-        # scales isotropically -- one actor per bin is the cheap way to vary a SHAPE per point.
-        _el = np.asarray(nz["neurite_elong"], np.float32) if "neurite_elong" in nz.files else None
-        if _el is not None and n_arbours:
-            _el = _el[keep]
-        _ball = pv.Sphere(radius=soma_radius_um / side_um, theta_resolution=24, phi_resolution=24)
+    # THE SOMA GLYPH IS A SPHERE AGAIN, and the tetra remains available behind `soma_glyph`.
+    # A tetrahedron oriented by `neurite_dir` shows real per-cell information a ball throws
+    # away -- the arbour's principal axis, which on these regions carries a median 82-91% of
+    # each neuron's variance. But it spends the glyph's SHAPE on anatomy that is static, while
+    # the thing the movie is about, the activity, has only colour and opacity left. A ball
+    # reads as one cell body at any orientation, so nothing in the frame competes with the
+    # thing that changes. The direction is still in the neuron state and still plotted, in
+    # `fabric_directions_4x2.png`, where it can be read quantitatively rather than guessed at
+    # from a cloud of darts.
+    _el = np.asarray(nz["neurite_elong"], np.float32) if "neurite_elong" in nz.files else None
+    if _el is not None and n_arbours:
+        _el = _el[keep]
+    # PER-NEURON RADIUS WHEN THE REGION MEASURED ONE. `plexus.io.neuprint.compute_soma_radii`
+    # sizes each cell body from the ball around it that no other neuron's neurite enters, so
+    # the somas can be drawn at their own sizes instead of one constant on all of them. A
+    # `soma_radius_um=<float>` argument still forces a constant, which is what a size sweep
+    # wants; None means "use the measurement if the region has one".
+    _srad = np.asarray(nz["soma_radius_um"], np.float64) if "soma_radius_um" in nz.files else None
+    if _srad is not None and n_arbours:
+        _srad = _srad[keep]
+    measured = soma_radius_um is None and _srad is not None
+    r_um = soma_radius_um if soma_radius_um is not None else 1.2       # fallback constant
+    if measured:
+        # unit geometry scaled per point: vtkGlyph3D scales isotropically off a scalar array,
+        # which is exactly a radius. The array is in UNIT-BOX units, the state is in um.
+        _cloud["r"] = np.ascontiguousarray(_srad / side_um)
+        _ball = (_tetra(1.0, elong=soma_elong) if soma_glyph == "tetra"
+                 else pv.Sphere(radius=1.0, theta_resolution=24, phi_resolution=24))
+    elif soma_glyph == "tetra":
+        _ball = _tetra(r_um / side_um, elong=soma_elong)
+    else:
+        _ball = pv.Sphere(radius=r_um / side_um, theta_resolution=24, phi_resolution=24)
     _ndir = np.asarray(nz["neurite_dir"], np.float32) if "neurite_dir" in nz.files else None
     if _ndir is not None and n_arbours:
         _ndir = _ndir[keep]
@@ -1292,30 +1371,28 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
                     w = np.clip((0.5 * (lo_e + hi_e) - 0.70) / (0.92 - 0.70), 0.0, 1.0)
                     w = w * w * (3.0 - 2.0 * w)                   # smoothstep on confidence
                     sub = _cloud.extract_points(np.flatnonzero(m), adjacent_cells=False)
-                    g = sub.glyph(geom=_tetra(soma_radius_um / side_um,
+                    g = sub.glyph(geom=_tetra(1.0 if measured else r_um / side_um,
                                               elong=1.0 + (soma_elong - 1.0) * w),
-                                  scale=False, orient="neurite_dir")
+                                  scale="r" if measured else False, orient="neurite_dir")
                     balls = g if balls is None else balls.merge(g)
             elif soma_glyph == "tetra" and _ndir is not None:
-                balls = _cloud.glyph(geom=_ball, scale=False, orient="neurite_dir")
+                balls = _cloud.glyph(geom=_ball, scale="r" if measured else False,
+                                     orient="neurite_dir")
             else:
-                balls = _cloud.glyph(geom=_ball, scale=False, orient=False)
-            # FACETED, NOT SPECULAR. `smooth_shading=False` gives every face its own normal, so
-            # the four faces of a tetra take four brightnesses and the solid reads as a solid --
-            # that is the "shadow". `specular=0` removes the highlight, which is the part that
-            # looked like plastic: a specular lobe moves with the camera, so it says where the
-            # light is rather than anything about the neuron. Diffuse is kept low against a high
-            # ambient so the form is legible without the facet brightness competing with the
-            # activity the colour encodes.
-            # BACK-FACE CULLING IS WHAT MAKES IT READ AS A SOLID. The glyphs are alpha-blended
-            # (the knee leaves mid-activity somas translucent), so without culling the two rear
-            # faces show THROUGH the two front ones and their brightnesses average out -- the
-            # tetra collapses into one flat triangle, which is exactly what it looked like. With
-            # `culling="back"` only the front faces draw, so a viewer sees the 2-3 that face
-            # them, each at its own diffuse brightness, and the form is legible even at alpha
-            # 0.5. (A tetrahedron has FOUR faces, never five, and at most three can face the
-            # camera at once.)
-            p.add_mesh(balls, scalars=key, rgb=True, lighting=True, smooth_shading=False,
+                balls = _cloud.glyph(geom=_ball, scale="r" if measured else False, orient=False)
+            # FLAT FOR A BALL, LIT AND FACETED FOR A DART. With `lighting=False` a sphere draws
+            # as a uniformly coloured disc: the silhouette is still a circle at the soma's true
+            # world size, but nothing inside it varies, so every cell body carries EXACTLY the
+            # colour its voltage maps to. Shading is the competing signal here -- a lit ball
+            # spans a range of brightnesses from its own curvature, and that range is the same
+            # visual channel the activity uses, so two cells at one voltage read as two values.
+            # A dart is the opposite case: it needs per-face normals or its four faces take one
+            # brightness and it collapses to a flat triangle, which is what it did.
+            # BACK-FACE CULLING STILL MATTERS WITH LIGHTING OFF, because the glyphs are
+            # alpha-blended -- the far hemisphere would otherwise composite under the near one
+            # and every soma would draw at roughly twice its intended opacity.
+            lit = soma_glyph == "tetra"
+            p.add_mesh(balls, scalars=key, rgb=True, lighting=lit, smooth_shading=not lit,
                        ambient=0.20, diffuse=0.80, specular=0.0, culling="back")
         if volume:
             p.add_volume(_grid(np.abs(g[t])), scalars="a", cmap=cmap,
@@ -1324,7 +1401,8 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
                                              ("128^3 volume", volume)) if on])
         seg_txt = (f"{meta['segments'] // 1000}k segments (1/{neurite_stride})   "
                    if neurites else "")
-        soma_txt = f"soma r={soma_radius_um} um   " if soma else ""
+        soma_txt = ((f"soma r={np.median(_srad):.2f} um median (measured)   "
+                     if measured else f"soma r={r_um} um   ") if soma else "")
         p.add_text(f"{name}  {layers}   frame {t + 1}/{n_frames}   "
                    f"{meta['neurons']} arbours   {seg_txt}{soma_txt}"
                    + (f"ss{ss}x   " if ss > 1 else "")
