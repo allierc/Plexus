@@ -22,10 +22,19 @@
 # 0.95 between eta, kappa, lambda and theta. The diffusion length was setting the pattern and the
 # reaction point was decorating it. At ratio 2 the labels mean what they say, and B then differs
 # from A in (F, kk) ALONE, which is what a regime sweep is supposed to vary.
+# TWELVE THOUSAND FRAMES, RECORDED AT 601 ROWS. n_frames doubles and `record_cap` deliberately
+# does NOT: the engine's stride becomes 20, so the run is twice as long in SIMULATED time while the
+# trajectory stays the same size. Passing `--frames` to the harness would have done this the other
+# way -- it sets record_cap = frames + 2, i.e. stride 1 -- and 12,002 rows x 4,000 cells x 6
+# columns is about 1.15 GB held in memory to answer a question 601 rows already answer.
+#
+# WHY LONGER AT ALL: at 6,000 frames the coupled pair is still resolving. Gray-Scott exclusion is
+# slow -- each system has to invade the other's territory a domain at a time -- and the difference
+# between `two_X` and `coupled_X` is exactly that late-time rearrangement.
 general:
   name: turing2d_gs_coupled_eta
   seed: 0
-  n_frames: 6000
+  n_frames: 12000
   record_cap: 602
   dt: 1.0
   dim: 2
