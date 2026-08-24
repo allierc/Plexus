@@ -172,9 +172,10 @@ def register_operator(*names: str, implementation: str | None = None,
         # enforced: `kind="seed"` with a domain-specific family (e.g. "anatomy") is the
         # intended orthogonal use of the two axes -- kind says WHEN/HOW, family says
         # WHAT FOR -- so a seed operator need not also spell "seed" on the family axis.
-        # This is a warning, not a hard error: several existing discovery_okuda operators
-        # (e.g. integrin_seed) already have this mismatch and that codebase is not in
-        # scope for this refactor yet, so import must not break on them.
+        # This is a warning, not a hard error, because a prototype outside this tree may
+        # still carry the mismatch and import must not break on it. Inside src/plexus the
+        # invariant holds: `integrin_seed` was the last operator tripping it and was fixed
+        # (kind "structural" -> "seed") on 24 August rather than exempted.
         if tags.get("family") == "seed" and tags.get("kind") != "seed":
             _warn(
                 f"[warn] operator {names[0]!r}: family=\"seed\" claims this establishes "

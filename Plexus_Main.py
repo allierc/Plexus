@@ -143,9 +143,15 @@ def _describe(data_dir: str, out_file: str | None, device: str = "cuda:0") -> No
     if not os.path.isdir(gemma):
         print(f"[describe] skip: no VLM weights at {gemma} (pass --no-describe to silence)", flush=True)
         return
-    movies = sorted(glob.glob(os.path.join(data_dir, "movie_*.mp4")))
+    # EVERY mp4 THE RUN WROTE, not just the ones named `movie_*`. The two-panel composition view
+    # lands as `movie.mp4` and the VTK products as `vtk_*.mp4`, so a run whose ONLY output is the
+    # panels reported "no movies found to describe" one line after printing the path of the movie
+    # it had just written. The captioner's business is "what did this run produce", and that is a
+    # question about the directory, not about a prefix.
+    movies = sorted(f for f in glob.glob(os.path.join(data_dir, "*.mp4"))
+                    if not os.path.basename(f).startswith("grid_"))   # the MPM grid diagnostic
     if not movies:
-        print("[describe] no movies found to describe", flush=True)
+        print(f"[describe] no .mp4 in {data_dir} to describe", flush=True)
         return
     gd = graphs_data_path()
     out_file = out_file or os.path.join(gd, "video_descriptions.txt")

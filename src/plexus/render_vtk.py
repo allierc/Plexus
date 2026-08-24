@@ -529,7 +529,33 @@ def _ease(u):
     return u * u * (3.0 - 2.0 * u)
 
 
+def offscreen():
+    """Make VTK stop trying to talk to an X server, and stop it printing when it fails.
+
+    THE NOISE IS Xlib's, NOT VTK's, which is why filtering python warnings never silenced it.
+    A VS Code remote session exports `DISPLAY=:11` with no Xauthority the container can read, so
+    every render window opened here printed
+
+        Authorization required, but no authorization protocol specified
+        vtkXOpenGLRenderWindow: bad X server connection. DISPLAY=:11
+
+    -- twice per plotter, straight to fd 2 from C, before falling back to the off-screen path it
+    was going to use anyway. Unsetting DISPLAY means the attempt is never made: with no DISPLAY,
+    VTK goes to EGL/OSMesa directly. Nothing here ever wants an on-screen window (`OFF_SCREEN` is
+    set unconditionally), so there is nothing to lose by removing it.
+
+    Idempotent, and safe to call before `import pyvista` or after.
+    """
+    os.environ.pop("DISPLAY", None)
+    try:
+        import vtkmodules.vtkCommonCore as _vcc          # keep VTK's own warnings off the terminal
+        _vcc.vtkObject.GlobalWarningDisplayOff()
+    except Exception:
+        pass
+
+
 def _plotter(size=None):
+    offscreen()
     import pyvista as pv
     pv.OFF_SCREEN = True
     p = pv.Plotter(off_screen=True, window_size=(size or SIZE, size or SIZE))
@@ -1049,6 +1075,17 @@ def evolve_volume(run_dir, out, field="neural_activity", cmap="viridis", fill=0.
     return f"{g.shape[0]} frames, {'x'.join(str(s) for s in g[0].shape)}, range [{lo:.3f}, {hi:.3f}]"
 
 
+def _set_text(actor, s):
+    """Update a caption in place. `add_text(position="upper_left")` hands back a
+    `vtkCornerAnnotation`, which takes `SetText(corner, s)` with corner 2 = upper left; a plain
+    `vtkTextActor` takes `SetInput(s)`. Which one comes back depends on the position argument,
+    so the caller cannot assume either."""
+    if hasattr(actor, "SetInput"):
+        actor.SetInput(s)
+    else:
+        actor.SetText(2, s)
+
+
 def skeleton_lines(region, max_neurons=200, stride=1, seed=0):
     """SWC skeletons of a frozen region, as ONE `pv.PolyData` of line segments in the unit box.
 
@@ -1233,6 +1270,14 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
                   # are invisible and the top few per cent are solid -- which is the contrast
                   # the power law could not produce (it left the 90th percentile at alpha 0.05).
                   soma_knee=(0.35, 0.80),
+                  # HOLD THEN FADE, in frames: draw the neurites at a constant colour for the
+                  # first `hold` frames, ramp their opacity to zero over the next `fade`, then
+                  # take them out of the scene entirely. The arbours are context -- they say
+                  # where the tissue is -- and once that is established the movie is about the
+                  # somas. It is also what makes large N affordable: the neurite layer is the
+                  # expensive one, and this pays for it in 200 frames of 2,001 rather than all
+                  # of them. None keeps the old behaviour, activity-coloured arbours throughout.
+                  neurite_fade=(100, 100), neurite_const_q=0.90,
                   fill=0.92, label=None, fps=None, n_frames_max=None,
                   vol_opacity=(0, 0.006, 0.018, 0.045, 0.10)):
     """Soma, neurites and the rendered volume, in one clip -- by COMPOSITING TWO PASSES.
@@ -1368,6 +1413,157 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     W = SIZE
     writer = imageio_ffmpeg.write_frames(out, (W, W), fps=fps or NEURAL_FPS, quality=8)
     writer.send(None)
+
+    def _soma_mesh():
+        """The glyphed somas AND, per glyph vertex, which neuron it belongs to.
+
+        The index is what lets a persistent scene recolour: `vtkGlyph3D` copies the geometry
+        once per point IN POINT ORDER, so vertex i belongs to neuron i // (points per glyph).
+        Returned alongside the mesh because the tetra path glyphs in elongation BINS and the
+        merged output is therefore not in neuron order -- deriving the mapping at the call site
+        would silently be wrong for exactly the case that needs it most.
+        """
+        scale = "r" if measured else False
+        if soma_glyph == "tetra" and _ndir is not None and _el is not None:
+            out_m, out_i = None, []
+            for lo_e, hi_e in _BINS:
+                m = np.flatnonzero((_el >= lo_e) & (_el < hi_e))
+                if not len(m):
+                    continue
+                w = np.clip((0.5 * (lo_e + hi_e) - 0.70) / (0.92 - 0.70), 0.0, 1.0)
+                w = w * w * (3.0 - 2.0 * w)                       # smoothstep on confidence
+                sub = _cloud.extract_points(m, adjacent_cells=False)
+                gl = sub.glyph(geom=_tetra(1.0 if measured else r_um / side_um,
+                                           elong=1.0 + (soma_elong - 1.0) * w),
+                               scale=scale, orient="neurite_dir")
+                out_i.append(np.repeat(m, gl.n_points // max(len(m), 1))[:gl.n_points])
+                out_m = gl if out_m is None else out_m.merge(gl)
+            return out_m, np.concatenate(out_i)
+        orient = "neurite_dir" if (soma_glyph == "tetra" and _ndir is not None) else False
+        gl = _cloud.glyph(geom=_ball, scale=scale, orient=orient)
+        n_pt = _cloud.n_points
+        return gl, np.repeat(np.arange(n_pt), gl.n_points // max(n_pt, 1))[:gl.n_points]
+
+    gg_pal = palette == "grey_green"
+    if not volume:
+        # ---------------------------------------------------------------- persistent scene
+        # THE GEOMETRY NEVER CHANGES; ONLY THE COLOURS DO. Rebuilding the scene per frame
+        # re-glyphs 8.5M soma cells and re-uploads a 9.4M-segment mesh 2,001 times over --
+        # measured at 3.12 s/frame on zf_Forebrain_8192 against 1.27 s when the scene is built
+        # once and only the scalar arrays are rewritten. The colours are also evaluated PER
+        # NEURON and gathered, not evaluated per vertex: the LUT is a pure function of the
+        # value, so `_rgba(v)[own]` is bit-identical to `_rgba(v[own])` and ~1,000x less work.
+        #
+        # `p.render()` IS NOT OPTIONAL. Without it `screenshot()` returns the PREVIOUS image:
+        # the timing looks even better (0.85 s/frame) and every frame of the movie is
+        # identical. Measured frame-to-frame delta was exactly 0.0 -- a frozen clip that costs
+        # less. The check below is what stops that shipping silently.
+        balls, soma_of = _soma_mesh()
+        p = _plotter(SIZE * ss)
+        p.enable_depth_peeling(12)
+        key = "rgba" if gg_pal else "rgb"
+        n_actor = None
+        if neurites:
+            if neurite_fade:
+                # WITHOUT INTENSITY: one constant colour for the whole arbour field, so the
+                # neurites read as anatomy rather than as a second activity signal. The fade is
+                # then a single actor opacity per frame, not 9.4M rewritten alphas.
+                #
+                # THE CONSTANT IS A QUANTILE OF |VOLTAGE|, and the choice is bounded on both
+                # sides. At the top of the clim every segment draws full green at the alpha
+                # ceiling and 9.4M of them overlapping turn the cube into a solid sheet with the
+                # somas invisible behind it. At the median the arbours nearly vanish, because
+                # the ramp is u**1.8 and the median u is small. `neurite_const_q` picks between
+                # them; it is a legibility knob and says nothing about the dynamics, which is
+                # why the intro carries no activity at all.
+                const = np.full(poly.n_points,
+                                float(np.quantile(np.abs(sv), neurite_const_q)), np.float32)
+                poly["rgba"] = (_rgba(const, vlo, vhi, a_lo=neurite_alpha[0],
+                                      a_hi=neurite_alpha[1], gamma=neurite_alpha[2])
+                                if gg_pal else _rgb(const, vlo, vhi))
+            else:
+                v0 = sv[tv[0]][arbour_row]
+                poly[key] = (_rgba(v0, vlo, vhi, a_lo=neurite_alpha[0], a_hi=neurite_alpha[1],
+                                   gamma=neurite_alpha[2])[own] if gg_pal
+                             else _rgb(v0, vlo, vhi)[own])
+            n_actor = p.add_mesh(poly, scalars=key if not neurite_fade else "rgba", rgb=True,
+                                 line_width=line_width, lighting=False,
+                                 opacity=None if gg_pal else neurite_opacity)
+        if soma:
+            s0 = sv_s[tv[0]]
+            balls[key] = (_rgba(s0, vlo, vhi, a_lo=soma_alpha[0], a_hi=soma_alpha[1],
+                                gamma=soma_alpha[2], knee=soma_knee)[soma_of] if gg_pal
+                          else _rgb(s0, vlo, vhi)[soma_of])
+            lit = soma_glyph == "tetra"
+            p.add_mesh(balls, scalars=key, rgb=True, lighting=lit, smooth_shading=not lit,
+                       ambient=0.20, diffuse=0.80, specular=0.0, culling="back")
+        layers = " + ".join([x for x, on in (("soma", soma), ("neurites", neurites)) if on])
+        seg_txt = (f"{meta['segments'] // 1000}k segments (1/{neurite_stride})   "
+                   if neurites else "")
+        soma_txt = ((f"soma r={np.median(_srad):.2f} um median (measured)   "
+                     if measured else f"soma r={r_um} um   ") if soma else "")
+        txt = p.add_text("", position="upper_left", font_size=10 * ss, color="white")
+        p.camera_position = "iso"
+        p.reset_camera()
+        p.camera.zoom(fill)
+        hold, fadelen = (neurite_fade if neurite_fade else (n_frames, 0))
+        prev, n_static, dropped = None, 0, None
+        import time as _time
+        _t0 = _time.time()
+        for t in range(n_frames):
+            if soma:
+                s = sv_s[tv[t]]
+                balls[key] = (_rgba(s, vlo, vhi, a_lo=soma_alpha[0], a_hi=soma_alpha[1],
+                                    gamma=soma_alpha[2], knee=soma_knee)[soma_of] if gg_pal
+                              else _rgb(s, vlo, vhi)[soma_of])
+            if n_actor is not None:
+                if neurite_fade:
+                    o = 1.0 if t < hold else max(0.0, 1.0 - (t - hold) / max(fadelen, 1))
+                    if o <= 0.0:
+                        # REMOVED, not drawn at zero opacity. A transparent actor still
+                        # rasterises and still costs its depth-peeling passes; taking it out of
+                        # the scene is the entire point of the fade, and it is what makes the
+                        # remaining ~90% of the clip cost soma-only.
+                        p.remove_actor(n_actor)
+                        n_actor, dropped = None, t
+                    else:
+                        n_actor.GetProperty().SetOpacity(float(o))
+                else:
+                    vv = sv[tv[t]][arbour_row]
+                    poly[key] = (_rgba(vv, vlo, vhi, a_lo=neurite_alpha[0], a_hi=neurite_alpha[1],
+                                       gamma=neurite_alpha[2])[own] if gg_pal
+                                 else _rgb(vv, vlo, vhi)[own])
+            _set_text(txt, f"{name}  {layers}   frame {t + 1}/{n_frames}   "
+                           f"{meta['neurons']} arbours   {seg_txt}{soma_txt}"
+                           + (f"ss{ss}x   " if ss > 1 else "")
+                           + f"|voltage| clim [{vlo:.2f}, {vhi:.2f}]")
+            p.render()                                    # see the note above -- NOT optional
+            frame = np.asarray(p.screenshot(return_img=True))[..., :3]
+            if ss > 1:
+                frame = _downsample(frame, ss)
+            if prev is not None and np.array_equal(frame, prev):
+                n_static += 1
+            prev = frame
+            writer.send(np.ascontiguousarray(frame))
+            # PROGRESS, because THE OUTPUT FILE IS NOT A PROGRESS INDICATOR. ffmpeg buffers the
+            # mp4, so a long render sits at 0 bytes for hours and looks hung when it is not --
+            # that reading is what got a batch of correct cluster jobs killed at 64 minutes.
+            if t % 50 == 0 or t == n_frames - 1:
+                print(f"[evolve_neural] {name}: frame {t + 1}/{n_frames}"
+                      f"  {(_time.time() - _t0) / max(t + 1, 1):.1f} s/frame"
+                      + ("  (neurites dropped)" if dropped is not None else ""), flush=True)
+        p.close()
+        writer.close()
+        if n_static > n_frames // 2:
+            raise RuntimeError(
+                f"{name}: {n_static}/{n_frames - 1} consecutive frames were pixel-identical -- "
+                f"the scene is not being re-rendered. This is the stale-screenshot failure; "
+                f"check that p.render() runs before every screenshot.")
+        return (f"{n_frames} frames, {meta['neurons']} arbours, {meta['segments']} segments, "
+                f"soma={soma} neurites={neurites} volume=False"
+                + (f", neurites dropped at frame {dropped}" if dropped else "")
+                + (f", {n_static} static frame pairs" if n_static else ""))
+
     cam = None
     for t in range(n_frames):
         v = sv[tv[t]]

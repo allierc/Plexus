@@ -25,6 +25,16 @@ import numpy as np
 
 AX = {"x": 0, "y": 1, "z": 2}
 
+# FLAT, UNSHADED, ONE SIZE -- asked for by name, and it is the right default for a SEGMENTATION
+# panel. Lit spheres carry a specular highlight and a dark limb, so one set's colour spans a range
+# of brightnesses that overlaps the next set's: the eye reads shading where the picture is meant to
+# encode identity. Sizing each set by its own measured spacing made it worse, because a dense set
+# then drew SMALLER marks than a sparse one and looked further away. Unshaded discs of one size say
+# only what they are meant to say -- which set a particle belongs to, and where it is.
+FLAT = dict(render_points_as_spheres=True,      # round, not square
+            lighting=False,                     # no diffuse, no specular, no limb darkening
+            ambient=1.0, diffuse=0.0, specular=0.0)
+
 
 def _load(run_dir):
     """(spec, trajectory) for a generated run, or a clear failure saying which is missing."""
@@ -113,8 +123,171 @@ def _draw_box3d(ax, lo, hi, c="#4a4a4a", lw=0.7):
         if sum(1 for i in range(3) if a[i] != b[i]) == 1:          # an edge: differs on one axis
             ax.plot(*zip(a, b), color=c, lw=lw)
 
-def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d=1.1,
-           frame_to="world", quiet=False):
+def panels_vtk(run_dir, axis="auto", thick=0.10, out=None, max_frames=150, fps=20,
+               dot=3.0, dot_section=7.0, px=820, movie=True, frame=-1):
+    """The same two panels, drawn by VTK instead of matplotlib -- MEASURED 5.9x faster per frame.
+
+    WHY THE SWITCH. The matplotlib version re-created a figure, two axes and every scatter from
+    scratch for each row: 284 ms a frame at 13,500 particles (cell_03), against 48 ms here, both
+    warm and averaged over 40 rows -- 71 s versus 12 s for a 150-frame clip. VTK builds the domain
+    panel's point clouds ONCE and only writes new coordinates into them, so its per-frame cost is
+    the render (18 ms measured bare) plus the section rebuild. The gap widens with frame count,
+    since the plotter and its lighting rig are built once rather than per frame. It is also the
+    engine's own renderer from Phase E onward, so the panels stop being a second, divergent way of
+    drawing the same run.
+
+    (The first, uncorrected timing of this said 20x. It was measuring `import torch` and
+    `import pyvista` -- 24 s of a 30-frame run -- not the renderer.)
+
+    UP IS `plotting.up_axis`, AND IT IS THE CAMERA'S JOB, not the data's. VTK lets the up vector be
+    named outright (`camera.up`), so unlike mplot3d -- which always puts its own z on screen and had
+    to be fed permuted coordinates -- nothing is moved. The picture and the trajectory are then the
+    same numbers, which is what two rungs read as "falling diagonally" cost us.
+    """
+    from plexus.render_vtk import offscreen
+    offscreen()                                               # kill the Xlib chatter before VTK loads
+    import pyvista as pv
+
+    spec, z = _load(run_dir)
+    sets, missing = _sets(spec, z)
+    if not sets:
+        raise SystemExit("  no set has recorded positions")
+    up = int((spec.get("plotting") or {}).get("up_axis", 2))
+    # THE CUT PLANE MUST CONTAIN THE VERTICAL, which is why the default is derived and not written
+    # down. Cutting ACROSS the up-axis gives a horizontal slice: for a cell dropped onto a floor
+    # that section is a disc that never shows the fall, never shows the squash on impact, and never
+    # shows the nucleus sitting low in the cytosol -- the three things the rung exists to show. Cut
+    # across a HORIZONTAL axis instead and the plane is vertical, so gravity's direction is in it.
+    k = ({i for i in range(3)} - {up}).pop() if str(axis).lower() in ("auto", "none") \
+        else AX[str(axis).lower()]
+    axis = "xyz"[k]
+    n_rows = sets[0][1].shape[0]
+    idx = (np.unique(np.linspace(0, n_rows - 1, min(max_frames, n_rows)).astype(int)) if movie
+           else np.array([frame if frame >= 0 else n_rows + frame]))
+
+    box = _box(spec)
+    allp = np.concatenate([p[idx[0]] for _n, p, _c, _l in sets])
+    wc = 0.5 * (box[0] + box[1]) if box is not None else allp.mean(0)
+    wr = float((box[1] - box[0]).max()) * 0.55 if box is not None else 1.0
+
+    pv.OFF_SCREEN = True
+    # WINDOW SIZE DIVISIBLE BY 16, so the mp4 writer does not resize behind us. ffmpeg's
+    # macro_block_size is 16; at 1640x820 imageio silently rescaled every frame to 1648x832 and
+    # said so on every run. Rounding the panel down costs four pixels and removes the resample.
+    px = int(px) // 16 * 16
+    p = pv.Plotter(off_screen=True, shape=(1, 2), window_size=(2 * px, px), border=False)
+    p.set_background("black")
+    p.enable_anti_aliasing("msaa", multi_samples=8)
+
+    # THE LEFT PANEL'S CLOUDS ARE BUILT ONCE and only re-pointed per frame -- the whole point of
+    # moving off matplotlib. The RIGHT panel cannot be: slab membership changes every frame as the
+    # body falls through the section plane, so its point count changes, and a PolyData's point count
+    # is fixed once its vertex list is built. (Leaving every particle in and pushing the ones
+    # outside the slab away from the camera does NOT work: the projection is parallel, so a point
+    # a hundred radii back renders at exactly the same size in exactly the same place.) The section
+    # is therefore rebuilt and re-added each frame, which is a few thousand floats against a full
+    # render -- still far cheaper than the matplotlib figure it replaces.
+    left = []
+    for _name, pos, rgb, _label in sets:
+        m = pv.PolyData(pos[idx[0]].astype(np.float64).copy())
+        m["rgb"] = (np.clip(rgb, 0, 1) * 255).astype(np.uint8)
+        left.append(m)
+    rgb8 = [(np.clip(c, 0, 1) * 255).astype(np.uint8) for _n, _p, c, _l in sets]
+    sec_actors = []
+
+    def _cam(sub, centre, radius, look):
+        p.subplot(0, sub)
+        d = np.zeros(3); d[look] = 1.0
+        if sub == 0:                                          # the domain, seen from an angle
+            e, a = np.radians(22.0), np.radians(-60.0)
+            ax_h = [i for i in range(3) if i != up]
+            d = np.zeros(3)
+            d[ax_h[0]], d[ax_h[1]], d[up] = np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)
+        p.camera.position = tuple(centre + d * radius * 6.0)
+        p.camera.focal_point = tuple(centre)
+        u = np.zeros(3); u[up if sub == 0 or look != up else (up + 1) % 3] = 1.0
+        p.camera.up = tuple(u)
+        p.camera.parallel_projection = True
+        # `parallel_scale` is the HALF-HEIGHT of the view, so framing a cube by its half-WIDTH cuts
+        # the corners off -- the domain box came out with three of its twelve edges outside the
+        # frame, in a panel whose entire job is to say which way is down and which wall was hit.
+        # The 1.5 covers the cube's half-diagonal (sqrt(3)/2 = 0.87 of a half-width) with a margin.
+        p.camera.parallel_scale = radius * (1.5 if sub == 0 else 1.0)
+
+    def _bodyframe(t):
+        pos_all = [pp[t] for _n, pp, _c, _l in sets]
+        allq = np.concatenate(pos_all)
+        bc = allq.mean(0)
+        return pos_all, bc, (float(np.abs(allq - bc).max()) * 1.12 or 1.0)
+
+    pos_all, bc, br = _bodyframe(int(idx[0]))
+    for i, (_n, pp, _c, _l) in enumerate(sets):
+        p.subplot(0, 0)
+        left[i].points = pos_all[i].astype(np.float64)
+        p.add_mesh(left[i], scalars="rgb", rgb=True, **FLAT, point_size=dot)
+    if box is not None:
+        p.subplot(0, 0)
+        p.add_mesh(pv.Box((box[0][0], box[1][0], box[0][1], box[1][1], box[0][2], box[1][2])
+                          ).extract_all_edges(), color="#5a5a5a", line_width=1.2, lighting=False)
+    _cam(0, wc, wr, up)
+
+    def _section(t):
+        """Rebuild the slab clouds for row `t` and return the body frame they were cut in."""
+        pos_all, bc, br = _bodyframe(t)
+        p.subplot(0, 1)
+        for a in sec_actors:
+            p.remove_actor(a, render=False)
+        sec_actors.clear()
+        lo, hi = bc[k] - thick * br, bc[k] + thick * br
+        for i, q in enumerate(pos_all):
+            left[i].points = q.astype(np.float64)
+            m = (q[:, k] >= lo) & (q[:, k] <= hi)
+            if not m.any():
+                continue
+            s = pv.PolyData(q[m].astype(np.float64))
+            s["rgb"] = rgb8[i][m]
+            sec_actors.append(p.add_mesh(s, scalars="rgb", rgb=True, **FLAT,
+                                          point_size=dot_section))
+        return bc, br
+
+    name = (spec.get("general") or {}).get("name", os.path.basename(run_dir))
+    counts = "   ".join(f"{n}: {pp.shape[1]}" for n, pp, _c, _l in sets)
+    p.subplot(0, 1)
+    p.add_text(f"cell, zoomed   cross section {axis} = body centre +/- {thick:.2f} R\n{counts}",
+               position="upper_left", font_size=10, color="white", name="hdr1")
+    if missing:
+        p.add_text(f"DECLARED BUT NOT RECORDED: {', '.join(missing)}",
+                   position="lower_left", font_size=9, color="#ff5555", name="miss")
+
+    out = out or os.path.join(run_dir, "movie.mp4" if movie else "panels.png")
+    if movie:
+        p.open_movie(out, framerate=fps, quality=8)
+    for t in idx:
+        bc, br = _section(int(t))
+        _cam(1, bc, br, k)                                    # the section follows the body down
+        p.subplot(0, 0)
+        p.add_text(f"{name}   frame {int(t) + 1}/{n_rows}   domain",
+                   position="upper_left", font_size=10, color="white", name="hdr0")
+        if movie:
+            p.write_frame()
+    if movie:
+        p.close()
+        print(f"  {out}   ({len(idx)} of {n_rows} rows @ {fps} fps, vtk)")
+    else:
+        p.screenshot(out)
+        p.close()
+        print(f"  {out}   (vtk)")
+        for n, pp, _c, _l in sets:
+            print(f"    {n:<10} {pp.shape[1]:>6} elements")
+    return out
+
+
+def panels(run_dir, frame=-1, axis="auto", thick=0.06, out=None, fill3d=1.9, fill2d=1.1,
+           frame_to="world", quiet=False, dot=3.0, dot_section=7.0):
+    from plexus.render_vtk import available
+    if available() and frame_to == "world":
+        return panels_vtk(run_dir, axis=axis, thick=thick, out=out, movie=False, frame=frame,
+                          dot=dot, dot_section=dot_section)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -125,6 +298,14 @@ def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d
     if not sets:
         raise SystemExit("  no set has recorded positions")
     k = AX[axis.lower()]
+    # MPLOT3D ALWAYS DRAWS ITS OWN Z UPWARD, whatever the data means. Gravity in this engine acts
+    # along -Y (`gravity` sets accel[:, 1]), so a cell falling straight down was plotted along a
+    # horizontal-ish screen axis and read as a diagonal drift -- twice, on two different rungs,
+    # while the trajectory was exactly vertical both times (dx and dz zero to four decimals).
+    # `plotting.up_axis` already says which data axis is up; `plot.py`'s splat renderer honours it
+    # and this one did not. The permutation sends the declared up-axis to mplot3d's z.
+    up = int((spec.get("plotting") or {}).get("up_axis", 2))
+    perm = [i for i in range(3) if i != up] + [up]          # (…, up) -> mpl (x, y, z)
 
     # ONE FRAME, ONE CAMERA BOX, SHARED BY BOTH PANELS. Framing each panel to its own contents would
     # make the section look like a different, larger object than the body it was cut from.
@@ -166,8 +347,9 @@ def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d
         # over, so the cell reads as a solid object -- which is what it is. A mplot3d axes also
         # draws its data into well under the full axes width, which the exact px conversion cannot
         # know, and the same factor absorbs it.
-        ax1.scatter(p[:, 0], p[:, 1], p[:, 2], c=rgb, depthshade=False, linewidths=0,
-                    s=dot_area_pt2(p, 2.0 * r, 6.3 * 110, 110, fill=fill3d), label=label)
+        pp = p[:, perm]
+        ax1.scatter(pp[:, 0], pp[:, 1], pp[:, 2], c=rgb, depthshade=False, linewidths=0,
+                    s=dot_area_pt2(pp, 2.0 * r, 6.3 * 110, 110, fill=fill3d), label=label)
         m = (p[:, k] >= lo) & (p[:, k] <= hi)                 # the slab
         if m.any():
             q = p[m]
@@ -177,7 +359,7 @@ def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d
                         s=dot_area_pt2(q[:, [o1, o2]], 2.0 * br, 6.3 * 110, 110, fill=fill2d))
 
     if box is not None:
-        _draw_box3d(ax1, box[0], box[1])
+        _draw_box3d(ax1, box[0][perm], box[1][perm])
         # the domain's own cross section at this slab: the rectangle the section is cut from
         from matplotlib.patches import Rectangle
         # the domain edge, drawn only where it falls inside the zoomed section -- when the cell
@@ -185,9 +367,10 @@ def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d
         ax2.add_patch(Rectangle((box[0][o1], box[0][o2]),
                                 box[1][o1] - box[0][o1], box[1][o2] - box[0][o2],
                                 fill=False, edgecolor="#4a4a4a", lw=0.7))
+    cp = c3[perm]
     for a in (ax1,):
-        a.set_xlim(c3[0] - r, c3[0] + r); a.set_ylim(c3[1] - r, c3[1] + r)
-        a.set_zlim(c3[2] - r, c3[2] + r); a.set_axis_off(); a.set_box_aspect((1, 1, 1))
+        a.set_xlim(cp[0] - r, cp[0] + r); a.set_ylim(cp[1] - r, cp[1] + r)
+        a.set_zlim(cp[2] - r, cp[2] + r); a.set_axis_off(); a.set_box_aspect((1, 1, 1))
     ax2.set_xlim(bc[o1] - br, bc[o1] + br); ax2.set_ylim(bc[o2] - br, bc[o2] + br)
     ax2.set_aspect("equal"); ax2.set_axis_off()
 
@@ -225,8 +408,8 @@ def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d
     return out
 
 
-def panels_movie(run_dir, axis="z", thick=0.10, out=None, max_frames=150, fps=20,
-                 fill3d=1.9, fill2d=1.1):
+def panels_movie(run_dir, axis="auto", thick=0.10, out=None, max_frames=150, fps=20,
+                 fill3d=1.9, fill2d=1.1, dot=3.0, dot_section=7.0):
     """The two-panel view over TIME -- the one movie that replaces the per-set pile.
 
     A STILL OF THE LAST FRAME ANSWERS NOTHING ABOUT A RUN THAT MOVES. `cell_02` is a cell dropped
@@ -238,6 +421,10 @@ def panels_movie(run_dir, axis="z", thick=0.10, out=None, max_frames=150, fps=20
     a clip nobody watches frame by frame. `max_frames` evenly spaced rows is enough to read a
     bounce, and the frame counter in the corner says which row each panel is.
     """
+    from plexus.render_vtk import available
+    if available():
+        return panels_vtk(run_dir, axis=axis, thick=thick, out=out, max_frames=max_frames, fps=fps,
+                          movie=True, dot=dot, dot_section=dot_section)
     import matplotlib
     matplotlib.use("Agg")
     import imageio.v2 as imageio
@@ -249,7 +436,7 @@ def panels_movie(run_dir, axis="z", thick=0.10, out=None, max_frames=150, fps=20
         raise SystemExit("  no set has recorded positions")
     n_rows = sets[0][1].shape[0]
     idx = np.unique(np.linspace(0, n_rows - 1, min(max_frames, n_rows)).astype(int))
-    out = out or os.path.join(run_dir, "panels.mp4")
+    out = out or os.path.join(run_dir, "movie.mp4")
     tmp = tempfile.mkdtemp()
     frames = []
     for k, t in enumerate(idx):
@@ -270,9 +457,12 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir")
     ap.add_argument("--frame", type=int, default=-1)
-    ap.add_argument("--axis", default="z", help="the axis the section is taken across")
+    ap.add_argument("--axis", default="auto", help="the axis the section is taken across")
     ap.add_argument("--thick", type=float, default=0.06, help="slab half-thickness, as a fraction "
                                                               "of the body radius")
+    ap.add_argument("--dot", type=float, default=3.0, help="dot size in px, domain panel")
+    ap.add_argument("--dot-section", dest="dot_section", type=float, default=7.0,
+                    help="dot size in px, section panel")
     ap.add_argument("--fill3d", type=float, default=1.9,
                     help="dot size as a multiple of the measured spacing, 3D panel")
     ap.add_argument("--fill2d", type=float, default=1.1, help="the same, section panel")
@@ -284,5 +474,5 @@ if __name__ == "__main__":
     a = ap.parse_args()
     (panels_movie if a.movie else panels)(
         a.run_dir, axis=a.axis, thick=a.thick, out=a.out,
-        fill3d=a.fill3d, fill2d=a.fill2d,
+        fill3d=a.fill3d, fill2d=a.fill2d, dot=a.dot, dot_section=a.dot_section,
         **({} if a.movie else dict(frame=a.frame, frame_to=a.frame_to)))
