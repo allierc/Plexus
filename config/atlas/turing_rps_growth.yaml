@@ -26,6 +26,13 @@
 #
 # GROWTH STARTS AT FRAME 450, inherited from r013_05, and the reason is the same: the pattern needs
 # to establish before the geometry starts moving under it, or the tissue grows on noise.
+# `_discovery:` IS DROPPED, NOT UPDATED. The fork inherited r013_05's block verbatim and it
+# described the model that was REPLACED -- gray_scott, the cone seed, cell_chem_from_shape,
+# interface_tension, cell_shape_probe, and a `cell_chem_react -> cell_grow.gate` connection this
+# spec does not have. A provenance block is a record of how a campaign FOUND a composition; this
+# spec was written by hand, so it has no such record and should not carry someone else's. Its
+# comp_hash (C37faf0d5d06) is r013_05's and would have made two different models look like one
+# to anything keyed on it.
 general:
   name: turing_rps_growth
   seed: 819657
@@ -158,56 +165,6 @@ schedule:
 - edge_flip
 - cell_divide
 - topo_record
-_discovery:
-  comp_hash: C37faf0d5d06
-  structure:
-    operators:
-    - id: cell_chem_diffuse0
-      op: cell_chem_diffuse
-      impl: graph_laplacian
-    - id: cell_chem_from_shape0
-      op: cell_chem_from_shape
-      impl: curvature
-    - id: cell_chem_react0
-      op: cell_chem_react
-      impl: gray_scott
-    - id: cell_chem_seed0
-      op: seed_cell_chem
-      impl: cone
-    - id: cell_divide0
-      op: cell_divide
-      impl: hertwig
-    - id: cell_geometry0
-      op: cell_geometry
-    - id: cell_grow0
-      op: cell_grow
-      impl: hill_conserve_amount
-    - id: cell_mechanics0
-      op: cell_mechanics
-      impl: default
-    - id: cell_neighbours0
-      op: cell_neighbours
-    - id: cell_shape_probe0
-      op: cell_shape_probe
-      impl: shape_index
-    - id: edge_flip0
-      op: edge_flip
-    - id: interface_tension0
-      op: interface_tension
-    - id: mesh_seed0
-      op: seed_mesh
-    connections:
-    - src_op: cell_chem_react
-      dst_op: cell_grow
-      slot: gate
-    - src_op: cell_chem_react
-      dst_op: interface_tension
-      slot: site
-  region: emergent RD + purse-string
-  defect_fixes:
-  - D1 engine owns the clock (every=1)
-  - D2 one global dt=1.0
-  - D3 topo_snapshot every=1 == position stride
 plotting:
   background: black
   blend: additive
