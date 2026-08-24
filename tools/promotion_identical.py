@@ -419,6 +419,8 @@ def suite_turing():
         # ---- the 3D twin: the same May-Leonard working point on a CLOSED surface, where a wave
         # has no boundary to die against and a spiral core has no edge to anchor to.
         ("turing_rps",         "May-Leonard on the closed vertex mesh: the 3D twin of turing2d_rps"),
+        ("turing_rps_growth",  "r013_05 x turing_rps: the RED species gates cell_grow, so the "
+                               "growth front travels with the rotating wave"),
         # ---- the TWO-SYSTEM twin of the Pearson sweep: system A fixed, system B walking the
         # diagram, so each motif is asked whether it survives being laid over another on the same
         # cells. Independent spans, no cross term -- what differs from the solo run is competition
