@@ -454,8 +454,21 @@ def suite_turing():
         ("turing2d_two_theta",   "two systems, B at Pearson theta: the twin of turing2d_gs_theta"),)]
 
 
+def suite_cell():
+    """The composed-cell ladder -- CORE ONLY, and a ladder rather than a gate.
+
+    Each rung adds exactly one thing to the one before it, so a difference in the result is
+    attributable. There is nothing to compare against: no archive contains a cell built from
+    heterogeneous substrates, which is the point of building one. Run with `--sides B`.
+    """
+    return [("CELL", f"cell/{n}", None, 0.0, "core", "core", what) for n, what in (
+        ("cell_00_hierarchy", "does the composition BUILD and can each part be told apart"),
+        ("cell_01_bounce",    "drop it: liquid cytosol should slosh, stiff nucleus should keep "
+                              "its shape, membrane should flatten and recover"))]
+
+
 SUITES = {"ECM": suite_ecm, "BASE": suite_base, "MINISITE": suite_minisite,
-          "TURING": suite_turing}
+          "TURING": suite_turing, "CELL": suite_cell}
 
 
 def _spec_src(spec):

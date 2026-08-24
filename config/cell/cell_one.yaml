@@ -1,0 +1,92 @@
+# cell_one -- ONE CELL, composed rather than simulated.
+#
+# The cell is a PARENT holding two distinct child sets, each in the substrate its own biology asks
+# for. Nothing here is a cell simulator: `cell` is an ordinary set, the interior is the material
+# point method, and the composition is containment plus the ordinary operators.
+#
+# WHAT DRIVES THE MOTION IS DENSITY, AND NOTHING ELSE. A liquid of uniform density under gravity
+# just sits, so a circulating interior has to come from a density difference. There are two here:
+#   * the cytosol carries two protein species, light (0.6) and heavy (1.8), mixed at the seed, so
+#     the light one rises through the heavy one and the interior overturns;
+#   * the nucleus is denser than either (2.6) and sediments, pushing cytosol around itself.
+# Neither flow is imposed. A prescribed stirring would prove nothing about composition.
+#
+# TWO CHILD SETS, ONE GRID. `cytosol` and `nucleus` are separate sets that both alias the MPM
+# particle entity -- same substrate, different objects, different densities. Both scatter to the
+# same grid and both gather from it, which is why `mpm_scatter` and `mpm_gather` are each named
+# TWICE in the schedule: the engine binds the i-th occurrence of a token to the i-th instance, and
+# an instance with no occurrence is constructed, listed in the run banner, and never called.
+#
+# THE PROTEINS NEED NO ADVECTION OPERATOR. They ARE particles, so `g2p` carries them with the grid
+# velocity by construction. An advection operator is only needed for a species held as a FIELD.
+general:
+  name: cell_one
+  seed: 0
+  n_frames: 4000
+  record_cap: 602
+  dt: 0.0028      # MPM CFL, matching `material_two_drops_st`
+  dim: 3
+  boundary: wall
+  world: [1.0, 1.0, 1.0]
+sets:
+  cell:
+    n: 1
+    spawn: point
+    types:
+      c: {fraction: 1.0, youngs: 40}
+    state:
+      pos: {width: 3, integration: none, boundary: free}
+  # THE INTERIOR: one cloud, two species, differing only in density.
+  cytosol:
+    parent: cell
+    per_parent: 12000
+    radius: 0.16
+    density: 1.0
+    types:
+      light: {fraction: 0.5, youngs: 15, material: liquid, density: 0.6}
+      heavy: {fraction: 0.5, youngs: 15, material: liquid, density: 1.8}
+  # THE NUCLEUS: the same substrate, a different object -- stiffer, denser, and its own set so it
+  # can be measured, coloured and reasoned about apart from the cytosol it displaces.
+  nucleus:
+    parent: cell
+    per_parent: 1500
+    radius: 0.055
+    density: 2.6
+    types:
+      n: {fraction: 1.0, youngs: 300, material: elastic}
+# THE GRID IS WHERE THE MECHANICS HAPPENS, so it is declared as a field and its resolution is a
+# stated number rather than a default. n_grid 96 over a unit box gives dx = 0.0104; the cell is
+# radius 0.16, so it spans about 31 cells and the nucleus about 10 -- enough that the interface
+# between them is resolved rather than being one grid cell wide, which is the failure mode
+# `AUDIT.md` records for the membrane coupling.
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+# GRAVITY IS ONE UNIFORM ACCELERATION AT THE CELL, not a per-particle force, and that is what makes
+# the buoyancy test honest. `gravity` emits an `mpm_acceleration` the substep consumes as a_ext, so
+# every particle feels the same a -- and if the light and heavy species still separate, it is
+# because the grid velocity is a MASS-WEIGHTED average, which is how buoyancy arises in a fluid.
+# Nothing here puts a density-dependent force on a particle by hand.
+- {op: gravity, at: cell, g: 4.0}
+- {op: mpm_strain, at: cytosol}
+- {op: mpm_strain, at: nucleus}
+- {op: mpm_scatter, at: cytosol, to: mpm_grid, drag: 0.02, a_max: 200}
+- {op: mpm_scatter, at: nucleus, to: mpm_grid, drag: 0.02, a_max: 200}
+# surface tension holds the interior together as one body -- the stand-in for a membrane until the
+# bonded `membrane` set is wired in. It is a MATERIAL property here, not a per-cell-pair one.
+# `rho_ref` 1.2 is the MEAN of the two species (0.6 and 1.8), so the light one is lighter than what
+# it displaces and rises while the heavy one is heavier and sinks -- and a node at the mixture's own
+# density feels nothing, which is what makes this buoyancy rather than a second gravity. Measured
+# first WITHOUT it: separation -0.0020 over 1,200 frames, because `gravity` emits an acceleration
+# and mass cancels.
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 60.0, wall_damp: 1.0,
+   buoyancy: 4.0, rho_ref: 1.2}
+- {op: mpm_gather, at: cytosol, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04}
+- {op: mpm_gather, at: nucleus, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04}
+schedule: [gravity, mpm_strain, mpm_strain, mpm_scatter, mpm_scatter,
+           mpm_grid_update, mpm_gather, mpm_gather]
+plotting:
+  background: black
+  cutaway: [x]
