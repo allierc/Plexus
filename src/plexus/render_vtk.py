@@ -229,8 +229,9 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
 def style_of(run_dir):
     """`(lut, blend)` from the run's own `spec.yaml` -- the colour table is part of the MODEL.
 
-    Returns `(None, None)` when the spec declares no `plotting.species`, which is every
-    Gray-Scott run: those keep the white -> red activator map they were built with.
+    Returns `(lut, blend, cutaway)`; all three are None when the spec declares no `plotting`
+    block, which is every Gray-Scott run -- those keep the white -> red activator map they were
+    built with and draw the whole closed surface.
     """
     for nm in ("spec.yaml", "spec_run.yaml"):
         f = os.path.join(run_dir, nm)
@@ -242,8 +243,8 @@ def style_of(run_dir):
         except Exception:
             return None, None
         lut = pl.get("species")
-        return (list(lut) if lut else None), pl.get("blend")
-    return None, None
+        return (list(lut) if lut else None), pl.get("blend"), pl.get("cutaway")
+    return None, None, None
 
 
 def frames_of(run_dir, traj=None):
@@ -357,6 +358,7 @@ def _marks(mt, idx, nF, prev_nF=None):
 
 
 def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=None, lut=None,
+            cutaway=None,
             blend=None):
     """The apical shell as PolyData with per-cell RGB. Rebuilt per frame: cells divide."""
     import pyvista as pv
@@ -365,9 +367,36 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=No
     es, et, ef = (np.asarray(mt[k]) for k in ("E_srce", "E_trgt", "E_face"))
     live = ef < nF
     rings = rings_from_flat_3d(es[live], et[live], ef[live], nF)
+    # THE CUTAWAY, and it is a WEDGE OF FACES DROPPED, not a clipping plane. A vtkClipPolyData
+    # cuts through faces and leaves a torn edge whose cells are half-drawn and half-coloured; the
+    # point of looking inside a growing tissue is to see whole cells on the far wall, so this drops
+    # each face ENTIRELY, by the side its centroid falls on. The surface stays a set of complete
+    # cells and the opening is jagged along cell boundaries, which is what a real dissection looks
+    # like anyway.
+    #
+    # `cutaway: [ax, ax]` names the axes whose POSITIVE octant is removed -- ["x","y"] takes the
+    # quarter where both x and y exceed the body's centroid, which on a spheroid opens a quadrant
+    # and shows the lumen and the inner wall. A single axis halves it; three take one octant.
+    _keep_face = None
+    if cutaway:
+        _ax = {"x": 0, "y": 1, "z": 2}
+        _sel = [_ax[a.lower().lstrip("+-")] for a in cutaway if a.lower().lstrip("+-") in _ax]
+        _neg = [a.startswith("-") for a in cutaway]
+        if _sel:
+            _c = np.asarray(pos, float).mean(0)
+            _cen = np.array([np.asarray(pos, float)[np.asarray(r, int)].mean(0)
+                             if (r is not None and len(r) >= 3) else _c for r in rings])
+            _in = np.ones(len(rings), bool)
+            for _k, _ax_i in enumerate(_sel):
+                _side = _cen[:, _ax_i] < _c[_ax_i] if (_k < len(_neg) and _neg[_k]) \
+                    else _cen[:, _ax_i] > _c[_ax_i]
+                _in &= _side
+            _keep_face = ~_in                       # drop the wedge, keep everything else
     faces, idx = [], []
     for f, r in enumerate(rings):
         if r is None or len(r) < 3:
+            continue
+        if _keep_face is not None and not _keep_face[f]:
             continue
         faces.append(len(r)); faces.extend(int(v) for v in r); idx.append(f)
     if not idx:
@@ -513,13 +542,14 @@ def _plotter(size=None):
 def kburns(run_dir, style, out, fill=1.0, label=None):
     """The finished specimen, turned once and zoomed in. Geometry fixed, camera moving."""
     fr = frames_of(run_dir)
-    _lut, _blend = style_of(run_dir)
+    _lut, _blend, _cut = style_of(run_dir)
     if not fr:
         return "no trajectory"
     L0 = box_of(run_dir, fr)
     name = label or os.path.basename(run_dir.rstrip("/"))
     pos, mt, act, _chem = fr[-1]
-    m = mesh_of(pos, mt, act, show_div=False, chem=_chem, lut=_lut, blend=_blend)
+    m = mesh_of(pos, mt, act, show_div=False, chem=_chem, lut=_lut, blend=_blend,
+                cutaway=_cut)
     n = int(KB_SECONDS * FPS)
     p = _plotter(); add(p, m, style)
     p.add_text(f"{name}  {style}", position="upper_left", font_size=11, color="white")
@@ -537,7 +567,7 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
 def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     """The run through time, camera nailed down."""
     fr = frames_of(run_dir)
-    _lut, _blend = style_of(run_dir)
+    _lut, _blend, _cut = style_of(run_dir)
     if not fr:
         return "no trajectory"
     ticks_all = _frames_ticks.value
@@ -567,7 +597,7 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     for t, (pos, mt, act, _chem) in enumerate(fr):
         back = _pair_reference(t, nFs, ticks, PAIR_TICKS)
         m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"), prev_nF=back,
-                    chem=_chem, lut=_lut, blend=_blend)
+                    chem=_chem, lut=_lut, blend=_blend, cutaway=_cut)
         if m is None:
             continue
         if actor is not None:
@@ -599,7 +629,8 @@ def still(run_dir, style="flat", out=None, fill=1.0, frame=-1, label=True, traj=
     nm = name or os.path.basename(run_dir.rstrip("/"))
     pos, mt, act, _chem = fr[frame][:4]
     m = mesh_of(pos, mt, act, show_div=(style == "mesh"), chem=_chem,
-                lut=style_of(run_dir)[0], blend=style_of(run_dir)[1])
+                lut=style_of(run_dir)[0], blend=style_of(run_dir)[1],
+                cutaway=style_of(run_dir)[2])
     p = _plotter()
     add(p, m, style)
     if label:

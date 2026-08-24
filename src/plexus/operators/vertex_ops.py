@@ -518,6 +518,12 @@ class Divide3D(Structural):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
+        # A POPULATION CEILING, off by default so nothing archived changes. `before_frame` stops
+        # division at a TIME; this stops it at a SIZE, which is what "grow to 30k cells and then
+        # just let the chemistry run" needs -- the frame at which a given spec reaches a given
+        # count is not knowable in advance, and guessing it either truncates the growth or wastes
+        # the rest of the run.
+        self.max_cells = int(params.get("max_cells", 0) or 0)
         self.factor = float(params.get("factor", 2.0))           # divide when volume >= factor x birth volume
         self.cycle_cv = float(params.get("cycle_cv", 0.0))       # STOCHASTIC CELL CYCLE: Gaussian CV of each daughter's
         #   cell-cycle length (fresh division threshold). >0 keeps division waves broken up (desynchronised) as the
@@ -626,6 +632,18 @@ class Divide3D(Structural):
             vol_ok = self._trigger(vf[f], Vbirth[f], djit[f], age[f], v_ref)
             return (vol_ok and age[f] >= self.min_cycle) or (age[f] >= self.max_cycle)
         cand = [f for f in range(nF) if _ready(f)]
+        # THE POPULATION CEILING, and it is a HARD STOP rather than a throttle. Once the tissue has
+        # `max_cells` cells nothing further divides, so the run keeps integrating -- chemistry,
+        # mechanics, edge flips all continue -- on a population that has stopped changing. That is
+        # the difference between this and `before_frame`: a frame number cannot say "when the
+        # tissue is this big", because the frame at which a given spec reaches a given count is not
+        # knowable before the run. Zero (the default) means no ceiling, so nothing archived moves.
+        #
+        # IT DROPS THE CANDIDATES RATHER THAN CAPPING THEM. Letting the last few through to land
+        # exactly on `max_cells` would make the stop depend on how many cells happened to ripen on
+        # the same tick, which is noise; refusing the whole tick makes the ceiling reproducible.
+        if self.max_cells and nF >= self.max_cells:
+            cand = []
         rng.shuffle(cand)                                        # unbiased when more cells are ready than the cap
         # NO THROTTLE, NO BYPASS. Every cell that is READY divides, and READY is the test two
         # lines above: current volume >= factor x jitter x its OWN birth volume, after min_cycle

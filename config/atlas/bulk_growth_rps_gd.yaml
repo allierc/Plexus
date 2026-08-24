@@ -1,0 +1,185 @@
+# bulk_growth_rps_gd -- May-Leonard: RED gates growth, BLUE gates death.
+#
+# ONE SERIES, ONE VARIABLE AT A TIME. `bulk_growth` is the control: an epithelium that grows and
+# divides with no chemistry at all. Each later member adds exactly one thing, so a difference in
+# the surface is attributable to the thing that was added and to nothing else.
+#
+#   bulk_growth           growth, no chemistry
+#   bulk_growth_turing    + Gray-Scott, present but NOT gating growth
+#   bulk_growth_rps       + May-Leonard, present but NOT gating growth
+#   bulk_growth_turing_g  + Gray-Scott, and the activator GATES growth
+#   bulk_growth_rps_gd    + May-Leonard, RED gates growth and BLUE gates death
+#
+# The middle two matter as much as the ends: chemistry that is running but not coupled is the
+# control for chemistry that is coupled, and without it any difference could be the chemistry's
+# presence rather than its coupling.
+#
+# GROWTH STOPS AT 30,000 CELLS in every member, so the runs end at the same size and the surfaces
+# are comparable. Without it the coupled members grow slower -- only gated cells divide -- and a
+# smaller tissue would be confounded with a differently-shaped one.
+#
+# RENDERED WITH A QUADRANT REMOVED (`cutaway: [x, y]`). Bulk growth builds a solid, and the
+# interesting structure is inside it: the lumen, the inner wall, whether growth is uniform through
+# the depth. The cut drops whole FACES by which side their centroid falls on rather than clipping
+# through them, so the far wall is made of complete cells rather than half-cells with a torn edge.
+#
+# THE MECHANICAL BASE IS IDENTICAL ACROSS ALL FIVE. `cell_chem_from_shape`, `interface_tension` and
+# `cell_shape_probe` are dropped from every member, including the ones whose Gray-Scott base
+# carried them. They are extra chemistry-to-mechanics couplings, and leaving them in the two Turing
+# members while the May-Leonard members lack them would mean the series varies TWO things between
+# rows 3 and 4 -- the reaction model and the presence of a curvature feedback -- and neither could
+# be blamed for a difference in the surface. A series whose members differ in more than one place
+# is a gallery, not an experiment.
+general:
+  name: bulk_growth_rps_gd
+  seed: 819657
+  n_frames: 4300
+  dt: 1.0
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+  record_cap: 602
+_run:
+  target_cells: 50000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 130004
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 65004
+    state:
+      chem:
+        width: 3
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: mesh_seed
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  radius: 5.0
+  jitter: 0.15
+  seed: 819657
+  vseed_cv: 0.15
+  p0: 3.5
+- op: cell_geometry
+  at: cell
+- op: cell_chem_seed
+  at: cell
+  mode: simplex
+  n_spots: 1
+  cone_deg: 8.0
+  seed: 819657
+  before_frame: 3
+  n_species: 3
+- op: cell_neighbours
+  at: cell
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  chi: 1.0
+  d:
+  - 0.02
+  - 0.02
+  - 0.02
+- op: cell_chem_react
+  at: cell
+  model: rock_paper_scissor
+  a: 0.6
+  rate: 0.05
+  chan: 0
+- op: cell_grow
+  at: vertex
+  cell_set: cell
+  rate: 0.001732
+  a_sw: 0.45
+  hill: 8.0
+  rho: 0.1
+  vth_frac: 2.5
+  after_frame: 450
+  conserve_amount: false
+  chan: 0
+- op: cell_mechanics
+  at: vertex
+  p0: 3.5
+  K_A: 1.0
+  K_P: 1.0
+  Gamma: 0.4
+  Lambda: 0.5
+  K_V: 40.0
+  K_R: 0.0
+  K_bend: 0.0
+  K_lumen: 0.0
+  antiinv: 0.0
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: cell_divide
+  at: vertex
+  factor: 2.0
+  reset_noise: 0.12
+  cycle_cv: 0.15
+  p0: 3.5
+  every: 4
+  cell_set: cell
+  min_cycle: 4
+  max_cycle: 1000000000
+  after_frame: 450
+  orient_iface: false
+  orient_asw: 0.6
+  g1_ramp: false
+  engine_clock: true
+  max_cells: 30000
+- op: topo_record
+  at: vertex
+  every: 1
+- op: cell_die
+  at: vertex
+  cell_set: cell
+  mode: field_high
+  field: act
+  chan: 2
+  frac: 0.02
+  after_frame: 600
+  min_age: 4
+schedule:
+- mesh_seed
+- cell_geometry
+- cell_chem_seed
+- cell_neighbours
+- cell_chem_diffuse
+- cell_chem_react
+- cell_grow
+- cell_mechanics
+- edge_flip
+- cell_divide
+- topo_record
+- cell_die
+plotting:
+  background: black
+  cutaway:
+  - x
+  - y
+  species:
+  - '#ff0000'
+  - '#00ff00'
+  - '#0000ff'
+  blend: additive
