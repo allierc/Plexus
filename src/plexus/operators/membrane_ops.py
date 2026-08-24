@@ -1971,11 +1971,23 @@ def _radius(M, u):
              (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
 
 
-@register_operator("integrin_seed", family="seed", set="particle", kind="structural")
+@register_operator("integrin_seed", family="seed", set="particle", kind="seed")
 class IntegrinSeed(Structural):
     """Lay the fibres down once: `layers` particles per fibre, from the surface outward by `length`."""
 
     EMIT = None
+    # kind "structural" -> "seed", 24 August. This operator establishes x_0 -- it lays the
+    # fibres down once and `forward` returns {} thereafter -- and every other `*_seed` in the
+    # registry (bm_seed, ecm_seed, block_seed, mesh_seed, adhesion_seed, cell_chem_seed,
+    # neural_seed) is already kind="seed". Registering it as a dynamics kind made it the one
+    # operator tripping the family/kind invariant, so `[warn] integrin_seed: family="seed"
+    # ... a seed masquerading as a dynamics kind` printed on EVERY invocation of Plexus_Main.
+    # It was the warning telling the truth, not a false positive to be exempted.
+    #
+    # AS A DYNAMICS KIND IT ALSO RAN EVERY TICK, doing nothing but a `self._done` check for
+    # the whole run. `kind="seed"` puts it under the seed lifecycle instead: `engine.seed()`
+    # for a spec with a `seed:` section, or the `_seed_window` gate for the legacy spelling,
+    # which confines it to the opening frames and preserves its ordering after `bm_seed`.
     SUPPORTED_DIMS = [3]
     REQUIRES_PARAMS = ["surface"]
     MECHANISM_TAGS = ["integrin", "hemidesmosome", "cell_matrix_anchoring", "material_seeding"]
