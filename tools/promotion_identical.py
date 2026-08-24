@@ -432,6 +432,16 @@ def suite_turing():
                                "growth front travels with the rotating wave"),
         ("turing_eta_growth",  "r013_05 x turing2d_gs_eta: growth switched on inside isolated "
                                "STATIONARY spots rather than along a maze"),
+        ("turing_rps_growth_30k", "the same, twice as long, growth stopped at 30k cells so the "
+                                  "wave flows over a frozen population"),
+        # ---- THE BULK SERIES. One control and four single-variable additions, all rendered with
+        # a quadrant cut away so the interior is visible. The two uncoupled chemistry members are
+        # the controls for the two coupled ones.
+        ("bulk_growth",          "control: growth and division, no chemistry"),
+        ("bulk_growth_turing",   "+ Gray-Scott, running but NOT gating growth"),
+        ("bulk_growth_rps",      "+ May-Leonard, running but NOT gating growth"),
+        ("bulk_growth_turing_g", "+ Gray-Scott, activator GATES growth"),
+        ("bulk_growth_rps_gd",   "+ May-Leonard, RED gates growth and BLUE gates death"),
         # ---- the TWO-SYSTEM twin of the Pearson sweep: system A fixed, system B walking the
         # diagram, so each motif is asked whether it survives being laid over another on the same
         # cells. Independent spans, no cross term -- what differs from the solo run is competition
