@@ -88,7 +88,33 @@ def _rgb(c):
     return np.array([int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)])
 
 
-def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d=1.1):
+def _box(spec):
+    """The world box as (lo, hi), or None when the spec declares no world."""
+    w = (spec.get("general") or {}).get("world")
+    if not w:
+        return None
+    hi = np.asarray([float(x) for x in (w if isinstance(w, (list, tuple)) else [w])], float)
+    if hi.size < 3:
+        hi = np.concatenate([hi, np.ones(3 - hi.size)])
+    return np.zeros(3), hi[:3]
+
+
+def _draw_box3d(ax, lo, hi, c="#4a4a4a", lw=0.7):
+    """The twelve edges of the domain.
+
+    WHY IT IS DRAWN AT ALL. Without it a point cloud in an empty frame has no orientation and no
+    floor: a body falling straight down the y axis was read as drifting diagonally, and the surface
+    it landed on was read as a diagonal wall, because nothing in the picture said which way was
+    down. The trajectory was correct throughout -- dx and dz were zero to four decimals. A frame of
+    reference is not decoration when the thing being judged is a direction.
+    """
+    import itertools
+    for a, b in itertools.combinations(list(itertools.product(*zip(lo, hi))), 2):
+        if sum(1 for i in range(3) if a[i] != b[i]) == 1:          # an edge: differs on one axis
+            ax.plot(*zip(a, b), color=c, lw=lw)
+
+def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d=1.1,
+           frame_to="world"):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -103,14 +129,31 @@ def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d
     # ONE FRAME, ONE CAMERA BOX, SHARED BY BOTH PANELS. Framing each panel to its own contents would
     # make the section look like a different, larger object than the body it was cut from.
     allp = np.concatenate([p[frame] for _n, p, _c, _l in sets])
-    c3 = allp.mean(0)
-    r = float(np.abs(allp - c3).max()) * 1.08 or 1.0
+    box = _box(spec)
+    # THE TWO PANELS FRAME DIFFERENTLY, ON PURPOSE, because they answer different questions.
+    #
+    # LEFT is the domain: where the cell IS. A body framed to itself looks identical at the top of
+    # its fall and resting on the floor, and the box is what makes "down" and "which wall" legible
+    # at all -- without it a straight drop was read as a diagonal drift for two rungs running.
+    #
+    # RIGHT is the body: what the cell is MADE of. Framed to the domain the section shrinks to a
+    # speck in a corner and the compartments it exists to show are a few pixels across. Giving both
+    # panels one framing, which is what the first version did, means one of them is always wrong.
+    wc = 0.5 * (box[0] + box[1]) if box is not None else allp.mean(0)
+    wr = float((box[1] - box[0]).max()) * 0.52 if box is not None else 1.0
+    bc = allp.mean(0)
+    br = float(np.abs(allp - bc).max()) * 1.10 or 1.0
+    if frame_to == "body":                       # both panels on the body, for a structural rung
+        wc, wr = bc, br
+    c3, r = wc, wr
 
     fig = plt.figure(figsize=(12.6, 6.4), facecolor="black")
     ax1 = fig.add_subplot(121, projection="3d", facecolor="black")
     ax2 = fig.add_subplot(122, facecolor="black")
 
-    lo, hi = c3[k] - thick * r, c3[k] + thick * r
+    # THE SLAB FOLLOWS THE BODY, not the domain: a section taken about the middle of the box
+    # misses a cell that has fallen to the floor entirely.
+    lo, hi = bc[k] - thick * br, bc[k] + thick * br
     o1, o2 = [i for i in range(3) if i != k]
 
     for _name, pos, rgb, label in sets:
@@ -131,20 +174,29 @@ def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d
             # THE SECTION IS NEARLY A SHEET, so it wants close to the flat-disc value -- the slab
             # is thin and the spacing measured in it is the spacing you actually see.
             ax2.scatter(q[:, o1], q[:, o2], c=rgb[m], linewidths=0,
-                        s=dot_area_pt2(q[:, [o1, o2]], 2.0 * r, 6.3 * 110, 110, fill=fill2d))
+                        s=dot_area_pt2(q[:, [o1, o2]], 2.0 * br, 6.3 * 110, 110, fill=fill2d))
 
+    if box is not None:
+        _draw_box3d(ax1, box[0], box[1])
+        # the domain's own cross section at this slab: the rectangle the section is cut from
+        from matplotlib.patches import Rectangle
+        # the domain edge, drawn only where it falls inside the zoomed section -- when the cell
+        # is resting on the floor its lower wall is in view and is worth seeing.
+        ax2.add_patch(Rectangle((box[0][o1], box[0][o2]),
+                                box[1][o1] - box[0][o1], box[1][o2] - box[0][o2],
+                                fill=False, edgecolor="#4a4a4a", lw=0.7))
     for a in (ax1,):
         a.set_xlim(c3[0] - r, c3[0] + r); a.set_ylim(c3[1] - r, c3[1] + r)
         a.set_zlim(c3[2] - r, c3[2] + r); a.set_axis_off(); a.set_box_aspect((1, 1, 1))
-    ax2.set_xlim(c3[o1] - r, c3[o1] + r); ax2.set_ylim(c3[o2] - r, c3[o2] + r)
+    ax2.set_xlim(bc[o1] - br, bc[o1] + br); ax2.set_ylim(bc[o2] - br, bc[o2] + br)
     ax2.set_aspect("equal"); ax2.set_axis_off()
 
     name = (spec.get("general") or {}).get("name", os.path.basename(run_dir))
     n_rows = sets[0][1].shape[0]
     fr = frame if frame >= 0 else n_rows + frame
-    ax1.text2D(0.02, 0.97, f"{name}   frame {fr + 1}/{n_rows}   instance segmentation",
+    ax1.text2D(0.02, 0.97, f"{name}   frame {fr + 1}/{n_rows}   domain",
                transform=ax1.transAxes, color="white", fontsize=11, va="top")
-    ax2.text(0.02, 0.97, f"cross section   {axis} = centre +/- {thick:.2f} of the body radius",
+    ax2.text(0.02, 0.97, f"cell, zoomed   cross section {axis} = body centre +/- {thick:.2f} R",
              transform=ax2.transAxes, color="white", fontsize=11, va="top")
     counts = "   ".join(f"{n}: {p.shape[1]}" for n, p, _c, _l in sets)
     ax2.text(0.02, 0.93, counts, transform=ax2.transAxes, color="#b0b0b0", fontsize=8, va="top")
@@ -182,7 +234,10 @@ if __name__ == "__main__":
     ap.add_argument("--fill3d", type=float, default=1.9,
                     help="dot size as a multiple of the measured spacing, 3D panel")
     ap.add_argument("--fill2d", type=float, default=1.1, help="the same, section panel")
+    ap.add_argument("--frame-to", dest="frame_to", default="world",
+                    choices=("world", "body"),
+                    help="frame on the domain (default) or zoom to the contents")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     panels(a.run_dir, frame=a.frame, axis=a.axis, thick=a.thick, out=a.out,
-           fill3d=a.fill3d, fill2d=a.fill2d)
+           fill3d=a.fill3d, fill2d=a.fill2d, frame_to=a.frame_to)

@@ -19,74 +19,129 @@
 #
 # THE PROTEINS NEED NO ADVECTION OPERATOR. They ARE particles, so `g2p` carries them with the grid
 # velocity by construction. An advection operator is only needed for a species held as a FIELD.
+#
+# THE CAMERA IS DECLARED, and it has to be. `material_3d_ball_drop` -- the 3D drop that reads
+# correctly -- sets `up_axis: 1`, and without it the renderer does not know which way is up: a fall
+# straight down the y axis is drawn as a diagonal, and the box edge it lands on is drawn as a
+# diagonal wall. The trajectory was never wrong. Measured on cell_02: dx = -0.0000, dz = +0.0000,
+# dy = -0.6583 -- a pure vertical fall, rendered as a diagonal one.
+#
+# `hide_sets: [cell]` IS WHY THERE IS NO movie_cell.mp4. The parent is one point at the centre of
+# the composition; a movie of it is a single dot crossing an empty frame. The key already exists and
+# is what the material specs use -- the renderer did not need changing.
+#
+# `box_frame: true` draws the domain, so which surface the body struck is not a matter of inference,
+# and `camera_turns: 0.0` holds the view still: an orbiting camera makes a straight fall look curved.
 general:
   name: cell_one
   seed: 0
   n_frames: 4000
   record_cap: 602
-  dt: 0.0028      # MPM CFL, matching `material_two_drops_st`
+  dt: 0.0028
   dim: 3
   boundary: wall
-  world: [1.0, 1.0, 1.0]
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
 sets:
   cell:
     n: 1
     spawn: point
     types:
-      c: {fraction: 1.0, youngs: 40}
+      c:
+        fraction: 1.0
+        youngs: 40
     state:
-      pos: {width: 3, integration: none, boundary: free}
-  # THE INTERIOR: one cloud, two species, differing only in density.
+      pos:
+        width: 3
+        integration: none
+        boundary: free
   cytosol:
     parent: cell
     per_parent: 12000
     radius: 0.16
     density: 1.0
     types:
-      light: {fraction: 0.5, youngs: 15, material: liquid, density: 0.6}
-      heavy: {fraction: 0.5, youngs: 15, material: liquid, density: 1.8}
-  # THE NUCLEUS: the same substrate, a different object -- stiffer, denser, and its own set so it
-  # can be measured, coloured and reasoned about apart from the cytosol it displaces.
+      light:
+        fraction: 0.5
+        youngs: 15
+        material: liquid
+        density: 0.6
+      heavy:
+        fraction: 0.5
+        youngs: 15
+        material: liquid
+        density: 1.8
   nucleus:
     parent: cell
     per_parent: 1500
     radius: 0.055
     density: 2.6
     types:
-      n: {fraction: 1.0, youngs: 300, material: elastic}
-# THE GRID IS WHERE THE MECHANICS HAPPENS, so it is declared as a field and its resolution is a
-# stated number rather than a default. n_grid 96 over a unit box gives dx = 0.0104; the cell is
-# radius 0.16, so it spans about 31 cells and the nucleus about 10 -- enough that the interface
-# between them is resolved rather than being one grid cell wide, which is the failure mode
-# `AUDIT.md` records for the membrane coupling.
+      n:
+        fraction: 1.0
+        youngs: 300
+        material: elastic
 fields:
   mpm_grid:
     frame: mpm_grid
     n_grid: 96
 operators:
-# GRAVITY IS ONE UNIFORM ACCELERATION AT THE CELL, not a per-particle force, and that is what makes
-# the buoyancy test honest. `gravity` emits an `mpm_acceleration` the substep consumes as a_ext, so
-# every particle feels the same a -- and if the light and heavy species still separate, it is
-# because the grid velocity is a MASS-WEIGHTED average, which is how buoyancy arises in a fluid.
-# Nothing here puts a density-dependent force on a particle by hand.
-- {op: gravity, at: cell, g: 4.0}
-- {op: mpm_strain, at: cytosol}
-- {op: mpm_strain, at: nucleus}
-- {op: mpm_scatter, at: cytosol, to: mpm_grid, drag: 0.02, a_max: 200}
-- {op: mpm_scatter, at: nucleus, to: mpm_grid, drag: 0.02, a_max: 200}
-# surface tension holds the interior together as one body -- the stand-in for a membrane until the
-# bonded `membrane` set is wired in. It is a MATERIAL property here, not a per-cell-pair one.
-# `rho_ref` 1.2 is the MEAN of the two species (0.6 and 1.8), so the light one is lighter than what
-# it displaces and rises while the heavy one is heavier and sinks -- and a node at the mixture's own
-# density feels nothing, which is what makes this buoyancy rather than a second gravity. Measured
-# first WITHOUT it: separation -0.0020 over 1,200 frames, because `gravity` emits an acceleration
-# and mass cancels.
-- {op: mpm_grid_update, at: mpm_grid, surface_tension: 60.0, wall_damp: 1.0,
-   buoyancy: 4.0, rho_ref: 1.2}
-- {op: mpm_gather, at: cytosol, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04}
-- {op: mpm_gather, at: nucleus, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04}
-schedule: [gravity, mpm_strain, mpm_strain, mpm_scatter, mpm_scatter,
-           mpm_grid_update, mpm_gather, mpm_gather]
+- op: gravity
+  at: cell
+  g: 4.0
+- op: mpm_strain
+  at: cytosol
+- op: mpm_strain
+  at: nucleus
+- op: mpm_scatter
+  at: cytosol
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_scatter
+  at: nucleus
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  surface_tension: 60.0
+  wall_damp: 1.0
+  buoyancy: 4.0
+  rho_ref: 1.2
+- op: mpm_gather
+  at: cytosol
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+- op: mpm_gather
+  at: nucleus
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+schedule:
+- gravity
+- mpm_strain
+- mpm_strain
+- mpm_scatter
+- mpm_scatter
+- mpm_grid_update
+- mpm_gather
+- mpm_gather
 plotting:
   background: black
-  cutaway: [x]
+  cutaway:
+  - x
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.2
+  splat_size: 2.6
+  splat_res: 560
