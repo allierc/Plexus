@@ -419,6 +419,15 @@ def suite_turing():
         # ---- the 3D twin: the same May-Leonard working point on a CLOSED surface, where a wave
         # has no boundary to die against and a spiral core has no edge to anchor to.
         ("turing_rps",         "May-Leonard on the closed vertex mesh: the 3D twin of turing2d_rps"),
+        # ---- the same six Pearson points WITH the cross term, so gs_X / two_X /
+        # coupled_X is one reaction point at three degrees of company: alone,
+        # sharing the cells, and chemically suppressed by a neighbour.
+        ("turing2d_gs_coupled_delta",  "coupled twin of turing2d_two_delta: same B point, cross term on"),
+        ("turing2d_gs_coupled_beta",   "coupled twin of turing2d_two_beta: same B point, cross term on"),
+        ("turing2d_gs_coupled_eta",    "coupled twin of turing2d_two_eta: same B point, cross term on"),
+        ("turing2d_gs_coupled_kappa",  "coupled twin of turing2d_two_kappa: same B point, cross term on"),
+        ("turing2d_gs_coupled_lambda", "coupled twin of turing2d_two_lambda: same B point, cross term on"),
+        ("turing2d_gs_coupled_theta",  "coupled twin of turing2d_two_theta: same B point, cross term on"),
         ("turing_rps_growth",  "r013_05 x turing_rps: the RED species gates cell_grow, so the "
                                "growth front travels with the rotating wave"),
         # ---- the TWO-SYSTEM twin of the Pearson sweep: system A fixed, system B walking the
