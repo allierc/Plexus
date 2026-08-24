@@ -1,0 +1,137 @@
+general:
+  name: cell_08_five_bounce
+  seed: 0
+  n_frames: 1500
+  record_cap: 602
+  dt: 0.0015
+  dim: 3
+  boundary: wall
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 5
+    types:
+      c:
+        fraction: 1.0
+        youngs: 40
+    state:
+      pos:
+        width: 3
+        integration: none
+        boundary: free
+    start:
+    - - 0.25
+      - 0.25
+      - 0.72
+    - - 0.75
+      - 0.28
+      - 0.6
+    - - 0.5
+      - 0.5
+      - 0.84
+    - - 0.28
+      - 0.75
+      - 0.66
+    - - 0.74
+      - 0.73
+      - 0.76
+  nucleus:
+    parent: cell
+    per_parent: 1500
+    radius: 0.055
+    density: 2.6
+    types:
+      n:
+        fraction: 1.0
+        youngs: 300
+        material: elastic
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  gy: 0.0
+  gz: -9.0
+- op: mpm_strain
+  at: nucleus
+- op: mpm_scatter
+  at: nucleus
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+  polar: higham
+  polar_iters: 4
+- op: mpm_grid_update
+  at: mpm_grid
+  surface_tension: 60.0
+  wall_damp: 1.0
+- op: mpm_gather
+  at: nucleus
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+schedule:
+- aggregate
+- gravity
+- substep_dt: 0.0001
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  capture: true
+plotting:
+  background: black
+  colors:
+    light:
+    - 0.25
+    - 0.69
+    - 1.0
+    heavy:
+    - 0.12
+    - 0.31
+    - 0.66
+    n:
+    - 1.0
+    - 0.82
+    - 0.29
+    m:
+    - 0.95
+    - 0.35
+    - 0.45
+  fps: 30
+  movie_max_frames: 600
+  up_axis: 2
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.2
+  splat_size: 2.6
+  splat_res: 560
+  panels: true
+  panels_thick: 0.1
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows five spherical clusters of particles moving within a three-dimensional
+      bounding box. Over the course of the frames, the clusters shift positions, with some moving closer
+      together while others move apart. The zoomed-in view on the right focuses on a single cluster, showing
+      its internal structure and density. The overall motion appears to be a stochastic or physical interaction
+      between the five distinct bodies.
+    objects: There are five spherical clusters of particles, each appearing as a dense, golden-yellow
+      mass. These clusters are distributed throughout a cubic domain defined by white wireframe lines.
+      Each cluster is roughly the same size, though they vary slightly in their internal distribution
+      of points. The zoomed-in view reveals that each cluster is composed of many individual small points
+      packed into a roughly spherical shape.
