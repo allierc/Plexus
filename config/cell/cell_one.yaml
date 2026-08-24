@@ -56,7 +56,8 @@ fields:
 operators:
 - op: gravity
   at: cell
-  g: 4.0
+  gy: 0.0
+  gz: -4.0
 - op: mpm_strain
   at: cytosol
 - op: mpm_strain
@@ -100,7 +101,7 @@ plotting:
   background: black
   cutaway:
   - x
-  up_axis: 1
+  up_axis: 2
   camera_elev: 1.18
   camera_zoom: 0.0
   camera_turns: 0.0

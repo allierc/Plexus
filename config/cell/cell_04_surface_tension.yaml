@@ -1,7 +1,7 @@
 general:
-  name: cell_00_hierarchy
+  name: cell_04_surface_tension
   seed: 0
-  n_frames: 200
+  n_frames: 1500
   record_cap: 602
   dt: 0.0015
   dim: 3
@@ -13,7 +13,6 @@ general:
 sets:
   cell:
     n: 1
-    spawn: point
     types:
       c:
         fraction: 1.0
@@ -23,6 +22,10 @@ sets:
         width: 3
         integration: none
         boundary: free
+    start:
+    - - 0.5
+      - 0.5
+      - 0.72
   nucleus:
     parent: cell
     per_parent: 1500
@@ -37,6 +40,7 @@ sets:
     parent: cell
     per_parent: 12000
     radius: 0.16
+    radius_inner: 0.065
     density: 1.0
     types:
       light:
@@ -49,18 +53,6 @@ sets:
         youngs: 15
         material: liquid
         density: 1.8
-    radius_inner: 0.065
-  membrane:
-    parent: cell
-    per_parent: 4000
-    radius: 0.168
-    radius_inner: 0.16
-    density: 1.1
-    types:
-      m:
-        fraction: 1.0
-        youngs: 900
-        material: elastic
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -68,58 +60,48 @@ fields:
 operators:
 - op: aggregate
   at: cell
-- op: mpm_strain
-  at: cytosol
-- op: mpm_strain
-  at: membrane
+- op: gravity
+  at: cell
+  gy: 0.0
+  gz: -9.0
 - op: mpm_strain
   at: nucleus
-- op: mpm_scatter
+- op: mpm_strain
   at: cytosol
+- op: mpm_scatter
+  at: nucleus
   to: mpm_grid
   drag: 0.02
   a_max: 200
 - op: mpm_scatter
-  at: membrane
-  to: mpm_grid
-  drag: 0.02
-  a_max: 200
-- op: mpm_scatter
-  at: nucleus
+  at: cytosol
   to: mpm_grid
   drag: 0.02
   a_max: 200
 - op: mpm_grid_update
   at: mpm_grid
-  surface_tension: 60.0
+  surface_tension: 1000.0
   wall_damp: 1.0
-- op: mpm_gather
-  at: cytosol
-  from: mpm_grid
-  wall_damp: 1.0
-  wall_contact: 0.04
-- op: mpm_gather
-  at: membrane
-  from: mpm_grid
-  wall_damp: 1.0
-  wall_contact: 0.04
 - op: mpm_gather
   at: nucleus
   from: mpm_grid
   wall_damp: 1.0
   wall_contact: 0.04
+- op: mpm_gather
+  at: cytosol
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
 schedule:
 - aggregate
+- gravity
 - substep_dt: 0.0001
   steps:
   - mpm_strain
   - mpm_strain
-  - mpm_strain
-  - mpm_scatter
   - mpm_scatter
   - mpm_scatter
   - mpm_grid_update
-  - mpm_gather
   - mpm_gather
   - mpm_gather
 plotting:
@@ -156,3 +138,17 @@ plotting:
   splat_res: 560
   panels: true
   panels_thick: 0.1
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of particles initially suspended in a 3D domain begins to move downward
+      toward the bottom boundary. As it descends, the outer blue layer deforms and stretches, eventually
+      flattening against the floor. The inner yellow core remains relatively compact but becomes increasingly
+      compressed as the outer layer spreads out. By the final frames, the structure has transitioned from
+      a sphere to a flattened, pancake-like shape resting on the surface.
+    objects: 'The scene contains two distinct sets of particles: a large outer shell and a smaller inner
+      core. The outer shell consists of numerous small blue particles arranged in a spherical topology
+      that gradually flattens. The inner core is composed of smaller yellow particles clustered tightly
+      together in a central spherical arrangement. Both sets of particles are contained within a large,
+      transparent cubic domain defined by white wireframe edges.'
