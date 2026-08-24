@@ -744,6 +744,14 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             _build_edge_set(H, sname, s, device)
             continue
         per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
+        # AN INNER RADIUS, SO A CHILD SET CAN BE A SHELL RATHER THAN A BALL. Without it every child
+        # is scattered through the WHOLE ball about its parent, so a cytosol and a nucleus declared
+        # on the same cell interpenetrate -- the nucleus occupies a volume the cytosol is also
+        # filling, which is not a cell but two clouds sharing a centre. `radius_inner` excludes the
+        # core, and the same key makes a MEMBRANE: a thin shell is just an annulus whose inner
+        # radius is close to its outer one. Zero (the default) is the old solid ball, so nothing
+        # archived moves.
+        r_in = float(s.get("radius_inner", 0.0))
         reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for agent_grow to wake
         per_tot = per + reserve
         _, render, depth = _entity_meta(sname, H.dim)  # render hints + depth from the registry
@@ -761,13 +769,23 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             # polar path is kept verbatim (bit-identical MPM particle seeding); 3D+ uses a
             # random unit direction so true 3D child sets are not collapsed onto a plane.
             if D == 2:
-                r = torch.sqrt(torch.rand(Np, generator=H.rng, device=device)) * radius
+                # uniform in the ANNULUS: the area element is r dr, so sampling
+                # sqrt(u) between the two radii squared keeps the density flat rather than
+                # piling particles against the inner edge.
+                _u = torch.rand(Np, generator=H.rng, device=device)
+                r = torch.sqrt(r_in ** 2 + _u * (radius ** 2 - r_in ** 2)) if r_in > 0 \
+                    else torch.sqrt(_u) * radius
                 th = torch.rand(Np, generator=H.rng, device=device) * 2 * math.pi
                 offset = torch.stack([r * torch.cos(th), r * torch.sin(th)], 1)
             else:
                 d = torch.randn(Np, D, generator=H.rng, device=device)        # isotropic direction
                 d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
-                r = torch.rand(Np, generator=H.rng, device=device).pow(1.0 / D) * radius   # uniform in the D-ball
+                # uniform in the D-ball, or in the D-annulus when an inner radius is set: the
+                # volume element is r^(D-1) dr, so the D-th root of a uniform draw between the two
+                # radii to the D-th power is flat in volume rather than bunched at the inside.
+                _u = torch.rand(Np, generator=H.rng, device=device)
+                r = (r_in ** D + _u * (radius ** D - r_in ** D)).pow(1.0 / D) if r_in > 0 \
+                    else _u.pow(1.0 / D) * radius
                 offset = d * r[:, None]
             state[:, px0:px1] = ppos + offset
             # `vel_init` on a CONTAINED set = one coherent random launch velocity per parent

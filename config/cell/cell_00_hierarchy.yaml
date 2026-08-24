@@ -1,0 +1,186 @@
+# cell_00_hierarchy -- RUNG ONE: does the composition BUILD, and can it be seen?
+#
+# No gravity, no buoyancy, no flow. This spec exists to answer two questions and no others: does one
+# parent hold two distinct child sets in different substrates, and can each be told apart in a
+# picture. Everything dynamic is deliberately absent, because a rung that tests the structure AND
+# the physics at once cannot say which of them failed.
+#
+# WHAT IS BEING COMPOSED. `cell` is an ordinary set with one member. `cytosol` and `nucleus` are two
+# separate child sets that both alias the material-point entity -- the same substrate, two different
+# biological objects, different densities and different stiffnesses. The cytosol carries two protein
+# species that differ only in density; they are types within one set because they mix, where the
+# nucleus is a set of its own because it is a distinct body.
+#
+# THE SEED MUST SEPARATE THE COMPARTMENTS, and the first attempt did not. Every child set was
+# scattered through the WHOLE ball about its parent, so the cytosol filled the nuclear volume too:
+# two clouds sharing a centre, not a cell. `radius_inner` makes a child an ANNULUS, and the same key
+# makes the membrane -- a shell is an annulus whose inner radius is close to its outer one. The
+# three now occupy 0-0.055, 0.065-0.160 and 0.160-0.168 and do not interpenetrate.
+#
+# WITHOUT A MEMBRANE THIS WAS A WATER DROPLET. Surface tension alone holds a liquid together; it is
+# not a boundary, it has no identity, and nothing can be bound to it or transported across it. The
+# membrane here is still only a stiff elastic shell -- the bonded `bm_*` network that can stretch
+# and rupture comes with the next rungs -- but it is a distinct SET, so it can be measured,
+# coloured and reasoned about apart from the fluid it contains.
+#
+# THE PANELS. Instance segmentation in 3D -- one colour per set, and two shades within the cytosol
+# for its two species -- and the same thing in cross section, because a filled body tells you
+# nothing from outside. The `sets` colour table is declared here rather than chosen by the renderer,
+# for the same reason the reaction-diffusion LUT is: which object gets which colour is a property of
+# the model, not of the picture.
+#
+# THE SUBSTEP BLOCK IS NOT OPTIONAL. `dt` is sim-time per FRAME; `substep_dt` is the CFL micro-step
+# the MPM cycle actually integrates at, and the four material operators run inside it. Omitting it
+# was how the first attempt at this spec drove the deformation gradient singular -- `mpm_strain`
+# failed with an ill-conditioned SVD, which is what an MPM step too large for its grid looks like.
+#
+# THE COLOURS USE THE EXISTING `plotting.colors` KEY, which `_typed_palette` already reads and which
+# is indexed by TYPE name. There was no need for a new one: the cytosol's two species and the
+# nucleus have distinct type names, so one flat table colours all three.
+#
+# THE NEXT RUNGS: 01 lets it fall and deform, 02 makes two of them collide, 03 turns on buoyancy.
+general:
+  name: cell_00_hierarchy
+  seed: 0
+  n_frames: 200
+  record_cap: 602
+  dt: 0.0015
+  dim: 3
+  boundary: wall
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    spawn: point
+    types:
+      c:
+        fraction: 1.0
+        youngs: 40
+    state:
+      pos:
+        width: 3
+        integration: none
+        boundary: free
+  nucleus:
+    parent: cell
+    per_parent: 1500
+    radius: 0.055
+    density: 2.6
+    types:
+      n:
+        fraction: 1.0
+        youngs: 300
+        material: elastic
+  cytosol:
+    parent: cell
+    per_parent: 12000
+    radius: 0.16
+    density: 1.0
+    types:
+      light:
+        fraction: 0.5
+        youngs: 15
+        material: liquid
+        density: 0.6
+      heavy:
+        fraction: 0.5
+        youngs: 15
+        material: liquid
+        density: 1.8
+    radius_inner: 0.065
+  membrane:
+    parent: cell
+    per_parent: 4000
+    radius: 0.168
+    radius_inner: 0.16
+    density: 1.1
+    types:
+      m:
+        fraction: 1.0
+        youngs: 900
+        material: elastic
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: mpm_strain
+  at: cytosol
+- op: mpm_strain
+  at: membrane
+- op: mpm_strain
+  at: nucleus
+- op: mpm_scatter
+  at: cytosol
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_scatter
+  at: membrane
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_scatter
+  at: nucleus
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  surface_tension: 60.0
+  wall_damp: 1.0
+- op: mpm_gather
+  at: cytosol
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+- op: mpm_gather
+  at: membrane
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+- op: mpm_gather
+  at: nucleus
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+schedule:
+- aggregate
+- substep_dt: 0.0001
+  steps:
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+plotting:
+  background: black
+  colors:
+    light:
+    - 0.25
+    - 0.69
+    - 1.0
+    heavy:
+    - 0.12
+    - 0.31
+    - 0.66
+    n:
+    - 1.0
+    - 0.82
+    - 0.29
+    m:
+    - 0.95
+    - 0.35
+    - 0.45
+  fps: 30
+  movie_max_frames: 600

@@ -1,0 +1,173 @@
+# cell_01_bounce -- RUNG TWO: drop the composed cell and watch each compartment deform differently.
+#
+# The composition is `cell_00_hierarchy`'s, unchanged: a nucleus at the core, a cytosol of two
+# protein species around it, a membrane shell containing both. The only additions are gravity and a
+# starting height. Nothing about the cell is retuned for the impact, because a rung that changes the
+# object AND the forcing cannot say which produced the deformation.
+#
+# WHAT THIS RUNG IS FOR, and it is the first thing in the ladder a single-substrate model could not
+# produce. The three compartments are made of different materials, so they must respond differently
+# to the same impact: the cytosol is `liquid` and should flow and slosh, the nucleus is stiff
+# `elastic` and should keep its shape while being displaced, and the membrane is a stiffer shell
+# that should flatten against the floor and recover. A model in which the cell is one material at
+# three stiffnesses gives three versions of the same response; this should give three different
+# ones. If it does not, the composition is decorative.
+#
+# THE DROP. The cell starts at z = 0.72 with an outer radius of 0.168, so it falls about 0.55 before
+# the membrane touches the floor -- roughly 230 frames at g = 9 and dt = 0.0015 -- and 1,500 frames
+# leaves room for several bounces. `boundary: wall` gives it a floor to hit.
+#
+# GRAVITY IS AT THE CELL, one uniform acceleration for the whole body, so nothing here sorts by
+# density. Buoyancy is rung four and needs the grid term; this rung is about MECHANICS.
+general:
+  name: cell_01_bounce
+  seed: 0
+  n_frames: 1500
+  record_cap: 602
+  dt: 0.0015
+  dim: 3
+  boundary: wall
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    types:
+      c:
+        fraction: 1.0
+        youngs: 40
+    state:
+      pos:
+        width: 3
+        integration: none
+        boundary: free
+    start:
+    - - 0.5
+      - 0.5
+      - 0.72
+  nucleus:
+    parent: cell
+    per_parent: 1500
+    radius: 0.055
+    density: 2.6
+    types:
+      n:
+        fraction: 1.0
+        youngs: 300
+        material: elastic
+  cytosol:
+    parent: cell
+    per_parent: 12000
+    radius: 0.16
+    density: 1.0
+    types:
+      light:
+        fraction: 0.5
+        youngs: 15
+        material: liquid
+        density: 0.6
+      heavy:
+        fraction: 0.5
+        youngs: 15
+        material: liquid
+        density: 1.8
+    radius_inner: 0.065
+  membrane:
+    parent: cell
+    per_parent: 4000
+    radius: 0.168
+    radius_inner: 0.16
+    density: 1.1
+    types:
+      m:
+        fraction: 1.0
+        youngs: 900
+        material: elastic
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.0
+- op: mpm_strain
+  at: cytosol
+- op: mpm_strain
+  at: membrane
+- op: mpm_strain
+  at: nucleus
+- op: mpm_scatter
+  at: cytosol
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_scatter
+  at: membrane
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_scatter
+  at: nucleus
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  surface_tension: 60.0
+  wall_damp: 1.0
+- op: mpm_gather
+  at: cytosol
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+- op: mpm_gather
+  at: membrane
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+- op: mpm_gather
+  at: nucleus
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+schedule:
+- aggregate
+- gravity
+- substep_dt: 0.0001
+  steps:
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+plotting:
+  background: black
+  colors:
+    light:
+    - 0.25
+    - 0.69
+    - 1.0
+    heavy:
+    - 0.12
+    - 0.31
+    - 0.66
+    n:
+    - 1.0
+    - 0.82
+    - 0.29
+    m:
+    - 0.95
+    - 0.35
+    - 0.45
+  fps: 30
+  movie_max_frames: 600
