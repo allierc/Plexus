@@ -111,3 +111,5 @@ plotting:
   dot_size: 1.2
   splat_size: 2.6
   splat_res: 560
+  panels: true
+  panels_thick: 0.1
