@@ -1,141 +1,69 @@
-# bulk_growth -- the control: growth and division, no chemistry.
+# bulk_growth -- a FILLED spheroid of cells, grown from 20, opened with a cutaway.
 #
-# ONE SERIES, ONE VARIABLE AT A TIME. `bulk_growth` is the control: an epithelium that grows and
-# divides with no chemistry at all. Each later member adds exactly one thing, so a difference in
-# the surface is attributable to the thing that was added and to nothing else.
+# NOT AN EPITHELIUM. The `cutaway_growth*` series is a closed vertex SURFACE seen from inside; this
+# is a solid aggregate -- cells packed through the volume, the way an organoid or a tumour spheroid
+# is. The difference is not cosmetic: a surface has an inside and an outside and grows by adding
+# area, while a filled body grows by adding cells anywhere and the interior is where the
+# interesting question lives (does it stay packed, does it hollow, does the core stall).
 #
-#   bulk_growth           growth, no chemistry
-#   bulk_growth_turing    + Gray-Scott, present but NOT gating growth
-#   bulk_growth_rps       + May-Leonard, present but NOT gating growth
-#   bulk_growth_turing_g  + Gray-Scott, and the activator GATES growth
-#   bulk_growth_rps_gd    + May-Leonard, RED gates growth and BLUE gates death
+# TWENTY LIVE CELLS IN A FORTY-THOUSAND SLOT POOL. `n` is the initially LIVE count and `buffer` is
+# the allocation, so the run starts as a 20-cell clump and `agent_divide` wakes dormant slots as
+# cells proliferate. Starting small is the point: a spheroid grown from 20 develops its own
+# packing, where one seeded at 4,000 inherits whatever the spawn distribution happened to be.
 #
-# The middle two matter as much as the ends: chemistry that is running but not coupled is the
-# control for chemistry that is coupled, and without it any difference could be the chemistry's
-# presence rather than its coupling.
+# THE MECHANICS ARE PAIRWISE, NOT A VERTEX MODEL. `attraction_repulsion` over a `radius_graph` is
+# short-range repulsion (volume exclusion -- two cells cannot occupy one place) plus longer-range
+# attraction (cohesion -- the aggregate holds together instead of dispersing). That is the minimum
+# that makes a packed 3D body, and it needs no mesh, which is what lets the population change
+# freely: a vertex model would have to retopologise on every division.
 #
-# GROWTH STOPS AT 30,000 CELLS in every member, so the runs end at the same size and the surfaces
-# are comparable. Without it the coupled members grow slower -- only gated cells divide -- and a
-# smaller tissue would be confounded with a differently-shaped one.
-#
-# RENDERED WITH A QUADRANT REMOVED (`cutaway: [x, y]`). Bulk growth builds a solid, and the
-# interesting structure is inside it: the lumen, the inner wall, whether growth is uniform through
-# the depth. The cut drops whole FACES by which side their centroid falls on rather than clipping
-# through them, so the far wall is made of complete cells rather than half-cells with a torn edge.
-#
-# THE MECHANICAL BASE IS IDENTICAL ACROSS ALL FIVE. `cell_chem_from_shape`, `interface_tension` and
-# `cell_shape_probe` are dropped from every member, including the ones whose Gray-Scott base
-# carried them. They are extra chemistry-to-mechanics couplings, and leaving them in the two Turing
-# members while the May-Leonard members lack them would mean the series varies TWO things between
-# rows 3 and 4 -- the reaction model and the presence of a curvature feedback -- and neither could
-# be blamed for a difference in the surface. A series whose members differ in more than one place
-# is a gallery, not an experiment.
+# RENDERED WITH A QUADRANT REMOVED. A filled body is opaque, so the live view of a solid spheroid
+# is a featureless ball whatever is happening inside it. `cutaway: [x, y]` drops the cells whose
+# centroid-relative position is positive in both axes -- the cut is taken against the CLOUD'S OWN
+# centroid, not the world origin, because a growing aggregate drifts and a fixed cut would slide
+# off the body.
 general:
   name: bulk_growth
-  seed: 819657
-  n_frames: 4300
+  seed: 0
+  n_frames: 4000
+  record_cap: 602
   dt: 1.0
-  record_cap: 2152
-  record_every: 1
-  boundary: free
   dim: 3
-  world:
-  - 80.0
-  - 80.0
-  - 80.0
-_run:
-  target_cells: 50000
-  seed_cells: 2000
+  boundary: free
+  world: [1.0, 1.0, 1.0]
 sets:
-  vertex:
-    n: 130004
-    mesh: half_edge
-    cell_set: cell
   cell:
-    n: 65004
+    n: 20
+    buffer: 40000
+    # ONE TYPE, AND ITS `p` IS THE WHOLE MECHANICS. The law is
+    #     f = p0*exp(-(r^2)^p1 / sigma^2)  -  p2*exp(-(r^2)^p3 / sigma^2)
+    # with the displacement applied along (neighbour - self), so POSITIVE f pulls together and
+    # negative pushes apart. Two conditions make a packed cohesive body rather than a collapsed
+    # point or a gas: p2 > p0, so the net force AT CONTACT (where both exponentials are 1) is
+    # repulsive and cells cannot occupy the same place; and p3 > p1, so the repulsion decays
+    # FASTER with distance than the attraction and the force turns positive further out, which is
+    # what holds the aggregate together. 1.8 > 1.0 and 1.9 > 0.7.
+    types:
+      cell:
+        fraction: 1.0
+        p: [1.0, 0.7, 1.8, 1.9]
+    spawn: ball
+    spawn_radius: 0.02
     state:
-      chem:
-        width: 2
-        integration: first_order
-      cen:
-        width: 3
-      area:
-        width: 1
+      pos: {width: 3, integration: first_order, boundary: free}
 fields: {}
 operators:
-- op: mesh_seed
-  at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 2000
-  radius: 5.0
-  jitter: 0.15
-  seed: 819657
-  vseed_cv: 0.15
-  p0: 3.5
-- op: cell_geometry
-  at: cell
-- op: cell_grow
-  at: vertex
-  cell_set: cell
-  rate: 0.001732
-  a_sw: 0.0
-  hill: 0.0
-  rho: 0.1
-  vth_frac: 2.5
-  after_frame: 450
-  conserve_amount: false
-- op: cell_mechanics
-  at: vertex
-  p0: 3.5
-  K_A: 1.0
-  K_P: 1.0
-  Gamma: 0.4
-  Lambda: 0.5
-  K_V: 40.0
-  K_R: 0.0
-  K_bend: 0.0
-  K_lumen: 0.0
-  antiinv: 0.0
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: edge_flip
-  at: vertex
-  l_th_frac: 0.28
-  every: 1
-  max_flips: 300
-- op: cell_divide
-  at: vertex
-  factor: 2.0
-  reset_noise: 0.12
-  cycle_cv: 0.15
-  p0: 3.5
-  every: 4
-  cell_set: cell
-  min_cycle: 4
-  max_cycle: 1000000000
-  after_frame: 450
-  orient_iface: false
-  orient_asw: 0.6
-  g1_ramp: false
-  engine_clock: true
-  max_cells: 30000
-- op: topo_record
-  at: vertex
-  every: 1
-schedule:
-- mesh_seed
-- cell_geometry
-- cell_grow
-- cell_mechanics
-- edge_flip
-- cell_divide
-- topo_record
+# `radius` sets who feels whom. At the seeded spacing (20 cells in a 0.02 ball) neighbours sit
+# ~0.01 apart; 0.03 takes the first couple of shells, which is what a contact-range law wants.
+- {op: radius_graph, at: cell, radius: 0.03}
+# sigma is the repulsion core -- the distance below which two cells push apart. Set to roughly the
+# cell spacing so the packing is one-cell-per-place rather than a collapsed point.
+- {op: attraction_repulsion, at: cell, sigma: 0.012}
+# `rate` is per-tick per-cell. 0.004 doubles the population about every 175 ticks, so 4,000 frames
+# is ~20 doublings of headroom against a 40,000 ceiling that `max_occ` stops at.
+- {op: agent_divide, at: cell, rate: 0.004, offset: 0.004, max_occ: 0.95}
+schedule: [radius_graph, attraction_repulsion, agent_divide]
 plotting:
   background: black
-  cutaway:
-  - x
-  - y
+  cutaway: [x, y]
+  dot_fill: 0.9

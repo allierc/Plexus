@@ -1,14 +1,14 @@
-# bulk_growth_turing -- Gray-Scott running, NOT gating growth.
+# cutaway_growth_turing -- Gray-Scott running, NOT gating growth.
 #
-# ONE SERIES, ONE VARIABLE AT A TIME. `bulk_growth` is the control: an epithelium that grows and
+# ONE SERIES, ONE VARIABLE AT A TIME. `cutaway_growth` is the control: an epithelium that grows and
 # divides with no chemistry at all. Each later member adds exactly one thing, so a difference in
 # the surface is attributable to the thing that was added and to nothing else.
 #
-#   bulk_growth           growth, no chemistry
-#   bulk_growth_turing    + Gray-Scott, present but NOT gating growth
-#   bulk_growth_rps       + May-Leonard, present but NOT gating growth
-#   bulk_growth_turing_g  + Gray-Scott, and the activator GATES growth
-#   bulk_growth_rps_gd    + May-Leonard, RED gates growth and BLUE gates death
+#   cutaway_growth           growth, no chemistry
+#   cutaway_growth_turing    + Gray-Scott, present but NOT gating growth
+#   cutaway_growth_rps       + May-Leonard, present but NOT gating growth
+#   cutaway_growth_turing_g  + Gray-Scott, and the activator GATES growth
+#   cutaway_growth_rps_gd    + May-Leonard, RED gates growth and BLUE gates death
 #
 # The middle two matter as much as the ends: chemistry that is running but not coupled is the
 # control for chemistry that is coupled, and without it any difference could be the chemistry's
@@ -31,7 +31,7 @@
 # be blamed for a difference in the surface. A series whose members differ in more than one place
 # is a gallery, not an experiment.
 general:
-  name: bulk_growth_turing
+  name: cutaway_growth_turing
   seed: 819657
   n_frames: 4300
   dt: 1.0

@@ -193,6 +193,8 @@ class CellRDSeed(Structural):
         # WHICH SPECIES THIS SEEDER FILLS: 0 (columns 0,1) by default; 2 for a second RD system.
         # HOW MANY COLUMNS THIS SEEDER FILLS. Two unless told otherwise, so nothing archived moves.
         self.n_species = int(params.get("n_species", self.N_SPECIES))
+        # (`simplex`) the total the species are normalised to. 1.0 is the May-Leonard simplex.
+        self.p0 = float(params.get("p0", 1.0))
         self.chan = _chan(params, type(self).__name__, self.n_species)
         self.mode = params.get("mode", "scatter")               # "noise" | "scatter" | "patch" | "cones"
         if self.mode not in self.MODES:
@@ -266,9 +268,13 @@ class CellRDSeed(Structural):
             # dominates immediately, w cyclically beats v, and the field collapses to w = 1
             # everywhere with zero spatial variance. No motif can emerge from that and none did.
             #
-            # `simplex` gives all n species the same small random field, so no species starts
-            # ahead and the cyclic term decides the outcome. The scale is set so p = sum stays
-            # below 1, which is where May-Leonard's logistic term is still positive.
+            # `simplex` gives all n species the same random field and then NORMALISES SO THEY SUM
+            # TO `p0`, which is what ParticleGraph's RD_RPS does (`init_mesh`, case 'RD_Mesh':
+            # `node_value = rand(n,3)` then `node_value[:,k] /= sum`). p0 = 1 is not a detail: the
+            # logistic factor is (1 - p - a*rival), so starting at p = 0.175 leaves (1-p) = 0.83 of
+            # net growth for EVERY species and the run spends itself climbing to the simplex
+            # instead of competing on it. The heteroclinic cycle that produces spirals lives AT
+            # p = 1, so an initial condition below it postpones the whole phenomenon.
             a = None
             u = None
         elif self.mode == "noise":                              # Brusselator: homogeneous steady state + noise
@@ -291,10 +297,11 @@ class CellRDSeed(Structural):
         # SIMPLEX WRITES EVERY SPECIES AND RETURNS -- it has no activator/substrate pair to write,
         # which is the whole point of it, so it must run BEFORE the `a`/`u` write rather than after.
         if self.mode == "simplex":
-            for _k in range(self.n_species):
-                if h1 - base > _k:
-                    _v = (0.05 + 0.25 * torch.rand(nF, generator=g)).to(dev) / max(self.n_species, 1)
-                    st[:nF, base + _k:base + _k + 1] = _v[:, None]
+            _cols = [k for k in range(self.n_species) if h1 - base > k]
+            _r = torch.rand(nF, len(_cols), generator=g).to(dev)
+            _r = self.p0 * _r / _r.sum(dim=1, keepdim=True).clamp(min=1e-9)
+            for _i, _k in enumerate(_cols):
+                st[:nF, base + _k:base + _k + 1] = _r[:, _i:_i + 1]
             clvl.state = st
             return {}
         st[:nF, base:base + 1] = a[:, None]
