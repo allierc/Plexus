@@ -2034,4 +2034,116 @@ aliases of contracts already registered. Saturation --- new frameworks
 contributing implementations rather than new contracts --- is the empirical
 signal that the operator algebra of the main text is complete.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Making a cell in Plexus}
+\label{app:cell}
+
+A cell is not one kind of thing, and that is the difficulty. Its interior is a
+dense fluid, its boundary is a surface that can stretch and tear, its skeleton is
+a network of filaments, its nucleus is a body of its own, and its receptors are
+discrete switches. A simulator built for any one of these is wrong for the
+others, so the usual answer is to write a special-purpose cell simulator that
+hard-codes a compromise between them.
+
+Plexus offers a different answer. A cell is a \emph{parent} that contains several
+distinct sets, each represented in the way its own biology asks for, joined by
+containment and by ordinary interaction operators. Nothing about the cell is
+built into the engine. If this works, it answers a sharper question than whether
+Plexus can simulate a cell:
+
+\begin{quote}
+Can a cell be composed from heterogeneous mechanistic substrates --- material,
+membrane, filaments, organelles and sensors --- without introducing a special
+cell simulator?
+\end{quote}
+
+\subsection{The composition}
+
+Each part is a set inside the cell, and the substrate differs on purpose. Making
+them all the same material with different stiffness would demonstrate parameter
+variation, not composition.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lll}
+\toprule
+\textbf{Part} & \textbf{Substrate} & \textbf{Operators}\\
+\midrule
+cytosol   & dense particle material   & the material-point cycle\\
+protein   & particles carried by that material & advection, diffusion, reaction\\
+membrane  & a bonded surface network  & bond, crosslink, remodel, unbond\\
+nucleus   & a second material body    & the same cycle, its own material\\
+receptor  & discrete switches         & bind, unbind, pull, sense\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two of these share a substrate and remain separate sets: the cytosol and the
+nucleus are both discretised as material points, but they are different sets with
+different materials and different densities. That is the distinction between
+composition and parameterisation.
+
+The sets are named for what they are, not for how they are computed. A set called
+\code{mpm\_particle} names a numerical method and violates the separation the
+main text rests on; \code{cytosol} names a biological object, and the material
+point method is how one operator chooses to discretise it.
+
+\subsection{The first experiment}
+
+One cell. The interior is a buoyant liquid holding two protein species of
+different density; the nucleus is denser than either; a bonded membrane keeps the
+cell intact; receptors sit on the membrane and read the local field.
+
+Buoyancy drives the motion. A liquid of uniform density under gravity does
+nothing, so the circulation has to come from a density difference, and here it
+comes from two: the lighter protein species rises through the heavier one and the
+interior overturns, and the nucleus sediments and pushes cytosol around itself as
+it falls. Neither flow is imposed. Both are consequences of density in a fluid,
+which is the point --- a prescribed stirring would prove nothing about
+composition.
+
+Buoyancy belongs in the grid solve rather than in a per-particle force, for the
+same reason surface tension already does: it depends on the local density, and
+only the grid knows what a particle is displacing.
+
+\subsection{What is missing}
+
+Two mechanisms do not yet exist, and both are small next to the composition
+itself.
+
+\emph{Advection.} A field or a species is not currently carried by the material
+it sits in. Proteins would diffuse and react but not flow, which removes the one
+thing the experiment is for. This is a new operator.
+
+\emph{Buoyancy.} A term in the grid solve, taking the local density against a
+reference, in the same place and the same form as surface tension.
+
+Everything else exists. Containment of several distinct sets under one parent
+already builds; the membrane operators already bond, crosslink and rupture, and
+need only to be attached to a cell rather than to a matrix; the receptors already
+bind and pull.
+
+\subsection{What would count as evidence}
+
+One measurement per substrate, not a gallery of pictures. A composition that
+looks right and conserves nothing has demonstrated rendering.
+
+\begin{itemize}
+\item mass per compartment over time --- circulation must conserve it, and drift
+      is the first sign the coupling is wrong;
+\item membrane bond state --- how many bonds are stretched and whether any
+      ruptured, which is the integrity claim and the one thing a merely stiffer
+      material could never show;
+\item receptor occupancy over time;
+\item the grid alongside the cell, because if the membrane is thinner than one
+      grid cell then its mechanics is a property of the resolution rather than of
+      the membrane.
+\end{itemize}
+
+The last is not a formality. A previous coupling in this project was found to
+have its strength set by grid spacing rather than by biology, and the measurement
+that revealed it was a picture of the grid beside the object it was resolving.
+
 \end{document}
