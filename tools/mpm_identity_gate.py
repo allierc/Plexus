@@ -60,11 +60,14 @@ def collect(device: str, frames_scale: float = 1.0) -> dict:
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", rel)
         sim = load(path)
         sim.n_frames = max(2, int(n * frames_scale))
-        # THE COMPILE FLAG IS STRIPPED. A spec may carry `compile: true` while someone is
-        # experimenting; the gate's subject is the operators, not the compiler, and a compiled run
-        # is not bit-identical to an eager one by construction.
+        # THE PERFORMANCE FLAGS ARE STRIPPED. A spec may carry `capture: true` or `compile: true`
+        # while someone is experimenting; the gate's subject is the OPERATORS, so it always runs
+        # the eager path. (`capture` is separately proven bit-identical to eager by its own gate;
+        # `compile` is not, by construction.) `polar:` is NOT stripped -- that is a real numerical
+        # choice a spec makes, and a reference taken before it changed SHOULD fail.
         for st in sim.schedule:
             if isinstance(st, dict):
+                st.pop("capture", None)
                 st.pop("compile", None)
                 st.pop("compile_mode", None)
         _H, tr = E.run(sim, out_path=None, device=device, progress=False)

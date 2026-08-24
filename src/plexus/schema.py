@@ -419,10 +419,12 @@ def load(path: str) -> Spec:
             # THE KEY SET IS CLOSED, so `complie: true` is an error and not a silently ignored
             # line. A performance flag that does nothing looks exactly like a performance flag
             # that does not help, and the run it was measured against is then meaningless.
-            _bad = set(step) - {"substep_dt", "steps", "compile", "compile_mode"}
+            _ok = {"substep_dt", "steps", "capture", "compile", "compile_mode",
+                   "compile_recompile_limit", "compile_verbose"}
+            _bad = set(step) - _ok
             if _bad:
                 raise ValueError(f"unknown key(s) {sorted(_bad)} on a `{{substep_dt: …}}` step; "
-                                 f"allowed: substep_dt, steps, compile, compile_mode")
+                                 f"allowed: {sorted(_ok)}")
             tokens = step["steps"]
         else:
             tokens = step if isinstance(step, list) else [step]

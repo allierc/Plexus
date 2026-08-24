@@ -54,6 +54,8 @@ operators:
   to: mpm_grid
   drag: 0.02
   a_max: 200
+  polar: higham
+  polar_iters: 4
 - op: mpm_grid_update
   at: mpm_grid
   surface_tension: 60.0
@@ -72,6 +74,7 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+  capture: true
 plotting:
   background: black
   colors:

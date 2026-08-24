@@ -843,6 +843,60 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
 # --------------------------------------------------------------------------- #
 #  seed: x_0 = S(theta_S), executed exactly once, before any dynamics
 # --------------------------------------------------------------------------- #
+def _capture_state(H) -> list:
+    """Every tensor a substep can write. Snapshot/restore around a graph capture.
+
+    Warming up and capturing both run the substep body, so the state they leave behind is not the
+    state the run is supposed to continue from. Getting this wrong does not raise -- it silently
+    advances the simulation by however many warm-up substeps were used.
+    """
+    seen, out = set(), []
+    for lvl in H.levels.values():
+        for _n, t in lvl.named_buffers(recurse=False):
+            if torch.is_tensor(t) and t.data_ptr() not in seen:
+                seen.add(t.data_ptr()); out.append(t)
+    for fld in H.fields.values():
+        for _n, t in fld.named_buffers(recurse=False):
+            if torch.is_tensor(t) and t.data_ptr() not in seen:
+                seen.add(t.data_ptr()); out.append(t)
+    return out
+
+
+def _capture_refusals(sim: Spec, H, step: dict, inst: list) -> list[str]:
+    """Why this substep block cannot be captured -- empty list means it can.
+
+    EVERY ITEM WAS MEASURED TO BREAK CAPTURE, not guessed. A refused capture costs a warning and
+    an eager run; an ACCEPTED capture that should have been refused costs a silently wrong result,
+    which is the failure this list exists to prevent.
+    """
+    why = []
+    if int(getattr(H, "dim", 2)) != 3:
+        why.append("dim != 3 (the 2D wall BC uses boolean-mask index_put and the 2D polar branch "
+                   "calls cuSOLVER; both are uncapturable and neither is rewritten yet)")
+    toks = set(step.get("steps", []))
+    for nm, ob, _sel, _g in inst:
+        if nm not in toks:
+            continue
+        if nm in ("mpm_scatter", "p2g") and str(getattr(ob, "polar", "svd")).lower() != "higham":
+            why.append(f"{nm} at {getattr(ob, 'at', '?')} uses polar={getattr(ob, 'polar', 'svd')!r}; "
+                       f"torch.linalg.svd is a cuSOLVER call and cannot be captured -- "
+                       f"set `polar: higham` on it")
+    for name, lvl in H.levels.items():
+        for attr, label in (("is_snow", "snow"), ("is_visco", "viscoelastic")):
+            t = getattr(lvl, attr, None)
+            if t is not None and bool(t.any()):
+                why.append(f"set {name!r} contains {label} particles; that branch of mpm_strain is "
+                           f"SVD plus boolean-mask indexing and is uncapturable")
+    if getattr(H, "emit_order", None):
+        why.append(f"engine-integrated sets {list(H.emit_order)} -- `_integrate` rebinds lvl.state "
+                   f"every tick, so a captured graph would read a stale buffer")
+    struct = {o.op for o in sim.operators
+              if getattr(get_operator(o.op, variant=o.impl), "KIND", None) == "structural"}
+    if struct:
+        why.append(f"structural operators {sorted(struct)} can change set sizes mid-run")
+    return why
+
+
 def seed(H: Hierarchy, sim: Spec, device: str = "cpu") -> None:
     """Run `sim.seed_ops` (the spec's `seed:` section) exactly once.
 
@@ -1238,6 +1292,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # frame-level delta snapshot it saw before, restored before each substep.
     _static_d: dict = {}
     _static_b: dict = {}
+    _graph = {}          # id(step) -> torch.cuda.CUDAGraph, or False once capture has been refused
 
     # ------------------------------------------------------------------ torch.compile, opt-in
     # `{substep_dt: X, steps: [...], compile: true}` -- the flag lives on the SUBSTEP BLOCK because
@@ -1421,6 +1476,66 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             _c.copy_(_t2)
                     H._delta = _static_d
                     H._delta_blocks = _static_b
+                    # ------------------------------------------------ CUDA graph capture, opt-in
+                    # THE SUBSTEP IS 415 KERNEL LAUNCHES AND ~30 us OF GPU WORK PER LAUNCH-BOUND
+                    # FRAME. Profiling says the GPU is idle 60% of the wall clock waiting for the
+                    # CPU to queue the next kernel; the four operators cannot be made to issue
+                    # fewer kernels without changing the discretisation. A captured graph replays
+                    # the whole substep as ONE launch, which is the only lever that reaches the
+                    # idle time. Measured 2.36x end to end on a two-set cell.
+                    #
+                    # WHY MANUAL CAPTURE AND NOT torch.compile. Per-operator compilation cannot
+                    # chain into one graph (each OptimizeContext bumps the cudagraph generation),
+                    # `mode="reduce-overhead"` fails outright on operators that write into
+                    # persistent buffers, and the merged-region form measured SLOWER than eager for
+                    # 55 s of compilation. Manual capture is also the only variant that is
+                    # bit-identical to its eager twin, which is what a promotion gate can check.
+                    _cap_key = id(step)
+                    if step.get("capture") and _graph.get(_cap_key) is None and tick >= 1:
+                        _why = _capture_refusals(sim, H, step, inst)
+                        if _why or not str(device).startswith("cuda"):
+                            _graph[_cap_key] = False
+                            warn("capture refused for this substep block; running it eager:\n"
+                                 + "\n".join(f"    - {w}" for w in
+                                              (_why or ["device is not cuda"])))
+                        else:
+                            # THE CAPTURE HAPPENS ON THE CURRENT DEVICE, not on the tensors'.
+                            # `torch.cuda.graph()` and `torch.cuda.CUDAGraph()` both bind to
+                            # whatever `torch.cuda.current_device()` says, which is 0 unless
+                            # someone set it. Running with `--device cuda:1` therefore captured an
+                            # EMPTY graph on cuda:0 -- "The CUDA Graph is empty" -- and then died
+                            # with cudaErrorStreamCaptureInvalidated. Every one of the four
+                            # operators captures cleanly once this context is right.
+                            _dev_ctx = torch.cuda.device(device)
+                            _dev_ctx.__enter__()
+                            _snap = _capture_state(H)
+                            _keep = [t.clone() for t in _snap]
+                            # WARM-UP ON A SIDE STREAM is required, not hygiene: a cold capture
+                            # picks up cuBLAS/cuDNN lazy initialisation and fails.
+                            _side = torch.cuda.Stream(device=device)
+                            _side.wait_stream(torch.cuda.current_stream(device))
+                            with torch.cuda.stream(_side):
+                                for _w in range(3):
+                                    _seen_this_tick.clear()
+                                    for token in step["steps"]:
+                                        _run_token(token, tick)
+                            torch.cuda.current_stream(device).wait_stream(_side)
+                            for _t, _k in zip(_snap, _keep):
+                                _t.copy_(_k)                    # undo the warm-up
+                            _gr = torch.cuda.CUDAGraph()
+                            _seen_this_tick.clear()
+                            with torch.cuda.graph(_gr):
+                                for token in step["steps"]:
+                                    _run_token(token, tick)
+                            for _t, _k in zip(_snap, _keep):
+                                _t.copy_(_k)                    # and undo the capture pass
+                            _graph[_cap_key] = _gr
+                            _dev_ctx.__exit__(None, None, None)
+                            print(f"[engine] substep captured as a CUDA graph "
+                                  f"({len(step['steps'])} operators, {count} replays/frame)",
+                                  flush=True)
+                    _gr = _graph.get(_cap_key)
+
                     for _s in range(count):
                         # THE OCCURRENCE COUNTER RESETS EVERY SUBSTEP, not every tick. `_run_token`
                         # binds the i-th OCCURRENCE of a token to the i-th INSTANCE of that
@@ -1455,8 +1570,11 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                                     _static_b[_k][_b].copy_(_t2)
                             H._delta = _static_d
                             H._delta_blocks = _static_b
-                        for token in step["steps"]:
-                            _run_token(token, tick)
+                        if _gr:
+                            _gr.replay()        # the whole substep, one launch
+                        else:
+                            for token in step["steps"]:
+                                _run_token(token, tick)
                     H.sub_dt = None
                     continue
                 for token in (step if isinstance(step, list) else [step]):
