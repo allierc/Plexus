@@ -1490,14 +1490,26 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     # persistent buffers, and the merged-region form measured SLOWER than eager for
                     # 55 s of compilation. Manual capture is also the only variant that is
                     # bit-identical to its eager twin, which is what a promotion gate can check.
+                    # CAPTURE IS THE DEFAULT, and refusing is quiet unless it was ASKED for.
+                    # It is bit-identical to eager (proven over 60 ticks on every buffer, not just
+                    # positions) and it refuses on anything it cannot capture, so defaulting it on
+                    # costs nothing and means a spec does not have to know the engine has a graph.
+                    # A spec that writes `capture: true` and cannot have it gets the full reason in
+                    # yellow; one that never mentioned it gets one line, because a warning nobody
+                    # asked for on 100 specs is a warning nobody reads.
                     _cap_key = id(step)
-                    if step.get("capture") and _graph.get(_cap_key) is None and tick >= 1:
+                    _cap_asked = "capture" in step
+                    if step.get("capture", True) and _graph.get(_cap_key) is None and tick >= 1:
                         _why = _capture_refusals(sim, H, step, inst)
                         if _why or not str(device).startswith("cuda"):
                             _graph[_cap_key] = False
-                            warn("capture refused for this substep block; running it eager:\n"
-                                 + "\n".join(f"    - {w}" for w in
-                                              (_why or ["device is not cuda"])))
+                            _msg = _why or ["device is not cuda"]
+                            if _cap_asked:
+                                warn("capture refused for this substep block; running it eager:\n"
+                                     + "\n".join(f"    - {w}" for w in _msg))
+                            else:
+                                print(f"[engine] substep not captured ({_msg[0].split(';')[0]})",
+                                      flush=True)
                         else:
                             # THE CAPTURE HAPPENS ON THE CURRENT DEVICE, not on the tensors'.
                             # `torch.cuda.graph()` and `torch.cuda.CUDAGraph()` both bind to

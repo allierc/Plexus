@@ -244,7 +244,25 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         # R <- (R + R^-T)/2, which converges quadratically from F and costs 6.4 ms for the
         # same batch -- 7x -- agreeing with the SVD rotation to 1.5e-6 with an orthogonality
         # error of 2.4e-7, i.e. to float32. Default stays "svd": identical numbers unless asked.
-        self.polar = str(params.get("polar", "svd")).lower()
+        # DEFAULT `higham`, CHANGED 24 AUGUST from `svd`. The polar factor R of the deformation
+        # gradient is the same rotation either way; these are two numerical routes to it.
+        #
+        #   svd     `torch.linalg.svd` -> a cuSOLVER call. It is an EXTERN kernel: no compiler
+        #           fuses it, and -- decisively -- it CANNOT BE CAPTURED into a CUDA graph, so a
+        #           spec using it forfeits the substep capture that is worth ~2x on its own.
+        #   higham  a Newton iteration built from matmuls and a cofactor cross product. Captures,
+        #           fuses, and on a two-set spec with the host syncs already gone it is faster.
+        #
+        # WHAT THE CHANGE COSTS, measured on cell_02 (a bouncing elastic nucleus) rather than
+        # asserted: max|diff| in position 2.4e-07 at 50 frames, 1.2e-06 at 200, 2.8e-05 at 600, and
+        # the two centres of mass stay within 3.8e-07 -- 9e-06 of the body radius. Bounded, not
+        # amplifying. 2D specs are UNAFFECTED: `forward` takes the analytic 2x2 rotation branch and
+        # never consults this parameter at all.
+        #
+        # `polar: svd` remains available for a spec that must reproduce a stored 3D result byte for
+        # byte. The promotion twins are unaffected either way, because okuda schedules these same
+        # core operators -- both sides of the comparison move together.
+        self.polar = str(params.get("polar", "higham")).lower()
         self.polar_iters = int(params.get("polar_iters", 6))
         # KEEP THE CAUCHY STRESS, OPTIONALLY. The fixed-corotated law below produces the Kirchhoff
         # stress tau = J.sigma, uses it to build the affine momentum matrix, and then overwrites the
