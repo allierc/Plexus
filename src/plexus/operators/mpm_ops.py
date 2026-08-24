@@ -326,6 +326,27 @@ class MPMGridUpdate(FieldUpdate):
         self.at = params.get("_at", "mpm_grid")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.surface_tension = float(params.get("surface_tension", 0.0))
+        # BUOYANCY, IN THE SAME PLACE AND FOR THE SAME REASON AS SURFACE TENSION: it depends on the
+        # LOCAL DENSITY, and only the grid knows what a particle is displacing.
+        #
+        # IT CANNOT BE A PER-PARTICLE FORCE HERE, and that was measured rather than assumed. The
+        # `gravity` operator emits an ACCELERATION the substep consumes as `a_ext`, so every
+        # particle receives the same `a` and mass cancels out of the grid velocity entirely. A
+        # one-cell run with two liquid species at densities 0.6 and 1.8, mixed, gave a light-heavy
+        # separation of -0.0020 over 1,200 frames -- zero, and faintly the wrong sign. Nothing
+        # sorts under a uniform acceleration.
+        #
+        # THE FORM IS ARCHIMEDES ON THE NODE. With rho = m_node / dx^D, a node heavier than the
+        # reference falls and a node lighter than it rises:
+        #     dv = dt * g * (rho - rho_ref) / rho
+        # so a node AT the reference density feels nothing, which is what makes this buoyancy and
+        # not a second gravity. `rho_ref` is the fluid the body is displacing -- for a mixture, its
+        # mean density -- and leaving it at 0 reduces the term to plain gravity, so the default is
+        # off (`buoyancy: 0`) and no existing run changes.
+        self.buoyancy = float(params.get("buoyancy", 0.0))
+        self.rho_ref = float(params.get("rho_ref", 1.0))
+        _bd = params.get("buoyancy_dir")
+        self.buoy_dir = [float(x) for x in _bd] if _bd else None
         self.wall_damp = float(params.get("wall_damp", 1.0))
         self._wall_key = None; self._wall_cache = None
         self._wall3d_key = None; self._wall3d_cache = None
@@ -424,6 +445,20 @@ class MPMGridUpdate(FieldUpdate):
                 gvv[..., 1] = torch.where(near & (gy_ > 0), gy_ * wd, gy_)
                 gv = gvv.view(nx * ny, 2)
             gv = torch.where(walls[:, None], torch.zeros_like(gv), gv)  # interior wall BC
+        if self.buoyancy != 0.0:
+            # rho at each node from the mass the particles deposited there. `gm` is a node mass and
+            # dx^D its volume, so this is a genuine density and the comparison with `rho_ref` is
+            # dimensionally honest rather than a tuned ratio.
+            _rho = gm / (dx ** D)
+            _act = _rho > 1e-9                                  # empty nodes have no buoyancy
+            _f = torch.zeros_like(_rho)
+            _f[_act] = (_rho[_act] - self.rho_ref) / _rho[_act]
+            _dir = torch.zeros(D, device=dev, dtype=gv.dtype)
+            if self.buoy_dir is not None:
+                _dir[:len(self.buoy_dir)] = torch.as_tensor(self.buoy_dir, device=dev, dtype=gv.dtype)
+            else:
+                _dir[1 if D == 2 else 2] = -1.0                 # "down" is -y in 2D, -z in 3D
+            gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
         else:                                                       # --- 3D: reflective box walls + friction ---
             if not periodic:
                 shape = g.shape; bnd = 3
