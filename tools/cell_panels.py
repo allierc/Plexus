@@ -114,7 +114,7 @@ def _draw_box3d(ax, lo, hi, c="#4a4a4a", lw=0.7):
             ax.plot(*zip(a, b), color=c, lw=lw)
 
 def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d=1.1,
-           frame_to="world"):
+           frame_to="world", quiet=False):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -216,11 +216,53 @@ def panels(run_dir, frame=-1, axis="z", thick=0.06, out=None, fill3d=1.9, fill2d
     out = out or os.path.join(run_dir, "panels.png")
     fig.savefig(out, dpi=120, facecolor="black")
     plt.close(fig)
-    print(f"  {out}")
-    for n, p, _c, _l in sets:
-        print(f"    {n:<10} {p.shape[1]:>6} elements")
-    if missing:
+    if not quiet:
+        print(f"  {out}")
+        for n, p, _c, _l in sets:
+            print(f"    {n:<10} {p.shape[1]:>6} elements")
+    if missing and not quiet:
         print(f"    DECLARED BUT NOT RECORDED: {missing}")
+    return out
+
+
+def panels_movie(run_dir, axis="z", thick=0.10, out=None, max_frames=150, fps=20,
+                 fill3d=1.9, fill2d=1.1):
+    """The two-panel view over TIME -- the one movie that replaces the per-set pile.
+
+    A STILL OF THE LAST FRAME ANSWERS NOTHING ABOUT A RUN THAT MOVES. `cell_02` is a cell dropped
+    from a height: its final frame is a ball resting on the floor, which is equally consistent with
+    falling, bouncing, splashing or never having moved. The whole reason for the ladder is what the
+    compartments DO to each other on impact, and that is a sequence.
+
+    SUBSAMPLED, because 501 recorded rows at two matplotlib panels each is minutes of rendering for
+    a clip nobody watches frame by frame. `max_frames` evenly spaced rows is enough to read a
+    bounce, and the frame counter in the corner says which row each panel is.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import imageio.v2 as imageio
+    import tempfile
+
+    spec, z = _load(run_dir)
+    sets, _missing = _sets(spec, z)
+    if not sets:
+        raise SystemExit("  no set has recorded positions")
+    n_rows = sets[0][1].shape[0]
+    idx = np.unique(np.linspace(0, n_rows - 1, min(max_frames, n_rows)).astype(int))
+    out = out or os.path.join(run_dir, "panels.mp4")
+    tmp = tempfile.mkdtemp()
+    frames = []
+    for k, t in enumerate(idx):
+        f = os.path.join(tmp, f"{k:05d}.png")
+        panels(run_dir, frame=int(t), axis=axis, thick=thick, out=f,
+               fill3d=fill3d, fill2d=fill2d, quiet=True)
+        frames.append(f)
+    with imageio.get_writer(out, fps=fps, quality=8) as w:
+        for f in frames:
+            w.append_data(imageio.imread(f))
+    import shutil
+    shutil.rmtree(tmp, ignore_errors=True)
+    print(f"  {out}   ({len(idx)} of {n_rows} rows @ {fps} fps)")
     return out
 
 
@@ -237,7 +279,10 @@ if __name__ == "__main__":
     ap.add_argument("--frame-to", dest="frame_to", default="world",
                     choices=("world", "body"),
                     help="frame on the domain (default) or zoom to the contents")
+    ap.add_argument("--movie", action="store_true", help="render the two-panel view over time")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
-    panels(a.run_dir, frame=a.frame, axis=a.axis, thick=a.thick, out=a.out,
-           fill3d=a.fill3d, fill2d=a.fill2d, frame_to=a.frame_to)
+    (panels_movie if a.movie else panels)(
+        a.run_dir, axis=a.axis, thick=a.thick, out=a.out,
+        fill3d=a.fill3d, fill2d=a.fill2d,
+        **({} if a.movie else dict(frame=a.frame, frame_to=a.frame_to)))

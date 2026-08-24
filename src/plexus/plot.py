@@ -150,9 +150,19 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         _t = os.path.join(get_repo_root(), "tools")
         if _t not in _sys.path:
             _sys.path.insert(0, _t)
-        from cell_panels import panels as _panels
-        _panels(data_dir, axis=(sim.plotting or {}).get("panels_axis", "z"),
-                thick=float((sim.plotting or {}).get("panels_thick", 0.10)))
+        from cell_panels import panels as _panels, panels_movie as _panels_movie
+        _ax = (sim.plotting or {}).get("panels_axis", "z")
+        _th = float((sim.plotting or {}).get("panels_thick", 0.10))
+        _panels(data_dir, axis=_ax, thick=_th)                      # the final frame, as a still
+        # AND THE SEQUENCE. A still of the last frame answers nothing about a run that moves: a
+        # dropped cell's final frame is a ball on the floor, equally consistent with falling,
+        # bouncing, splashing or never having moved. The ladder is about what the compartments do
+        # to each other on impact, which is a sequence. `movie` is honoured so `-o plot` without it
+        # stays a one-second operation.
+        if movie:
+            _panels_movie(data_dir, axis=_ax, thick=_th,
+                          max_frames=int((sim.plotting or {}).get("panels_frames", 150)),
+                          fps=int((sim.plotting or {}).get("fps", 20)))
         print(f"[plot] panels -> {data_dir}", flush=True)
         return data_dir
 
