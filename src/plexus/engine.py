@@ -1317,75 +1317,88 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # run is NOT bit-identical to the same spec uncompiled. The promotion suite's whole gate is
     # byte-identity, so a spec carrying this flag can never be a twin; the warning says so out loud
     # rather than leaving it to be discovered by a red row.
-    _compiled = []
-    for _step in sim.schedule:
-        if not (isinstance(_step, dict) and _step.get("compile")):
-            continue
-        _mode = str(_step.get("compile_mode", "default"))
-        # THE THREE THINGS DYNAMO ASKS FOR BY NAME when it traces this operator set. Left at their
-        # defaults, compiling was SLOWER than eager (164 vs 156 ms/frame measured), because none of
-        # what follows is a fusion failure -- it is the tracer bailing out and re-tracing.
-        #
-        #   (capture_scalar_outputs IS NOT SET, and that is deliberate. `mpm_gather` reads the
-        #   domain box with `[float(b) for b in H.world_size]`; `float()` on a tensor element is
-        #   `.item()` and dynamo breaks the graph there. Turning the flag on makes it an UNBACKED
-        #   SYMBOLIC FLOAT, and inductor in this torch/triton then emits a Triton kernel that
-        #   references a symbol it never defined -- `NameError('zuf0 is not defined')`, a hard
-        #   compile failure, not a slowdown. The cause is fixed at the source instead: the box is
-        #   constant for a run, so `mpm_gather` caches it on the instance and the `float()` is
-        #   traced once rather than every call.)
-        #
-        #   allow_unspec_int_on_nn_module -- dynamo treats an INTEGER ATTRIBUTE of an nn.Module as
-        #   a compile-time constant. `mpm_scatter` reads `H.micro`, the shared-grid stamp, which
-        #   advances every substep, so every substep looked like a new constant and triggered a
-        #   fresh compile: `last reason: H.micro == 9`. This is a self-inflicted wound from the
-        #   accumulate fix and this flag is its cure -- the counter becomes an input, not a
-        #   constant.
-        #
-        #   recompile_limit -- the polar decomposition does `U[det(U) < 0, :, -1] *= -1`, a boolean
-        #   mask whose length is DATA-DEPENDENT (how many matrices are improper rotations, which
-        #   changes as the body deforms). Every new count is a new shape: `___stack2 size mismatch
-        #   at index 0, expected 13, actual 15`. Eight of those exhausts the default limit and the
-        #   function falls back to eager FOREVER, having paid for eight compiles first. Raising the
-        #   limit lets the common counts settle into a cache instead.
-        import torch._dynamo as _dyn
-        _dyn.config.allow_unspec_int_on_nn_module = True
-        _dyn.config.recompile_limit = max(int(getattr(_dyn.config, "recompile_limit", 8)),
-                                          int(_step.get("compile_recompile_limit", 64)))
-        if _step.get("compile_verbose"):
-            _dyn.config.verbose = True                        # full graph-break provenance
-        else:
-            # THE WARNINGS ARE NOT ACTIONABLE ONCE THE FLAGS ABOVE ARE SET, and they printed
-            # thirty lines of stack over the progress bar on every run. `compile_verbose: true`
-            # brings them back when the question is why a graph broke.
-            import logging
-            for _lg in ("torch._dynamo", "torch._inductor", "torch._dynamo.convert_frame"):
-                logging.getLogger(_lg).setLevel(logging.ERROR)
-            import warnings as _w
-            _w.filterwarnings("ignore", message=".*TensorFloat32.*")
-            _w.filterwarnings("ignore", message=".*fp32_precision.*")
-        for _tok in _step.get("steps", []):
-            for _j in _by_token.get(_tok, []):
-                if _j in [c[0] for c in _compiled]:
-                    continue
-                _ob = inst[_j][1]
-                try:
-                    # THE BOUND METHOD, not the module. `torch.compile(module)` returns a NEW
-                    # OptimizedModule, which would have to be substituted back into `inst` and
-                    # would break every `getattr(ob, ...)` the loop does on the original (EMIT,
-                    # INTEGRAND, MAY_MUTATE_INTEGRATED_STATE). Compiling `ob.forward` and storing
-                    # it as an instance attribute leaves the object itself untouched, and
-                    # `nn.Module.__call__` looks `self.forward` up on the instance first.
-                    _ob.forward = torch.compile(_ob.forward, mode=_mode, dynamic=False)
-                    _compiled.append((_j, _tok))
-                except Exception as _e:                      # no triton, unsupported backend, ...
-                    warn(f"torch.compile unavailable for {_tok!r} ({type(_e).__name__}: {_e}); "
-                         f"running it eager")
-    if _compiled:
-        warn(f"torch.compile ON for {len(_compiled)} operator instance(s): "
-             f"{', '.join(t for _i, t in _compiled)} (mode={_mode}). Compiled arithmetic is fused "
-             f"and reordered, so this run is NOT bit-identical to the same spec uncompiled -- it "
-             f"cannot be used as a promotion twin. The first few frames pay compilation.")
+    # torch.compile IS INSTALLED AFTER THE FIRST TICK, not at build. Every MPM operator resolves
+    # its run-constant predicates on its FIRST call ("does this set contain liquid / snow", the CSF
+    # guard) -- one `bool(t.any())` behind a cache. Wrapping at build meant dynamo traced that
+    # first call and broke the graph there: measured 13 graph breaks and 18 separate graphs for
+    # four operators, one break per predicate, permanently, because the branch stays in the traced
+    # code. Letting tick 0 run eager resolves every cache, so tick 1 compiles a body with plain
+    # python bools in it and no syncs at all. Same reason capture waits for tick 1.
+    _compile_done = [False]
+
+    def _install_compile():
+        if _compile_done[0]:
+            return
+        _compile_done[0] = True
+        _compiled = []
+        for _step in sim.schedule:
+            if not (isinstance(_step, dict) and _step.get("compile")):
+                continue
+            _mode = str(_step.get("compile_mode", "default"))
+            # THE THREE THINGS DYNAMO ASKS FOR BY NAME when it traces this operator set. Left at their
+            # defaults, compiling was SLOWER than eager (164 vs 156 ms/frame measured), because none of
+            # what follows is a fusion failure -- it is the tracer bailing out and re-tracing.
+            #
+            #   (capture_scalar_outputs IS NOT SET, and that is deliberate. `mpm_gather` reads the
+            #   domain box with `[float(b) for b in H.world_size]`; `float()` on a tensor element is
+            #   `.item()` and dynamo breaks the graph there. Turning the flag on makes it an UNBACKED
+            #   SYMBOLIC FLOAT, and inductor in this torch/triton then emits a Triton kernel that
+            #   references a symbol it never defined -- `NameError('zuf0 is not defined')`, a hard
+            #   compile failure, not a slowdown. The cause is fixed at the source instead: the box is
+            #   constant for a run, so `mpm_gather` caches it on the instance and the `float()` is
+            #   traced once rather than every call.)
+            #
+            #   allow_unspec_int_on_nn_module -- dynamo treats an INTEGER ATTRIBUTE of an nn.Module as
+            #   a compile-time constant. `mpm_scatter` reads `H.micro`, the shared-grid stamp, which
+            #   advances every substep, so every substep looked like a new constant and triggered a
+            #   fresh compile: `last reason: H.micro == 9`. This is a self-inflicted wound from the
+            #   accumulate fix and this flag is its cure -- the counter becomes an input, not a
+            #   constant.
+            #
+            #   recompile_limit -- the polar decomposition does `U[det(U) < 0, :, -1] *= -1`, a boolean
+            #   mask whose length is DATA-DEPENDENT (how many matrices are improper rotations, which
+            #   changes as the body deforms). Every new count is a new shape: `___stack2 size mismatch
+            #   at index 0, expected 13, actual 15`. Eight of those exhausts the default limit and the
+            #   function falls back to eager FOREVER, having paid for eight compiles first. Raising the
+            #   limit lets the common counts settle into a cache instead.
+            import torch._dynamo as _dyn
+            _dyn.config.allow_unspec_int_on_nn_module = True
+            _dyn.config.recompile_limit = max(int(getattr(_dyn.config, "recompile_limit", 8)),
+                                              int(_step.get("compile_recompile_limit", 64)))
+            if _step.get("compile_verbose"):
+                _dyn.config.verbose = True                        # full graph-break provenance
+            else:
+                # THE WARNINGS ARE NOT ACTIONABLE ONCE THE FLAGS ABOVE ARE SET, and they printed
+                # thirty lines of stack over the progress bar on every run. `compile_verbose: true`
+                # brings them back when the question is why a graph broke.
+                import logging
+                for _lg in ("torch._dynamo", "torch._inductor", "torch._dynamo.convert_frame"):
+                    logging.getLogger(_lg).setLevel(logging.ERROR)
+                import warnings as _w
+                _w.filterwarnings("ignore", message=".*TensorFloat32.*")
+                _w.filterwarnings("ignore", message=".*fp32_precision.*")
+            for _tok in _step.get("steps", []):
+                for _j in _by_token.get(_tok, []):
+                    if _j in [c[0] for c in _compiled]:
+                        continue
+                    _ob = inst[_j][1]
+                    try:
+                        # THE BOUND METHOD, not the module. `torch.compile(module)` returns a NEW
+                        # OptimizedModule, which would have to be substituted back into `inst` and
+                        # would break every `getattr(ob, ...)` the loop does on the original (EMIT,
+                        # INTEGRAND, MAY_MUTATE_INTEGRATED_STATE). Compiling `ob.forward` and storing
+                        # it as an instance attribute leaves the object itself untouched, and
+                        # `nn.Module.__call__` looks `self.forward` up on the instance first.
+                        _ob.forward = torch.compile(_ob.forward, mode=_mode, dynamic=False)
+                        _compiled.append((_j, _tok))
+                    except Exception as _e:                      # no triton, unsupported backend, ...
+                        warn(f"torch.compile unavailable for {_tok!r} ({type(_e).__name__}: {_e}); "
+                             f"running it eager")
+        if _compiled:
+            warn(f"torch.compile ON for {len(_compiled)} operator instance(s): "
+                 f"{', '.join(t for _i, t in _compiled)} (mode={_mode}). Compiled arithmetic is fused "
+                 f"and reordered, so this run is NOT bit-identical to the same spec uncompiled -- it "
+                 f"cannot be used as a promotion twin. The first few frames pay compilation.")
 
     def _run_token(token, tick):
         """Run the operator instance this schedule position names, enforcing the first-tick
@@ -1436,6 +1449,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # memory for a graph it will never traverse, and the inverse half asks explicitly.
     with (contextlib.nullcontext() if grad else torch.no_grad()):
         for tick in ticks:                           # one tick = one pass of the schedule + integrate
+            if tick == 1:
+                _install_compile()                   # after tick 0 has warmed every run-constant cache
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
             # THE MICRO-STEP COUNTER. A shared accumulator field -- the MPM grid is the one in the
             # library -- has to know when a fresh solve begins, because the FIRST operator writing
