@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+"""Run a rung of the composed-cell ladder on the cluster, into `graphs_data/cell/`.
+
+WHY NOT THE PROMOTION HARNESS. That harness exists to run one spec TWICE -- once on a pristine
+worktree and once on the core -- and compare the bytes. The cell ladder has nothing to compare
+against: no archive contains a cell built from heterogeneous substrates, which is the reason for
+building one. Borrowing the harness gave every rung a `log/promotion/CELL_*/` pair directory with an
+empty A side, and buried the outputs two levels down inside it. This submits one run and lets
+`graphs_data_path` put it where every other generated dataset goes.
+
+    python tools/cell_run.py cell_01_bounce [cell_02_...] [--frames N] [--local]
+
+`--local` runs in-process instead of submitting, for a short rung you want to watch.
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "discovery_okuda"))
+FOLDER = "cell"                      # -> <GNN_OUTPUT_ROOT>/graphs_data/cell/<name>
+
+
+def _spec(name):
+    p = os.path.join(ROOT, "config", FOLDER, f"{name}.yaml")
+    if not os.path.exists(p):
+        raise SystemExit(f"  no spec at {os.path.relpath(p, ROOT)}")
+    return p
+
+
+def submit(name, frames=None):
+    """One bsub, writing to the default data root -- i.e. graphs_data/cell/<name>."""
+    import cluster as C
+    _spec(name)
+    out_dir = os.path.join(ROOT, "log", "cell")
+    os.makedirs(out_dir, exist_ok=True)
+    sh = os.path.join(out_dir, f"{name}.sh")
+    with open(sh, "w") as f:
+        f.write("\n".join([
+            "#!/bin/bash -l",
+            f"cd {C.cpath(ROOT)}",
+            f"export PYTHONPATH={C.cpath(os.path.join(ROOT, 'src'))}",
+            "export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8",
+            "export MPLBACKEND=Agg",
+            # NO `--output_root`. That flag is what redirected the promotion runs into their pair
+            # directories; leaving it off lets `graphs_data_path` resolve the ordinary data root,
+            # which is the whole point of this script.
+            f"conda run -n {C.ENV} python Plexus_Main.py -o generate {FOLDER}/{name}"
+            + (f" --frames {frames}" if frames else "")
+            + " --device cuda:0 --force",
+        ]) + "\n")
+    os.chmod(sh, 0o755)
+    log = C.cpath(os.path.join(out_dir, f"{name}.out"))
+    gpu = "-gpu num=1 " if C.GPU != "0" else ""
+    cmd = (f"bsub -q {C.QUEUE} {gpu}-J cell_{name} -o {log} -e {log.replace('.out', '.err')} "
+           f"bash {C.cpath(sh)}")
+    r = C._ssh(cmd, timeout=45)
+    print(f"  {name}: {(r.stdout or r.stderr or '').strip()[:120]}")
+    print(f"     -> graphs_data/{FOLDER}/{name}/    log/cell/{name}.out")
+
+
+def local(name, frames=None):
+    import plexus.schema as S
+    import plexus.operators                                              # noqa: F401
+    from plexus.generators.graph_data_generator import data_generate
+    sim = S.load(_spec(name))
+    if frames:
+        sim.n_frames = int(frames)
+    d, _ = data_generate(sim, FOLDER, device="cpu", erase=True, save=True)
+    # THE SPEC TRAVELS WITH ITS DATA. `Plexus_Main` copies it after generating; doing it here too
+    # means a locally-run rung is readable by `cell_panels.py`, which needs the spec for its colour
+    # table and would otherwise fail on exactly the runs that are quickest to iterate on.
+    import shutil
+    shutil.copy2(_spec(name), os.path.join(d, "spec.yaml"))
+    print(f"  {d}")
+    return d
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("names", nargs="+")
+    ap.add_argument("--frames", type=int, default=None)
+    ap.add_argument("--local", action="store_true")
+    a = ap.parse_args()
+    for n in a.names:
+        (local if a.local else submit)(n, a.frames)
