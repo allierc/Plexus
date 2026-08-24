@@ -126,7 +126,7 @@ it.**
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/turing_gs_stripes_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_gs_stripes.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">stripes (F = 0.05)<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_kappa_B
@@ -188,7 +188,7 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_gs_spots_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_gs_spots.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">spots (F = 0.034)<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_eta_B
@@ -250,7 +250,7 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_two_beta_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_two_beta.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">two chemistries<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_two_beta_B
