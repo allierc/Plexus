@@ -156,6 +156,12 @@ operators:
   at: mpm_grid
   surface_tension: 0.0
   wall_damp: 1.0
+  plate_axis: 2
+  plate_centre: 0.5
+  plate_gap_half: 0.105
+  plate_gap_half_end: 0.03
+  plate_close_from: 120
+  plate_close_to: 950
 - op: mpm_gather
   at: nucleus
   from: mpm_grid
@@ -171,33 +177,6 @@ operators:
   from: mpm_grid
   wall_damp: 1.0
   wall_contact: 0.04
-- op: plate_confine
-  at: nucleus
-  axis: 2
-  centre: 0.5
-  gap_half: 0.105
-  gap_half_end: 0.03
-  close_from: 120
-  close_to: 950
-  stiff: 0.9
-- op: plate_confine
-  at: cytosol
-  axis: 2
-  centre: 0.5
-  gap_half: 0.105
-  gap_half_end: 0.03
-  close_from: 120
-  close_to: 950
-  stiff: 0.9
-- op: plate_confine
-  at: membrane
-  axis: 2
-  centre: 0.5
-  gap_half: 0.105
-  gap_half_end: 0.03
-  close_from: 120
-  close_to: 950
-  stiff: 0.9
 schedule:
 - aggregate
 - substep_dt: 0.0001
@@ -214,9 +193,6 @@ schedule:
   - mpm_gather
   capture: true
   compile: true
-- plate_confine
-- plate_confine
-- plate_confine
 plotting:
   background: black
   colors:
