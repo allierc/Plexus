@@ -86,11 +86,21 @@ if HAVE_WARP:
                    C: wp.array(dtype=wp.mat33), F: wp.array(dtype=wp.mat33),
                    MASS: wp.array(dtype=float), MU: wp.array(dtype=float),
                    LA: wp.array(dtype=float), PVOL: wp.array(dtype=float),
-                   AEXT: wp.array(dtype=wp.vec3),
+                   AEXT: wp.array(dtype=wp.vec3), JP: wp.array(dtype=float),
+                   SNW: wp.array(dtype=float), LIQ: wp.array(dtype=float),
+                   OCC: wp.array(dtype=float), TURG: wp.array(dtype=float),
+                   ACT: wp.array(dtype=wp.mat33),
                    GM: wp.array(dtype=float), GMV: wp.array(dtype=wp.vec3),
-                   ng: int, dx: float, dt: float, drag: float, iters: int):
+                   GC: wp.array(dtype=float),
+                   ng: int, dx: float, dt: float, drag: float, iters: int,
+                   has_snw: int, has_liq: int, has_turg: int, has_act: int):
         p = wp.tid()
         inv_dx = 1.0 / dx
+        # DORMANT PARTICLES CONTRIBUTE NOTHING. The default masks the scatter weights by occupancy
+        # (`weight * (occ > 0)`); this kernel had no `occ` at all, so a growth reservoir waiting to
+        # be spawned was depositing mass and momentum into the grid the whole time it waited.
+        if OCC[p] <= 0.0:
+            return
 
         # READ STRAIGHT OUT OF `p.state`. `p.get("pos")` is a NON-CONTIGUOUS column slice, so
         # `.contiguous()` allocated a fresh temporary on every call -- see the note on
@@ -105,9 +115,33 @@ if HAVE_WARP:
 
         J = wp.determinant(Fp)
         R = polar_R(Fp, iters)
+        # SNOW HARDENS AS IT PACKS, and this kernel did not know it. `mpm_strain` accumulates the
+        # plastic volume ratio Jp, and the DEFAULT scatter scales both Lame parameters by
+        # exp(10(1-Jp)) -- Jp<1 (packed) stiffens, Jp>1 softens (mpm_ops.py:322). Omitting it left
+        # snow with its virgin stiffness no matter how compacted it got, so a snow block compressed
+        # without limit into a flat pancake instead of holding a packed shape.
+        #
+        # THE GATE COULD NOT SEE IT: over its 20 frames Jp barely leaves 1, so h ~ 1 and the two
+        # implementations agreed to 2.1e-07 on the centre of mass. The divergence needs hundreds of
+        # frames of sustained plastic flow to appear, which is the length a SCENE runs and not the
+        # length a gate ran.
+        mu_p = MU[p]
+        la_p = LA[p]
+        if has_snw == 1 and SNW[p] > 0.0:
+            h = wp.exp(wp.clamp(10.0 * (1.0 - JP[p]), -6.0, 6.0))
+            mu_p = mu_p * h
+            la_p = la_p * h
         # fixed-corotated Kirchhoff stress: 2 mu (F - R) F^T + I la J (J - 1)
-        S = 2.0 * MU[p] * ((Fp - R) * wp.transpose(Fp)) + wp.identity(n=3, dtype=float) * (
-            LA[p] * J * (J - 1.0))
+        S = 2.0 * mu_p * ((Fp - R) * wp.transpose(Fp)) + wp.identity(n=3, dtype=float) * (
+            la_p * J * (J - 1.0))
+        # THE TWO OPTIONAL STRESS TERMS the default adds and this kernel dropped. `active_stress`
+        # is written by pulse_to_active_stress; `turgor` by mpm_turgor, and its sign is the one
+        # that makes a cell a cell -- tau is Kirchhoff (positive = tension) and a fluid at pressure
+        # P has sigma = -P.I, so a POSITIVE turgor SUBTRACTS and pushes the material outward.
+        if has_act == 1:
+            S = S + ACT[p]
+        if has_turg == 1:
+            S = S - wp.identity(n=3, dtype=float) * TURG[p]
         S = S * ((-dt * 4.0 * inv_dx * inv_dx) * PVOL[p])
         affine = S + Cp * mass
 
@@ -151,6 +185,12 @@ if HAVE_WARP:
                     mom = mass * v + affine * dpos
                     wp.atomic_add(GM, idx, w * mass)
                     wp.atomic_add(GMV, idx, w * mom)
+                    # LIQUID COLOUR, the field the CSF surface tension is computed from. Without
+                    # it `mpm_grid_update` finds gc all zero, its `_c_csf` predicate is False, and
+                    # the ENTIRE surface-tension branch is skipped -- so `surface_tension: 60.0`
+                    # in a spec did exactly nothing on any run using this implementation.
+                    if has_liq == 1:
+                        wp.atomic_add(GC, idx, w * mass * LIQ[p])
 
 
 @register_operator("mpm_scatter", implementation="warp", family="mpm",
@@ -192,6 +232,29 @@ class MPMScatterWarp(MPMScatter):
             a_ext = a_ext + pa
         a_ext = (a_ext + torch.nan_to_num(H.delta(p.name))).contiguous()
 
+        # run-constant, and it must be cached: `bool(t.any())` is a sync and a sync inside a
+        # CUDA-graph capture is illegal.
+        from plexus.operators.mpm_ops import _const_any
+        _has_snw = _const_any(self, "_c_snow", getattr(p, "is_snow", None))
+        _has_liq = _const_any(self, "_c_liquid", getattr(p, "is_liquid", None))
+        if getattr(self, "_sbuf", None) is None:
+            z = torch.zeros(p.n, device=dev)
+            def _mf(t):
+                return t.float().contiguous() if t is not None else z
+            self._sbuf = (_mf(getattr(p, "is_snow", None)), _mf(getattr(p, "is_liquid", None)),
+                          torch.ones(p.n, device=dev) if getattr(p, "occ", None) is None else None,
+                          z)
+        _snw, _liq, _occ1, _z = self._sbuf
+        _occ = _occ1 if _occ1 is not None else p.occ.contiguous()
+        # OPTIONAL SIDE CHANNELS, re-read every call because they are written by OTHER operators
+        # within the same tick (mpm_turgor, pulse_to_active_stress) and are not run-constant.
+        _turg = getattr(p, "turgor", None)
+        _has_turg = _turg is not None
+        _turg = _turg.contiguous() if _has_turg else _z
+        _act = getattr(H, "active_stress", None)
+        _has_act = _act is not None
+        _act = _act.contiguous() if _has_act else torch.zeros(p.n, 3, 3, device=dev)
+
         gm, gmv = g.m, g.mv
         if getattr(self, "_zeroes_grid", True):
             gm.zero_(); gmv.zero_(); g.c.zero_()
@@ -209,8 +272,13 @@ class MPMScatterWarp(MPMScatter):
                     wp.from_torch(p.mass.contiguous()), wp.from_torch(p.mu.contiguous()),
                     wp.from_torch(p.la.contiguous()), wp.from_torch(p.p_vol.contiguous()),
                     wp.from_torch(a_ext, dtype=wp.vec3),
+                    wp.from_torch(p.Jp.contiguous()), wp.from_torch(_snw),
+                    wp.from_torch(_liq), wp.from_torch(_occ), wp.from_torch(_turg),
+                    wp.from_torch(_act, dtype=wp.mat33),
                     wp.from_torch(gm), wp.from_torch(gmv.view(-1, 3), dtype=wp.vec3),
-                    int(g.nx), float(g.dx), float(dt), float(self.drag), int(self.polar_iters)])
+                    wp.from_torch(g.c),
+                    int(g.nx), float(g.dx), float(dt), float(self.drag), int(self.polar_iters),
+                    int(_has_snw), int(_has_liq), int(_has_turg), int(_has_act)])
         return {}
 
 
