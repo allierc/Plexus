@@ -73,9 +73,10 @@ def main():
                         help="how many PNG stills to drop through the run, copied from the movie's "
                              "own rendered frames (no extra render). 0 disables. The newest is "
                              "always also written as 3d.png so a long run can be watched")
-    parser.add_argument("--render-dot", default="auto",
+    parser.add_argument("--render-dot", default=None,
                         help="dot size in px, or 'auto' to size it to the drawn particles' median "
-                             "nearest-neighbour spacing so the material reads as solid")
+                             "nearest-neighbour spacing. DEFAULT: the spec's `plotting.dot_size`, "
+                             "then auto -- so the size lives in the config, not in the command")
     parser.add_argument("--no-describe", action="store_true",
                         help="skip the automatic VLM video description that -o generate runs by default")
     parser.add_argument("--describe-out", default=None,
@@ -124,7 +125,8 @@ def main():
         # the trajectory. `plot_dataset` below still runs and still renders from the recorded data;
         # this hook exists for the runs where that is impossible, and at 100 M particles one
         # recorded frame is 1.2 GB so it is impossible often. `--no-viz` turns off every renderer.
-        _dot = args.render_dot if args.render_dot == "auto" else float(args.render_dot)
+        _dot = (None if args.render_dot is None
+                else args.render_dot if args.render_dot == "auto" else float(args.render_dot))
         # A CAPTURED GRAPH AND A RENDERER COMPETE FOR THE SAME CARD, and the failure is silent:
         # the allocator retries rather than raising, so the run sits at 100% CPU with no output and
         # no error. That is what a 100 M render did -- the capture pool plus the renderer plus the
