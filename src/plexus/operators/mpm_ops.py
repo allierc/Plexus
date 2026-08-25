@@ -624,6 +624,29 @@ class MPMGridUpdate(FieldUpdate):
         self._wall_key = key; self._wall_cache = walls
         return walls
 
+    def _wall_bc_2d(self, gv, nx, ny, dev, wd):
+        """Reflective domain walls, 2D. EXTRACTED VERBATIM so `default` is unchanged, and made a
+        method so an implementation can replace THIS and nothing else.
+
+        It is 8 of the 113 aten calls a 2D grid solve issues and 66% of a 2D frame, because
+        `gv[lox, :, 0] = ...` is boolean-mask indexing: it lowers to `index_put_`, which goes
+        through `nonzero`, which SYNCHRONISES. Eight of those per call at 18 substeps is ~144
+        pipeline drains a frame. The 3D branch expresses the identical condition with `torch.where`
+        on broadcast masks and has none -- see `mpm_grid_update[implementation: nosync]`.
+        """
+        gv = gv.view(nx, ny, 2)
+        ix = torch.arange(nx, device=dev); iy = torch.arange(ny, device=dev); bnd = 3
+        lox, hix = ix < bnd, ix > nx - bnd
+        loy, hiy = iy < bnd, iy > ny - bnd
+        gv[lox, :, 0] = gv[lox, :, 0].clamp(min=0); gv[hix, :, 0] = gv[hix, :, 0].clamp(max=0)
+        gv[:, loy, 1] = gv[:, loy, 1].clamp(min=0); gv[:, hiy, 1] = gv[:, hiy, 1].clamp(max=0)
+        if wd != 1.0:
+            gl = gv[lox, :, 1]; gv[lox, :, 1] = torch.where(gl > 0, gl * wd, gl)
+            gh = gv[hix, :, 1]; gv[hix, :, 1] = torch.where(gh > 0, gh * wd, gh)
+            gv[:, loy, 0] = gv[:, loy, 0] * wd
+            gv[:, hiy, 0] = gv[:, hiy, 0] * wd
+        return gv.view(nx * ny, 2)
+
     def forward(self, H, mask=None):
         g = H.field(self.at); dev = g.m.device
         dt = sub_dt(H, self.dt_sub)
@@ -655,19 +678,8 @@ class MPMGridUpdate(FieldUpdate):
                 inv_m = (dx * dx) / gm.clamp(min=1e-8)
                 gv = gv + dt * torch.stack([stfx * inv_m, stfy * inv_m], dim=1)
 
-            if not periodic:                                        # reflective domain walls
-                gv = gv.view(nx, ny, 2)
-                ix = torch.arange(nx, device=dev); iy = torch.arange(ny, device=dev); bnd = 3
-                lox, hix = ix < bnd, ix > nx - bnd
-                loy, hiy = iy < bnd, iy > ny - bnd
-                gv[lox, :, 0] = gv[lox, :, 0].clamp(min=0); gv[hix, :, 0] = gv[hix, :, 0].clamp(max=0)
-                gv[:, loy, 1] = gv[:, loy, 1].clamp(min=0); gv[:, hiy, 1] = gv[:, hiy, 1].clamp(max=0)
-                if wd != 1.0:
-                    gl = gv[lox, :, 1]; gv[lox, :, 1] = torch.where(gl > 0, gl * wd, gl)
-                    gh = gv[hix, :, 1]; gv[hix, :, 1] = torch.where(gh > 0, gh * wd, gh)
-                    gv[:, loy, 0] = gv[:, loy, 0] * wd
-                    gv[:, hiy, 0] = gv[:, hiy, 0] * wd
-                gv = gv.view(nx * ny, 2)
+            if not periodic:
+                gv = self._wall_bc_2d(gv, nx, ny, dev, wd)
             walls = self._walls(H, g, dev)
             if wd != 1.0 and _const_any(self, "_c_walls2d", walls):  # friction in cells touching obstacles
                 w2 = walls.view(nx, ny)
@@ -762,6 +774,54 @@ class MPMGridUpdate(FieldUpdate):
             gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
         g.v.copy_(gv)                       # in place: a captured graph holds this address
         return {}
+
+
+
+# ==========================================================================================================
+# `mpm_grid_update[implementation: nosync]` -- the 2D wall BC without boolean-mask indexing.
+#
+# WHY THIS EXISTS, MEASURED. In 3D `mpm_grid_update` is 2.5% of a frame at 5M particles and 12% at
+# 945k. In 2D it is 66% -- 163 ms of 246 on `material_dam_break`, 109 of 163 on
+# `material_active_swirl` -- and 2D is 58 of the 78 specs in config/material. The cause is not
+# arithmetic: one 2D grid solve issues 113 aten calls, and 8 of them are `index_put_` from
+# `gv[lox, :, 0] = ...`. Boolean-mask indexing lowers through `nonzero`, which SYNCHRONISES, so
+# every one drains the pipeline; at 18 substeps that is ~144 drains a frame.
+#
+# THE MASKS ARE RUN-CONSTANT. `lox = ix < bnd` depends only on the grid extent, so nothing here is
+# data-dependent -- the sync buys nothing at all. The 3D branch already writes the identical
+# condition as `torch.where` on broadcast masks; this is the 2D branch written the same way.
+#
+# IT SHOULD BE BIT-IDENTICAL TO `default`, which is a much stronger claim than the `warp`
+# implementations can make and is gated as such: same operations, same order, same reads. The
+# ordering matters and is preserved -- the friction block reads the velocity AFTER the clamps, so
+# `vy` carries steps 3-4 before step 5 uses it, and a row that is both `lox` and `hix` sees the
+# first update before the second, exactly as the in-place version does.
+# ==========================================================================================================
+@register_operator("mpm_grid_update", implementation="nosync", family="mpm",
+                   set="field", kind="field")
+class MPMGridUpdateNoSync(MPMGridUpdate):
+    """`mpm_grid_update` with a sync-free 2D wall BC. Identical in 3D, where the default already is."""
+
+    MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions", "sync_free"]
+
+    def _wall_bc_2d(self, gv, nx, ny, dev, wd):
+        gv = gv.view(nx, ny, 2)
+        bnd = 3
+        ix = torch.arange(nx, device=dev).view(nx, 1)      # broadcast over y
+        iy = torch.arange(ny, device=dev).view(1, ny)      # broadcast over x
+        lox, hix = ix < bnd, ix > nx - bnd
+        loy, hiy = iy < bnd, iy > ny - bnd
+        vx, vy = gv[..., 0], gv[..., 1]
+        vx = torch.where(lox, vx.clamp(min=0), vx)         # do not penetrate the x walls
+        vx = torch.where(hix, vx.clamp(max=0), vx)
+        vy = torch.where(loy, vy.clamp(min=0), vy)         # ... or the y walls
+        vy = torch.where(hiy, vy.clamp(max=0), vy)
+        if wd != 1.0:                                      # tangential friction on the wall slabs
+            vy = torch.where(lox & (vy > 0), vy * wd, vy)
+            vy = torch.where(hix & (vy > 0), vy * wd, vy)
+            vx = torch.where(loy, vx * wd, vx)
+            vx = torch.where(hiy, vx * wd, vx)
+        return torch.stack([vx, vy], dim=-1).view(nx * ny, 2)
 
 
 # ==========================================================================================================
