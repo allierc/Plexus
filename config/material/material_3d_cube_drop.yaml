@@ -54,11 +54,11 @@ operators:
   polar: higham
 - op: mpm_grid_update
   at: mpm_grid
-  wall_damp: 0.7
+  wall_damp: 1.0
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
-  wall_damp: 0.7
+  wall_damp: 1.0
   wall_contact: 0.04
   vmax: 1000000000.0
   implementation: warp
