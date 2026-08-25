@@ -29,6 +29,7 @@ def data_generate(
     erase: bool = False,
     save: bool = True,
     live_every_frac: float | None = 0.05,
+    live_movie: dict | None = None,
 ) -> tuple[str, dict]:
     """forward-simulate `sim` and write its trajectory under
     graphs_data/<pre_folder>/<sim.name>/. Returns (data_dir, out).
@@ -36,7 +37,15 @@ def data_generate(
     generation writes DATA ONLY -- the trajectory + metadata. Visualization is a
     separate, external concern (plexus.plot, run as `Plexus_Main -o plot`); the
     generator never imports matplotlib, so adding simulations never grows a plot
-    switch in here (the ParticleGraph anti-pattern)."""
+    switch in here (the ParticleGraph anti-pattern).
+
+    `live_movie` is the ONE EXCEPTION, and it earns it by being the case the separate
+    concern cannot serve: at 100 M particles a single recorded frame is 1.2 GB, so
+    `plot_dataset` has nothing to read back from. It is an `on_frame` hook -- the same
+    extension point `live_every_frac` already uses -- and its pyvista import lives inside
+    `plexus.live_movie`, below the branch that decides whether to build one, so this module
+    still imports no rendering stack. Pass `None` (what `--no-viz` does) and nothing is
+    built, which is how a throughput measurement is taken."""
     folder = pre_folder.rstrip("/")
     data_dir = graphs_data_path(folder, sim.name)
     if erase and os.path.isdir(data_dir):
@@ -56,21 +65,44 @@ def data_generate(
     # frame number on it, so the run can be watched rather than only waited for. Off with
     # `live_every_frac=None`. The matplotlib import is inside `plexus.live.snapshot`, so this module
     # still imports no plotting stack -- see its own docstring on why that matters.
-    on_frame = None
+    hooks = []
     if live_every_frac:
         from plexus.live import every_n, snapshot
         _stride = every_n(sim.n_frames, live_every_frac)
 
-        def on_frame(H, tick, _d=data_dir, _n=sim.n_frames, _name=sim.name, _s=_stride,
-                     _st=(sim.plotting or {})):
+        def _snap(H, tick, _d=data_dir, _n=sim.n_frames, _name=sim.name, _s=_stride,
+                  _st=(sim.plotting or {})):
             if tick % _s == 0 or tick == _n:
                 # THE SPEC'S OWN COLOUR TABLE. Which chem column is drawn in which colour is a
                 # property of the model (a Gray-Scott substrate is usually not drawn; May-Leonard's
                 # three species are a partition and want RGB), so it travels with the spec rather
                 # than being guessed by the renderer.
                 snapshot(H, tick, _n, _d, name=_name, style=_st)
+        hooks.append(_snap)
 
-    H, out = run(sim, out_path=out_path, device=device, progress=True, on_frame=on_frame)
+    mov = None
+    if live_movie is not None:
+        from plexus.live_movie import LiveMovie
+        mov = LiveMovie(out=os.path.join(data_dir, "movie.mp4"),
+                        world=list(sim.world_size), n_frames=sim.n_frames,
+                        up=int((sim.plotting or {}).get("up_axis", 2)),
+                        name=sim.name, sim=sim, style=(sim.plotting or {}), **live_movie)
+        hooks.append(mov)
+
+    # COMPOSED, not replaced. The live PNG snapshot and the live movie are independent answers to
+    # "what is this run doing right now" and a run may want both; `on_frame` is a single slot, so
+    # the composition happens here rather than by one hook knowing about the other.
+    on_frame = None
+    if hooks:
+        def on_frame(H, tick, _hs=tuple(hooks)):
+            for h in _hs:
+                h(H, tick)
+
+    try:
+        H, out = run(sim, out_path=out_path, device=device, progress=True, on_frame=on_frame)
+    finally:
+        if mov is not None:
+            mov.close()
 
     # also save a light, framework-agnostic .npz (positions/occupancy per set) so
     # downstream code need not depend on zarr to read a generated dataset back.

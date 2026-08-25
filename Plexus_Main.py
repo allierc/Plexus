@@ -55,6 +55,17 @@ def main():
                         help="on -o plot, also render a gif movie per set")
     parser.add_argument("--grid", action="store_true",
                         help="render the MLS-MPM 6-panel grid-diagnostic movie (objects/C/F/Jp/stress/grid)")
+    parser.add_argument("--no-viz", action="store_true",
+                        help="NO RENDERING AT ALL: no live mp4, no live png snapshots, no plot pass, "
+                             "no captioning. This is how a throughput measurement is taken -- the "
+                             "ms/frame a render is folded into is not the simulation's")
+    parser.add_argument("--render-n", type=int, default=400_000,
+                        help="particles DRAWN in the live mp4; the run still simulates all of them")
+    parser.add_argument("--render-max-frames", type=int, default=300,
+                        help="cap on rendered frames; longer runs are strided down to this")
+    parser.add_argument("--render-dot", default="auto",
+                        help="dot size in px, or 'auto' to size it to the drawn particles' median "
+                             "nearest-neighbour spacing so the material reads as solid")
     parser.add_argument("--no-describe", action="store_true",
                         help="skip the automatic VLM video description that -o generate runs by default")
     parser.add_argument("--describe-out", default=None,
@@ -95,17 +106,26 @@ def main():
     os.makedirs(run_log_dir, exist_ok=True)
     shutil.copy2(yaml_file, os.path.join(run_log_dir, "spec.yaml"))   # same name as the data-dir copy (line ~104)
 
-    describe = not args.no_describe
+    describe = not args.no_describe and not args.no_viz
     data_dir = None
 
     if "generate" in task:
+        # THE mp4 IS WRITTEN BY THE RUN ITSELF, not by a second script and not by a second pass over
+        # the trajectory. `plot_dataset` below still runs and still renders from the recorded data;
+        # this hook exists for the runs where that is impossible, and at 100 M particles one
+        # recorded frame is 1.2 GB so it is impossible often. `--no-viz` turns off every renderer.
+        _dot = args.render_dot if args.render_dot == "auto" else float(args.render_dot)
+        lm = None if args.no_viz else {"render_n": args.render_n,
+                                       "max_frames": args.render_max_frames, "dot": _dot}
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
-                                    erase=args.force, save=True)
+                                    erase=args.force, save=True,
+                                    live_every_frac=(None if args.no_viz else 0.05),
+                                    live_movie=lm)
         shutil.copy2(yaml_file, os.path.join(data_dir, "spec.yaml"))   # co-locate the spec with its data
         _mark(run_log_dir, "_completed_generate", data_dir)
 
     # render movies if plotting was asked OR describing (the captioner needs the mp4s)
-    if "plot" in task or (describe and "generate" in task):
+    if not args.no_viz and ("plot" in task or (describe and "generate" in task)):
         from plexus.plot import plot_dataset
         data_dir = plot_dataset(sim, pre_folder, movie=(args.movie or describe))
         if "plot" in task:
@@ -115,7 +135,7 @@ def main():
     if args.grid and data_dir is None and ("generate" in task or "plot" in task):
         from plexus.paths import graphs_data_path
         data_dir = os.path.join(graphs_data_path(), pre_folder.rstrip("/"), name)
-    if args.grid and data_dir:
+    if args.grid and data_dir and not args.no_viz:
         from plexus.generators.mpm_grid_diag import generate_grid_movie
         generate_grid_movie(sim, data_dir, device=args.device)
 
@@ -189,3 +209,13 @@ if __name__ == "__main__":
 # python Plexus_Main.py -o generate attraction_repulsion
 # python Plexus_Main.py -o generate interaction/attraction_repulsion --force
 # PLEXUS_OUTPUT_ROOT=/groups/saalfeld/home/allierc/GraphData python Plexus_Main.py -o generate attraction_repulsion
+# cd /workspace/Plexus && PYTHONPATH=src /workspace/.conda_envs/neural-graph-linux/bin/python -u \
+#   tools/mpm_live_movie.py --spec config/material/material_3d_water_bench_100m.yaml \
+#   --frames 90 --render-n 400000 --device cuda:1 \
+#   --out graphs_data/cell/mpm_100m/movie.mp4
+# bsub -n 8 -gpu "num=1" -q gpu_a100 -W 96:00 \
+#   "cd /groups/saalfeld/home/allierc/Graph/Plexus && PYTHONPATH=src python -u Plexus_Main.py \
+#      -o generate material_3d_water_bench_100mL --device cuda:0 \
+#      --render-n 100000008 --render-max-frames 500 --no-describe"
+
+

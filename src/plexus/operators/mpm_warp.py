@@ -131,6 +131,11 @@ class MPMScatterWarp(MPMScatter):
 
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate",
                       "fused_kernel"]
+    # 3D ONLY, DECLARED. Inherited from MPMScatter this said [2, 3], so `contract.capabilities()`
+    # reported the fused kernel as able to run 2D -- it cannot, `forward` raises -- and any
+    # capability-driven dispatch built on that table would have routed every 2D spec into a kernel
+    # that refuses them. 58 of the 78 specs in config/material are 2D (`general.dim` defaults to 2).
+    SUPPORTED_DIMS = [3]
     DIFFERENTIABLE = False
 
     def forward(self, H, mask=None):
@@ -274,6 +279,7 @@ class MPMGatherWarp(MPMGather):
     """G2P as one Warp kernel. Pure reads: no atomics, no sort, nothing shared."""
 
     MECHANISM_TAGS = ["grid_to_particle", "advection", "fused_kernel"]
+    SUPPORTED_DIMS = [3]                       # see MPMScatterWarp: inherited [2, 3] was a lie
     DIFFERENTIABLE = False
 
     def forward(self, H, mask=None):
