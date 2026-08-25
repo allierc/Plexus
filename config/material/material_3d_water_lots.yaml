@@ -400,7 +400,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -437,6 +437,22 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: The simulation begins with a collection of distinct, isolated clusters
+      of particles distributed throughout a 3D volume. Over time, these clusters begin
+      to migrate toward the bottom of the container and start to merge with one another.
+      As the simulation progresses, the individual clusters lose their distinct boundaries
+      and form a large, interconnected mass at the base. In the final frames, the
+      particles settle into a dense, layered structure with some vertical plumes extending
+      upward.
+    objects: The scene contains multiple clusters of particles, each represented by
+      a unique vibrant color such as red, blue, green, yellow, and magenta. Initially,
+      these clusters are small, spherical, and spatially separated from each other
+      within the bounding box. As time passes, the clusters expand in size and begin
+      to overlap, forming complex, irregular shapes. By the end of the sequence, the
+      objects have merged into a single large, multi-colored mass that occupies the
+      bottom portion of the space.
 plotting:
   background: black
   up_axis: 1
@@ -559,19 +575,3 @@ plotting:
     - 1.0
     - 0.0
     - 0.302
-descriptions:
-  movie_mpm_particle:
-    description: The simulation begins with a collection of distinct, isolated clusters
-      of particles distributed throughout a 3D volume. Over time, these clusters begin
-      to migrate toward the bottom of the container and start to merge with one another.
-      As the simulation progresses, the individual clusters lose their distinct boundaries
-      and form a large, interconnected mass at the base. In the final frames, the
-      particles settle into a dense, layered structure with some vertical plumes extending
-      upward.
-    objects: The scene contains multiple clusters of particles, each represented by
-      a unique vibrant color such as red, blue, green, yellow, and magenta. Initially,
-      these clusters are small, spherical, and spatially separated from each other
-      within the bounding box. As time passes, the clusters expand in size and begin
-      to overlap, forming complex, irregular shapes. By the end of the sequence, the
-      objects have merged into a single large, multi-colored mass that occupies the
-      bottom portion of the space.

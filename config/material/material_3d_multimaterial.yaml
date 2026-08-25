@@ -69,7 +69,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -100,12 +100,27 @@ operators:
 schedule:
 - aggregate
 - gravity
-- substep_dt: 1.185185e-04
+- substep_dt: 0.0001185185
   steps:
   - mpm_strain
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: Initially, three distinct clusters of particles are arranged in a
+      linear sequence along a diagonal axis. Over time, the central blue cluster begins
+      to expand and flatten, spreading across the bottom plane of the bounding box.
+      The green and white clusters remain relatively stationary as the blue cluster
+      grows to encompass the area beneath them. By the final frame, the blue particles
+      form a large, thin sheet on the floor while the green and white clusters sit
+      atop it.
+    objects: 'There are three primary clusters of particles: one green, one blue,
+      and one white. The green cluster is a compact, roughly spherical mass located
+      on the left side of the scene. The white cluster is a similar compact, spherical
+      mass located on the right side of the scene. The blue cluster starts as a compact
+      sphere in the center but transforms into a large, flat, two-dimensional sheet
+      that covers the bottom of the cube.'
 plotting:
   background: black
   up_axis: 1
@@ -133,18 +148,3 @@ plotting:
     - 0.95
     - 0.96
     - 1.0
-descriptions:
-  movie_mpm_particle:
-    description: Initially, three distinct clusters of particles are arranged in a
-      linear sequence along a diagonal axis. Over time, the central blue cluster begins
-      to expand and flatten, spreading across the bottom plane of the bounding box.
-      The green and white clusters remain relatively stationary as the blue cluster
-      grows to encompass the area beneath them. By the final frame, the blue particles
-      form a large, thin sheet on the floor while the green and white clusters sit
-      atop it.
-    objects: 'There are three primary clusters of particles: one green, one blue,
-      and one white. The green cluster is a compact, roughly spherical mass located
-      on the left side of the scene. The white cluster is a similar compact, spherical
-      mass located on the right side of the scene. The blue cluster starts as a compact
-      sphere in the center but transforms into a large, flat, two-dimensional sheet
-      that covers the bottom of the cube.'

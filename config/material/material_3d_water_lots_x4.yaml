@@ -400,7 +400,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -437,6 +437,21 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: The simulation begins with a sparse, three-dimensional distribution
+      of large, multi-colored hexagonal particles. Over time, these particles rapidly
+      collapse toward the bottom plane of the bounding box, transitioning into a dense,
+      continuous field of tiny points. The initial volumetric structure flattens into
+      a complex, swirling pattern of colors on the base. By the final frames, the
+      field stabilizes into a highly organized, multi-layered distribution with distinct
+      color gradients.
+    objects: The scene contains a set of large, discrete hexagonal particles that
+      are initially scattered throughout a 3D space. These particles feature a variety
+      of vibrant colors, including magenta, blue, green, and orange. As the simulation
+      progresses, the objects transform into a massive collection of microscopic points
+      forming a dense, interconnected field. This final field exhibits a swirling
+      topology with distinct color zones arranged in concentric and overlapping layers.
 plotting:
   background: black
   up_axis: 1
@@ -559,18 +574,3 @@ plotting:
     - 1.0
     - 0.0
     - 0.302
-descriptions:
-  movie_mpm_particle:
-    description: The simulation begins with a sparse, three-dimensional distribution
-      of large, multi-colored hexagonal particles. Over time, these particles rapidly
-      collapse toward the bottom plane of the bounding box, transitioning into a dense,
-      continuous field of tiny points. The initial volumetric structure flattens into
-      a complex, swirling pattern of colors on the base. By the final frames, the
-      field stabilizes into a highly organized, multi-layered distribution with distinct
-      color gradients.
-    objects: The scene contains a set of large, discrete hexagonal particles that
-      are initially scattered throughout a 3D space. These particles feature a variety
-      of vibrant colors, including magenta, blue, green, and orange. As the simulation
-      progresses, the objects transform into a massive collection of microscopic points
-      forming a dense, interconnected field. This final field exhibits a swirling
-      topology with distinct color zones arranged in concentric and overlapping layers.

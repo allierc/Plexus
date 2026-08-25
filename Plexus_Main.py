@@ -108,8 +108,13 @@ def main():
     # MPM grid-dt CFL: auto-correct the SPEC (not the engine) so dt_sub respects the
     # Courant condition before we generate; idempotent for non-MPM / already-stable specs.
     if "generate" in task:
-        from plexus.generators.mpm_cfl import Courant_Friedrichs_Lewy_condition
+        from plexus.generators.mpm_cfl import (Courant_Friedrichs_Lewy_condition,
+                                               particles_per_cell)
         Courant_Friedrichs_Lewy_condition(yaml_file)
+        # The grid's OTHER discretisation constraint. CFL bounds the time step; this bounds the
+        # space step against the particle count, and it had no check at all until a spec was
+        # raised to n_grid 192 at a fixed particle count and its snow quietly collapsed.
+        particles_per_cell(yaml_file)
     sim = load(yaml_file)
 
     # self-describing run dir: snapshot the spec into log/<type>/<name>/

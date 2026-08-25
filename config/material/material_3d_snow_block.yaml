@@ -39,7 +39,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -75,6 +75,19 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: A dense cluster of grey particles is initially positioned in the
+      center of a large wireframe cube. Over the course of the simulation, the cluster
+      gradually descends toward the bottom face of the cube. The particles maintain
+      a relatively cohesive, roughly spherical shape as they move downward. By the
+      final frame, the cluster has settled near the bottom corner of the bounding
+      box.
+    objects: The scene contains a large, hollow wireframe cube that defines the spatial
+      boundaries. Inside this cube, there is a dense collection of small, grey particles.
+      These particles are clustered together to form a single, roughly spherical mass.
+      The particles are much smaller than the cube, which serves as the primary reference
+      for scale.
 plotting:
   background: black
   up_axis: 1
@@ -94,16 +107,3 @@ plotting:
     - 0.92
     - 0.95
     - 1.0
-descriptions:
-  movie_mpm_particle:
-    description: A dense cluster of grey particles is initially positioned in the
-      center of a large wireframe cube. Over the course of the simulation, the cluster
-      gradually descends toward the bottom face of the cube. The particles maintain
-      a relatively cohesive, roughly spherical shape as they move downward. By the
-      final frame, the cluster has settled near the bottom corner of the bounding
-      box.
-    objects: The scene contains a large, hollow wireframe cube that defines the spatial
-      boundaries. Inside this cube, there is a dense collection of small, grey particles.
-      These particles are clustered together to form a single, roughly spherical mass.
-      The particles are much smaller than the cube, which serves as the primary reference
-      for scale.
