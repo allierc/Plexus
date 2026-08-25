@@ -1,0 +1,575 @@
+general:
+  name: material_3d_water_bench
+  seed: 0
+  n_frames: 240
+  dt: 0.0036
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  record_cap: 121
+sets:
+  cell:
+    n: 27
+    types:
+      w00:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.11
+        - 0.11
+        - 0.11
+        - 0.19
+        - 0.19
+        - 0.19
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w01:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.36
+        - 0.11
+        - 0.11
+        - 0.44
+        - 0.19
+        - 0.19
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w02:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.61
+        - 0.11
+        - 0.11
+        - 0.69
+        - 0.19
+        - 0.19
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w03:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.11
+        - 0.36
+        - 0.11
+        - 0.19
+        - 0.44
+        - 0.19
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w04:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.36
+        - 0.36
+        - 0.11
+        - 0.44
+        - 0.44
+        - 0.19
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w05:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.61
+        - 0.36
+        - 0.11
+        - 0.69
+        - 0.44
+        - 0.19
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w06:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.11
+        - 0.61
+        - 0.11
+        - 0.19
+        - 0.69
+        - 0.19
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w07:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.36
+        - 0.61
+        - 0.11
+        - 0.44
+        - 0.69
+        - 0.19
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w08:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.61
+        - 0.61
+        - 0.11
+        - 0.69
+        - 0.69
+        - 0.19
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w09:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.11
+        - 0.11
+        - 0.36
+        - 0.19
+        - 0.19
+        - 0.44
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w10:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.36
+        - 0.11
+        - 0.36
+        - 0.44
+        - 0.19
+        - 0.44
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w11:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.61
+        - 0.11
+        - 0.36
+        - 0.69
+        - 0.19
+        - 0.44
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w12:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.11
+        - 0.36
+        - 0.36
+        - 0.19
+        - 0.44
+        - 0.44
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w13:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.36
+        - 0.36
+        - 0.36
+        - 0.44
+        - 0.44
+        - 0.44
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w14:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.61
+        - 0.36
+        - 0.36
+        - 0.69
+        - 0.44
+        - 0.44
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w15:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.11
+        - 0.61
+        - 0.36
+        - 0.19
+        - 0.69
+        - 0.44
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w16:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.36
+        - 0.61
+        - 0.36
+        - 0.44
+        - 0.69
+        - 0.44
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w17:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.61
+        - 0.61
+        - 0.36
+        - 0.69
+        - 0.69
+        - 0.44
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w18:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.11
+        - 0.11
+        - 0.61
+        - 0.19
+        - 0.19
+        - 0.69
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w19:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.36
+        - 0.11
+        - 0.61
+        - 0.44
+        - 0.19
+        - 0.69
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w20:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.61
+        - 0.11
+        - 0.61
+        - 0.69
+        - 0.19
+        - 0.69
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w21:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.11
+        - 0.36
+        - 0.61
+        - 0.19
+        - 0.44
+        - 0.69
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w22:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.36
+        - 0.36
+        - 0.61
+        - 0.44
+        - 0.44
+        - 0.69
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w23:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.61
+        - 0.36
+        - 0.61
+        - 0.69
+        - 0.44
+        - 0.69
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w24:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.11
+        - 0.61
+        - 0.61
+        - 0.19
+        - 0.69
+        - 0.69
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w25:
+        fraction: 0.037037
+        youngs: 200
+        block:
+        - 0.36
+        - 0.61
+        - 0.61
+        - 0.44
+        - 0.69
+        - 0.69
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+      w26:
+        fraction: 0.037038
+        youngs: 200
+        block:
+        - 0.61
+        - 0.61
+        - 0.61
+        - 0.69
+        - 0.69
+        - 0.69
+        layers:
+        - frac: 1.0
+          youngs: 200
+          material: liquid
+  mpm_particle:
+    parent: cell
+    per_parent: 35000
+    radius: 0.05
+    density: 1.0
+    vel_init: 2.5
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 16.0
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.05
+  a_max: 200
+  implementation: triton
+  polar: higham
+  polar_iters: 4
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+  vmax: 1000000000.0
+schedule:
+- aggregate
+- gravity
+- substep_dt: 0.0005142857
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  capture: true
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: dots
+  dot_size: 1.2
+  splat_res: 640
+  box_frame: true
+  fps: 60
+  hide_sets:
+  - cell
+  colors:
+    w00:
+    - 1.0
+    - 0.0
+    - 0.0
+    w01:
+    - 1.0
+    - 0.208
+    - 0.0
+    w02:
+    - 1.0
+    - 0.417
+    - 0.0
+    w03:
+    - 1.0
+    - 0.649
+    - 0.0
+    w04:
+    - 1.0
+    - 0.857
+    - 0.0
+    w05:
+    - 0.911
+    - 1.0
+    - 0.0
+    w06:
+    - 0.703
+    - 1.0
+    - 0.0
+    w07:
+    - 0.471
+    - 1.0
+    - 0.0
+    w08:
+    - 0.263
+    - 1.0
+    - 0.0
+    w09:
+    - 0.031
+    - 1.0
+    - 0.0
+    w10:
+    - 0.0
+    - 1.0
+    - 0.177
+    w11:
+    - 0.0
+    - 1.0
+    - 0.409
+    w12:
+    - 0.0
+    - 1.0
+    - 0.617
+    w13:
+    - 0.0
+    - 1.0
+    - 0.849
+    w14:
+    - 0.0
+    - 0.943
+    - 1.0
+    w15:
+    - 0.0
+    - 0.711
+    - 1.0
+    w16:
+    - 0.0
+    - 0.503
+    - 1.0
+    w17:
+    - 0.0
+    - 0.271
+    - 1.0
+    w18:
+    - 0.0
+    - 0.063
+    - 1.0
+    w19:
+    - 0.169
+    - 0.0
+    - 1.0
+    w20:
+    - 0.378
+    - 0.0
+    - 1.0
+    w21:
+    - 0.609
+    - 0.0
+    - 1.0
+    w22:
+    - 0.818
+    - 0.0
+    - 1.0
+    w23:
+    - 0.996
+    - 0.0
+    - 0.946
+    w24:
+    - 1.0
+    - 0.0
+    - 0.742
+    w25:
+    - 1.0
+    - 0.0
+    - 0.511
+    w26:
+    - 1.0
+    - 0.0
+    - 0.302
+descriptions:
+  movie_mpm_particle:
+    description: The simulation begins with a discrete set of colored hexagonal particles
+      distributed within a 3D bounding box. Over time, these particles rapidly transition
+      into a dense, continuous field of points that settle toward the bottom plane
+      of the volume. The field exhibits complex, swirling patterns and turbulent structures
+      as it evolves. Eventually, the distribution stabilizes into a layered, multi-colored
+      sheet with distinct peaks and valleys.
+    objects: The scene contains a collection of hexagonal particles that are initially
+      separated and scattered in space. These particles are rendered in a vibrant
+      spectrum of colors including magenta, cyan, green, blue, and orange. As the
+      simulation progresses, the individual hexagons merge into a massive, interconnected
+      cloud of tiny points. The final state shows a large, flat surface of points
+      with varying heights and intricate, nested color patterns.

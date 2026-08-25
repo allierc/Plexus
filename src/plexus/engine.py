@@ -1482,7 +1482,15 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             # `leave=True` because the finished bar is the record of how long the run took and how
             # many frames it got through; erasing it on completion throws that away and leaves the
             # log with no evidence the loop ran at all.
-            ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", ncols=100, leave=True)
+            # ms/FRAME IN THE BAR, not just frame/s. Every performance comparison in this repo is
+            # quoted in ms/frame -- the benchmark, the profiler, the operator docstrings -- so a bar
+            # that only shows frame/s has to be converted in the reader's head, and 1.51 frame/s
+            # against "we measured 461 ms" is a needless subtraction. tqdm's `rate` is frames per
+            # second when it is going fast and seconds per frame when it is going slow, which makes
+            # it worse: the unit silently flips mid-run.
+            ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", ncols=150, leave=True,
+                         bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} "
+                                    "[{elapsed}<{remaining}{postfix}]")
         except ImportError:
             pass
     # the tape is OFF unless the caller asked for it (see the docstring): generation pays no
@@ -1491,6 +1499,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         for tick in ticks:                           # one tick = one pass of the schedule + integrate
             if tick == 1:
                 _install_compile()                   # after tick 0 has warmed every run-constant cache
+            if progress and tick and hasattr(ticks, "set_postfix_str") and tick % 8 == 0:
+                _el = ticks.format_dict.get("elapsed") or 0.0
+                if _el > 0:
+                    ticks.set_postfix_str(f"{_el / tick * 1000:.1f} ms/frame", refresh=False)
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
             H.frame_t.fill_(float(tick))             # the same, reachable from inside a CUDA graph
             # THE MICRO-STEP COUNTER. A shared accumulator field -- the MPM grid is the one in the
