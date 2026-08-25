@@ -65,6 +65,11 @@ The four MLS-MPM operators --- \code{mpm\_strain}, \code{mpm\_scatter}, \code{mp
   bodies.
 \end{itemize}
 
+\code{paper/mpm\_warp\_code.pdf} is the companion to this note: \textbf{every line of both versions
+of all four operators}, extracted from the source at build time by
+\code{tools/mpm\_code\_appendix.py} rather than transcribed, with the line spans stamped on each
+listing. It also states plainly which two operators have no \code{warp} twin yet.
+
 They are the same mechanism and the same equations, so they sit on the \code{implementation} axis
 rather than the \code{model} axis: a spec that swaps one for the other is asserting that the biology
 did not change. That assertion is what \S6 tests.
