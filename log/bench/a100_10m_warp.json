@@ -1,0 +1,12 @@
+[
+ {
+  "particles": 9999990,
+  "substeps": 7,
+  "ms_per_frame": 778.6252377554774,
+  "ms_per_substep": 111.23217682221106,
+  "gb_per_frame": 60.47993952,
+  "gb_per_s": 77.67528791430385,
+  "peak_gib": 3.144947052001953,
+  "device": "NVIDIA A100-SXM4-80GB"
+ }
+]

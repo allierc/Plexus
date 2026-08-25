@@ -1,0 +1,314 @@
+NVIDIA A100-SXM4-80GB, 81920 MiB
+torch 2.9.0+cu130 warp 1.16.0
+### 500k impl=default --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_500k.yaml   capture=False compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+      500,013    7      581.3       83.05      5.2    0.3%      1.59
+
+  rows -> log/bench/a100_500k_default.json
+
+### 500k impl=default --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_500k.yaml   capture=True compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+      500,013    7      572.5       81.79      5.3    0.3%      1.74
+
+  rows -> log/bench/a100_500k_default_cap.json
+
+### 500k impl=warp --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_500k.yaml   capture=False compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 10126.04 ms  (compiled)
+      500,013    7       40.7        5.82     74.2    4.8%      0.22
+
+  rows -> log/bench/a100_500k_warp.json
+
+### 500k impl=warp --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_500k.yaml   capture=True compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 5.57 ms  (cached)
+      500,013    7       24.0        3.42    126.2    8.1%      0.37
+
+  rows -> log/bench/a100_500k_warp_cap.json
+
+### 1m impl=default --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_1m.yaml   capture=False compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+      999,999    7     1158.3      165.47      5.2    0.3%      3.11
+
+  rows -> log/bench/a100_1m_default.json
+
+### 1m impl=default --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_1m.yaml   capture=True compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+      999,999    7     1146.9      163.84      5.3    0.3%      3.32
+
+  rows -> log/bench/a100_1m_default_cap.json
+
+### 1m impl=warp --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_1m.yaml   capture=False compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 5.75 ms  (cached)
+      999,999    7       71.3       10.18     84.9    5.5%      0.37
+
+  rows -> log/bench/a100_1m_warp.json
+
+### 1m impl=warp --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_1m.yaml   capture=True compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 4.22 ms  (cached)
+      999,999    7       46.7        6.67    129.6    8.3%      0.58
+
+  rows -> log/bench/a100_1m_warp_cap.json
+
+### 5m impl=default --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_5m.yaml   capture=False compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+    4,999,995    7     5790.6      827.23      5.2    0.3%     15.30
+
+  rows -> log/bench/a100_5m_default.json
+
+### 5m impl=default --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_5m.yaml   capture=True compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+    4,999,995    7     5750.6      821.51      5.3    0.3%     15.98
+
+  rows -> log/bench/a100_5m_default_cap.json
+
+### 5m impl=warp --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_5m.yaml   capture=False compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 6.10 ms  (cached)
+    4,999,995    7      378.5       54.07     79.9    5.1%      1.61
+
+  rows -> log/bench/a100_5m_warp.json
+
+### 5m impl=warp --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_5m.yaml   capture=True compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 4.63 ms  (cached)
+    4,999,995    7      229.8       32.84    131.6    8.5%      2.29
+
+  rows -> log/bench/a100_5m_warp_cap.json
+
+### 10m impl=default --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_10m.yaml   capture=False compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+    9,999,990    7    11598.0     1656.86      5.2    0.3%     30.53
+
+  rows -> log/bench/a100_10m_default.json
+
+### 10m impl=default --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_10m.yaml   capture=True compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+    9,999,990    7    11519.0     1645.57      5.3    0.3%     31.80
+
+  rows -> log/bench/a100_10m_default_cap.json
+
+### 10m impl=warp --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_10m.yaml   capture=False compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 5.96 ms  (cached)
+    9,999,990    7      778.6      111.23     77.7    5.0%      3.14
+
+  rows -> log/bench/a100_10m_warp.json
+
+### 10m impl=warp --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_10m.yaml   capture=True compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 4.47 ms  (cached)
+    9,999,990    7      459.5       65.64    131.6    8.5%      4.42
+
+  rows -> log/bench/a100_10m_warp_cap.json
+
+### 20m impl=default --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_20m.yaml   capture=False compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+            0   OutOfMemoryError: CUDA out of memory. Tried to allocate 18.11 GiB. GPU
+
+### 20m impl=default --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_20m.yaml   capture=True compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+            0   OutOfMemoryError: CUDA out of memory. Tried to allocate 18.11 GiB. GPU
+
+### 20m impl=warp --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_20m.yaml   capture=False compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 5.60 ms  (cached)
+   20,000,007    7     1544.8      220.69     78.3    5.0%      6.23
+
+  rows -> log/bench/a100_20m_warp.json
+
+### 20m impl=warp --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_20m.yaml   capture=True compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 4.68 ms  (cached)
+   20,000,007    7      913.2      130.45    132.5    8.5%      8.68
+
+  rows -> log/bench/a100_20m_warp_cap.json
+
+### 100m impl=default --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_100m.yaml   capture=False compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+            0   OutOfMemoryError: CUDA out of memory. Tried to allocate 60.35 GiB. GPU
+
+### 100m impl=default --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_100m.yaml   capture=True compile=False impl=default   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+            0   OutOfMemoryError: CUDA out of memory. Tried to allocate 60.35 GiB. GPU
+
+### 100m impl=warp --nocapture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_100m.yaml   capture=False compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 6.38 ms  (cached)
+  100,000,008    7     7853.9     1121.98     77.0    5.0%     30.89
+
+  rows -> log/bench/a100_100m_warp.json
+
+### 100m impl=warp --capture
+
+  NVIDIA A100-SXM4-80GB  108 SMs  79 GiB  peak ~1555 GB/s
+  material_3d_water_bench_100m.yaml   capture=True compile=False impl=warp   torch 2.9.0+cu130   h10u28.int.janelia.org
+
+    particles  sub   ms/frame  ms/substep     GB/s  % peak  peak GiB
+  ---------------------------------------------------------------------
+Module plexus.operators.mpm_warp a1acd70 load on device 'cuda:0' took 6.86 ms  (cached)
+  100,000,008    7     4551.0      650.15    132.9    8.5%     42.81
+
+  rows -> log/bench/a100_100m_warp_cap.json
+
+### DONE
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h10u28>
+Subject: Job 153743106: <mpm_a100_sweep> in cluster <Janelia> Done
+
+Job <mpm_a100_sweep> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Tue Aug 25 13:54:36 2026
+Job was executed on host(s) <8*h10u28>, in queue <gpu_a100>, as user <allierc> in cluster <Janelia> at Tue Aug 25 13:54:36 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus> was used as the working directory.
+Started at Tue Aug 25 13:54:36 2026
+Terminated at Tue Aug 25 14:13:43 2026
+Results reported at Tue Aug 25 14:13:43 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l log/bench/a100_sweep.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   1194.71 sec.
+    Max Memory :                                 3486 MB
+    Average Memory :                             1405.68 MB
+    Total Requested Memory :                     327680.00 MB
+    Delta Memory :                               324194.00 MB
+    Max Swap :                                   -
+    Max Processes :                              6
+    Max Threads :                                55
+    Run time :                                   1147 sec.
+    Turnaround time :                            1147 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <log/bench/a100_sweep.err> for stderr output of this job.
+

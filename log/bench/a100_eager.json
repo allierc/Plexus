@@ -1,0 +1,52 @@
+[
+ {
+  "particles": 350001,
+  "substeps": 18,
+  "ms_per_frame": 1047.3197946092114,
+  "ms_per_substep": 58.184433033845075,
+  "gb_per_frame": 5.443215552,
+  "gb_per_s": 5.197281269787361,
+  "peak_gib": 1.126596450805664,
+  "device": "NVIDIA A100-SXM4-80GB"
+ },
+ {
+  "particles": 945000,
+  "substeps": 18,
+  "ms_per_frame": 2811.0092978924513,
+  "ms_per_substep": 156.16718321624728,
+  "gb_per_frame": 14.69664,
+  "gb_per_s": 5.228243112187062,
+  "peak_gib": 2.937941074371338,
+  "device": "NVIDIA A100-SXM4-80GB"
+ },
+ {
+  "particles": 1999998,
+  "substeps": 18,
+  "ms_per_frame": 5932.43718885351,
+  "ms_per_substep": 329.579843825195,
+  "gb_per_frame": 31.103968896,
+  "gb_per_s": 5.243033833454053,
+  "peak_gib": 6.153435707092285,
+  "device": "NVIDIA A100-SXM4-80GB"
+ },
+ {
+  "particles": 4999995,
+  "substeps": 18,
+  "ms_per_frame": 14815.384543244727,
+  "ms_per_substep": 823.0769190691515,
+  "gb_per_frame": 77.75992224,
+  "gb_per_s": 5.248592907799728,
+  "peak_gib": 15.294552326202393,
+  "device": "NVIDIA A100-SXM4-80GB"
+ },
+ {
+  "particles": 9999990,
+  "substeps": 18,
+  "ms_per_frame": 29699.873389396816,
+  "ms_per_substep": 1649.9929660776008,
+  "gb_per_frame": 155.51984448,
+  "gb_per_s": 5.2363807226034265,
+  "peak_gib": 30.52399492263794,
+  "device": "NVIDIA A100-SXM4-80GB"
+ }
+]
