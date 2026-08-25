@@ -811,6 +811,21 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
                 vc = getattr(parent, "_launch_v", None)
                 if vc is None or vc.shape != (parent.n, D):
                     vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcell)
+                    # `vel_init_axes: [0, 1]` -- launch in the PLANE only.
+                    #
+                    # An isotropic draw does not average to zero over a handful of cells: with 20
+                    # the sample mean of one component is ~v/sqrt(3n), and with no gravity and no
+                    # drag there is nothing to cancel it. In a run confined between plates that
+                    # small bias decides everything -- the ensemble sank 0.015 before the plates
+                    # engaged, met the lower plate first, and came out with 56% of each cell's
+                    # particles flat against its underside and 3% against its top. It reads as an
+                    # asymmetric boundary condition and is actually an asymmetric initial condition.
+                    _axes = s.get("vel_init_axes")
+                    if _axes is not None:
+                        keep = torch.zeros(D, device=device)
+                        for _a in _axes:
+                            keep[int(_a)] = 1.0
+                        vc = vc * keep
                     parent._launch_v = vc
                 state[:, vx0:vx1] = vc[parent_idx]
         occ = parent.occ[parent_idx].clone()                      # a child is live iff its parent is
