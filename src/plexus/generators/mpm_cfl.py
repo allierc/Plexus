@@ -261,6 +261,16 @@ def _body_volumes(spec, dim):
                  else (4.0 / 3.0) * math.pi * rad_default ** 3)
             out.append((sname, v, int(sv["per_parent"]), n_par))
             continue
+        # THE ENGINE'S EXACT ALLOCATION, replicated rather than approximated: engine.py:610 gives
+        # the LAST type the remainder (`total - start`) so per-type rounding never leaves cells
+        # unassigned. Applying round() to every type -- including the last -- reported `snow`
+        # absent when it in fact receives every cell the others rounded away.
+        _names = list(types)
+        _alloc, _start = {}, 0
+        for _i, _tn in enumerate(_names):
+            _k = ((n_par - _start) if _i == len(_names) - 1
+                  else int(round(float(types[_tn].get("fraction", 1.0 / len(_names))) * n_par)))
+            _alloc[_tn] = max(_k, 0); _start += _k
         for tn, t in types.items():
             b = t.get("block")
             if b:
@@ -270,8 +280,25 @@ def _body_volumes(spec, dim):
             else:
                 r = float(t.get("radius", rad_default))
                 v = math.pi * r ** 2 if dim == 2 else (4.0 / 3.0) * math.pi * r ** 3
+            # NOT scaled by `fraction`. `fraction` selects how many PARENT CELLS take this type
+            # (engine.py:610, k = round(fraction * n_cells)); every cell that does gets the FULL
+            # `per_parent` particles, and p_vol = vol/per_parent, so each body is fully dense
+            # whatever the split. Multiplying here reported 3.85 p/cell for a body that actually
+            # had 38.5, and warned about specs that were fine.
+            #
+            # A TYPE THAT ROUNDS TO ZERO CELLS IS NOT A SAMPLING PROBLEM, IT IS AN ABSENT BODY, and
+            # it gets its own warning below because it is much easier to misread: the material
+            # simply is not in the scene.
             frac = float(t.get("fraction", 1.0 / max(len(types), 1)))
-            out.append((f"{sname}/{tn}", v, int(sv["per_parent"]) * frac, n_par))
+            if _alloc.get(tn, 0) == 0 and n_par > 0:
+                warn(f"{(spec.get('general') or {}).get('name', '?')}: type {tn!r} has "
+                     f"fraction {frac} of {n_par} parent cells -> round({frac * n_par:.2f}) = ZERO "
+                     f"cells, so this material is ABSENT from the run. Fractions quantise to "
+                     f"1/{n_par} here; use a multiple of {1.0 / n_par:.3f} or raise the parent "
+                     f"count. (The LAST type absorbs whatever the others round away, so it gets "
+                     f"more cells than its fraction asks for.)")
+                continue
+            out.append((f"{sname}/{tn} x{_alloc[tn]}", v, int(sv["per_parent"]), n_par))
     return out
 
 

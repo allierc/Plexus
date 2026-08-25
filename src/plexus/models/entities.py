@@ -131,6 +131,7 @@ class MPMParticle:
         youngs_c = torch.full((parent.n,), 100.0, device=device)
         core_y = torch.zeros(parent.n, device=device); core_f = torch.zeros(parent.n, device=device)
         type_layers = {}
+        type_mat = {}
         for tid, t in enumerate(type_list):
             sel = ntp == tid
             youngs_c[sel] = float(t.get("youngs", 100.0))
@@ -142,6 +143,15 @@ class MPMParticle:
                 type_layers[tid] = [(float(L["frac"]), float(L["youngs"]), L.get("material", "elastic"),
                                      float(L.get("tau", 0.0)))                  # tau: viscoelastic relaxation time
                                     for L in layers]
+            elif t.get("material"):
+                # `material` DIRECTLY ON THE TYPE, so a uniform body does not have to be written as
+                # a one-element `layers` list. `layers` describes RADIAL STRUCTURE -- a nucleus
+                # inside a cytosol inside a membrane -- and spelling a homogeneous snow block as
+                # `layers: [{frac: 1.0, youngs: 90, material: snow}]` says "one concentric shell
+                # covering the whole body", which is a true but unreadable way to say "this block
+                # is snow". It also duplicated `youngs` at both levels, since the type-level value
+                # is the fallback the layer overrides.
+                type_mat[tid] = (t["material"], float(t.get("tau", 0.0)))
 
         # block-fill: a type FILLS an axis-aligned box (pool/cube) instead of a disc
         # around the centre. 2D block = [x0,y0,x1,y1]; 3D block = [x0,y0,z0,x1,y1,z1].
@@ -203,6 +213,9 @@ class MPMParticle:
         for _tid, (_mat, _tau) in _own_mat.items():
             if _mat and _mat != "elastic":
                 _mark(_mat, (_cnt == _tid), _tau)
+        # uniform parent types: no radial bands, the whole body is one material
+        for _tid, (_m, _tu) in type_mat.items():
+            _mark(_m, ntp[pidx] == _tid, _tu)
         if type_layers:
             rnorm = r / max(rad, 1e-9)
             nt = ntp[pidx]
