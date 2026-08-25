@@ -45,6 +45,11 @@ def main():
     ap.add_argument("--render-n", type=int, default=400_000,
                     help="particles DRAWN per frame; the run still simulates all of them")
     ap.add_argument("--stride", type=int, default=1, help="render every k-th simulation frame")
+    ap.add_argument("--capture", action="store_true",
+                    help="CUDA-graph capture the substep. OFF by default here, unlike the bench: "
+                         "capture holds every intermediate resident in a private pool, which costs "
+                         "42.81 GiB at 100M against 30.89 GiB without -- and the renderer needs the "
+                         "headroom more than the movie needs the 1.7x.")
     ap.add_argument("--fps", type=int, default=20)
     ap.add_argument("--px", type=int, default=1280)
     ap.add_argument("--dot", type=float, default=1.4)
@@ -71,6 +76,13 @@ def main():
     spec = yaml.safe_load(open(spec_path))
     spec["general"]["n_frames"] = a.frames
     spec["general"]["record_cap"] = 2                 # the recorder is switched OFF in all but name
+    # CAPTURE IS FORCED OFF unless asked. The bench specs declare `capture: true` because there it is
+    # worth 1.73x, but a captured graph allocates from a resident private pool: 42.81 GiB at 100M
+    # against 30.89 GiB eager (measured, A100). On a 47.4 GiB card that is the difference between a
+    # movie and an OutOfMemoryError in mpm_strain on the second frame.
+    for st in spec.get("schedule", []):
+        if isinstance(st, dict) and "substep_dt" in st:
+            st["capture"] = bool(a.capture)
     name = spec["general"]["name"]
     world = spec["general"].get("world", [1.0, 1.0, 1.0])
     up = int((spec.get("plotting") or {}).get("up_axis", 2))
