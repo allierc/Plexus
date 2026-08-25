@@ -178,7 +178,8 @@ def tbl_sweep(pattern, peak, label):
 # over the same storage and move nothing, so counting them would inflate the default's bill with
 # bytes it never touches.
 # ==========================================================================================================
-def trace(impl, spec_rel="config/material/material_3d_water_bench.yaml", device="cuda:1"):
+def trace(impl, spec_rel="config/material/material_3d_water_bench.yaml", device="cuda:1",
+          tag=None):
     import tempfile
 
     import torch
@@ -250,7 +251,7 @@ def trace(impl, spec_rel="config/material/material_3d_water_bench.yaml", device=
         H, _ = E.run(sim, out_path=None, device=device, progress=False)
     N = H.level("mpm_particle").n
     out = {"N": N, "impl": impl, "rows": [[list(k), rec[k]] for k in order]}
-    dst = f"/tmp/trace_ops_{impl}.json"
+    dst = f"/tmp/trace_ops_{tag or impl}.json"
     json.dump(out, open(dst, "w"))
     tot = per_op_totals(out)
     print(f"\n  {impl:<8} N={N:,}   " + "   ".join(
