@@ -39,6 +39,30 @@ except Exception:
     HAVE_WARP = False
 
 
+def _wp_launch(kernel, dim, dev, inputs):
+    """`wp.launch` ON PYTORCH'S CURRENT STREAM.
+
+    THIS IS NOT A DETAIL. Warp launches on its OWN default stream for the device unless told
+    otherwise, and PyTorch captures a CUDA graph on ITS current stream. Launched on a different
+    stream, the warp kernels are simply NOT RECORDED into the graph: they run once, eagerly, while
+    the capture is being taken, and never again on any replay. The visible symptom is a simulation
+    that advances exactly one frame and then freezes -- `material_3d_ball_drop` sat at its seeded
+    mean height for all 640 frames, with the engine cheerfully reporting "substep captured as a
+    CUDA graph (4 operators, 21 replays/frame)".
+
+    Nothing caught it because `tools/mpm_warp_gate.py` sets `capture: false` on every spec it runs,
+    so the captured warp path had never once been compared against anything.
+    """
+    import torch as _t
+    # `sync_enter=False`: ScopedStream's default is to make the new stream WAIT on the old one via
+    # an event, and recording a cross-stream wait is itself illegal inside a capture -- it turned
+    # the silent freeze into `cudaErrorStreamCaptureInvalidated`. There is nothing to synchronise
+    # anyway: we are asking warp to launch on the very stream torch is already using.
+    with wp.ScopedStream(wp.stream_from_torch(_t.cuda.current_stream(dev)),
+                         sync_enter=False, sync_exit=False):
+        wp.launch(kernel, dim=dim, device=f"cuda:{dev.index or 0}", inputs=inputs)
+
+
 if HAVE_WARP:
 
     @wp.func
@@ -58,7 +82,7 @@ if HAVE_WARP:
         return R
 
     @wp.kernel
-    def p2g_atomic(X: wp.array(dtype=wp.vec3), V: wp.array(dtype=wp.vec3),
+    def p2g_atomic(STATE: wp.array2d(dtype=float), pa: int, va: int,
                    C: wp.array(dtype=wp.mat33), F: wp.array(dtype=wp.mat33),
                    MASS: wp.array(dtype=float), MU: wp.array(dtype=float),
                    LA: wp.array(dtype=float), PVOL: wp.array(dtype=float),
@@ -68,8 +92,13 @@ if HAVE_WARP:
         p = wp.tid()
         inv_dx = 1.0 / dx
 
-        x = X[p]
-        v = V[p] + dt * (AEXT[p] - drag * V[p])     # body force + Stokes drag, as the torch op does
+        # READ STRAIGHT OUT OF `p.state`. `p.get("pos")` is a NON-CONTIGUOUS column slice, so
+        # `.contiguous()` allocated a fresh temporary on every call -- see the note on
+        # MPMScatterWarp.forward for why that was fatal under CUDA-graph capture. Indexing the
+        # state here costs nothing and removes 2 x N x 3 x 4 B of copy traffic per substep.
+        x = wp.vec3(STATE[p, pa + 0], STATE[p, pa + 1], STATE[p, pa + 2])
+        v0 = wp.vec3(STATE[p, va + 0], STATE[p, va + 1], STATE[p, va + 2])
+        v = v0 + dt * (AEXT[p] - drag * v0)         # body force + Stokes drag, as the torch op does
         mass = MASS[p]
         Fp = F[p]
         Cp = C[p]
@@ -148,7 +177,9 @@ class MPMScatterWarp(MPMScatter):
             raise RuntimeError(f"mpm_scatter[warp] is 3D CUDA only (got dim={D}, dev={dev})")
         dt = sub_dt(H, self.dt_sub)
 
-        X, V = p.get("pos").contiguous(), p.get("vel").contiguous()
+        # NOT `pa`/`va`: `pa` is rebound to H.part_accel eleven lines down, which silently turned
+        # the pos column offset into a tensor.
+        p_off, _ = p.state_schema["pos"]; v_off, _ = p.state_schema["vel"]
         pn = getattr(p, "parent_name", None)
         if pn is not None:
             ac = torch.nan_to_num(H.delta(pn), posinf=self.a_max, neginf=-self.a_max
@@ -170,9 +201,9 @@ class MPMScatterWarp(MPMScatter):
         # capture guard depends on is preserved.
         wdev = f"cuda:{dev.index or 0}"
         n = int(p.n)
-        wp.launch(
-            p2g_atomic, dim=n, device=wdev,
-            inputs=[wp.from_torch(X, dtype=wp.vec3), wp.from_torch(V, dtype=wp.vec3),
+        _wp_launch(
+            p2g_atomic, n, dev,
+            [wp.from_torch(p.state), int(p_off), int(v_off),
                     wp.from_torch(p.C.contiguous(), dtype=wp.mat33),
                     wp.from_torch(p.F.contiguous(), dtype=wp.mat33),
                     wp.from_torch(p.mass.contiguous()), wp.from_torch(p.mu.contiguous()),
@@ -196,7 +227,7 @@ class MPMScatterWarp(MPMScatter):
 if HAVE_WARP:
 
     @wp.kernel
-    def g2p(X: wp.array(dtype=wp.vec3), STATE: wp.array2d(dtype=float),
+    def g2p(STATE: wp.array2d(dtype=float),
             C: wp.array(dtype=wp.mat33), GV: wp.array(dtype=wp.vec3),
             OCC: wp.array(dtype=float), LIQ: wp.array(dtype=float),
             pa: int, va: int, ngx: int, ngy: int, ngz: int, dx: float, dt: float,
@@ -204,7 +235,7 @@ if HAVE_WARP:
             bx: float, by: float, bz: float, has_liq: int):
         p = wp.tid()
         inv_dx = 1.0 / dx
-        x = X[p]
+        x = wp.vec3(STATE[p, pa + 0], STATE[p, pa + 1], STATE[p, pa + 2])   # no copy; see p2g
         base = wp.vec3(wp.floor(x[0] * inv_dx - 0.5),
                        wp.floor(x[1] * inv_dx - 0.5),
                        wp.floor(x[2] * inv_dx - 0.5))
@@ -305,12 +336,11 @@ class MPMGatherWarp(MPMGather):
                 else torch.zeros(p.n, device=dev))
         vmax = min(self.vmax, 0.4 * float(g.dx) / float(dt))
         wdev = f"cuda:{dev.index or 0}"
-        wp.launch(g2p, dim=int(p.n), device=wdev,
-                  inputs=[wp.from_torch(p.get("pos").contiguous(), dtype=wp.vec3),
-                          wp.from_torch(p.state),
+        _wp_launch(g2p, int(p.n), dev,
+                  [wp.from_torch(p.state),
                           wp.from_torch(p.C, dtype=wp.mat33),
-                          wp.from_torch(g.v.view(-1, 3).contiguous(), dtype=wp.vec3),
-                          wp.from_torch(occ.contiguous()), wp.from_torch(liqf),
+                          wp.from_torch(g.v.view(-1, 3), dtype=wp.vec3),
+                          wp.from_torch(occ), wp.from_torch(liqf),
                           int(pa), int(va), int(g.shape[0]), int(g.shape[1]), int(g.shape[2]),
                           float(g.dx), float(dt),
                           float(self.wall_damp), float(self.wall_contact), float(vmax),
@@ -326,14 +356,26 @@ class MPMGatherWarp(MPMGather):
 # `mpm_grid_update` is O(cells), so the grid solve's cost is FLAT as the particle count grows and
 # this one's is not.
 #
-# ELASTIC AND LIQUID ONLY, AND IT SAYS SO. The default body has two more branches -- viscoelastic
-# and snow -- and both need a 3x3 SVD. Warp has `wp.svd3`, so they are portable in principle, but
-# torch returns singular values DESCENDING and `wp.svd3` makes no such guarantee, while the snow
-# branch's proper-rotation sign fix indexes the LAST singular value specifically. Porting that on
-# an unverified ordering assumption is how a sign error gets into a material model and is not caught
-# for months, because snow still looks like snow. So this implementation refuses a set that carries
-# visco or snow particles rather than guessing, and those specs keep `default`. Elastic and liquid
-# are what every benchmark spec and most of `config/material` actually use.
+# ALL FOUR BRANCHES: elastic, liquid, viscoelastic, snow. The last two need a 3x3 SVD and were
+# refused at first, on the grounds that torch returns singular values DESCENDING while `wp.svd3`
+# made no such promise -- and the snow branch's proper-rotation fix indexes the LAST singular value
+# specifically, so the order changes the answer. MEASURED over 20,000 deformation-gradient-like
+# matrices rather than assumed:
+#
+#   sigma descending          100.0% of cases          -- matches torch
+#   det(U), det(V)            +1.000 ALWAYS            -- torch gives +-1
+#   |sigma| vs torch          1.9e-06 near identity, 1.0e-04 on pathological input
+#
+# The second row is the surprise and it makes the port SIMPLER than the default, not riskier:
+# `wp.svd3` already returns proper rotations with a SIGNED sigma, which is exactly the state the
+# default reaches by hand through `negU`/`negV`. Reconstruction error is larger than torch's
+# (6.2e-03 worst case against 4.9e-06) but that lives in U and V -- a valid alternative
+# factorisation where sigma are near-degenerate -- and the material branches use only sigma, which
+# agrees to 1.9e-06 in the regime snow occupies (|F - I| < 0.05, since snow clamps sigma into a
+# window 0.0325 wide).
+#
+# TWO KERNELS, NOT ONE WITH FLAGS. `strain_elastic` is the common path and carrying the SVD in it
+# would cost register pressure on every spec to serve the two that need it.
 # ==========================================================================================================
 if HAVE_WARP:
 
@@ -356,14 +398,57 @@ if HAVE_WARP:
         F[p] = Fp
 
 
+    @wp.kernel
+    def strain_full(C: wp.array(dtype=wp.mat33), F: wp.array(dtype=wp.mat33),
+                    LIQ: wp.array(dtype=float), VIS: wp.array(dtype=float),
+                    SNW: wp.array(dtype=float), TAU: wp.array(dtype=float),
+                    JP: wp.array(dtype=float), OCC: wp.array(dtype=float),
+                    dt: float, has_liq: int, has_vis: int, has_snw: int):
+        p = wp.tid()
+        if OCC[p] <= 0.0:
+            return
+        I3 = wp.identity(n=3, dtype=float)
+        Fp = (I3 + dt * C[p]) * F[p]
+
+        if has_liq == 1 and LIQ[p] > 0.0:                     # LIQUID: drop shape memory
+            Jl = wp.pow(wp.max(wp.determinant(Fp), 1.0e-6), 1.0 / 3.0)
+            Fp = I3 * Jl
+
+        if has_vis == 1 and VIS[p] > 0.0:                     # VISCOELASTIC: partial shape reset
+            U = wp.mat33(); sg = wp.vec3(); V = wp.mat33()
+            wp.svd3(Fp, U, sg, V)
+            Jl = wp.pow(wp.max(sg[0] * sg[1] * sg[2], 1.0e-6), 1.0 / 3.0)
+            a = wp.exp(-dt / wp.max(TAU[p], 1.0e-6))          # memory kept: a->1 elastic, a->0 liquid
+            sg = wp.vec3(Jl + (sg[0] - Jl) * a, Jl + (sg[1] - Jl) * a, Jl + (sg[2] - Jl) * a)
+            Fp = (U * wp.diag(sg)) * wp.transpose(V)
+
+        if has_snw == 1 and SNW[p] > 0.0:                     # SNOW: clamp stretches, harden via Jp
+            U = wp.mat33(); sg = wp.vec3(); V = wp.mat33()
+            # NO SIGN FIX NEEDED. The default computes one because torch can return det(U) = -1;
+            # `wp.svd3` returns proper rotations already, with the sign carried in sigma -- the same
+            # state, reached by the library instead of by hand.
+            wp.svd3(Fp, U, sg, V)
+            lo = 1.0 - 2.5e-2
+            hi = 1.0 + 7.5e-3
+            sc = wp.vec3(wp.clamp(sg[0], lo, hi), wp.clamp(sg[1], lo, hi), wp.clamp(sg[2], lo, hi))
+            Fp = (U * wp.diag(sc)) * wp.transpose(V)
+            ratio = (sg[0] * sg[1] * sg[2]) / wp.max(sc[0] * sc[1] * sc[2], 1.0e-6)
+            JP[p] = wp.clamp(JP[p] * ratio, 0.6, 20.0)
+
+        F[p] = Fp
+
+
 @register_operator("mpm_strain", implementation="warp", family="mpm",
                    set="particle", kind="lateral")
 class MPMStrainWarp(MPMStrain):
     """The deformation-gradient update as one Warp kernel. Elastic + liquid; see the module note."""
 
-    MECHANISM_TAGS = ["elastic_strain", "incompressible_volume", "fused_kernel"]
+    MECHANISM_TAGS = ["elastic_strain", "plastic_flow", "incompressible_volume", "fused_kernel"]
     SUPPORTED_DIMS = [3]
     DIFFERENTIABLE = False
+    # Tells the engine's capture-refusal list that this implementation's snow/viscoelastic branches
+    # are NOT the uncapturable cuSOLVER-plus-boolean-mask pair the default's are.
+    CAPTURABLE_MATERIAL_BRANCHES = True
 
     def forward(self, H, mask=None):
         if not HAVE_WARP:
@@ -380,23 +465,31 @@ class MPMStrainWarp(MPMStrain):
         # viscoelastic is fixed at seeding. `_const_any` is the codebase's existing answer to
         # exactly this and is what the default bodies use.
         from plexus.operators.mpm_ops import _const_any
-        for nm in ("is_visco", "is_snow"):
-            if _const_any(self, "_c_" + nm, getattr(p, nm, None)):
-                raise RuntimeError(
-                    f"mpm_strain[warp] does not implement the {nm[3:]} branch (it needs a 3x3 SVD "
-                    f"whose singular-value ordering differs from torch's); set "
-                    f"`implementation: default` on mpm_strain for this spec")
+        has_vis = _const_any(self, "_c_is_visco", getattr(p, "is_visco", None))
+        has_snw = _const_any(self, "_c_is_snow", getattr(p, "is_snow", None))
         dt = sub_dt(H, self.dt_sub)
         liq = getattr(p, "is_liquid", None)
         has_liq = 1 if liq is not None else 0
-        if getattr(self, "_side", None) is None:      # run-constant; built once, not per substep
-            self._side = (liq.float().contiguous() if liq is not None
-                          else torch.zeros(p.n, device=dev),
+        if getattr(self, "_side", None) is None:      # ALL run-constant; built once, not per substep
+            z = torch.zeros(p.n, device=dev)
+            def _f(t):
+                return t.float().contiguous() if t is not None else z
+            self._side = (_f(liq), _f(getattr(p, "is_visco", None)), _f(getattr(p, "is_snow", None)),
+                          (p.visco_tau.contiguous() if getattr(p, "visco_tau", None) is not None
+                           else torch.ones(p.n, device=dev)),
                           torch.ones(p.n, device=dev) if getattr(p, "occ", None) is None else None)
-        liqf = self._side[0]
-        occ = self._side[1] if self._side[1] is not None else p.occ.contiguous()
-        wp.launch(strain_elastic, dim=int(p.n), device=f"cuda:{dev.index or 0}",
-                  inputs=[wp.from_torch(p.C, dtype=wp.mat33), wp.from_torch(p.F, dtype=wp.mat33),
-                          wp.from_torch(liqf), wp.from_torch(occ),
-                          float(dt), int(has_liq)])
+        liqf, visf, snwf, tau, occ1 = self._side
+        occ = occ1 if occ1 is not None else p.occ.contiguous()
+        wdev = f"cuda:{dev.index or 0}"
+        if not (has_vis or has_snw):                  # the common path, no SVD in the kernel at all
+            _wp_launch(strain_elastic, int(p.n), dev,
+                      [wp.from_torch(p.C, dtype=wp.mat33), wp.from_torch(p.F, dtype=wp.mat33),
+                              wp.from_torch(liqf), wp.from_torch(occ), float(dt), int(has_liq)])
+        else:
+            _wp_launch(strain_full, int(p.n), dev,
+                      [wp.from_torch(p.C, dtype=wp.mat33), wp.from_torch(p.F, dtype=wp.mat33),
+                              wp.from_torch(liqf), wp.from_torch(visf), wp.from_torch(snwf),
+                              wp.from_torch(tau), wp.from_torch(p.Jp.contiguous()),
+                              wp.from_torch(occ), float(dt), int(has_liq),
+                              int(bool(has_vis)), int(bool(has_snw))])
         return {}

@@ -927,12 +927,22 @@ def _capture_refusals(sim: Spec, H, step: dict, inst: list) -> list[str]:
             why.append(f"{nm} at {getattr(ob, 'at', '?')} uses polar={getattr(ob, 'polar', 'svd')!r}; "
                        f"torch.linalg.svd is a cuSOLVER call and cannot be captured -- "
                        f"set `polar: higham` on it")
-    for name, lvl in H.levels.items():
-        for attr, label in (("is_snow", "snow"), ("is_visco", "viscoelastic")):
-            t = getattr(lvl, attr, None)
-            if t is not None and bool(t.any()):
-                why.append(f"set {name!r} contains {label} particles; that branch of mpm_strain is "
-                           f"SVD plus boolean-mask indexing and is uncapturable")
+    # SNOW AND VISCOELASTIC ARE A PROPERTY OF THE IMPLEMENTATION, NOT OF THE MATERIAL. The default
+    # `mpm_strain` reaches those branches through `torch.linalg.svd` (cuSOLVER) and `F[sm] = ...`
+    # (boolean-mask indexing, hence `nonzero`, hence a sync) -- neither capturable. An
+    # implementation that does the same maths with `wp.svd3` and per-thread branches has neither,
+    # and says so with `CAPTURABLE_MATERIAL_BRANCHES`. Keyed on the material alone, this refused
+    # capture for every snow spec no matter who was computing the strain.
+    _strain_ok = any(getattr(ob, "CAPTURABLE_MATERIAL_BRANCHES", False)
+                     for nm, ob, _s, _g in inst if nm in toks and nm == "mpm_strain")
+    if not _strain_ok:
+        for name, lvl in H.levels.items():
+            for attr, label in (("is_snow", "snow"), ("is_visco", "viscoelastic")):
+                t = getattr(lvl, attr, None)
+                if t is not None and bool(t.any()):
+                    why.append(f"set {name!r} contains {label} particles; that branch of "
+                               f"mpm_strain is SVD plus boolean-mask indexing and is uncapturable "
+                               f"-- `implementation: warp` on mpm_strain removes this")
     if getattr(H, "emit_order", None):
         why.append(f"engine-integrated sets {list(H.emit_order)} -- `_integrate` rebinds lvl.state "
                    f"every tick, so a captured graph would read a stale buffer")

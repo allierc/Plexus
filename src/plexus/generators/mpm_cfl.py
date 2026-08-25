@@ -76,6 +76,21 @@ def _max_wave_speed(spec, rho_default=1.0) -> float:
     return cmax
 
 
+def _snap_to_frame(dt_target: float, dt_frame: float) -> float:
+    """The largest step <= `dt_target` that divides `dt_frame` EXACTLY.
+
+    Both constraints at once, which is the point. `dt_frame / round(dt_frame/dt_target)` divides
+    exactly but can land ABOVE the stability limit -- on material_3d_multimaterial it suggested
+    1.231e-04 against a CFL limit of 1.226e-04, i.e. it recommended an unstable step in order to
+    fix a clock error. Taking the CEILING of the substep count instead can only make the step
+    smaller, so the result is stable by construction and exact by construction.
+    """
+    if not dt_frame or dt_target <= 0.0:
+        return dt_target
+    n = max(1, int(math.ceil(dt_frame / dt_target - 1e-9)))
+    return dt_frame / n
+
+
 def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     """Check (and, if needed, correct in place) the grid-dt CFL of an MPM spec.
 
@@ -126,12 +141,13 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     if _dtf:
         _n = max(1, round(_dtf / micro_dt))
         _err = abs(_n * micro_dt - _dtf) / _dtf
-        if _err > 1e-6:
-            warn(f"{spec.get('general', {}).get('name', yaml_path)}: {token}={micro_dt:.3e} does "
-                 f"not divide general.dt={_dtf:.3e} -- {_n} substeps advance "
-                 f"{_n * micro_dt:.4e}, i.e. {_err * 100:.1f}% {'more' if _n * micro_dt > _dtf else 'less'} "
-                 f"simulated time per frame than the spec declares. Use "
-                 f"{token}={_dtf / _n:.3e} for exactly {_n} substeps.")
+        # 1e-5, NOT 1e-6, AND SIX DIGITS ON THE WAY OUT. The corrected value is written back as a
+        # decimal literal, so it cannot divide `general.dt` to infinite precision; at four
+        # significant figures the residual was 1.2e-05 and this branch re-fired on its own output
+        # every single run. Six digits bound the round-off at ~5e-07, comfortably inside a 1e-05
+        # gate -- which is still 0.001% of a frame, three orders below the 6.7% error that first
+        # motivated this check.
+        _divide_fix = _snap_to_frame(micro_dt, _dtf) if _err > 1e-5 else None
 
     # --- the stability limit (same physics either form) ------------------------ #
     dx = 1.0 / n_grid                            # grid CELL SIZE (world is unit-width)
@@ -144,6 +160,22 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     name = spec.get("general", {}).get("name", yaml_path)
     # Already stable? Leave it. The 1% slack makes this IDEMPOTENT: it absorbs the 3-sig-fig
     # rounding of a value WE wrote last run, so a corrected spec is not re-bumped every generate.
+    # THE CLOCK FIX IS APPLIED, NOT ANNOUNCED. This used to `warn(...)` and leave the spec alone,
+    # so every run re-printed a complaint about a value this function had itself written on the
+    # previous run -- and the frame advanced by the wrong amount the whole time. Snapping to a step
+    # that divides `general.dt` can only SHRINK it, so it cannot break the stability bound below.
+    if _dtf and _divide_fix is not None:
+        _n_new = max(1, round(_dtf / _divide_fix))
+        print(f"[grid-CFL] {name if 'name' in dir() else spec.get('general', {}).get('name', yaml_path)}: "
+              f"{token}={micro_dt:.3e} did not divide general.dt={_dtf:.3e} "
+              f"({_err * 100:.1f}% of a frame lost per frame); corrected -> {_divide_fix:.4e} "
+              f"for exactly {_n_new} substeps.", flush=True)
+        micro_dt = _divide_fix
+        if write:
+            text = re.sub(rf"(\b{token}:\s*)[0-9.eE+\-]+",
+                          lambda m: f"{m.group(1)}{_divide_fix:.6e}", text, count=1)
+            open(yaml_path, "w").write(text)
+
     if micro_dt <= dt_cfl * 1.01:
         # STABLE -- and now it SAYS BY HOW MUCH. This branch was silent, so a spec running four
         # times more substeps than stability requires looked exactly like one running at the
@@ -168,16 +200,21 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     # oracle: per-frame time = substeps*dt_sub, so raise substeps as dt_sub falls (new_sub).
     # decomposed: per-frame time = general.dt (fixed) and substeps = round(general.dt/substep_dt)
     #             is implicit, so shrinking substep_dt raises the count automatically -> no rewrite.
+    # DECOMPOSED FORM: snap to a step that also divides general.dt, so this correction does not
+    # itself create the clock error the block above then has to repair on the next run.
+    dt_new = dt_cfl if substeps is not None else _snap_to_frame(dt_cfl, _dtf)
     new_sub = int(math.ceil(substeps * micro_dt / dt_cfl)) if substeps is not None else None
-    info = {"name": name, "cmax": cmax, "token": token, "dt_old": micro_dt, "dt_new": dt_cfl,
+    info = {"name": name, "cmax": cmax, "token": token, "dt_old": micro_dt, "dt_new": dt_new,
             "sub_old": substeps, "sub_new": new_sub}
-    sub_note = f", substeps {substeps}->{new_sub}" if new_sub is not None else " (substeps auto = round(dt/substep_dt))"
+    sub_note = (f", substeps {substeps}->{new_sub}" if new_sub is not None
+                else f" ({round(_dtf / dt_new)} substeps, dividing general.dt exactly)" if _dtf
+                else " (substeps auto = round(dt/substep_dt))")
     print(f"[grid-CFL] {name}: {token}={micro_dt:.2e} > limit {dt_cfl:.2e} "
           f"(c_max={cmax:.1f}, dx={dx:.2e}, cfl={cfl}); correcting spec -> "
-          f"{token}={dt_cfl:.3e}{sub_note} (per-frame time preserved).", flush=True)
+          f"{token}={dt_new:.4e}{sub_note} (per-frame time preserved).", flush=True)
     if write:
         # Rewrite ONLY the relevant token(s) in the raw text (regex, count=1) so comments/layout survive.
-        text = re.sub(rf"(\b{token}:\s*)[0-9.eE+\-]+", lambda m: f"{m.group(1)}{dt_cfl:.3e}", text, count=1)
+        text = re.sub(rf"(\b{token}:\s*)[0-9.eE+\-]+", lambda m: f"{m.group(1)}{dt_new:.6e}", text, count=1)
         if new_sub is not None:                  # oracle form only: also bump the explicit substeps
             text = re.sub(r"(\bsubsteps:\s*)\d+", lambda m: f"{m.group(1)}{new_sub}", text, count=1)
         open(yaml_path, "w").write(text)
