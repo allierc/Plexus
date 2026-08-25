@@ -49,6 +49,7 @@ operators:
 - at: mpm_grid
   op: mpm_grid_update
   wall_damp: 0.9
+  surface_tension: 60.0
 - at: mpm_particle
   from: mpm_grid
   implementation: warp

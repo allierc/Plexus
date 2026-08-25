@@ -91,7 +91,7 @@ def _final(H):
     return out
 
 
-def run(spec_name, impl, frames, warmup, device, seed=0):
+def run(spec_name, impl, frames, warmup, device, seed=0, capture=False):
     import torch
     import yaml
 
@@ -118,7 +118,13 @@ def run(spec_name, impl, frames, warmup, device, seed=0):
                 o["polar"] = "higham"
     for st in spec.get("schedule", []):
         if isinstance(st, dict) and "substep_dt" in st:
-            st["capture"] = False                     # capture is orthogonal; keep the gate on the ops
+            # CAPTURE IS *NOT* ORTHOGONAL, and pinning it False here is what let a broken captured
+            # path ship. Warp launches on its own stream unless told otherwise, so under capture its
+            # kernels were never recorded into the graph: they ran once during the capture and never
+            # on any replay, and `material_3d_ball_drop` sat frozen for 640 frames while the engine
+            # reported a successful capture. The gate compared only the eager path and saw nothing.
+            # It is now an AXIS: `--capture` runs the warp side captured, against an eager default.
+            st["capture"] = bool(capture) and impl != "default"
             st.pop("compile", None)
     spec["general"]["n_frames"] = frames + warmup
     spec["general"]["record_cap"] = 2
@@ -190,6 +196,9 @@ def main():
     ap.add_argument("--warmup", type=int, default=3)
     ap.add_argument("--device", default="cuda:1")
     ap.add_argument("--json", default="/tmp/mpm_warp_gate.json")
+    ap.add_argument("--capture", action="store_true",
+                    help="CUDA-graph-capture the WARP side (the default side stays eager), so the "
+                         "captured path is compared against the reference too")
     ap.add_argument("--only", default=None, help="comma-separated spec names, for a re-run")
     a = ap.parse_args()
 
@@ -198,7 +207,8 @@ def main():
     names = a.only.split(",") if a.only else (SPECS_3D + SPECS_2D)
 
     print(f"\n  {torch.cuda.get_device_properties(a.device).name}   "
-          f"{a.frames} timed frames after {a.warmup} warm-up, capture off, polar=higham both sides")
+          f"{a.frames} timed frames after {a.warmup} warm-up, "
+          f"warp capture={'ON' if a.capture else 'off'}, polar=higham both sides")
     print(f"\n  {'spec':<32}{'dim':>4}{'particles':>10}{'default':>10}{'warp':>10}{'x':>6}"
           f"{'max|dpos|':>11}{'d_mass':>9}{'d_com':>9}{'d_KE':>9}  verdict")
     print("  " + "-" * 128)
@@ -222,7 +232,8 @@ def main():
         got = {}
         for impl in ("warp", "default"):
             try:
-                got[impl] = run(nm, impl, a.frames, a.warmup, a.device)
+                got[impl] = run(nm, impl, a.frames, a.warmup, a.device,
+                                capture=a.capture)
                 row[f"ms_{impl}"] = got[impl]["ms"]
                 row[f"gib_{impl}"] = got[impl]["gib"]
                 row["n"] = got[impl]["n"]

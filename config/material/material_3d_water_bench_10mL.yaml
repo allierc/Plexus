@@ -1,15 +1,13 @@
 descriptions:
   movie_mpm_particle:
-    description:
-      The simulation begins with a set of discrete, well-separated colored
+    description: The simulation begins with a set of discrete, well-separated colored
       clusters of particles within a 3D bounding box. Over time, these clusters begin
       to expand and migrate toward the center and bottom of the volume. As the simulation
       progresses, the clusters merge and deform into large, continuous, and interconnected
       fluid-like structures. In the final frames, the particles settle into a dense,
       layered distribution across the bottom of the container with some vertical plumes
       remaining.
-    objects:
-      The scene contains multiple distinct clusters of particles, each assigned
+    objects: The scene contains multiple distinct clusters of particles, each assigned
       a unique primary color such as magenta, blue, green, and yellow. Initially,
       these objects are small, compact, and spatially isolated from one another in
       a grid-like arrangement. As time passes, the objects grow in size and lose their
@@ -29,36 +27,37 @@ general:
   record_cap: 4
   seed: 0
   world:
-    - 1.0
-    - 1.0
-    - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
 operators:
-  - at: cell
-    op: aggregate
-  - at: cell
-    g: 16.0
-    op: gravity
-  - at: mpm_particle
-    op: mpm_strain
-    implementation: warp
-  - a_max: 200
-    at: mpm_particle
-    drag: 0.05
-    implementation: warp
-    op: mpm_scatter
-    polar: higham
-    polar_iters: 4
-    to: mpm_grid
-  - at: mpm_grid
-    op: mpm_grid_update
-    wall_damp: 0.9
-  - at: mpm_particle
-    from: mpm_grid
-    implementation: warp
-    op: mpm_gather
-    vmax: 1000000000.0
-    wall_contact: 0.04
-    wall_damp: 1.0
+- at: cell
+  op: aggregate
+- at: cell
+  g: 16.0
+  op: gravity
+- at: mpm_particle
+  op: mpm_strain
+  implementation: warp
+- a_max: 200
+  at: mpm_particle
+  drag: 0.05
+  implementation: warp
+  op: mpm_scatter
+  polar: higham
+  polar_iters: 4
+  to: mpm_grid
+- at: mpm_grid
+  op: mpm_grid_update
+  wall_damp: 0.9
+  surface_tension: 60.0
+- at: mpm_particle
+  from: mpm_grid
+  implementation: warp
+  op: mpm_gather
+  vmax: 1000000000.0
+  wall_contact: 0.04
+  wall_damp: 1.0
 plotting:
   background: black
   box_frame: true
@@ -67,511 +66,511 @@ plotting:
   camera_zoom: 0.0
   colors:
     w00:
-      - 1.0
-      - 0.0
-      - 0.0
+    - 1.0
+    - 0.0
+    - 0.0
     w01:
-      - 1.0
-      - 0.208
-      - 0.0
+    - 1.0
+    - 0.208
+    - 0.0
     w02:
-      - 1.0
-      - 0.417
-      - 0.0
+    - 1.0
+    - 0.417
+    - 0.0
     w03:
-      - 1.0
-      - 0.649
-      - 0.0
+    - 1.0
+    - 0.649
+    - 0.0
     w04:
-      - 1.0
-      - 0.857
-      - 0.0
+    - 1.0
+    - 0.857
+    - 0.0
     w05:
-      - 0.911
-      - 1.0
-      - 0.0
+    - 0.911
+    - 1.0
+    - 0.0
     w06:
-      - 0.703
-      - 1.0
-      - 0.0
+    - 0.703
+    - 1.0
+    - 0.0
     w07:
-      - 0.471
-      - 1.0
-      - 0.0
+    - 0.471
+    - 1.0
+    - 0.0
     w08:
-      - 0.263
-      - 1.0
-      - 0.0
+    - 0.263
+    - 1.0
+    - 0.0
     w09:
-      - 0.031
-      - 1.0
-      - 0.0
+    - 0.031
+    - 1.0
+    - 0.0
     w10:
-      - 0.0
-      - 1.0
-      - 0.177
+    - 0.0
+    - 1.0
+    - 0.177
     w11:
-      - 0.0
-      - 1.0
-      - 0.409
+    - 0.0
+    - 1.0
+    - 0.409
     w12:
-      - 0.0
-      - 1.0
-      - 0.617
+    - 0.0
+    - 1.0
+    - 0.617
     w13:
-      - 0.0
-      - 1.0
-      - 0.849
+    - 0.0
+    - 1.0
+    - 0.849
     w14:
-      - 0.0
-      - 0.943
-      - 1.0
+    - 0.0
+    - 0.943
+    - 1.0
     w15:
-      - 0.0
-      - 0.711
-      - 1.0
+    - 0.0
+    - 0.711
+    - 1.0
     w16:
-      - 0.0
-      - 0.503
-      - 1.0
+    - 0.0
+    - 0.503
+    - 1.0
     w17:
-      - 0.0
-      - 0.271
-      - 1.0
+    - 0.0
+    - 0.271
+    - 1.0
     w18:
-      - 0.0
-      - 0.063
-      - 1.0
+    - 0.0
+    - 0.063
+    - 1.0
     w19:
-      - 0.169
-      - 0.0
-      - 1.0
+    - 0.169
+    - 0.0
+    - 1.0
     w20:
-      - 0.378
-      - 0.0
-      - 1.0
+    - 0.378
+    - 0.0
+    - 1.0
     w21:
-      - 0.609
-      - 0.0
-      - 1.0
+    - 0.609
+    - 0.0
+    - 1.0
     w22:
-      - 0.818
-      - 0.0
-      - 1.0
+    - 0.818
+    - 0.0
+    - 1.0
     w23:
-      - 0.996
-      - 0.0
-      - 0.946
+    - 0.996
+    - 0.0
+    - 0.946
     w24:
-      - 1.0
-      - 0.0
-      - 0.742
+    - 1.0
+    - 0.0
+    - 0.742
     w25:
-      - 1.0
-      - 0.0
-      - 0.511
+    - 1.0
+    - 0.0
+    - 0.511
     w26:
-      - 1.0
-      - 0.0
-      - 0.302
+    - 1.0
+    - 0.0
+    - 0.302
   dot_size: 1.2
   fps: 60
   hide_sets:
-    - cell
+  - cell
   render_3d: dots
   splat_res: 640
   up_axis: 1
 schedule:
-  - aggregate
-  - gravity
-  - capture: false
-    steps:
-      - mpm_strain
-      - mpm_scatter
-      - mpm_grid_update
-      - mpm_gather
-    substep_dt: 2.795e-04
+- aggregate
+- gravity
+- capture: false
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  substep_dt: 0.0002795
 sets:
   cell:
     n: 27
     types:
       w00:
         block:
-          - 0.11
-          - 0.11
-          - 0.11
-          - 0.19
-          - 0.19
-          - 0.19
+        - 0.11
+        - 0.11
+        - 0.11
+        - 0.19
+        - 0.19
+        - 0.19
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w01:
         block:
-          - 0.36
-          - 0.11
-          - 0.11
-          - 0.44
-          - 0.19
-          - 0.19
+        - 0.36
+        - 0.11
+        - 0.11
+        - 0.44
+        - 0.19
+        - 0.19
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w02:
         block:
-          - 0.61
-          - 0.11
-          - 0.11
-          - 0.69
-          - 0.19
-          - 0.19
+        - 0.61
+        - 0.11
+        - 0.11
+        - 0.69
+        - 0.19
+        - 0.19
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w03:
         block:
-          - 0.11
-          - 0.36
-          - 0.11
-          - 0.19
-          - 0.44
-          - 0.19
+        - 0.11
+        - 0.36
+        - 0.11
+        - 0.19
+        - 0.44
+        - 0.19
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w04:
         block:
-          - 0.36
-          - 0.36
-          - 0.11
-          - 0.44
-          - 0.44
-          - 0.19
+        - 0.36
+        - 0.36
+        - 0.11
+        - 0.44
+        - 0.44
+        - 0.19
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w05:
         block:
-          - 0.61
-          - 0.36
-          - 0.11
-          - 0.69
-          - 0.44
-          - 0.19
+        - 0.61
+        - 0.36
+        - 0.11
+        - 0.69
+        - 0.44
+        - 0.19
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w06:
         block:
-          - 0.11
-          - 0.61
-          - 0.11
-          - 0.19
-          - 0.69
-          - 0.19
+        - 0.11
+        - 0.61
+        - 0.11
+        - 0.19
+        - 0.69
+        - 0.19
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w07:
         block:
-          - 0.36
-          - 0.61
-          - 0.11
-          - 0.44
-          - 0.69
-          - 0.19
+        - 0.36
+        - 0.61
+        - 0.11
+        - 0.44
+        - 0.69
+        - 0.19
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w08:
         block:
-          - 0.61
-          - 0.61
-          - 0.11
-          - 0.69
-          - 0.69
-          - 0.19
+        - 0.61
+        - 0.61
+        - 0.11
+        - 0.69
+        - 0.69
+        - 0.19
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w09:
         block:
-          - 0.11
-          - 0.11
-          - 0.36
-          - 0.19
-          - 0.19
-          - 0.44
+        - 0.11
+        - 0.11
+        - 0.36
+        - 0.19
+        - 0.19
+        - 0.44
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w10:
         block:
-          - 0.36
-          - 0.11
-          - 0.36
-          - 0.44
-          - 0.19
-          - 0.44
+        - 0.36
+        - 0.11
+        - 0.36
+        - 0.44
+        - 0.19
+        - 0.44
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w11:
         block:
-          - 0.61
-          - 0.11
-          - 0.36
-          - 0.69
-          - 0.19
-          - 0.44
+        - 0.61
+        - 0.11
+        - 0.36
+        - 0.69
+        - 0.19
+        - 0.44
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w12:
         block:
-          - 0.11
-          - 0.36
-          - 0.36
-          - 0.19
-          - 0.44
-          - 0.44
+        - 0.11
+        - 0.36
+        - 0.36
+        - 0.19
+        - 0.44
+        - 0.44
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w13:
         block:
-          - 0.36
-          - 0.36
-          - 0.36
-          - 0.44
-          - 0.44
-          - 0.44
+        - 0.36
+        - 0.36
+        - 0.36
+        - 0.44
+        - 0.44
+        - 0.44
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w14:
         block:
-          - 0.61
-          - 0.36
-          - 0.36
-          - 0.69
-          - 0.44
-          - 0.44
+        - 0.61
+        - 0.36
+        - 0.36
+        - 0.69
+        - 0.44
+        - 0.44
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w15:
         block:
-          - 0.11
-          - 0.61
-          - 0.36
-          - 0.19
-          - 0.69
-          - 0.44
+        - 0.11
+        - 0.61
+        - 0.36
+        - 0.19
+        - 0.69
+        - 0.44
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w16:
         block:
-          - 0.36
-          - 0.61
-          - 0.36
-          - 0.44
-          - 0.69
-          - 0.44
+        - 0.36
+        - 0.61
+        - 0.36
+        - 0.44
+        - 0.69
+        - 0.44
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w17:
         block:
-          - 0.61
-          - 0.61
-          - 0.36
-          - 0.69
-          - 0.69
-          - 0.44
+        - 0.61
+        - 0.61
+        - 0.36
+        - 0.69
+        - 0.69
+        - 0.44
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w18:
         block:
-          - 0.11
-          - 0.11
-          - 0.61
-          - 0.19
-          - 0.19
-          - 0.69
+        - 0.11
+        - 0.11
+        - 0.61
+        - 0.19
+        - 0.19
+        - 0.69
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w19:
         block:
-          - 0.36
-          - 0.11
-          - 0.61
-          - 0.44
-          - 0.19
-          - 0.69
+        - 0.36
+        - 0.11
+        - 0.61
+        - 0.44
+        - 0.19
+        - 0.69
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w20:
         block:
-          - 0.61
-          - 0.11
-          - 0.61
-          - 0.69
-          - 0.19
-          - 0.69
+        - 0.61
+        - 0.11
+        - 0.61
+        - 0.69
+        - 0.19
+        - 0.69
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w21:
         block:
-          - 0.11
-          - 0.36
-          - 0.61
-          - 0.19
-          - 0.44
-          - 0.69
+        - 0.11
+        - 0.36
+        - 0.61
+        - 0.19
+        - 0.44
+        - 0.69
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w22:
         block:
-          - 0.36
-          - 0.36
-          - 0.61
-          - 0.44
-          - 0.44
-          - 0.69
+        - 0.36
+        - 0.36
+        - 0.61
+        - 0.44
+        - 0.44
+        - 0.69
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w23:
         block:
-          - 0.61
-          - 0.36
-          - 0.61
-          - 0.69
-          - 0.44
-          - 0.69
+        - 0.61
+        - 0.36
+        - 0.61
+        - 0.69
+        - 0.44
+        - 0.69
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w24:
         block:
-          - 0.11
-          - 0.61
-          - 0.61
-          - 0.19
-          - 0.69
-          - 0.69
+        - 0.11
+        - 0.61
+        - 0.61
+        - 0.19
+        - 0.69
+        - 0.69
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w25:
         block:
-          - 0.36
-          - 0.61
-          - 0.61
-          - 0.44
-          - 0.69
-          - 0.69
+        - 0.36
+        - 0.61
+        - 0.61
+        - 0.44
+        - 0.69
+        - 0.69
         fraction: 0.037037
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
       w26:
         block:
-          - 0.61
-          - 0.61
-          - 0.61
-          - 0.69
-          - 0.69
-          - 0.69
+        - 0.61
+        - 0.61
+        - 0.61
+        - 0.69
+        - 0.69
+        - 0.69
         fraction: 0.037038
         layers:
-          - frac: 1.0
-            material: liquid
-            youngs: 200
+        - frac: 1.0
+          material: liquid
+          youngs: 200
         youngs: 200
   mpm_particle:
     density: 1.0

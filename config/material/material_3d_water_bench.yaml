@@ -421,6 +421,7 @@ operators:
 - op: mpm_grid_update
   at: mpm_grid
   wall_damp: 0.9
+  surface_tension: 60.0
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -562,31 +563,17 @@ plotting:
     - 0.302
 descriptions:
   movie_mpm_particle:
-    description: The simulation begins with a discrete set of colored hexagonal particles
-      distributed within a 3D bounding box. Over time, these particles rapidly transition
-      into a dense, continuous field of points that settle toward the bottom plane
-      of the volume. The field exhibits complex, swirling patterns and turbulent structures
-      as it evolves. Eventually, the distribution stabilizes into a layered, multi-colored
-      sheet with distinct peaks and valleys.
-    objects: The scene contains a collection of hexagonal particles that are initially
-      separated and scattered in space. These particles are rendered in a vibrant
-      spectrum of colors including magenta, cyan, green, blue, and orange. As the
-      simulation progresses, the individual hexagons merge into a massive, interconnected
-      cloud of tiny points. The final state shows a large, flat surface of points
-      with varying heights and intricate, nested color patterns.
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_mpm_particle:
-    description: The simulation begins with a set of discrete, well-separated colored clusters of particles
-      within a 3D bounding box. Over time, these clusters begin to expand and migrate toward the center
-      and bottom of the volume. As the simulation progresses, the clusters merge and deform into large,
-      continuous, and interconnected fluid-like structures. In the final frames, the particles settle
-      into a dense, layered distribution across the bottom of the container with some vertical plumes
+    description: The simulation begins with a set of discrete, well-separated colored
+      clusters of particles within a 3D bounding box. Over time, these clusters begin
+      to expand and migrate toward the center and bottom of the volume. As the simulation
+      progresses, the clusters merge and deform into large, continuous, and interconnected
+      fluid-like structures. In the final frames, the particles settle into a dense,
+      layered distribution across the bottom of the container with some vertical plumes
       remaining.
-    objects: The scene contains multiple distinct clusters of particles, each assigned a unique primary
-      color such as magenta, blue, green, and yellow. Initially, these objects are small, compact, and
-      spatially isolated from one another in a grid-like arrangement. As time passes, the objects grow
-      in size and lose their individual boundaries, merging into large, amorphous masses. By the end,
-      the objects form a complex, multi-colored field of interconnected filaments and pools of varying
-      sizes.
+    objects: The scene contains multiple distinct clusters of particles, each assigned
+      a unique primary color such as magenta, blue, green, and yellow. Initially,
+      these objects are small, compact, and spatially isolated from one another in
+      a grid-like arrangement. As time passes, the objects grow in size and lose their
+      individual boundaries, merging into large, amorphous masses. By the end, the
+      objects form a complex, multi-colored field of interconnected filaments and
+      pools of varying sizes.

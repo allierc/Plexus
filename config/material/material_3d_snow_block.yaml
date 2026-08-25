@@ -48,6 +48,7 @@ operators:
   g: 18.0
 - op: mpm_strain
   at: mpm_particle
+  implementation: warp
 - op: mpm_scatter
   at: mpm_particle
   to: mpm_grid
