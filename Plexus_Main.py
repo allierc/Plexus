@@ -69,6 +69,10 @@ def main():
                         help="particles DRAWN in the live mp4; the run still simulates all of them")
     parser.add_argument("--render-max-frames", type=int, default=300,
                         help="cap on rendered frames; longer runs are strided down to this")
+    parser.add_argument("--render-stills", type=int, default=10,
+                        help="how many PNG stills to drop through the run, copied from the movie's "
+                             "own rendered frames (no extra render). 0 disables. The newest is "
+                             "always also written as 3d.png so a long run can be watched")
     parser.add_argument("--render-dot", default="auto",
                         help="dot size in px, or 'auto' to size it to the drawn particles' median "
                              "nearest-neighbour spacing so the material reads as solid")
@@ -150,7 +154,8 @@ def main():
                           f"'substep captured as a CUDA graph', that is why -- set "
                           f"`capture: false` on the spec's substep block.", flush=True)
         lm = None if args.no_viz else {"render_n": args.render_n,
-                                       "max_frames": args.render_max_frames, "dot": _dot}
+                                       "max_frames": args.render_max_frames, "dot": _dot,
+                                       "stills": args.render_stills}
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
                                     erase=args.force, save=True,
                                     live_every_frac=(None if args.no_viz else 0.05),

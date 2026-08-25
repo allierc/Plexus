@@ -28,6 +28,7 @@ all.
 """
 from __future__ import annotations
 
+import os
 import time
 
 import numpy as np
@@ -63,7 +64,7 @@ class LiveMovie:
 
     def __init__(self, out, world, n_frames, up=2, render_n=400_000, max_frames=300,
                  fps=20, px=1280, dot="auto", fill=0.9, elev=18.0, azim=-58.0, name="", seed=0,
-                 sim=None, style=None):
+                 sim=None, style=None, stills=10):
         from plexus.render_vtk import offscreen
         offscreen()                                   # kill the Xlib chatter before VTK loads
         import pyvista as pv
@@ -85,6 +86,19 @@ class LiveMovie:
         self.px_used = None
         self.up = int(up)
         self.stride = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
+        # STILLS COME OUT OF THE MOVIE'S OWN RENDER, not a second one. `Plotter.image` is the frame
+        # `write_frame()` just rasterised, so a PNG costs a file write and nothing else -- no extra
+        # render pass, and no second copy of the camera/palette/dot-size code to drift out of sync
+        # with this one. They are therefore chosen from the RENDERED ticks: a still on a tick the
+        # movie skipped would have no image to copy and would have to re-render, which is the thing
+        # being avoided.
+        _rendered = list(range(self.stride, self.n_frames + 1, self.stride)) or [self.n_frames]
+        n_st = max(0, int(stills))
+        self.still_ticks = (set(np.unique(np.linspace(0, len(_rendered) - 1, n_st).astype(int))
+                                .tolist()) if n_st else set())
+        self.still_ticks = {_rendered[i] for i in self.still_ticks}
+        self.still_dir = os.path.dirname(out) or "."
+        self.stills_written = 0
         self.cloud = self.idx = None
         self.drawn = self.n = self.rendered = 0
         self.t0 = None
@@ -178,6 +192,8 @@ class LiveMovie:
                         position="upper_left", font_size=11, color="white", name="hdr")
         self.p.write_frame()
         self.rendered += 1
+        if tick in self.still_ticks:
+            self._still(tick)
 
     def _rgb(self, H, lvl, pos):
         """Per-particle colour, FIXED AT t=0 and carried with the particle.
@@ -253,6 +269,19 @@ class LiveMovie:
               f"= {sp:.3e} world, box {span:.3g})", flush=True)
         return self.px_used
 
+    def _still(self, tick):
+        """Write the frame just rendered as a PNG. `3d.png` is always the newest, so a long run can
+        be watched from the file browser; the numbered copies survive so the run leaves a strip."""
+        try:
+            import imageio.v3 as iio
+            img = self.p.image                      # the frame write_frame() just rasterised
+            n = f"{self.stills_written:02d}"
+            iio.imwrite(os.path.join(self.still_dir, f"still_{n}_f{tick:05d}.png"), img)
+            iio.imwrite(os.path.join(self.still_dir, "3d.png"), img)
+            self.stills_written += 1
+        except Exception as e:                      # a missing PNG must never end a 20-minute run
+            print(f"[live-movie] still at frame {tick} failed: {type(e).__name__}: {e}", flush=True)
+
     def close(self):
         try:
             self.p.close()
@@ -264,5 +293,7 @@ class LiveMovie:
         sub = f", {self.drawn:,} of them drawn" if self.drawn < self.n else ""
         print(f"[live-movie] {self.out}   {self.n:,} particles{sub}, {self.rendered} frames"
               f"{'' if self.stride == 1 else f' (every {self.stride}th)'}, "
-              f"coloured by {self.colour_by}, dot {self.px_used:.2f} px", flush=True)
+              f"coloured by {self.colour_by}, dot {self.px_used:.2f} px"
+              + (f", {self.stills_written} stills + 3d.png" if self.stills_written else ""),
+              flush=True)
         return self.out
