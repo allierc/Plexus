@@ -183,6 +183,7 @@ class MPMScatterTriton(MPMScatter):
 
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate",
                       "fused_kernel"]
+    SUPPORTED_DIMS = [3]                       # 3D-only kernel; inherited [2, 3] was a lie
     DIFFERENTIABLE = False                  # atomics; no backward
     BLOCK = 128
 
