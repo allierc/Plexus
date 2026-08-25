@@ -120,7 +120,10 @@ class LiveMovie:
         self.p.open_movie(out, framerate=int(fps), quality=8)
 
     def _xyz(self, lvl):
-        pos = lvl.get("pos")[self.idx].detach().cpu().numpy().astype(np.float64)
+        # float32, NOT float64. VTK stores points in whatever dtype it is handed; float64 doubles
+        # both the host copy and VTK's resident buffer (10 M points: 240 MB against 120 MB) to carry
+        # digits that never survive the projection to a 1280 px frame.
+        pos = lvl.get("pos")[self.idx].detach().cpu().numpy().astype(np.float32)
         if pos.shape[1] == 2:                         # pad a 2D run into the z=0 plane
             pos = np.concatenate([pos, np.zeros((pos.shape[0], 1))], 1)
         return pos
@@ -146,9 +149,17 @@ class LiveMovie:
             # SEEDED, AND DRAWN ONCE. A subset re-drawn each frame makes the fluid boil: every dot
             # would be a different particle, so nothing would appear to move. Fixing the subset is
             # what makes this a movie of the material rather than of noise.
-            g = torch.Generator(device="cpu").manual_seed(self.seed)
             k = min(self.render_n, self.n)
-            self.idx = torch.randperm(self.n, generator=g)[:k].to(lvl.state.device)
+            if k >= self.n:
+                # DRAWING EVERYTHING: index with a CONTIGUOUS range, not a permutation. A full
+                # randperm is a no-op as a sample -- it selects every particle either way -- but it
+                # makes each frame's gather a random scatter across the whole set instead of a
+                # coalesced sequential read, and it costs 8 B per particle to store the permutation
+                # (0.8 GB at 100 M). All cost, no effect.
+                self.idx = torch.arange(self.n, device=lvl.state.device)
+            else:
+                g = torch.Generator(device="cpu").manual_seed(self.seed)
+                self.idx = torch.randperm(self.n, generator=g)[:k].to(lvl.state.device)
             self.drawn = k
             pos = self._xyz(lvl)
             self.cloud = self.pv.PolyData(pos)
