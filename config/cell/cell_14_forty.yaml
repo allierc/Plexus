@@ -1,0 +1,300 @@
+general:
+  name: cell_14_forty
+  seed: 0
+  n_frames: 1200
+  record_cap: 602
+  dt: 0.0015
+  dim: 3
+  boundary: wall
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 40
+    types:
+      c:
+        fraction: 1.0
+        youngs: 40
+    state:
+      pos:
+        width: 3
+        integration: none
+        boundary: free
+    start:
+    - - 0.0765
+      - 0.0765
+      - 0.5
+    - - 0.2295
+      - 0.0765
+      - 0.5
+    - - 0.3825
+      - 0.0765
+      - 0.5
+    - - 0.5355
+      - 0.0765
+      - 0.5
+    - - 0.6885
+      - 0.0765
+      - 0.5
+    - - 0.8415
+      - 0.0765
+      - 0.5
+    - - 0.153
+      - 0.209
+      - 0.5
+    - - 0.306
+      - 0.209
+      - 0.5
+    - - 0.459
+      - 0.209
+      - 0.5
+    - - 0.612
+      - 0.209
+      - 0.5
+    - - 0.765
+      - 0.209
+      - 0.5
+    - - 0.918
+      - 0.209
+      - 0.5
+    - - 0.0765
+      - 0.3415
+      - 0.5
+    - - 0.2295
+      - 0.3415
+      - 0.5
+    - - 0.3825
+      - 0.3415
+      - 0.5
+    - - 0.5355
+      - 0.3415
+      - 0.5
+    - - 0.6885
+      - 0.3415
+      - 0.5
+    - - 0.8415
+      - 0.3415
+      - 0.5
+    - - 0.153
+      - 0.474
+      - 0.5
+    - - 0.306
+      - 0.474
+      - 0.5
+    - - 0.459
+      - 0.474
+      - 0.5
+    - - 0.612
+      - 0.474
+      - 0.5
+    - - 0.765
+      - 0.474
+      - 0.5
+    - - 0.918
+      - 0.474
+      - 0.5
+    - - 0.0765
+      - 0.6065
+      - 0.5
+    - - 0.2295
+      - 0.6065
+      - 0.5
+    - - 0.3825
+      - 0.6065
+      - 0.5
+    - - 0.5355
+      - 0.6065
+      - 0.5
+    - - 0.6885
+      - 0.6065
+      - 0.5
+    - - 0.8415
+      - 0.6065
+      - 0.5
+    - - 0.153
+      - 0.739
+      - 0.5
+    - - 0.306
+      - 0.739
+      - 0.5
+    - - 0.459
+      - 0.739
+      - 0.5
+    - - 0.612
+      - 0.739
+      - 0.5
+    - - 0.765
+      - 0.739
+      - 0.5
+    - - 0.918
+      - 0.739
+      - 0.5
+    - - 0.0765
+      - 0.8715
+      - 0.5
+    - - 0.2295
+      - 0.8715
+      - 0.5
+    - - 0.3825
+      - 0.8715
+      - 0.5
+    - - 0.5355
+      - 0.8715
+      - 0.5
+  nucleus:
+    parent: cell
+    per_parent: 336
+    radius: 0.0283
+    density: 2.6
+    types:
+      n:
+        fraction: 1.0
+        youngs: 150
+        material: elastic
+    vel_init: 0.1
+    vel_init_axes:
+    - 0
+    - 1
+  cytosol:
+    parent: cell
+    per_parent: 1180
+    radius: 0.0557
+    radius_inner: 0.0237
+    density: 1.0
+    types:
+      light:
+        fraction: 0.5
+        youngs: 300
+        material: elastic
+        density: 0.6
+      heavy:
+        fraction: 0.5
+        youngs: 300
+        material: elastic
+        density: 1.8
+    vel_init: 0.1
+    vel_init_axes:
+    - 0
+    - 1
+  membrane:
+    parent: cell
+    per_parent: 2040
+    radius: 0.0765
+    radius_inner: 0.0557
+    density: 1.1
+    types:
+      m:
+        fraction: 1.0
+        youngs: 900
+        material: elastic
+    vel_init: 0.1
+    vel_init_axes:
+    - 0
+    - 1
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: mpm_strain
+  at: nucleus
+- op: mpm_strain
+  at: cytosol
+- op: mpm_strain
+  at: membrane
+- op: mpm_scatter
+  at: nucleus
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_scatter
+  at: cytosol
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_scatter
+  at: membrane
+  to: mpm_grid
+  drag: 0.02
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  surface_tension: 0.0
+  wall_damp: 1.0
+  plate_axis: 2
+  plate_centre: 0.5
+  plate_gap_half: 0.088
+  plate_gap_half_end: 0.0255
+  plate_close_from: 120
+  plate_close_to: 950
+- op: mpm_gather
+  at: nucleus
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+- op: mpm_gather
+  at: cytosol
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+- op: mpm_gather
+  at: membrane
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.04
+schedule:
+- aggregate
+- substep_dt: 0.0001
+  steps:
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  capture: true
+  compile: true
+plotting:
+  background: black
+  colors:
+    light:
+    - 0.25
+    - 0.69
+    - 1.0
+    heavy:
+    - 0.12
+    - 0.31
+    - 0.66
+    n:
+    - 1.0
+    - 0.82
+    - 0.29
+    m:
+    - 0.1
+    - 0.1
+    - 0.9
+  fps: 30
+  movie_max_frames: 600
+  up_axis: 2
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.2
+  splat_size: 2.6
+  splat_res: 560
+  panels: true
+  panels_thick: 0.1
+  panels_dot: 1.0
+  panels_dot_section: 2.2
