@@ -835,7 +835,8 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
     MAY_MUTATE_INTEGRATED_STATE = True             # advects pos/vel inside the substep (like the oracle)
     MECHANISM_TAGS = ["grid_to_particle", "advection"]
     PARAM_ROLES = {"dt_sub": "substep_timestep", "wall_damp": "wall_restitution",
-                   "wall_contact": "contact_layer_thickness", "vmax": "speed_cap"}
+                   "wall_contact": "contact_layer_thickness", "vmax": "speed_cap",
+                   "wall_damp_mode": "restitution_application_rate"}
     REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM G2P); Sulsky, D. et al. (1994)."
 
     def __init__(self, params, device="cpu"):
@@ -845,6 +846,13 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.wall_damp = float(params.get("wall_damp", 1.0))
         self.wall_contact = float(params.get("wall_contact", 0.04))
+        # HOW OFTEN `wall_damp` IS APPLIED, and it is the difference between a restitution
+        # coefficient and a decay rate. See the note in `forward`. `per_substep` is the historical
+        # behaviour and stays the default so no existing run changes.
+        self.wall_damp_mode = str(params.get("wall_damp_mode", "per_substep")).lower()
+        if self.wall_damp_mode not in ("per_substep", "per_impact"):
+            raise ValueError(f"mpm_gather: wall_damp_mode must be 'per_substep' or 'per_impact', "
+                             f"got {self.wall_damp_mode!r}")
         self.vmax = float(params.get("vmax", 1e9))
 
     def forward(self, H, mask=None):
@@ -877,6 +885,32 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
             liquid = getattr(p, "is_liquid", None)
             if liquid is not None:
                 near = near & ~liquid
+            # ONCE PER IMPACT, NOT ONCE PER SUBSTEP. `wall_damp` reads as a restitution coefficient
+            # -- "keep 60% of the velocity on a bounce" -- and under `per_substep` it is not one:
+            # the multiplier lands on every substep the particle spends inside `wall_contact`, so
+            # one impact removes wall_damp ** (substeps in the layer). That exponent grows with grid
+            # resolution, because a finer grid resolves the contact more stiffly and the body
+            # lingers. MEASURED on material_3d_ball_drop, energy removed by the wall:
+            #
+            #     n_grid  64   2.4%      n_grid  96  71.0%      n_grid 128  70.8%
+            #
+            # -- the same spec, the same wall_damp, 68.6 percentage points apart. It is not even
+            # monotonic across scenes: genA_code_star_ball loses MORE at 64 (84.1%) than at 96
+            # (67.5%). A parameter whose meaning depends on the discretisation cannot be calibrated
+            # once, which is why retuning every spec was the wrong fix.
+            #
+            # `per_impact` applies it on the RISING EDGE of contact only -- the substep where the
+            # particle enters the layer -- so one impact costs exactly one multiplication whatever
+            # the substep count. The edge state is a persistent per-particle buffer written IN
+            # PLACE, so a captured graph keeps reading the address it saw.
+            if self.wall_damp_mode == "per_impact":
+                prev = getattr(p, "_wall_near", None)
+                if prev is None:
+                    p.register_buffer("_wall_near",
+                                      torch.zeros(p.n, dtype=torch.bool, device=dev))
+                    prev = p._wall_near
+                near, _keep = near & ~prev, near
+                prev.copy_(_keep)
             new_V = torch.where(near[:, None], new_V * self.wall_damp, new_V)
         sp = new_V.norm(dim=1, keepdim=True).clamp(min=1e-9)
         vmax = min(self.vmax, 0.4 * dx / dt)                       # CFL velocity cap
