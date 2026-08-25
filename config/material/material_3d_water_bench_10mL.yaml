@@ -22,7 +22,7 @@ general:
   boundary: wall
   dim: 3
   dt: 0.0036
-  n_frames: 500
+  n_frames: 1000
   name: material_3d_water_bench_10mL
   record_cap: 4
   seed: 0
@@ -38,6 +38,7 @@ operators:
   op: gravity
 - at: mpm_particle
   op: mpm_strain
+  implementation: warp
 - a_max: 200
   at: mpm_particle
   drag: 0.05
