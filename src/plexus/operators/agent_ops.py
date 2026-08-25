@@ -629,9 +629,19 @@ class Centroid(Aggregate):
         s = torch.zeros(parent.n, D, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
         w = torch.zeros(parent.n, device=dev).index_add_(0, pidx, cocc)
         centroid = s / w.clamp(min=1.0)[:, None]
-        new = parent.state.clone()                 # only live parents take the readout
-        new[:, px0:px1] = torch.where(parent.occ[:, None] > 0, centroid, parent.state[:, px0:px1])
-        parent.state = new
+        # IN PLACE. `new = parent.state.clone(); parent.state = new` gave the parent level a NEW
+        # state tensor on every tick, which is invisible in eager and fatal for a captured CUDA
+        # graph: the graph holds the address it saw at capture, so a replay would keep reading the
+        # tensor the run had stopped writing. `aggregate` sits OUTSIDE the substep block, which is
+        # why it survived the sweep that put the four MPM operators in place -- the guard that
+        # compares buffer addresses each tick is what caught it, firing at frame 2 of cell_13 and
+        # dropping the graph for the whole run.
+        #
+        # Legal for the same reason the clone was: this operator declares
+        # MAY_MUTATE_INTEGRATED_STATE, so the engine's tick-0 integration-invariant guard does not
+        # apply, and `centroid` is fully computed from the CHILD set before the parent is touched.
+        parent.state[:, px0:px1] = torch.where(parent.occ[:, None] > 0, centroid,
+                                               parent.state[:, px0:px1])
         return {}
 
 
