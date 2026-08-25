@@ -61,9 +61,11 @@ def run_one(spec_path, n_particles, frames, warmup, device, capture, compile_on,
                 for p in psets)
 
     for o in spec["operators"]:
-        if o.get("op") == "mpm_scatter":
+        if o.get("op") == "mpm_scatter" and impl:
+            # `--impl` OVERRIDES; absent leaves the spec alone, so a spec that DECLARES an
+            # implementation is benchmarked as written. `--impl default` forces the torch path.
             o.pop("implementation", None)
-            if impl:
+            if impl != "default":
                 o["implementation"] = impl
                 o.setdefault("polar", "higham")
     blk = next((s for s in spec["schedule"] if isinstance(s, dict) and "substep_dt" in s), None)
