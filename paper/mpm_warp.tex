@@ -53,12 +53,16 @@ The four MLS-MPM operators --- \code{mpm\_strain}, \code{mpm\_scatter}, \code{mp
 
 \begin{itemize}
 \item \gd{\code{default}} --- the prior MPM. Pure PyTorch, dimension-generic (2D and 3D from one
-  body), differentiable, runs on CPU and on any CUDA device. This is the reference: every claim
-  below is measured against it.
-\item \gd{\code{warp}} --- the refactor. \code{mpm\_scatter} and \code{mpm\_gather} become one
-  NVIDIA Warp kernel each, one CUDA thread per particle, all 27 stencil taps in registers. 3D and
-  CUDA only, not differentiable. \code{mpm\_strain} and \code{mpm\_grid\_update} are unchanged and
-  still run the \code{default} bodies.
+  body), runs on CPU and on any CUDA device, and \textbf{differentiable in use, not merely in
+  principle}: \code{engine.run(\ldots, grad=True)} keeps the autograd tape across the rollout
+  (\code{engine.py:1498}) and \code{discovery\_cardio\_mpm/train.py} calls \code{loss.backward()}
+  through exactly these four operators. This is the reference: every claim below is measured against
+  it.
+\item \gd{\code{warp}} --- the refactor. \code{mpm\_scatter} and \code{mpm\_gather} become one NVIDIA
+  Warp kernel each: one CUDA thread per particle, and the particle's whole 27-node loop runs inside
+  that thread with the running sums held in registers (\S4). 3D and CUDA only.
+  \code{mpm\_strain} and \code{mpm\_grid\_update} are unchanged and still run the \code{default}
+  bodies.
 \end{itemize}
 
 They are the same mechanism and the same equations, so they sit on the \code{implementation} axis
@@ -92,7 +96,13 @@ weight of node $i$ at particle $p$, and $\mathbf{x}_{ip}=\mathbf{x}_i-\mathbf{x}
   \qquad \mathbf{x}_p \leftarrow \mathbf{x}_p + \Delta t\,\mathbf{v}_p
 \end{align}
 
-$\mathbf{R}_p$ is the orthogonal polar factor of $\mathbf{F}_p$; $J=\det\mathbf{F}_p$;
+$\mathbf{F}_p$ is the \textbf{deformation gradient} --- one $D{\times}D$ matrix per particle
+($3{\times}3$ in 3D, so \code{p.F} is $[N,3,3]$, initialised to the identity at
+\code{entities.py:238}). It is the Jacobian $\partial\mathbf{x}/\partial\mathbf{X}$ of the map from a
+particle's reference position to its current one, so it carries the accumulated stretch, shear and
+rotation since $t=0$; strain and stress are derived \emph{from} it, and it is not itself a strain
+tensor. $\mathbf{R}_p$ is its orthogonal polar factor (the rotation part) and $J=\det\mathbf{F}_p$ is
+the volume ratio, $1$ for undeformed material;
 $\mathbf{o}_i\in\{0,1,2\}^3$ is the node's offset within the stencil and $\mathbf{f}_p$ the
 particle's fractional cell position, so $\mathbf{o}_i-\mathbf{f}_p$ is $\mathbf{x}_{ip}$ in cell
 units. \textbf{The stencil is $3^3=27$ nodes, not $3^2=9$}: the quadratic B-spline has support of
@@ -178,6 +188,22 @@ $[N,27,3,3]$ tensors are most of it.
 The Warp kernel is one thread per particle. Everything the table above lists as a tensor is, here, a
 local variable --- and a local variable in a CUDA thread is a register, which is not memory.
 
+\paragraph{Nothing is ever 27 wide, and that is the point.} It would be wrong to picture 27 nodes
+held at once: a thread has $\approx$64 registers to work with, nowhere near enough for 27 copies of
+(weight, node velocity, offset). The loop instead \emph{visits} the 27 nodes one at a time and
+\textbf{accumulates}. Only two things persist across iterations --- \code{newv} (3 floats) and
+\code{newC} (9 floats), twelve registers of running sum --- and each node's weight, velocity and
+offset live for exactly one iteration before the next node overwrites them. The register cost is
+therefore $O(1)$ in the stencil size, not $O(27)$, which is precisely what PyTorch cannot express:
+having no way to say ``form this, add it to a running sum, discard it'', it must make the loop a
+tensor axis and materialise all 27 slices at once.
+
+\code{ptxas -arch=sm\_86 -O3 --verbose} on Warp's emitted PTX confirms the arithmetic worked out:
+\gd{64 registers, 0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads} for both
+\code{g2p} and \code{p2g\_atomic}. \textbf{Zero spill is the load-bearing number} --- had the working
+set exceeded the register file, the compiler would have quietly pushed the overflow to local memory,
+which is global memory wearing a different name, and the fusion would have bought nothing.
+
 \begin{lstlisting}[numbers=none]
 @wp.kernel                                    # src/plexus/operators/mpm_warp.py:193
 def g2p(X, STATE, C, GV, OCC, LIQ, pa, va, ngx, ngy, ngz, dx, dt, ...):
@@ -237,6 +263,15 @@ grid is the opposite --- many particles land on the same node, and the kernel us
 \code{wp.atomic\_add}, 108 of them per particle ($27$ nodes $\times$ (1 mass $+$ 3 momentum)). That is
 why the two fusions do not cost the same and do not buy the same (\S5), and it is the remaining wall
 (\S7).
+
+\paragraph{Differentiability is not lost in principle, only unwired here.} Warp emits a backward
+kernel next to every forward one --- \code{g2p\_\ldots\_cuda\_kernel\_backward} sits in the same PTX
+file --- so the reason \code{warp} carries \code{DIFFERENTIABLE = False} is not that the tool cannot
+do it. It is that this port launches with a plain \code{wp.launch} outside a \code{wp.Tape}, and
+\code{wp.from\_torch} wraps the tensors without \code{requires\_grad}, so no backward is registered
+with autograd. Wiring it up is a separate job; until it is done, anything that needs a gradient ---
+\code{discovery\_cardio\_mpm}'s training loop above all --- must stay on \code{default}, and that is
+a second reason (alongside byte-identity, \S6) why \code{default} is not going away.
 
 \paragraph{One convenience worth naming.} \code{wp.mat33} is a first-class type with
 \code{determinant}, \code{inverse}, \code{transpose} and \code{outer}, so the polar iteration
