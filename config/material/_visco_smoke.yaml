@@ -26,13 +26,13 @@ sets:
           tau: 0.05
   mpm_particle:
     parent: cell
-    per_parent: 3000
+    per_parent: 7500
     radius: 0.09
     density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -50,6 +50,7 @@ operators:
   at: mpm_grid
   surface_tension: 0.0
   wall_damp: 1.0
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -78,3 +79,4 @@ plotting:
     - 0.52
   fps: 30
   movie_max_frames: 600
+  dot_size: 1.2

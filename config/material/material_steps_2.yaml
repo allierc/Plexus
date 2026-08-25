@@ -43,13 +43,13 @@ sets:
           material: liquid
   mpm_particle:
     parent: cell
-    per_parent: 7000
+    per_parent: 45000
     radius: 0.22
     density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -67,6 +67,7 @@ operators:
   at: mpm_grid
   surface_tension: 12.0
   wall_damp: 0.5
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -116,3 +117,4 @@ descriptions:
       for the blue particles to interact with.
 plotting:
   background: black
+  dot_size: 1.2

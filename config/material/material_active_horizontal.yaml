@@ -4,7 +4,7 @@ fields:
     res: 128
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
   direction:
     frame: vector_grid
     source: material/dir_horizontal.tif
@@ -51,6 +51,7 @@ operators:
   op: mpm_grid_update
   wall_contact: 0.06
   wall_damp: 0.5
+  implementation: nosync
 - at: mpm_particle
   from: mpm_grid
   op: mpm_gather
@@ -86,7 +87,7 @@ sets:
   mpm_particle:
     density: 1.0
     parent: cell
-    per_parent: 16384
+    per_parent: 144500
 descriptions:
   movie_activation:
     description: The video shows a black screen with no visible movement or changes.
@@ -119,3 +120,5 @@ descriptions:
       fills a large square area. A specific subset of these particles coalesces into
       a singular, connected structure near the bottom center. This central object
       is dark and elongated, contrasting with the surrounding bright blue field.
+plotting:
+  dot_size: 1.2

@@ -27,13 +27,13 @@ sets:
           material: liquid
   mpm_particle:
     parent: cell
-    per_parent: 10000
+    per_parent: 79500
     radius: 0.3
     density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -51,6 +51,7 @@ operators:
   at: mpm_grid
   surface_tension: 8
   wall_damp: 0.5
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -91,3 +92,4 @@ descriptions:
       field that occupies the lower portion of the white background.
 plotting:
   background: black
+  dot_size: 1.2

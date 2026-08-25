@@ -22,13 +22,13 @@ sets:
           material: snow
   mpm_particle:
     parent: cell
-    per_parent: 6000
+    per_parent: 23500
     radius: 0.16
     density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -46,6 +46,7 @@ operators:
   at: mpm_grid
   surface_tension: 0
   wall_damp: 0.5
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -88,3 +89,4 @@ descriptions:
       from sparse individual dots to thick, opaque clusters.
 plotting:
   background: black
+  dot_size: 1.2

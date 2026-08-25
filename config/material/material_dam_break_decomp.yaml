@@ -27,13 +27,13 @@ sets:
           material: liquid
   mpm_particle:
     parent: cell
-    per_parent: 9000
+    per_parent: 57500
     radius: 0.3
     density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -52,6 +52,7 @@ operators:
   surface_tension: 10.0
   wall_damp: 0.5
   wall_contact: 0.06
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -95,3 +96,4 @@ descriptions:
       changes from a vertical orientation to a horizontal one.
 plotting:
   background: black
+  dot_size: 1.2

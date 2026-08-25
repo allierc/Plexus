@@ -21,7 +21,7 @@ sets:
         - 0.85
   mpm_particle:
     parent: cell
-    per_parent: 16384
+    per_parent: 144500
     density: 1.0
 fields:
   activation:
@@ -29,7 +29,7 @@ fields:
     res: 128
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -66,6 +66,7 @@ operators:
   at: mpm_grid
   wall_damp: 0.5
   wall_contact: 0.06
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -118,3 +119,5 @@ descriptions:
       color, appearing as a single pixel or small cluster of pixels. The particles
       do not form any specific geometric shapes or clusters, maintaining a sparse
       and even spatial occupancy.
+plotting:
+  dot_size: 1.2

@@ -16,14 +16,14 @@ sets:
         youngs: 90
   mpm_particle:
     parent: cell
-    per_parent: 2500
+    per_parent: 4500
     grow_reserve: 7000
     radius: 0.07
     density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: cell_grow
   at: cell
@@ -47,6 +47,7 @@ operators:
   at: mpm_grid
   surface_tension: 0.0
   wall_damp: 0.95
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -70,3 +71,4 @@ plotting:
     - 0.55
   fps: 30
   movie_max_frames: 500
+  dot_size: 1.2
