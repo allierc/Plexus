@@ -31,13 +31,13 @@ sets:
           material: elastic
   mpm_particle:
     parent: body
-    per_parent: 7000
+    per_parent: 14500
     radius: 0.12
     density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: body
@@ -56,6 +56,7 @@ operators:
   surface_tension: 0.0
   wall_damp: 0.5
   wall_contact: 0.06
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -74,3 +75,4 @@ schedule:
 plotting:
   colormap: Set1
   background: black
+  dot_size: 1.2

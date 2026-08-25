@@ -62,7 +62,7 @@ sets:
         - 0.8
   mpm_particle:
     parent: cell
-    per_parent: 100000
+    per_parent: 226000
     radius: 0.06
     density: 1.0
     vel_init: 1.0

@@ -7,7 +7,7 @@ fields:
     source: material/dir_swirl.tif
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
   delay_map:
     frame: image
     source: material/delay_swirl.tif
@@ -46,6 +46,7 @@ operators:
   op: mpm_grid_update
   wall_contact: 0.06
   wall_damp: 0.5
+  implementation: nosync
 - at: mpm_particle
   from: mpm_grid
   op: mpm_gather
@@ -80,7 +81,7 @@ sets:
   mpm_particle:
     density: 1.0
     parent: cell
-    per_parent: 16384
+    per_parent: 144500
 descriptions:
   movie_activation:
     description: A white, wedge-shaped field of light originates from a central point
@@ -117,3 +118,4 @@ descriptions:
       a dense, speckled texture.
 plotting:
   background: black
+  dot_size: 1.2

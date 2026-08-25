@@ -54,7 +54,7 @@ sets:
           material: liquid
   mpm_particle:
     parent: cell
-    per_parent: 100000
+    per_parent: 317000
     radius: 0.05
     density: 1.0
 fields:

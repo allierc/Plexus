@@ -49,7 +49,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -67,6 +67,7 @@ operators:
   at: mpm_grid
   surface_tension: 10
   wall_damp: 0.5
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -130,3 +131,4 @@ plotting:
     - 0.12
     - 0.12
   background: black
+  dot_size: 1.2

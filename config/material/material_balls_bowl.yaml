@@ -47,13 +47,13 @@ sets:
           material: elastic
   mpm_particle:
     parent: cell
-    per_parent: 1200
+    per_parent: 3500
     radius: 0.06
     density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -71,6 +71,7 @@ operators:
   at: mpm_grid
   surface_tension: 0
   wall_damp: 0.6
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -110,3 +111,4 @@ descriptions:
       of the first cluster.
 plotting:
   background: black
+  dot_size: 1.2

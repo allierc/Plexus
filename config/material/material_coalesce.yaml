@@ -39,13 +39,13 @@ sets:
           material: liquid
   mpm_particle:
     parent: cell
-    per_parent: 3500
+    per_parent: 12000
     radius: 0.24
     density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -63,6 +63,7 @@ operators:
   at: mpm_grid
   surface_tension: 30
   wall_damp: 1.0
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -105,3 +106,4 @@ descriptions:
       equal in size and maintain a side-by-side arrangement throughout the simulation.
 plotting:
   background: black
+  dot_size: 1.2

@@ -26,14 +26,14 @@ sets:
         youngs: 600
   mpm_particle:
     parent: cell
-    per_parent: 3000
+    per_parent: 6500
     radius: 0.085
     density: 1.0
     vel_init: 0.45
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -51,6 +51,7 @@ operators:
   at: mpm_grid
   surface_tension: 0.0
   wall_damp: 1.0
+  implementation: nosync
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -94,3 +95,4 @@ descriptions:
 plotting:
   background: black
   colormap: tab10
+  dot_size: 1.2
