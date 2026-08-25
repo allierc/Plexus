@@ -60,6 +60,14 @@ SPECS_2D = [
 ]
 
 
+def _impls_of(op):
+    from plexus.models.registry import get_contract
+    try:
+        return get_contract(op).impls()
+    except Exception:
+        return []
+
+
 def _final(H):
     """The state both implementations must agree on, plus the aggregates the verdict keys on."""
     import torch
@@ -95,9 +103,13 @@ def run(spec_name, impl, frames, warmup, device, seed=0):
 
     spec = yaml.safe_load(open(os.path.join(CFG, spec_name + ".yaml")))
     for o in spec.get("operators", []):
-        if isinstance(o, dict) and o.get("op") in ("mpm_scatter", "mpm_gather"):
+        if isinstance(o, dict) and o.get("op") in ("mpm_scatter", "mpm_gather",
+                                                  "mpm_strain", "mpm_grid_update"):
             o.pop("implementation", None)
-            if impl != "default":
+            # ONLY WHERE THE VARIANT EXISTS. mpm_grid_update has no warp twin, so naming one would
+            # raise for the whole spec and report "warp cannot run this" about an operator that was
+            # never ported -- an absence dressed up as a failure.
+            if impl != "default" and impl in _impls_of(o["op"]):
                 o["implementation"] = impl
             if o["op"] == "mpm_scatter":
                 # SAME POLAR ON BOTH SIDES. The warp kernel implements Higham's iteration only, so

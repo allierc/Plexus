@@ -29,7 +29,7 @@ from __future__ import annotations
 import torch
 
 from plexus.models.registry import register_operator
-from plexus.operators.mpm_ops import MPMScatter, MPMGather
+from plexus.operators.mpm_ops import MPMGather, MPMScatter, MPMStrain
 
 try:
     import warp as wp
@@ -315,4 +315,79 @@ class MPMGatherWarp(MPMGather):
                           float(g.dx), float(dt),
                           float(self.wall_damp), float(self.wall_contact), float(vmax),
                           float(bx), float(by), float(bz), int(has_liq)])
+        return {}
+
+
+# ==========================================================================================================
+# F UPDATE -- `mpm_strain[implementation: warp]`
+#
+# With the scatter and the gather fused, this and `mpm_grid_update` are the whole remaining frame.
+# It is the easier of the two and the larger lever at scale: `mpm_strain` is O(particles) while
+# `mpm_grid_update` is O(cells), so the grid solve's cost is FLAT as the particle count grows and
+# this one's is not.
+#
+# ELASTIC AND LIQUID ONLY, AND IT SAYS SO. The default body has two more branches -- viscoelastic
+# and snow -- and both need a 3x3 SVD. Warp has `wp.svd3`, so they are portable in principle, but
+# torch returns singular values DESCENDING and `wp.svd3` makes no such guarantee, while the snow
+# branch's proper-rotation sign fix indexes the LAST singular value specifically. Porting that on
+# an unverified ordering assumption is how a sign error gets into a material model and is not caught
+# for months, because snow still looks like snow. So this implementation refuses a set that carries
+# visco or snow particles rather than guessing, and those specs keep `default`. Elastic and liquid
+# are what every benchmark spec and most of `config/material` actually use.
+# ==========================================================================================================
+if HAVE_WARP:
+
+    @wp.kernel
+    def strain_elastic(C: wp.array(dtype=wp.mat33), F: wp.array(dtype=wp.mat33),
+                       LIQ: wp.array(dtype=float), OCC: wp.array(dtype=float),
+                       dt: float, has_liq: int):
+        p = wp.tid()
+        # DORMANT PARTICLES DO NOT DEFORM. The default writes `where(live, F_new, F_old)`; leaving
+        # early leaves F[p] untouched, which is the same thing and skips the work.
+        if OCC[p] <= 0.0:
+            return
+        Fp = (wp.identity(n=3, dtype=float) + dt * C[p]) * F[p]
+        if has_liq == 1 and LIQ[p] > 0.0:
+            # LIQUID: drop shape memory, keep volume. J is taken from the UPDATED F, as the default
+            # does -- computing it before the (I + dt C) step would reset to last substep's volume.
+            J = wp.determinant(Fp)
+            Jl = wp.pow(wp.max(J, 1.0e-6), 1.0 / 3.0)
+            Fp = wp.identity(n=3, dtype=float) * Jl
+        F[p] = Fp
+
+
+@register_operator("mpm_strain", implementation="warp", family="mpm",
+                   set="particle", kind="lateral")
+class MPMStrainWarp(MPMStrain):
+    """The deformation-gradient update as one Warp kernel. Elastic + liquid; see the module note."""
+
+    MECHANISM_TAGS = ["elastic_strain", "incompressible_volume", "fused_kernel"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+
+    def forward(self, H, mask=None):
+        if not HAVE_WARP:
+            raise RuntimeError("mpm_strain[warp] needs warp-lang")
+        from plexus.operators.mpm_ops import sub_dt
+        p = H.level(self.at); dev = p.state.device
+        D = p.F.shape[-1]
+        if D != 3 or str(dev) == "cpu":
+            raise RuntimeError(f"mpm_strain[warp] is 3D CUDA only (got dim={D}, dev={dev})")
+        for nm in ("is_visco", "is_snow"):
+            m = getattr(p, nm, None)
+            if m is not None and bool(m.any()):
+                raise RuntimeError(
+                    f"mpm_strain[warp] does not implement the {nm[3:]} branch (it needs a 3x3 SVD "
+                    f"whose singular-value ordering differs from torch's); set "
+                    f"`implementation: default` on mpm_strain for this spec")
+        dt = sub_dt(H, self.dt_sub)
+        liq = getattr(p, "is_liquid", None)
+        has_liq = 1 if liq is not None else 0
+        liqf = (liq.float().contiguous() if liq is not None else torch.zeros(p.n, device=dev))
+        occ = getattr(p, "occ", None)
+        occ = torch.ones(p.n, device=dev) if occ is None else occ.contiguous()
+        wp.launch(strain_elastic, dim=int(p.n), device=f"cuda:{dev.index or 0}",
+                  inputs=[wp.from_torch(p.C, dtype=wp.mat33), wp.from_torch(p.F, dtype=wp.mat33),
+                          wp.from_torch(liqf), wp.from_torch(occ),
+                          float(dt), int(has_liq)])
         return {}
