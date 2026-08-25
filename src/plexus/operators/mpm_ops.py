@@ -452,6 +452,9 @@ class MPMGridUpdate(FieldUpdate):
     REQUIRES_PARAMS = []                        # no required params — all optional (grid from `at:`, engine-injected)
     MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions"]
     PARAM_ROLES = {"dt_sub": "substep_timestep", "surface_tension": "interface_cohesion",
+                   "plate_gap_half": "free_half_gap", "plate_gap_half_end": "final_free_half_gap",
+                   "plate_close_from": "frame_closing_starts", "plate_close_to": "frame_closing_ends",
+                   "plate_axis": "confined_axis", "plate_centre": "gap_centre_on_axis",
                    "wall_damp": "wall_restitution"}
     REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994)."
 
@@ -482,8 +485,101 @@ class MPMGridUpdate(FieldUpdate):
         _bd = params.get("buoyancy_dir")
         self.buoy_dir = [float(x) for x in _bd] if _bd else None
         self.wall_damp = float(params.get("wall_damp", 1.0))
+        # A MOVING PLATEN, AS A GRID VELOCITY BOUNDARY CONDITION.
+        #
+        # WHY IT CANNOT BE A POSITION PROJECTION, which is what `plate_confine` does and what the
+        # first squash experiment used. In MPM the stress a material carries comes from its
+        # deformation gradient F, and `mpm_strain` updates F from the VELOCITY GRADIENT read off
+        # the grid. Teleporting a particle's position never enters that path: the constitutive
+        # model is never told it has been compressed, so no stress builds, nothing pushes back,
+        # and nothing bulges sideways. Measured on cell_12 -- half-height fell 2.8x while the
+        # equatorial radius moved by less than 0.1% and the volume proxy r^2*h fell 3.0x. That is
+        # a CROP, not a squash: matter displaced in z and never returned laterally.
+        #
+        # Imposed here instead, in the same place and the same way as the reflective domain walls:
+        # clamp the normal grid velocity of every node beyond the plate to the PLATE'S OWN
+        # velocity. Compression then enters the velocity field, F contracts in z, the elastic
+        # model generates stress, and the lateral bulge and volume conservation come out of the
+        # physics rather than being hoped for.
+        #
+        # THE GAP IS COMPUTED FROM A TENSOR, not from `H.frame`. A captured CUDA graph bakes python
+        # constants in at capture time, so a python gap would freeze at whatever it was on the
+        # capture tick and the plates would never close -- silently. `H.frame_t` is a device scalar
+        # the engine fills each tick.
+        self.plate_axis = int(params.get("plate_axis", 2))
+        self.plate_centre = float(params.get("plate_centre", 0.5))
+        _pg = params.get("plate_gap_half", None)
+        self.plate_gap_half = None if _pg is None else float(_pg)
+        _pe = params.get("plate_gap_half_end", None)
+        self.plate_gap_half_end = self.plate_gap_half if _pe is None else float(_pe)
+        self.plate_close_from = float(params.get("plate_close_from", 0))
+        self.plate_close_to = float(params.get("plate_close_to", 0))
+        # A MOVING PLATEN, IMPOSED ON THE GRID. `plate_confine` projects particle POSITIONS after
+        # the substep block, and a projection is invisible to the constitutive model: stress comes
+        # from F, F is updated from the velocity gradient, and teleporting a particle changes
+        # neither. Measured on cell_12: half-height fell 2.8x while the equatorial radius moved by
+        # 0.1% and r^2*h -- volume -- fell 3x. The cell was being cropped, not squashed.
+        #
+        # A rigid obstacle cannot fix it either: `_walls3d` zeroes grid velocity inside a solid,
+        # which stops material entering but cannot expel what is already there. A plate has to
+        # CARRY a velocity, so the nodes it covers move at the plate's speed, the field near it is
+        # compressive, F contracts along the axis, and the elastic response pushes material out
+        # sideways. That is the difference between squashing and clipping.
+        self.plate_axis = params.get("plate_axis", None)
+        self.plate_axis = None if self.plate_axis is None else int(self.plate_axis)
+        self.plate_centre = float(params.get("plate_centre", 0.5))
+        self.plate_gap_half = float(params.get("plate_gap_half", 0.0) or 0.0)
+        _pge = params.get("plate_gap_half_end", None)
+        self.plate_gap_half_end = None if _pge is None else float(_pge)
+        self.plate_close_from = int(params.get("plate_close_from", 0))
+        self.plate_close_to = int(params.get("plate_close_to", 0))
         self._wall_key = None; self._wall_cache = None
         self._wall3d_key = None; self._wall3d_cache = None
+
+    def _plate_bc(self, H, g, gv, dev, dt):
+        """Two rigid plates closing along `plate_axis`, as a velocity condition on the grid.
+
+        Frictionless and one-sided, the standard MPM rigid-body collision: a node the plate has
+        reached may not move further into it, and is carried at the plate's own speed. Everything
+        else -- the compression, the lateral bulge, the volume -- follows from the solve rather
+        than being imposed.
+        """
+        ax = self.plate_axis
+        gap, v_plate = self.plate_state(H)
+        shape = g.shape
+        idx = (torch.arange(shape[ax], device=dev) + 0.5) * g.dx
+        shp = [1] * g.dim
+        shp[ax] = shape[ax]
+        coord = (idx - self.plate_centre).view(shp)                  # signed distance from the centre
+
+        gvv = gv.view(*shape, g.dim)
+        c = gvv[..., ax]
+        # Top plate moves at -|v|, bottom at +|v|; a covered node is clamped so it cannot outrun
+        # the plate outward. Clamping rather than assigning leaves material free to move INWARD
+        # faster than the plate, which is what being squeezed out from between them looks like.
+        top = coord >= gap
+        bot = coord <= -gap
+        c = torch.where(top, c.clamp(max=-abs(v_plate)), c)
+        c = torch.where(bot, c.clamp(min=abs(v_plate)), c)
+        gvv[..., ax] = c
+        return gvv.view(g.n_cells, g.dim)
+
+    def plate_state(self, H):
+        """(current half-gap, plate closing speed in world units per second)."""
+        g0, g1 = self.plate_gap_half, self.plate_gap_half_end
+        if g1 is None or self.plate_close_to <= self.plate_close_from:
+            return g0, 0.0
+        span = self.plate_close_to - self.plate_close_from
+        u = (int(getattr(H, "frame", 0)) - self.plate_close_from) / span
+        u = min(1.0, max(0.0, u))
+        gap = g0 + u * (g1 - g0)
+        # Per FRAME in the schedule, per SECOND on the grid: the grid solve advances by a substep
+        # dt, so the closing rate has to be divided by the frame's own dt to become a velocity.
+        # Zero once the plates have arrived, or they keep pushing on a gap that no longer changes.
+        moving = 0.0 < u < 1.0 or (u == 0.0 and int(getattr(H, "frame", 0)) >= self.plate_close_from)
+        dt_frame = float(getattr(H, "dt", 0.0) or 0.0) or 1.0
+        v = ((g1 - g0) / span) / dt_frame if (u < 1.0 and moving) else 0.0
+        return gap, v
 
     def _walls3d(self, H, g, dev):
         """Rasterize 3D obstacles onto the grid (cached). Formats: a box
@@ -641,6 +737,39 @@ class MPMGridUpdate(FieldUpdate):
                             cj = gv[..., j]
                             gv[..., j] = torch.where(slab, cj * wd, cj)
                 gv = gv.view(g.n_cells, D)
+            if self.plate_axis is not None and self.plate_gap_half > 0.0:
+                gv = self._plate_bc(H, g, gv, dev, dt)
+            if self.plate_gap_half is not None:
+                ax = self.plate_axis
+                shape = g.shape
+                nax = shape[ax]
+                # node coordinate along the confined axis, as `_walls3d` computes it
+                coord = (torch.arange(nax, device=dev, dtype=gv.dtype) + 0.5) * dx
+                shp = [1] * D; shp[ax] = nax
+                zc = (coord - self.plate_centre).view(shp)
+                g0, g1 = self.plate_gap_half, self.plate_gap_half_end
+                span = max(self.plate_close_to - self.plate_close_from, 1.0)
+                fr = getattr(H, "frame_t", None)
+                fr = torch.zeros((), device=dev) if fr is None else fr.to(gv.dtype)
+                u = ((fr - self.plate_close_from) / span).clamp(0.0, 1.0)
+                gap = g0 + u * (g1 - g0)                       # tensor: safe inside a capture
+                # the plate's own speed, and its SIGN: closing means the +z plate moves down.
+                closing = (u > 0) & (u < 1)
+                v_plate = torch.where(closing,
+                                      torch.as_tensor((g1 - g0) / (span * float(getattr(H, "dt", 1.0))),
+                                                      device=dev, dtype=gv.dtype),
+                                      torch.zeros((), device=dev, dtype=gv.dtype))
+                gvv = gv.view(*shape, D)
+                ck = gvv[..., ax]
+                # BEYOND THE TOP PLATE: no faster outward than the plate itself, i.e. v <= v_plate
+                # (v_plate <= 0 while closing, so this both blocks penetration AND drives the
+                # compression). Mirrored below the bottom plate.
+                hi = zc > gap
+                lo = zc < -gap
+                ck = torch.where(hi, torch.minimum(ck, v_plate), ck)
+                ck = torch.where(lo, torch.maximum(ck, -v_plate), ck)
+                gvv[..., ax] = ck
+                gv = gvv.view(g.n_cells, D)
             walls = self._walls3d(H, g, dev)                        # solid 3D obstacles (box / sphere)
             if _const_any(self, "_c_walls3d", walls):
                 gv = torch.where(walls[:, None], torch.zeros_like(gv), gv)   # no-slip: zero grid velocity inside

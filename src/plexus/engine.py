@@ -657,6 +657,13 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     H.world_width = float(H.world_size[0])                 # legacy scalar (axis-0 width)
     H.boundary = sim.boundary                              # 'periodic' (wrap) | 'wall' (clamp) | 'free'/'none'/'open' (unbounded)
     H.periodic = (sim.boundary == "periodic")
+    H.dt = float(sim.dt)                        # per-FRAME sim time; substeps read H.sub_dt
+    # THE FRAME NUMBER AS A DEVICE TENSOR, so a CAPTURED substep can depend on it.
+    # `H.frame` is a python int, and a CUDA graph bakes python constants in at capture: any
+    # operator whose behaviour varies with the frame -- a plate that closes, a ramped force, a
+    # scheduled stimulus -- would replay frame 1 forever, silently. Filled in place each tick
+    # OUTSIDE the graph, read as a tensor INSIDE it, so the value the kernels see is current.
+    H.frame_t = torch.zeros((), device=device)
     H.obstacles = list(getattr(sim, "obstacles", []) or [])   # wall rects/discs for the `bounce` op
 
     # pass 1: top-level sets (no parent) -- positions seeded across the domain.
@@ -1470,6 +1477,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             if tick == 1:
                 _install_compile()                   # after tick 0 has warmed every run-constant cache
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
+            H.frame_t.fill_(float(tick))             # the same, reachable from inside a CUDA graph
             # THE MICRO-STEP COUNTER. A shared accumulator field -- the MPM grid is the one in the
             # library -- has to know when a fresh solve begins, because the FIRST operator writing
             # into it must clear it and every later one must add. Neither the tick nor the substep
