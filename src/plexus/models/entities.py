@@ -114,10 +114,19 @@ class MPMParticle:
         # different: two protein species of different density live inside ONE cell, so the
         # variation is between particles, not between their parents. The child set declares its
         # own `types` and the engine already assigns it a `node_type`; this reads that.
+        # ... AND THE PARENT'S TYPE TOO, when the bodies themselves are what differ. The note
+        # above is about two protein species inside ONE cell, where the variation really is between
+        # particles. It is not the only case: a scene of a jelly block, a water pool and a snow
+        # block declares those on the PARENT's types, so per-BODY density was unreachable and snow
+        # could not be made to float on water. Parent-type density is applied first; a child-type
+        # declaration still wins, being the finer statement.
+        rho_p = rho
+        if type_list and any("density" in t for t in type_list):
+            rho_p = torch.as_tensor([float(t.get("density", rho)) for t in type_list],
+                                    device=device, dtype=torch.float32)[ntp][pidx]
         _ct = list((s.get("types") or {}).values())
         _nt = getattr(lvl, "node_type", None)
-        rho_p = rho
-        if _ct and _nt is not None and len(_ct) > 1:
+        if _ct and _nt is not None and len(_ct) > 1 and any("density" in t for t in _ct):
             rho_p = torch.as_tensor([float(t.get("density", rho)) for t in _ct],
                                     device=device, dtype=torch.float32)[_nt]
         ppc = int(s["per_parent"])

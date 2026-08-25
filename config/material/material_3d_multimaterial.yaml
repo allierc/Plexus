@@ -6,117 +6,117 @@ general:
   boundary: wall
   dim: 3
   world:
-    - 1.0
-    - 1.0
-    - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
 sets:
   cell:
     n: 3
     start:
-      - - 0.24
-        - 0.6
-        - 0.5
-      - - 0.5
-        - 0.6
-        - 0.5
-      - - 0.76
-        - 0.6
-        - 0.5
+    - - 0.5
+      - 0.2
+      - 0.5
+    - - 0.29000000000000004
+      - 0.55
+      - 0.51
+    - - 0.71
+      - 0.55
+      - 0.51
     types:
-      jelly:
-        fraction: 0.1
-        youngs: 260
-        block:
-          - 0.14
-          - 0.5
-          - 0.4
-          - 0.34
-          - 0.72
-          - 0.6
       water:
-        fraction: 0.8
+        fraction: 0.3334
         youngs: 200
-        block:
-          - 0.4
-          - 0.5
-          - 0.4
-          - 0.6
-          - 0.72
-          - 0.6
+        density: 1.0
         material: liquid
-      snow:
-        fraction: 0.1
-        youngs: 90
         block:
-          - 0.66
-          - 0.5
-          - 0.4
-          - 0.86
-          - 0.72
-          - 0.6
+        - 0.1
+        - 0.06
+        - 0.3
+        - 0.9
+        - 0.34
+        - 0.7
+      snow:
+        fraction: 0.3333
+        youngs: 90
+        density: 0.35
         material: snow
+        block:
+        - 0.2
+        - 0.46
+        - 0.42
+        - 0.38
+        - 0.64
+        - 0.6
+      jelly:
+        fraction: 0.3333
+        youngs: 260
+        density: 1.15
+        block:
+        - 0.62
+        - 0.46
+        - 0.42
+        - 0.8
+        - 0.64
+        - 0.6
   mpm_particle:
     parent: cell
-    per_parent: 1000000
+    per_parent: 634000
     radius: 0.16
-    density: 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
     n_grid: 96
 operators:
-  - op: aggregate
-    at: cell
-  - op: gravity
-    at: cell
-    g: 16.0
-  - op: mpm_strain
-    at: mpm_particle
-    implementation: warp
-  - op: mpm_scatter
-    at: mpm_particle
-    to: mpm_grid
-    drag: 0.05
-    a_max: 200
-    implementation: warp
-    polar: higham
-  - op: mpm_grid_update
-    at: mpm_grid
-    wall_damp: 0.7
-    surface_tension: 40.0
-  - op: mpm_gather
-    at: mpm_particle
-    from: mpm_grid
-    wall_damp: 0.7
-    wall_contact: 0.01
-    vmax: 1000000000.0
-    implementation: warp
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 16.0
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.05
+  a_max: 200
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+  surface_tension: 40.0
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.01
+  vmax: 1000000000.0
+  implementation: warp
 schedule:
-  - aggregate
-  - gravity
-  - substep_dt: 0.0001185185
-    steps:
-      - mpm_strain
-      - mpm_scatter
-      - mpm_grid_update
-      - mpm_gather
+- aggregate
+- gravity
+- substep_dt: 0.0001185185
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
 descriptions:
   movie_mpm_particle:
-    description:
-      Initially, three distinct clusters of particles are arranged in a
+    description: Initially, three distinct clusters of particles are arranged in a
       linear sequence along a diagonal axis. Over time, the central blue cluster begins
       to expand and flatten, spreading across the bottom plane of the bounding box.
       The green and white clusters remain relatively stationary as the blue cluster
       grows to encompass the area beneath them. By the final frame, the blue particles
       form a large, thin sheet on the floor while the green and white clusters sit
       atop it.
-    objects:
-      "There are three primary clusters of particles: one green, one blue,
+    objects: 'There are three primary clusters of particles: one green, one blue,
       and one white. The green cluster is a compact, roughly spherical mass located
       on the left side of the scene. The white cluster is a similar compact, spherical
       mass located on the right side of the scene. The blue cluster starts as a compact
       sphere in the center but transforms into a large, flat, two-dimensional sheet
-      that covers the bottom of the cube."
+      that covers the bottom of the cube.'
 plotting:
   background: black
   up_axis: 1
@@ -125,7 +125,7 @@ plotting:
   box_frame: true
   fps: 60
   hide_sets:
-    - cell
+  - cell
   dot_size: 1.2
   render_3d: dots
   splat_size: 2.4
@@ -133,14 +133,14 @@ plotting:
   camera_turns: 0.0
   colors:
     jelly:
-      - 0.4
-      - 0.85
-      - 0.55
+    - 0.4
+    - 0.85
+    - 0.55
     water:
-      - 0.3
-      - 0.62
-      - 1.0
+    - 0.3
+    - 0.62
+    - 1.0
     snow:
-      - 0.95
-      - 0.96
-      - 1.0
+    - 0.95
+    - 0.96
+    - 1.0
