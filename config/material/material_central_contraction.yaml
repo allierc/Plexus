@@ -1,71 +1,120 @@
-general: {name: material_central_contraction, seed: 0, n_frames: 450, dt: 0.002, boundary: wall}
-
-# A square elastic sheet (16384 MLS-MPM material points filling [0.15,0.85]^2) that
-# is contracted toward its centre by a periodically pulsed active force. The force is
-# decomposed into three single-concern operators:
-#   pacemaker            (when)  -- a periodic scalar clock p(t) -> H.signals["beat"]
-#   activation_pulse       (where) -- p(t) x Gaussian(centre,radius) -> activation field
-#   active_force (what)  -- amplitude * grad(activation) -> H.part_accel (MPM body force)
-# and MPM (mpm_strain / mpm_scatter / mpm_grid_update / mpm_gather) is HOW the material responds.
+general:
+  name: material_central_contraction
+  seed: 0
+  n_frames: 450
+  dt: 0.002
+  boundary: wall
 sets:
   cell:
     n: 1
-    start: [[0.5, 0.5]]
+    start:
+    - - 0.5
+      - 0.5
     types:
-      sheet: {fraction: 1.0, youngs: 80, block: [0.15, 0.15, 0.85, 0.85]}
-  mpm_particle: {parent: cell, per_parent: 16384, density: 1.0}
-
+      sheet:
+        fraction: 1.0
+        youngs: 80
+        block:
+        - 0.15
+        - 0.15
+        - 0.85
+        - 0.85
+  mpm_particle:
+    parent: cell
+    per_parent: 16384
+    density: 1.0
 fields:
-  activation: {frame: grid, res: 128}      # the scalar pulse field (rendered)
-  mpm_grid: {frame: mpm_grid, n_grid: 128}     # MLS-MPM background grid (transient)
-
+  activation:
+    frame: grid
+    res: 128
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
 operators:
-- {op: aggregate, at: cell}
-- {op: pacemaker, at: activation, name: beat, period: 150, duration: 30, phase: 0}
-- {op: activation_pulse, at: activation, clock: beat, center: [0.5, 0.5], radius: 0.12}
-- {op: active_force, at: mpm_particle, from: activation, amplitude: 20.0, mode: inward}
-- {op: drag, emit: mpm_acceleration, at: mpm_particle, k: 30.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.5, wall_contact: 0.06}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06}
-
+- op: aggregate
+  at: cell
+- op: pacemaker
+  at: activation
+  name: beat
+  period: 150
+  duration: 30
+  phase: 0
+- op: activation_pulse
+  at: activation
+  clock: beat
+  center:
+  - 0.5
+  - 0.5
+  radius: 0.12
+- op: active_force
+  at: mpm_particle
+  from: activation
+  amplitude: 20.0
+  mode: inward
+- op: drag
+  emit: mpm_acceleration
+  at: mpm_particle
+  k: 30.0
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.5
+  wall_contact: 0.06
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.5
+  wall_contact: 0.06
 schedule:
 - aggregate
 - pacemaker
 - activation_pulse
 - active_force
 - drag
-- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
-
-# --- auto: video descriptions (gemma-4-12B) ---
+- substep_dt: 0.0002
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
 descriptions:
   movie_activation:
-    description: The video begins with a completely black frame, showing no visible activity. A single,
-      bright white point of light suddenly appears in the center of the frame. This point of light quickly
-      expands into a large, soft, and blurry white orb. Finally, the orb rapidly fades away, returning
-      the scene to a state of total darkness.
-    objects: The scene contains a single dynamic object that transitions from non-existence to a visible
-      state. Initially, there are no objects present in the black void. A small, intense white point of
-      light emerges as the primary object. This object grows into a large, circular, and diffuse white
-      sphere before disappearing.
+    description: The video begins with a completely black frame, showing no visible
+      activity. A single, bright white point of light suddenly appears in the center
+      of the frame. This point of light quickly expands into a large, soft, and blurry
+      white orb. Finally, the orb rapidly fades away, returning the scene to a state
+      of total darkness.
+    objects: The scene contains a single dynamic object that transitions from non-existence
+      to a visible state. Initially, there are no objects present in the black void.
+      A small, intense white point of light emerges as the primary object. This object
+      grows into a large, circular, and diffuse white sphere before disappearing.
   movie_cell:
-    description: The simulation shows a dense collection of blue particles distributed within a square
-      boundary. Over time, the particles exhibit a subtle shift in their spatial distribution, appearing
-      to move or fluctuate slightly. The overall density of the blue region remains constant throughout
-      the sequence. The boundaries of the square shape stay fixed while the internal texture evolves.
-    objects: The scene contains a large number of small, blue particles. These particles are arranged
-      in a dense, stochastic distribution that fills a square area. Each individual particle is tiny and
-      appears as a single pixel or a small cluster of pixels. The blue color is uniform across all particles,
-      contrasting against the white background.
+    description: The simulation shows a dense collection of blue particles distributed
+      within a square boundary. Over time, the particles exhibit a subtle shift in
+      their spatial distribution, appearing to move or fluctuate slightly. The overall
+      density of the blue region remains constant throughout the sequence. The boundaries
+      of the square shape stay fixed while the internal texture evolves.
+    objects: The scene contains a large number of small, blue particles. These particles
+      are arranged in a dense, stochastic distribution that fills a square area. Each
+      individual particle is tiny and appears as a single pixel or a small cluster
+      of pixels. The blue color is uniform across all particles, contrasting against
+      the white background.
   movie_mpm_particle:
-    description: The simulation shows a large collection of blue particles distributed uniformly across
-      a square white field. Over the course of the video, the particles appear to undergo a stochastic
-      process, shifting positions slightly while maintaining a constant overall density. There is no discernible
-      global motion or structural formation, suggesting a state of equilibrium or high-entropy diffusion.
-      The distribution remains homogeneous throughout the entire time sequence.
-    objects: The scene contains thousands of small, individual blue dots representing discrete particles.
-      These particles are arranged in a random, non-connected distribution across the entire 2D plane.
-      Each particle is uniform in size and color, appearing as a single pixel or small cluster of pixels.
-      The particles do not form any specific geometric shapes or clusters, maintaining a sparse and even
-      spatial occupancy.
+    description: The simulation shows a large collection of blue particles distributed
+      uniformly across a square white field. Over the course of the video, the particles
+      appear to undergo a stochastic process, shifting positions slightly while maintaining
+      a constant overall density. There is no discernible global motion or structural
+      formation, suggesting a state of equilibrium or high-entropy diffusion. The
+      distribution remains homogeneous throughout the entire time sequence.
+    objects: The scene contains thousands of small, individual blue dots representing
+      discrete particles. These particles are arranged in a random, non-connected
+      distribution across the entire 2D plane. Each particle is uniform in size and
+      color, appearing as a single pixel or small cluster of pixels. The particles
+      do not form any specific geometric shapes or clusters, maintaining a sparse
+      and even spatial occupancy.

@@ -400,7 +400,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -437,6 +437,20 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: The simulation begins with a discrete set of colored hexagonal particles
+      distributed within a 3D bounding box. Over time, these particles rapidly transition
+      into a dense, continuous field of points that settle toward the bottom plane
+      of the volume. The field exhibits complex, swirling patterns and turbulent structures
+      as it evolves. Eventually, the distribution stabilizes into a layered, multi-colored
+      sheet with distinct peaks and valleys.
+    objects: The scene contains a collection of hexagonal particles that are initially
+      separated and scattered in space. These particles are rendered in a vibrant
+      spectrum of colors including magenta, cyan, green, blue, and orange. As the
+      simulation progresses, the individual hexagons merge into a massive, interconnected
+      cloud of tiny points. The final state shows a large, flat surface of points
+      with varying heights and intricate, nested color patterns.
 plotting:
   background: black
   up_axis: 1
@@ -559,17 +573,3 @@ plotting:
     - 1.0
     - 0.0
     - 0.302
-descriptions:
-  movie_mpm_particle:
-    description: The simulation begins with a discrete set of colored hexagonal particles
-      distributed within a 3D bounding box. Over time, these particles rapidly transition
-      into a dense, continuous field of points that settle toward the bottom plane
-      of the volume. The field exhibits complex, swirling patterns and turbulent structures
-      as it evolves. Eventually, the distribution stabilizes into a layered, multi-colored
-      sheet with distinct peaks and valleys.
-    objects: The scene contains a collection of hexagonal particles that are initially
-      separated and scattered in space. These particles are rendered in a vibrant
-      spectrum of colors including magenta, cyan, green, blue, and orange. As the
-      simulation progresses, the individual hexagons merge into a massive, interconnected
-      cloud of tiny points. The final state shows a large, flat surface of points
-      with varying heights and intricate, nested color patterns.

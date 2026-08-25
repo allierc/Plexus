@@ -39,7 +39,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -75,6 +75,18 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: A cluster of blue particles initially occupies the center of a 3D
+      bounding box. Over time, the cluster collapses downward toward the bottom surface
+      of the box. The particles spread out horizontally as they settle, forming a
+      thin layer. By the final frame, the particles have flattened into a nearly uniform
+      distribution across the bottom plane.
+    objects: The scene contains a large collection of small, blue particles. These
+      particles are initially clustered in a dense, roughly spherical shape in the
+      center of the space. As the simulation progresses, they transition into a flattened,
+      disc-like arrangement. The particles are contained within a large, transparent
+      wireframe cube that defines the spatial boundaries.
 plotting:
   background: black
   up_axis: 1
@@ -94,15 +106,3 @@ plotting:
     - 0.3
     - 0.62
     - 1.0
-descriptions:
-  movie_mpm_particle:
-    description: A cluster of blue particles initially occupies the center of a 3D
-      bounding box. Over time, the cluster collapses downward toward the bottom surface
-      of the box. The particles spread out horizontally as they settle, forming a
-      thin layer. By the final frame, the particles have flattened into a nearly uniform
-      distribution across the bottom plane.
-    objects: The scene contains a large collection of small, blue particles. These
-      particles are initially clustered in a dense, roughly spherical shape in the
-      center of the space. As the simulation progresses, they transition into a flattened,
-      disc-like arrangement. The particles are contained within a large, transparent
-      wireframe cube that defines the spatial boundaries.

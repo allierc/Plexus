@@ -29,7 +29,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -59,12 +59,23 @@ operators:
 schedule:
 - aggregate
 - gravity
-- substep_dt: 1.434e-04
+- substep_dt: 0.0001434
   steps:
   - mpm_strain
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: A spherical cluster of particles begins at the center of a 3D bounding
+      box. It moves downward and toward the right side of the box. The cluster maintains
+      its spherical shape and size throughout the motion. It eventually settles near
+      the bottom-right corner of the frame.
+    objects: The scene contains a single spherical cluster composed of many small,
+      reddish-brown particles. This cluster is situated within a large, transparent
+      3D wireframe cube. The cube is defined by white lines and serves as a spatial
+      boundary for the simulation. The particles are densely packed to form a cohesive,
+      roughly spherical mass.
 plotting:
   background: black
   up_axis: 1
@@ -84,14 +95,3 @@ plotting:
     - 1.0
     - 0.55
     - 0.35
-descriptions:
-  movie_mpm_particle:
-    description: A spherical cluster of particles begins at the center of a 3D bounding
-      box. It moves downward and toward the right side of the box. The cluster maintains
-      its spherical shape and size throughout the motion. It eventually settles near
-      the bottom-right corner of the frame.
-    objects: The scene contains a single spherical cluster composed of many small,
-      reddish-brown particles. This cluster is situated within a large, transparent
-      3D wireframe cube. The cube is defined by white lines and serves as a spatial
-      boundary for the simulation. The particles are densely packed to form a cohesive,
-      roughly spherical mass.

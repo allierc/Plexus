@@ -5,42 +5,95 @@ general:
   dt: 0.0036
   boundary: wall
   obstacles:
-  - [0.0, 0.66, 0.66, 0.72]
-  - [0.34, 0.4, 1.0, 0.46]
-  - [0.0, 0.16, 0.66, 0.22]
+  - - 0.0
+    - 0.66
+    - 0.66
+    - 0.72
+  - - 0.34
+    - 0.4
+    - 1.0
+    - 0.46
+  - - 0.0
+    - 0.16
+    - 0.66
+    - 0.22
 sets:
   cell:
     n: 1
-    start: [0.18, 0.82, 0.18, 0.82]
+    start:
+    - 0.18
+    - 0.82
+    - 0.18
+    - 0.82
     types:
       water:
         fraction: 1.0
         youngs: 300
         layers:
-        - {frac: 1.0, youngs: 300, material: liquid}
-  mpm_particle: {parent: cell, per_parent: 7000, radius: 0.1, density: 1.0}
+        - frac: 1.0
+          youngs: 300
+          material: liquid
+  mpm_particle:
+    parent: cell
+    per_parent: 7000
+    radius: 0.1
+    density: 1.0
 fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 128}
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
 operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, surface_tension: 12, wall_damp: 0.5}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 12.0
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.05
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  surface_tension: 12
+  wall_damp: 0.5
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.5
+  wall_contact: 0.06
+  vmax: 1000000000.0
 schedule:
 - aggregate
 - gravity
 - substep_dt: 0.0002
-  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
-
-# --- auto: video descriptions (gemma-4-12B) ---
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
 descriptions:
   movie_cell:
-    description: A blue sphere starts at rest on a top horizontal platform. It then falls vertically to a middle platform, where it comes to a stop. From the middle platform, it falls again to a bottom platform. Finally, it settles on the bottom platform, completing its downward movement.
-    objects: The scene contains three horizontal platforms of varying lengths and positions. These platforms are light gray and arranged in a staggered, descending formation. A single blue sphere is the primary moving object in the simulation. The sphere is circular and significantly smaller than the length of the platforms.
+    description: A blue sphere starts at rest on a top horizontal platform. It then
+      falls vertically to a middle platform, where it comes to a stop. From the middle
+      platform, it falls again to a bottom platform. Finally, it settles on the bottom
+      platform, completing its downward movement.
+    objects: The scene contains three horizontal platforms of varying lengths and
+      positions. These platforms are light gray and arranged in a staggered, descending
+      formation. A single blue sphere is the primary moving object in the simulation.
+      The sphere is circular and significantly smaller than the length of the platforms.
   movie_mpm_particle:
-    description: A blue sphere sits on a dark grey platform at the beginning of the simulation. As time progresses, the sphere begins to deform and flatten against the surface. The sphere eventually loses its spherical shape and spreads out into a thin, irregular layer. Finally, the blue material flows off the edge of the platform and settles onto a lower level.
-    objects: The primary object is a blue, textured sphere that occupies the upper left portion of the frame. There are three dark grey rectangular platforms arranged at different heights and horizontal positions. The top platform is the widest and supports the initial blue sphere. The lower platforms are smaller and serve as landing surfaces for the flowing material.
+    description: A blue sphere sits on a dark grey platform at the beginning of the
+      simulation. As time progresses, the sphere begins to deform and flatten against
+      the surface. The sphere eventually loses its spherical shape and spreads out
+      into a thin, irregular layer. Finally, the blue material flows off the edge
+      of the platform and settles onto a lower level.
+    objects: The primary object is a blue, textured sphere that occupies the upper
+      left portion of the frame. There are three dark grey rectangular platforms arranged
+      at different heights and horizontal positions. The top platform is the widest
+      and supports the initial blue sphere. The lower platforms are smaller and serve
+      as landing surfaces for the flowing material.
 plotting:
   background: black

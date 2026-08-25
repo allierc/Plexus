@@ -40,7 +40,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -76,6 +76,19 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: A blue cluster of particles initially occupies the upper half of
+      a cubic volume. Over time, the cluster descends toward the bottom surface, gradually
+      flattening into a thin layer. A smaller, spherical cluster of grey particles
+      is positioned directly beneath the blue mass and is eventually enveloped by
+      it. By the final frame, the blue particles have spread out to cover the entire
+      bottom face of the cube.
+    objects: The primary object is a large, dense cluster of blue particles that changes
+      shape from a cube to a flat sheet. A secondary, smaller spherical cluster of
+      grey particles is located in the center of the cube. Both sets of particles
+      are contained within a large, transparent white wireframe cube. The blue particles
+      are significantly more numerous and larger in total volume than the grey particles.
 plotting:
   background: black
   up_axis: 1
@@ -94,16 +107,3 @@ plotting:
     - 0.3
     - 0.62
     - 1.0
-descriptions:
-  movie_mpm_particle:
-    description: A blue cluster of particles initially occupies the upper half of
-      a cubic volume. Over time, the cluster descends toward the bottom surface, gradually
-      flattening into a thin layer. A smaller, spherical cluster of grey particles
-      is positioned directly beneath the blue mass and is eventually enveloped by
-      it. By the final frame, the blue particles have spread out to cover the entire
-      bottom face of the cube.
-    objects: The primary object is a large, dense cluster of blue particles that changes
-      shape from a cube to a flat sheet. A secondary, smaller spherical cluster of
-      grey particles is located in the center of the cube. Both sets of particles
-      are contained within a large, transparent white wireframe cube. The blue particles
-      are significantly more numerous and larger in total volume than the grey particles.

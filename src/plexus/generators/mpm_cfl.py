@@ -23,6 +23,7 @@ Either way it edits only the relevant token(s), so comments and layout are prese
 from __future__ import annotations
 
 import math
+import os
 import re
 
 import yaml
@@ -219,3 +220,110 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
             text = re.sub(r"(\bsubsteps:\s*)\d+", lambda m: f"{m.group(1)}{new_sub}", text, count=1)
         open(yaml_path, "w").write(text)
     return True, info
+
+
+# ==========================================================================================================
+# PARTICLES PER CELL -- the other half of an MPM discretisation, and the one with no error message.
+#
+# `substep_dt` has the CFL check above; the grid resolution had nothing, so `n_grid` could be raised
+# without touching the particle count and the run would go quietly wrong. It cost a whole batch:
+# `material_3d_multimaterial` went from n_grid 64 to 192 at a fixed 100k particles per body, which
+# divides particles-per-cell by (192/64)^3 = 27 -- 43.3 to 1.61 -- and its snow block, which had
+# held its shape as a slightly compacted cube, collapsed into a flat pancake. That reads as a
+# material-parameter problem and is a sampling problem.
+#
+# WHY 8. MPM carries the material on particles and solves on the grid, so a cell needs enough
+# particle samples to determine the local deformation: the convention is 2 per axis, hence 2^3 = 8
+# in 3D and 2^2 = 4 in 2D. Below about half of that the deformation gradient in a cell is
+# underdetermined, the grid velocity there is essentially one particle's own velocity, and the body
+# loses stiffness and fractures numerically.
+#
+# REPORTED, NEVER ACTED ON. Both cures -- coarsen the grid or add particles -- change what the run
+# IS, so neither is this function's decision to make. Same discipline as the CFL headroom message.
+# ==========================================================================================================
+PPC_TARGET = 8.0                 # 2 particles per axis in 3D (4.0 in 2D; set below from `dim`)
+PPC_FLOOR = 0.5                  # fraction of target below which the material is under-sampled
+
+
+def _body_volumes(spec, dim):
+    """(name, volume) for every declared body type, from its `block` extent or its radius."""
+    out = []
+    sets = spec.get("sets") or {}
+    for sname, sv in sets.items():
+        if not isinstance(sv, dict) or "per_parent" not in sv:
+            continue
+        parent = sets.get(sv.get("parent"), {}) or {}
+        types = parent.get("types") or {}
+        rad_default = float(sv.get("radius", parent.get("radius", 0.05)) or 0.05)
+        n_par = int(parent.get("n", 1))
+        if not types:
+            v = (math.pi * rad_default ** 2 if dim == 2
+                 else (4.0 / 3.0) * math.pi * rad_default ** 3)
+            out.append((sname, v, int(sv["per_parent"]), n_par))
+            continue
+        for tn, t in types.items():
+            b = t.get("block")
+            if b:
+                v = 1.0
+                for k in range(dim):
+                    v *= abs(float(b[dim + k]) - float(b[k]))
+            else:
+                r = float(t.get("radius", rad_default))
+                v = math.pi * r ** 2 if dim == 2 else (4.0 / 3.0) * math.pi * r ** 3
+            frac = float(t.get("fraction", 1.0 / max(len(types), 1)))
+            out.append((f"{sname}/{tn}", v, int(sv["per_parent"]) * frac, n_par))
+    return out
+
+
+def particles_per_cell(yaml_path: str) -> list:
+    """Warn when a spec's grid and particle count disagree about how finely it is sampled."""
+    try:
+        spec = yaml.safe_load(open(yaml_path))
+    except Exception:
+        return []
+    if not isinstance(spec, dict):
+        return []
+    dim = int((spec.get("general") or {}).get("dim", 2))
+    n_grid = next((int(fc["n_grid"]) for fc in (spec.get("fields") or {}).values()
+                   if isinstance(fc, dict) and "n_grid" in fc), None)
+    if n_grid is None:
+        return []
+    target = PPC_TARGET if dim == 3 else 4.0
+    name = (spec.get("general") or {}).get("name", os.path.basename(yaml_path))
+    rows = []
+    _dupes = []
+    # DEDUPED. A spec with 27 identical blobs would otherwise emit 27 identical warnings, and a
+    # message repeated 27 times is one nobody reads.
+    seen = {}
+    for label, vol, n_per_parent, _n_par in _body_volumes(spec, dim):
+        cells = vol * n_grid ** dim
+        if cells <= 0:
+            continue
+        ppc = n_per_parent / cells
+        rows.append((label, ppc, cells, n_per_parent))
+        key = (round(ppc, 3), round(cells))
+        if key in seen:
+            seen[key][1] += 1
+            continue
+        seen[key] = [label, 1]
+        if ppc < target * PPC_FLOOR:
+            # `n_grid` for the target, and the particle count for the target, so the reader can pick
+            want_grid = int(round((n_per_parent / (target * vol)) ** (1.0 / dim)))
+            want_n = int(target * cells)
+            warn(f"{name}: {label} has {ppc:.2f} particles per grid cell "
+                 f"({n_per_parent:,.0f} particles over {cells:,.0f} cells at n_grid={n_grid}) -- "
+                 f"UNDER-SAMPLED, MPM wants ~{target:.0f}. The body will lose stiffness and may "
+                 f"fracture numerically. Either n_grid={want_grid} or "
+                 f"{want_n:,} particles for that body.")
+            _dupes.append(key)
+        elif ppc > target * 16:
+            print(f"[grid-ppc] {name}: {label} has {ppc:.0f} particles per cell "
+                  f"(~{target:.0f} is the convention) -- the grid cannot resolve detail the "
+                  f"particles carry, so this is cost without fidelity; n_grid="
+                  f"{int(round((n_per_parent / (target * vol)) ** (1.0 / dim)))} would use them.",
+                  flush=True)
+    for k in _dupes:                      # "... and 26 more just like it", once
+        if seen.get(k, [None, 1])[1] > 1:
+            print(f"[grid-ppc] {name}: ... and {seen[k][1] - 1} further bodies identical to "
+                  f"{seen[k][0]}.", flush=True)
+    return rows

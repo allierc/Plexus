@@ -60,7 +60,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -96,6 +96,18 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: A large cluster of blue particles begins in the upper center of a
+      cubic volume. Over time, the cluster descends and spreads outward toward the
+      bottom surface. As it falls, the particles interact with three vertical rectangular
+      pillars, causing some to accumulate around them. By the final frame, the particles
+      have mostly settled into a flat layer across the bottom of the cube.
+    objects: The scene contains a large cloud of small blue particles that form a
+      dense, roughly spherical mass. There are three tall, thin rectangular pillars
+      arranged in a triangular formation at the base of the cube. The entire simulation
+      is contained within a large, transparent white wireframe cube. The background
+      is solid black, providing high contrast for the blue particles and white outlines.
 plotting:
   background: black
   up_axis: 1
@@ -114,15 +126,3 @@ plotting:
     - 0.3
     - 0.62
     - 1.0
-descriptions:
-  movie_mpm_particle:
-    description: A large cluster of blue particles begins in the upper center of a
-      cubic volume. Over time, the cluster descends and spreads outward toward the
-      bottom surface. As it falls, the particles interact with three vertical rectangular
-      pillars, causing some to accumulate around them. By the final frame, the particles
-      have mostly settled into a flat layer across the bottom of the cube.
-    objects: The scene contains a large cloud of small blue particles that form a
-      dense, roughly spherical mass. There are three tall, thin rectangular pillars
-      arranged in a triangular formation at the base of the cube. The entire simulation
-      is contained within a large, transparent white wireframe cube. The background
-      is solid black, providing high contrast for the blue particles and white outlines.

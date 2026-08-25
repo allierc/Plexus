@@ -41,7 +41,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -77,6 +77,17 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+descriptions:
+  movie_mpm_particle:
+    description: Three spherical particles are shown moving within a 3D bounding box.
+      The blue particle moves towards the center while the red and green particles
+      move towards each other. The red and green particles eventually collide and
+      overlap in the center of the box. The blue particle then moves towards the combined
+      red and green cluster.
+    objects: There are three spherical particles in the scene. The particles are colored
+      blue, red, and green. They are of approximately equal size and are initially
+      separated from each other. The particles move independently until the red and
+      green ones merge into a single overlapping cluster.
 plotting:
   background: black
   up_axis: 1
@@ -103,14 +114,3 @@ plotting:
     - 0.45
     - 0.6
     - 1.0
-descriptions:
-  movie_mpm_particle:
-    description: Three spherical particles are shown moving within a 3D bounding box.
-      The blue particle moves towards the center while the red and green particles
-      move towards each other. The red and green particles eventually collide and
-      overlap in the center of the box. The blue particle then moves towards the combined
-      red and green cluster.
-    objects: There are three spherical particles in the scene. The particles are colored
-      blue, red, and green. They are of approximately equal size and are initially
-      separated from each other. The particles move independently until the red and
-      green ones merge into a single overlapping cluster.
