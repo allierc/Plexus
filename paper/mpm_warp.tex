@@ -352,14 +352,42 @@ cards land at $\approx$77\,GB/s, which is $\approx$5\% of A100 peak and $\approx
 the \emph{same absolute} throughput on very different hardware, which is the signature of a serialised
 bottleneck rather than a memory one. That bottleneck is the scatter's atomics (\S7).
 
-\paragraph{What CUDA-graph capture actually removes, and it is not launch latency.} Capture is worth
-\gd{1.73$\times$} at 100\,M (7853.9 $\to$ 4551.0\,ms/frame) --- but at 4.5\,s a frame, the 28 kernel
-launches it elides are nanoseconds against seconds, so launch overhead cannot be the mechanism. The
-memory column names it: peak rises \gd{30.89 $\to$ 42.81\,GiB} under capture, a 39\% increase. A
-captured graph allocates from a private pool that stays resident, so \code{mpm\_strain}'s and
+\subsection{CUDA-graph capture: what it is, what it removes, and when it stops earning its keep}
+
+\code{capture: true} on a schedule's substep block tells the engine to record that block's four
+operators \emph{once} as a \code{torch.cuda.CUDAGraph} and then replay the recording seven times a
+frame, instead of re-issuing the kernels through Python each substep. It is orthogonal to the
+\code{implementation} axis: \code{default} and \code{warp} can each be captured or not, and the
+benchmark tables above report both settings for exactly that reason.
+
+\paragraph{What it removes is not launch latency.} Capture is worth \gd{1.73$\times$} at 100\,M
+(7853.9 $\to$ 4551.0\,ms/frame) --- but at 4.5\,s a frame, the 28 kernel launches it elides are
+nanoseconds against seconds, so launch overhead cannot be the mechanism. The memory column names it:
+peak \emph{rises} \gd{30.89 $\to$ 42.81\,GiB} under capture, a 39\% increase. A captured graph
+allocates from a private pool that stays resident, so \code{mpm\_strain}'s and
 \code{mpm\_grid\_update}'s $[N,3,3]$ intermediates are allocated \emph{once} instead of being
-malloc'd and freed 7 times a frame. Capture is buying the removal of the caching allocator, which is
-the same thing fusion bought --- and it buys it for the two operators fusion has not reached yet.
+malloc'd and freed seven times a frame. Capture is buying the removal of the caching allocator ---
+the same thing fusion bought, for the two operators fusion has not reached.
+
+\paragraph{Which means it has an expiry date, and that is the point.} Everything capture earns here,
+it earns on behalf of the un-fused half. \code{mpm\_scatter[warp]} and \code{mpm\_gather[warp]}
+allocate nothing (\S4), so there is nothing for the private pool to hold on their behalf; the
+\gd{1.73$\times$} is \code{mpm\_strain}'s 313\,B and \code{mpm\_grid\_update}'s 151\,B per particle
+per substep, being allocated once rather than seven times. \textbf{When those two are ported, capture's
+benefit should largely evaporate while its 39\% memory cost remains} --- so the right sequence is to
+fuse them and \emph{re-measure} capture, not to leave a flag on because it once helped. If it falls
+to a few percent it should default to off.
+
+\paragraph{It fails silently, and that is its real cost today.} A capture pool that does not fit does
+not raise. The allocator retries, so the run sits at 100\% CPU with no output, no error and no
+progress --- indefinitely. That is what a 100\,M render did on a 48\,GiB A6000: 42.8\,GiB of capture
+pool, plus a live renderer, plus 3.6\,GB of recording buffers. The diagnostic is an \emph{absence}:
+the engine prints \code{substep captured as a CUDA graph} when a capture completes, and that line
+never appeared. \code{Plexus\_Main.py} now projects the footprint before the run --- measured at
+0.42\,GiB per million particles captured against 0.309 eager --- compares it with \emph{that card's}
+memory rather than against a particle count or a card name, warns when it exceeds 80\%, and offers
+\code{--no-capture}. A fixed threshold would have nagged on an 80\,GiB H100, where 100\,M is
+unremarkable, and stayed silent on a 24\,GiB card, where 50\,M is not.
 
 \begin{figure}[t]
 \centering
@@ -418,7 +446,9 @@ with it. Anything that needs byte-identity --- the promotion twins --- stays on 
 \item \textbf{\code{mpm\_strain} and \code{mpm\_grid\_update} are still \code{default}} and are now
   the whole remaining frame: \bpstrain\,B and \bpgridupdate\,B per particle-substep against
   \code{warp}'s zero for the other two. \code{strain} is a $[N,3,3]$ matrix product and fuses
-  trivially; \code{grid\_update} is $O(\text{cells})$ and is a different kernel shape.
+  trivially; \code{grid\_update} is $O(\text{cells})$ and is a different kernel shape. Porting them
+  also settles \S5.4: capture exists to paper over exactly these two, so its $1.73\times$ should be
+  re-measured once they are gone.
 \item \textbf{The atomics are the wall.} \code{warp} sits at $\approx$8--10\% of peak on both cards
   and does not improve when the card gets faster, which is the same signature \code{default} showed
   for a different reason. The fix is the node-centric P2G that NVIDIA's own \code{warp.fem} MPM uses:

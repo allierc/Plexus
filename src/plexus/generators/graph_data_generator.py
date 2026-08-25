@@ -66,6 +66,14 @@ def data_generate(
     # `live_every_frac=None`. The matplotlib import is inside `plexus.live.snapshot`, so this module
     # still imports no plotting stack -- see its own docstring on why that matters.
     hooks = []
+    # THE VTK MOVIE SUPERSEDES THE MATPLOTLIB PNG SNAPSHOT -- do not run both. They answer the same
+    # question ("what is this run doing right now") and the movie answers it more often and far more
+    # cheaply: 0.1 s a frame against seconds-to-minutes for a matplotlib scatter of the full set.
+    # Running both is how a 100 M render came to spend its time in `snapshot` while the movie it was
+    # asked for sat idle. `--no-viz` still turns off both; asking for the movie now turns off the
+    # stills, and a run that wants the stills can pass `live_movie=None`.
+    if live_movie is not None:
+        live_every_frac = None
     if live_every_frac:
         from plexus.live import every_n, snapshot
         _stride = every_n(sim.n_frames, live_every_frac)

@@ -104,6 +104,13 @@ def dot_area_pt2(pos, span_data, fig_px, dpi, fill=0.9, cap=(1.0, 400.0)):
     q = np.asarray(pos, float)[:, :2]
     if len(q) < 2 or span_data <= 0:
         return 12.0
+    # MEASURED ON A SAMPLE, because the median converges long before the full set and the tree does
+    # not. Uncapped, this built a cKDTree over EVERY point: 1.3 s at 1 M, 7.6 s at 4 M, and ~3 min
+    # at 100 M -- fired every 5% of frames, that is ~80 minutes of a 100 M run spent measuring a dot
+    # size, with no output, which reads exactly like a hang. (It is what one looked like.) 20,000
+    # points is the same cap `plexus.live_movie._dot_px` uses and for the same reason.
+    if len(q) > 20000:
+        q = q[np.random.default_rng(0).choice(len(q), 20000, replace=False)]
     try:
         from scipy.spatial import cKDTree
         # k=2 because the nearest neighbour of a point is itself at distance 0

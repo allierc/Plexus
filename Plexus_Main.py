@@ -63,6 +63,12 @@ def main():
                         help="particles DRAWN in the live mp4; the run still simulates all of them")
     parser.add_argument("--render-max-frames", type=int, default=300,
                         help="cap on rendered frames; longer runs are strided down to this")
+    parser.add_argument("--no-capture", action="store_true",
+                        help="override the spec and do NOT CUDA-graph-capture the substep. Capture "
+                             "is worth ~1.7x but costs ~39%% more device memory (30.9 -> 42.8 GiB "
+                             "at 100 M particles), because a captured graph allocates from a "
+                             "private pool that stays resident. On a card where the renderer also "
+                             "needs room, that trade goes the other way")
     parser.add_argument("--render-dot", default="auto",
                         help="dot size in px, or 'auto' to size it to the drawn particles' median "
                              "nearest-neighbour spacing so the material reads as solid")
@@ -101,6 +107,14 @@ def main():
         Courant_Friedrichs_Lewy_condition(yaml_file)
     sim = load(yaml_file)
 
+    # CAPTURE IS A SPEC CHOICE AND STAYS ONE -- this overrides it only when asked, and says so.
+    # Silently flipping a spec value is how a run stops being reproducible from its spec.
+    if args.no_capture:
+        for _st in sim.schedule:
+            if isinstance(_st, dict) and _st.get("capture"):
+                _st["capture"] = False
+                print("[capture] OFF by --no-capture (spec asked for it)", flush=True)
+
     # self-describing run dir: snapshot the spec into log/<type>/<name>/
     run_log_dir = log_path(pre_folder.rstrip("/"), name)
     os.makedirs(run_log_dir, exist_ok=True)
@@ -115,6 +129,34 @@ def main():
         # this hook exists for the runs where that is impossible, and at 100 M particles one
         # recorded frame is 1.2 GB so it is impossible often. `--no-viz` turns off every renderer.
         _dot = args.render_dot if args.render_dot == "auto" else float(args.render_dot)
+        # A CAPTURED GRAPH AND A RENDERER COMPETE FOR THE SAME CARD, and the failure is silent:
+        # the allocator retries rather than raising, so the run sits at 100% CPU with no output and
+        # no error. That is what a 100 M render did -- the capture pool plus the renderer plus the
+        # recording buffers on a 47.4 GiB card -- and the tell was that `[engine] substep captured
+        # as a CUDA graph` never printed.
+        #
+        # THE TEST IS THE FOOTPRINT AGAINST *THIS* CARD, NOT A PARTICLE COUNT AND NOT A CARD NAME.
+        # 20 M is a stall on a 48 GiB A6000 and unremarkable on an 80 GiB H100, so a fixed
+        # threshold would nag on the big card and stay silent on a 24 GiB one. The coefficients are
+        # measured, on `warp`, over 500 k -> 100 M (paper/mpm_warp.pdf 5.2-5.3): 0.309 GiB per
+        # million particles eager, 0.42 with capture -- capture's private pool stays resident, which
+        # is where the ~39% comes from.
+        if not args.no_viz and not args.no_capture and args.device.startswith("cuda"):
+            _npart = sum(int(v.get("per_parent", 0)) * int(sim.sets.get(v.get("parent"), {}).get("n", 1))
+                         for v in sim.sets.values() if isinstance(v, dict) and "per_parent" in v)
+            _cap_on = any(isinstance(x, dict) and x.get("capture") for x in sim.schedule)
+            if _npart and _cap_on:
+                import torch
+                _tot = torch.cuda.get_device_properties(args.device).total_memory / 2 ** 30
+                _proj = 0.42 * _npart / 1e6            # GiB, captured
+                if _proj > 0.80 * _tot:                # the renderer and the recorder want the rest
+                    print(f"[capture] WARNING: {_npart:,} particles with capture ON projects "
+                          f"~{_proj:.0f} GiB on a {_tot:.0f} GiB "
+                          f"{torch.cuda.get_device_properties(args.device).name}, and a live "
+                          f"renderer needs room too. Without capture it is ~{0.309 * _npart / 1e6:.0f} "
+                          f"GiB. If the run stalls at 100% CPU with no output and never prints "
+                          f"'substep captured as a CUDA graph', that is why -- rerun with "
+                          f"--no-capture.", flush=True)
         lm = None if args.no_viz else {"render_n": args.render_n,
                                        "max_frames": args.render_max_frames, "dot": _dot}
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
