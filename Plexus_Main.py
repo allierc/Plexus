@@ -39,9 +39,15 @@ def main():
     # back to these hardcoded values. Edit the list to debug a different task/config.
     # Ignored as soon as any real CLI argument is passed.
     if len(sys.argv) == 1:
+        # `--no-viz` DELIBERATELY, because this path exists for stepping through operators: without
+        # it the VTK plotter is built and fires on every frame while you are stopped on a breakpoint.
+        # For line-by-line work also set CUDA_LAUNCH_BLOCKING=1 in the debug environment -- CUDA is
+        # asynchronous, so without it a tensor may not be computed when you inspect it and an error
+        # surfaces at the wrong line. (`--device cpu` is synchronous and this spec is only 18,000
+        # particles.) The MPM `forward`s to break in are all in src/plexus/operators/mpm_ops.py.
         sys.argv += ["-o", "generate",
-                     "/workspace/Plexus/config/material/material_3balls_bouncy.yaml",
-                     "--device", "cuda:0", "--movie", "--grid"]
+                     "/workspace/Plexus/config/material/material_3d_multimaterial.yaml",
+                     "--device", "cuda:0", "--no-viz"]
 
     parser = argparse.ArgumentParser(description="plexus")
     parser.add_argument("-o", "--option", nargs="+", required=True,
@@ -63,12 +69,6 @@ def main():
                         help="particles DRAWN in the live mp4; the run still simulates all of them")
     parser.add_argument("--render-max-frames", type=int, default=300,
                         help="cap on rendered frames; longer runs are strided down to this")
-    parser.add_argument("--no-capture", action="store_true",
-                        help="override the spec and do NOT CUDA-graph-capture the substep. Capture "
-                             "is worth ~1.7x but costs ~39%% more device memory (30.9 -> 42.8 GiB "
-                             "at 100 M particles), because a captured graph allocates from a "
-                             "private pool that stays resident. On a card where the renderer also "
-                             "needs room, that trade goes the other way")
     parser.add_argument("--render-dot", default="auto",
                         help="dot size in px, or 'auto' to size it to the drawn particles' median "
                              "nearest-neighbour spacing so the material reads as solid")
@@ -107,14 +107,6 @@ def main():
         Courant_Friedrichs_Lewy_condition(yaml_file)
     sim = load(yaml_file)
 
-    # CAPTURE IS A SPEC CHOICE AND STAYS ONE -- this overrides it only when asked, and says so.
-    # Silently flipping a spec value is how a run stops being reproducible from its spec.
-    if args.no_capture:
-        for _st in sim.schedule:
-            if isinstance(_st, dict) and _st.get("capture"):
-                _st["capture"] = False
-                print("[capture] OFF by --no-capture (spec asked for it)", flush=True)
-
     # self-describing run dir: snapshot the spec into log/<type>/<name>/
     run_log_dir = log_path(pre_folder.rstrip("/"), name)
     os.makedirs(run_log_dir, exist_ok=True)
@@ -141,7 +133,7 @@ def main():
         # measured, on `warp`, over 500 k -> 100 M (paper/mpm_warp.pdf 5.2-5.3): 0.309 GiB per
         # million particles eager, 0.42 with capture -- capture's private pool stays resident, which
         # is where the ~39% comes from.
-        if not args.no_viz and not args.no_capture and args.device.startswith("cuda"):
+        if not args.no_viz and args.device.startswith("cuda"):
             _npart = sum(int(v.get("per_parent", 0)) * int(sim.sets.get(v.get("parent"), {}).get("n", 1))
                          for v in sim.sets.values() if isinstance(v, dict) and "per_parent" in v)
             _cap_on = any(isinstance(x, dict) and x.get("capture") for x in sim.schedule)
@@ -155,8 +147,8 @@ def main():
                           f"{torch.cuda.get_device_properties(args.device).name}, and a live "
                           f"renderer needs room too. Without capture it is ~{0.309 * _npart / 1e6:.0f} "
                           f"GiB. If the run stalls at 100% CPU with no output and never prints "
-                          f"'substep captured as a CUDA graph', that is why -- rerun with "
-                          f"--no-capture.", flush=True)
+                          f"'substep captured as a CUDA graph', that is why -- set "
+                          f"`capture: false` on the spec's substep block.", flush=True)
         lm = None if args.no_viz else {"render_n": args.render_n,
                                        "max_frames": args.render_max_frames, "dot": _dot}
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
