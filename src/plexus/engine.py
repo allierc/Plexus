@@ -1500,9 +1500,16 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             if tick == 1:
                 _install_compile()                   # after tick 0 has warmed every run-constant cache
             if progress and tick and hasattr(ticks, "set_postfix_str") and tick % 8 == 0:
-                _el = ticks.format_dict.get("elapsed") or 0.0
-                if _el > 0:
-                    ticks.set_postfix_str(f"{_el / tick * 1000:.1f} ms/frame", refresh=False)
+                # THE RECENT RATE, NOT THE CUMULATIVE AVERAGE. `elapsed / tick` folds the one-off
+                # startup -- building the hierarchy, the CUDA-graph capture, a torch.compile -- into
+                # every reading: on a 945k-particle run that is ~4 s of capture, so frame 39 reported
+                # 641 ms where the steady rate was 553. tqdm's own `rate` is an exponential moving
+                # average over recent iterations, so it converges within a few frames and reads the
+                # same as the benchmark does.
+                _r = ticks.format_dict.get("rate")
+                if _r:
+                    ticks.set_postfix_str(f"{1000.0 / _r:.1f} ms/frame  {_r:.2f} fps",
+                                          refresh=False)
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
             H.frame_t.fill_(float(tick))             # the same, reachable from inside a CUDA graph
             # THE MICRO-STEP COUNTER. A shared accumulator field -- the MPM grid is the one in the

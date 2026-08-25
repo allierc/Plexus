@@ -44,6 +44,7 @@ from . import field_ops             # noqa: F401  the grid field, deposit, diffu
 #                                                 chemotax, playback, pacemaker, activation_pulse, signal
 from . import mpm_ops               # noqa: F401  mpm_grid + p2g/grid_update/g2p/strain, anchor,
 from . import mpm_triton         # noqa: F401  mpm_scatter[implementation: triton] -- one fused kernel
+from . import mpm_warp           # noqa: F401  mpm_scatter[implementation: warp]
 #                                                 spin, apply_material_map, and the fenced oracle
 from . import agent_ops             # noqa: F401  agent_scatter/gather/remodel, agent_divide/grow,
 #                                                 polarity, active force+stress, aggregate/broadcast,
@@ -66,5 +67,5 @@ from . import neural                # noqa: F401  neural_seed, neuron_update (ph
 from . import observation           # noqa: F401  voxelize -- a REPRESENTATION, not a mechanism
 
 __all__ = ["interaction_ops", "motion_ops", "field_ops", "mpm_ops", "agent_ops",
-           "mpm_triton", "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
+           "mpm_triton", "mpm_warp", "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
            "contact_ops", "neural", "observation"]
