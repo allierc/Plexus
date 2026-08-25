@@ -373,9 +373,15 @@ class MPMStrainWarp(MPMStrain):
         D = p.F.shape[-1]
         if D != 3 or str(dev) == "cpu":
             raise RuntimeError(f"mpm_strain[warp] is 3D CUDA only (got dim={D}, dev={dev})")
+        # CACHED, and it MUST be. `bool(m.any())` is a device->host sync, and a sync inside a
+        # CUDA-graph capture is illegal -- `cudaErrorStreamCaptureUnsupported`, which took down
+        # every 3D spec the moment this operator was used, because `capture` defaults to True
+        # (engine.py:1586). The predicate is run-constant: which particles are snow or
+        # viscoelastic is fixed at seeding. `_const_any` is the codebase's existing answer to
+        # exactly this and is what the default bodies use.
+        from plexus.operators.mpm_ops import _const_any
         for nm in ("is_visco", "is_snow"):
-            m = getattr(p, nm, None)
-            if m is not None and bool(m.any()):
+            if _const_any(self, "_c_" + nm, getattr(p, nm, None)):
                 raise RuntimeError(
                     f"mpm_strain[warp] does not implement the {nm[3:]} branch (it needs a 3x3 SVD "
                     f"whose singular-value ordering differs from torch's); set "
@@ -383,9 +389,12 @@ class MPMStrainWarp(MPMStrain):
         dt = sub_dt(H, self.dt_sub)
         liq = getattr(p, "is_liquid", None)
         has_liq = 1 if liq is not None else 0
-        liqf = (liq.float().contiguous() if liq is not None else torch.zeros(p.n, device=dev))
-        occ = getattr(p, "occ", None)
-        occ = torch.ones(p.n, device=dev) if occ is None else occ.contiguous()
+        if getattr(self, "_side", None) is None:      # run-constant; built once, not per substep
+            self._side = (liq.float().contiguous() if liq is not None
+                          else torch.zeros(p.n, device=dev),
+                          torch.ones(p.n, device=dev) if getattr(p, "occ", None) is None else None)
+        liqf = self._side[0]
+        occ = self._side[1] if self._side[1] is not None else p.occ.contiguous()
         wp.launch(strain_elastic, dim=int(p.n), device=f"cuda:{dev.index or 0}",
                   inputs=[wp.from_torch(p.C, dtype=wp.mat33), wp.from_torch(p.F, dtype=wp.mat33),
                           wp.from_torch(liqf), wp.from_torch(occ),

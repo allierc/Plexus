@@ -63,7 +63,7 @@ class LiveMovie:
     """
 
     def __init__(self, out, world, n_frames, up=2, render_n=400_000, max_frames=300,
-                 fps=20, px=1280, dot="auto", fill=0.9, elev=18.0, azim=-58.0, name="", seed=0,
+                 fps=20, px=1280, dot=None, fill=0.9, elev=18.0, azim=-58.0, name="", seed=0,
                  sim=None, style=None, stills=10):
         from plexus.render_vtk import offscreen
         offscreen()                                   # kill the Xlib chatter before VTK loads
@@ -82,6 +82,12 @@ class LiveMovie:
         # renderer samples it, and a dot sized to the DRAWN spacing puts that right: the picture
         # then shows the material at the resolution actually drawn, instead of showing 250x fewer
         # dots at the size that suited 250x more of them.
+        # THE SPEC ALREADY SAYS HOW BIG A DOT IS. `plotting.dot_size` is declared in essentially
+        # every material spec and `plot.py` honours it; this renderer did not, so a config that
+        # said 1.2 got whatever the CLI defaulted to. Precedence: an explicit argument (the CLI)
+        # beats the spec, the spec beats "auto".
+        if dot is None:
+            dot = self.style.get("dot_size", "auto")
         self.dot, self.fill = dot, float(fill)
         self.px_used = None
         self.up = int(up)

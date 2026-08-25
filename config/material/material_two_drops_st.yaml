@@ -35,10 +35,21 @@ schedule:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: Two separate circular particles initially move toward each other from the left and right sides of the frame. They collide and begin to merge into a single, unified shape. As they fuse, the boundary between the two colors becomes irregular and complex. Finally, the two particles completely integrate into a single, multi-colored blob.
-    objects: The scene contains two primary circular particles that are initially distinct and separate. One particle is light blue and the other is light orange, both having a similar diameter. As the simulation progresses, the two circles overlap and deform into a single, larger irregular shape. The final object is a single composite blob featuring both blue and orange colors with a jagged internal boundary.
+    description: Two separate blue and orange circular clusters initially exist side-by-side. They begin
+      to move toward each other and merge into a single, unified shape. As they fuse, the internal boundaries
+      shift and reorganize into a complex, interlocking pattern. The final state shows a single, stable
+      composite object with a distinct blue and orange distribution.
+    objects: The scene contains two primary clusters of particles, one blue and one orange. Initially,
+      these clusters are separate, roughly circular, and of similar size. As they merge, they form a single,
+      larger, roughly spherical object. The final object maintains a dual-color composition with a complex,
+      irregular internal interface.
   movie_mpm_particle:
-    description: Two separate blue and orange circular clusters of particles initially exist side-by-side. They begin to move toward each other and merge into a single, unified spherical mass. As they merge, the blue and orange particles intermix to form a composite globe-like structure. The final frames show a stable, integrated sphere where the two colors are distributed across the surface.
-    objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation progresses, the particles reorganize into a single spherical topology. The final object is a single sphere composed of both blue and orange particles of uniform size.
-plotting:
-  background: black
+    description: Two distinct clusters of particles begin as separate entities and move toward each other.
+      As they approach, the two groups begin to intermingle and overlap significantly. The particles continue
+      to mix until they form a single, unified cluster with a complex internal structure. By the end of
+      the sequence, the two colors are thoroughly integrated into a single cohesive shape.
+    objects: The scene contains two primary sets of particles, one colored blue and the other colored
+      orange. Initially, the blue particles form a circular cluster on the left, while the orange particles
+      form a similar circular cluster on the right. Both clusters are composed of many small, individual
+      points that maintain a roughly spherical boundary. As the simulation progresses, the two sets of
+      particles merge into a single, larger, and more irregular composite shape.
