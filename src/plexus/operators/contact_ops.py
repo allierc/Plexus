@@ -698,7 +698,8 @@ class PlateConfine3D(Structural):
     DIFFERENTIABLE = False
     MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["rigid_confinement", "anisotropic_boundary", "solid_obstacle"]
-    PARAM_ROLES = {"gap_half": "free_half_gap", "stiff": "projection_fraction",
+    PARAM_ROLES = {"gap_half": "free_half_gap", "gap_half_end": "final_free_half_gap",
+                   "close_from": "frame_closing_starts", "close_to": "frame_closing_ends", "stiff": "projection_fraction",
                    "axis": "confined_axis", "centre": "gap_centre_on_axis"}
     REFERENCE = "Plexus (this work); the confinement geometry of Okuda, S. et al. (2018) Sci. Rep. 8:2386."
 
@@ -710,6 +711,23 @@ class PlateConfine3D(Structural):
         self.gap_half = float(params["gap_half"])
         self.stiff = float(params.get("stiff", 0.6))
         self.damp_normal = bool(params.get("damp_normal", True))
+        # A MOVING PLATEN. `gap_half` alone is a gap that was always there, which answers "how does
+        # a cell behave when confined" but not "what does confining it DO" -- and the second is the
+        # question a squashing experiment asks. With `gap_half_end` the plates close linearly from
+        # `close_from` to `close_to` (frames), so one run shows the whole sequence: sphere, ovoid,
+        # then the flattened, mutually-pressed shape an epithelium has.
+        #
+        # WHY THE PLATEN MUST BE THIS OPERATOR AND NOT AN `obstacles:` BOX. The obstacle path
+        # rasterises solid cells onto the MPM grid and zeroes their velocity, which stops a particle
+        # entering but cannot EXPEL one already inside: a cell seeded across a plate keeps its shape
+        # and simply freezes the overlapping shell (measured on cell_10 -- z/x aspect 1.00 against a
+        # gap 13% narrower than the cell). This operator PROJECTS positions, so a plate that arrives
+        # where matter already is pushes that matter out, which is what squashing means.
+        self.gap_half_end = params.get("gap_half_end", None)
+        self.gap_half_end = None if self.gap_half_end is None else float(self.gap_half_end)
+        self.close_from = int(params.get("close_from", 0))
+        self.close_to = int(params.get("close_to", 0))
+        self._gap0 = self.gap_half
         self._said = False
 
     def forward(self, H, mask=None):
@@ -722,6 +740,10 @@ class PlateConfine3D(Structural):
         m = getattr(lvl, "_mesh", None)
         n = int(m["Nv"]) if (m is not None and "Nv" in m) else pos.shape[0]
 
+        if self.gap_half_end is not None and self.close_to > self.close_from:
+            u = (int(getattr(H, "frame", 0)) - self.close_from) / (self.close_to - self.close_from)
+            u = min(1.0, max(0.0, u))
+            self.gap_half = self._gap0 + u * (self.gap_half_end - self._gap0)
         z = pos[:n, ax] - self.centre
         over = z.abs() - self.gap_half
         hit = over > 0

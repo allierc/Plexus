@@ -871,6 +871,21 @@ def _capture_state(H) -> list:
     return out
 
 
+def _graph_sig(H) -> tuple:
+    """Identity of every buffer a captured graph baked in: storage address, shape, dtype.
+
+    A CUDA graph replays kernels against the pointers it saw at capture. Anything that reallocates
+    one of those tensors -- a structural operator resizing a set, `_integrate` rebinding
+    `lvl.state`, an operator assigning rather than copying -- leaves the replay writing into memory
+    the run no longer reads, and it does so SILENTLY: no error, just a simulation that quietly
+    stops advancing in whatever the stale buffer held. Cheaper and far more honest than trying to
+    predict from an operator's `kind` which of those things it might do: compare the addresses.
+
+    Once per tick over ~30 tensors, so the cost is nil against a 15-substep frame.
+    """
+    return tuple((t.data_ptr(), tuple(t.shape), t.dtype) for t in _capture_state(H))
+
+
 def _capture_refusals(sim: Spec, H, step: dict, inst: list) -> list[str]:
     """Why this substep block cannot be captured -- empty list means it can.
 
@@ -899,10 +914,12 @@ def _capture_refusals(sim: Spec, H, step: dict, inst: list) -> list[str]:
     if getattr(H, "emit_order", None):
         why.append(f"engine-integrated sets {list(H.emit_order)} -- `_integrate` rebinds lvl.state "
                    f"every tick, so a captured graph would read a stale buffer")
-    struct = {o.op for o in sim.operators
-              if getattr(get_operator(o.op, variant=o.impl), "KIND", None) == "structural"}
-    if struct:
-        why.append(f"structural operators {sorted(struct)} can change set sizes mid-run")
+    # NO STATIC CHECK FOR "STRUCTURAL" OPERATORS. `kind` is the wrong proxy: what invalidates a
+    # graph is a buffer being REALLOCATED, and `kind="structural"` means "may change the entity
+    # set", which is neither necessary nor sufficient. `plate_confine` is tagged structural and
+    # only projects positions in place -- refusing it cost the squash experiment its capture for
+    # no reason -- while `_integrate` rebinds `lvl.state` and is not an operator at all. The
+    # property is checked directly instead, once per tick, by `_graph_sig` below.
     return why
 
 
@@ -1302,6 +1319,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     _static_d: dict = {}
     _static_b: dict = {}
     _graph = {}          # id(step) -> torch.cuda.CUDAGraph, or False once capture has been refused
+    _graph_sigs = {}     # id(step) -> the buffer identities the graph was captured against
 
     # ------------------------------------------------------------------ torch.compile, opt-in
     # `{substep_dt: X, steps: [...], compile: true}` -- the flag lives on the SUBSTEP BLOCK because
@@ -1566,11 +1584,21 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             for _t, _k in zip(_snap, _keep):
                                 _t.copy_(_k)                    # and undo the capture pass
                             _graph[_cap_key] = _gr
+                            _graph_sigs[_cap_key] = _graph_sig(H)
                             _dev_ctx.__exit__(None, None, None)
                             print(f"[engine] substep captured as a CUDA graph "
                                   f"({len(step['steps'])} operators, {count} replays/frame)",
                                   flush=True)
                     _gr = _graph.get(_cap_key)
+                    if _gr and _graph_sig(H) != _graph_sigs[_cap_key]:
+                        # A BUFFER MOVED SINCE CAPTURE. Fall back rather than replay into memory
+                        # nothing reads any more -- that failure is silent and produces a run that
+                        # looks finished and is wrong.
+                        warn("a state buffer was reallocated after the substep was captured "
+                             "(a set resized, or an operator assigned instead of copying); "
+                             "dropping the CUDA graph and continuing eager for the rest of the run")
+                        _graph[_cap_key] = False
+                        _gr = None
 
                     for _s in range(count):
                         # THE OCCURRENCE COUNTER RESETS EVERY SUBSTEP, not every tick. `_run_token`
