@@ -61,13 +61,14 @@ def run_one(spec_path, n_particles, frames, warmup, device, capture, compile_on,
                 for p in psets)
 
     for o in spec["operators"]:
-        if o.get("op") == "mpm_scatter" and impl:
+        if o.get("op") in ("mpm_scatter", "mpm_gather") and impl:
             # `--impl` OVERRIDES; absent leaves the spec alone, so a spec that DECLARES an
             # implementation is benchmarked as written. `--impl default` forces the torch path.
             o.pop("implementation", None)
             if impl != "default":
                 o["implementation"] = impl
-                o.setdefault("polar", "higham")
+                if o["op"] == "mpm_scatter":
+                    o.setdefault("polar", "higham")
     blk = next((s for s in spec["schedule"] if isinstance(s, dict) and "substep_dt" in s), None)
     if blk is not None:
         blk.pop("capture", None); blk.pop("compile", None)
@@ -115,7 +116,8 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--capture", action="store_true", help="CUDA-graph capture the substep")
     ap.add_argument("--compile", dest="compile_on", action="store_true")
-    ap.add_argument("--impl", default=None, help="mpm_scatter implementation, e.g. triton")
+    ap.add_argument("--impl", default=None,
+                    help="implementation for mpm_scatter AND mpm_gather, e.g. warp")
     ap.add_argument("--json", default=None, help="also write the rows here")
     a = ap.parse_args()
 

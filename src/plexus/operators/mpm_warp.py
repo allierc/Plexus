@@ -29,7 +29,7 @@ from __future__ import annotations
 import torch
 
 from plexus.models.registry import register_operator
-from plexus.operators.mpm_ops import MPMScatter
+from plexus.operators.mpm_ops import MPMScatter, MPMGather
 
 try:
     import warp as wp
@@ -175,4 +175,138 @@ class MPMScatterWarp(MPMScatter):
                     wp.from_torch(a_ext, dtype=wp.vec3),
                     wp.from_torch(gm), wp.from_torch(gmv.view(-1, 3), dtype=wp.vec3),
                     int(g.nx), float(g.dx), float(dt), float(self.drag), int(self.polar_iters)])
+        return {}
+
+
+# ==========================================================================================================
+# G2P -- `mpm_gather[implementation: warp]`
+#
+# THE SCATTER WAS 64% OF THE FRAME AND IS NOW ~21%; PROFILED AFTER THAT, THE GATHER IS 60.5%.
+# It is also by far the easier kernel: grid -> particle is a pure READ. Each particle reads the
+# velocity of its 27 neighbouring nodes and forms two weighted sums (the new velocity, and the
+# affine matrix C). Nothing is shared, nothing collides, there are no atomics and no sort. The
+# PyTorch version is slow for one reason only: it materialises [N, 27, 3] and [N, 27, 3, 3]
+# intermediates through global memory, and never needs to.
+# ==========================================================================================================
+if HAVE_WARP:
+
+    @wp.kernel
+    def g2p(X: wp.array(dtype=wp.vec3), STATE: wp.array2d(dtype=float),
+            C: wp.array(dtype=wp.mat33), GV: wp.array(dtype=wp.vec3),
+            OCC: wp.array(dtype=float), LIQ: wp.array(dtype=float),
+            pa: int, va: int, ngx: int, ngy: int, ngz: int, dx: float, dt: float,
+            wall_damp: float, wall_contact: float, vmax: float,
+            bx: float, by: float, bz: float, has_liq: int):
+        p = wp.tid()
+        inv_dx = 1.0 / dx
+        x = X[p]
+        base = wp.vec3(wp.floor(x[0] * inv_dx - 0.5),
+                       wp.floor(x[1] * inv_dx - 0.5),
+                       wp.floor(x[2] * inv_dx - 0.5))
+        fx = wp.vec3(x[0] * inv_dx - base[0], x[1] * inv_dx - base[1], x[2] * inv_dx - base[2])
+
+        newv = wp.vec3(0.0, 0.0, 0.0)
+        newC = wp.mat33(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        for i in range(3):
+            wi = float(0.0)
+            if i == 0:
+                wi = 0.5 * (1.5 - fx[0]) * (1.5 - fx[0])
+            elif i == 1:
+                wi = 0.75 - (fx[0] - 1.0) * (fx[0] - 1.0)
+            else:
+                wi = 0.5 * (fx[0] - 0.5) * (fx[0] - 0.5)
+            for j in range(3):
+                wj = float(0.0)
+                if j == 0:
+                    wj = 0.5 * (1.5 - fx[1]) * (1.5 - fx[1])
+                elif j == 1:
+                    wj = 0.75 - (fx[1] - 1.0) * (fx[1] - 1.0)
+                else:
+                    wj = 0.5 * (fx[1] - 0.5) * (fx[1] - 0.5)
+                for k in range(3):
+                    wk = float(0.0)
+                    if k == 0:
+                        wk = 0.5 * (1.5 - fx[2]) * (1.5 - fx[2])
+                    elif k == 1:
+                        wk = 0.75 - (fx[2] - 1.0) * (fx[2] - 1.0)
+                    else:
+                        wk = 0.5 * (fx[2] - 0.5) * (fx[2] - 0.5)
+                    w = wi * wj * wk
+                    # row-major over `g.shape`, EXACTLY as `bspline` flattens it: axis 0 spans the
+                    # world width and carries `nx`, axes 1-2 span [0,1] and carry `ny`.
+                    gi = wp.clamp(int(base[0]) + i, 0, ngx - 1)
+                    gj = wp.clamp(int(base[1]) + j, 0, ngy - 1)
+                    gk = wp.clamp(int(base[2]) + k, 0, ngz - 1)
+                    gv = GV[(gi * ngy + gj) * ngz + gk]
+                    dpos = wp.vec3(float(i) - fx[0], float(j) - fx[1], float(k) - fx[2])
+                    newv = newv + w * gv
+                    newC = newC + (4.0 * inv_dx * w) * wp.outer(gv, dpos)
+
+        # inelastic wall contact for SOLIDS: a liquid is handled by the asymmetric grid wall
+        # friction instead, so pinning it here would stop it draining.
+        if wall_damp != 1.0:
+            near = (x[0] < wall_contact or x[0] > bx - wall_contact or
+                    x[1] < wall_contact or x[1] > by - wall_contact or
+                    x[2] < wall_contact or x[2] > bz - wall_contact)
+            if has_liq == 1 and LIQ[p] > 0.0:
+                near = False
+            if near:
+                newv = newv * wall_damp
+
+        sp = wp.length(newv)
+        if sp > vmax:
+            newv = newv * (vmax / sp)
+        xn = x + dt * newv
+        xn = wp.vec3(wp.clamp(xn[0], 2.0 * dx, bx - 2.0 * dx),
+                     wp.clamp(xn[1], 2.0 * dx, by - 2.0 * dx),
+                     wp.clamp(xn[2], 2.0 * dx, bz - 2.0 * dx))
+
+        if OCC[p] <= 0.0:                      # DORMANT particles are frozen, not advected
+            return
+        STATE[p, pa + 0] = xn[0]; STATE[p, pa + 1] = xn[1]; STATE[p, pa + 2] = xn[2]
+        STATE[p, va + 0] = newv[0]; STATE[p, va + 1] = newv[1]; STATE[p, va + 2] = newv[2]
+        C[p] = newC
+
+
+@register_operator("mpm_gather", implementation="warp", family="mpm",
+                   set="particle", kind="exchange")
+class MPMGatherWarp(MPMGather):
+    """G2P as one Warp kernel. Pure reads: no atomics, no sort, nothing shared."""
+
+    MECHANISM_TAGS = ["grid_to_particle", "advection", "fused_kernel"]
+    DIFFERENTIABLE = False
+
+    def forward(self, H, mask=None):
+        if not HAVE_WARP:
+            raise RuntimeError("mpm_gather[warp] needs warp-lang")
+        from plexus.operators.mpm_ops import sub_dt
+        p = H.level(self.at); g = H.field(self.frm); dev = p.state.device
+        D = p.F.shape[-1]
+        if D != 3 or str(dev) == "cpu" or bool(getattr(H, "periodic", False)):
+            raise RuntimeError("mpm_gather[warp] is 3D, non-periodic, CUDA only")
+        dt = sub_dt(H, self.dt_sub)
+        if getattr(self, "_box", None) is None:
+            self._box = [float(b) for b in
+                         getattr(H, "world_size", torch.tensor([g.width, 1.0]))][:D]
+        bx, by, bz = self._box
+        pa, _pb = p.state_schema["pos"]; va, _vb = p.state_schema["vel"]
+        occ = getattr(p, "occ", None)
+        if occ is None:
+            occ = torch.ones(p.n, device=dev)
+        liq = getattr(p, "is_liquid", None)
+        has_liq = 1 if liq is not None else 0
+        liqf = (liq.float().contiguous() if liq is not None
+                else torch.zeros(p.n, device=dev))
+        vmax = min(self.vmax, 0.4 * float(g.dx) / float(dt))
+        wdev = f"cuda:{dev.index or 0}"
+        wp.launch(g2p, dim=int(p.n), device=wdev,
+                  inputs=[wp.from_torch(p.get("pos").contiguous(), dtype=wp.vec3),
+                          wp.from_torch(p.state),
+                          wp.from_torch(p.C, dtype=wp.mat33),
+                          wp.from_torch(g.v.view(-1, 3).contiguous(), dtype=wp.vec3),
+                          wp.from_torch(occ.contiguous()), wp.from_torch(liqf),
+                          int(pa), int(va), int(g.shape[0]), int(g.shape[1]), int(g.shape[2]),
+                          float(g.dx), float(dt),
+                          float(self.wall_damp), float(self.wall_contact), float(vmax),
+                          float(bx), float(by), float(bz), int(has_liq)])
         return {}

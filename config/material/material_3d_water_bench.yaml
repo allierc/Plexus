@@ -415,7 +415,7 @@ operators:
   to: mpm_grid
   drag: 0.05
   a_max: 200
-  implementation: triton
+  implementation: warp
   polar: higham
   polar_iters: 4
 - op: mpm_grid_update
@@ -424,6 +424,7 @@ operators:
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
+  implementation: warp
   wall_damp: 1.0
   wall_contact: 0.04
   vmax: 1000000000.0
@@ -573,3 +574,19 @@ descriptions:
       simulation progresses, the individual hexagons merge into a massive, interconnected
       cloud of tiny points. The final state shows a large, flat surface of points
       with varying heights and intricate, nested color patterns.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_mpm_particle:
+    description: The simulation begins with a set of discrete, well-separated colored clusters of particles
+      within a 3D bounding box. Over time, these clusters begin to expand and migrate toward the center
+      and bottom of the volume. As the simulation progresses, the clusters merge and deform into large,
+      continuous, and interconnected fluid-like structures. In the final frames, the particles settle
+      into a dense, layered distribution across the bottom of the container with some vertical plumes
+      remaining.
+    objects: The scene contains multiple distinct clusters of particles, each assigned a unique primary
+      color such as magenta, blue, green, and yellow. Initially, these objects are small, compact, and
+      spatially isolated from one another in a grid-like arrangement. As time passes, the objects grow
+      in size and lose their individual boundaries, merging into large, amorphous masses. By the end,
+      the objects form a complex, multi-colored field of interconnected filaments and pools of varying
+      sizes.

@@ -1,0 +1,371 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{good}{HTML}{1B7F3B}
+\definecolor{warn}{HTML}{B26B00}
+\definecolor{bad}{HTML}{B3261E}
+\definecolor{grey}{HTML}{666666}
+\definecolor{lst}{HTML}{F5F5F5}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\gd}[1]{\textcolor{good}{\textbf{#1}}}
+\newcommand{\bd}[1]{\textcolor{bad}{\textbf{#1}}}
+\newcommand{\wn}[1]{\textcolor{warn}{\textbf{#1}}}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\setlist{leftmargin=1.2em,itemsep=2pt,topsep=3pt}
+
+\lstset{basicstyle=\ttfamily\scriptsize, backgroundcolor=\color{lst}, frame=none,
+        numbers=left, numberstyle=\tiny\color{grey}, xleftmargin=2.4em, framexleftmargin=2em,
+        columns=fullflexible, breaklines=true, showstringspaces=false, language=Python,
+        keywordstyle=\color{black}, commentstyle=\color{grey}\itshape, aboveskip=4pt,
+        belowskip=4pt}
+
+\input{mpm_warp_tables}
+
+\title{\vspace{-1.6cm}\textbf{Two implementations of the same MPM}\\[3pt]
+\large \code{default} against \code{warp}, line by line, with the tensors each one allocates}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1.1cm}
+
+\section{What this is}
+
+The four MLS-MPM operators --- \code{mpm\_strain}, \code{mpm\_scatter}, \code{mpm\_grid\_update},
+\code{mpm\_gather} --- now exist in two forms that a spec selects by name on the
+\code{implementation} axis:
+
+\begin{itemize}
+\item \gd{\code{default}} --- the prior MPM. Pure PyTorch, dimension-generic (2D and 3D from one
+  body), differentiable, runs on CPU and on any CUDA device. This is the reference: every claim
+  below is measured against it.
+\item \gd{\code{warp}} --- the refactor. \code{mpm\_scatter} and \code{mpm\_gather} become one
+  NVIDIA Warp kernel each, one CUDA thread per particle, all 27 stencil taps in registers. 3D and
+  CUDA only, not differentiable. \code{mpm\_strain} and \code{mpm\_grid\_update} are unchanged and
+  still run the \code{default} bodies.
+\end{itemize}
+
+They are the same mechanism and the same equations, so they sit on the \code{implementation} axis
+rather than the \code{model} axis: a spec that swaps one for the other is asserting that the biology
+did not change. That assertion is what \S6 tests.
+
+\paragraph{The headline.} On \Ntrace{} particles, seven substeps per frame, one RTX A6000:
+\bd{1150.8\,ms/frame} for \code{default} against \gd{79.4\,ms/frame} for \code{warp}
+(\gd{14.5$\times$}), and \gd{52.2\,ms/frame} with the substep loop additionally captured as a CUDA
+graph (\gd{22.0$\times$}). Peak allocated memory falls from 2.94\,GiB to 0.35\,GiB, which is the
+reason for the speedup and not a side effect of it.
+
+\section{The cycle, and what each operator owes}
+
+MLS-MPM carries the material on particles $p$ and solves on a background grid $i$ that is thrown
+away every substep. Per substep, with $\Delta x$ the cell size, $w_{ip}$ the quadratic B-spline
+weight of node $i$ at particle $p$, and $\mathbf{x}_{ip}=\mathbf{x}_i-\mathbf{x}_p$:
+
+\begin{align}
+\textbf{strain}\quad & \mathbf{F}_p \leftarrow (\mathbf{I}+\Delta t\,\mathbf{C}_p)\,\mathbf{F}_p \\
+\textbf{scatter}\quad & m_i = \sum_p w_{ip} m_p,
+  \qquad (m\mathbf{v})_i = \sum_p w_{ip}\big[m_p\mathbf{v}_p + \mathbf{A}_p\,\mathbf{x}_{ip}\big] \\
+& \mathbf{A}_p = -\tfrac{4\Delta t}{\Delta x^{2}}V_p^{0}\,\boldsymbol{\sigma}_p + m_p\mathbf{C}_p,
+  \qquad \boldsymbol{\sigma}_p = 2\mu(\mathbf{F}_p-\mathbf{R}_p)\mathbf{F}_p^{\!\top}
+   + \lambda J(J-1)\mathbf{I} \\
+\textbf{grid}\quad & \mathbf{v}_i = (m\mathbf{v})_i / \max(m_i,\epsilon),
+  \quad\text{then gravity, walls, plates, surface tension} \\
+\textbf{gather}\quad & \mathbf{v}_p = \sum_i w_{ip}\mathbf{v}_i,
+  \qquad \mathbf{C}_p = \tfrac{4}{\Delta x}\sum_i w_{ip}\,
+    \mathbf{v}_i \otimes (\mathbf{o}_i - \mathbf{f}_p),
+  \qquad \mathbf{x}_p \leftarrow \mathbf{x}_p + \Delta t\,\mathbf{v}_p
+\end{align}
+
+$\mathbf{R}_p$ is the orthogonal polar factor of $\mathbf{F}_p$; $J=\det\mathbf{F}_p$;
+$\mathbf{o}_i\in\{0,1,2\}^3$ is the node's offset within the stencil and $\mathbf{f}_p$ the
+particle's fractional cell position, so $\mathbf{o}_i-\mathbf{f}_p$ is $\mathbf{x}_{ip}$ in cell
+units. \textbf{The stencil is $3^3=27$ nodes, not $3^2=9$}: the quadratic B-spline has support of
+three cells \emph{per axis}, and in three dimensions the tensor product of three axes is $27$. Every
+per-particle cost in this note carries that factor of $27$.
+
+\paragraph{The contract both implementations sign.} \code{mpm\_scatter} reads
+\code{pos, vel, C, F, mass, mu, la, pvol} and the parent's acceleration, and accumulates into
+\code{mpm\_grid.m} and \code{.mv} \emph{in place}. It must \textbf{not} touch \code{F} --- an earlier
+attempt fused the strain update into the scatter kernel for free, and advanced \code{F} twice per
+substep; the grid mass still agreed to eleven digits while \code{F} disagreed at $3.3\times10^{-4}$.
+\code{mpm\_gather} reads \code{mpm\_grid.v}, writes \code{pos}, \code{vel} and \code{C} in place, and
+leaves dormant particles (\code{occ}$=0$, the growth reservoir) exactly where they were.
+
+\section{\code{default}, line by line: what each line allocates}
+
+The gather is the shorter of the two and makes the point completely. This is
+\code{mpm\_ops.py} lines 790--845, with the tensors folded in; $N$ is the particle count, $S=27$,
+$D=3$.
+
+\begin{lstlisting}[numbers=none]
+offsets = stencil_offsets(D, dev); S = offsets.shape[0]          # [27,3]   memoised, free
+X, V = p.get("pos"), p.get("vel")                                # views    free
+fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
+    base   = (X * inv_dx - 0.5).floor().long()                   # [N,3]    i64   22.7 MB
+    fx     = X * inv_dx - base.float()                           # [N,3]    f32   11.3 MB
+    w      = stack(3 quadratic terms)                            # [N,3,3]  f32   34.0 MB
+    weight = ones(N,S); for k: weight *= w[:, oidx[:,k], k]       # [N,27]   f32  102.1 MB x6
+    gpos   = base[:,None,:] + oidx[None]                         # [N,27,3] i64  612.4 MB
+    comps  = [gpos[...,k].clamp(0, shape[k]-1) for k in 0..2]    # [N,27]   i64  204.1 MB x3
+    flat   = ((c0 * ny) + c1) * nz + c2                          # [N,27]   i64  204.1 MB x4
+gvn = g.v[flat].view(p.n, S, D)                                  # [N,27,3] f32  306.2 MB
+new_V = (weight[..., None] * gvn).sum(1)                         # [N,27,3] f32  306.2 MB
+dpos_grid = offsets[None] - fx[:, None, :]                       # [N,27,3] f32  306.2 MB
+new_C = 4*inv_dx*(weight[...,None,None] *
+        (gvn[...,:,None] @ dpos_grid[...,None,:])).sum(1)        # [N,27,3,3] f32 918.5 MB x2
+...
+\end{lstlisting}
+
+\noindent
+The last line is the whole story. \code{gvn[...,:,None] @ dpos\_grid[...,None,:]} is $N\times27$
+independent $3{\times}1$ by $1{\times}3$ outer products; PyTorch has no way to express ``form this
+$3{\times}3$, weight it, add it to a running sum, discard it''. It must \textbf{materialise all
+$N\times27$ of them}, write \gd{918.5\,MB} to global memory, read it back to multiply by
+\code{weight}, write \gd{another 918.5\,MB}, read \emph{that} back to reduce over the stencil axis,
+and only then produce the $[N,3,3]$ that is actually wanted --- \gd{34.0\,MB}. The useful output is
+\gd{1.8\%} of the traffic spent producing it.
+
+\subsection{The full bill, measured}
+
+The listing above is read off the source; the tables below are \emph{measured}. A
+\code{TorchDispatchMode} records every \code{aten} call one real substep makes and the shape and
+dtype of every tensor it allocates --- including the ones the source never names: the broadcast
+temporaries, the \code{index} gathers hiding behind \code{w[:, oidx[:,k], k]}, the int64 index
+arithmetic. Views (\code{expand}, \code{unsqueeze}, \code{view}, \code{select}) are \textbf{excluded}
+--- they return a new tensor object over the same storage and move nothing, and counting them would
+inflate \code{default}'s bill with bytes it never touches. Rows below 40\,MB are omitted; the totals
+include everything. Regenerate with \code{python tools/mpm\_warp\_note.py --trace}.
+
+\begin{center}
+\footnotesize
+\textbf{\code{mpm\_gather}, \code{default}} \quad ($N=\Ntrace$, one substep)\\[2pt]
+\tblGatherDefault
+\end{center}
+
+\begin{center}
+\footnotesize
+\textbf{\code{mpm\_scatter}, \code{default}} \quad (same substep)\\[2pt]
+\tblScatterDefault
+\end{center}
+
+\noindent
+Per particle per substep, the four \code{default} operators allocate
+\bd{\bpstrain\,B} (strain) $+$ \bd{\bpscatter\,B} (scatter) $+$ \bd{\bpgridupdate\,B} (grid) $+$
+\bd{\bpgather\,B} (gather). The \emph{essential} traffic --- what any correct MLS-MPM must move, and
+the constant \code{tools/mpm\_bench.py} divides by --- is 216 floats $=864$\,B: read
+\code{pos/vel/C/F/mass/mu/la}, scatter mass and momentum to 27 nodes, gather velocity back from 27.
+So \code{default} moves \bd{\ampltotal$\times$} more bytes than the algorithm requires, and the two
+$[N,27,3,3]$ tensors are most of it.
+
+\section{\code{warp}, line by line: the same arithmetic, nowhere to put it}
+
+The Warp kernel is one thread per particle. Everything the table above lists as a tensor is, here, a
+local variable --- and a local variable in a CUDA thread is a register, which is not memory.
+
+\begin{lstlisting}[numbers=none]
+@wp.kernel                                    # src/plexus/operators/mpm_warp.py:193
+def g2p(X, STATE, C, GV, OCC, LIQ, pa, va, ngx, ngy, ngz, dx, dt, ...):
+    p = wp.tid()                              # one thread per particle
+    x    = X[p]                                            # vec3   -> 3 registers
+    base = wp.vec3(floor(x[k]*inv_dx - 0.5) for k)         # vec3   -> 3 registers
+    fx   = x*inv_dx - base                                 # vec3   -> 3 registers
+    newv = wp.vec3(0,0,0)                                  # vec3   -> 3 registers
+    newC = wp.mat33(0,...,0)                               # mat33  -> 9 registers
+    for i in range(3):                        # the 27-node stencil, UNROLLED by the compiler
+      wi = <quadratic in fx[0]>               #   the [N,3,3] `w` tensor: 1 register, reused
+      for j in range(3):
+        wj = <quadratic in fx[1]>
+        for k in range(3):
+          wk = <quadratic in fx[2]>
+          w    = wi*wj*wk                     #   the [N,27] `weight` tensor: 1 register
+          gv   = GV[(gi*ngy + gj)*ngz + gk]   #   the [N,27,3] `gvn` tensor: 3 registers
+          dpos = wp.vec3(i-fx[0], j-fx[1], k-fx[2])   #   the [N,27,3] `dpos_grid`: 3 registers
+          newv = newv + w*gv                          #   the [N,27,3] product: never exists
+          newC = newC + (4*inv_dx*w)*wp.outer(gv, dpos)  # the [N,27,3,3]: NEVER EXISTS
+    ...
+    STATE[p, pa+0..2] = xn ; STATE[p, va+0..2] = newv ; C[p] = newC   # the only writes
+\end{lstlisting}
+
+\noindent
+The correspondence is exact, term for term. What changes is where the intermediate lives:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+quantity & \code{default} tensor & at $N=\Ntrace$ & \code{warp} \\
+\midrule
+B-spline weights per axis     & \code{[N,3,3]} f32     & 34.0\,MB  & 3 registers, recomputed per tap \\
+stencil weight                & \code{[N,27]} f32      & 102.1\,MB $\times6$ & 1 register \\
+node indices                  & \code{[N,27,3]} i64    & 612.4\,MB & 3 integers, computed inline \\
+flattened index               & \code{[N,27]} i64      & 204.1\,MB $\times4$ & 1 integer \\
+gathered node velocity        & \code{[N,27,3]} f32    & 306.2\,MB & \code{wp.vec3}, 3 registers \\
+$\mathbf{x}_{ip}$ in cells    & \code{[N,27,3]} f32    & 306.2\,MB & \code{wp.vec3}, 3 registers \\
+outer product $\mathbf{v}_i\otimes\mathbf{x}_{ip}$ & \code{[N,27,3,3]} f32 & \bd{918.5\,MB $\times2$} & \gd{accumulated into 9 registers} \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{allocated per substep, both fused operators}}
+  & \bd{13\,237\,MB} & \gd{\warpfusedmb\,MB} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The traced \code{warp} run confirms it: \code{mpm\_scatter} and \code{mpm\_gather} do not appear in
+the allocating-op trace \emph{at all}. What remains is \code{mpm\_strain} (\bpstrain\,B/particle) and
+\code{mpm\_grid\_update} (\bpgridupdate\,B/particle), both still \code{default} bodies, for a total of
+\gd{\ampltotalwarp$\times$} the essential traffic against \code{default}'s \bd{\ampltotal$\times$}.
+
+\paragraph{The scatter differs in one way the gather does not.} Grid$\rightarrow$particle is a pure
+read: no two threads write the same place, so there is nothing to coordinate. Particle$\rightarrow$
+grid is the opposite --- many particles land on the same node, and the kernel uses
+\code{wp.atomic\_add}, 108 of them per particle ($27$ nodes $\times$ (1 mass $+$ 3 momentum)). That is
+why the two fusions do not cost the same and do not buy the same (\S5), and it is the remaining wall
+(\S7).
+
+\paragraph{One convenience worth naming.} \code{wp.mat33} is a first-class type with
+\code{determinant}, \code{inverse}, \code{transpose} and \code{outer}, so the polar iteration
+$\mathbf{R}\leftarrow\frac{1}{2}(\mathbf{R}+\mathbf{R}^{-\top})$ is three lines. The same kernel
+written in Triton needed twenty-seven hand-rolled cofactor expressions, because Triton has no matrix
+type. Fewer lines is not the argument; \emph{fewer places to put a cofactor sign error} is.
+
+\section{What it buys}
+
+\subsection{Which fusion did what}
+
+Each operator was switched on its own, on the \Ntrace-particle benchmark, RTX A6000, 12 timed frames
+after 4 warm-up frames.
+
+\begin{center}\footnotesize\tblAblation\end{center}
+
+\noindent
+\textbf{The two fusions are superlinear together.} Alone they are worth $2.5\times$ and $1.5\times$ on
+the frame; together they are worth $14.5\times$, and $2.5\times1.5=3.75$, not $14.5$. The reason is in
+the memory column, which only moves when \emph{both} land: 2.94\,GiB $\to$ 2.80 $\to$ 2.94 $\to$
+\gd{0.35}. Fusing one end still leaves the other end's $918.5$\,MB temporary alive, so the allocator's
+high-water mark is unchanged, the caching allocator keeps thrashing, and every other kernel in the
+substep keeps paying for it. The last $918.5$\,MB is not one seventh of the problem --- it is the
+problem.
+
+\subsection{Scaling: 20 million particles now run}
+
+RTX A6000 (48\,GiB, peak 768\,GB/s), \code{warp}, capture off, 12 timed frames:
+
+\begin{center}\footnotesize\tblSweepAsix\end{center}
+
+\noindent
+Throughput is \gd{flat at $\approx$75\,GB/s across a 106$\times$ range in problem size} --- 73.4\,GB/s
+at 945\,k and 75.9\,GB/s at 100\,M --- and memory is linear at \gd{0.309\,GiB per million particles}.
+There is no knee anywhere: the cost per particle at 100\,M is the cost per particle at 945\,k.
+
+\textbf{The target the exercise was set for --- 20\,k cells $\times$ 1000 particles $=$ 20\,M --- fits
+on one A6000 at 1.61\,s/frame and 6.23\,GiB}, with room for five times more. One hundred million
+particles run on the same 48\,GiB card at 7.97\,s/frame and 30.9\,GiB. The comparison that makes that
+number legible: on the A100, \code{default} at \textbf{10\,M} needed \textbf{30.5\,GiB} and
+\textbf{11.60\,s/frame}. \code{warp} therefore fits \gd{ten times the particles in the same memory},
+and a frame of 100\,M costs \gd{less} than a frame of 10\,M did.
+
+Under \code{default}, 20\,M would need $\approx$62\,GiB of allocator high-water for the temporaries
+alone and does not run on a 48\,GiB card at all.
+
+\subsection{A100 baseline}
+
+NVIDIA A100-SXM4-80GB (peak 1555\,GB/s), same specs, \code{warp} with capture:
+
+\begin{center}\footnotesize\tblSweepAhun\end{center}
+
+\noindent
+\textbf{The most informative row in this note is a \code{default} row.} On the A100, \code{default}
+runs at \bd{5.2\,GB/s}; on the A6000 it runs at \bd{5.0\,GB/s}. A card with twice the memory
+bandwidth buys the prior implementation \bd{4\%}. That is the proof that \code{default} was never
+bandwidth-bound: it was bound by the count of kernel launches and by allocator work, neither of which
+a faster card improves. Fusion is not an optimisation of the old design; it is the only thing that
+could have helped.
+
+\code{warp} at $\approx$8\% of A100 peak is not bandwidth-bound either --- see \S7.
+
+\section{Precision}
+
+\code{warp} is \textbf{not} byte-identical to \code{default} and cannot be, for two independent
+reasons: the 27-tap sums are reassociated (the kernel accumulates sequentially, PyTorch's
+\code{.sum(1)} reduces pairwise), and \code{wp.atomic\_add} in the scatter commits in whatever order
+the hardware schedules. So this is an \code{implementation} with a tolerance gate, not a promotion
+twin with \code{tools/mpm\_identity\_gate.py}.
+
+Measured after 2 frames $\times$ 7 substeps on 108\,k particles, both implementations run from the
+same seed:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}llrrl@{}}
+\toprule
+switched & quantity & max $|\Delta|$ & max relative & reference scale \\
+\midrule
+gather only  & \code{pos} & $1.79\times10^{-7}$ & $4.3\times10^{-7}$ & $|x|\approx0.40$ \\
+gather only  & \code{F}   & $8.34\times10^{-7}$ & $8.3\times10^{-7}$ & $|F|\approx0.33$ \\
+gather only  & grid \code{m} & $3.07\times10^{-12}$ & --- & total mass identical to 6 digits \\
+\midrule
+both         & \code{pos} & $1.79\times10^{-7}$ & $5.3\times10^{-7}$ & $|x|\approx0.40$ \\
+both         & \code{F}   & $8.34\times10^{-7}$ & $8.3\times10^{-7}$ & $|F|\approx0.33$ \\
+both         & grid \code{mv} & $1.46\times10^{-11}$ & --- & $|mv|\approx1.8\times10^{-8}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Float32 has $\epsilon=1.19\times10^{-7}$, so a position of $0.40$ has an ulp of $2.98\times10^{-8}$
+and the observed $1.79\times10^{-7}$ is \gd{6 ulp after 14 substeps} --- round-off, accumulated at
+the rate reassociation predicts. The large \emph{relative} figures on the grid (up to
+$1.2\times10^{-4}$) are on nodes whose mass is $\approx10^{-8}$: a tiny denominator, not a
+disagreement. Total grid mass matches to six digits.
+
+\paragraph{What this costs, stated plainly.} A run cannot be reproduced bit-for-bit across the two
+implementations, so the \code{implementation} field is part of a run's identity and must be recorded
+with it. Anything that needs byte-identity --- the promotion twins --- stays on \code{default}.
+
+\section{What is left}
+
+\begin{enumerate}
+\item \textbf{\code{mpm\_strain} and \code{mpm\_grid\_update} are still \code{default}} and are now
+  the whole remaining frame: \bpstrain\,B and \bpgridupdate\,B per particle-substep against
+  \code{warp}'s zero for the other two. \code{strain} is a $[N,3,3]$ matrix product and fuses
+  trivially; \code{grid\_update} is $O(\text{cells})$ and is a different kernel shape.
+\item \textbf{The atomics are the wall.} \code{warp} sits at $\approx$8--10\% of peak on both cards
+  and does not improve when the card gets faster, which is the same signature \code{default} showed
+  for a different reason. The fix is the node-centric P2G that NVIDIA's own \code{warp.fem} MPM uses:
+  sort particles by cell into CSR, one thread \emph{per grid node}, each summing its own
+  contributions with a plain \code{+=} --- zero atomics. The read amplification that argument was
+  rejected on earlier ($27\times$) is a coalesced streaming read, not the same kind of cost as a
+  serialised atomic write.
+\item \textbf{Memory is no longer the constraint, and that is new.} At 0.309\,GiB per million
+  particles an 80\,GiB A100 holds $\approx$250\,M and a 48\,GiB A6000 $\approx$150\,M. Past
+  $\approx$20\,M the fixed $96^3$ grid of this benchmark stops being a discretisation anyone would
+  choose, so the next question is not how many particles fit but what grid they need --- and a finer
+  grid costs substeps through the CFL bound $\Delta t \le \mathrm{cfl}\cdot\Delta x/c$, which is a
+  different scaling problem from this one.
+\end{enumerate}
+
+\paragraph{Provenance.} Benchmarks: \code{tools/mpm\_bench.py}. Specs:
+\code{config/material/material\_3d\_water\_bench\_\{500k,1m,5m,10m,20m,100m,200m\}}\code{.yaml} ---
+27 blobs of radius 0.05 in a unit box, $96^3$ grid, $\Delta t=3.6\times10^{-3}$ in 7 substeps, held
+fixed across the sweep so the only variable is particle count. Tables regenerated by
+\code{tools/mpm\_warp\_note.py}. A production 20\,M run would use a finer grid and correspondingly
+more substeps; this sweep deliberately does not, because a benchmark that changes two things at once
+measures neither.
+
+\end{document}
