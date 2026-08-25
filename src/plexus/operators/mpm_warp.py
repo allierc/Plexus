@@ -298,9 +298,10 @@ if HAVE_WARP:
     def g2p(STATE: wp.array2d(dtype=float),
             C: wp.array(dtype=wp.mat33), GV: wp.array(dtype=wp.vec3),
             OCC: wp.array(dtype=float), LIQ: wp.array(dtype=float),
+            NEAR: wp.array(dtype=float),
             pa: int, va: int, ngx: int, ngy: int, ngz: int, dx: float, dt: float,
             wall_damp: float, wall_contact: float, vmax: float,
-            bx: float, by: float, bz: float, has_liq: int):
+            bx: float, by: float, bz: float, has_liq: int, per_impact: int):
         p = wp.tid()
         inv_dx = 1.0 / dx
         x = wp.vec3(STATE[p, pa + 0], STATE[p, pa + 1], STATE[p, pa + 2])   # no copy; see p2g
@@ -354,7 +355,17 @@ if HAVE_WARP:
                     x[2] < wall_contact or x[2] > bz - wall_contact)
             if has_liq == 1 and LIQ[p] > 0.0:
                 near = False
-            if near:
+            hit = near
+            if per_impact == 1:
+                # RISING EDGE ONLY -- see the long note in mpm_ops.MPMGather.forward. One impact
+                # must cost one multiplication, not one per substep spent in the contact layer,
+                # or the coefficient's meaning moves with the grid resolution.
+                hit = near and (NEAR[p] < 0.5)
+                if near:
+                    NEAR[p] = 1.0
+                else:
+                    NEAR[p] = 0.0
+            if hit:
                 newv = newv * wall_damp
 
         sp = wp.length(newv)
@@ -403,16 +414,23 @@ class MPMGatherWarp(MPMGather):
         liqf = (liq.float().contiguous() if liq is not None
                 else torch.zeros(p.n, device=dev))
         vmax = min(self.vmax, 0.4 * float(g.dx) / float(dt))
+        # PERSISTENT contact-edge state for `wall_damp_mode: per_impact`. float, not bool, because
+        # warp arrays of bool are awkward to alias from torch; written in place so a captured graph
+        # keeps the address. Allocated once, on the first call, which is before capture installs.
+        if getattr(self, "_near", None) is None:
+            self._near = torch.zeros(p.n, device=dev)
+        _near = self._near
         wdev = f"cuda:{dev.index or 0}"
         _wp_launch(g2p, int(p.n), dev,
                   [wp.from_torch(p.state),
                           wp.from_torch(p.C, dtype=wp.mat33),
                           wp.from_torch(g.v.view(-1, 3), dtype=wp.vec3),
-                          wp.from_torch(occ), wp.from_torch(liqf),
+                          wp.from_torch(occ), wp.from_torch(liqf), wp.from_torch(_near),
                           int(pa), int(va), int(g.shape[0]), int(g.shape[1]), int(g.shape[2]),
                           float(g.dx), float(dt),
                           float(self.wall_damp), float(self.wall_contact), float(vmax),
-                          float(bx), float(by), float(bz), int(has_liq)])
+                          float(bx), float(by), float(bz), int(has_liq),
+                          int(self.wall_damp_mode == "per_impact")])
         return {}
 
 

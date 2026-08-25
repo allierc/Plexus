@@ -75,7 +75,7 @@ def _energy(H, up, g):
     return tot
 
 
-def run(spec_name, n_grid=None, wall_damp=None, frames=200, device="cuda:1"):
+def run(spec_name, n_grid=None, wall_damp=None, frames=200, device="cuda:1", mode=None):
     import yaml
 
     import plexus.operators  # noqa: F401
@@ -92,6 +92,10 @@ def run(spec_name, n_grid=None, wall_damp=None, frames=200, device="cuda:1"):
         for o in s["operators"]:
             if "wall_damp" in o:
                 o["wall_damp"] = float(wall_damp)
+    if mode is not None:
+        for o in s["operators"]:
+            if o.get("op") == "mpm_gather":
+                o["wall_damp_mode"] = mode
     up = int((s.get("plotting") or {}).get("up_axis", 1))
     g = next((float(o.get("g", 0.0)) for o in s["operators"] if o.get("op") == "gravity"), 0.0)
     s["general"]["n_frames"] = int(frames)
@@ -113,10 +117,11 @@ def run(spec_name, n_grid=None, wall_damp=None, frames=200, device="cuda:1"):
     return sum(es[-k:]) / k                          # mean energy over the final fifth
 
 
-def wall_loss(spec_name, n_grid, wall_damp, frames, device):
+def wall_loss(spec_name, n_grid, wall_damp, frames, device, mode=None):
     """Fraction of the run's end-state energy removed by the wall, against an undamped twin."""
-    e_damped = run(spec_name, n_grid=n_grid, wall_damp=wall_damp, frames=frames, device=device)
-    e_free = run(spec_name, n_grid=n_grid, wall_damp=1.0, frames=frames, device=device)
+    e_damped = run(spec_name, n_grid=n_grid, wall_damp=wall_damp, frames=frames, device=device,
+                   mode=mode)
+    e_free = run(spec_name, n_grid=n_grid, wall_damp=1.0, frames=frames, device=device, mode=mode)
     if not (e_free == e_free) or abs(e_free) < 1e-12:
         return float("nan")
     return 1.0 - e_damped / e_free
@@ -131,6 +136,8 @@ def main():
     ap.add_argument("--ref-grid", type=int, default=64)
     ap.add_argument("--target-grid", type=int, default=96)
     ap.add_argument("--grids", default="64,96,128")
+    ap.add_argument("--mode", default=None,
+                    help="wall_damp_mode to force: per_substep (historical) or per_impact (the fix)")
     ap.add_argument("--only", default=None)
     ap.add_argument("--json", default=None)
     a = ap.parse_args()
@@ -144,8 +151,8 @@ def main():
 
     if a.measure:
         print(f"\n  ENERGY REMOVED BY THE WALL, vs the same spec at wall_damp 1.0, "
-              f"{a.frames} frames.\n  A resolution-INDEPENDENT wall_damp would give the same "
-              f"number in every column.\n")
+              f"{a.frames} frames, wall_damp_mode={a.mode or 'as written'}.\n  A "
+              f"resolution-INDEPENDENT wall_damp would give the same number in every column.\n")
         print(f"  {'spec':<28}{'wall_damp':>10}" + "".join(f"{'n_grid ' + str(g):>13}" for g in grids)
               + f"{'  spread':>10}")
         print("  " + "-" * (38 + 13 * len(grids) + 10))
@@ -155,7 +162,7 @@ def main():
             vals = []
             for gr in grids:
                 try:
-                    vals.append(wall_loss(nm, gr, wd, a.frames, a.device))
+                    vals.append(wall_loss(nm, gr, wd, a.frames, a.device, a.mode))
                 except Exception as e:
                     vals.append(float("nan"))
                     print(f"    {nm} @ {gr}: {type(e).__name__}: {str(e).splitlines()[0][:50]}",
