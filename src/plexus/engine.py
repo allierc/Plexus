@@ -1108,8 +1108,19 @@ def _setup_recording(sim: Spec, H: Hierarchy):
     default 256). The stride is 1 (EVERY frame kept) when n_frames <= the cap, and the FINAL
     frame is always recorded. Returns
     (rec_index, rec_sets, occ_sets, rec_state, rec_mesh, fstride, rec_fields)."""
-    set_cap = int(getattr(sim, "record_cap", 10000))          # max recorded SET (position) frames (spec-tunable)
-    sstride = max(1, (sim.n_frames + set_cap) // set_cap)     # 1 if n_frames <= cap, else sub-sample to ~set_cap frames
+    # `save_data` IS A YES/NO, and it is the one a spec should be writing. `record_cap` silently
+    # strided the trajectory -- a spec asking for 1800 frames got 301 and nothing said which -- and
+    # it is still honoured because 1,662 specs set it. When `save_data` is given it wins: True saves
+    # EVERY frame, False saves none. The size is printed either way, because 1800 frames of 2M
+    # particles is 40 GB and that should be a decision, not a discovery.
+    _sd = getattr(sim, "save_data", None)
+    if _sd is False:
+        set_cap = 1                                           # only the final frame, as a stub
+    elif _sd is True:
+        set_cap = sim.n_frames + 1                            # every frame, no striding
+    else:
+        set_cap = int(getattr(sim, "record_cap", 10000))      # legacy: max recorded SET frames
+    sstride = max(1, (sim.n_frames + set_cap) // set_cap)     # 1 if n_frames <= cap, else sub-sample
     rec_ticks = sorted(set(range(0, sim.n_frames + 1, sstride)) | {sim.n_frames})   # ticks recorded (last always in)
     rec_index = {t: i for i, t in enumerate(rec_ticks)}      # tick -> row index in the recording arrays
     n_rec = len(rec_ticks)

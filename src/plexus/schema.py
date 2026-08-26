@@ -92,6 +92,8 @@ class Spec:
     # plexus/units.py). Absent => the run is dimensionless and no result from it may carry a unit.
     # `time_s` defaults to 1.0, i.e. THE CONVENTION IS THAT `dt` IS IN SECONDS.
     units: "Units" = field(default_factory=lambda: Units(declared=False))
+    # SAVE THE TRAJECTORY, OR DO NOT. None = the legacy `record_cap` path.
+    save_data: bool = None
 
 
 _RESERVED = {"op", "at", "to", "from", "implementation", "model"}
@@ -470,4 +472,5 @@ def load(path: str) -> Spec:
         record_cap=int(gv("record_cap", 10000)),
         field_record_cap=int(gv("field_record_cap", 256)),
         units=parse_units(gv("units", None)),
+        save_data=gv("save_data", None),
     )
