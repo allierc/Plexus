@@ -181,7 +181,9 @@ def main():
                                        "dt": getattr(sim, "dt", None),
                                        "time_s": (sim.units.time_s if getattr(
                                            getattr(sim, "units", None), "declared", False) else None),
-                                       "real_time": not args.no_real_time}
+                                       "real_time": not args.no_real_time,
+                                       "length_um": (sim.units.length_um if getattr(
+                                           getattr(sim, "units", None), "declared", False) else None)}
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
                                     erase=args.force, save=True,
                                     live_every_frac=(None if args.no_viz else 0.05),
