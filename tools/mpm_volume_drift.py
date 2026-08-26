@@ -48,7 +48,7 @@ CFG = os.path.join(ROOT, "config", "material")
 NU = 0.2
 
 
-def run(spec_name, rho, frames, n_particles, device, g=None, impl=None):
+def run(spec_name, rho, frames, n_particles, device, g=None, impl=None, dt_scale=1.0):
     import torch
     import yaml
 
@@ -80,6 +80,15 @@ def run(spec_name, rho, frames, n_particles, device, g=None, impl=None):
     f = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
     yaml.safe_dump(s, f); f.close()
     Courant_Friedrichs_Lewy_condition(f.name)
+    if dt_scale != 1.0:
+        # AFTER the CFL pass, not before: the pass writes the largest stable substep, and this
+        # test asks what happens BELOW it. An O(dt^2) error falls 4x when the substep halves;
+        # anything that does not is a different mechanism.
+        y = yaml.safe_load(open(f.name))
+        y["schedule"] = [({**x, "substep_dt": x["substep_dt"] * dt_scale}
+                          if isinstance(x, dict) and "substep_dt" in x else x)
+                         for x in y["schedule"]]
+        yaml.safe_dump(y, open(f.name, "w"))
     sim = load(f.name); os.unlink(f.name)
 
     tr = []
@@ -90,6 +99,7 @@ def run(spec_name, rho, frames, n_particles, device, g=None, impl=None):
 
     E.run(sim, out_path=None, device=device, on_frame=on_frame, progress=False)
     return {"rho": rho, "g": gg, "H0": H0, "lambda": la, "impl": impl or "as written",
+            "dt_scale": dt_scale,
             "pred": 1.0 - rho * gg * H0 / (2.0 * la), "trace": tr}
 
 
@@ -102,6 +112,9 @@ def main():
     ap.add_argument("--device", default="cuda:1")
     ap.add_argument("--impl", default=None, help="force default or warp on every mpm_* operator")
     ap.add_argument("--g0", action="store_true", help="add a gravity-off arm per density")
+    ap.add_argument("--dt-scale", default="1.0",
+                    help="comma list of multipliers on the CFL substep; an O(dt^2) error falls 4x "
+                         "per halving")
     ap.add_argument("--json", default=None)
     a = ap.parse_args()
 
@@ -110,15 +123,16 @@ def main():
 
     print(f"\n  mean(J) = the liquid's volume ratio, and for a confined column exactly H/H0."
           f"\n  {a.particles:,} particles, {a.frames} frames, impl {a.impl or 'as written'}\n")
-    print(f"  {'rho':>6}{'g':>6}{'J start':>10}{'J end':>10}{'predicted':>11}{'obs-pred':>10}"
-          f"{'drift/1k fr':>13}")
-    print("  " + "-" * 66)
+    print(f"  {'rho':>6}{'g':>6}{'dt/cfl':>8}{'J start':>10}{'J end':>10}{'predicted':>11}"
+          f"{'obs-pred':>10}{'drift/1k fr':>13}")
+    print("  " + "-" * 74)
     rows = []
-    arms = [(float(r), None) for r in a.rho.split(",")]
+    scales = [float(x) for x in str(a.dt_scale).split(",")]
+    arms = [(float(r), None, sc) for r in a.rho.split(",") for sc in scales]
     if a.g0:
-        arms += [(float(r), 0.0) for r in a.rho.split(",")]
-    for rho, g in arms:
-        o = run(a.spec, rho, a.frames, a.particles, a.device, g=g, impl=a.impl)
+        arms += [(float(r), 0.0, 1.0) for r in a.rho.split(",")]
+    for rho, g, sc in arms:
+        o = run(a.spec, rho, a.frames, a.particles, a.device, g=g, impl=a.impl, dt_scale=sc)
         t = o["trace"]
         half = len(t) // 2
         # drift = slope over the SECOND half, where the initial transient is done; a settled
@@ -126,7 +140,7 @@ def main():
         drift = (t[-1] - t[half]) / max(len(t) - half, 1) * 1000
         o["drift_per_1k"] = drift
         rows.append(o)
-        print(f"  {rho:>6}{o['g']:>6.0f}{t[0]:>10.5f}{t[-1]:>10.5f}{o['pred']:>11.5f}"
+        print(f"  {rho:>6}{o['g']:>6.0f}{sc:>8.2f}{t[0]:>10.5f}{t[-1]:>10.5f}{o['pred']:>11.5f}"
               f"{t[-1] - o['pred']:>10.5f}{drift:>13.5f}", flush=True)
     if a.json:
         json.dump(rows, open(a.json, "w"), indent=1)

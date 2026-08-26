@@ -524,6 +524,19 @@ class MPMGridUpdate(FieldUpdate):
         # A BAND WITHOUT A REFERENCE DENSITY IS A SILENT OFF-SWITCH: `c` would still be a mass, of
         # order rho*dx^D ~ 1e-6, so `c > 0.2` is false everywhere, the mask is empty and the term
         # vanishes without a word. Refuse the combination rather than run it.
+        # SAY SO, LOUDLY, RATHER THAN LET A MEANINGLESS NUMBER THROUGH. A spec that asks for surface
+        # tension without a reference density gets the legacy path, which is what keeps old runs
+        # reproducible -- but nothing about the yaml says the number is a tension divided by a cell
+        # mass, and nothing warns that it will mean something different if `n_grid` is touched.
+        if self.surface_tension > 0.0 and self.csf_rho <= 0.0:
+            import warnings
+            warnings.warn(
+                f"mpm_grid_update: surface_tension={self.surface_tension:g} is being applied to an "
+                f"UNNORMALISED colour field (csf_rho unset), so it is a tension divided by the mass "
+                f"of one cell, rho*dx^D. It is ~1/(rho*dx^D) too small in physical units and its "
+                f"meaning CHANGES WITH n_grid. Set csf_rho to the liquid's density and csf_band "
+                f"(0.2) and re-fit sigma from a Bond number: sigma = rho*g*L^2 / Bond.",
+                RuntimeWarning, stacklevel=2)
         if self.csf_band > 0.0 and self.csf_rho <= 0.0:
             raise ValueError(
                 "mpm_grid_update: csf_band needs csf_rho -- the band is a test on the liquid "
@@ -745,14 +758,33 @@ class MPMGridUpdate(FieldUpdate):
             if getattr(self, "_c_csf", None) is None:
                 self._c_csf = bool(surf > 0.0 and bool((gc > 0).any()))
             if self._c_csf:                                        # CSF continuum surface force
-                c = gc.view(nx, ny)
+                # SAME MISSING REFERENCE AS 3D, SAME REPAIR, and the 2D corpus is the reason it is
+                # opt-in rather than applied: material_two_drops_st runs g = 0, so its Bond number
+                # is ZERO and a tension 1/(rho*dx^2) = 36,864x too small is still the only force in
+                # the scene -- measured Rg 0.13406 -> 0.10341 and r90 0.19205 -> 0.14136 over 4000
+                # frames, against a sigma = 0 twin that does not move at all (Rg identical to five
+                # decimals for 601 frames). That demo is correct AS WRITTEN and must stay so.
+                # What the defect costs is scenes where gravity competes, and the resolution
+                # dependence: the same yaml number is a different physical tension at every n_grid.
+                if self.csf_rho > 0.0:
+                    c = (gc / (self.csf_rho * dx * dx)).view(nx, ny)   # liquid VOLUME FRACTION
+                else:
+                    c = gc.view(nx, ny)                                # legacy: raw liquid MASS
+                for _ in range(self.csf_smooth):        # separable [1/4,1/2,1/4]; no-op when 0
+                    for k in range(2):
+                        c = 0.25 * torch.roll(c, 1, k) + 0.5 * c + 0.25 * torch.roll(c, -1, k)
                 cx = (torch.roll(c, -1, 0) - torch.roll(c, 1, 0)) * (0.5 * inv_dx)
                 cy = (torch.roll(c, -1, 1) - torch.roll(c, 1, 1)) * (0.5 * inv_dx)
                 gmag = torch.sqrt(cx * cx + cy * cy); eps = 1e-6
                 nxg, nyg = cx / (gmag + eps), cy / (gmag + eps)
                 kappa = -((torch.roll(nxg, -1, 0) - torch.roll(nxg, 1, 0)) * (0.5 * inv_dx)
                           + (torch.roll(nyg, -1, 1) - torch.roll(nyg, 1, 1)) * (0.5 * inv_dx))
-                fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
+                if self.csf_band > 0.0:
+                    _mfull = self.csf_rho * dx * dx
+                    fmask = ((c > self.csf_band) & (c < 1.0 - self.csf_band)
+                             & (gm.view(nx, ny) > self.csf_band * _mfull)).to(c.dtype)
+                else:
+                    fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
                 stfx = (surf * kappa * cx * fmask).view(-1); stfy = (surf * kappa * cy * fmask).view(-1)
                 inv_m = (dx * dx) / gm.clamp(min=self.csf_mass_floor)
                 gv = gv + dt * torch.stack([stfx * inv_m, stfy * inv_m], dim=1)
