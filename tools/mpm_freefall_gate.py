@@ -61,13 +61,20 @@ def main():
     com = P[:, :, up].mean(axis=1)
     floor = 2.0 * dx                                 # the gather's own position clamp
 
-    h = float(lo[0] - floor)
+    # TO CONTACT, NOT TO THE FLOOR. The gather damps velocity everywhere within `wall_contact` of a
+    # wall -- 3.84 cells by default -- so the last 3.84 m of a 100 m box are NOT free flight and a
+    # "time to y = floor" is 6.3% late for a reason that has nothing to do with gravity. The
+    # free-fall clock stops when the body first enters that band.
+    band = float(next((o.get("wall_contact_cells", 3.84) for o in s["operators"]
+                       if o["op"] == "mpm_gather"), 3.84)) * dx
+    contact = floor + band
+    h = float(lo[0] - contact)
     t_cf = math.sqrt(2.0 * h / g)
     # first frame whose lowest point has reached the floor, refined by linear interpolation
-    hit = int(np.argmax(lo <= floor + 1e-9))
+    hit = int(np.argmax(lo <= contact + 1e-9))
     if hit > 0:
         y0, y1 = lo[hit - 1], lo[hit]
-        frac = (y0 - floor) / max(y0 - y1, 1e-12)
+        frac = (y0 - contact) / max(y0 - y1, 1e-12)
         t_hit = (hit - 1 + frac) * dt
     else:
         t_hit = float("nan")
@@ -80,7 +87,7 @@ def main():
     v_meas = -(com[n - 1] - com[n - 3]) / (2 * dt)
 
     print(f"\n  {a.spec}: a {(P.shape[1] * float(s['sets']['mpm_particle']['particle_mass']) / float(s['sets']['mpm_particle']['density'])) ** (1/3):.1f} m cube of water "
-          f"in a {W:.0f} m box, released {h:.2f} m above the floor\n")
+          f"in a {W:.0f} m box, falling {h:.2f} m to first contact at y = {contact:.2f} m\n")
     print(f"  {'quantity':<26}{'measured':>14}{'closed form':>14}{'error':>10}{'':>7}")
     print("  " + "-" * 72)
     rows = [("time to ground (s)", t_hit, t_cf, 2.0),
