@@ -217,6 +217,56 @@ def _polar_higham(F, iters=6):
 
 
 @register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
+def _hand_body_force_to_grid(op, H, a_ext, dev, D):
+    """WHERE A BODY FORCE BELONGS. Canonical MLS-MPM applies gravity ON THE GRID, as an
+    acceleration, AFTER the momentum has been divided by nodal mass -- Taichi's mpm88/mpm99 read
+
+        if grid_m[I] > 0:  grid_v[I] = (1 / grid_m[I]) * grid_v[I];  grid_v[I][1] -= dt * gravity
+
+    This operator instead folds it into the PARTICLE velocity before P2G, so it rides through the
+    scatter as momentum and comes back out of a division it never needed to be inside.
+
+    IN EXACT ARITHMETIC THE TWO ARE THE SAME THING: sum_p w m (v + a dt) / sum_p w m = v_bar + a dt,
+    because the mass cancels. The placement only starts to matter when something breaks that
+    cancellation, and exactly one thing does -- `gm.clamp(min=mass_floor)` in the grid solve. On a
+    node lighter than the floor the whole momentum, gravity's share included, is scaled by
+    gm/mass_floor < 1, and a particle there cannot accelerate.
+
+    MEASURED, before assuming that is what ails anything: a lone block dropped in an empty box
+    accelerates at 0.9996 OF g with drag 0, and 0.9902 with the spec's Stokes drag 0.1 -- the
+    1% being the drag, exactly. So on this spec family the floor does NOT bind and gravity IS
+    delivered. Turning `mass_floor` down from 1e-10 to 1e-14 changes the suspended-particle count
+    from 224 to 224 on material_3d_water_st000. This path is therefore the CORRECT ARCHITECTURE,
+    not a cure for the haze, and it is offered as `body_force: grid` so the two can be compared
+    rather than argued about.
+
+    WHAT MOVES AND WHAT CANNOT. Only the PARENT-LEVEL acceleration -- gravity, buoyancy, anything
+    emitted `at:` the parent set -- is a field quantity with a grid representation, and only when
+    every parent carries the SAME vector (checked once, cached). Per-particle body forces (turgor,
+    active stress, per-particle drag) have no grid representation and stay on the particle, where
+    the clamp still reaches them; that is an argument for fixing the clamp, not for moving them.
+    """
+    if getattr(op, "body_force", "particle") != "grid":
+        return a_ext
+    if getattr(op, "_c_bf", None) is None:
+        # a device sync, so it happens ONCE and is cached: is the parent acceleration uniform?
+        amax = (a_ext - a_ext[:1]).abs().max() if a_ext.numel() else torch.zeros((), device=dev)
+        op._c_bf = bool(float(amax) < 1e-12)
+        if not op._c_bf:
+            import warnings
+            warnings.warn(
+                "mpm_scatter: body_force='grid' needs a body force that is the same for every "
+                "particle, and this one is not (per-particle accelerations have no grid "
+                "representation). Falling back to the particle path for all of it.",
+                RuntimeWarning, stacklevel=2)
+        op._bf_buf = torch.zeros(D, device=dev)
+    if not op._c_bf:
+        return a_ext
+    op._bf_buf.copy_(a_ext[0])              # persistent buffer -> safe inside a captured graph
+    H._mpm_body_accel = op._bf_buf          # consumed by MPMGridUpdate after normalisation
+    return a_ext - op._bf_buf                # particle keeps only what the grid cannot carry
+
+
 class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     EMIT = None                 # particle->grid: writes the mpm_grid field in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
@@ -225,6 +275,7 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate"]
     PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt", "drag": "Stokes drag coefficient",
                    "a_max": "external-acceleration clamp",
+                   "body_force": "body_force_application_site",
                    "store_stress": "cache Cauchy stress to a per-particle buffer"}
     REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM P2G); Sulsky, D. et al. (1994)."
 
@@ -235,6 +286,15 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.drag = float(params.get("drag", 0.0))
         self.a_max = float(params.get("a_max", 200.0))
+        # WHERE THE BODY FORCE IS APPLIED. "particle" (default, and every existing run) folds it
+        # into the particle velocity before P2G; "grid" hands the uniform part to the grid solve,
+        # which is where canonical MLS-MPM puts it. See _hand_body_force_to_grid for why the two
+        # are algebraically identical until the mass clamp binds, and for the measurement showing
+        # that on this spec family it does not.
+        self.body_force = str(params.get("body_force", "particle"))
+        if self.body_force not in ("particle", "grid"):
+            raise ValueError(f"mpm_scatter: body_force must be 'particle' or 'grid', "
+                             f"got {self.body_force!r}")
         # HOW THE POLAR ROTATION IS FOUND, in 3-D. The fixed-corotated stress needs R from
         # F = R S, and the obvious way to get it is an SVD -- but `torch.linalg.svd` on a
         # batch of 3x3 matrices costs about a microsecond EACH, and this operator runs once
@@ -298,6 +358,7 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         # per-particle body force from particle-level force operators (e.g. pulse_to_contraction,
         # drag) -- the symmetric counterpart of the parent-delta path above (gravity).
         a_ext = a_ext + torch.nan_to_num(H.delta(p.name))
+        a_ext = _hand_body_force_to_grid(self, H, a_ext, dev, D)
         V = V + dt * (a_ext - self.drag * V)                       # body force + Stokes drag (local; G2P resets V)
 
         F, C, mass = p.F, p.C, p.mass
@@ -748,6 +809,16 @@ class MPMGridUpdate(FieldUpdate):
         # Kept as a PARAMETER at its historical value so no existing run changes; a spec whose
         # particle mass has outgrown it sets `mass_floor` smaller.
         gv = gmv / gm.clamp(min=self.mass_floor)[:, None]
+        # THE BODY FORCE, IF mpm_scatter HANDED IT OVER (`body_force: grid`). Applied here and not
+        # in the scatter because this is after the division by nodal mass: as a pure addition to a
+        # velocity it carries no mass factor, so `gm.clamp` cannot attenuate it and a node holding
+        # one lone particle receives exactly the same `dt * a` as a node in the bulk. That is the
+        # canonical MLS-MPM ordering (Hu et al. 2018; Taichi mpm88/mpm99 apply gravity immediately
+        # after `grid_v = (1/grid_m) * grid_v` and before the wall conditions, which is the order
+        # kept here). Absent the handover the attribute is None and this is not even a tensor op.
+        _bf = getattr(H, "_mpm_body_accel", None)
+        if _bf is not None:
+            gv = gv + dt * _bf
 
         if D == 2:                                                  # --- 2D: verbatim (bit-identical) ---
             surf = self.surface_tension
@@ -1640,7 +1711,16 @@ class MLSMPMMechanics(Exchange):
         self.n_grid = int(params.get("n_grid", 128))
         self.substeps = int(params.get("substeps", 10))
         self.dt_sub = float(params.get("dt_sub", 2e-4))
-        self.a_max = float(params.get("a_max", 200.0))    # clamp broadcast accel
+        self.a_max = float(params.get("a_max", 200.0))
+        # WHERE THE BODY FORCE IS APPLIED. "particle" (default, and every existing run) folds it
+        # into the particle velocity before P2G; "grid" hands the uniform part to the grid solve,
+        # which is where canonical MLS-MPM puts it. See _hand_body_force_to_grid for why the two
+        # are algebraically identical until the mass clamp binds, and for the measurement showing
+        # that on this spec family it does not.
+        self.body_force = str(params.get("body_force", "particle"))
+        if self.body_force not in ("particle", "grid"):
+            raise ValueError(f"mpm_scatter: body_force must be 'particle' or 'grid', "
+                             f"got {self.body_force!r}")    # clamp broadcast accel
         self.drag = float(params.get("drag", 40.0))       # Stokes drag (overdamped)
         self.wall_damp = float(params.get("wall_damp", 1.0))  # 1.0=elastic wall; <1 loses energy on bounce
         self.wall_contact = float(params.get("wall_contact", 0.04))  # contact-layer thickness damped on bounce

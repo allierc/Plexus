@@ -230,7 +230,12 @@ class MPMScatterWarp(MPMScatter):
         pa = getattr(H, "part_accel", None)
         if pa is not None:
             a_ext = a_ext + pa
-        a_ext = (a_ext + torch.nan_to_num(H.delta(p.name))).contiguous()
+        from plexus.operators.mpm_ops import _hand_body_force_to_grid
+        a_ext = a_ext + torch.nan_to_num(H.delta(p.name))
+        # SAME SPLIT AS THE TORCH SCATTER. This is the path the material specs actually run
+        # (`implementation: warp` on mpm_scatter), so leaving it out would mean `body_force: grid`
+        # silently did nothing on every spec that asked for it.
+        a_ext = _hand_body_force_to_grid(self, H, a_ext, dev, D).contiguous()
 
         # run-constant, and it must be cached: `bool(t.any())` is a sync and a sync inside a
         # CUDA-graph capture is illegal.
