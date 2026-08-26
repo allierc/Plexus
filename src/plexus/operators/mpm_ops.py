@@ -101,25 +101,53 @@ _OFFSETS = stencil_offsets(2)
 
 @register_field("mpm_grid")
 class MPMGrid(Field):
-    """MLS-MPM background grid on [0,width]x[0,1](x[0,1]) with square cells dx = 1/n_grid.
+    """MLS-MPM background grid over the world box, with square cells dx = world_size[1] / n_grid.
     Channels: m (mass), mv (momentum [.,dim]), c (liquid colour for CSF), v (velocity
     [.,dim]). Pure scratch: p2g zeroes + scatters into it each substep, grid_update
-    solves on it, g2p reads it back."""
+    solves on it, g2p reads it back.
+
+    THE CELL SIZE COMES FROM THE WORLD, which it did not before. This used to read
+    `dx = 1.0 / n_grid` with axes 1.. assumed to span [0,1] and only axis 0 scaled by `width`, so
+    `n_grid` meant "cells per unit length". On a box that is not 1 unit across -- a 0.1 m water
+    scene, say -- that puts a 1.0-wide grid on a 0.1-wide world: the cell is 10x too large, only
+    ~10 of 96 cells per axis carry any mass, and the failure is not subtle. `MPMGather` clamps
+    positions into [2*dx, box[k] - 2*dx] with `box` correct and `dx` wrong, which crushes a 0.1 m
+    cube into a 0.058 m slab on the first substep.
+
+    `n_grid` now means CELLS ACROSS AXIS 1. The two readings coincide when world_size[1] == 1.0,
+    and they always did here: of the 1,744 specs under config/, 152 are MPM, 94 declare
+    `general.world` and ALL 94 are exactly [1.0, 1.0, 1.0]; the other 58 are 2D and omit it, which
+    schema.py defaults to [1.0, 1.0]. So every existing spec keeps the identical dx and the
+    identical node count, and no spec sets `width` on this field.
+
+    inv_dx IS NOT 1.0/dx. `1.0 / (1.0 / n) != float(n)` for 640 of the first 4,096 integers -- the
+    first offender is n = 49 -- so the reciprocal round-trip is exact only by luck at the n_grid
+    values in use (48, 64, 96, 128, 192). Deriving it from the integer directly keeps byte-identity
+    on the corpus, and keeps it for a spec that picks n_grid = 49 tomorrow.
+    """
 
     RECORD = False                                   # transient scratch -- not recorded/rendered
 
-    def __init__(self, name, width=1.0, n_grid=128, dim=2, device="cpu", **kw):
+    def __init__(self, name, width=1.0, n_grid=128, dim=2, device="cpu", world_size=None, **kw):
         super().__init__(name)
         self.dim = int(dim)
-        self.ny = int(n_grid)                        # cells per unit length (axes 1..)
-        self.nx = int(round(float(width) * self.ny)) # axis 0 spans the world width
-        self.width = float(width)
-        self.dx = 1.0 / self.ny
-        self.inv_dx = float(self.ny)
+        # `width` is the legacy axis-0 scalar and stays the fallback: a caller that does not pass
+        # the per-axis box gets exactly the old geometry, [width] x [1] x [1].
+        box = [float(w) for w in world_size] if world_size else \
+              [float(width)] + [1.0] * (self.dim - 1)
+        if len(box) != self.dim:
+            raise ValueError(f"MPMGrid: world_size has {len(box)} entries but dim={self.dim}")
+        self.world_size = box
+        self.width = box[0]
+        self.n_grid = int(n_grid)                    # cells across axis 1
+        self.inv_dx = float(n_grid) / box[1]         # NOT 1.0/dx -- see the note above
+        self.dx = box[1] / float(n_grid)
+        n_k = [max(1, int(round(box[k] * self.inv_dx))) for k in range(self.dim)]
+        self.nx, self.ny = n_k[0], n_k[1]
         if self.dim == 2:
             self.shape = (self.nx, self.ny)
-        else:                                        # 3D cube: axes 1,2 span [0,1]
-            self.nz = self.ny
+        else:
+            self.nz = n_k[2]
             self.shape = (self.nx, self.ny, self.nz)
         n = 1
         for s in self.shape:
@@ -216,7 +244,6 @@ def _polar_higham(F, iters=6):
     return R
 
 
-@register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
 def _hand_body_force_to_grid(op, H, a_ext, dev, D):
     """WHERE A BODY FORCE BELONGS. Canonical MLS-MPM applies gravity ON THE GRID, as an
     acceleration, AFTER the momentum has been divided by nodal mass -- Taichi's mpm88/mpm99 read
@@ -267,11 +294,15 @@ def _hand_body_force_to_grid(op, H, a_ext, dev, D):
     return a_ext - op._bf_buf                # particle keeps only what the grid cannot carry
 
 
+@register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
 class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     EMIT = None                 # particle->grid: writes the mpm_grid field in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []        # no required params — `to` defaults to mpm_grid, all knobs optional
     REQUIRES_TYPE_PROPS = ["youngs"]
+    # a liquid has no Young's modulus (nu -> 1/2 makes E = 3K(1-2nu) -> 0); it has a bulk modulus,
+    # and for mu = 0 that IS lambda. Either spelling satisfies the requirement.
+    TYPE_PROP_ALTERNATIVES = {"youngs": ("bulk_modulus",)}
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate"]
     PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt", "drag": "Stokes drag coefficient",
                    "a_max": "external-acceleration clamp",
@@ -1047,7 +1078,17 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
         self.frm = params.get("from", "mpm_grid")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.wall_damp = float(params.get("wall_damp", 1.0))
-        self.wall_contact = float(params.get("wall_contact", 0.04))
+        # A LENGTH, AND THEREFORE A TRAP IN ANY BOX THAT IS NOT 1 UNIT WIDE. The contact test is
+        # `(x < cb) | (x > box[k] - cb)`, so in a 0.1 m box the historical 0.04 selects everything
+        # but a 0.02 m sliver -- the entire fluid reads as permanently in wall contact and is
+        # permanently damped. `wall_contact_cells` states it in the only scale the grid has:
+        # 0.04 / (1/96) = 3.84 cells, so the default reproduces 0.04 exactly at n_grid 96 and
+        # follows the world everywhere else. An explicit `wall_contact` still wins, for the specs
+        # that tuned it.
+        self.wall_contact_cells = float(params.get("wall_contact_cells", 3.84))
+        self.wall_contact = params.get("wall_contact", None)
+        if self.wall_contact is not None:
+            self.wall_contact = float(self.wall_contact)
         # HOW OFTEN `wall_damp` IS APPLIED, and it is the difference between a restitution
         # coefficient and a decay rate. See the note in `forward`. `per_substep` is the historical
         # behaviour and stays the default so no existing run changes.
@@ -1056,6 +1097,12 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
             raise ValueError(f"mpm_gather: wall_damp_mode must be 'per_substep' or 'per_impact', "
                              f"got {self.wall_damp_mode!r}")
         self.vmax = float(params.get("vmax", 1e9))
+
+    def _contact_band(self, g):
+        """The contact-layer thickness, in world length. An explicit `wall_contact` wins; otherwise
+        it is `wall_contact_cells * dx`, which follows the box instead of assuming it is 1 wide."""
+        return self.wall_contact if self.wall_contact is not None \
+            else self.wall_contact_cells * float(g.dx)
 
     def forward(self, H, mask=None):
         p = H.level(self.at); g = H.field(self.frm); dev = p.state.device
@@ -1080,7 +1127,7 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
         new_C = 4 * inv_dx * (weight[..., None, None] * (gvn[..., :, None] @ dpos_grid[..., None, :])).sum(1)
         new_V = torch.nan_to_num(new_V)
         if self.wall_damp != 1.0 and not periodic:                 # inelastic wall contact (solids)
-            cb = self.wall_contact
+            cb = self._contact_band(g)
             near = torch.zeros(p.n, dtype=torch.bool, device=dev)
             for k in range(D):
                 near = near | (X[:, k] < cb) | (X[:, k] > box[k] - cb)
@@ -1785,7 +1832,10 @@ class MLSMPMMechanics(Exchange):
     #   (advection)      engine     pos/vel integration of the returned G2P delta
 
     # --- declared dependencies (no longer hidden inside the substep) ----- #
-    REQUIRES_TYPE_PROPS = ["youngs"]                      # per-cell-type stiffness -> mu, la
+    REQUIRES_TYPE_PROPS = ["youngs"]
+    # a liquid has no Young's modulus (nu -> 1/2 makes E = 3K(1-2nu) -> 0); it has a bulk modulus,
+    # and for mu = 0 that IS lambda. Either spelling satisfies the requirement.
+    TYPE_PROP_ALTERNATIVES = {"youngs": ("bulk_modulus",)}                      # per-cell-type stiffness -> mu, la
     REQUIRES_BUFFERS = ["C", "F", "mass", "mu", "la", "p_vol"]  # per-particle (mpm_particle entity provisions them)
     REQUIRES_HSTATE = []                                  # body force = the PARENT set's accumulated delta (H.delta)
 
@@ -1822,7 +1872,17 @@ class MLSMPMMechanics(Exchange):
                              f"got {self.body_force!r}")    # clamp broadcast accel
         self.drag = float(params.get("drag", 40.0))       # Stokes drag (overdamped)
         self.wall_damp = float(params.get("wall_damp", 1.0))  # 1.0=elastic wall; <1 loses energy on bounce
-        self.wall_contact = float(params.get("wall_contact", 0.04))  # contact-layer thickness damped on bounce
+        # A LENGTH, AND THEREFORE A TRAP IN ANY BOX THAT IS NOT 1 UNIT WIDE. The contact test is
+        # `(x < cb) | (x > box[k] - cb)`, so in a 0.1 m box the historical 0.04 selects everything
+        # but a 0.02 m sliver -- the entire fluid reads as permanently in wall contact and is
+        # permanently damped. `wall_contact_cells` states it in the only scale the grid has:
+        # 0.04 / (1/96) = 3.84 cells, so the default reproduces 0.04 exactly at n_grid 96 and
+        # follows the world everywhere else. An explicit `wall_contact` still wins, for the specs
+        # that tuned it.
+        self.wall_contact_cells = float(params.get("wall_contact_cells", 3.84))
+        self.wall_contact = params.get("wall_contact", None)
+        if self.wall_contact is not None:
+            self.wall_contact = float(self.wall_contact)  # contact-layer thickness damped on bounce
         self.surface_tension = float(params.get("surface_tension", 0.0))  # liquid cohesion (CSF coefficient)
         self.vmax = float(params.get("vmax", 1e9))        # max cell speed (default: CFL only)
         self.dx = 1.0 / self.n_grid

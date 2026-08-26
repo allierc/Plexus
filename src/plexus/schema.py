@@ -326,10 +326,16 @@ def load(path: str) -> Spec:
                 raise ValueError(
                     f"operator {name!r} requires per-type property {prop!r}, but neither "
                     f"{sel.set!r} nor its parents declare `types`.")
+            # ONE PROPERTY, MORE THAN ONE WAY TO SPELL IT. `youngs` and `bulk_modulus` are two
+            # routes to the same Lame pair -- for a liquid, where mu = 0, they are the SAME number
+            # reached differently -- so requiring the first by name would forbid the second. The
+            # operator declares the alternatives and the type satisfies any one of them.
+            alts = getattr(cls, "TYPE_PROP_ALTERNATIVES", {}).get(prop, ())
             for tname, t in set_types.items():
-                if prop not in t:
+                if prop not in t and not any(a in t for a in alts):
+                    also = f" (or {' / '.join(alts)})" if alts else ""
                     raise ValueError(
-                        f"operator {name!r} requires property {prop!r} on every type of "
+                        f"operator {name!r} requires property {prop!r}{also} on every type of "
                         f"{owner!r}; missing on type {tname!r}. "
                         f"(declared in {cls.__name__}.REQUIRES_TYPE_PROPS)")
         opspec = OpSpec(op=name, on=sel, to=o.get("to"), frm=o.get("from"),
@@ -393,8 +399,10 @@ def load(path: str) -> Spec:
     # asking to be a fluid silently built as whatever its parent cell was. The provision hook reads
     # all three today -- per the PARTICLE's own type, not its parent's -- so the warning would now
     # be false where it used to be the only notice anyone got.
+    # `bulk_modulus` is read by mpm_scatter via TYPE_PROP_ALTERNATIVES rather than by name, so the
+    # used_props scan does not see it and it would be reported as read by no operator.
     _KNOWN_TYPE_KEYS = {"fraction", "core", "layers", "block",
-                        "material", "density", "tau"} | used_props
+                        "material", "density", "tau", "bulk_modulus"} | used_props
     for sname, s in raw["sets"].items():
         for tname, t in s.get("types", {}).items():
             for k in t:
