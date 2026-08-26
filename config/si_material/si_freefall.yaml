@@ -19,19 +19,20 @@ sets:
     n: 1
     start:
     - - 50.0
-      - 85.0
+      - 80.0
       - 50.0
     types:
-      water:
+      snow:
         fraction: 1.0
-        material: liquid
-        bulk_modulus: 2200000000.0
+        material: snow
+        shape: ball
+        youngs: 140000.0
   mpm_particle:
     parent: cell
-    per_parent: 64000
+    per_parent: 33510
     radius: 0.5
-    density: 1000.0
-    particle_mass: 125.0
+    density: 400.0
+    particle_mass: 50.0
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -45,9 +46,6 @@ operators:
 - op: mpm_strain
   at: mpm_particle
   implementation: warp
-- op: mpm_viscosity
-  at: mpm_particle
-  eta: 0.001
 - op: mpm_scatter
   at: mpm_particle
   to: mpm_grid
@@ -58,9 +56,6 @@ operators:
 - op: mpm_grid_update
   at: mpm_grid
   wall_damp: 0.9
-  surface_tension: 0.072
-  csf_rho: 1000.0
-  csf_band: 0.2
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
@@ -71,10 +66,9 @@ operators:
 schedule:
 - aggregate
 - gravity
-- substep_dt: 0.00026
+- substep_dt: 0.001
   steps:
   - mpm_strain
-  - mpm_viscosity
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
@@ -90,7 +84,7 @@ plotting:
   render_3d: dots
   camera_turns: 0.0
   colors:
-    water:
-    - 0.3
-    - 0.62
+    snow:
+    - 0.88
+    - 0.93
     - 1.0
