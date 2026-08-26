@@ -72,6 +72,11 @@ def main():
                              "run at several draw counts when its trajectory is too big to store")
     parser.add_argument("--render-max-frames", type=int, default=300,
                         help="cap on rendered frames; longer runs are strided down to this")
+    parser.add_argument("--keep-stills", action="store_true",
+                        help="keep the numbered still_NN_*.png after the run. They exist to let a "
+                             "run be WATCHED while it runs; once the mp4 is written they are "
+                             "redundant copies of frames it already holds, so they are deleted by "
+                             "default and only 3d.png (the final frame) is kept")
     parser.add_argument("--render-stills", type=int, default=10,
                         help="how many PNG stills to drop through the run, copied from the movie's "
                              "own rendered frames (no extra render). 0 disables. The newest is "
@@ -166,7 +171,8 @@ def main():
         _rn = [int(x) for x in str(args.render_n).split(",") if x.strip()]
         lm = None if args.no_viz else {"render_n": (_rn if len(_rn) > 1 else _rn[0]),
                                        "max_frames": args.render_max_frames, "dot": _dot,
-                                       "stills": args.render_stills}
+                                       "stills": args.render_stills,
+                                       "keep_stills": args.keep_stills}
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
                                     erase=args.force, save=True,
                                     live_every_frac=(None if args.no_viz else 0.05),

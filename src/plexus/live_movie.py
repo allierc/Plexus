@@ -64,7 +64,7 @@ class LiveMovie:
 
     def __init__(self, out, world, n_frames, up=2, render_n=400_000, max_frames=300,
                  fps=20, px=1280, dot=None, fill=0.9, elev=18.0, azim=-58.0, name="", seed=0,
-                 sim=None, style=None, stills=10):
+                 sim=None, style=None, stills=10, keep_stills=False):
         from plexus.render_vtk import offscreen
         offscreen()                                   # kill the Xlib chatter before VTK loads
         import pyvista as pv
@@ -106,6 +106,13 @@ class LiveMovie:
         self.still_ticks = {_rendered[i] for i in self.still_ticks}
         self.still_dir = os.path.dirname(out) or "."
         self.stills_written = 0
+        # THE NUMBERED STILLS ARE A LIVE-PROGRESS ARTEFACT, NOT AN OUTPUT. Their job is to let a
+        # run be watched while it is running; once the mp4 exists they are 10 redundant copies of
+        # frames the movie already holds, and across a spec library they add up -- 851 files and
+        # 0.21 GB from one night's material runs alone. `3d.png` is kept, because that is the one
+        # a file browser is pointed at, and it is the final frame.
+        self.keep_stills = bool(keep_stills)
+        self._still_paths = []
         self.cloud = self.idx = None
         self.drawn = self.n = self.rendered = 0
         self.t0 = None
@@ -343,8 +350,10 @@ class LiveMovie:
             import imageio.v3 as iio
             img = self.p.image                      # the frame write_frame() just rasterised
             n = f"{self.stills_written:02d}"
-            iio.imwrite(os.path.join(self.still_dir, f"still_{n}_f{tick:05d}.png"), img)
+            _p = os.path.join(self.still_dir, f"still_{n}_f{tick:05d}.png")
+            iio.imwrite(_p, img)
             iio.imwrite(os.path.join(self.still_dir, "3d.png"), img)
+            self._still_paths.append(_p)
             self.stills_written += 1
         except Exception as e:                      # a missing PNG must never end a 20-minute run
             print(f"[live-movie] still at frame {tick} failed: {type(e).__name__}: {e}", flush=True)
@@ -354,6 +363,16 @@ class LiveMovie:
             self.p.close()
         except Exception:
             pass
+        if not self.keep_stills:
+            _n = 0
+            for _p in self._still_paths:
+                try:
+                    os.remove(_p); _n += 1
+                except OSError:
+                    pass
+            if _n:
+                self.stills_written = 0
+                self._removed_stills = _n
         if self.failed or not self.rendered:
             print(f"[live-movie] wrote nothing ({self.failed or 'no frames rendered'})", flush=True)
             return None
@@ -362,6 +381,8 @@ class LiveMovie:
               f"{'' if self.stride == 1 else f' (every {self.stride}th)'}, "
               f"coloured by {self.colour_by}, dot {self.px_used:.2f} px"
               + (f", {self.n_obstacles} obstacle(s)" if self.n_obstacles else "")
-              + (f", {self.stills_written} stills + 3d.png" if self.stills_written else ""),
+              + (f", {self.stills_written} stills + 3d.png" if self.stills_written
+                 else (f", {getattr(self, '_removed_stills', 0)} stills removed, 3d.png kept"
+                       if getattr(self, "_removed_stills", 0) else "")),
               flush=True)
         return self.out
