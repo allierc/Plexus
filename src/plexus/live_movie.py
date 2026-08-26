@@ -244,8 +244,14 @@ class LiveMovie:
                 _lab = (f"{_v * 1e3:g} mm" if _v < 0.01 else f"{_v * 100:g} cm" if _v < 1.0
                         else f"{_v:g} m" if _v < 1000.0 else f"{_v / 1000:g} km")
                 _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.05 * float(span[self.up])
-                self.p.add_point_labels([_mid], [_lab], font_size=11, text_color="white",
-                                        shape=None, show_points=False, always_visible=True)
+                # TWICE THE HEADER'S NUMBER TO GET THE SAME HEIGHT. `add_text` and
+                # `add_point_labels` do not interpret `font_size` the same way -- both set to 11 and
+                # the label renders about half the cap height of the top-left print. 22 matches it,
+                # and at that size the label spans roughly two thirds of the bar, which is what
+                # makes the two read as one annotation.
+                self.p.add_point_labels([_mid], [_lab], font_size=22, text_color="white",
+                                        shape=None, show_points=False, always_visible=True,
+                                        justification_horizontal="center")
             centre, radius = 0.5 * span, float(span.max()) * 0.55
             e, az = np.radians(elev), np.radians(azim)
             ax_h = [i for i in range(3) if i != self.up]
