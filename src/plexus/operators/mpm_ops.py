@@ -244,6 +244,51 @@ def _polar_higham(F, iters=6):
     return R
 
 
+# ==========================================================================================================
+# DIMENSIONAL CONSTANTS, EXPRESSED RELATIVE TO THEIR OWN NATURAL SCALE
+# ==========================================================================================================
+_REF_DX, _REF_RHO = 1.0 / 96, 1.0          # the box every one of these numbers was chosen against
+
+#   name -> (historical value, exponent of density, exponent of length)
+#   a mass is rho * L^3;  a length is L;  a reciprocal length is L^-1.
+_CONST_DIMS = {
+    "mass_floor":     (1e-10, 1, 3),
+    "csf_mass_floor": (1e-8, 1, 3),
+    "ring":           (0.04, 0, 1),
+    "csf_eps":        (1e-6, 0, -1),
+}
+
+
+def _scale_constant(name, dx, rho=1.0):
+    """The value a dimensional constant takes at this (dx, rho).
+
+    WHY THESE ARE NOT NUMBERS. Each was chosen against a UNIT BOX at n_grid 96 with density 1, and
+    each means something else the moment any of the three changes. `wall_contact: 0.04` -- the first
+    one converted -- was the plain case: in a 0.1 m box it selected everything but a 0.02 m sliver,
+    so the whole fluid read as permanently in wall contact and was permanently damped.
+
+    The others are quieter and one of them is already costing accuracy. The CSF regulariser `eps` in
+    n = grad(c)/(|grad c| + eps) has units of 1/LENGTH, and it is why `csf_rho` is not a pure gain
+    rescaling: at the parity tension sigma = 120/192^2, material_two_drops_st reproduces only to
+    2.376% RMS in CSF force, 32.7% once `csf_band` is on, because an absolute epsilon added to
+    |grad c| bites differently once the colour is divided by rho*dx^D.
+
+    CALIBRATED TO REPRODUCE THE HISTORICAL NUMBER EXACTLY at the reference, so no existing spec
+    moves: at rho = 1 and dx = 1/96 both ratios are exactly 1.0 and the result is the original float,
+    not a value close to it.
+
+    NOT EVERY CONSTANT BELONGS HERE, and the ones left out are left out for a reason:
+      a_max 200   an acceleration. The natural scale is `g`, which DIFFERS BETWEEN SPECS (14, 16,
+                  9.81), so no single multiple reproduces them all -- converting it would be a
+                  behaviour change dressed as a refactor.
+      vmax 1e9    a velocity, and inert: the binding cap is min(vmax, 0.4*dx/dt) in the gather, so
+                  the absolute default never applies.
+      spin_k 30   a rate, and there is no natural time scale in the operator to divide it by.
+    """
+    v0, a, b = _CONST_DIMS[name]
+    return v0 * (float(rho) / _REF_RHO) ** a * (float(dx) / _REF_DX) ** b
+
+
 def _hand_body_force_to_grid(op, H, a_ext, dev, D):
     """WHERE A BODY FORCE BELONGS. Canonical MLS-MPM applies gravity ON THE GRID, as an
     acceleration, AFTER the momentum has been divided by nodal mass -- Taichi's mpm88/mpm99 read
@@ -563,7 +608,7 @@ class MPMGridUpdate(FieldUpdate):
         self.at = params.get("_at", "mpm_grid")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.surface_tension = float(params.get("surface_tension", 0.0))
-        self.mass_floor = float(params.get("mass_floor", 1e-10))
+        self.mass_floor = params.get("mass_floor", None)      # None -> derived from dx, rho
         # THE SAME DEFECT, A HUNDRED TIMES LARGER. The CSF surface-tension term converts a nodal
         # force to an acceleration with `dx^D / gm.clamp(min=1e-8)`, and 1e-8 is TEN THOUSAND times
         # the per-particle mass of a 10M-particle run (1.4e-09). Measured on that run at frame 500:
@@ -574,7 +619,7 @@ class MPMGridUpdate(FieldUpdate):
         # SWEEP DID NOTHING: that was measured to be the missing colour normalisation below, a factor
         # of 1/(rho*dx^D) ~ 1e6, against this floor's median 18x on half the nodes. Both are real;
         # they differ by five orders of magnitude, and setting `csf_rho` makes this floor inert.
-        self.csf_mass_floor = float(params.get("csf_mass_floor", 1e-8))
+        self.csf_mass_floor = params.get("csf_mass_floor", None)   # None -> derived
         # WHAT "COLOUR = 1" MEANS -- WHICH THIS BLOCK NEVER KNEW, AND THE REASON THE PARAGRAPH ABOVE
         # IS TREATING A SYMPTOM. `mpm_scatter` deposits `weight * mass * is_liquid`, so `gc` is a
         # liquid MASS PER NODE in absolute units, not the dimensionless volume fraction (0 in air,
@@ -620,6 +665,7 @@ class MPMGridUpdate(FieldUpdate):
         # change the trajectory (r90 0.302 unsmoothed vs 0.306 smoothed at Bond 1) and it leaks
         # colour into empty cells, which is why the band below carries an explicit mass clause.
         self.csf_smooth = int(params.get("csf_smooth", 0))
+        self.csf_eps = params.get("csf_eps", None)                 # None -> derived (a 1/length)
         # A BAND WITHOUT A REFERENCE DENSITY IS A SILENT OFF-SWITCH: `c` would still be a mass, of
         # order rho*dx^D ~ 1e-6, so `c > 0.2` is false everywhere, the mask is empty and the term
         # vanishes without a word. Refuse the combination rather than run it.
@@ -826,9 +872,23 @@ class MPMGridUpdate(FieldUpdate):
             gv[:, hiy, 0] = gv[:, hiy, 0] * wd
         return gv.view(nx * ny, 2)
 
+    def _const(self, name, g):
+        """A declared value wins; otherwise the constant is derived from THIS grid's cell size and
+        the liquid's own density. `csf_rho` is that density when it is given (it is, by definition,
+        the divisor that turns deposited mass into a volume fraction); `rho_ref` otherwise, whose
+        default 1.0 is exactly the reference these numbers were chosen against."""
+        v = getattr(self, name)
+        if v is not None:
+            return float(v)
+        rho = self.csf_rho if self.csf_rho > 0.0 else self.rho_ref
+        return _scale_constant(name, float(g.dx), rho)
+
     def forward(self, H, mask=None):
         g = H.field(self.at); dev = g.m.device
         dt = sub_dt(H, self.dt_sub)
+        _mass_floor = self._const("mass_floor", g)
+        _csf_floor = self._const("csf_mass_floor", g)
+        _csf_eps = self._const("csf_eps", g)
         nx, ny, inv_dx, dx = g.nx, g.ny, g.inv_dx, g.dx
         D = g.dim
         periodic = bool(getattr(H, "periodic", False))
@@ -846,7 +906,7 @@ class MPMGridUpdate(FieldUpdate):
         #
         # Kept as a PARAMETER at its historical value so no existing run changes; a spec whose
         # particle mass has outgrown it sets `mass_floor` smaller.
-        gv = gmv / gm.clamp(min=self.mass_floor)[:, None]
+        gv = gmv / gm.clamp(min=_mass_floor)[:, None]
         # THE BODY FORCE, IF mpm_scatter HANDED IT OVER (`body_force: grid`). Applied here and not
         # in the scatter because this is after the division by nodal mass: as a pure addition to a
         # velocity it carries no mass factor, so `gm.clamp` cannot attenuate it and a node holding
@@ -884,7 +944,7 @@ class MPMGridUpdate(FieldUpdate):
                         c = 0.25 * torch.roll(c, 1, k) + 0.5 * c + 0.25 * torch.roll(c, -1, k)
                 cx = (torch.roll(c, -1, 0) - torch.roll(c, 1, 0)) * (0.5 * inv_dx)
                 cy = (torch.roll(c, -1, 1) - torch.roll(c, 1, 1)) * (0.5 * inv_dx)
-                gmag = torch.sqrt(cx * cx + cy * cy); eps = 1e-6
+                gmag = torch.sqrt(cx * cx + cy * cy); eps = _csf_eps
                 nxg, nyg = cx / (gmag + eps), cy / (gmag + eps)
                 kappa = -((torch.roll(nxg, -1, 0) - torch.roll(nxg, 1, 0)) * (0.5 * inv_dx)
                           + (torch.roll(nyg, -1, 1) - torch.roll(nyg, 1, 1)) * (0.5 * inv_dx))
@@ -895,7 +955,7 @@ class MPMGridUpdate(FieldUpdate):
                 else:
                     fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
                 stfx = (surf * kappa * cx * fmask).view(-1); stfy = (surf * kappa * cy * fmask).view(-1)
-                inv_m = (dx * dx) / gm.clamp(min=self.csf_mass_floor)
+                inv_m = (dx * dx) / gm.clamp(min=_csf_floor)
                 gv = gv + dt * torch.stack([stfx * inv_m, stfy * inv_m], dim=1)
 
             if not periodic:
@@ -940,7 +1000,7 @@ class MPMGridUpdate(FieldUpdate):
                 grad = [(torch.roll(c, -1, k) - torch.roll(c, 1, k)) * (0.5 * inv_dx)
                         for k in range(D)]
                 gmag = torch.sqrt(sum(gk * gk for gk in grad))
-                eps = 1e-6
+                eps = _csf_eps
                 nrm = [gk / (gmag + eps) for gk in grad]
                 kappa = -sum((torch.roll(nrm[k], -1, k) - torch.roll(nrm[k], 1, k)) * (0.5 * inv_dx)
                              for k in range(D))
@@ -956,7 +1016,7 @@ class MPMGridUpdate(FieldUpdate):
                              & (gm.view(*g.shape) > self.csf_band * _mfull)).to(c.dtype)
                 else:
                     fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
-                inv_m = (dx ** D) / gm.clamp(min=self.csf_mass_floor)   # force -> acceleration
+                inv_m = (dx ** D) / gm.clamp(min=_csf_floor)   # force -> acceleration
                 gv = gv + dt * torch.stack(
                     [(surf * kappa * grad[k] * fmask).view(-1) * inv_m for k in range(D)], dim=1)
             if not periodic:
@@ -1446,25 +1506,37 @@ class MPMAnchor(Lateral):
         super().__init__(params, device)
         self.k = float(params["k"])
         self.mode = str(params.get("mode", "boundary"))       # "boundary" ring | "substrate" all
-        self.ring = float(params.get("ring", 0.04))           # ring width (world units) for mode=boundary
+        self.ring = params.get("ring", None)                  # None -> derived (a length)
         self.at = params.get("_at", "particle")
         self._rest = None
         self._sel = None
 
-    def _init(self, lvl):
+    def _init(self, lvl, H=None):
+        # THE BAND IS A LENGTH, AND ITS NATURAL SCALE IS THE CELL. An anchor ring narrower than a
+        # couple of cells cannot be resolved by the grid that carries the force, so `dx` is the
+        # right yardstick -- 3.84 cells, which is exactly 0.04 at n_grid 96 and therefore leaves
+        # every existing spec where it was. Falls back to the historical constant when no MPM grid
+        # is in the run (the operator does not require one).
         self._rest = lvl.get("pos").clone()                   # undeformed sheet (frame 0)
+        if self.ring is None:
+            _g = (H.fields.get("mpm_grid") if H is not None and getattr(H, "fields", None)
+                  else None)
+            self._ring = (_scale_constant("ring", float(_g.dx)) if _g is not None
+                          else _CONST_DIMS["ring"][0])
+        else:
+            self._ring = float(self.ring)
         if self.mode == "substrate":
             self._sel = torch.ones(self._rest.shape[0], dtype=torch.bool, device=self._rest.device)
         else:                                                 # outer ring of the tissue's rest extent
             lo = self._rest.min(0).values
             hi = self._rest.max(0).values
-            near = ((self._rest - lo) < self.ring) | ((hi - self._rest) < self.ring)   # [N,2]
+            near = ((self._rest - lo) < self._ring) | ((hi - self._rest) < self._ring)  # [N,2]
             self._sel = near.any(dim=1)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         if self._rest is None:
-            self._init(lvl)
+            self._init(lvl, H)
         acc = self.k * (self._rest - lvl.get("pos")) * (self._sel * lvl.occ)[:, None].float()
         if mask is not None:
             acc = acc * mask[:, None].float()
