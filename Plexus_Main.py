@@ -72,6 +72,10 @@ def main():
                              "run at several draw counts when its trajectory is too big to store")
     parser.add_argument("--render-max-frames", type=int, default=300,
                         help="cap on rendered frames; longer runs are strided down to this")
+    parser.add_argument("--no-real-time", action="store_true",
+                        help="draw every frame instead of choosing the stride that makes 60 fps "
+                             "playback equal real time. Only has an effect when the spec declares "
+                             "`general.units`, since without them a second means nothing")
     parser.add_argument("--keep-stills", action="store_true",
                         help="keep the numbered still_NN_*.png after the run. They exist to let a "
                              "run be WATCHED while it runs; once the mp4 is written they are "
@@ -172,7 +176,12 @@ def main():
         lm = None if args.no_viz else {"render_n": (_rn if len(_rn) > 1 else _rn[0]),
                                        "max_frames": args.render_max_frames, "dot": _dot,
                                        "stills": args.render_stills,
-                                       "keep_stills": args.keep_stills}
+                                       "keep_stills": args.keep_stills,
+                                       # the movie can only be timed if the run has a clock
+                                       "dt": getattr(sim, "dt", None),
+                                       "time_s": (sim.units.time_s if getattr(
+                                           getattr(sim, "units", None), "declared", False) else None),
+                                       "real_time": not args.no_real_time}
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
                                     erase=args.force, save=True,
                                     live_every_frac=(None if args.no_viz else 0.05),

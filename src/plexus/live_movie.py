@@ -64,7 +64,8 @@ class LiveMovie:
 
     def __init__(self, out, world, n_frames, up=2, render_n=400_000, max_frames=300,
                  fps=20, px=1280, dot=None, fill=0.9, elev=18.0, azim=-58.0, name="", seed=0,
-                 sim=None, style=None, stills=10, keep_stills=False):
+                 sim=None, style=None, stills=10, keep_stills=False,
+                 dt=None, time_s=None, real_time=True):
         from plexus.render_vtk import offscreen
         offscreen()                                   # kill the Xlib chatter before VTK loads
         import pyvista as pv
@@ -93,6 +94,28 @@ class LiveMovie:
         self.up = int(up)
         # (reset to 1 for 2D below, once the world tells us the run is planar)
         self.stride = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
+        # REAL TIME, WHICH IS ONLY MEANINGFUL ONCE A RUN HAS UNITS. One simulated frame lasts
+        # `dt * time_s` SECONDS, so playing at `fps` shows real time exactly when the render stride
+        # is 1/(fps * dt * time_s). Without a `units:` block `time_s` is 1.0 by default and the run
+        # is dimensionless, so this computes a stride for a second that means nothing -- hence it
+        # only engages when the units were DECLARED, and otherwise the movie is what it always was.
+        #
+        # It cannot always be reached: a run whose frames are further apart than 1/fps of real time
+        # is already faster than real when every frame is drawn, and one with a huge frame count
+        # would need a stride so large the motion aliases. Both are reported rather than silently
+        # accepted, because "this movie is real time" is a claim.
+        self.dt, self.time_s, self.real_time = dt, time_s, bool(real_time)
+        self.speed = None                              # playback seconds per simulated second
+        if self.real_time and dt and time_s:
+            frame_s = float(dt) * float(time_s)        # seconds of the world, per simulated frame
+            want = 1.0 / (float(fps) * frame_s)        # frames to skip so `fps` playback is 1:1
+            if want >= 1.0:
+                self.stride = max(1, int(round(want)))
+                _cap = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
+                if self.stride < _cap:                 # max_frames is a HARD cap on file size
+                    self.stride = _cap
+            self.speed = 1.0 / (float(fps) * frame_s * self.stride)
+            self.duration_s = self.n_frames * frame_s
         # STILLS COME OUT OF THE MOVIE'S OWN RENDER, not a second one. `Plotter.image` is the frame
         # `write_frame()` just rasterised, so a PNG costs a file write and nothing else -- no extra
         # render pass, and no second copy of the camera/palette/dot-size code to drift out of sync
@@ -261,8 +284,17 @@ class LiveMovie:
         self.cloud.points = self._xyz(lvl)
         el = time.perf_counter() - self.t0
         sub = f", {self.drawn:,} drawn" if self.drawn < self.n else ""
+        # THE CLOCK, WHEN THERE IS ONE. With units declared the overlay carries the world's own
+        # time and how fast the movie is running against it, so nobody has to ask.
+        clk = ""
+        if self.speed is not None:
+            _t = tick * float(self.dt) * float(self.time_s)
+            _f = self.speed
+            _how = ("real time" if 0.95 <= _f <= 1.05 else
+                    (f"{1 / _f:.4g}x slow motion" if _f < 1 else f"{_f:.4g}x faster than real"))
+            clk = f"\nt = {_t:.4g} s of {self.duration_s:.4g} s   {_how}"
         self.p.add_text(f"{self.name}\n{self.n:,} particles{sub}\n"
-                        f"frame {tick}/{self.n_frames}   {el / max(tick, 1) * 1000:.0f} ms/frame",
+                        f"frame {tick}/{self.n_frames}   {el / max(tick, 1) * 1000:.0f} ms/frame{clk}",
                         position="upper_left", font_size=11, color="white", name="hdr")
         self.p.write_frame()
         self.rendered += 1
