@@ -114,16 +114,39 @@ class LiveMovie:
         # would need a stride so large the motion aliases. Both are reported rather than silently
         # accepted, because "this movie is real time" is a claim.
         self.dt, self.time_s, self.real_time = dt, time_s, bool(real_time)
-        self.speed = None                              # playback seconds per simulated second
-        if self.real_time and dt and time_s:
-            frame_s = float(dt) * float(time_s)        # seconds of the world, per simulated frame
-            want = 1.0 / (float(fps) * frame_s)        # frames to skip so `fps` playback is 1:1
-            if want >= 1.0:
-                self.stride = max(1, int(round(want)))
-                _cap = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
-                if self.stride < _cap:                 # max_frames is a HARD cap on file size
-                    self.stride = _cap
-            self.speed = 1.0 / (float(fps) * frame_s * self.stride)
+        self.speed = None
+        # `playback` IS THE SPEED, AND IT IS THE THING TO ASK FOR. One video second holds `fps`
+        # movie frames, each `stride` simulated frames apart, so it shows
+        #
+        #     speed = fps * stride * dt * time_s        SECONDS OF THE WORLD PER VIDEO SECOND
+        #
+        # 1.0 is real time; 0.25 is quarter speed, i.e. 4x SLOW MOTION. Inverting that -- which the
+        # first version of this did -- reads a 4x slow-motion movie as "4x faster than real", and
+        # the error is invisible at real time because 1/1 == 1.
+        #
+        # REAL TIME IS OFTEN NOT WATCHABLE, and saying so is the point of having units. si_gate is
+        # 0.25 L of water in a 100 mm box: the whole run is 1.5 SECONDS of world, and the cube's
+        # fall takes 0.078 s -- under 5 frames of a real-time movie. Small scenes are simply fast.
+        _pb = float((style or {}).get("playback", 1.0))
+        if self.real_time and dt and time_s and _pb > 0:
+            frame_s = float(dt) * float(time_s)
+            want = _pb / (float(fps) * frame_s)         # frames to skip for the requested speed
+            self.stride = max(1, int(round(want)))
+            _cap = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
+            if self.stride < _cap:
+                # THE CAP WINS, AND SAYS SO. `max_frames` bounds the file size, so it can override
+                # the requested speed -- at 1800 frames and max_frames 300 the stride cannot go
+                # below 6, which puts a floor of 3.3x on the slow motion however small `playback`
+                # is. Silently clamping it would mean a spec asking for 10x and getting 3.3x with
+                # nothing said, and the overlay would then report the speed it ACTUALLY got, which
+                # looks like the request was honoured.
+                print(f"[live-movie] playback {_pb:g} wants stride {self.stride}, but "
+                      f"max_frames={int(max_frames)} forces {_cap} "
+                      f"({float(fps) * _cap * frame_s:.4g}x real time, not {_pb:g}). "
+                      f"Raise --render-max-frames to {int(np.ceil(self.n_frames / self.stride))} "
+                      f"to get what was asked for.", flush=True)
+                self.stride = _cap
+            self.speed = float(fps) * self.stride * frame_s
             self.duration_s = self.n_frames * frame_s
         # STILLS COME OUT OF THE MOVIE'S OWN RENDER, not a second one. `Plotter.image` is the frame
         # `write_frame()` just rasterised, so a PNG costs a file write and nothing else -- no extra
@@ -300,7 +323,7 @@ class LiveMovie:
             _t = tick * float(self.dt) * float(self.time_s)
             _f = self.speed
             _how = ("real time" if 0.95 <= _f <= 1.05 else
-                    (f"{1 / _f:.4g}x slow motion" if _f < 1 else f"{_f:.4g}x faster than real"))
+                    (f"{1 / _f:.4g}x slow motion" if _f < 1.0 else f"{_f:.4g}x faster than real"))
             clk = f"\nt = {_t:.4g} s of {self.duration_s:.4g} s   {_how}"
         self.p.add_text(f"{self.name}\n{self.n:,} particles{sub}\n"
                         f"frame {tick}/{self.n_frames}   {el / max(tick, 1) * 1000:.0f} ms/frame{clk}",

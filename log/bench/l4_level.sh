@@ -12,6 +12,6 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 echo "### $SPEC  $(date +%H:%M:%S)"
 # no `| tail`: tail buffers to EOF and a long job then shows nothing at all until it finishes
 $PY -u Plexus_Main.py -o generate "$SPEC" --device cuda:0 \
-    --render-n 1000000 --render-max-frames 300 --no-describe 2>&1 \
+    --render-n 1000000 --render-max-frames 600 --no-describe 2>&1 \
   | tr '\r' '\n' | grep -vE "^\[generate\].*[0-9]%\|"
 echo "### DONE $(date +%H:%M:%S)"
