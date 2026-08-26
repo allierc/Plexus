@@ -216,7 +216,6 @@ def _polar_higham(F, iters=6):
     return R
 
 
-@register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
 def _hand_body_force_to_grid(op, H, a_ext, dev, D):
     """WHERE A BODY FORCE BELONGS. Canonical MLS-MPM applies gravity ON THE GRID, as an
     acceleration, AFTER the momentum has been divided by nodal mass -- Taichi's mpm88/mpm99 read
@@ -267,6 +266,7 @@ def _hand_body_force_to_grid(op, H, a_ext, dev, D):
     return a_ext - op._bf_buf                # particle keeps only what the grid cannot carry
 
 
+@register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
 class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     EMIT = None                 # particle->grid: writes the mpm_grid field in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
