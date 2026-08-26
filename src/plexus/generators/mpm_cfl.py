@@ -55,11 +55,34 @@ def _max_wave_speed(spec, rho_default=1.0) -> float:
 
     Density is per SET, overridable per TYPE, exactly as `models/entities.py` assigns it.
     """
-    cmax = 0.0
-    for sname, st in (spec.get("sets") or {}).items():
+    # THE DENSITY AND THE MATERIAL CAN LIVE ON DIFFERENT SETS, and pairing them within one set is
+    # wrong for exactly the composition this repo uses most: the 27 water blocks declare `youngs`
+    # and `material` on the PARENT (`cell`) types, while `density` sits on the CHILD
+    # (`mpm_particle`) set. Walking sets independently then gave the parent rho = 1.0 (it has no
+    # density) and the child no types (it has none), so a spec at density 0.25 was evaluated at
+    # 1.0 -- c came out 7.46 instead of 14.9, the limit was twice too loose, and
+    # material_3d_water_dam_20m_rho0p25 was passed as stable and blew up: by frame 1 its material
+    # spanned [0.010, 0.990] on all three axes. That is the failure direction this function's own
+    # docstring calls the dangerous one, in a case it did not cover.
+    #
+    # So: for every set that declares a density, find the sets whose types describe ITS material --
+    # itself, and its parent if it names one -- and pair them.
+    sets = spec.get("sets") or {}
+    rho_for = {}
+    for sname, st in sets.items():
         if not isinstance(st, dict):
             continue
-        rho_set = float(st.get("density", rho_default))
+        rho_for.setdefault(sname, float(st.get("density", rho_default)))
+        par = st.get("parent")
+        if par in sets and "density" in st:
+            # the child's particles carry the child's density, and their material comes from the
+            # parent's type table; attribute the lower of the two to the parent so it is not missed
+            rho_for[par] = min(rho_for.get(par, float("inf")), float(st["density"]))
+    cmax = 0.0
+    for sname, st in sets.items():
+        if not isinstance(st, dict):
+            continue
+        rho_set = rho_for.get(sname, float(st.get("density", rho_default)))
         for t in (st.get("types") or {}).values():
             if not isinstance(t, dict):
                 continue
