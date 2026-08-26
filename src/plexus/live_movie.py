@@ -341,13 +341,13 @@ class LiveMovie:
         sub = f", {self.drawn:,} drawn" if self.drawn < self.n else ""
         # THE CLOCK, WHEN THERE IS ONE. With units declared the overlay carries the world's own
         # time and how fast the movie is running against it, so nobody has to ask.
+        # THE WORLD'S OWN CLOCK, and nothing else. The playback rate is a property of the FILE,
+        # reported once when the movie opens; repeating it on every frame said the same thing 300
+        # times and crowded out the number that changes. `ms/frame compute` stays because it is the
+        # machine's speed and it is genuinely useful while a run is in flight.
         clk = ""
         if self.speed is not None:
-            _t = tick * float(self.dt) * float(self.time_s)
-            _f = self.speed
-            _how = ("real time" if 0.95 <= _f <= 1.05 else
-                    (f"{1 / _f:.4g}x slow motion" if _f < 1.0 else f"{_f:.4g}x faster than real"))
-            clk = f"\nt = {_t:.4g} s of {self.duration_s:.4g} s   {_how}"
+            clk = f"\nt = {tick * float(self.dt) * float(self.time_s):.4g} s"
         self.p.add_text(f"{self.name}\n{self.n:,} particles{sub}\n"
                         f"frame {tick}/{self.n_frames}   "
                         f"{el / max(tick, 1) * 1000:.0f} ms/frame compute{clk}",
