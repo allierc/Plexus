@@ -463,6 +463,16 @@ class MPMGridUpdate(FieldUpdate):
         self.at = params.get("_at", "mpm_grid")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.surface_tension = float(params.get("surface_tension", 0.0))
+        self.mass_floor = float(params.get("mass_floor", 1e-10))
+        # THE SAME DEFECT, A HUNDRED TIMES LARGER. The CSF surface-tension term converts a nodal
+        # force to an acceleration with `dx^D / gm.clamp(min=1e-8)`, and 1e-8 is TEN THOUSAND times
+        # the per-particle mass of a 10M-particle run (1.4e-09). Measured on that run at frame 500:
+        # the floor binds on 59,932 of 122,868 occupied nodes -- 48.8% -- and scales the surface
+        # tension there by a median factor of 0.056. Surface tension acts AT THE INTERFACE, which is
+        # exactly where nodal mass is lowest, so the floor attenuates the term precisely where it is
+        # supposed to work, and worse the more particles a spec uses. It is why a 0-vs-40 sweep of
+        # `surface_tension` on a 1M run moved nothing measurable.
+        self.csf_mass_floor = float(params.get("csf_mass_floor", 1e-8))
         # BUOYANCY, IN THE SAME PLACE AND FOR THE SAME REASON AS SURFACE TENSION: it depends on the
         # LOCAL DENSITY, and only the grid knows what a particle is displacing.
         #
@@ -655,7 +665,19 @@ class MPMGridUpdate(FieldUpdate):
         periodic = bool(getattr(H, "periodic", False))
         wd = self.wall_damp
         gm, gmv, gc = g.m, g.mv, g.c
-        gv = gmv / gm.clamp(min=1e-10)[:, None]
+        # THE MASS FLOOR IS ABSOLUTE AND THE PARTICLE MASS IS NOT. `p_vol = body_volume /
+        # per_parent`, so per-particle mass falls as 1/N: 1.5e-08 at 945k particles, 1.4e-09 at
+        # 10M, 1.4e-10 at 100M. A node carrying one particle at a typical tail weight of the
+        # B-spline holds 1.05e-09 at 945k -- comfortably above the floor -- and 9.9e-11 at 10M,
+        # BELOW it. Once the floor binds, `gmv / 1e-10` is smaller than the true `gmv / gm`, so an
+        # isolated particle's gathered velocity is scaled DOWN every substep and it can never
+        # accelerate under gravity. It hangs in mid-air, which is what a 10M run showed: 21,826
+        # particles suspended up to y = 0.60 above a bulk surface at y = 0.115, descending 0.13 in
+        # 3.6 s where free fall at g = 16 would be 104.
+        #
+        # Kept as a PARAMETER at its historical value so no existing run changes; a spec whose
+        # particle mass has outgrown it sets `mass_floor` smaller.
+        gv = gmv / gm.clamp(min=self.mass_floor)[:, None]
 
         if D == 2:                                                  # --- 2D: verbatim (bit-identical) ---
             surf = self.surface_tension
@@ -675,7 +697,7 @@ class MPMGridUpdate(FieldUpdate):
                           + (torch.roll(nyg, -1, 1) - torch.roll(nyg, 1, 1)) * (0.5 * inv_dx))
                 fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
                 stfx = (surf * kappa * cx * fmask).view(-1); stfy = (surf * kappa * cy * fmask).view(-1)
-                inv_m = (dx * dx) / gm.clamp(min=1e-8)
+                inv_m = (dx * dx) / gm.clamp(min=self.csf_mass_floor)
                 gv = gv + dt * torch.stack([stfx * inv_m, stfy * inv_m], dim=1)
 
             if not periodic:
@@ -723,7 +745,7 @@ class MPMGridUpdate(FieldUpdate):
                 # injects a random force into every interior node. The 2% of the peak gradient is
                 # the 2D threshold, kept.
                 fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
-                inv_m = (dx ** D) / gm.clamp(min=1e-8)              # force -> acceleration on the node
+                inv_m = (dx ** D) / gm.clamp(min=self.csf_mass_floor)   # force -> acceleration
                 gv = gv + dt * torch.stack(
                     [(surf * kappa * grad[k] * fmask).view(-1) * inv_m for k in range(D)], dim=1)
             if not periodic:
