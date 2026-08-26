@@ -186,9 +186,28 @@ class MPMParticle:
                 _rho_t = float(t.get("density", rho if not torch.is_tensor(rho) else 1.0))
                 _pv = float(_pm) / _rho_t
                 _vol = float(ppc) * _pv                       # ppc here is per_parent, the count
-                _side = _vol ** (1.0 / D)
-                _u = torch.rand(nb, D, generator=H.rng, device=device) - 0.5
-                pos[bm] = cpos[bm] + _u * _side               # a cube of the derived size, on the parent
+                # THE SHAPE THE VOLUME TAKES. A cube by default, because it is what a `block` would
+                # have given; `shape: ball` makes it a sphere of the same volume instead, which is
+                # what you want for anything thrown, dropped or rolled. Either way the VOLUME is
+                # the derived quantity and the shape only decides how it is arranged.
+                _shape = str(t.get("shape", "cube")).lower()
+                if _shape in ("ball", "sphere"):
+                    _r = (_vol * 3.0 / (4.0 * math.pi)) ** (1.0 / 3.0) if D == 3 \
+                        else (_vol / math.pi) ** 0.5
+                    # UNIFORM IN THE BALL, not in the radius: a direction on the sphere times
+                    # r * u^(1/D). Scattering r uniformly would pile the particles at the centre
+                    # and give the wrong density profile before anything had moved.
+                    _n = torch.randn(nb, D, generator=H.rng, device=device)
+                    _n = _n / _n.norm(dim=1, keepdim=True).clamp(min=1e-12)
+                    _u = torch.rand(nb, 1, generator=H.rng, device=device) ** (1.0 / D)
+                    pos[bm] = cpos[bm] + _n * _u * _r
+                    _side = 2.0 * _r                          # reported as the extent
+                elif _shape == "cube":
+                    _side = _vol ** (1.0 / D)
+                    _u = torch.rand(nb, D, generator=H.rng, device=device) - 0.5
+                    pos[bm] = cpos[bm] + _u * _side           # a cube of the derived size
+                else:
+                    raise ValueError(f"shape must be 'cube' or 'ball', got {_shape!r}")
             if _side is not None:
                 print(f"[build] {lvl.name}: particle_mass {float(_pm):.4g} / density -> p_vol "
                       f"{float(_pm) / float(rho if not torch.is_tensor(rho) else 1.0):.4g}, "

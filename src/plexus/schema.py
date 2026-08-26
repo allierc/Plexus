@@ -404,7 +404,7 @@ def load(path: str) -> Spec:
     # `bulk_modulus` is read by mpm_scatter via TYPE_PROP_ALTERNATIVES rather than by name, so the
     # used_props scan does not see it and it would be reported as read by no operator.
     _KNOWN_TYPE_KEYS = {"fraction", "core", "layers", "block",
-                        "material", "density", "tau", "bulk_modulus"} | used_props
+                        "material", "density", "tau", "bulk_modulus", "shape"} | used_props
     for sname, s in raw["sets"].items():
         for tname, t in s.get("types", {}).items():
             for k in t:
