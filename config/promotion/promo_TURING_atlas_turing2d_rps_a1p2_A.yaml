@@ -1,0 +1,62 @@
+general:
+  name: promo_TURING_atlas_turing2d_rps_a1p2_A
+  seed: 0
+  n_frames: 4000
+  record_cap: 602
+  dt: 1.0
+  dim: 2
+  boundary: free
+  world:
+  - 49.4
+  - 49.4
+sets:
+  cell:
+    n: 4000
+    spawn: sunflower
+    spawn_radius: 19.0
+    state:
+      pos:
+        width: 2
+        integration: none
+        boundary: free
+      chem:
+        width: 3
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: cell_chem_seed
+  at: cell
+  seed: 0
+  before_frame: 3
+  mode: simplex
+  n_species: 3
+- op: radius_graph
+  at: cell
+  radius: 0.95
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  chi: 1.0
+  d:
+  - 0.02
+  - 0.02
+  - 0.02
+- op: cell_chem_react
+  at: cell
+  model: rock_paper_scissor
+  a: 1.2
+  rate: 0.05
+schedule:
+- cell_chem_seed
+- radius_graph
+- cell_chem_diffuse
+- cell_chem_react
+plotting:
+  background: black
+  dot_fill: 0.9
+  blend: additive
+  species:
+  - '#ff0000'
+  - '#00ff00'
+  - '#0000ff'
