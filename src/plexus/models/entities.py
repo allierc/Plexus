@@ -162,6 +162,39 @@ class MPMParticle:
                 # is the fallback the layer overrides.
                 type_mat[tid] = (t["material"], float(t.get("tau", 0.0)))
 
+        # THE VOLUME CAN COME FROM THE MASS INSTEAD OF FROM A BOX. `per_parent` is the hierarchy's
+        # own call -- how many children a parent has -- and it should not double as an MPM sampling
+        # knob. So a spec may instead say what ONE PARTICLE WEIGHS, and the body's volume follows:
+        #
+        #     p_vol = particle_mass / density        V = per_parent * p_vol       side = V^(1/3)
+        #
+        # and the particles are seeded in a cube of that side centred on their parent. Declaring N
+        # and m_p fixes the volume; declaring N and a block fixes the mass. Both together is one
+        # statement too many, which is what `_volume_conflict` below is for.
+        _pm = s.get("particle_mass")
+        if _pm is not None and float(_pm) <= 0:
+            raise ValueError(f"particle_mass must be > 0, got {_pm}")
+        if _pm is not None:
+            _side = None
+            for tid, t in enumerate(type_list):
+                if t.get("block") is not None:
+                    continue                                  # an explicit box wins; see the check
+                bm = ntp[pidx] == tid
+                nb = int(bm.sum())
+                if nb == 0:
+                    continue
+                _rho_t = float(t.get("density", rho if not torch.is_tensor(rho) else 1.0))
+                _pv = float(_pm) / _rho_t
+                _vol = float(ppc) * _pv                       # ppc here is per_parent, the count
+                _side = _vol ** (1.0 / D)
+                _u = torch.rand(nb, D, generator=H.rng, device=device) - 0.5
+                pos[bm] = cpos[bm] + _u * _side               # a cube of the derived size, on the parent
+            if _side is not None:
+                print(f"[build] {lvl.name}: particle_mass {float(_pm):.4g} / density -> p_vol "
+                      f"{float(_pm) / float(rho if not torch.is_tensor(rho) else 1.0):.4g}, "
+                      f"{ppc:,} per parent -> body side {_side:.6g} (volume {_side ** D:.4g})",
+                      flush=True)
+
         # block-fill: a type FILLS an axis-aligned box (pool/cube) instead of a disc
         # around the centre. 2D block = [x0,y0,x1,y1]; 3D block = [x0,y0,z0,x1,y1,z1].
         for tid, t in enumerate(type_list):
@@ -297,6 +330,36 @@ class MPMParticle:
                 for k in range(D):
                     vol *= abs(v[D + k] - v[k])
                 p_vol = torch.where(ntp[pidx] == tid, torch.full_like(p_vol, vol / ppc), p_vol)
+        # A DECLARED PARTICLE MASS SETS p_vol OUTRIGHT, and then the geometry is only a placement.
+        # WARN, DO NOT SILENTLY PICK ONE: a block says the body occupies THIS much space and a
+        # particle mass says it occupies THAT much, and when they disagree the run means neither.
+        # The tolerance is 1% because a block is usually written to 3 figures.
+        if _pm is not None:
+            _rho_scalar = float(rho) if not torch.is_tensor(rho) else None
+            for tid, t in enumerate(type_list):
+                _rt = float(t.get("density", _rho_scalar if _rho_scalar is not None else 1.0))
+                _pv = float(_pm) / _rt
+                _sel = ntp[pidx] == tid
+                if not bool(_sel.any()):
+                    continue
+                blk = t.get("block")
+                if blk is not None:
+                    v = [float(x) for x in blk]
+                    _vg = 1.0
+                    for k in range(D):
+                        _vg *= abs(v[D + k] - v[k])
+                    _vm = float(ppc) * _pv
+                    if abs(_vm / _vg - 1.0) > 0.01:
+                        import warnings
+                        warnings.warn(
+                            f"{lvl.name}: TWO VOLUMES, AND THEY DISAGREE. The `block` on type "
+                            f"{(list(types.keys())[tid] if types else tid)!r} encloses "
+                            f"{_vg:.6g}, while per_parent {ppc:,} x particle_mass {float(_pm):.4g} "
+                            f"/ density {_rt:g} = {_vm:.6g} -- a factor of {_vm / _vg:.4g}. The "
+                            f"particle_mass wins for p_vol (and therefore for the physics); the "
+                            f"block only places the particles. Drop one of the two.",
+                            RuntimeWarning, stacklevel=2)
+                p_vol = torch.where(_sel, torch.full_like(p_vol, _pv), p_vol)
 
         lvl.register_buffer("C", torch.zeros(Np, D, D, device=device))
         lvl.register_buffer("F", torch.eye(D, device=device).expand(Np, D, D).contiguous())
