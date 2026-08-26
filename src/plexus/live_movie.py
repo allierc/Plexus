@@ -91,6 +91,7 @@ class LiveMovie:
         self.dot, self.fill = dot, float(fill)
         self.px_used = None
         self.up = int(up)
+        # (reset to 1 for 2D below, once the world tells us the run is planar)
         self.stride = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
         # STILLS COME OUT OF THE MOVIE'S OWN RENDER, not a second one. `Plotter.image` is the frame
         # `write_frame()` just rasterised, so a PNG costs a file write and nothing else -- no extra
@@ -116,27 +117,47 @@ class LiveMovie:
         self.p.set_background("black")
         self.p.enable_anti_aliasing("msaa", multi_samples=8)
 
+        # 2D IS DETECTED FROM THE WORLD ITSELF, BEFORE PADDING. This used to pad `world` to three
+        # entries, replace the zero third span with 1.0 so the camera maths would not divide by it,
+        # and then test `span[2] <= 1e-6` to decide whether the run was 2D -- a test that could
+        # never fire, because the line above had just overwritten the thing it tested. Every 2D run
+        # was therefore drawn as an angled 3D cube with the particles lying on its floor.
         w = [float(x) for x in world]
-        while len(w) < 3:                             # a 2D run is drawn in the z=0 plane
+        self.is2d = len(w) < 3
+        if self.is2d:
+            self.up = 1
+        while len(w) < 3:
             w.append(0.0)
         self.lo, self.hi = np.zeros(3), np.array(w)
-        span = np.where(self.hi > self.lo, self.hi, self.lo + 1.0)
-        self.p.add_mesh(pv.Box((0, span[0], 0, span[1], 0, max(span[2], 1e-6))
-                               ).extract_all_edges(),
-                        color="#4a4a4a", line_width=1.0, lighting=False)
-        centre, radius = 0.5 * span, float(span.max()) * 0.55
-        e, az = np.radians(elev), np.radians(azim)
-        ax_h = [i for i in range(3) if i != self.up]
-        d = np.zeros(3)
-        d[ax_h[0]], d[ax_h[1]], d[self.up] = np.cos(e) * np.cos(az), np.cos(e) * np.sin(az), np.sin(e)
-        if span[2] <= 1e-6:                           # 2D: look straight down the empty axis
-            d = np.array([0.0, 0.0, 1.0])
-        self.p.camera.position = tuple(centre + d * radius * 6.0)
-        self.p.camera.focal_point = tuple(centre)
-        u = np.zeros(3); u[self.up if span[2] > 1e-6 else 1] = 1.0
-        self.p.camera.up = tuple(u)
-        self.p.camera.parallel_projection = True
-        self.p.camera.parallel_scale = radius * 1.45
+        span = np.array([x if x > 0 else 1.0 for x in w])
+
+        if self.is2d:
+            # A RECTANGLE, NOT A BOX, and seen square-on. A wireframe cube around a plane of
+            # particles says the run has a depth it does not have.
+            r = pv.Rectangle([[0.0, 0.0, 0.0], [span[0], 0.0, 0.0], [span[0], span[1], 0.0]])
+            self.p.add_mesh(r.extract_all_edges(), color="#4a4a4a", line_width=1.0, lighting=False)
+            centre = np.array([span[0] / 2, span[1] / 2, 0.0])
+            self.p.camera.position = tuple(centre + np.array([0.0, 0.0, 1.0]) * span.max() * 4.0)
+            self.p.camera.focal_point = tuple(centre)
+            self.p.camera.up = (0.0, 1.0, 0.0)                 # +y is up on screen
+            self.p.camera.parallel_projection = True
+            self.p.camera.parallel_scale = float(max(span[0], span[1])) * 0.55
+        else:
+            self.p.add_mesh(pv.Box((0, span[0], 0, span[1], 0, span[2])).extract_all_edges(),
+                            color="#4a4a4a", line_width=1.0, lighting=False)
+            centre, radius = 0.5 * span, float(span.max()) * 0.55
+            e, az = np.radians(elev), np.radians(azim)
+            ax_h = [i for i in range(3) if i != self.up]
+            d = np.zeros(3)
+            d[ax_h[0]], d[ax_h[1]], d[self.up] = (np.cos(e) * np.cos(az), np.cos(e) * np.sin(az),
+                                                  np.sin(e))
+            self.p.camera.position = tuple(centre + d * radius * 6.0)
+            self.p.camera.focal_point = tuple(centre)
+            u = np.zeros(3); u[self.up] = 1.0
+            self.p.camera.up = tuple(u)
+            self.p.camera.parallel_projection = True
+            self.p.camera.parallel_scale = radius * 1.45
+
         self.p.open_movie(out, framerate=int(fps), quality=8)
 
     def _xyz(self, lvl):

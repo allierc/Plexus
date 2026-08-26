@@ -65,8 +65,11 @@ def main():
                         help="NO RENDERING AT ALL: no live mp4, no live png snapshots, no plot pass, "
                              "no captioning. This is how a throughput measurement is taken -- the "
                              "ms/frame a render is folded into is not the simulation's")
-    parser.add_argument("--render-n", type=int, default=400_000,
-                        help="particles DRAWN in the live mp4; the run still simulates all of them")
+    parser.add_argument("--render-n", default="400000",
+                        help="particles DRAWN in the live mp4; the run still simulates all of them. "
+                             "COMMA-SEPARATED writes one movie per value (movie_10M.mp4, "
+                             "movie_50M.mp4, ...) from the SAME simulation -- the only way to see a "
+                             "run at several draw counts when its trajectory is too big to store")
     parser.add_argument("--render-max-frames", type=int, default=300,
                         help="cap on rendered frames; longer runs are strided down to this")
     parser.add_argument("--render-stills", type=int, default=10,
@@ -160,7 +163,8 @@ def main():
                           f"GiB. If the run stalls at 100% CPU with no output and never prints "
                           f"'substep captured as a CUDA graph', that is why -- set "
                           f"`capture: false` on the spec's substep block.", flush=True)
-        lm = None if args.no_viz else {"render_n": args.render_n,
+        _rn = [int(x) for x in str(args.render_n).split(",") if x.strip()]
+        lm = None if args.no_viz else {"render_n": (_rn if len(_rn) > 1 else _rn[0]),
                                        "max_frames": args.render_max_frames, "dot": _dot,
                                        "stills": args.render_stills}
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
