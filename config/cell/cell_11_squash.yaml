@@ -257,3 +257,16 @@ plotting:
   panels_thick: 0.1
   panels_dot: 1.6
   panels_dot_section: 3.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A cluster of spherical cells undergoes a progressive deformation process over time. The
+      cells are initially spherical and then gradually flatten into oblate spheroids as they are compressed.
+      This "squashing" effect is most visible in the cross-sectional views on the right side of the frames.
+      By the final frame, the cells have reached a highly flattened, disk-like shape.
+    objects: The scene contains a large cluster of approximately twenty individual cells arranged in a
+      dense, packed group. Each cell is composed of a blue outer membrane and a bright yellow-orange interior
+      representing the nucleus and cytosol. The cells are relatively uniform in size but change their
+      aspect ratio from spherical to flattened throughout the simulation. The right side of each frame
+      displays four zoomed-in cross-sections of specific cells to highlight internal structural changes.

@@ -234,3 +234,17 @@ plotting:
   splat_res: 560
   panels: true
   panels_thick: 0.1
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a cluster of spherical cells in a 3D domain that remains largely
+      static in position. The internal components of the cells, specifically the nucleus and cytosol,
+      show very minor fluctuations in their spatial distribution. The cross-sectional views on the right
+      side of the frame provide a detailed look at the internal organization of four specific cells. Throughout
+      the entire sequence, the overall structure and density of the cell monolayer do not undergo significant
+      morphological changes.
+    objects: The scene contains a cluster of approximately twenty spherical cells arranged in a dense,
+      monolayer-like formation. These cells are primarily colored in a bright blue, representing the membrane
+      and cytosol. Each cell contains a smaller, lighter blue internal structure representing the nucleus.
+      The cells are uniform in size and are contained within a large, transparent cubic bounding box.
