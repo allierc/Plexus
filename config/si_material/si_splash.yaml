@@ -19,7 +19,7 @@ sets:
     n: 1
     start:
     - - 0.15
-      - 0.23100394750525632
+      - 0.2243761674958083
       - 0.15
     types:
       water:
@@ -28,7 +28,7 @@ sets:
         bulk_modulus: 100000.0
   mpm_particle:
     parent: cell
-    per_parent: 2000000
+    per_parent: 2700000
     radius: 0.5
     density: 1000.0
     particle_mass: 1.0e-06
