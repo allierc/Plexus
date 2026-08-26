@@ -111,6 +111,7 @@ class LiveMovie:
         self.t0 = None
         self.failed = None
         self.colour_by = "?"
+        self.n_obstacles = 0
 
         px = int(px) // 16 * 16                       # ffmpeg's macro_block_size; see cell_panels
         self.p = pv.Plotter(off_screen=True, window_size=(px, px), border=False)
@@ -158,7 +159,46 @@ class LiveMovie:
             self.p.camera.parallel_projection = True
             self.p.camera.parallel_scale = radius * 1.45
 
+        self._draw_obstacles(span)
         self.p.open_movie(out, framerate=int(fps), quality=8)
+
+    def _draw_obstacles(self, span):
+        """The world's solid geometry, which the simulation sees and this renderer did not.
+
+        `general.obstacles` is what `mpm_grid_update` rasterises into its no-slip mask, so a movie
+        that omits it shows fluid parting around nothing. `plot.py` has drawn them since the
+        beginning (`_draw_obstacles`); this renderer simply never did, so every obstacle spec --
+        genA/genB/genC and the four material_3d_obstacle_* -- rendered a hole in the flow with no
+        cause visible.
+
+        The length disambiguates, exactly as plot.py reads it: 3 = 2D disc [cx,cy,r], 4 = 2D
+        rectangle [x0,y0,x1,y1] in a planar run and a 3D SPHERE [cx,cy,cz,r] otherwise, 6 = 3D box.
+        """
+        obs = list(getattr(self.sim, "obstacles", []) or []) if self.sim is not None else []
+        pv = self.pv
+        for r in obs:
+            v = [float(x) for x in r]
+            try:
+                if self.is2d and len(v) == 3:
+                    m = pv.Polygon(center=(v[0], v[1], 0.0), radius=v[2], n_sides=64)
+                elif self.is2d and len(v) == 4:
+                    m = pv.Rectangle([[v[0], v[1], 0.0], [v[2], v[1], 0.0], [v[2], v[3], 0.0]])
+                elif len(v) == 4:
+                    m = pv.Sphere(radius=v[3], center=(v[0], v[1], v[2]),
+                                  theta_resolution=48, phi_resolution=48)
+                elif len(v) == 6:
+                    m = pv.Box((v[0], v[3], v[1], v[4], v[2], v[5]))
+                else:
+                    continue
+            except Exception as e:
+                print(f"[live-movie] obstacle {v} not drawn: {type(e).__name__}: {e}", flush=True)
+                continue
+            # OPAQUE AND LIT, unlike the particles. The dots are flat and unshaded so density reads
+            # as brightness; an obstacle drawn the same way would be a featureless silhouette, and
+            # in 3D you could not tell a sphere from a disc.
+            self.p.add_mesh(m, color="#9a9a9a", opacity=1.0, lighting=not self.is2d,
+                            specular=0.2, smooth_shading=True)
+        self.n_obstacles = len(obs)
 
     def _xyz(self, lvl):
         # float32, NOT float64. VTK stores points in whatever dtype it is handed; float64 doubles
@@ -321,6 +361,7 @@ class LiveMovie:
         print(f"[live-movie] {self.out}   {self.n:,} particles{sub}, {self.rendered} frames"
               f"{'' if self.stride == 1 else f' (every {self.stride}th)'}, "
               f"coloured by {self.colour_by}, dot {self.px_used:.2f} px"
+              + (f", {self.n_obstacles} obstacle(s)" if self.n_obstacles else "")
               + (f", {self.stills_written} stills + 3d.png" if self.stills_written else ""),
               flush=True)
         return self.out
