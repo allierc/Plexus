@@ -1,7 +1,7 @@
 general:
   name: si_fill
   seed: 0
-  n_frames: 6000
+  n_frames: 2400
   dt: 0.00083333
   boundary: wall
   dim: 3
@@ -13,7 +13,7 @@ general:
     length_um: 1000000.0
     time_s: 1.0
     force_nN: 1000000000.0
-  save_data: false
+  save_data: true
 sets:
   cell:
     n: 1
@@ -94,3 +94,4 @@ plotting:
     - 0.3
     - 0.62
     - 1.0
+  slow_motion: 4
