@@ -1,0 +1,90 @@
+# zf_Tectum_2192 -- 2198 larval-zebrafish neurons of the Tectum, the intermediate scale
+# between the 1000- and 4096-neuron sets. DERIVED WITHOUT A FETCH: the parent
+# zf_Tectum_4096 cube was shrunk about its own centre from 80.02 um
+# to 61.42 um until 2198 somas remained, so this is a genuine cube of tissue at the
+# SAME DENSITY as its parent rather than a thinned subsample of it. `p` is 20/N =
+# 0.00910, holding MEAN IN-DEGREE at ~20 as at 1000 (p=0.02) and 4096 (p=0.005).
+general:
+  name: zf_Tectum_2192
+  seed: 0
+  n_frames: 2000
+  dt: 0.05
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 2001
+  field_record_cap: 250
+  units:
+    length_um: 61.42349052429199
+    time_s: 1.0
+sets:
+  brain: {n: 1}
+  assembly: {parent: brain, per_parent: 1}
+  neuron:
+    parent: assembly
+    per_parent: 2198
+    types:
+      slow_quiet:  {fraction: 0.25, p: [1.0, 0.0, 1.2, 0.5, 1.00, 0.0]}
+      slow_bursty: {fraction: 0.25, p: [1.0, 0.0, 1.2, 1.6, 0.50, 0.0]}
+      fast_quiet:  {fraction: 0.25, p: [2.5, 0.0, 1.2, 0.5, 2.00, 0.0]}
+      fast_bursty: {fraction: 0.25, p: [2.5, 0.0, 1.2, 1.6, 0.25, 0.0]}
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/zf_Tectum_2192/connectome.npz
+fields:
+  neural_activity: {frame: grid, res: 128, components: 1, couples_to: assembly}
+seed:
+  - {op: neural_seed, at: neuron, region: zf_Tectum_2192, v0_mean: 0.0, v0_sd: 0.5}
+operators:
+  - {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.01}
+  - {op: neuron_signal, at: neuron, model: type_pairwise, edge_set: synapse, activation: tanh}
+  - {op: aggregate, at: assembly, child: neuron, block: voltage, into: activity}
+  - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
+      sigma: 6.0, normalize: none}
+schedule: [neuron_update, neuron_signal, aggregate, voxelize]
+plotting: {background: black, point_size: 4.0}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_assembly:
+    description: A single blue point remains stationary in the center of a black field throughout the
+      entire sequence. There is no movement, expansion, or change in the position of the object over time.
+      The scene is static, showing a constant state without any evolution or interaction. The video represents
+      a fixed point in space with no dynamic progression.
+    objects: The scene contains a single, small point located at the center of the frame. This object
+      is a bright blue color, contrasting sharply against the background. It is a singular, isolated point
+      with no connections to other objects. The size of the point is very small relative to the large,
+      black surrounding area.
+  movie_brain:
+    description: A single blue point remains stationary in the center of a black field throughout the
+      entire sequence. There is no movement, expansion, or change in the position of the object over time.
+      The scene is static, showing a constant state without any evolution or interaction. The video represents
+      a fixed point in space with no dynamic progression.
+    objects: The scene contains a single, small point located at the center of the frame. This object
+      is a bright blue color, providing a sharp contrast against the background. It is a singular, isolated
+      point with no connections to other objects or structures. The size of the point is very small relative
+      to the large, black rectangular field.
+  movie_neural_activity:
+    description: The simulation shows a cluster of white, cloud-like structures that gradually become
+      more defined and organized. Initially, the shapes are blurry and loosely connected in a central
+      mass. As time progresses, the internal structures sharpen, revealing a more complex, interlocking
+      geometric pattern. By the final frame, the cluster has settled into a distinct, faceted crystalline-like
+      arrangement.
+    objects: The scene contains a single large cluster composed of multiple interconnected white blobs.
+      These blobs are arranged in a dense, roughly spherical topology that evolves into a more structured,
+      faceted shape. The objects are bright white against a solid black background, creating a high-contrast
+      visual. Each individual component within the cluster is small and irregular, but they collectively
+      form a large, singular complex.
+  movie_neuron:
+    description: The simulation shows a dense cloud of blue particles arranged in a diamond-shaped formation.
+      Over time, the particles appear to undergo a subtle internal reorganization or shift in density.
+      The overall structure remains stable, maintaining its primary geometric boundaries throughout the
+      sequence. There is no significant expansion or contraction of the global cluster during the observed
+      period.
+    objects: The scene contains a large collection of small, individual blue points. These points are
+      clustered together to form a large, roughly diamond-shaped volume. The particles are distributed
+      with varying density, creating a textured, granular appearance. Each individual point is uniform
+      in size and color, contrasting sharply against the black background.

@@ -238,3 +238,15 @@ plotting:
   panels_thick: 0.1
   panels_dot: 1.0
   panels_dot_section: 2.2
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A collection of spherical cell-like structures is initially arranged in a dense, roughly
+      cubic grid. Over time, the entire group of cells undergoes a significant compression along the vertical
+      axis. The individual cells flatten into disc-like shapes as they are squeezed together. By the final
+      frame, the cells have been compressed into thin, pancake-like layers.
+    objects: The scene contains a large cluster of approximately 30 individual cell-like objects. Each
+      object features a bright yellow-orange core surrounded by a blue outer shell. The objects are initially
+      spherical and arranged in a compact, three-dimensional grid. As the simulation progresses, they
+      maintain their relative positions but change from spheres to flattened, elliptical shapes.

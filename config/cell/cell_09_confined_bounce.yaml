@@ -189,3 +189,15 @@ plotting:
   splat_res: 560
   panels: true
   panels_thick: 0.1
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a cluster of spherical bodies confined within a cubic domain. Over
+      the course of the frames, the bodies maintain a relatively stable, packed configuration. The internal
+      structure of a single body is shown in a zoomed-in cross-section on the right. This cross-section
+      reveals a stable internal organization of different components throughout the time sequence.
+    objects: The scene contains a cluster of five large spherical bodies arranged in a compact group.
+      These bodies are primarily blue and appear to be composed of many smaller particles. A zoomed-in
+      view on the right shows a single body with a yellow core, a light blue interior, and a dark blue
+      outer shell. The entire system is contained within a large, transparent white wireframe cube.
