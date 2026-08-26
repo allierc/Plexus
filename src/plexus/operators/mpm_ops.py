@@ -455,7 +455,8 @@ class MPMGridUpdate(FieldUpdate):
                    "plate_gap_half": "free_half_gap", "plate_gap_half_end": "final_free_half_gap",
                    "plate_close_from": "frame_closing_starts", "plate_close_to": "frame_closing_ends",
                    "plate_axis": "confined_axis", "plate_centre": "gap_centre_on_axis",
-                   "wall_damp": "wall_restitution"}
+                   "wall_damp": "wall_restitution", "csf_rho": "liquid_reference_density",
+                   "csf_band": "interface_fraction_band", "csf_smooth": "colour_mollify_passes"}
     REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994)."
 
     def __init__(self, params, device="cpu"):
@@ -470,9 +471,65 @@ class MPMGridUpdate(FieldUpdate):
         # the floor binds on 59,932 of 122,868 occupied nodes -- 48.8% -- and scales the surface
         # tension there by a median factor of 0.056. Surface tension acts AT THE INTERFACE, which is
         # exactly where nodal mass is lowest, so the floor attenuates the term precisely where it is
-        # supposed to work, and worse the more particles a spec uses. It is why a 0-vs-40 sweep of
-        # `surface_tension` on a 1M run moved nothing measurable.
+        # supposed to work, and worse the more particles a spec uses. NOT, HOWEVER, WHY THE SIGMA
+        # SWEEP DID NOTHING: that was measured to be the missing colour normalisation below, a factor
+        # of 1/(rho*dx^D) ~ 1e6, against this floor's median 18x on half the nodes. Both are real;
+        # they differ by five orders of magnitude, and setting `csf_rho` makes this floor inert.
         self.csf_mass_floor = float(params.get("csf_mass_floor", 1e-8))
+        # WHAT "COLOUR = 1" MEANS -- WHICH THIS BLOCK NEVER KNEW, AND THE REASON THE PARAGRAPH ABOVE
+        # IS TREATING A SYMPTOM. `mpm_scatter` deposits `weight * mass * is_liquid`, so `gc` is a
+        # liquid MASS PER NODE in absolute units, not the dimensionless volume fraction (0 in air,
+        # 1 in liquid) that Brackbill's f = sigma * kappa * grad(c) is written for. On an all-liquid
+        # spec the "colour" is bitwise the mass field: max |gc - gm| / gm over occupied nodes is
+        # 2.7e-7 on material_3d_water_drop and 2.5e-7 on material_3d_water_dam_20m.
+        #
+        # Setting `csf_rho` to the liquid's density divides it by the mass of one FULL liquid cell,
+        # rho * dx^D, and that single division is the repair. MEASURED COST OF NOT DOING IT: the
+        # delivered acceleration is short by exactly 1/(rho * dx^D) -- 8.887e5 at n_grid 96 against
+        # the predicted 96^3 = 884,736 (0.4%), and 7.356e6 at 192 against 192^3 = 7.078e6 (3.9%).
+        # So `surface_tension` is not a tension: it is a tension divided by a cell mass, and its
+        # PHYSICAL MEANING CHANGES WITH `n_grid`. `surface_tension: 60` on the dam at 192^3 is a
+        # physical sigma of 8.5e-6 against rho*g*R^2 = 0.092 for its 0.076-half-width blocks --
+        # BOND NUMBER 10,900, gravity beating capillarity by four orders of magnitude. That is the
+        # whole content of "sigma 0 -> 150 moves the centre of mass by 0.0001 of the box".
+        #
+        # DEFAULT 0.0 KEEPS THE OLD PATH BIT-IDENTICAL, because the branch is a static Python `if`
+        # and `range(0)` emits no ops, so CUDA-graph capture is unchanged. A spec that sets it MUST
+        # re-fit its own sigma -- sigma_new = sigma_old * rho * dx^D for parity, or from a Bond
+        # number for physics: rho*g*L^2 gives Bond 1 (0.64 on the drop at 96^3, 0.092 on the dam).
+        self.csf_rho = float(params.get("csf_rho", 0.0))
+        # THE INTERFACE TEST NEEDS THE SAME REFERENCE, and for want of it selects the bulk.
+        # `gmag > 0.02 * gmag.max()` is a percentile of a running maximum with no absolute scale,
+        # and the P2G shot noise at 8 particles per cell gives the BULK a |grad c| of the same order
+        # as the interface's, so a 2% cut admits everything: measured 98.1% OF OCCUPIED NODES on
+        # material_3d_water_drop and 97.7% on material_3d_water_dam_20m. It is an occupancy mask
+        # wearing an interface's name. An absolute band on the volume fraction cuts it to 21.7% and
+        # 25.8% of occupied at `csf_band: 0.2`.
+        #
+        # THE UPPER BOUND IS THE LOAD-BEARING HALF. At sigma 0.64 (Bond 1) on the drop, the band
+        # 0.2 < c < 0.8 gives spread r90 0.311 with gm_max 2.2e-6 against one full cell's 1.1e-6 --
+        # clean -- while `c > 0.1` with NO upper bound, which is what the relative threshold
+        # effectively does, implodes to r90 0.0006 on 422 surviving occupied nodes. The bulk noise
+        # force is harmless today only because everything is 1e6 too small; it detonates the moment
+        # the gain is right, so the two parameters have to move together.
+        self.csf_band = float(params.get("csf_band", 0.0))
+        # MOLLIFY BEFORE THE SECOND DERIVATIVE -- worth little at 96^3 and a lot at 192^3. Band-median
+        # kappa on a B-spline-splatted sphere with real 8-ppc shot noise, as a fraction of the exact
+        # 2/R: normalised colour reads 1.07 unsmoothed / 1.02 with two passes at 96^3, and 1.27 /
+        # 1.06 at 192^3. The SHIPPED raw colour reads 0.70 at 96^3 and 0.08 at 192^3, because
+        # noise-driven |div n| grows as alpha/dx while the true curvature stays at 2/R. It does not
+        # change the trajectory (r90 0.302 unsmoothed vs 0.306 smoothed at Bond 1) and it leaks
+        # colour into empty cells, which is why the band below carries an explicit mass clause.
+        self.csf_smooth = int(params.get("csf_smooth", 0))
+        # A BAND WITHOUT A REFERENCE DENSITY IS A SILENT OFF-SWITCH: `c` would still be a mass, of
+        # order rho*dx^D ~ 1e-6, so `c > 0.2` is false everywhere, the mask is empty and the term
+        # vanishes without a word. Refuse the combination rather than run it.
+        if self.csf_band > 0.0 and self.csf_rho <= 0.0:
+            raise ValueError(
+                "mpm_grid_update: csf_band needs csf_rho -- the band is a test on the liquid "
+                "VOLUME FRACTION, and without csf_rho the colour is still a mass (~rho*dx^D), so "
+                "the band would select nothing and surface tension would be silently disabled. "
+                "Set csf_rho to the liquid's density.")
         # BUOYANCY, IN THE SAME PLACE AND FOR THE SAME REASON AS SURFACE TENSION: it depends on the
         # LOCAL DENSITY, and only the grid knows what a particle is displacing.
         #
@@ -732,7 +789,13 @@ class MPMGridUpdate(FieldUpdate):
             if getattr(self, "_c_csf", None) is None:
                 self._c_csf = bool(surf > 0.0 and bool((gc > 0).any()))
             if self._c_csf:
-                c = gc.view(*g.shape)
+                if self.csf_rho > 0.0:
+                    c = (gc / (self.csf_rho * dx ** D)).view(*g.shape)   # liquid VOLUME FRACTION
+                else:
+                    c = gc.view(*g.shape)                                # legacy: raw liquid MASS
+                for _ in range(self.csf_smooth):        # separable [1/4,1/2,1/4]; no-op when 0
+                    for k in range(D):
+                        c = 0.25 * torch.roll(c, 1, k) + 0.5 * c + 0.25 * torch.roll(c, -1, k)
                 grad = [(torch.roll(c, -1, k) - torch.roll(c, 1, k)) * (0.5 * inv_dx)
                         for k in range(D)]
                 gmag = torch.sqrt(sum(gk * gk for gk in grad))
@@ -740,11 +803,18 @@ class MPMGridUpdate(FieldUpdate):
                 nrm = [gk / (gmag + eps) for gk in grad]
                 kappa = -sum((torch.roll(nrm[k], -1, k) - torch.roll(nrm[k], 1, k)) * (0.5 * inv_dx)
                              for k in range(D))
-                # ONLY WHERE THERE IS AN INTERFACE. In the bulk `grad(c)` is numerical noise and
-                # the unit normal built from it is a random direction, so an unmasked curvature
-                # injects a random force into every interior node. The 2% of the peak gradient is
-                # the 2D threshold, kept.
-                fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
+                # ONLY WHERE THERE IS AN INTERFACE -- the comment was always right and the test never
+                # enforced it. `gmag > 0.02 * gmag.max()` selects 98.1% of OCCUPIED nodes on
+                # material_3d_water_drop; the band selects 21.7%. The mass clause is what makes
+                # `csf_mass_floor` inert rather than load-bearing: the lightest node admitted holds
+                # csf_band * rho * dx^D = 2.3e-7 at band 0.2 on the drop, 23x the 1e-8 floor, so
+                # masked nodes with gm == 0 go 2.6% -> 0.0% and floor-binding 16.6% -> 0.0%.
+                if self.csf_band > 0.0:
+                    _mfull = self.csf_rho * dx ** D
+                    fmask = ((c > self.csf_band) & (c < 1.0 - self.csf_band)
+                             & (gm.view(*g.shape) > self.csf_band * _mfull)).to(c.dtype)
+                else:
+                    fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
                 inv_m = (dx ** D) / gm.clamp(min=self.csf_mass_floor)   # force -> acceleration
                 gv = gv + dt * torch.stack(
                     [(surf * kappa * grad[k] * fmask).view(-1) * inv_m for k in range(D)], dim=1)
