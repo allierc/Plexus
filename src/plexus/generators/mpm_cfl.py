@@ -141,6 +141,108 @@ def _max_wave_speed(spec, rho_default=1.0) -> float:
     return cmax
 
 
+def _similarity(spec, dx: float, dim: int) -> list:
+    """The dimensionless groups of an MPM scene, reported at build.
+
+    WHY A REPORT AND NOT A CHECK. Every diagnosis in this campaign came from computing these by hand
+    AFTER a run: that the corpus "water" impacts at MACH 0.449 with 10.1% volumetric strain and is a
+    compressible foam; that a drop was sampled at 283 PARTICLES PER CELL against a convention of 8;
+    that 64 mL spread over a 0.3 m floor lands 0.34 OF ONE CELL deep and can never be a body. Not one
+    of those is visible in a spec, and every one of them is arithmetic on numbers the spec already
+    contains. Printing them costs nothing and turns a wasted cluster run into a line of output.
+
+    WHAT IT REFUSES TO GUESS. Reynolds needs a viscosity, Bond and Weber need a surface tension, and
+    a Mach number needs a sound speed -- so each is emitted only when the spec actually declares what
+    it is built from. A group computed from a default is a number about the default.
+    """
+    import math as _m
+    out = []
+    sets = spec.get("sets") or {}
+    gen = spec.get("general") or {}
+    w = gen.get("world", 1.0)
+    box = [float(x) for x in w] if isinstance(w, (list, tuple)) else [float(w)] * dim
+    H = box[1] if len(box) > 1 else box[0]
+    g = 0.0
+    for o in (spec.get("operators") or []):
+        if isinstance(o, dict) and o.get("op") == "gravity":
+            g = abs(float(o.get("g", 0.0) or 0.0))
+    rho = 1.0
+    for st in sets.values():
+        if isinstance(st, dict) and "density" in st:
+            rho = float(st["density"])
+    K, R = _liquid_scale(spec, dim)
+    if not (K < float("inf")):
+        # NOT A LIQUID, BUT STILL A WAVE. A solid or a snow body has lambda + 2*mu, and Mach is what
+        # decides whether it is being simulated or merely deformed -- si_freefall's snowball impacts
+        # at Mach 1.85, which is real and worth saying rather than skipping because `is_liquid` is
+        # false. Only the surface-tension groups genuinely need a liquid.
+        c_s = _max_wave_speed(spec)
+        if c_s <= 0:
+            return out
+        # _max_wave_speed returns a SPEED. K = rho*c^2, or `c = sqrt(K/rho)` below divides by rho
+        # a second time -- which read snow's 19.7 m/s as 0.986 and its Mach as 37.6.
+        K, R = rho * c_s * c_s, float("inf")
+    c = _m.sqrt(K / max(rho, 1e-30))
+    # THE FALL AND THE BODY'S OWN HEIGHT, from a `block` if one is written and from the DERIVED
+    # volume if not -- a spec that declares `particle_mass` has no block at all, and reading the box
+    # instead would report the room's height as the water's. That is the difference between a
+    # self-weight strain of 25.2% and the 10.1% the body actually carries.
+    y0, hgt = None, None
+    for st in sets.values():
+        if not isinstance(st, dict):
+            continue
+        for t in ((st.get("types")) or {}).values():
+            b = (t or {}).get("block")
+            if b and len(b) >= 2 * dim:
+                y0 = float(b[1]) if y0 is None else min(y0, float(b[1]))
+                _h = abs(float(b[dim + 1]) - float(b[1]))
+                hgt = _h if hgt is None else max(hgt, _h)
+    if y0 is None:                                    # derived volume: N * m_p / rho, on `start`
+        for sn, st in sets.items():
+            if not isinstance(st, dict) or "particle_mass" not in st:
+                continue
+            _n = int(st.get("per_parent", 0) or 0)
+            _mp = float(st["particle_mass"]); _r = float(st.get("density", 1.0) or 1.0)
+            _side = (_n * _mp / _r) ** (1.0 / dim)
+            _par = sets.get(st.get("parent")) or {}
+            _st = (_par.get("start") or [[0.0] * dim])[0]
+            y0 = float(_st[1]) - _side / 2.0
+            hgt = _side
+    fall = max((y0 or 0.0) - 2.0 * dx, 0.0)
+    U = _m.sqrt(2.0 * g * fall) if g > 0 else 0.0
+    L = R if R < float("inf") else (hgt if hgt else H)
+    Hb = hgt if hgt else H                            # the BODY's height, for the self-weight strain
+    out.append(f"c = sqrt(K/rho) = {c:.4g}  (K {K:.4g}, rho {rho:g})")
+    if U > 0:
+        out.append(f"Mach {U / c:.3f}  ->  drho/rho ~ {100 * (U / c) ** 2:.2f}%"
+                   + ("   <- WARN: above 0.2, this is a compressible foam, not a liquid"
+                      if U / c > 0.2 else ""))
+        out.append(f"Froude {U / _m.sqrt(g * L):.3f}   (U {U:.4g}, L {L:.4g})")
+    if g > 0:
+        out.append(f"self-weight volumetric strain rho*g*H/K = {100 * rho * g * Hb / K:.3f}%"
+                   f"   (H = the body's own height, {Hb:.4g})")
+    sig, eta = 0.0, 0.0
+    for o in (spec.get("operators") or []):
+        if not isinstance(o, dict):
+            continue
+        if o.get("op") == "mpm_grid_update" and o.get("csf_rho"):
+            sig = float(o.get("surface_tension", 0.0) or 0.0)
+        if o.get("op") == "mpm_viscosity":
+            eta = float(o.get("eta", 0.0) or 0.0)
+    if eta > 0 and U > 0:
+        out.append(f"Reynolds rho*U*L/eta = {rho * U * L / eta:.4g}")
+    if sig > 0:
+        if g > 0:
+            out.append(f"Bond rho*g*L^2/sigma = {rho * g * L * L / sig:.4g}")
+            lc = _m.sqrt(sig / (rho * g))
+            out.append(f"capillary length sqrt(sigma/rho g) = {lc:.4g} = {lc / dx:.1f} cells"
+                       + ("   <- WARN: under 2 cells, nothing shaped by surface tension is resolved"
+                          if lc / dx < 2.0 else ""))
+        if U > 0:
+            out.append(f"Weber rho*U^2*L/sigma = {rho * U * U * L / sig:.4g}")
+    return out
+
+
 def _cell_size(spec, n_grid: int, dim: int) -> float:
     """The background cell size, `world_size[1] / n_grid`, matching MPMGrid.
 
@@ -337,6 +439,13 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     # SAME `cfl` safety factor is applied to it as to the elastic one, because at the bare limit
     # the drop already piles 60.8 full cells of mass on one node against 1.8 for a clean run.
     cap_raw, sigma, rho_liq = _capillary_limit(spec, dx, dim)
+
+    _nm = (spec.get("general") or {}).get("name", os.path.basename(yaml_path))
+    for _line in _similarity(spec, dx, dim):
+        if "WARN" in _line:
+            warn(f"[similarity] {_nm}: {_line}")
+        else:
+            print(f"[similarity] {_nm}: {_line}", flush=True)
     dt_cap = cfl * cap_raw
     if cmax <= 0.0 and dt_cap == float("inf"):
         return False, None                       # no elastic material AND no tension -> nothing to bound
