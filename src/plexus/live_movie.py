@@ -113,41 +113,35 @@ class LiveMovie:
         # is already faster than real when every frame is drawn, and one with a huge frame count
         # would need a stride so large the motion aliases. Both are reported rather than silently
         # accepted, because "this movie is real time" is a claim.
+        # REAL TIME BY DERIVING THE FRAMERATE, not by thinning the movie.
+        #
+        # The movie is capped at `max_frames` (300) because that is what bounds the file, and the
+        # stride follows from it: ceil(n_frames / max_frames). What makes playback real time is then
+        # the FRAMERATE, which is not a free choice at all --
+        #
+        #     fps = frames_rendered / (n_frames * dt * time_s)
+        #
+        # -- because the video must last exactly as long as the world it shows. For a 1.5 s run cut
+        # to 300 frames that is 200 fps. High, and legal in H.264; a player that cannot honour it
+        # shows the movie SLOWER than real, never faster, which is the safe direction to fail in.
+        #
+        # This replaces a `playback` speed knob, which was a way of asking for slow motion and is
+        # not what a movie with units should do: it should show the world at the rate the world
+        # ran, and if that is too fast to watch, the answer is a longer run, not a slower film.
         self.dt, self.time_s, self.real_time = dt, time_s, bool(real_time)
         self.speed = None
-        # `playback` IS THE SPEED, AND IT IS THE THING TO ASK FOR. One video second holds `fps`
-        # movie frames, each `stride` simulated frames apart, so it shows
-        #
-        #     speed = fps * stride * dt * time_s        SECONDS OF THE WORLD PER VIDEO SECOND
-        #
-        # 1.0 is real time; 0.25 is quarter speed, i.e. 4x SLOW MOTION. Inverting that -- which the
-        # first version of this did -- reads a 4x slow-motion movie as "4x faster than real", and
-        # the error is invisible at real time because 1/1 == 1.
-        #
-        # REAL TIME IS OFTEN NOT WATCHABLE, and saying so is the point of having units. si_gate is
-        # 0.25 L of water in a 100 mm box: the whole run is 1.5 SECONDS of world, and the cube's
-        # fall takes 0.078 s -- under 5 frames of a real-time movie. Small scenes are simply fast.
-        _pb = float((style or {}).get("playback", 1.0))
-        if self.real_time and dt and time_s and _pb > 0:
+        if self.real_time and dt and time_s:
             frame_s = float(dt) * float(time_s)
-            want = _pb / (float(fps) * frame_s)         # frames to skip for the requested speed
-            self.stride = max(1, int(round(want)))
-            _cap = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
-            if self.stride < _cap:
-                # THE CAP WINS, AND SAYS SO. `max_frames` bounds the file size, so it can override
-                # the requested speed -- at 1800 frames and max_frames 300 the stride cannot go
-                # below 6, which puts a floor of 3.3x on the slow motion however small `playback`
-                # is. Silently clamping it would mean a spec asking for 10x and getting 3.3x with
-                # nothing said, and the overlay would then report the speed it ACTUALLY got, which
-                # looks like the request was honoured.
-                print(f"[live-movie] playback {_pb:g} wants stride {self.stride}, but "
-                      f"max_frames={int(max_frames)} forces {_cap} "
-                      f"({float(fps) * _cap * frame_s:.4g}x real time, not {_pb:g}). "
-                      f"Raise --render-max-frames to {int(np.ceil(self.n_frames / self.stride))} "
-                      f"to get what was asked for.", flush=True)
-                self.stride = _cap
-            self.speed = float(fps) * self.stride * frame_s
             self.duration_s = self.n_frames * frame_s
+            n_rendered = max(1, self.n_frames // self.stride)
+            fps = n_rendered / self.duration_s
+            self.speed = float(fps) * self.stride * frame_s      # world-seconds per video-second
+            self.fps = fps                                       # <- what open_movie must use
+            print(f"[live-movie] {self.n_frames} frames of {self.duration_s:.4g} s -> stride "
+                  f"{self.stride}, {n_rendered} movie frames at {fps:.4g} fps = real time"
+                  + ("" if 5.0 <= fps <= 120.0 else
+                     f"  (NOTE: {fps:.4g} fps is outside the 5-120 most players honour; if it is "
+                     f"clamped the movie runs SLOW, not fast)"), flush=True)
         # STILLS COME OUT OF THE MOVIE'S OWN RENDER, not a second one. `Plotter.image` is the frame
         # `write_frame()` just rasterised, so a PNG costs a file write and nothing else -- no extra
         # render pass, and no second copy of the camera/palette/dot-size code to drift out of sync
@@ -222,7 +216,7 @@ class LiveMovie:
             self.p.camera.parallel_scale = radius * 1.45
 
         self._draw_obstacles(span)
-        self.p.open_movie(out, framerate=int(fps), quality=8)
+        self.p.open_movie(out, framerate=max(1, int(round(getattr(self, "fps", fps)))), quality=8)
 
     def _draw_obstacles(self, span):
         """The world's solid geometry, which the simulation sees and this renderer did not.
