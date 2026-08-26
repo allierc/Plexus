@@ -31,13 +31,13 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The simulation shows a dense field of orange and blue particles distributed across a
-      black background. Over time, the particles appear to undergo a subtle, stochastic shifting in their
-      spatial positions. There is no significant global movement or large-scale structural change visible
-      between the frames. The overall density and distribution of the two colors remain constant throughout
-      the sequence.
-    objects: 'The scene contains two distinct sets of small, circular particles: one set is orange and
-      the other is blue. These particles are distributed randomly across the entire frame without forming
-      any specific geometric patterns or clusters. Each individual particle is very small and uniform
-      in size relative to the total area. The orange and blue particles are intermingled, creating a speckled,
-      high-contrast visual texture.'
+    description: The video shows a dense field of small, glowing particles moving in a complex, fluid-like
+      motion. These particles appear to be drifting and swirling, creating a sense of depth and dynamic
+      flow. The overall scene transitions through various patterns of movement, from organized streams
+      to more chaotic, scattered distributions. The background remains dark, highlighting the vibrant
+      colors and intricate paths of the moving points.
+    objects: The scene is populated by thousands of tiny, point-like particles distributed throughout
+      the frame. These particles are primarily colored in shades of orange and light blue, creating a
+      high-contrast visual effect. They are arranged in a non-linear, stochastic topology, appearing to
+      flow together in clusters and individual streams. The size of each particle is uniform and very
+      small, resembling a field of distant stars or microscopic matter in motion.
