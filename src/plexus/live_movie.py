@@ -66,6 +66,15 @@ class LiveMovie:
                  fps=20, px=1280, dot=None, fill=0.9, elev=18.0, azim=-58.0, name="", seed=0,
                  sim=None, style=None, stills=10, keep_stills=False,
                  dt=None, time_s=None, real_time=True):
+        # THE SPEC'S `plotting.fps` WAS DECORATIVE. `style` carries it, `fps` was a separate
+        # keyword defaulting to 20, and nothing connected them -- so every movie was written at 20
+        # regardless of what the spec asked for. It matters twice over now: `fps` sets the mp4's
+        # framerate AND the render stride that makes playback real time, and the two must agree or
+        # the clock in the overlay is a claim about a file that does not keep it. si_gate at
+        # fps 20 took stride 60 and held 30 frames for 1.5 s of world -- arithmetically real time,
+        # but so heavily aliased that it reads as several times too fast. At 60 it is stride 20 and
+        # 90 frames, the same 1.5 s, smooth.
+        fps = float((style or {}).get("fps", fps))
         from plexus.render_vtk import offscreen
         offscreen()                                   # kill the Xlib chatter before VTK loads
         import pyvista as pv
