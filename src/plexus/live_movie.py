@@ -134,12 +134,23 @@ class LiveMovie:
         if self.real_time and dt and time_s:
             frame_s = float(dt) * float(time_s)
             self.duration_s = self.n_frames * frame_s
+            # SLOW MOTION AS A DECLARED FACTOR, not as a thinner movie. The frame COUNT is fixed
+            # by max_frames and the stride follows from it; slowing the film down is then purely a
+            # matter of the framerate, `fps = frames / (duration * slow_motion)`. Nothing is
+            # dropped, nothing is resampled -- the same 300 frames simply take 4x longer to play,
+            # which is what slow motion is. `slow_motion: 1` is real time.
+            _sm = float((style or {}).get("slow_motion", 1.0))
+            if _sm <= 0:
+                raise ValueError(f"plotting.slow_motion must be > 0, got {_sm}")
             n_rendered = max(1, self.n_frames // self.stride)
-            fps = n_rendered / self.duration_s
+            fps = n_rendered / (self.duration_s * _sm)
+            self.slow_motion = _sm
             self.speed = float(fps) * self.stride * frame_s      # world-seconds per video-second
             self.fps = fps                                       # <- what open_movie must use
+            _how = "real time" if abs(_sm - 1.0) < 1e-9 else f"{_sm:g}x slow motion"
             print(f"[live-movie] {self.n_frames} frames of {self.duration_s:.4g} s -> stride "
-                  f"{self.stride}, {n_rendered} movie frames at {fps:.4g} fps = real time"
+                  f"{self.stride}, {n_rendered} movie frames at {fps:.4g} fps = {_how} "
+                  f"({n_rendered / fps:.4g} s of video)"
                   + ("" if 5.0 <= fps <= 120.0 else
                      f"  (NOTE: {fps:.4g} fps is outside the 5-120 most players honour; if it is "
                      f"clamped the movie runs SLOW, not fast)"), flush=True)
@@ -348,6 +359,8 @@ class LiveMovie:
         clk = ""
         if self.speed is not None:
             clk = f"\nt = {tick * float(self.dt) * float(self.time_s):.4g} s"
+            if abs(getattr(self, "slow_motion", 1.0) - 1.0) > 1e-9:
+                clk += f"   {self.slow_motion:g}x slow"
         self.p.add_text(f"{self.name}\n{self.n:,} particles{sub}\n"
                         f"frame {tick}/{self.n_frames}   "
                         f"{el / max(tick, 1) * 1000:.0f} ms/frame compute{clk}",
