@@ -130,6 +130,14 @@ class LiveMovie:
         # ran, and if that is too fast to watch, the answer is a longer run, not a slower film.
         self.dt, self.time_s, self.real_time = dt, time_s, bool(real_time)
         self.length_um = length_um
+        self._box_label = ""
+        if length_um and time_s is not None:
+            _m = float(length_um) / 1.0e6
+            _w = [float(x) * _m for x in world]
+            _f = (lambda v: f"{v * 1e3:g} mm" if v < 0.01 else f"{v * 100:g} cm"
+                  if v < 1.0 else f"{v:g} m" if v < 1000.0 else f"{v / 1000:g} km")
+            self._box_label = ("   box " + " x ".join(_f(v) for v in _w)
+                               if len(set(_w)) > 1 else f"   box {_f(_w[0])} cube")
         self.speed = None
         if self.real_time and dt and time_s:
             frame_s = float(dt) * float(time_s)
@@ -214,33 +222,29 @@ class LiveMovie:
         else:
             self.p.add_mesh(pv.Box((0, span[0], 0, span[1], 0, span[2])).extract_all_edges(),
                             color="#4a4a4a", line_width=1.0, lighting=False)
-            # A SCALE BAR, AND ONLY WHEN THERE IS A SCALE. Without `general.units` the box is a
-            # number of nothing and a bar labelled "20" would be a lie; with units it is metres and
-            # the eye can finally check the picture against the physics. The length is the largest
-            # round number (1, 2 or 5 times a power of ten) that fits in a third of the box, so a
-            # 100 m box gets 20 m and a 0.1 m box gets 20 mm without either being told to.
+            # A SCALE BAR, AND ONLY WHERE THERE IS A SCALE. Without `general.units` the box is
+            # a number of nothing and a bar labelled "20" would be a lie. The length is the largest
+            # round number (1, 2 or 5 times a power of ten) fitting in a third of the box, so it
+            # sizes itself: 20 m for a 100 m box, 2 cm for a 0.1 m one, with nothing to set.
+            #
+            # A PLAIN SEGMENT: no end ticks, and the label in the same font and size as the
+            # top-left print, so it reads as one annotation rather than two competing ones.
             if self.time_s is not None and getattr(self, "length_um", None):
-                _m_per_unit = float(self.length_um) / 1.0e6      # metres per simulation length unit
-                _target = float(span[ax_h0 := [i for i in range(3) if i != self.up][0]]) / 3.0
-                _p10 = 10.0 ** np.floor(np.log10(max(_target, 1e-30)))
-                _len = max([f * _p10 for f in (1.0, 2.0, 5.0) if f * _p10 <= _target] or [_p10])
+                _m = float(self.length_um) / 1.0e6            # metres per simulation length unit
+                _ax0 = [i for i in range(3) if i != self.up][0]
+                _tgt = float(span[_ax0]) / 3.0
+                _p10 = 10.0 ** np.floor(np.log10(max(_tgt, 1e-30)))
+                _len = max([f * _p10 for f in (1.0, 2.0, 5.0) if f * _p10 <= _tgt] or [_p10])
+                _other = [i for i in range(3) if i not in (self.up, _ax0)][0]
                 _a = np.zeros(3); _b = np.zeros(3)
-                _a[ax_h0] = 0.0; _b[ax_h0] = _len          # along the first horizontal axis
-                _other = [i for i in range(3) if i not in (self.up, ax_h0)][0]
-                _a[_other] = _b[_other] = -0.04 * float(span[_other])   # just outside the box
+                _a[_ax0] = 0.0; _b[_ax0] = _len
+                _a[_other] = _b[_other] = -0.04 * float(span[_other])
                 self.p.add_mesh(pv.Line(_a, _b), color="white", line_width=4.0, lighting=False)
-                for _e in (_a, _b):                         # end ticks, so it reads as a bar
-                    _t0 = _e.copy(); _t1 = _e.copy()
-                    _t0[self.up] = -0.015 * float(span[self.up])
-                    _t1[self.up] = +0.015 * float(span[self.up])
-                    self.p.add_mesh(pv.Line(_t0, _t1), color="white", line_width=4.0,
-                                    lighting=False)
-                _v = _len * _m_per_unit
-                _lab = (f"{_v * 1e3:g} mm" if _v < 0.01 else
-                        f"{_v * 100:g} cm" if _v < 1.0 else
-                        f"{_v:g} m" if _v < 1000.0 else f"{_v / 1000:g} km")
+                _v = _len * _m
+                _lab = (f"{_v * 1e3:g} mm" if _v < 0.01 else f"{_v * 100:g} cm" if _v < 1.0
+                        else f"{_v:g} m" if _v < 1000.0 else f"{_v / 1000:g} km")
                 _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.05 * float(span[self.up])
-                self.p.add_point_labels([_mid], [_lab], font_size=13, text_color="white",
+                self.p.add_point_labels([_mid], [_lab], font_size=11, text_color="white",
                                         shape=None, show_points=False, always_visible=True)
             centre, radius = 0.5 * span, float(span.max()) * 0.55
             e, az = np.radians(elev), np.radians(azim)
@@ -361,7 +365,7 @@ class LiveMovie:
             clk = f"\nt = {tick * float(self.dt) * float(self.time_s):.4g} s"
             if abs(getattr(self, "slow_motion", 1.0) - 1.0) > 1e-9:
                 clk += f"   {self.slow_motion:g}x slow"
-        self.p.add_text(f"{self.name}\n{self.n:,} particles{sub}\n"
+        self.p.add_text(f"{self.name}{self._box_label}\n{self.n:,} particles{sub}\n"
                         f"frame {tick}/{self.n_frames}   "
                         f"{el / max(tick, 1) * 1000:.0f} ms/frame compute{clk}",
                         position="upper_left", font_size=11, color="white", name="hdr")
