@@ -441,7 +441,7 @@ class MPMGatherWarp(MPMGather):
                           wp.from_torch(occ), wp.from_torch(liqf), wp.from_torch(_near),
                           int(pa), int(va), int(g.shape[0]), int(g.shape[1]), int(g.shape[2]),
                           float(g.dx), float(dt),
-                          float(self.wall_damp), float(self.wall_contact), float(vmax),
+                          float(self.wall_damp), float(self._contact_band(g)), float(vmax),
                           float(bx), float(by), float(bz), int(has_liq),
                           int(self.wall_damp_mode == "per_impact")])
         return {}

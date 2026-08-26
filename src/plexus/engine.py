@@ -863,6 +863,11 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         import inspect
         if "dim" in inspect.signature(cls.__init__).parameters and "dim" not in fcfg:
             fcfg["dim"] = H.dim                                       # N-D grid field follows the dimension contract
+        # THE PER-AXIS BOX, not just its width. `world_width` is world_size[0]; a field whose cell
+        # size must follow the world (MPMGrid) cannot derive it from one axis. Passed behind the
+        # same signature guard as `dim` above, so a field that does not accept it is untouched.
+        if "world_size" in inspect.signature(cls.__init__).parameters and "world_size" not in fcfg:
+            fcfg["world_size"] = [float(w) for w in H.world_size]
         fld = cls(fname, width=H.world_width, device=device, **fcfg)   # name positional; rest by keyword
         if hasattr(fld, "periodic"):
             fld.periodic = H.periodic                                   # torus field iff the world wraps

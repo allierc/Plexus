@@ -242,6 +242,48 @@ class MPMParticle:
         mu, la = _lame(p_y)
         mu = torch.where(is_liquid, torch.zeros_like(mu), mu)    # liquid: no shear modulus -> pressure only
                                                                  # (viscoelastic KEEPS mu -- it relaxes F, not mu)
+        # `bulk_modulus` -- SAY WHAT A LIQUID ACTUALLY HAS. Young's modulus is defined by pulling a
+        # rod with free sides: it stretches AND thins. A fluid at rest carries no shear, so it cannot
+        # hold that stress state at all; formally nu -> 1/2 and E = 3K(1-2nu) -> 0 while K stays
+        # finite. Water's Young's modulus is ZERO and its bulk modulus is 2.2 GPa.
+        #
+        # What `youngs: 200` on a liquid in this codebase actually sets, once `mu` is zeroed on the
+        # line above, is K = la = E*nu/((1+nu)(1-2nu)) = 55.6 at the default nu = 0.2 -- a roundabout
+        # bulk modulus reached through a modulus the material does not possess and a Poisson ratio
+        # that is wrong for it. `bulk_modulus` sets K directly, in the same units as any other
+        # stress, and is the only sane way to write a liquid in a spec that carries units.
+        #
+        # WHY IT MATTERS BEYOND TIDINESS. K is the number that sets the Mach number, and four
+        # separate defects measured in this codebase are one defect in K being far too low:
+        # a "water" impacting at Mach 0.449 with 10.1% self-weight volumetric strain; a drop that
+        # compacts monotonically and never settles; a mean(J) that creeps for the whole run; and a
+        # surface-tension implosion in which the Laplace pressure 2*sigma/R reaches 0.47 OF K and the
+        # drop squeezes itself to a point. Real water in a 0.1 m box has 2*sigma/R / K = 1.3e-8.
+        #
+        # LIQUID ONLY, and an ERROR alongside `youngs`, because two ways to set one number is two
+        # chances to disagree. Absent -> every existing spec is byte-identical.
+        _bk = [t for t in type_list if t.get("bulk_modulus") is not None]
+        if _bk:
+            k_c = torch.full((parent.n,), float("nan"), device=device)
+            for tid, t in enumerate(type_list):
+                K = t.get("bulk_modulus")
+                if K is None:
+                    continue
+                if t.get("youngs") is not None:
+                    raise ValueError(
+                        f"a material type declares BOTH youngs={t['youngs']} and "
+                        f"bulk_modulus={K}. For a liquid `mu` is zeroed, so `youngs` is only a "
+                        f"roundabout way of setting the same K -- give one or the other.")
+                if str(t.get("material", "elastic")) != "liquid":
+                    raise ValueError(
+                        f"bulk_modulus={K} on material {t.get('material', 'elastic')!r}. It is "
+                        f"defined here for `material: liquid` only, where mu = 0 makes K = lambda "
+                        f"exactly; on a solid the bulk modulus is K = lambda + 2*mu/3 and setting "
+                        f"lambda from it would silently be the wrong number.")
+                k_c[ntp == tid] = float(K)
+            _has_k = ~torch.isnan(k_c[pidx])
+            la = torch.where(_has_k, torch.nan_to_num(k_c[pidx]), la)   # mu is already 0 -> K = la
+
 
         # per-particle volume: ball footprint (disc pi*r^2 in 2D, sphere 4/3 pi r^3 in
         # 3D) / ppc, or the box volume / ppc for a block-filled pool.
