@@ -22,8 +22,8 @@ general:
   boundary: wall
   dim: 3
   dt: 0.0036
-  n_frames: 1000
-  name: material_3d_water_bench_200m
+  n_frames: 200
+  name: material_3d_water_dam_20m_rho0p5
   record_cap: 2
   seed: 0
   world:
@@ -51,8 +51,8 @@ operators:
   op: mpm_grid_update
   wall_damp: 0.9
   surface_tension: 60.0
-  mass_floor: 1.7e-15
-  csf_mass_floor: 1.7e-15
+  mass_floor: 8.7e-15
+  csf_mass_floor: 8.7e-15
 - at: mpm_particle
   from: mpm_grid
   implementation: warp
@@ -69,7 +69,7 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
-  substep_dt: 2.769231e-04
+  substep_dt: 0.0002769231
 sets:
   cell:
     n: 27
@@ -372,9 +372,9 @@ sets:
         youngs: 200
         material: liquid
   mpm_particle:
-    density: 1.0
+    density: 0.5
     parent: cell
-    per_parent: 7407407
+    per_parent: 740740
     vel_init: 0.0
 plotting:
   background: black

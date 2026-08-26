@@ -81,7 +81,7 @@ operators:
 schedule:
 - aggregate
 - gravity
-- substep_dt: 0.0001326
+- substep_dt: 8.739545e-05
   steps:
   - mpm_strain
   - mpm_scatter

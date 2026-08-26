@@ -88,14 +88,25 @@ def data_generate(
                 snapshot(H, tick, _n, _d, name=_name, style=_st)
         hooks.append(_snap)
 
-    mov = None
+    movs = []
     if live_movie is not None:
         from plexus.live_movie import LiveMovie
-        mov = LiveMovie(out=os.path.join(data_dir, "movie.mp4"),
-                        world=list(sim.world_size), n_frames=sim.n_frames,
-                        up=int((sim.plotting or {}).get("up_axis", 2)),
-                        name=sim.name, sim=sim, style=(sim.plotting or {}), **live_movie)
-        hooks.append(mov)
+        # SEVERAL MOVIES FROM ONE SIMULATION. At 200 M particles the trajectory is not stored --
+        # 1000 frames would be 2.4 TB -- so a movie cannot be re-rendered at a different draw count
+        # afterwards; the only way to see the same run at 10 M, 50 M and 100 M drawn is to write all
+        # three DURING it. Each gets its own subsample and its own file; they share the simulation.
+        _cfg = dict(live_movie)
+        _ns = _cfg.pop("render_n")
+        _ns = [int(x) for x in (_ns if isinstance(_ns, (list, tuple)) else [_ns])]
+        for _n in _ns:
+            _tag = "" if len(_ns) == 1 else f"_{_n // 1000000}M" if _n >= 1000000 else f"_{_n // 1000}k"
+            movs.append(LiveMovie(out=os.path.join(data_dir, f"movie{_tag}.mp4"),
+                                  world=list(sim.world_size), n_frames=sim.n_frames,
+                                  up=int((sim.plotting or {}).get("up_axis", 2)),
+                                  name=sim.name, sim=sim, style=(sim.plotting or {}),
+                                  render_n=_n, stills=(_cfg.get("stills", 10) if _n == _ns[0] else 0),
+                                  **{k: v for k, v in _cfg.items() if k != "stills"}))
+        hooks.extend(movs)
 
     # COMPOSED, not replaced. The live PNG snapshot and the live movie are independent answers to
     # "what is this run doing right now" and a run may want both; `on_frame` is a single slot, so
@@ -109,8 +120,8 @@ def data_generate(
     try:
         H, out = run(sim, out_path=out_path, device=device, progress=True, on_frame=on_frame)
     finally:
-        if mov is not None:
-            mov.close()
+        for _m in movs:
+            _m.close()
 
     # also save a light, framework-agnostic .npz (positions/occupancy per set) so
     # downstream code need not depend on zarr to read a generated dataset back.
