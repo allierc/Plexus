@@ -424,6 +424,13 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         act = getattr(H, "active_stress", None)
         if act is not None:
             stress = stress + act
+        # THE SAME CHANNEL, FOR A DIFFERENT MECHANISM. `extra_stress` is any additive Kirchhoff
+        # stress written by an operator upstream in the substep -- today the Newtonian viscous
+        # stress from `mpm_viscosity`. Kept separate from `active_stress` so the two compose
+        # rather than clobber, and so a spec that reads `active_stress` back means what it says.
+        xtr = getattr(H, "extra_stress", None)
+        if xtr is not None:
+            stress = stress + xtr
         # TURGOR / OSMOTIC PRESSURE (optional, default OFF): an isotropic OUTWARD pressure carried
         # by this set, written as a per-particle `turgor` buffer by the `mpm_turgor` operator. The
         # sign is the one that makes a cell a cell: tau here is Kirchhoff (positive = tension), a
@@ -1281,6 +1288,98 @@ class MPMTurgor(Lateral):
             p.register_buffer("turgor", P)
         else:
             p.turgor.copy_(P)
+        return {}
+
+
+# ==========================================================================================================
+# mpm_viscosity -- the Newtonian viscous stress a liquid in this MPM does not otherwise have.
+# ==========================================================================================================
+@register_operator("mpm_viscosity", family="mpm", set="particle", kind="lateral")
+class MPMViscosity(Lateral):
+    """WHY A LIQUID HERE NEVER STOPS MOVING. `material: liquid` sets mu = 0, so the deviatoric
+    stress is IDENTICALLY ZERO and nothing in the constitutive model resists or dissipates shear.
+    The only sinks in the whole scheme are `wall_damp` and MLS-MPM's own numerical dissipation --
+    and APIC exists precisely to minimise the latter. A real drop comes to rest; this one has no
+    mechanism to.
+
+    MEASURED, on material_3d_water_st050 (290k particles, 2400 frames): kinetic energy falls 500x
+    between frames 400 and 1600 and then STOPS FALLING -- 7e-5, 8e-5, 8e-5, 11e-5 at frames 1600,
+    1800, 2000, 2200. A plateau, not a decay. Of the residual at frame 2201, 29% IS SUB-GRID
+    JITTER (rms speed 0.0107, of which 0.0090 survives coarse-graining onto 4-cell boxes and
+    0.0058 does not), which is exactly the scale a viscosity acts on.
+
+    THE STRESS. Water is Newtonian: sigma = -p I + 2 mu_dyn D, with D the strain-rate tensor
+    (1/2)(grad v + grad v^T) and mu_dyn ~ 1.0e-3 Pa s. In MLS-MPM the affine matrix C IS the
+    velocity gradient, so D = (1/2)(C + C^T) and the Kirchhoff viscous stress is
+
+        tau_visc = mu_dyn * (C + C^T)
+
+    added to the elastic stress with the SAME sign convention (positive = tension): under
+    extension a viscous fluid pulls back, exactly as an elastic one does. It costs one 3x3
+    symmetrisation per particle -- C is already carried -- and no extra P2G pass, because it goes
+    through the additive-stress channel `mpm_scatter` already reads for `pulse_to_active_stress`.
+    That channel is live on the warp path too (the kernel takes ACT as a mat33), so this operator
+    works at `implementation: warp` without a kernel change.
+
+    HOW BIG SHOULD IT BE, AND WHAT IT IS HONEST TO CLAIM. Quote it as a Reynolds number or it means
+    nothing. Re = U L / nu with L the body's own size. In the water-drop scene (L ~ 0.2, U ~ 3.9 at
+    impact, U ~ 0.01 once settled) a kinematic nu of 3e-4 gives Re ~ 2300 DURING THE IMPACT -- high
+    enough that the splash is barely touched -- and Re ~ 6 ONCE SETTLED, where it dominates and the
+    jitter dies. That asymmetry is the physics doing the work, not a schedule: Re falls as U does.
+    A real centimetre-scale water drop lands at Re 1e4-1e5, so a splash genuinely IS near-inviscid
+    and real water genuinely does slosh; what stops a real puddle is viscosity acting on the small
+    scales over many seconds. Pushed far past the Reynolds-matched value this term becomes
+    numerical damping wearing a physics name, and should be called sub-grid or artificial
+    viscosity when it is used that way.
+
+    WHAT IT IS NOT. It is NOT `drag`, which is a body force -dragl*v and therefore damps UNIFORM
+    TRANSLATION -- it slows free fall. A viscous stress depends on the velocity GRADIENT, so a body
+    in rigid translation has C = 0, tau_visc = 0, and falls at exactly g. That is the gate.
+    It also will not stop the slow compaction of a drop (a volume error, not a momentum one), nor
+    the surface-tension implosion at high sigma (the CSF overpowering the bulk modulus).
+
+    STABILITY. An explicit viscous stress carries its own diffusion limit, dt < rho dx^2 / (2 D mu).
+    At mu 3e-4, rho 1, dx 1/96, D 3 that is 6.0e-2 against a 2e-4 substep -- 300x of headroom -- and
+    even mu 1e-2 leaves 9x. The operator reports the margin so a spec cannot walk past it silently.
+    """
+
+    EMIT = None                 # writes H.extra_stress, consumed by mpm_scatter in the same substep
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["eta"]
+    MECHANISM_TAGS = ["viscous_stress", "momentum_diffusion", "dissipation"]
+    PARAM_ROLES = {"eta": "dynamic_viscosity", "liquid_only": "restrict_to_liquid_particles"}
+    REFERENCE = ("Batchelor, G.K. (1967). An Introduction to Fluid Dynamics, ch. 3 (Newtonian "
+                 "stress); Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM, C = grad v).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "mpm_particle")
+        self.eta = float(params["eta"])                    # DYNAMIC viscosity mu_dyn
+        # ONLY THE LIQUID, BY DEFAULT. A solid already carries a deviatoric stress through mu > 0;
+        # adding a viscous one on top makes it Kelvin-Voigt, which is a different material and
+        # should be asked for rather than inherited.
+        self.liquid_only = bool(params.get("liquid_only", True))
+        if self.eta < 0:
+            raise ValueError(f"mpm_viscosity: eta must be >= 0, got {self.eta}")
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        C = p.C
+        tau = self.eta * (C + C.transpose(-2, -1))
+        if self.liquid_only:
+            liq = getattr(p, "is_liquid", None)
+            if _const_any(self, "_c_liquid", liq):
+                tau = tau * liq[:, None, None].to(tau.dtype)
+        occ = getattr(p, "occ", None)
+        if occ is not None:
+            tau = tau * (occ > 0).to(tau.dtype)[:, None, None]
+        if mask is not None:
+            tau = tau * mask.to(tau.dtype)[:, None, None]
+        prev = getattr(H, "extra_stress", None)
+        if prev is None or prev.shape != tau.shape:
+            H.extra_stress = tau
+        else:
+            prev.copy_(tau)                     # persistent buffer -> safe inside a captured graph
         return {}
 
 
