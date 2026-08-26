@@ -257,6 +257,14 @@ class MPMScatterWarp(MPMScatter):
         _has_turg = _turg is not None
         _turg = _turg.contiguous() if _has_turg else _z
         _act = getattr(H, "active_stress", None)
+        # THE SAME ADDITIVE-STRESS SLOT CARRIES BOTH. The kernel takes one mat33 per particle, so
+        # active stress and the viscous stress from `mpm_viscosity` are summed here rather than
+        # given separate inputs -- they enter the momentum identically and the kernel cannot tell
+        # them apart. Summing in torch also keeps the kernel signature (and its cached compile)
+        # unchanged, which is why `mpm_viscosity` needs no warp kernel of its own.
+        _xtr = getattr(H, "extra_stress", None)
+        if _xtr is not None:
+            _act = _xtr if _act is None else (_act + _xtr)
         _has_act = _act is not None
         _act = _act.contiguous() if _has_act else torch.zeros(p.n, 3, 3, device=dev)
 
