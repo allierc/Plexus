@@ -1751,6 +1751,14 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     rec_fields[fn].append(fld.grid.detach().to("cpu", torch.float32).numpy().copy())
             # generic per-tick hook: lets a diagnostic capture live H state (e.g. the MPM
             # continuum buffers F/C/Jp + the transient grid) that the trajectory does not store.
+            # ARM ANY OPERATOR THAT WANTS ITS REST STATE FROM A PARTICULAR FRAME. `mpm_anchor`
+            # gated with `after_frame` would otherwise capture whatever the run had drifted to by
+            # the time it first ran; `anchor_frame` makes that a declared choice instead.
+            for _nm, _op, _sel, _g in inst:
+                _af = getattr(_op, "anchor_frame", None)
+                if _af is not None and int(_af) == tick and not getattr(_op, "_armed", False):
+                    _op.capture_rest(H)
+                    _op._armed = True
             if on_frame is not None:
                 on_frame(H, tick)
 
