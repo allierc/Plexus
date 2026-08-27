@@ -22,7 +22,17 @@ sets:
         fraction: 1.0
         material: liquid
         bulk_modulus: 100000.0
-        shape: cube
+        block:
+        - 0.12418004946093206
+        - 0.1094999034327277
+        - 0.12418004946093206
+        - 0.17581995053906793
+        - 0.1905000965672723
+        - 0.17581995053906793
+    start:
+    - - 0.15
+      - 0.15
+      - 0.15
   mpm_particle:
     parent: cell
     per_parent: 29648
@@ -68,7 +78,7 @@ operators:
 schedule:
 - aggregate
 - gravity
-- substep_dt: 0.00012
+- substep_dt: 0.0001193289
   steps:
   - mpm_strain
   - mpm_viscosity
