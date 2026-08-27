@@ -1344,10 +1344,39 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # IT ALSO AFFECTS THE TWO-SPECIES SPECS ALREADY ON DISK, which carry two `cell_chem_diffuse`,
     # two `cell_chem_react` and two `cell_chem_seed` with no windows at all: both instances were
     # meant to run once each per tick and each has been running twice.
-    _by_token = {}
-    for _i, (_nm, *_rest) in enumerate(inst):
-        _by_token.setdefault(_nm, []).append(_i)
+    #
+    # AND THE i-th TOKEN RUNS THE i-th *LIVE* INSTANCE. Binding to declaration order alone is right
+    # only while every instance is in its window. The whole point of carrying an operator twice is
+    # that the two windows are DISJOINT, so at any tick exactly one is live -- and a schedule that
+    # names the token once (the natural way to write "one grid solve per substep, with the parameter
+    # changing at frame 400") bound occurrence 0 to instance 0 forever and NEVER RAN INSTANCE 1.
+    #
+    # MEASURED ON si_two_drops3d_cycle: sigma +0.018 before frame 400, sigma -0.018 after. Over 6
+    # ticks the positive instance was called 312 times and the negative one ZERO. The second stage
+    # of a two-stage run did not merely do the wrong thing, it did not exist -- and because
+    # `mpm_grid_update` is the step that divides momentum by mass, the run also lost its grid solve
+    # entirely for the whole second half.
+    #
+    # Filtering by the window makes the one-token spelling mean what it reads as, and changes
+    # nothing where every instance is live: with two ungated `cell_chem_diffuse` and two tokens the
+    # live list is the declaration list.
     _seen_this_tick = {}
+
+    def _live_ids(tick):
+        """Instance indices whose frame gate is open at `tick`, in declaration order."""
+        return tuple(_j for _j, (_nm, _ob, _sel, (_a, _b, _e)) in enumerate(inst)
+                     if _a <= tick < _b and (_e <= 1 or tick % _e == 0))
+
+    def _tokens_live(tick):
+        by = {}
+        for _j in _live_ids(tick):
+            by.setdefault(inst[_j][0], []).append(_j)
+        return by
+
+    _by_token_all = {}
+    for _i, (_nm, *_rest) in enumerate(inst):
+        _by_token_all.setdefault(_nm, []).append(_i)
+    _by_token = _tokens_live(0)
 
     # STATIC STORAGE FOR THE SUBSTEP'S DELTA SNAPSHOT.
     #
@@ -1366,8 +1395,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # frame-level delta snapshot it saw before, restored before each substep.
     _static_d: dict = {}
     _static_b: dict = {}
-    _graph = {}          # id(step) -> torch.cuda.CUDAGraph, or False once capture has been refused
-    _graph_sigs = {}     # id(step) -> the buffer identities the graph was captured against
+    _graph = {}          # (id(step), live ids) -> torch.cuda.CUDAGraph, or False once refused
+    _graph_sigs = {}     # the same key -> the buffer identities the graph was captured against
+    _refused_said = set()  # id(step) whose refusal has been printed already
+    _gate_said = set()     # (id(step), live ids) already checked for a step the gate emptied
 
     # ------------------------------------------------------------------ torch.compile, opt-in
     # `{substep_dt: X, steps: [...], compile: true}` -- the flag lives on the SUBSTEP BLOCK because
@@ -1471,11 +1502,22 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         integration-invariant guard on non-opted-out operators."""
         _n = _seen_this_tick.get(token, 0)
         _seen_this_tick[token] = _n + 1
-        _idx = _by_token.get(token) or []
-        # A token with no instance of its own falls back to every instance of that name, which is
-        # the old behaviour and the right answer when a schedule names an operator more often than
-        # the spec instantiates it.
-        _want = {_idx[_n]} if _n < len(_idx) else set(_idx)
+        _idx = _by_token.get(token) or []                 # the LIVE instances, in declaration order
+        _all = _by_token_all.get(token) or []             # every declared instance of that name
+        # THREE CASES, and the middle one is the one a live filter makes common.
+        #   _n < len(_idx)   the i-th occurrence takes the i-th live instance. The normal path.
+        #   _n < len(_all)   the schedule names it as often as it is DECLARED, but some of those
+        #                    instances are gated off this tick. The extra occurrences run NOTHING --
+        #                    they belong to the windows that are closed. Falling back to "every live
+        #                    instance" here would re-run the live one, and a two-stage spec written
+        #                    the explicit way (the token twice, one per window) would apply its
+        #                    surface tension TWICE PER SUBSTEP for the whole run.
+        #   otherwise        the schedule genuinely names it more often than it is declared, e.g. a
+        #                    single operator repeated within a substep. Old behaviour: every live
+        #                    instance, on each occurrence.
+        _want = ({_idx[_n]} if _n < len(_idx)
+                 else set() if _n < len(_all)
+                 else set(_idx))
         for _j, (nm, ob, sel, (after_frame, before_frame, every)) in enumerate(inst):
             if nm != token or _j not in _want:
                 continue
@@ -1546,6 +1588,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             H.micro = getattr(H, "micro", 0) + 1
             H.zero_delta()
             _seen_this_tick.clear()                  # token occurrence -> instance, per tick
+            _by_token.clear()
+            _by_token.update(_tokens_live(tick))     # ... and only instances whose window is open
             for step in sim.schedule:                # operators accumulate per-set deltas
                 # a micro-loop `{substep_dt: <dt_sub>, steps: [...]}`: run the inner operators
                 # once per substep at `dt_sub` (e.g. the MPM strain->P2G->grid->G2P cycle). The
@@ -1607,14 +1651,59 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     # A spec that writes `capture: true` and cannot have it gets the full reason in
                     # yellow; one that never mentioned it gets one line, because a warning nobody
                     # asked for on 100 specs is a warning nobody reads.
-                    _cap_key = id(step)
+                    # ONE GRAPH PER GATE CONFIGURATION, not one graph per block.
+                    #
+                    # A captured graph is a fixed list of kernels. The frame gate is python, so it
+                    # is evaluated once -- AT CAPTURE -- and the replay carries whatever was live at
+                    # tick 1 for the rest of the run. Keyed on `id(step)` alone, every
+                    # `before_frame` / `after_frame` / `every` on an operator INSIDE a substep block
+                    # was therefore silently inert from tick 1 on, which is precisely the class of
+                    # failure `_capture_refusals` exists to prevent and the one thing it did not
+                    # check. Measured on si_two_drops3d_cycle with the schedule naming the token
+                    # twice, so the binding above was already correct: eager gave 312 / 416 calls to
+                    # the two windows, captured gave 108 / 0.
+                    #
+                    # Refusing capture whenever a gated operator appears would cost the 2.36x on
+                    # every staged spec. Putting the live set in the key instead costs one extra
+                    # capture per configuration -- two for a two-stage run -- and each replay is
+                    # then a graph of exactly the operators that were live when it was taken.
+                    _blk_toks = set(step.get("steps", []))
+                    _cap_key = (id(step), tuple(_j for _j in _live_ids(tick)
+                                                if inst[_j][0] in _blk_toks))
                     _cap_asked = "capture" in step
+                    # A GATE THAT EMPTIES A STEP OF THE CYCLE SAYS SO.
+                    #
+                    # A frame window that closes with nothing to replace it does not leave the
+                    # substep doing the same thing more weakly -- it DELETES that step. On
+                    # si_two_drops3d_cycle the only `mpm_grid_update` went out of window at frame
+                    # 400 and the second half of the run had no grid solve at all: the momentum was
+                    # never divided by the mass and no wall was ever applied, so the fluid simply
+                    # stopped. It looked exactly like "the second stage did nothing", which is a
+                    # description of the symptom and not of the cause.
+                    #
+                    # This costs one set difference per configuration change, and it is the only
+                    # thing standing between a mis-windowed spec and a run that finishes, renders,
+                    # and is wrong.
+                    if _cap_key not in _gate_said:
+                        _gate_said.add(_cap_key)
+                        _dead = [t for t in step.get("steps", [])
+                                 if t not in {inst[_j][0] for _j in _cap_key[1]}]
+                        if _dead:
+                            warn(f"at frame {tick} the substep block has NO live instance of "
+                                 f"{_dead} -- every declared one is outside its "
+                                 f"after_frame/before_frame window, so that step is absent from "
+                                 f"the cycle from here on. If this is a staged run, the stage that "
+                                 f"takes over is missing or its window does not start at {tick}.")
                     if step.get("capture", True) and _graph.get(_cap_key) is None and tick >= 1:
                         _why = _capture_refusals(sim, H, step, inst)
                         if _why or not str(device).startswith("cuda"):
                             _graph[_cap_key] = False
                             _msg = _why or ["device is not cuda"]
-                            if _cap_asked:
+                            _said = id(step) in _refused_said       # say it once per BLOCK, not
+                            _refused_said.add(id(step))             # once per gate configuration
+                            if _said:
+                                pass
+                            elif _cap_asked:
                                 warn("capture refused for this substep block; running it eager:\n"
                                      + "\n".join(f"    - {w}" for w in _msg))
                             else:
@@ -1665,7 +1754,12 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                         warn("a state buffer was reallocated after the substep was captured "
                              "(a set resized, or an operator assigned instead of copying); "
                              "dropping the CUDA graph and continuing eager for the rest of the run")
-                        _graph[_cap_key] = False
+                        # EVERY configuration of this block, not just the live one: the buffer moved
+                        # under all of them, and a later frame window would otherwise replay into
+                        # memory nothing reads any more.
+                        for _k in [k for k in _graph if k[0] == id(step)]:
+                            _graph[_k] = False
+                        _refused_said.add(id(step))
                         _gr = None
 
                     for _s in range(count):
