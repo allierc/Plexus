@@ -1,0 +1,103 @@
+general:
+  name: si_snow_funnel
+  seed: 0
+  n_frames: 1200
+  dt: 0.0008333333333333334
+  boundary: wall
+  obstacles:
+  - - 0.0
+    - 0.0
+    - 0.09
+    - 0.5
+  - - 0.09
+    - 0.0
+    - 0.15
+    - 0.275
+  - - 0.15
+    - 0.0
+    - 0.21
+    - 0.16
+  - - 0.29
+    - 0.0
+    - 0.35
+    - 0.16
+  - - 0.35
+    - 0.0
+    - 0.41
+    - 0.275
+  - - 0.41
+    - 0.0
+    - 0.5
+    - 0.5
+  world:
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 1
+    start:
+    - 0.25
+    - 0.4
+    - 0.25
+    - 0.4
+    types:
+      snow:
+        fraction: 1.0
+        layers:
+        - frac: 1.0
+          material: snow
+          youngs: 500000.0
+        youngs: 500000.0
+  mpm_particle:
+    parent: cell
+    per_parent: 30000
+    radius: 0.09
+    density: 400.0
+    particle_mass: 4.0715e-05
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+- op: mpm_grid_update
+  at: mpm_grid
+  surface_tension: 0.0
+  wall_damp: 0.5
+  implementation: nosync
+  csf_rho: 400.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.5
+  vmax: 1000000000.0
+schedule:
+- aggregate
+- gravity
+- substep_dt: 8.333333333333333e-05
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  dot_size: 1.2
+  slow_motion: 4

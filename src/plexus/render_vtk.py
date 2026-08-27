@@ -554,6 +554,29 @@ def offscreen():
         pass
 
 
+
+def open_movie(p, out, framerate, quality=8):
+    """Open an mp4 that is READABLE WHILE IT IS BEING WRITTEN, and after a run is killed.
+
+    A plain mp4 puts its index -- the `moov` atom -- at the END, because the muxer only knows the
+    frame offsets once it has written them. So a run that dies, is killed, or runs out of memory
+    before the writer closes leaves `ftyp` + `mdat`: tens or hundreds of MB of perfectly good H.264
+    that no player will open. That is not hypothetical -- si_fill lost an 86 MB movie of a
+    2M-particle run exactly this way, and si_bench_100m_fast would have lost 190 MB.
+
+    `frag_keyframe+empty_moov` writes a self-contained index in front and one per fragment, so the
+    file is valid from the first frame on. `-flush_packets 1` is the part that is easy to miss and
+    without which the rest is decorative: ffmpeg buffers, and a fragmented file that is not flushed
+    still sits at 36 bytes after 40 frames. Measured on a 400-frame run: readable at 232 frames
+    while the writer was at frame 280.
+
+    `-g 1` makes every frame a keyframe, which costs size and buys a file that can be cut anywhere.
+    """
+    p.open_movie(out, framerate=max(1, int(round(framerate))), quality=quality,
+                 output_params=["-movflags", "frag_keyframe+empty_moov+default_base_moof",
+                                "-g", "1", "-flush_packets", "1"])
+
+
 def _plotter(size=None):
     offscreen()
     import pyvista as pv
@@ -579,7 +602,7 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
     n = int(KB_SECONDS * FPS)
     p = _plotter(); add(p, m, style)
     p.add_text(f"{name}  {style}", position="upper_left", font_size=11, color="white")
-    p.open_movie(out, framerate=FPS, quality=8)
+    open_movie(p, out, FPS)
     for i in range(n):
         u = i / (n - 1)
         aim(p, L0 * (1.0 - (1.0 - KB_ZOOM) * _ease(u)),
@@ -611,7 +634,7 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     lo = float(min(np.nanmin(v) for v in vals)) if vals else 0.0
     hi = float(max(np.nanmax(v) for v in vals)) if vals else 1.0
     p = _plotter()
-    p.open_movie(out, framerate=EV_FPS, quality=8)
+    open_movie(p, out, EV_FPS)
     # THE PAIR WINDOW, IN TICKS, matched to how long a mother stays marked: `age <= DIVIDED` is four
     # division CALLS and `cell_divide` runs every four ticks, so a mother is blue for about sixteen
     # ticks. The daughter threshold is therefore the face count from sixteen ticks ago, not from the
@@ -704,7 +727,7 @@ def compare(dir_a, dir_b, out, style="mesh", fill=1.0, labels=("A", "B"), title=
     p = pv.Plotter(off_screen=True, window_size=(2 * SIZE, SIZE), shape=(1, 2), border=False)
     p.set_background("black")
     p.enable_anti_aliasing("msaa", multi_samples=8)
-    p.open_movie(out, framerate=EV_FPS, quality=8)
+    open_movie(p, out, EV_FPS)
     # ONE LABEL FOR BOTH PANELS, but each side keeps ITS OWN ticks for `_pair_reference`. The two are
     # different questions: "what time is this frame" is shared, because the panels are aligned; "what
     # was nF a few ticks ago on THIS side" is per-side, and feeding it the other side's tick array
@@ -989,7 +1012,7 @@ def evolve_points(run_dir, out, set_name="neuron", block="voltage", cmap="viridi
     name = label or os.path.basename(run_dir.rstrip("/"))
     L = float(np.nanmax(np.abs(pos))) * 1.05
     p = _plotter()
-    p.open_movie(out, framerate=fps or EV_FPS, quality=8)
+    open_movie(p, out, fps or EV_FPS)
     actor = txt = None
     for t in range(pos.shape[0]):
         live = occ[t] > 0
@@ -1052,7 +1075,7 @@ def evolve_volume(run_dir, out, field="neural_activity", cmap="viridis", fill=0.
             skel_note = (f"   skeletons {meta['neurons']}n {meta['segments'] // 1000}k seg "
                          f"({frac:.0%} in cube)")
             print(f"[render] skeletons: {meta}", flush=True)
-    p.open_movie(out, framerate=fps or EV_FPS, quality=8)
+    open_movie(p, out, fps or EV_FPS)
     actor = txt = None
     for t in range(g.shape[0]):
         vol = _grid(np.abs(g[t]))
@@ -1216,7 +1239,7 @@ def evolve_skeleton_activity(run_dir, out, region, field="neural_activity", n_ar
     cm = colormaps[cmap]
     name = label or os.path.basename(run_dir.rstrip("/"))
     p = _plotter()
-    p.open_movie(out, framerate=fps or EV_FPS, quality=8)
+    open_movie(p, out, fps or EV_FPS)
     actor = txt = None
     for t in range(g.shape[0]):
         a = np.abs(g[t])[idx[:, 0], idx[:, 1], idx[:, 2]]

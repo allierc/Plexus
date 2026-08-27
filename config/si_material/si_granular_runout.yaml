@@ -1,41 +1,44 @@
 general:
-  name: si_fill
+  name: si_granular_runout
   seed: 0
-  n_frames: 2400
-  dt: 0.00083333
+  n_frames: 1200
+  dt: 0.0008333333333333334
   boundary: wall
   dim: 3
   world:
-  - 0.2
-  - 0.2
-  - 0.2
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
   units:
     length_um: 1000000.0
     time_s: 1.0
     force_nN: 1000000000.0
-  save_data: false
 sets:
   cell:
     n: 1
-    start:
-    - - 0.1
-      - 0.13300394750525635
-      - 0.1
     types:
-      water:
+      grain:
+        material: snow
+        youngs: 500000.0
+        block:
+        - 0.02
+        - 0.01
+        - 0.2
+        - 0.12
+        - 0.4
+        - 0.3
         fraction: 1.0
-        material: liquid
-        bulk_modulus: 100000.0
   mpm_particle:
     parent: cell
-    per_parent: 2000000
+    per_parent: 220830
     radius: 0.5
-    density: 1000.0
-    particle_mass: 1.0e-06
+    density: 400.0
+    particle_mass: 7.06426e-06
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 100
+    n_grid: 96
 operators:
 - op: aggregate
   at: cell
@@ -45,9 +48,6 @@ operators:
 - op: mpm_strain
   at: mpm_particle
   implementation: warp
-- op: mpm_viscosity
-  at: mpm_particle
-  eta: 0.001
 - op: mpm_scatter
   at: mpm_particle
   to: mpm_grid
@@ -57,24 +57,19 @@ operators:
   polar: higham
 - op: mpm_grid_update
   at: mpm_grid
-  wall_damp: 0.9
-  surface_tension: 0.072
-  csf_rho: 1000.0
-  csf_band: 0.2
+  wall_damp: 0.8
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
-  wall_damp: 0.9
-  wall_damp_mode: per_impact
+  wall_damp: 0.8
   vmax: 1000000000.0
   implementation: warp
 schedule:
 - aggregate
 - gravity
-- substep_dt: 7.575727e-05
+- substep_dt: 5.555556e-05
   steps:
   - mpm_strain
-  - mpm_viscosity
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
@@ -83,15 +78,15 @@ plotting:
   up_axis: 1
   camera_elev: 1.18
   camera_zoom: 0.0
+  camera_turns: 0.0
   box_frame: true
   hide_sets:
   - cell
-  dot_size: 1.6
   render_3d: dots
-  camera_turns: 0.0
-  colors:
-    water:
-    - 0.3
-    - 0.62
-    - 1.0
+  dot_size: 1.3
   slow_motion: 4
+  colors:
+    grain:
+    - 0.92
+    - 0.94
+    - 1.0
