@@ -1077,14 +1077,38 @@ class MPMGridUpdate(FieldUpdate):
             # dx^D its volume, so this is a genuine density and the comparison with `rho_ref` is
             # dimensionally honest rather than a tuned ratio.
             _rho = gm / (dx ** D)
-            _act = _rho > 1e-9                                  # empty nodes have no buoyancy
-            _f = torch.zeros_like(_rho)
-            _f[_act] = (_rho[_act] - self.rho_ref) / _rho[_act]
-            _dir = torch.zeros(D, device=dev, dtype=gv.dtype)
-            if self.buoy_dir is not None:
-                _dir[:len(self.buoy_dir)] = torch.as_tensor(self.buoy_dir, device=dev, dtype=gv.dtype)
-            else:
-                _dir[1 if D == 2 else 2] = -1.0                 # "down" is -y in 2D, -z in 3D
+            # BRANCH-FREE, BECAUSE A BOOLEAN-MASK ASSIGNMENT CANNOT BE CAPTURED. `_f[_act] = ...`
+            # compiles to index_put, which needs `nonzero`, which is a device->host sync -- and a
+            # sync inside a CUDA graph capture is `cudaErrorStreamCaptureUnsupported`, not a
+            # slowdown. Both 3D buoyancy scenes died on it at the first captured substep with
+            # "operation not permitted when stream is capturing". `torch.where` is the same
+            # arithmetic with no data-dependent control flow; the clamp keeps the empty-node
+            # division finite before the `where` discards it.
+            _safe = _rho.clamp(min=1e-9)
+            _f = torch.where(_rho > 1e-9, (_rho - self.rho_ref) / _safe,
+                             torch.zeros_like(_rho))            # empty nodes have no buoyancy
+            # BUILT ONCE, NOT PER SUBSTEP. Writing a python float into a device tensor --
+            # `_dir[1] = -1.0` -- is a host-to-device copy, and that is as uncapturable as the
+            # boolean mask above was: the same run died again, four lines further down, on the same
+            # `cudaErrorStreamCaptureUnsupported`. The direction is a run constant, so it is
+            # assembled on the host and moved once; the captured region only ever reads it.
+            _key = (D, str(dev), gv.dtype)
+            if getattr(self, "_dir_key", None) != _key:
+                _v = [0.0] * D
+                if self.buoy_dir is not None:
+                    for _i, _x in enumerate(self.buoy_dir[:D]):
+                        _v[_i] = float(_x)
+                else:
+                    # DOWN IS WHEREVER GRAVITY SAYS IT IS, and `gravity` says -y: it defaults to
+                    # `gy = -g, gz = 0` in 3D as well as in 2D. This line used to read -z in 3D, so
+                    # on every 3D spec buoyancy pushed at RIGHT ANGLES to the weight it is supposed
+                    # to oppose -- a bubble drifting sideways rather than rising. One shipped spec
+                    # is affected (config/cell/cell_one.yaml, buoyancy 4.0, no explicit direction),
+                    # and it was wrong before this change, not after. `buoyancy_dir` overrides.
+                    _v[1] = -1.0
+                self._dir_cache = torch.tensor(_v, device=dev, dtype=gv.dtype)
+                self._dir_key = _key
+            _dir = self._dir_cache
             gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
         g.v.copy_(gv)                       # in place: a captured graph holds this address
         return {}

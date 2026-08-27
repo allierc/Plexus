@@ -338,9 +338,28 @@ class LiveMovie:
             # OPAQUE AND LIT, unlike the particles. The dots are flat and unshaded so density reads
             # as brightness; an obstacle drawn the same way would be a featureless silhouette, and
             # in 3D you could not tell a sphere from a disc.
+            #
+            # MATTE, NOT GLOSSY, AND FLAT-SHADED. `specular=0.2` with `smooth_shading=True` put a
+            # moving highlight on every box and rounded the edges of shapes that are exactly
+            # axis-aligned boxes -- the stair in si_avalanche read as polished metal and its steps
+            # had soft corners they do not have. `specular=0` removes the sheen; flat shading gives
+            # each face one constant tone, so a box looks like a box and the geometry is legible
+            # from its face brightnesses alone. Depth then comes from the shadows below, not from
+            # a highlight sliding across the surface.
             self.p.add_mesh(m, color="#9a9a9a", opacity=1.0, lighting=not self.is2d,
-                            specular=0.2, smooth_shading=True)
+                            specular=0.0, specular_power=1.0, ambient=0.28, diffuse=0.85,
+                            smooth_shading=False)
         self.n_obstacles = len(obs)
+        # REAL SHADOWS, once, and only when there is something to cast them. VTK's shadow pass
+        # costs a second render of the scene per light, which is why it is not on by default; with
+        # obstacles present it is what separates a body resting ON a step from one floating above
+        # it, and that ambiguity is exactly what a flat-shaded scene cannot resolve on its own.
+        if obs and not self.is2d:
+            try:
+                self.p.enable_shadows()
+            except Exception as e:                      # not fatal: the movie is still readable
+                print(f"[live-movie] shadows unavailable ({type(e).__name__}: {e}); "
+                      f"obstacles are flat-shaded without them", flush=True)
 
     def _xyz(self, lvl):
         # float32, NOT float64. VTK stores points in whatever dtype it is handed; float64 doubles
