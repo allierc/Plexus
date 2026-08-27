@@ -1549,8 +1549,9 @@ class MPMAnchor(Lateral):
         # is in the run (the operator does not require one).
         self._rest = lvl.get("pos").clone()                   # undeformed sheet (frame 0)
         if self.ring is None:
-            _g = (H.fields.get("mpm_grid") if H is not None and getattr(H, "fields", None)
-                  else None)
+            # H.fields is a torch ModuleDict: it supports `in` and `[...]` but NOT `.get`.
+            _fl = getattr(H, "fields", None) if H is not None else None
+            _g = _fl["mpm_grid"] if (_fl is not None and "mpm_grid" in _fl) else None
             self._ring = (_scale_constant("ring", float(_g.dx)) if _g is not None
                           else _CONST_DIMS["ring"][0])
         else:
