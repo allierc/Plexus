@@ -285,7 +285,24 @@ class LiveMovie:
             self.p.camera.parallel_scale = radius * 1.45
 
         self._draw_obstacles(span)
-        self.p.open_movie(out, framerate=max(1, int(round(getattr(self, "fps", fps)))), quality=8)
+        # A FRAGMENTED MP4, SO THE FILE IS READABLE WHILE IT IS STILL BEING WRITTEN.
+        # A plain mp4 keeps its index -- the moov atom -- at the END, so nothing before close()
+        # plays and copying the file mid-run copies an unreadable prefix. That is why killing a run
+        # used to lose the movie, and why SIGINT (which lets close() run) saved a 10-hour job's
+        # 98.9 MB where SIGKILL would have left 52 MB of rubble.
+        #
+        # `frag_keyframe+empty_moov` writes a self-contained fragment per keyframe and `-g 1` makes
+        # every frame a keyframe, but neither is enough on its own: MEASURED, both leave the file at
+        # 36 bytes after 40 frames because ffmpeg buffers. `-flush_packets 1` is the one that
+        # matters -- with it the same file reads 30 frames at frame 40, and is still a valid
+        # complete movie after close.
+        #
+        # It costs a little size (no global index, a fragment header per frame) and it means a
+        # long run can be WATCHED from the file at any moment, with no duplicate and no second
+        # writer, which is what `3d.png` was standing in for.
+        self.p.open_movie(out, framerate=max(1, int(round(getattr(self, "fps", fps)))), quality=8,
+                          output_params=["-movflags", "frag_keyframe+empty_moov+default_base_moof",
+                                         "-g", "1", "-flush_packets", "1"])
 
     def _draw_obstacles(self, span):
         """The world's solid geometry, which the simulation sees and this renderer did not.
