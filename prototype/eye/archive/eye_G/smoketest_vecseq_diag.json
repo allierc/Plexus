@@ -1,0 +1,41 @@
+{
+  "preload": 0.5,
+  "keep": {
+    "MR": 0.5
+  },
+  "release_floor": 0.14,
+  "tonic": 0.14,
+  "preload_hold": 20,
+  "release_hold": 20,
+  "lead": 10,
+  "tail": 10,
+  "gaze_at_end_of_preload_deg": [
+    -0.109,
+    -0.04,
+    0.008
+  ],
+  "gaze_at_end_of_release_deg": [
+    -1.059,
+    -0.005,
+    0.06
+  ],
+  "gaze_peak_h_deg": -1.059,
+  "gaze_peak_h_frame": 60,
+  "radius_worst_pct": 0.077,
+  "shorten_pct_at_end_of_preload": {
+    "LR": 7.07,
+    "SR": 8.12,
+    "MR": 7.59,
+    "IR": 5.65,
+    "SO": 8.29,
+    "IO": 7.99
+  },
+  "shorten_pct_at_end_of_release": {
+    "LR": 2.82,
+    "SR": 3.6,
+    "MR": 8.16,
+    "IR": 3.13,
+    "SO": 2.89,
+    "IO": 3.14
+  }
+}
