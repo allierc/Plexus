@@ -137,8 +137,8 @@ def main():
         print("    SKIPPED: every spec has the same R, so there is no 1/R to fit. Pass radii that "
               "differ (si_laplace_r05,r10,r20) for this row to mean anything.")
         xs = None
-    if xs is not None:
     ys = np.array([1.0 - res[nm]["J"] for nm in a.specs.split(",")])
+    if xs is not None:
         A = np.vstack([xs, np.ones_like(xs)]).T
         m, c = np.linalg.lstsq(A, ys, rcond=None)[0]
         sl = 2.0 * res[a.specs.split(",")[0]]["sig"] / res[a.specs.split(",")[0]]["K"]
