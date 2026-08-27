@@ -130,6 +130,25 @@ class LiveMovie:
         # ran, and if that is too fast to watch, the answer is a longer run, not a slower film.
         self.dt, self.time_s, self.real_time = dt, time_s, bool(real_time)
         self.length_um = length_um
+        # THE GRID, BESIDE THE PARTICLE COUNT. The two together are what actually determines
+        # whether a run resolves anything: 100M particles on a 96^3 grid is 8,176 per cell and a
+        # picture of nothing in particular, while the same 100M on 330^3 is the MPM convention of 8.
+        # The particle count alone has been the headline on every movie in this corpus and it is the
+        # half that flatters.
+        self._grid_label = ""
+        _fl = getattr(sim, "fields", None) or {}
+        _ng = next((int(fc["n_grid"]) for fc in _fl.values()
+                    if isinstance(fc, dict) and "n_grid" in fc), None)
+        if _ng:
+            _d = len(world) if world is not None else 3
+            _cells = _ng ** _d
+            _c = (f"{_cells / 1e6:.1f}M" if _cells >= 1e6 else f"{_cells / 1e3:.0f}k")
+            self._grid_label = (f"   grid {_ng}^{_d} = {_c} cells")
+            if length_um:                       # with units, the cell has a SIZE worth quoting
+                _dx = float(world[1] if len(world) > 1 else world[0]) / _ng \
+                    * float(length_um) / 1.0e6
+                self._grid_label += (f", dx {_dx * 1e3:.3g} mm" if _dx < 1.0
+                                     else f", dx {_dx:.3g} m")
         self._box_label = ""
         if length_um and time_s is not None:
             _m = float(length_um) / 1.0e6
@@ -371,7 +390,8 @@ class LiveMovie:
             clk = f"\nt = {tick * float(self.dt) * float(self.time_s):.4g} s"
             if abs(getattr(self, "slow_motion", 1.0) - 1.0) > 1e-9:
                 clk += f"   {self.slow_motion:g}x slow"
-        self.p.add_text(f"{self.name}{self._box_label}\n{self.n:,} particles{sub}\n"
+        self.p.add_text(f"{self.name}{self._box_label}\n"
+                        f"{self.n:,} particles{sub}{self._grid_label}\n"
                         f"frame {tick}/{self.n_frames}   "
                         f"{el / max(tick, 1) * 1000:.0f} ms/frame compute{clk}",
                         position="upper_left", font_size=11, color="white", name="hdr")
