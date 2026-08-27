@@ -1,0 +1,135 @@
+[eye_G] /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/eye_G/E130_ks5000_lr115_spec.yaml
+[eye_G] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718)
+[eye_G] muscle volumes (sim units^3): LR=1.49e-05  SR=2.25e-05  MR=1.46e-05  IR=2.28e-05  SO=2.54e-05  IO=2.92e-05
+[engine] 460 sim frames -> recording 461 set frames (stride 1), fields every 461 steps (<= 1)
+[engine] === eye_G_blend_synergies ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=460
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(6)  orbit(1)  mpm_particle(45000)  muscle_particle(13200)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: blend_globe, blend_muscles   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, bone_anchor, muscle_sleeve, orbit_socket   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather
+[blend_globe] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718)
+[blend_globe] 45000 points, volume 0.00241, 13347 on the shell, 5941 lens, 1482 cornea
+[blend_globe] [1m[32mfill 24.5%[0m of the bounding box was inside the mesh
+[blend_muscles] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718)
+[blend_muscles] 6 straps x 2200 points; standoff +0.008 / embed -0.006
+[blend_muscles] fibre smoothing: off (raw geodesic s)
+[blend_muscles] rest lengths:
+    LR=0.143 (fill [1m[32m3.0%[0m, moved 16%, tendon +0.0000 in)
+    SR=0.150 (fill [1m[32m3.8%[0m, moved 26%, tendon +0.0011 in)
+    MR=0.180 (fill [1m[32m2.6%[0m, moved 0%, tendon +0.0000 in)
+    IR=0.159 (fill [1m[32m2.8%[0m, moved 36%, tendon +0.0012 in)
+    SO=0.177 (fill [1m[32m2.4%[0m, moved 0%, tendon +0.0002 in)
+    IO=0.169 (fill [1m[32m2.1%[0m, moved 17%, tendon +0.0010 in)
+
+  what each synergy did (open loop, so this is the geometry talking):
+    LR     LR                                         gaze [8.57, 1.83, -0.43]  expected horizontal + OK
+
+  [1m[32mworkspace: 8.6 deg horizontal x 1.8 deg vertical[0m
+
+{
+  "n_frames": 460,
+  "program": "pairs",
+  "synergies": {
+    "LR": {
+      "label": "LR",
+      "window": [
+        40,
+        240
+      ],
+      "gaze_excursion_deg": [
+        8.57,
+        1.83,
+        -0.43
+      ],
+      "peak_abs_deg": [
+        8.96,
+        1.84,
+        0.76
+      ],
+      "expected": "horizontal +",
+      "ok": true
+    }
+  },
+  "radius_worst_pct": 1.02,
+  "strain_p99": 0.0278,
+  "peak_shortening_pct": 74.38,
+  "max_shortening_pct": {
+    "LR": 74.38,
+    "SR": 3.16,
+    "MR": 3.0,
+    "IR": 2.44,
+    "SO": 3.14,
+    "IO": 3.29
+  },
+  "geometry": {
+    "source": "260802_s2_EYE_MUSCLES_MODEL.blend",
+    "side": "R",
+    "scale": 0.16768,
+    "axial_ratio": 0.7178,
+    "semi_axes": [
+      0.1241,
+      0.1059,
+      0.0825
+    ],
+    "rest_lengths": {
+      "LR": 0.1577,
+      "SR": 0.1561,
+      "MR": 0.1961,
+      "IR": 0.1667,
+      "SO": 0.2006,
+      "IO": 0.2133
+    },
+    "muscle_volumes": {
+      "LR": 1.48875e-05,
+      "SR": 2.25246e-05,
+      "MR": 1.45764e-05,
+      "IR": 2.28027e-05,
+      "SO": 2.5405e-05,
+      "IO": 2.91811e-05
+    }
+  }
+}
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@e10u26>
+Subject: Job 153479628: <eye_G_buck_ks5000_lr115> in cluster <Janelia> Done
+
+Job <eye_G_buck_ks5000_lr115> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Thu Aug 20 11:01:12 2026
+Job was executed on host(s) <8*e10u26>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Thu Aug 20 11:04:41 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Thu Aug 20 11:04:41 2026
+Terminated at Thu Aug 20 11:08:16 2026
+Results reported at Thu Aug 20 11:08:16 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_buck_ks5000_lr115.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   197.22 sec.
+    Max Memory :                                 1795 MB
+    Average Memory :                             1294.66 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               121085.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                11
+    Run time :                                   216 sec.
+    Turnaround time :                            424 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_buck_ks5000_lr115.err> for stderr output of this job.
+

@@ -1,0 +1,16 @@
+{
+  "axis": "h",
+  "amplitude_deg": 20.0,
+  "period_s": 3.0,
+  "k_sleeve": 5000.0,
+  "n_frames": 1040,
+  "achieved_peak_gaze_deg": [
+    20.059,
+    -0.002,
+    -0.006
+  ],
+  "radius_worst_pct": 0.059,
+  "peak_mus_vm": 67.471,
+  "peak_mus_vm_frame": 558,
+  "mus_vm_p99_over_run": 16.715
+}
