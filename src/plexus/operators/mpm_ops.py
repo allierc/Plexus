@@ -1285,6 +1285,15 @@ class MPMStrain(Lateral):
         super().__init__(params, device)
         self.at = params.get("_at", "mpm_particle")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
+        # HOW A LIQUID'S VOLUME IS ADVANCED. `det` (the default) carries J through F exactly as
+        # every existing spec has; `trace` uses J *= 1 + dt*tr(C) instead. See the long note in
+        # forward() -- `det` loses a column's pressure at ~1.1%/s at rest and gets worse as the mesh
+        # is refined. This is OPT-IN because it changes the numbers of all 179 MPM specs, and the
+        # default stays where it is until the gate says what the new numbers are.
+        self.liquid_volume = str(params.get("liquid_volume", "det")).lower()
+        if self.liquid_volume not in ("det", "trace"):
+            raise ValueError(f"liquid_volume must be 'det' or 'trace', got "
+                             f"{self.liquid_volume!r}")
 
     def forward(self, H, mask=None):
         p = H.level(self.at); dev = p.state.device
@@ -1299,6 +1308,40 @@ class MPMStrain(Lateral):
             J = torch.linalg.det(F)
         liquid = getattr(p, "is_liquid", None)
         if _const_any(self, "_c_liquid", liquid):                  # LIQUID: drop shape memory
+            if self.liquid_volume == "trace":
+                # A LIQUID AT REST BLEEDS ITS PRESSURE AWAY, and this is why.
+                #
+                # The liquid already drops SHAPE memory (F becomes isotropic below), so its whole
+                # state is the volume J -- and J is carried through F, i.e. multiplied by
+                # det(I + dt*C) every substep. The law it is discretising is dJ/dt = J*tr(C), whose
+                # exact step is J *= exp(dt*tr C). Those two agree to first order and NOT to second:
+                #
+                #     det(I + dt C)  = 1 + dt*trC + dt^2*(trC^2 - tr(C^2))/2 + dt^3*det C
+                #     exp(dt*trC)    = 1 + dt*trC + dt^2* trC^2            /2 + ...
+                #
+                # The difference is -dt^2*tr(C^2)/2, and tr(C^2) is a SUM OF SQUARES: it is positive
+                # whatever the sign of the noise, so it does not average out. Every substep multiplies
+                # J by slightly less than it should, and a column that is not moving at all loses its
+                # stored compression.
+                #
+                # MEASURED, on si_hydrostatic -- a 40 mm confined column whose free surface holds to
+                # 0.001 mm, i.e. mechanically dead still. The hydrostatic gradient dp/dd decays
+                # monotonically in TIME, -8.66% of rho*g at 0.33 s to -12.96% at 4.0 s: about
+                # 1.1% of the pressure per second, at rest.
+                #
+                # AND THE SCALING IDENTIFIES IT. Grid noise gives C ~ v_noise/dx and CFL gives
+                # dt ~ dx, so the accumulated bias over a fixed TIME goes as dt*tr(C^2) ~ v^2/dx --
+                # it gets WORSE as the mesh is refined. Measured -5.52% / -8.45% / -12.15% at
+                # n_grid 40 / 64 / 96, very nearly linear in 1/dx. It is also why `drag` HELPED
+                # (-8.44% with it, -12.11% without): drag suppresses exactly the v_noise that drives
+                # it. Wall contact was tested and is not involved (-8.44% vs -8.39% with it off).
+                #
+                # THE FIX, and it is what Taichi's mpm88/mpm99 do for water: advance the volume by
+                # its OWN first-order law, J *= 1 + dt*tr(C). That is no more accurate in dt than
+                # det(I + dt*C) -- both are first-order -- but it does not couple to the deviatoric
+                # part of C at all, so noise no longer has a preferred direction to push J in.
+                trC = p.C.diagonal(dim1=-2, dim2=-1).sum(-1)
+                J = torch.where(liquid, torch.linalg.det(p.F) * (1.0 + dt * trC), J)
             Jc = J.clamp(min=1e-6)
             Jl = torch.sqrt(Jc) if D == 2 else Jc.pow(1.0 / D)     # volume-preserving isotropic reset
             F = torch.where(liquid[:, None, None], eye * Jl[:, None, None], F)
