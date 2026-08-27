@@ -221,16 +221,40 @@ def _similarity(spec, dx: float, dim: int) -> list:
     if g > 0:
         out.append(f"self-weight volumetric strain rho*g*H/K = {100 * rho * g * Hb / K:.3f}%"
                    f"   (H = the body's own height, {Hb:.4g})")
-    sig, eta = 0.0, 0.0
+    sig, eta, sig_legacy = 0.0, 0.0, 0.0
     for o in (spec.get("operators") or []):
         if not isinstance(o, dict):
             continue
-        if o.get("op") == "mpm_grid_update" and o.get("csf_rho"):
-            sig = float(o.get("surface_tension", 0.0) or 0.0)
+        if o.get("op") == "mpm_grid_update":
+            _s = float(o.get("surface_tension", 0.0) or 0.0)
+            if o.get("csf_rho"):
+                sig = _s
+            elif _s > 0:
+                sig_legacy = _s
         if o.get("op") == "mpm_viscosity":
             eta = float(o.get("eta", 0.0) or 0.0)
     if eta > 0 and U > 0:
         out.append(f"Reynolds rho*U*L/eta = {rho * U * L / eta:.4g}")
+    if sig_legacy > 0:
+        # THE 54 SPECS THIS REPORT WAS SUPPOSED TO EXPOSE, AND WAS NOT. Bond was computed only when
+        # `csf_rho` was set, so every spec still on the legacy mass-colour scale -- the ones whose
+        # surface tension is meaningless and where saying so is the entire point -- printed nothing
+        # at all about it. Silence read as "no surface tension here".
+        #
+        # WHAT THE NUMBER IN THE YAML ACTUALLY IS. Without `csf_rho` the colour field is a MASS per
+        # node (~rho*dx^D), not a volume fraction, so `grad c` and with it the whole CSF force carry
+        # that factor: the effective physical tension is sigma * rho * dx^D. At rho 1 and n_grid 96
+        # that is 1.13e-6, which is why `surface_tension: 60` moves nothing. It is also why the
+        # number changes meaning when n_grid is touched, with no error and no warning.
+        _se = sig_legacy * rho * dx ** dim
+        out.append(f"surface_tension {sig_legacy:g} is UNNORMALISED (no csf_rho): the effective "
+                   f"tension is sigma*rho*dx^{dim} = {_se:.4g}, {sig_legacy / max(_se, 1e-300):.3g}x "
+                   f"smaller, and it RESCALES WITH n_grid")
+        if g > 0 and _se > 0:
+            out.append(f"Bond rho*g*L^2/sigma_effective = {rho * g * L * L / _se:.4g}"
+                       + ("   <- WARN: above 100, gravity beats surface tension by orders of "
+                          "magnitude and this spec's surface tension does nothing"
+                          if rho * g * L * L / _se > 100 else ""))
     if sig > 0:
         if g > 0:
             out.append(f"Bond rho*g*L^2/sigma = {rho * g * L * L / sig:.4g}")
@@ -400,7 +424,25 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
                     if isinstance(s, dict) and "substep_dt" in s
                     and MPM_STEPS & set(s.get("steps", []))), None)
         if blk is None:
-            return False, None                                       # neither form -> not an MPM spec, nothing to do
+            # A FLAT MPM SCHEDULE STILL GETS ITS REPORT, and is told that nothing bounds its step.
+            # Returning here meant a spec that runs the MPM cycle at the FRAME timestep -- no
+            # substep block, so no `substep_dt` to correct -- got no CFL check and no [similarity]
+            # line at all. One spec is in that state (config/cell/cell_one.yaml) and it was the
+            # single hole in "the report prints for every MPM spec". There is no key to rewrite, so
+            # this warns rather than corrects.
+            _ops = {o.get("op") for o in (spec.get("operators") or []) if isinstance(o, dict)}
+            if MPM_STEPS & _ops:
+                _nm = spec.get("general", {}).get("name", os.path.basename(yaml_path))
+                _d = int(spec.get("general", {}).get("dim", 3))
+                _ng = next((int(fc["n_grid"]) for fc in spec.get("fields", {}).values()
+                            if isinstance(fc, dict) and "n_grid" in fc), 128)
+                for _ln in _similarity(spec, _cell_size(spec, _ng, _d), _d):
+                    print(f"[similarity] {_nm}: {_ln}", flush=True)
+                print(f"[grid-CFL] {_nm}: NO substep block -- the MPM cycle runs once per frame at "
+                      f"general.dt={spec.get('general', {}).get('dt')}, so nothing here checks it "
+                      f"against the elastic or capillary limit. Wrap the mpm_* steps in "
+                      f"{{substep_dt: ..., steps: [...]}} to get the guard.", flush=True)
+            return False, None                                       # nothing to correct either way
         token = "substep_dt"
         micro_dt = float(blk.get("substep_dt", 2e-4))
         substeps = None                                              # implicit: round(general.dt / substep_dt)

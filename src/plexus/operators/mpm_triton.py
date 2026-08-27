@@ -54,9 +54,10 @@ except Exception:                                        # no triton -> the oper
 if HAVE_TRITON:
 
     @triton.jit
-    def _p2g(X, V, C, F, MASS, MU, LA, PVOL, AEXT, GM, GMV,
+    def _p2g(X, V, C, F, MASS, MU, LA, PVOL, AEXT, GM, GMV, GC, LIQ,
              N, NG: tl.constexpr, DX: tl.constexpr, DT: tl.constexpr,
-             DRAG: tl.constexpr, ITERS: tl.constexpr, BLOCK: tl.constexpr):
+             DRAG: tl.constexpr, ITERS: tl.constexpr, HAS_LIQ: tl.constexpr,
+             BLOCK: tl.constexpr):
         """One program handles BLOCK particles: strain -> stress -> weights -> scatter."""
         pid = tl.program_id(0)
         off = pid * BLOCK + tl.arange(0, BLOCK)
@@ -76,6 +77,13 @@ if HAVE_TRITON:
         mu = tl.load(MU + off, mask=m, other=0.0)
         la = tl.load(LA + off, mask=m, other=0.0)
         pv = tl.load(PVOL + off, mask=m, other=0.0)
+        # LIQUID COLOUR, the field the CSF surface tension is computed from -- `w * mass * liquid`,
+        # the same deposit the torch and warp scatters make. Without it `mpm_grid_update` finds gc
+        # all zero, its `_c_csf` predicate is False, and the ENTIRE surface-tension branch is
+        # skipped: `surface_tension: 0.64` measured spread_r90 0.17831 and level_p95 0.61445,
+        # identical to SEVEN FIGURES to the same run at sigma = 0. HAS_LIQ is constexpr so a
+        # non-liquid spec compiles the loads and the atomic away entirely.
+        liq = tl.load(LIQ + off, mask=m, other=0.0) if HAS_LIQ else 0.0
 
         # body force + Stokes drag, as the torch operator does before the scatter
         v0 = v0 + DT * (a0 - DRAG * v0)
@@ -170,6 +178,8 @@ if HAVE_TRITON:
                     tl.atomic_add(GMV + idx * 3 + 0, w * mom0, mask=m)
                     tl.atomic_add(GMV + idx * 3 + 1, w * mom1, mask=m)
                     tl.atomic_add(GMV + idx * 3 + 2, w * mom2, mask=m)
+                    if HAS_LIQ:
+                        tl.atomic_add(GC + idx, w * mass * liq, mask=m)
 
 
 @register_operator("mpm_scatter", implementation="triton", family="mpm",
@@ -217,11 +227,16 @@ class MPMScatterTriton(MPMScatter):
 
         n = int(p.n)
         grid = (triton.cdiv(n, self.BLOCK),)
+        from plexus.operators.mpm_ops import _const_any
+        liquid = getattr(p, "is_liquid", None)
+        has_liq = bool(_const_any(self, "_c_liquid", liquid))
+        liq = (liquid.to(p.mass.dtype).contiguous() if has_liq
+               else torch.empty(0, device=dev, dtype=p.mass.dtype))
         _p2g[grid](X.contiguous(), V.contiguous(), p.C.contiguous(), p.F,
                    p.mass.contiguous(), p.mu.contiguous(), p.la.contiguous(),
-                   p.p_vol.contiguous(), a_ext.contiguous(), gm, gmv,
+                   p.p_vol.contiguous(), a_ext.contiguous(), gm, gmv, g.c, liq,
                    n, NG=int(g.nx), DX=float(g.dx), DT=float(dt), DRAG=float(self.drag),
-                   ITERS=int(self.polar_iters), BLOCK=self.BLOCK)
+                   ITERS=int(self.polar_iters), HAS_LIQ=has_liq, BLOCK=self.BLOCK)
         return {}
 
 
@@ -252,9 +267,9 @@ if HAVE_TRITON:
 
     @triton.jit
     def _p2g_colour(XS, VS, CS, FS, MASSS, MUS, LAS, PVOLS, AEXTS,
-                    CELL_OFF, CELL_ID, GM, GMV, NCOL,
+                    CELL_OFF, CELL_ID, GM, GMV, GC, LIQS, NCOL,
                     NG: tl.constexpr, DX: tl.constexpr, DT: tl.constexpr,
-                    DRAG: tl.constexpr, ITERS: tl.constexpr):
+                    DRAG: tl.constexpr, ITERS: tl.constexpr, HAS_LIQ: tl.constexpr):
         """One program = one CELL. The 27-node stencil is the VECTOR dimension.
 
         THE FIRST VERSION PUT THE NODE LOOP OUTSIDE THE PARTICLE LOOP, which recomputed the polar
@@ -286,6 +301,7 @@ if HAVE_TRITON:
         a0 = tl.zeros([32], dtype=tl.float32)
         a1 = tl.zeros([32], dtype=tl.float32)
         a2 = tl.zeros([32], dtype=tl.float32)
+        ac = tl.zeros([32], dtype=tl.float32)      # liquid colour, for the CSF surface tension
 
         for q in tl.range(lo, hi):
             x0 = tl.load(XS + q*3+0); x1 = tl.load(XS + q*3+1); x2 = tl.load(XS + q*3+2)
@@ -341,12 +357,16 @@ if HAVE_TRITON:
             a0 += w*(mass*v0 + (q00*dp0+q01*dp1+q02*dp2))
             a1 += w*(mass*v1 + (q10*dp0+q11*dp1+q12*dp2))
             a2 += w*(mass*v2 + (q20*dp0+q21*dp1+q22*dp2))
+            if HAS_LIQ:
+                ac += w*mass*tl.load(LIQS + q)
 
         # CONFLICT-FREE: no other cell of this colour writes these nodes, so plain read-add-write.
         tl.store(GM + idx, tl.load(GM + idx, mask=act, other=0.0) + am, mask=act)
         tl.store(GMV + idx*3+0, tl.load(GMV + idx*3+0, mask=act, other=0.0) + a0, mask=act)
         tl.store(GMV + idx*3+1, tl.load(GMV + idx*3+1, mask=act, other=0.0) + a1, mask=act)
         tl.store(GMV + idx*3+2, tl.load(GMV + idx*3+2, mask=act, other=0.0) + a2, mask=act)
+        if HAS_LIQ:
+            tl.store(GC + idx, tl.load(GC + idx, mask=act, other=0.0) + ac, mask=act)
 
 
 @register_operator("mpm_scatter", implementation="triton_colour", family="mpm",
@@ -394,6 +414,11 @@ class MPMScatterTritonColour(MPMScatterTriton):
         MS = p.mass[order].contiguous(); MU = p.mu[order].contiguous()
         LA = p.la[order].contiguous(); PV = p.p_vol[order].contiguous()
         AE = a_ext[order].contiguous()
+        from plexus.operators.mpm_ops import _const_any
+        liquid = getattr(p, "is_liquid", None)
+        has_liq = bool(_const_any(self, "_c_liquid", liquid))
+        LQ = (liquid.to(p.mass.dtype)[order].contiguous() if has_liq
+              else torch.empty(0, device=dev, dtype=p.mass.dtype))
 
         gm, gmv = g.m, g.mv
         if getattr(self, "_zeroes_grid", True):
@@ -407,6 +432,7 @@ class MPMScatterTritonColour(MPMScatterTriton):
             if n == 0:
                 continue
             _p2g_colour[(n,)](XS, VS, CS, FS, MS, MU, LA, PV, AE, off, ids.contiguous(),
-                              gm, gmv, n, NG=NG, DX=float(g.dx), DT=float(dt),
-                              DRAG=float(self.drag), ITERS=int(self.polar_iters))
+                              gm, gmv, g.c, LQ, n, NG=NG, DX=float(g.dx), DT=float(dt),
+                              DRAG=float(self.drag), ITERS=int(self.polar_iters),
+                              HAS_LIQ=has_liq)
         return {}

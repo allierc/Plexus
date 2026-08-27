@@ -64,6 +64,18 @@ def main():
     s = yaml.safe_load(open(os.path.join(ROOT, "config", a.type, a.spec + ".yaml")))
     s["general"]["n_frames"] = int(a.frames)
     s["general"]["save_data"] = False
+    # RESIZING THE PARTICLE COUNT MUST HOLD THE DENSITY, and on a `block:` spec it does not do so by
+    # itself. With a block the positions fill the declared box whatever N is, but each particle
+    # still carries `p_vol = particle_mass / density`, so N * p_vol stops equalling the box volume
+    # the moment N changes: the same water is represented by more or fewer, unchanged, particles.
+    # The stress term is proportional to p_vol, so a `--particles` flag meant to make the gate
+    # cheaper would have silently rescaled the material's stiffness per unit volume and the
+    # measured pressure with it. Scaling particle_mass by the same factor keeps N * p_vol fixed.
+    if int(a.particles) != int(s["sets"]["mpm_particle"]["per_parent"]):
+        _f = float(s["sets"]["mpm_particle"]["per_parent"]) / float(a.particles)
+        _pm = s["sets"]["mpm_particle"].get("particle_mass")
+        if _pm is not None:
+            s["sets"]["mpm_particle"]["particle_mass"] = float(_pm) * _f
     s["sets"]["mpm_particle"]["per_parent"] = int(a.particles)
     rho = float(s["sets"]["mpm_particle"]["density"])
     K = float(list(s["sets"]["cell"]["types"].values())[0]["bulk_modulus"])
