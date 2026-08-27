@@ -1528,6 +1528,15 @@ class MPMAnchor(Lateral):
         self.k = float(params["k"])
         self.mode = str(params.get("mode", "boundary"))       # "boundary" ring | "substrate" all
         self.ring = params.get("ring", None)                  # None -> derived (a length)
+        # WHICH CONFIGURATION IS "REST"? Until now it was whenever the operator first ran, which is
+        # frame 0 for an ungated operator and therefore looked like a choice. It is not: gate this
+        # operator with `after_frame` and the rest state silently becomes whatever the run had
+        # drifted to by then. For a merge-then-separate sequence that is exactly wrong -- the anchor
+        # would hold the MERGED drop rather than pull back to the two it started as.
+        # `anchor_frame` names the frame whose positions are the rest state, and the operator
+        # captures them there even when its force is switched on later.
+        self.anchor_frame = params.get("anchor_frame", None)
+        self._armed = False
         self.at = params.get("_at", "particle")
         self._rest = None
         self._sel = None
@@ -1553,6 +1562,12 @@ class MPMAnchor(Lateral):
             hi = self._rest.max(0).values
             near = ((self._rest - lo) < self._ring) | ((hi - self._rest) < self._ring)  # [N,2]
             self._sel = near.any(dim=1)
+
+    def capture_rest(self, H):
+        """Take the rest configuration now, whatever the gate says. Called by the engine at
+        `anchor_frame` so a later-gated anchor still remembers where the body started."""
+        if self._rest is None:
+            self._init(H.level(self.at), H)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
