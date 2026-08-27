@@ -124,26 +124,32 @@ def solid(block, E, mat="elastic"):
 
 # ---------------------------------------------------------------- the sixteen scenes
 def _hourglass():
-    """Snow through a waist built from stacked boxes. Discharge rate is Beverloo's."""
-    L, w, obs = 0.30, 0.30, []
-    for i, (y0, y1) in enumerate([(0.00, 0.03), (0.03, 0.06), (0.06, 0.09), (0.09, 0.12)]):
-        h = 0.115 - 0.025 * i                       # walls closing toward the waist at y = 0.12
-        obs += [[0.0, y0, 0.0, h, y1, w], [w - h, y0, 0.0, w, y1, w],
-                [0.0, y0, 0.0, w, y1, h], [0.0, y0, w - h, w, y1, w]]
-    for i, (y0, y1) in enumerate([(0.13, 0.16), (0.16, 0.19), (0.19, 0.22), (0.22, 0.30)]):
-        h = 0.04 + 0.025 * i                        # and opening again above it
-        obs += [[0.0, y0, 0.0, h, y1, w], [w - h, y0, 0.0, w, y1, w],
-                [0.0, y0, 0.0, w, y1, h], [0.0, y0, w - h, w, y1, w]]
-    return spec("si_hourglass", L, 96, 1200,
-                {"snow": solid([0.10, 0.16, 0.10, 0.20, 0.28, 0.20], 5.0e5, "snow")},
+    """Snow through a waist. Discharge rate is Beverloo's.
+
+    OPEN IN z, ON PURPOSE. A closed four-walled funnel OCCLUDES ITS OWN INTERIOR -- obstacles are
+    drawn opaque, so the first build of this scene rendered as a featureless grey block with the
+    sand invisible inside it. Confining in x only and letting the domain walls do z gives the same
+    convergent throat and a clear line of sight to the material, which is the whole point of the
+    scene existing.
+    """
+    L, w, c, obs = 0.30, 0.30, 0.15, []
+    ys = [(0.02, 0.05), (0.05, 0.08), (0.08, 0.11), (0.11, 0.14)]
+    for i, (y0, y1) in enumerate(ys):               # closing down to the waist at y = 0.14
+        a = 0.105 - 0.021 * i                       # half-width of the opening at this layer
+        obs += [[0.0, y0, 0.0, c - a, y1, w], [c + a, y0, 0.0, w, y1, w]]
+    for i, (y0, y1) in enumerate([(0.15, 0.19), (0.19, 0.23), (0.23, 0.27), (0.27, 0.30)]):
+        a = 0.024 + 0.027 * i                       # and opening again above it
+        obs += [[0.0, y0, 0.0, c - a, y1, w], [c + a, y0, 0.0, w, y1, w]]
+    return spec("si_hourglass", L, 96, 2400,
+                {"snow": solid([0.115, 0.16, 0.02, 0.185, 0.29, 0.28], 5.0e5, "snow")},
                 rho=RHO_SNOW, eta=0.0, wall_damp=0.85, colors={"snow": WHITE},
-                obstacles=obs, note="snow through an hourglass waist; Beverloo discharge")
+                obstacles=obs, note="snow through a converging waist; Beverloo discharge")
 
 
 def _waterfall():
     obs = [[0.0, 0.40, 0.0, 0.16, 0.44, 0.5], [0.0, 0.28, 0.0, 0.30, 0.32, 0.5],
            [0.0, 0.16, 0.0, 0.44, 0.20, 0.5], [0.0, 0.04, 0.0, 0.50, 0.08, 0.5]]
-    return spec("si_waterfall", 0.50, 96, 1200,
+    return spec("si_waterfall", 0.50, 96, 2400,
                 {"water": liquid([0.01, 0.44, 0.05, 0.15, 0.62, 0.45], K_for(0.5))},
                 sigma=SIGMA, obstacles=obs, wall_damp=0.9,
                 note="water cascading down four steps into a pool")
@@ -151,7 +157,7 @@ def _waterfall():
 
 def _crown_drop():
     L = 0.030
-    return spec("si_crown_drop", L, 96, 1200,
+    return spec("si_crown_drop", L, 96, 2400,
                 {"film": liquid([0.001, 0.001, 0.001, 0.029, 0.006, 0.029], K_for(L)),
                  "drop": liquid([0.012, 0.020, 0.012, 0.018, 0.026, 0.018], K_for(L))},
                 sigma=SIGMA, colors={"film": BLUE, "drop": ORANGE}, dot=1.1,
@@ -161,7 +167,7 @@ def _crown_drop():
 def _pillar_forest():
     obs = [[x, 0.0, z, x + 0.045, 0.30, z + 0.045]
            for x in (0.16, 0.26, 0.36) for z in (0.16, 0.26, 0.36)]
-    return spec("si_pillar_forest", 0.50, 96, 1200,
+    return spec("si_pillar_forest", 0.50, 96, 2400,
                 {"water": liquid([0.01, 0.01, 0.01, 0.13, 0.42, 0.49], K_for(0.5))},
                 sigma=SIGMA, obstacles=obs, wall_damp=0.9,
                 note="dam break through a 3x3 forest of pillars")
@@ -169,7 +175,7 @@ def _pillar_forest():
 
 def _avalanche():
     obs = [[0.0, 0.36 - 0.06 * i, 0.0, 0.08 * (i + 1), 0.40 - 0.06 * i, 0.5] for i in range(6)]
-    return spec("si_avalanche", 0.50, 96, 1200,
+    return spec("si_avalanche", 0.50, 96, 2400,
                 {"snow": solid([0.02, 0.40, 0.10, 0.16, 0.60, 0.40], 5.0e5, "snow")},
                 rho=RHO_SNOW, eta=0.0, obstacles=obs, wall_damp=0.8, colors={"snow": WHITE},
                 note="a snow block released onto a descending stair")
@@ -177,7 +183,7 @@ def _avalanche():
 
 def _bubble_rise():
     L = 0.20
-    return spec("si_bubble_rise", L, 96, 1200,
+    return spec("si_bubble_rise", L, 96, 2400,
                 {"heavy": liquid([0.01, 0.01, 0.01, 0.19, 0.16, 0.19], K_for(L))},
                 sigma=SIGMA, buoyancy=1.0, rho_ref=RHO_W, colors={"heavy": BLUE},
                 note="buoyancy against rho_ref: the light region rises through the heavy one")
@@ -185,7 +191,7 @@ def _bubble_rise():
 
 def _jet_pool():
     L = 0.20
-    return spec("si_jet_pool", L, 96, 1200,
+    return spec("si_jet_pool", L, 96, 2400,
                 {"pool": liquid([0.01, 0.01, 0.01, 0.19, 0.05, 0.19], K_for(L)),
                  "jet": liquid([0.088, 0.09, 0.088, 0.112, 0.19, 0.112], K_for(L))},
                 sigma=SIGMA, colors={"pool": BLUE, "jet": ORANGE},
@@ -194,16 +200,16 @@ def _jet_pool():
 
 def _split_merge():
     L = 0.050
-    return spec("si_split_merge", L, 96, 1200,
+    return spec("si_split_merge", L, 96, 2400,
                 {"a": liquid([0.010, 0.019, 0.019, 0.024, 0.031, 0.031], K_for(L)),
                  "b": liquid([0.026, 0.019, 0.019, 0.040, 0.031, 0.031], K_for(L))},
-                g=0.0, sigma=SIGMA, gate=(SIGMA, -SIGMA, 600), colors={"a": BLUE, "b": ORANGE},
-                note="merge at +sigma, then pull apart at -sigma from frame 600 (the frame gate)")
+                g=0.0, sigma=SIGMA, gate=(SIGMA, -SIGMA, 1200), colors={"a": BLUE, "b": ORANGE},
+                note="merge at +sigma, then pull apart at -sigma from frame 1200 (the frame gate)")
 
 
 def _plateau_rayleigh():
     L = 0.050
-    return spec("si_plateau_rayleigh", L, 96, 1200,
+    return spec("si_plateau_rayleigh", L, 96, 2400,
                 {"jet": liquid([0.004, 0.0225, 0.0225, 0.046, 0.0275, 0.0275], K_for(L))},
                 g=0.0, sigma=SIGMA, colors={"jet": BLUE},
                 note="a 2.5 mm liquid cylinder in zero g: breaks up at lambda = 9.02 R")
@@ -211,7 +217,7 @@ def _plateau_rayleigh():
 
 def _solitary_wave():
     L = 0.50
-    return spec("si_solitary_wave", L, 96, 1200,
+    return spec("si_solitary_wave", L, 96, 2400,
                 {"layer": liquid([0.01, 0.01, 0.01, 0.49, 0.07, 0.49], K_for(L)),
                  "hump": liquid([0.01, 0.07, 0.01, 0.10, 0.14, 0.49], K_for(L))},
                 sigma=SIGMA, colors={"layer": BLUE, "hump": GREEN},
@@ -219,7 +225,7 @@ def _solitary_wave():
 
 
 def _granular_runout():
-    return spec("si_granular_runout", 0.50, 96, 1200,
+    return spec("si_granular_runout", 0.50, 96, 2400,
                 {"grain": solid([0.02, 0.01, 0.20, 0.12, 0.40, 0.30], 5.0e5, "snow")},
                 rho=RHO_SNOW, eta=0.0, wall_damp=0.8, colors={"grain": WHITE},
                 note="column collapse: runout against the aspect-ratio law")
@@ -227,7 +233,7 @@ def _granular_runout():
 
 def _rayleigh_taylor():
     L = 0.20
-    return spec("si_rayleigh_taylor", L, 96, 1200,
+    return spec("si_rayleigh_taylor", L, 96, 2400,
                 {"heavy": liquid([0.01, 0.10, 0.01, 0.19, 0.19, 0.19], K_for(L)),
                  "light": liquid([0.01, 0.01, 0.01, 0.19, 0.10, 0.19], K_for(L))},
                 sigma=SIGMA, buoyancy=1.0, rho_ref=RHO_W,
@@ -236,14 +242,15 @@ def _rayleigh_taylor():
 
 
 def _torricelli():
-    L, w = 0.30, 0.30
-    t = 0.03
-    obs = [[0.0, 0.0, 0.0, t, 0.30, w], [w - t, 0.0, 0.0, w, 0.30, w],
-           [0.0, 0.0, 0.0, w, 0.30, t], [0.0, 0.0, w - t, w, 0.30, w],
-           [0.0, 0.03, 0.0, 0.13, 0.06, w], [0.17, 0.03, 0.0, w, 0.06, w],
-           [0.0, 0.03, 0.0, w, 0.06, 0.13], [0.0, 0.03, 0.17, w, 0.06, w]]
-    return spec("si_torricelli", L, 96, 1200,
-                {"water": liquid([0.035, 0.06, 0.035, 0.265, 0.26, 0.265], K_for(L))},
+    # THE DOMAIN WALLS ARE THE TANK. Building four side walls out of obstacles as well hid the
+    # water behind them -- the same occlusion that made the first hourglass a grey block. All this
+    # scene needs is a FLOOR with a hole in it, raised off the bottom so the jet has somewhere to
+    # fall to, and `boundary: wall` supplies the sides for free.
+    L, w, y0, y1 = 0.30, 0.30, 0.09, 0.12
+    obs = [[0.0, y0, 0.0, 0.13, y1, w], [0.17, y0, 0.0, w, y1, w],
+           [0.13, y0, 0.0, 0.17, y1, 0.13], [0.13, y0, 0.17, 0.17, y1, w]]
+    return spec("si_torricelli", L, 96, 2400,
+                {"water": liquid([0.01, 0.12, 0.01, 0.29, 0.28, 0.29], K_for(L))},
                 sigma=SIGMA, obstacles=obs, wall_damp=0.95,
                 note="a tank draining through a 40 mm floor orifice: v = sqrt(2 g h)")
 
@@ -255,13 +262,13 @@ def _restitution():
         x = 0.05 + 0.09 * i
         ts[f"e{i}"] = solid([x, 0.26, 0.17, x + 0.06, 0.32, 0.23], E)
         cols[f"e{i}"] = c
-    return spec("si_restitution", L, 96, 900, ts, eta=0.0, colors=cols, wall_damp=1.0,
+    return spec("si_restitution", L, 96, 1800, ts, eta=0.0, colors=cols, wall_damp=1.0,
                 note="four cubes, E from 1e5 to 1e8 Pa, dropped together: restitution against E")
 
 
 def _viscous_spread():
     L = 0.20
-    return spec("si_viscous_spread", L, 96, 1200,
+    return spec("si_viscous_spread", L, 96, 2400,
                 {"syrup": liquid([0.07, 0.01, 0.07, 0.13, 0.13, 0.13], K_for(L))},
                 sigma=SIGMA, eta=5.0, colors={"syrup": ORANGE},
                 note="a 5 Pa s blob slumping: a viscous gravity current, radius ~ t^(1/8)")
@@ -269,7 +276,7 @@ def _viscous_spread():
 
 def _laplace_trio():
     L = 0.060
-    return spec("si_laplace_trio", L, 96, 900,
+    return spec("si_laplace_trio", L, 96, 1800,
                 {"big": liquid([0.004, 0.022, 0.020, 0.020, 0.038, 0.040], K_for(L)),
                  "mid": liquid([0.026, 0.024, 0.024, 0.038, 0.036, 0.036], K_for(L)),
                  "small": liquid([0.045, 0.027, 0.027, 0.053, 0.035, 0.035], K_for(L))},
