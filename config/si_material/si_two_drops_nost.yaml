@@ -34,14 +34,14 @@ sets:
         shape: ball
   mpm_particle:
     parent: cell
-    per_parent: 5605
+    per_parent: 89685
     radius: 0.5
     density: 1000.0
-    particle_mass: 6.781684027777778e-05
+    particle_mass: 4.238552517361111e-06
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 192
+    n_grid: 768
 operators:
 - op: aggregate
   at: cell
@@ -69,7 +69,7 @@ operators:
 schedule:
 - aggregate
 - gravity
-- substep_dt: 6.536713410100344e-05
+- substep_dt: 1.6460488974586822e-05
   steps:
   - mpm_strain
   - mpm_viscosity
@@ -79,8 +79,15 @@ schedule:
 plotting:
   background: black
   up_axis: 1
-  dot_size: 2.0
+  dot_size: 1.4
   slow_motion: 1
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
   colors:
     a:
     - 0.3
