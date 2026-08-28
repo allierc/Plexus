@@ -322,6 +322,13 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return self.wfile.write(body)
 
+        if route == "/api/studio/session":
+            from plexus.gui import studio
+            S = studio.SESSION
+            return self._send_json({"state": S.get("state"), "chars": S.get("chars"),
+                                    "seconds": S.get("seconds"), "error": S.get("error"),
+                                    "specs": len(studio.REFERENCES)})
+
         if route == "/api/studio/list":
             from plexus.gui import studio
             return self._send_json({"specs": studio.list_specs()})
@@ -407,7 +414,8 @@ class Handler(BaseHTTPRequestHandler):
             current = open(sp).read() if os.path.exists(sp) else ""
             res = studio.author_spec(prompt, name, current=current,
                                      model=data.get("model") or "sonnet",
-                                     deep=bool(data.get("deep")))
+                                     deep=bool(data.get("deep")),
+                                     effort=data.get("effort") or "low")
             if not res["yaml"]:
                 studio.fail(f"Claude returned no YAML for {prompt!r} "
                             f"(rc={res['rc']}, {res['seconds']}s)", res["log"] or res["raw"])
@@ -565,6 +573,15 @@ def _ctype(path):
     }.get(ext, "application/octet-stream")
 
 
-def serve(host="127.0.0.1", port=8765):
+def serve(host="127.0.0.1", port=8765, prime=True):
     httpd = ThreadingHTTPServer((host, port), Handler)
+    if prime:
+        # PRIME WHILE THE BROWSER IS STILL OPENING. Loading the corpus into a session takes a few
+        # seconds and happens once; doing it lazily would make the FIRST prompt -- the one someone
+        # is watching -- the one that pays for it.
+        try:
+            from plexus.gui import studio
+            studio.prime_async()
+        except Exception as e:                                       # noqa: BLE001
+            print(f"[studio] could not start priming: {e}", flush=True)
     return httpd

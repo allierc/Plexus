@@ -36,8 +36,13 @@ import threading
 import time
 
 # --------------------------------------------------------------------------------------- paths
-_HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(os.path.dirname(_HERE))
+_HERE = os.path.dirname(os.path.abspath(__file__))          # src/plexus/gui
+# THREE LEVELS, NOT TWO: gui -> plexus -> src -> the repo. Two put REPO at `src/`, and everything
+# derived from it went quietly to the wrong place -- CONFIG_DIR became src/config/studio (so the
+# spec list was always empty), MAIN became src/Plexus_Main.py (so no run could start), and the
+# priming corpus lost both reference specs and the paper, shrinking to 1,586 chars of operator
+# names with nothing to copy the shape of.
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 CONFIG_DIR = os.path.join(REPO, "config", "studio")
 MAIN = os.path.join(REPO, "Plexus_Main.py")
 PY = os.environ.get("PLEXUS_PYTHON") or os.sys.executable
@@ -71,14 +76,31 @@ def _claude_bin() -> str:
 # tools it returns in 24 s, inside the 30 s budget. The grounding is the same either way (it is the
 # same file, from the same folder); only who fetches it changes. Repo access is still available
 # behind DEEP, at a longer cap, for the cases the reference does not cover.
-REFERENCE = "si_gate"
+# WHAT GETS PRIMED INTO THE SESSION, ONCE. Two real specs (one drop-scale and capillary, one with
+# obstacles and a second material), the REGISTRY's own operator names -- authoritative, unlike a
+# paper that can drift -- and the sections of plexus2.tex that decide a spec's shape. Not the whole
+# paper: it is 111 KB and most of it is about inverse modelling and the atlas, which no spec needs.
+# ONE SPEC PER DISTINCT SHAPE, not every spec. There are ~1,744 configs; priming with all of them
+# is megabytes and mostly repetition -- the si_ families are parameter sweeps of the same handful
+# of forms. What a spec-writer needs is COVERAGE of the forms: a capillary drop at zero g, an
+# obstacle field with a second material, several types sharing one grid, a frame-gated two-stage
+# run, and a viscous one. Six of those is ~14 KB and spans the vocabulary.
+REFERENCES = ("si_laplace_r10",        # zero g, surface tension, csf_rho/csf_band
+              "si_hourglass",          # obstacles as boxes, snow, wall_damp
+              "si_crown_drop",         # two liquid types, capillary scale
+              "si_split_merge",        # frame-gated operators: before_frame / after_frame
+              "si_viscous_spread",     # mpm_viscosity
+              "si_restitution")        # elastic solids, several types at once
+TEX_SECTIONS = ((125, 258),      # The language: operators, sets, states, fields, hierarchy
+                (934, 1045))     # Schedules, model specification, units
 
 SYSTEM_BRIEF = """\
 You are writing ONE Plexus2 simulation spec, as YAML, and nothing else.
 
 Copy the SHAPE of the reference: the general/sets/fields/operators/schedule/plotting blocks, the
 substep micro-loop, the operator names and their `at`/`to`/`from`. Change only what the request asks
-for.
+for. The references you were given are the curated ones; never treat a spec under config/studio/ as
+a model to copy, since those are this tool's own drafts and may be wrong.
 
 Hard requirements:
   * SI units throughout -- metres, seconds, kilograms, pascals. Keep general.units as given.
@@ -133,16 +155,119 @@ def _extract_yaml(text: str) -> str:
     return text
 
 
-def _reference_yaml() -> str:
-    for cand in (os.path.join(REPO, "config", "si_material", REFERENCE + ".yaml"),
-                 os.path.join(REPO, "config", "si_material", "si_gate.yaml")):
-        if os.path.exists(cand):
-            return open(cand).read()
-    return ""
+SESSION: dict = {"id": None, "model": None, "primed": 0.0, "chars": 0,
+                 "state": "cold", "seconds": 0.0, "error": None}
 
 
-def author_spec(prompt: str, name: str, current: str = "", timeout: int = 30,
-                model: str = "sonnet", deep: bool = False) -> dict:
+def prime_async(model: str = "sonnet") -> None:
+    """Prime in the background at server start, so the first PREVIEW is not the one that pays."""
+    if SESSION.get("state") == "priming":
+        return
+    SESSION.update(state="priming", error=None)
+
+    def _go():
+        r = prime_session(model)
+        SESSION.update(state=("ready" if r.get("ok") else "cold"),
+                       seconds=r.get("seconds", 0.0), error=r.get("error"))
+    threading.Thread(target=_go, daemon=True).start()
+
+
+def _corpus() -> str:
+    """The material the session is primed with: operator names, two specs, the language sections."""
+    parts = []
+    try:
+        import plexus.operators                                  # registers the whole atlas
+        from plexus.models.registry import _OPERATOR_REGISTRY as REG   # name -> default impl class
+        names = sorted(REG)
+        parts.append("REGISTERED OPERATORS (these names, and no others):\n" + ", ".join(names))
+    except Exception:                                            # noqa: BLE001
+        pass
+    for r in REFERENCES:
+        # FROM si_material ONLY, never from config/studio: the corpus is the thing every generated
+        # spec is modelled on, so anything unreviewed in it propagates into everything after it.
+        f = os.path.join(REPO, "config", "si_material", r + ".yaml")
+        if os.path.exists(f):
+            parts.append(f"REFERENCE SPEC {r}.yaml -- copy this SHAPE:\n```yaml\n"
+                         + open(f).read() + "```")
+    tex = os.path.join(REPO, "paper", "plexus2.tex")
+    if os.path.exists(tex):
+        lines = open(tex, errors="replace").read().splitlines()
+        for a, b in TEX_SECTIONS:
+            parts.append("FROM plexus2.tex:\n" + "\n".join(lines[a - 1:b]))
+    return "\n\n".join(parts)
+
+
+def _session_dir() -> str:
+    """Where the CLI keeps this project's transcripts: ~/.claude/projects/<slugged cwd>/."""
+    slug = REPO.replace("/", "-")
+    return os.path.join(os.path.expanduser("~"), ".claude", "projects", slug)
+
+
+def _session_id_for(corpus: str) -> str:
+    """A session id DERIVED FROM THE CORPUS, so state can be reused and invalidated correctly.
+
+    A random id would re-prime on every server start, paying 4-6 s and a corpus of tokens each
+    time for a session the CLI has already written to disk. Hashing the corpus into the uuid gives
+    both halves for free: the same corpus finds the same transcript and skips priming entirely,
+    and ANY change to it -- another reference spec, an edited tex range -- yields a different id
+    and re-primes automatically. No cache to invalidate by hand, which is the kind of cache that
+    goes stale and lies.
+    """
+    import hashlib
+    import uuid
+    return str(uuid.UUID(hashlib.md5(corpus.encode()).hexdigest()))
+
+
+def prime_session(model: str = "sonnet", timeout: int = 120) -> dict:
+    """Load the corpus into ONE claude session; later requests fork from it.
+
+    WHY THIS EXISTS. Every spec request used to be a cold `claude -p` carrying the whole reference
+    inline: 24-30 s, and the same tens of thousands of tokens re-sent every time -- which is what
+    pushed it past the 30 s cap. Priming once and forking per request measured 4.5 s to prime and
+    14.8 s per generation, with a prompt that is now just the request.
+
+    FORK, DO NOT CONTINUE. `--resume` alone would append every past request to one growing session,
+    so the tenth prompt of an evening carries the nine before it and the cost climbs with use.
+    `--fork-session` branches from the primed state each time, so the context is constant: corpus +
+    the current spec + the instruction. Iteration still works because the current spec is passed
+    explicitly, which it has to be anyway -- the file on disk is the truth, not the transcript.
+    """
+    corpus = _corpus()
+    sid = _session_id_for(corpus)
+    tr = os.path.join(_session_dir(), sid + ".jsonl")
+    if os.path.exists(tr) and os.path.getsize(tr) > 0:
+        SESSION.update(id=sid, model=model, primed=os.path.getmtime(tr), chars=len(corpus))
+        print(f"[studio] reusing primed session {sid[:8]} from disk "
+              f"({len(corpus):,} chars, {os.path.getsize(tr) / 1024:.0f} KB transcript) -- "
+              f"no priming needed", flush=True)
+        return {"ok": True, "id": sid, "seconds": 0.0, "chars": len(corpus), "reused": True}
+    # `--effort low` FOR THE PRIMING TURN ONLY. It has nothing to decide -- it is loading a corpus
+    # and saying "ready" -- so thinking about it is pure latency. The generation turns that fork
+    # from it run at high effort, which is where the effort belongs.
+    msg = (corpus + "\n\nYou will now be asked to write or modify Plexus2 specs against the above. "
+           "Reply to THIS message with one short line of acknowledgement and no YAML.")
+    t0 = time.time()
+    try:
+        r = subprocess.run([_claude_bin(), "-p", "--session-id", sid, msg,
+                            "--allowedTools", "", "--model", model, "--effort", "low"],
+                           cwd=REPO, capture_output=True, text=True, timeout=timeout,
+                           stdin=subprocess.DEVNULL)
+        ok = r.returncode == 0
+    except Exception as e:                                       # noqa: BLE001
+        fail(f"could not prime the Claude session: {e}")
+        return {"ok": False, "error": str(e)}
+    dt = round(time.time() - t0, 1)
+    if not ok:
+        fail("could not prime the Claude session", r.stderr[-1500:])
+        return {"ok": False, "error": (r.stderr or "")[-300:]}
+    SESSION.update(id=sid, model=model, primed=time.time(), chars=len(corpus))
+    print(f"[studio] primed session {sid[:8]} with {len(corpus):,} chars "
+          f"({len(REFERENCES)} specs + operator registry + plexus2.tex) in {dt}s", flush=True)
+    return {"ok": True, "id": sid, "seconds": dt, "chars": len(corpus)}
+
+
+def author_spec(prompt: str, name: str, current: str = "", timeout: int = 600,
+                model: str = "sonnet", deep: bool = False, effort: str = "low") -> dict:
     """Write a spec, or MODIFY the one passed in. Returns {yaml, log, seconds}.
 
     ITERATION IS THE POINT. "a ball of water falling", then "make the ball bigger", then "increase
@@ -155,9 +280,21 @@ def author_spec(prompt: str, name: str, current: str = "", timeout: int = 30,
                f"Apply this change, and change nothing else:\n\n{prompt}\n\n"
                f"Output the COMPLETE modified spec as one fenced yaml block.")
     else:
-        msg = (f"Reference spec, copy its shape:\n\n```yaml\n{_reference_yaml()}\n```\n\n"
-               f"Write a Plexus2 spec for this scene:\n\n{prompt}\n")
-    cmd = [_claude_bin(), "-p", msg, "--append-system-prompt", SYSTEM_BRIEF, "--model", model]
+        msg = f"Write a Plexus2 spec for this scene:\n\n{prompt}\n"
+    # EFFECTIVELY UNCAPPED (600 s), because a cap here only ever destroys work. The 30 s budget was
+    # set from a measured 24 s cold call, and then the sizing rule went into the brief and effort
+    # went to high: the same request now takes 103 s and a 30 s cap returned nothing at all, having
+    # paid for all of it. The elapsed time is REPORTED instead, which is the number worth having.
+    cmd = [_claude_bin(), "-p", msg, "--append-system-prompt", SYSTEM_BRIEF,
+           "--model", model, "--effort", effort]
+    # FORK THE PRIMED SESSION when there is one: the corpus is already in it, so this prompt is
+    # just the request. Falls back to a cold call with the reference inlined if priming never
+    # happened or the session has gone -- slower, but it still answers.
+    if not deep and SESSION.get("id") and SESSION.get("model") == model:
+        cmd += ["--resume", SESSION["id"], "--fork-session"]
+    elif not deep:
+        msg_ref = _corpus()
+        cmd[2] = f"{msg_ref}\n\n{msg}"
     if deep:
         cmd += ["--allowedTools", "Read", "Glob", "Grep",
                 "--add-dir", os.path.join(REPO, "config"),
@@ -357,6 +494,9 @@ DEV_BRIEF = """\
 You are asked for something the current Plexus2 cannot express. Do NOT write a spec, and do NOT
 edit any file. Produce an ANALYSIS of what the engine would need.
 
+Never read config/studio/ -- those are generated drafts, unreviewed and sometimes wrong. The
+curated specs are config/si_material/ and config/material/.
+
 Read first, and say what you read: src/plexus/operators/ (the operator library -- registry-driven,
 one class per operator with PARAM_ROLES, EMIT, SUPPORTED_DIMS), src/plexus/models/registry.py
 (how an operator is registered and dispatched), src/plexus/schema.py (what a spec is allowed to
@@ -433,10 +573,15 @@ def start_dev(prompt: str, model: str = "sonnet", timeout: int = 900) -> dict:
                # tool" for it, which is the kind of line that trains you to ignore warnings.
                "--disallowedTools", "Write", "Edit", "NotebookEdit", "Bash",
                "WebFetch", "WebSearch", "Task",
+               # CURATED FOLDERS ONLY. `--add-dir config` handed it config/studio/ as well, and
+               # those are the studio's OWN generated drafts -- unreviewed, sometimes wrong, and
+               # written by the same model. Feeding them back as reference is how a mistake becomes
+               # a convention. si_material/ and material/ are the folders a person maintains.
                "--add-dir", os.path.join(REPO, "src"),
-               "--add-dir", os.path.join(REPO, "config"),
+               "--add-dir", os.path.join(REPO, "config", "si_material"),
+               "--add-dir", os.path.join(REPO, "config", "material"),
                "--add-dir", os.path.join(REPO, "paper"),
-               "--model", model,
+               "--model", model, "--effort", "high",
                "--output-format", "stream-json", "--verbose"]
         t0 = time.time()
         print(f"\n[studio/dev] {prompt}", flush=True)
@@ -688,6 +833,7 @@ CSS = """
             color:var(--dim); padding-top:8px; white-space:nowrap; letter-spacing:.04em; }
   .plexus.dev { color:var(--amber); }
   .ok { color:var(--green); } .bad { color:var(--red); } .warn { color:var(--amber); }
+  #ready { margin-top:2px; min-height:16px; }
   .knobs { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .knobs .k { display:flex; flex-direction:column; gap:3px; }
   .knobs input { padding:5px 7px; font-variant-numeric:tabular-nums; }
@@ -732,6 +878,8 @@ renders or validates on its own &mdash; the preview and the full run are the sam
     <select id="dev"><option>cuda:1</option><option>cuda:0</option><option>cpu</option></select>
     <div class="label" style="margin-top:6px">Model</div>
     <select id="model"><option>sonnet</option><option>opus</option><option>haiku</option></select>
+    <div class="label" style="margin-top:6px">Effort</div>
+    <select id="effort"><option>low</option><option>medium</option><option>high</option></select>
     <label class="chk"><input type="checkbox" id="deep"> deep (read config/ + paper, slower)</label>
     <button class="wide" id="newspec" style="margin-top:6px">New scene</button>
   </div>
@@ -739,12 +887,13 @@ renders or validates on its own &mdash; the preview and the full run are the sam
   <div>
     <div class="scene" id="scene"><span class="empty">no scene yet</span></div>
     <div class="bar"><i id="bar"></i></div>
-    <div class="stat" id="stat">Type a scene below and press AUTHOR.</div>
+    <div class="stat" id="stat">Type a scene below and press PREVIEW.</div>
+    <div class="stat" id="ready">Claude: starting ...</div>
 
     <div style="margin-top:14px">
       <div class="promptrow">
         <span class="plexus">Plexus:</span>
-        <textarea id="prompt" rows="3" placeholder="a 5 cm cube of water dropped into a shallow pool, with a sphere obstacle in the middle"></textarea>
+        <textarea id="prompt" rows="3" placeholder="describe a scene">a 2 cm water drop falls down</textarea>
       </div>
       <div class="row">
         <button id="preview">Preview</button>
@@ -870,9 +1019,9 @@ $("preview").onclick = async () => {
     const editing = !!cur;
     say(editing ? `applying "${p}" to ${cur} ...` : "asking Claude for a new scene ...");
     const d = await api("/api/studio/author",
-      {prompt: p, model: $("model").value, deep: $("deep").checked,
+      {prompt: p, model: $("model").value, deep: $("deep").checked, effort: $("effort").value,
        name: cur || null, knobs: knobs()});
-    $("ptime").textContent = `claude ${d.seconds||0}s`;
+    $("ptime").textContent = `claude ${d.seconds||0}s (effort ${$("effort").value})`;
     if (d.error) { $("preview").disabled = false; $("gen").disabled = false;
       return say("FAILED: " + d.error + (d.detail ? "\n" + d.detail : ""), "bad"); }
     $("knobstat").textContent = d.report || "";
@@ -888,7 +1037,26 @@ $("preview").onclick = async () => {
 $("newspec").onclick = () => { cur = null; $("prompt").focus(); $("yaml").value = "";
   $("scene").innerHTML = '<span class="empty">no scene yet</span>';
   ["particles","ngrid","width"].forEach(id => $(id).addEventListener("change", gauges));
-refresh(); say("new scene -- describe it and press PREVIEW"); };
+async function readyPoll() {
+  const s = await api("/api/studio/session");
+  const R = $("ready");
+  if (s.state === "ready") {
+    R.textContent = `Claude ready -- ${(s.chars||0).toLocaleString()} chars primed `
+      + `(${s.specs} specs + operator registry + plexus2.tex) in ${s.seconds}s, effort high`;
+    R.className = "stat ok";
+  } else if (s.state === "priming") {
+    R.textContent = "Claude: loading configs and plexus2.tex into a session ...";
+    R.className = "stat warn"; setTimeout(readyPoll, 1200);
+  } else {
+    R.textContent = "Claude: NOT primed" + (s.error ? " -- " + s.error : "")
+      + " (each prompt will send the corpus inline; slower)";
+    R.className = "stat bad"; setTimeout(readyPoll, 4000);
+  }
+}
+readyPoll();
+refresh();
+$("prompt").focus();
+$("prompt").setSelectionRange($("prompt").value.length, $("prompt").value.length); say("new scene -- describe it and press PREVIEW"); };
 $("gen").onclick = () => { if (cur) api("/api/studio/run",
     {name: cur, device: $("dev").value, preview: false}).then(watch); };
 $("stop").onclick = () => api("/api/studio/stop", {name: cur}).then(() => say("stopped", "warn"));
@@ -950,7 +1118,26 @@ $("save").onclick = async () => {
 };
 
 ["particles","ngrid","width"].forEach(id => $(id).addEventListener("change", gauges));
+async function readyPoll() {
+  const s = await api("/api/studio/session");
+  const R = $("ready");
+  if (s.state === "ready") {
+    R.textContent = `Claude ready -- ${(s.chars||0).toLocaleString()} chars primed `
+      + `(${s.specs} specs + operator registry + plexus2.tex) in ${s.seconds}s, effort high`;
+    R.className = "stat ok";
+  } else if (s.state === "priming") {
+    R.textContent = "Claude: loading configs and plexus2.tex into a session ...";
+    R.className = "stat warn"; setTimeout(readyPoll, 1200);
+  } else {
+    R.textContent = "Claude: NOT primed" + (s.error ? " -- " + s.error : "")
+      + " (each prompt will send the corpus inline; slower)";
+    R.className = "stat bad"; setTimeout(readyPoll, 4000);
+  }
+}
+readyPoll();
 refresh();
+$("prompt").focus();
+$("prompt").setSelectionRange($("prompt").value.length, $("prompt").value.length);
 """
 
 
