@@ -1043,7 +1043,7 @@ renders or validates on its own &mdash; the preview and the full run are the sam
     <div style="margin-top:14px">
       <div class="promptrow">
         <span class="plexus">Plexus:</span>
-        <textarea id="prompt" rows="3" placeholder="describe a scene -- Enter to preview, Shift+Enter for a new line">a 2 cm water drop falls down</textarea>
+        <textarea id="prompt" rows="3" placeholder="describe a scene -- Enter to preview, Shift+Enter for a new line">a 2 cm water ball at 3/4 of the scene height, falling down</textarea>
       </div>
       <div class="row">
         <button id="preview">Preview</button>
