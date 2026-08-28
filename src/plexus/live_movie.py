@@ -34,6 +34,7 @@ import time
 import numpy as np
 
 FLAT = dict(render_points_as_spheres=True, lighting=False, ambient=1.0, diffuse=0.0, specular=0.0)
+_CS_AXIS = {"x": 0, "y": 1, "z": 2}
 
 
 def _biggest_particle_set(H):
@@ -99,6 +100,22 @@ class LiveMovie:
         if dot is None:
             dot = self.style.get("dot_size", "auto")
         self.dot, self.fill = dot, float(fill)
+        # A CROSS SECTION, AS AN OVERLAY. `plotting.cross_section` selects a slab normal to one axis
+        # and scatters what is inside it in the plane of the other two -- for a jet falling in -y an
+        # xz slice shows the stream's footprint, so a round column and a broken-up turbulent one look
+        # different at a glance where the 3D view shows only its silhouette.
+        #
+        # It is a vtkChartXY OVERLAY on the same renderer, not a second render pass: the frame still
+        # costs one `write_frame()`, and the stills keep coming out of that same image.
+        _cs = (style or {}).get("cross_section")
+        self.cs = None
+        if _cs:
+            _cs = {} if _cs is True else dict(_cs)
+            self.cs_axis = _CS_AXIS[str(_cs.get("axis", "y")).lower()]
+            self.cs_at = float(_cs.get("at", 0.35))          # fraction of the box along that axis
+            self.cs_cells = float(_cs.get("thickness", 4.0))  # slab half-width, in CELLS
+            self.cs_max = int(_cs.get("max_points", 6000))
+            self.cs_cfg = _cs
         self.px_used = None
         self.up = int(up)
         # (reset to 1 for 2D below, once the world tells us the run is planar)
@@ -225,6 +242,7 @@ class LiveMovie:
         # never fire, because the line above had just overwritten the thing it tested. Every 2D run
         # was therefore drawn as an angled 3D cube with the particles lying on its floor.
         w = [float(x) for x in world]
+        self.world = w                 # the per-axis box, kept for the cross-section panel
         self.is2d = len(w) < 3
         if self.is2d:
             self.up = 1
@@ -306,6 +324,38 @@ class LiveMovie:
         # It costs a little size (no global index, a fragment header per frame) and it means a
         # long run can be WATCHED from the file at any moment, with no duplicate and no second
         # writer, which is what `3d.png` was standing in for.
+        if self.cs is None and getattr(self, "cs_cfg", None) is not None:
+            ax = self.cs_axis
+            lat = [k for k in range(3) if k != ax][:2]
+            ch = pv.Chart2D(size=(0.26, 0.26), loc=(0.015, 0.645))
+            ch.background_color = (0, 0, 0, 0.55)
+            ch.border_color = "#9a9a9a"
+            names = "xyz"
+            ch.title = (f"{names[lat[0]]}{names[lat[1]]} slice at "
+                        f"{names[ax]} = {self.cs_at:.2f} of the box")
+            # FIXED RANGES, NOT AUTOSCALED. An autoscaling axis rescales to whatever is in the slab,
+            # so a jet that thins to a thread would fill the panel exactly as a full one does and the
+            # thing the panel exists to show would be the one thing it hides.
+            ch.x_axis.range = [0.0, float(self.world[lat[0]])]
+            ch.y_axis.range = [0.0, float(self.world[lat[1]])]
+            # LABELS AND TICKS ON, EXPLICITLY. The first build drew a bare rectangle: `.label` is
+            # set here but a chart at this size hides its decorations unless asked, so the panel had
+            # no axes, no ticks and no title -- an empty box that could equally have meant "no data"
+            # or "not working".
+            ch.x_axis.label = f"{names[lat[0]]} (m)"
+            ch.y_axis.label = f"{names[lat[1]]} (m)"
+            for _a in (ch.x_axis, ch.y_axis):
+                _a.label_visible = True
+                _a.ticks_visible = True
+                _a.tick_labels_visible = True
+                _a.grid = False
+            ch.legend_visible = False
+            _c = list((style or {}).get("colors", {}).values())
+            self._cs_series = ch.scatter([0.0], [0.0], size=3, style="o",
+                                         color=(tuple(_c[0]) if _c else (0.3, 0.62, 1.0)))
+            self.p.add_chart(ch)
+            self.cs = ch
+            self._cs_lat = lat
         self.p.open_movie(out, framerate=max(1, int(round(getattr(self, "fps", fps)))), quality=8,
                           output_params=["-movflags", "frag_keyframe+empty_moov+default_base_moof",
                                          "-g", "1", "-flush_packets", "1"])
@@ -360,7 +410,13 @@ class LiveMovie:
         # costs a second render of the scene per light, which is why it is not on by default; with
         # obstacles present it is what separates a body resting ON a step from one floating above
         # it, and that ambiguity is exactly what a flat-shaded scene cannot resolve on its own.
-        if obs and not self.is2d:
+        # SHADOWS ARE OPT-IN, `plotting.shadows: true`, and default OFF. They make obstacle
+        # geometry legible -- which is why they were added -- but VTK's shadow pass RE-LIGHTS every
+        # actor, including the particle cloud that explicitly asked for `lighting=False`. Measured on
+        # si_jet_sphere_wide: a cloud whose colour array is uniformly [76, 158, 255] renders at
+        # [134, 135, 137] with shadows on and [98, 104, 112] with them off. The blue water came out
+        # grey, and nothing about the colour pipeline was wrong -- the lighting was.
+        if obs and not self.is2d and bool(self.style.get("shadows", False)):
             try:
                 self.p.enable_shadows()
             except Exception as e:                      # not fatal: the movie is still readable
@@ -437,10 +493,44 @@ class LiveMovie:
                         f"frame {tick}/{self.n_frames}   "
                         f"{el / max(tick, 1) * 1000:.0f} ms/frame compute{clk}",
                         position="upper_left", font_size=11, color="white", name="hdr")
+        if self.cs is not None:
+            self._update_cross_section(H)
         self.p.write_frame()
         self.rendered += 1
         if tick in self.still_ticks:
             self._still(tick)
+
+    def _update_cross_section(self, H):
+        """Scatter whatever is inside the slab, in the plane of the other two axes."""
+        try:
+            lvl = H.level(self.set_name) if getattr(self, "set_name", None) else None
+            if lvl is None:
+                from plexus.live_movie import _biggest_particle_set
+                lvl = H.level(_biggest_particle_set(H))
+            X = lvl.get("pos").detach()
+            occ = getattr(lvl, "occ", None)
+            if occ is not None:
+                X = X[occ > 0]
+            if X.shape[0] == 0:
+                self._cs_series.update([], [])
+                return
+            ax, (a, b) = self.cs_axis, self._cs_lat
+            dx = float(self.world[ax]) / 96.0
+            for fc in getattr(H, "fields", {}).values():
+                if hasattr(fc, "dx"):
+                    dx = float(fc.dx)
+                    break
+            y0 = self.cs_at * float(self.world[ax])
+            sel = (X[:, ax] - y0).abs() < self.cs_cells * dx
+            P = X[sel]
+            if P.shape[0] > self.cs_max:            # a slab of a big jet is tens of thousands
+                step = P.shape[0] // self.cs_max + 1
+                P = P[::step]
+            self._cs_series.update(P[:, a].cpu().numpy(), P[:, b].cpu().numpy())
+        except Exception as e:                       # noqa: BLE001 -- a panel must never kill a run
+            if not getattr(self, "_cs_warned", False):
+                self._cs_warned = True
+                print(f"[live-movie] cross section unavailable ({type(e).__name__}: {e})", flush=True)
 
     def _rgb(self, H, lvl, pos):
         """Per-particle colour, FIXED AT t=0 and carried with the particle.

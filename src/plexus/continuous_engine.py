@@ -148,6 +148,23 @@ class MPMEmit(Operator):
         idx = (torch.arange(k_frame, device=dev) + self._cursor) % n
         self._cursor = (self._cursor + k_frame) % n
 
+        # THE CURSOR RECYCLES BLINDLY, SO SAY WHEN IT EATS ITS OWN TAIL. It wraps after
+        # `pool / k` frames and overwrites whatever is in those slots. That is correct exactly when
+        # the pool outlasts the transit time -- a particle emitted `pool/k` frames ago must already
+        # have drained -- and silently WRONG when it does not: fluid still in mid-air is teleported
+        # back to the inlet, which reads as a jet that stutters or as mass appearing from nowhere,
+        # not as a pool that is too small. The count is a sync, but this is a frame-level operator
+        # outside the captured region and the slice is only `k` long.
+        _clobber = int((p.occ[idx] > 0).sum())
+        if _clobber and not getattr(self, "_clobbered", False):
+            self._clobbered = True
+            from plexus.paths import warn
+            warn(f"mpm_emit: the pool has wrapped onto {_clobber:,} particles that are STILL LIVE "
+                 f"({100.0 * _clobber / max(k_frame, 1):.0f}% of this frame's emission). The pool "
+                 f"({n:,}) is smaller than emission x transit; those particles are being teleported "
+                 f"back to the inlet mid-flight. Raise per_parent to at least "
+                 f"{int(n * 1.5):,}, or lower the inlet speed or area.")
+
         # ---- place them in a SLAB, not on a plane ----
         u = torch.rand(k_frame, D, device=dev, generator=getattr(H, "rng", None))
         pos = torch.empty(k_frame, D, device=dev, dtype=p.state.dtype)

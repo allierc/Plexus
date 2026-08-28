@@ -1,8 +1,8 @@
 general:
-  name: si_jet_sphere
+  name: si_jet_sphere_wide
   engine: continuous
   seed: 0
-  n_frames: 1200
+  n_frames: 900
   dt: 0.0008333333333333334
   boundary: wall
   dim: 3
@@ -12,9 +12,9 @@ general:
   - 0.1
   obstacles:
   - - 0.05
-    - 0.045
+    - 0.0825
     - 0.05
-    - 0.016
+    - 0.002
   save_data: false
   units:
     length_um: 1000000.0
@@ -32,7 +32,7 @@ sets:
         eta: 0.001
   mpm_particle:
     parent: cell
-    per_parent: 600000
+    per_parent: 170000
     radius: 0.5
     density: 1000.0
     particle_mass: 1.41285e-07
@@ -49,13 +49,13 @@ operators:
 - op: mpm_emit
   at: mpm_particle
   face: -y
-  speed: 1.2
+  speed: 0.8
   ppc: 8.0
   patch:
-  - 0.44
-  - 0.44
-  - 0.56
-  - 0.56
+  - 0.42
+  - 0.42
+  - 0.58
+  - 0.58
 - op: mpm_drain
   at: mpm_particle
   face: -y
@@ -117,7 +117,7 @@ plotting:
     - 0.62
     - 1.0
   cross_section:
-    axis: y
-    at: 0.35
+    axis: z
+    at: 0.5
     thickness: 4
-    max_points: 6000
+    max_points: 8000
