@@ -1560,7 +1560,16 @@ class MPMViscosity(Lateral):
     def forward(self, H, mask=None):
         p = H.level(self.at)
         C = p.C
-        tau = self.eta * (C + C.transpose(-2, -1))
+        # PER-PARTICLE eta WHERE THE SPEC DECLARED ONE, this operator's scalar everywhere else.
+        # `entities.py` builds the buffer from the type table exactly as it builds mu and la, and
+        # leaves NaN where a type said nothing -- so a spec that never mentions per-type eta has no
+        # buffer at all and this is the same multiply it always was.
+        _pe = getattr(p, "eta", None)
+        if _pe is not None:
+            _e = torch.where(torch.isnan(_pe), torch.full_like(_pe, self.eta), _pe)
+            tau = _e[:, None, None] * (C + C.transpose(-2, -1))
+        else:
+            tau = self.eta * (C + C.transpose(-2, -1))
         if self.liquid_only:
             liq = getattr(p, "is_liquid", None)
             if _const_any(self, "_c_liquid", liq):

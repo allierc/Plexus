@@ -384,6 +384,28 @@ class MPMParticle:
         lvl.register_buffer("F", torch.eye(D, device=device).expand(Np, D, D).contiguous())
         lvl.register_buffer("mu", mu)
         lvl.register_buffer("la", la)
+        # PER-TYPE VISCOSITY, built the same way mu and la are. `eta` was the one material property
+        # that lived on the OPERATOR rather than on the particle, so every body in a set shared it:
+        # a spec with a water drop, a gel blob and a snowball got one eta for all three, and the
+        # obvious fix -- `at: mpm_particle[type=jelly]` -- cannot work, because the types are on the
+        # PARENT and only a set declaring `types:` carries node_type.
+        #
+        # Registered ONLY when some type actually declares `eta`. Absent, `mpm_viscosity` uses its
+        # own scalar exactly as before, so every existing spec is byte-identical.
+        _etas = [t.get("eta") for t in type_list]
+        _own_etas = [t.get("eta") for t in _ct] if _ct else []
+        if any(e is not None for e in _etas + _own_etas):
+            _eta = torch.full((Np,), float("nan"), device=device)
+            for _tid, _t in enumerate(type_list):           # the PARENT's types, per particle
+                if _t.get("eta") is not None:
+                    _eta = torch.where(ntp[pidx] == _tid,
+                                       torch.full_like(_eta, float(_t["eta"])), _eta)
+            if _ct and _cnt is not None:                    # a child set's OWN types win
+                for _tid, _t in enumerate(_ct):
+                    if _t.get("eta") is not None:
+                        _eta = torch.where(_cnt == _tid,
+                                           torch.full_like(_eta, float(_t["eta"])), _eta)
+            lvl.register_buffer("eta", _eta)                # NaN = "not declared, use the operator's"
         lvl.register_buffer("is_liquid", is_liquid)
         lvl.register_buffer("is_snow", is_snow)
         lvl.register_buffer("is_visco", is_visco)
