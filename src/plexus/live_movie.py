@@ -114,7 +114,10 @@ class LiveMovie:
             _cs = {} if _cs is True else dict(_cs)
             self.cs_axis = _CS_AXIS[str(_cs.get("axis", "y")).lower()]
             self.cs_at = float(_cs.get("at", 0.35))          # fraction of the box along that axis
-            self.cs_cells = float(_cs.get("thickness", 4.0))  # slab half-width, in CELLS
+            # THICKNESS IS THE FULL SLAB, IN CELLS, and halved here. It read as a half-width
+            # before, so `thickness: 4` cut a slab 8 cells (8.3 mm) thick -- two diameters of a 4 mm
+            # sphere seen at once, which is why the column looked solid rather than a sheet.
+            self.cs_cells = float(_cs.get("thickness", 4.0)) / 2.0
             self.cs_max = int(_cs.get("max_points", 6000))
             # `only: true` REPLACES the 3D view rather than sitting in its corner. A slice IS the
             # better picture for a jet: the 3D column is an opaque silhouette that hides its own
@@ -456,6 +459,12 @@ class LiveMovie:
             # detach it from its colours.
             _ax, _w = self.cs_axis, float(self.world[self.cs_axis])
             _sel = (_p[:, _ax] - self.cs_at * _w).abs() < self.cs_cells * self._cs_dx
+            if not getattr(self, "_cs_said", False):
+                self._cs_said = True
+                print(f"[live-movie] cross section: slab {2 * self.cs_cells * self._cs_dx * 1000:.2f}"
+                      f" mm thick ({2 * self.cs_cells:.2f} cells) at "
+                      f"{'xyz'[_ax]} = {self.cs_at * _w * 1000:.1f} mm, "
+                      f"{int(_sel.sum()):,} of {_sel.numel():,} drawn", flush=True)
             # PARKED JUST OUTSIDE, NOT FAR OUTSIDE. VTK sizes `render_points_as_spheres` sprites
             # from the ACTOR'S BOUNDS, so hiding particles at -9 m beside a 0.1 m box made the
             # bounding box 90x the domain and shrank every drawn dot to nothing: 17,338 lit pixels,
