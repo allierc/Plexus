@@ -481,6 +481,30 @@ class Handler(BaseHTTPRequestHandler):
             d["text"] = (d.get("text") or "")[:400]      # the full text went to the terminal
             return self._send_json(d)
 
+        if route == "/api/studio/apply":
+            # RE-SIZE WITHOUT ASKING CLAUDE. A particle count is not a question about the scene;
+            # round-tripping it through the model would cost 20 s to be handed back the spec it
+            # already wrote, and would risk it changing something else on the way.
+            from plexus.gui import studio
+            name = data.get("name") or ""
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            if not os.path.exists(sp):
+                return self._send_json({"error": "no such spec"}, 404)
+            try:
+                spec = studio.apply_knobs(yaml.safe_load(open(sp)) or {}, data.get("knobs") or {})
+            except Exception as e:                                       # noqa: BLE001
+                studio.fail(str(e))
+                return self._send_json({"error": str(e)}, 400)
+            spec.setdefault("general", {})["name"] = name
+            ok, err = _validate(spec)
+            if not ok:
+                studio.fail(f"re-sizing {name!r} produced an invalid spec", err)
+                return self._send_json({"error": err})
+            with open(sp, "w") as f:
+                f.write(_dump_yaml(spec))
+            return self._send_json({"name": name, "valid": True,
+                                    "report": studio.knob_report(spec, data.get("knobs") or {})})
+
         if route == "/api/studio/metrics":
             from plexus.gui import studio
             sp = os.path.join(studio.CONFIG_DIR, (data.get("name") or "") + ".yaml")
