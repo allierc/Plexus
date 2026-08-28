@@ -1,7 +1,7 @@
 general:
-  name: si_multimaterial
+  name: sit_water_fall_h053
   seed: 0
-  n_frames: 1200
+  n_frames: 2400
   dt: 0.0008333333333333334
   boundary: wall
   dim: 3
@@ -9,6 +9,7 @@ general:
   - 0.5
   - 0.5
   - 0.5
+  record_cap: 61
   save_data: false
   units:
     length_um: 1000000.0
@@ -16,63 +17,33 @@ general:
     force_nN: 1000000000.0
 sets:
   cell:
-    n: 3
+    n: 1
     start:
-    - - 0.08
-      - 0.305
-      - 0.25
     - - 0.25
-      - 0.305
-      - 0.25
-    - - 0.42
-      - 0.305
+      - 0.375
       - 0.25
     types:
-      jelly:
-        fraction: 0.3333
-        density: 1.15
-        block:
-        - 0.03
-        - 0.25
-        - 0.2
-        - 0.13
-        - 0.36
-        - 0.3
-        bulk_modulus: 981000.0
       water:
-        fraction: 0.3333
-        density: 1.0
+        fraction: 1.0
         material: liquid
         block:
-        - 0.16
-        - 0.25
-        - 0.16
-        - 0.34
-        - 0.36
-        - 0.34
+        - 0.01
+        - 0.275
+        - 0.01
+        - 0.49
+        - 0.475
+        - 0.49
         bulk_modulus: 981000.0
-      snow:
-        fraction: 0.3334
-        density: 0.35
-        material: snow
-        block:
-        - 0.37
-        - 0.25
-        - 0.2
-        - 0.47
-        - 0.36
-        - 0.3
-        youngs: 500000.0
   mpm_particle:
     parent: cell
-    per_parent: 202000
-    radius: 0.08
+    per_parent: 4000000
+    radius: 0.25
     density: 1000.0
-    particle_mass: 9.51155e-06
+    particle_mass: 1.152e-05
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 111
 operators:
 - op: aggregate
   at: cell
@@ -94,14 +65,14 @@ operators:
   polar: higham
 - op: mpm_grid_update
   at: mpm_grid
-  wall_damp: 0.7
-  surface_tension: 0.072
+  wall_damp: 0.9
+  mass_floor: 1.3e-13
+  surface_tension: 0.0
   csf_rho: 1000.0
-  csf_band: 0.2
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
-  wall_damp: 0.7
+  wall_damp: 1.0
   vmax: 1000000000.0
   implementation: warp
 schedule:
@@ -125,19 +96,11 @@ plotting:
   dot_size: 1.2
   render_3d: dots
   splat_size: 2.4
-  splat_res: 600
+  splat_res: 560
   camera_turns: 0.0
   colors:
-    jelly:
-    - 0.4
-    - 0.85
-    - 0.55
     water:
     - 0.3
     - 0.62
-    - 1.0
-    snow:
-    - 0.95
-    - 0.96
     - 1.0
   slow_motion: 4

@@ -1,33 +1,14 @@
 general:
-  name: si_steps
+  name: sit_cube_drop
   seed: 0
-  n_frames: 1200
+  n_frames: 2400
   dt: 0.0008333333333333334
   boundary: wall
-  obstacles:
-  - - 0.0
-    - 0.0
-    - 0.08
-    - 0.17
-  - - 0.08
-    - 0.0
-    - 0.16
-    - 0.14
-  - - 0.16
-    - 0.0
-    - 0.24
-    - 0.11
-  - - 0.24
-    - 0.0
-    - 0.32
-    - 0.08
-  - - 0.32
-    - 0.0
-    - 0.4
-    - 0.05
+  dim: 3
   world:
-  - 0.5
-  - 0.5
+  - 0.2
+  - 0.2
+  - 0.2
   save_data: false
   units:
     length_um: 1000000.0
@@ -37,28 +18,31 @@ sets:
   cell:
     n: 1
     start:
-    - 0.055
-    - 0.3
-    - 0.055
-    - 0.3
+    - - 0.1
+      - 0.124
+      - 0.1
     types:
-      water:
+      jelly:
         fraction: 1.0
-        layers:
-        - frac: 1.0
-          material: liquid
-          bulk_modulus: 981000.0
-        bulk_modulus: 981000.0
+        block:
+        - 0.072
+        - 0.1
+        - 0.072
+        - 0.128
+        - 0.15600000000000003
+        - 0.128
+        bulk_modulus: 392400.0
+        material: liquid
   mpm_particle:
     parent: cell
-    per_parent: 58000
-    radius: 0.125
+    per_parent: 1242990
+    radius: 0.032
     density: 1000.0
-    particle_mass: 0.000141056
+    particle_mass: 1.41285e-07
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -67,6 +51,7 @@ operators:
   g: 9.81
 - op: mpm_strain
   at: mpm_particle
+  implementation: warp
 - op: mpm_viscosity
   at: mpm_particle
   eta: 0.001
@@ -75,18 +60,19 @@ operators:
   to: mpm_grid
   drag: 0.0
   a_max: 200.0
+  implementation: warp
+  polar: higham
 - op: mpm_grid_update
   at: mpm_grid
-  surface_tension: 0.072
-  wall_damp: 0.65
-  implementation: nosync
+  wall_damp: 1.0
+  surface_tension: 0.0
   csf_rho: 1000.0
-  csf_band: 0.2
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
-  wall_damp: 0.65
+  wall_damp: 1.0
   vmax: 1000000000.0
+  implementation: warp
 schedule:
 - aggregate
 - gravity
@@ -99,5 +85,20 @@ schedule:
   - mpm_gather
 plotting:
   background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
   dot_size: 1.2
+  render_3d: dots
+  splat_size: 2.6
+  splat_res: 560
+  camera_turns: 0.0
+  colors:
+    jelly:
+    - 0.4
+    - 0.8
+    - 1.0
   slow_motion: 4
