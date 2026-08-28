@@ -921,6 +921,39 @@ def out_dir(name: str) -> str:
     return os.path.join(get_data_root(), "graphs_data", "studio", name)
 
 
+_FPS_CACHE: dict = {}
+
+
+def _mp4_info(path: str) -> tuple:
+    """(fps, n_frames) of a movie, probed ONCE per file and cached on its mtime.
+
+    Stepping a <video> frame by frame needs the real frame interval, and these movies do not have a
+    conventional one: LiveMovie DERIVES fps so the clip lasts as long as the world it shows, which
+    lands anywhere from 1 to 200. Guessing 1/30 would skip four frames on one spec and repeat three
+    on another. ffmpeg is asked instead, and only when the file changes.
+    """
+    if not path or not os.path.exists(path):
+        return 0.0, 0
+    key = (path, os.path.getmtime(path))
+    if key in _FPS_CACHE:
+        return _FPS_CACHE[key]
+    fps, n = 0.0, 0
+    try:
+        import imageio_ffmpeg
+        r = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-hide_banner", "-i", path],
+                           capture_output=True, text=True, timeout=20)
+        m = re.search(r"([\d.]+)\s+fps", r.stderr or "")
+        fps = float(m.group(1)) if m else 0.0
+        d = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", r.stderr or "")
+        if d and fps:
+            secs = int(d.group(1)) * 3600 + int(d.group(2)) * 60 + float(d.group(3))
+            n = int(round(secs * fps))
+    except Exception:                                                    # noqa: BLE001
+        pass
+    _FPS_CACHE[key] = (fps, n)
+    return fps, n
+
+
 def artefacts(name: str) -> dict:
     """What this spec has produced, showing the NEWEST frame of the two places one can land.
 
@@ -945,7 +978,9 @@ def artefacts(name: str) -> dict:
             # THE VIDEO NEEDS A BUSTER TOO. `Cache-Control: no-store` covers the browser, but the
             # <video> element keeps whatever it already decoded for a src it has seen before, so a
             # second GENERATE at the same path replayed the first one's movie.
-            "mp4_mtime": os.path.getmtime(mp4) if os.path.exists(mp4) else 0}
+            "mp4_mtime": os.path.getmtime(mp4) if os.path.exists(mp4) else 0,
+            "mp4_fps": _mp4_info(mp4 if os.path.exists(mp4) else "")[0],
+            "mp4_frames": _mp4_info(mp4 if os.path.exists(mp4) else "")[1]}
 
 
 def list_specs() -> list[dict]:
@@ -1029,6 +1064,8 @@ CSS = """
   .gauge span { font-size:11px; font-variant-numeric:tabular-nums; }
   .gauge i { display:block; font-style:normal; margin-top:3px; color:var(--dim);
              font-size:10px; line-height:1.4; }
+  .step { display:flex; gap:6px; }
+  .step button { flex:1; font-size:15px; line-height:1; padding:5px 0; }
   .gauge.green { border-left-color:var(--green); } .gauge.green span { color:var(--green); }
   .gauge.amber { border-left-color:var(--amber); } .gauge.amber span { color:var(--amber); }
   .gauge.red   { border-left-color:var(--red);   } .gauge.red   span { color:var(--red); }
@@ -1111,8 +1148,14 @@ renders or validates on its own &mdash; the preview and the full run are the sam
     <button class="wide" id="view">View</button>
     <button class="wide" id="stop" disabled>Stop</button>
     <div class="label" style="margin-top:8px">Show</div>
-    <button class="wide" id="showpng">Frame</button>
+    <button class="wide" id="showpng">Still</button>
     <button class="wide" id="showmp4">Movie</button>
+    <div class="label" style="margin-top:8px">Step</div>
+    <div class="step">
+      <button id="prevf">&#8249;</button>
+      <button id="nextf">&#8250;</button>
+    </div>
+    <div class="stat" id="fno" style="min-height:14px"></div>
   </div>
 </div>
 </div><script>__JS__</script></body></html>
@@ -1171,6 +1214,7 @@ async function gauges() {
 function paint(d) {
   const S = $("scene");
   const png = d.png, mp4 = d.mp4;
+  vfps = d.mp4_fps || 0; vframes = d.mp4_frames || 0;
   if (showing === "mp4" && mp4) {
     S.innerHTML = `<video controls autoplay loop `
       + `src="/media?path=${encodeURIComponent(mp4)}&t=${d.mp4_mtime||0}"></video>`;
@@ -1386,8 +1430,27 @@ submitOnEnter("prompt", "preview");
 submitOnEnter("devprompt", "devgo");
 
 $("view").onclick = () => $("ed").classList.toggle("on");
-$("showpng").onclick = () => { showing = "png"; repaint(); };
+$("showpng").onclick = () => { showing = "png"; $("fno").textContent = ""; repaint(); };
 $("showmp4").onclick = () => { showing = "mp4"; repaint(); };
+
+// FRAME-BY-FRAME, ON THE MOVIE ITSELF -- there is no per-frame image to page through (the stills
+// are deleted at close and 3d.png is only the last frame), so the mp4 IS the frame store. Stepping
+// is `currentTime += 1/fps` with the REAL fps from the file: these movies have a derived framerate
+// that lands anywhere from 1 to 200, so a hardcoded 1/30 would skip frames on one spec and repeat
+// them on another.
+let vfps = 0, vframes = 0;
+async function step(d) {
+  if (showing !== "mp4") { showing = "mp4"; await repaint(); }
+  const v = $("scene").querySelector("video");
+  if (!v) { $("fno").textContent = "no movie yet"; return; }
+  v.pause();
+  const f = Math.max(0, Math.min((vframes || 1) - 1,
+                                 Math.round(v.currentTime * (vfps || 1)) + d));
+  v.currentTime = (f + 0.5) / (vfps || 1);          // mid-frame: lands inside f, not on its edge
+  $("fno").textContent = `frame ${f + 1} / ${vframes || "?"}  @ ${(vfps||0).toFixed(0)} fps`;
+}
+$("nextf").onclick = () => step(+1);
+$("prevf").onclick = () => step(-1);
 $("revert").onclick = () => cur && select(cur);
 $("save").onclick = async () => {
   if (!cur) return;
