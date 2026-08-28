@@ -108,8 +108,20 @@ REFERENCES = ("si_laplace_r10",        # zero g, surface tension, csf_rho/csf_ba
               # was asked and does not scale.
               "si_two_drops3d_s144",   # n + start + shape: ball -- two bodies, generalises to N
               "si_balls_bouncy")       # n = 3, per-body types and colours
-TEX_SECTIONS = ((125, 258),      # The language: operators, sets, states, fields, hierarchy
-                (934, 1045))     # Schedules, model specification, units
+# THE SOURCE, NOT THE PAPER. plexus2.tex describes the language in prose; it does not say which
+# SET carries `node_type`, and that omission cost two passes on a real request. "three balls with
+# different viscosity" produced `at: mpm_particle[type=...]`, which is an AttributeError every time,
+# because `_assign_types` registers `node_type` ONLY on a set that declares `types:` -- the parent
+# `cell` does, `mpm_particle` does not. No amount of prose about the operator algebra prevents that;
+# forty lines of the function that raises it do.
+SOURCE_SLICES = (
+    ("src/plexus/engine.py", 573, 630,
+     "_assign_types: WHICH sets get node_type and type_names -- only those declaring `types:`"),
+    ("src/plexus/engine.py", 1008, 1036,
+     "_selector_mask: what `at: set[type=a]` resolves to, and when it cannot"),
+    ("src/plexus/models/entities.py", 160, 235,
+     "how a body is SIZED and PLACED: particle_mass -> volume -> shape, and block-fill"),
+)
 
 SYSTEM_BRIEF = """\
 You are writing ONE Plexus2 simulation spec, as YAML, and nothing else.
@@ -128,6 +140,13 @@ Hard requirements:
   * gravity `g: 9.81` unless the scene is explicitly weightless.
   * `surface_tension` in N/m, and only WITH `csf_rho` set to the liquid density; otherwise omit it.
   * Obstacles are axis-aligned boxes [x0,y0,z0,x1,y1,z1] or spheres [cx,cy,cz,r], in metres.
+  * `at: <set>[type=<name>]` WORKS ONLY ON A SET THAT DECLARES `types:`. The parent `cell` does;
+    `mpm_particle` does NOT, so `at: mpm_particle[type=water]` is always
+    "AttributeError: 'Level' object has no attribute 'node_type'". See _assign_types below.
+    An operator that acts on the particles acts on ALL of them: `at: mpm_particle`, no selector.
+    So a per-body parameter that the operator carries as a single scalar (mpm_viscosity's `eta`,
+    mpm_scatter's `drag`) CANNOT differ between bodies of one particle set. If the request needs
+    that, say so in a comment rather than writing a selector that cannot work.
 
 N SEPARATE BODIES -- "ten balls", "three drops", "a row of cubes" -- is `sets.cell.n: N` with N
 entries under `sets.cell.start` (one [x,y,z] per body, in metres) and a type carrying `shape: ball`
@@ -214,11 +233,13 @@ def _corpus() -> str:
         if os.path.exists(f):
             parts.append(f"REFERENCE SPEC {r}.yaml -- copy this SHAPE:\n```yaml\n"
                          + open(f).read() + "```")
-    tex = os.path.join(REPO, "paper", "plexus2.tex")
-    if os.path.exists(tex):
-        lines = open(tex, errors="replace").read().splitlines()
-        for a, b in TEX_SECTIONS:
-            parts.append("FROM plexus2.tex:\n" + "\n".join(lines[a - 1:b]))
+    for rel, a, b, why in SOURCE_SLICES:
+        f = os.path.join(REPO, rel)
+        if not os.path.exists(f):
+            continue
+        lines = open(f, errors="replace").read().splitlines()
+        parts.append(f"FROM {rel}:{a}-{b} -- {why}\n```python\n"
+                     + "\n".join(lines[a - 1:b]) + "\n```")
     return "\n\n".join(parts)
 
 
@@ -292,7 +313,8 @@ def prime_session(model: str = "sonnet", timeout: int = 120) -> dict:
 
 
 def author_spec(prompt: str, name: str, current: str = "", timeout: int = 600,
-                model: str = "sonnet", deep: bool = False, effort: str = "low") -> dict:
+                model: str = "sonnet", deep: bool = False, effort: str = "low",
+                error: str = "") -> dict:
     """Write a spec, or MODIFY the one passed in. Returns {yaml, log, seconds}.
 
     ITERATION IS THE POINT. "a ball of water falling", then "make the ball bigger", then "increase
@@ -300,7 +322,17 @@ def author_spec(prompt: str, name: str, current: str = "", timeout: int = 600,
     given it is pasted in whole and the instruction is applied to it, so the model edits a spec that
     already validated rather than writing a fresh one that may not.
     """
-    if current.strip():
+    if error.strip():
+        # THE SECOND PASS. The engine's own message is the best possible description of what went
+        # wrong -- better than anything this tool could infer -- and pasting it back is exactly what
+        # a person does when a run fails. Automating it removes the copy-and-paste, not the
+        # judgement: the model still has to read the traceback and work out what it means.
+        msg = (f"This spec was written for: {prompt}\n\n"
+               f"```yaml\n{current}\n```\n\n"
+               f"It FAILED. The error was:\n\n{error.strip()[-2500:]}\n\n"
+               f"Fix the cause and output the COMPLETE corrected spec as one fenced yaml block. "
+               f"Change only what the error requires.")
+    elif current.strip():
         msg = (f"Here is the current spec:\n\n```yaml\n{current}\n```\n\n"
                f"Apply this change, and change nothing else:\n\n{prompt}\n\n"
                f"Output the COMPLETE modified spec as one fenced yaml block.")
@@ -1170,10 +1202,7 @@ $("preview").onclick = async () => {
   if (p) {
     const editing = !!cur;
     say(editing ? `applying "${p}" to ${cur} ...` : "asking Claude for a new scene ...");
-    const d = await api("/api/studio/author",
-      {prompt: p, model: $("model").value, deep: $("deep").checked, effort: $("effort").value,
-       name: cur || null, knobs: knobs()});
-    $("ptime").textContent = `claude ${d.seconds||0}s (effort ${$("effort").value})`;
+    const d = await authorRetrying(p);
     if (d.error) { $("preview").disabled = false; $("gen").disabled = false;
       return say("FAILED: " + d.error + (d.detail ? "\n" + d.detail : ""), "bad"); }
     $("knobstat").textContent = d.report || "";
@@ -1224,16 +1253,49 @@ $("prompt").setSelectionRange($("prompt").value.length, $("prompt").value.length
 //   * nothing changed -> render.
 let lastPrompt = "", lastKnobs = "";
 const knobKey = () => JSON.stringify(knobs());
+
+// TWO PASSES, NEVER MORE. A failure carries the engine's own message, which is the best available
+// description of what is wrong, so handing it straight back is what a person does anyway -- this
+// only removes the copy-and-paste. The cap is hard because a model that could not fix a fault from
+// its own traceback will not fix it from the same traceback again; a third pass is a loop that
+// burns tokens and hides the failure behind a spinner instead of showing it to you.
+let passes = 0, passPrompt = "";
+async function author(prompt, errorText) {
+  passes = errorText ? passes + 1 : 1;
+  passPrompt = prompt;
+  if (errorText) say(`SECOND PASS -- handing the failure back to Claude ...`, "warn");
+  const d = await api("/api/studio/author",
+    {prompt, model: $("model").value, deep: $("deep").checked, effort: $("effort").value,
+     name: cur || null, knobs: knobs(), error: errorText || ""});
+  $("ptime").textContent = `claude ${d.seconds||0}s (effort ${$("effort").value}`
+    + (passes > 1 ? `, pass ${passes})` : ")");
+  return d;
+}
+// a spec that fails to VALIDATE is a failure like any other: retry once with the schema's message
+async function authorRetrying(prompt) {
+  let d = await author(prompt, "");
+  if (d.error && passes < 2) {
+    const detail = (d.detail || d.error || "").toString();
+    d = await author(prompt, `${d.error}\n${detail}`);
+  }
+  return d;
+}
+// and a RUN that fails gets the same treatment, once, from wherever it failed
+async function retryFromRun(status) {
+  if (passes >= 2 || !passPrompt || !cur) return false;
+  const tail = (status.tail || []).join("\n") + "\n" + (status.error || "");
+  const d = await author(passPrompt, tail);
+  if (d.error) { say("second pass FAILED: " + d.error, "bad"); return false; }
+  await select(d.name);
+  return true;
+}
 $("gen").onclick = async () => {
   const p = $("prompt").value.trim();
   $("gen").disabled = true; $("preview").disabled = true;
   try {
     if (p && p !== lastPrompt) {
       say(cur ? `applying "${p}" to ${cur}, then rendering ...` : "asking Claude, then rendering ...");
-      const d = await api("/api/studio/author",
-        {prompt: p, model: $("model").value, deep: $("deep").checked, effort: $("effort").value,
-         name: cur || null, knobs: knobs()});
-      $("ptime").textContent = `claude ${d.seconds||0}s (effort ${$("effort").value})`;
+      const d = await authorRetrying(p);
       if (d.error) { $("gen").disabled = false; $("preview").disabled = false;
         return say("FAILED: " + d.error + (d.detail ? "\n" + d.detail : ""), "bad"); }
       lastPrompt = p; await select(d.name); $("prompt").value = "";
@@ -1266,9 +1328,16 @@ function watch(j) {
         + (s.tail && s.tail.length ? "\n" + s.tail[s.tail.length-1].slice(0,150) : ""));
     if (s.done) {
       clearInterval(poll); poll = null;
-      $("stop").disabled = true; $("gen").disabled = false; $("preview").disabled = false;
       $("bar").style.width = s.rc === 0 ? "100%" : "0";
-      say(s.rc === 0 ? `done in ${s.elapsed}s` : ("FAILED: " + (s.error||"")),
+      if (s.rc !== 0 && await retryFromRun(s)) {
+        // the spec was rewritten from its own traceback: run the same thing again, once
+        api("/api/studio/run",
+            {name: cur, device: $("dev").value, preview: s.tag === "preview"}).then(watch);
+        return;
+      }
+      $("stop").disabled = true; $("gen").disabled = false; $("preview").disabled = false;
+      say(s.rc === 0 ? `done in ${s.elapsed}s`
+                     : (`FAILED after ${passes} pass${passes>1?"es":""}: ` + (s.error||"")),
           s.rc === 0 ? "ok" : "bad");
       showing = (s.tag === "generate" && s.rc === 0) ? "mp4" : "png";
       await repaint(); await refresh(cur);

@@ -412,10 +412,16 @@ class Handler(BaseHTTPRequestHandler):
             name = data.get("name") or _studio_name(prompt)
             sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
             current = open(sp).read() if os.path.exists(sp) else ""
+            err_ctx = (data.get("error") or "").strip()
+            if err_ctx:
+                _last = err_ctx.strip().splitlines()[-1][:160] if err_ctx else ""
+                print(f"\n[studio] SECOND PASS on {name!r} -- feeding the failure back to Claude\n"
+                      f"         {_last}", flush=True)
             res = studio.author_spec(prompt, name, current=current,
                                      model=data.get("model") or "sonnet",
                                      deep=bool(data.get("deep")),
-                                     effort=data.get("effort") or "low")
+                                     effort=data.get("effort") or "low",
+                                     error=err_ctx)
             if not res["yaml"]:
                 studio.fail(f"Claude returned no YAML for {prompt!r} "
                             f"(rc={res['rc']}, {res['seconds']}s)", res["log"] or res["raw"])
