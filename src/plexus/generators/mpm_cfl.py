@@ -657,7 +657,10 @@ PPC_FLOOR = 0.5                  # fraction of target below which the material i
 
 
 def _body_volumes(spec, dim):
-    """(name, volume) for every declared body type, from its `block` extent or its radius."""
+    """(name, volume) for every declared body type: from `particle_mass`, `block`, or `radius`.
+
+    The order matches models/entities.py, which is the only place the answer is authoritative.
+    """
     out = []
     sets = spec.get("sets") or {}
     for sname, sv in sets.items():
@@ -667,9 +670,20 @@ def _body_volumes(spec, dim):
         types = parent.get("types") or {}
         rad_default = float(sv.get("radius", parent.get("radius", 0.05)) or 0.05)
         n_par = int(parent.get("n", 1))
+        # THE MASS-DERIVED BODY, WHICH THIS FUNCTION USED TO MISS ENTIRELY. models/entities.py sizes
+        # a body three ways in this order: from `particle_mass` (V = per_parent * mass / density,
+        # arranged by `shape`), from an explicit `block`, or from `radius`. Only the last two were
+        # read here, so every spec that declares its size through the mass -- which is all of
+        # si_material/ -- fell through to `radius`, and `radius` is a FRACTION, not a length. With
+        # `radius: 0.5` that is a body of 0.524 m^3: si_gate was reported as 100,000 particles over
+        # 463,246,686 cells, i.e. 0.0 per cell, on a spec that is correctly sampled. The warning
+        # fired on healthy specs and the number was meaningless.
+        _pm = sv.get("particle_mass")
+        _rho = float(sv.get("density", 1.0) or 1.0)
+        _v_mass = (float(sv["per_parent"]) * float(_pm) / _rho) if _pm and _rho else None
         if not types:
-            v = (math.pi * rad_default ** 2 if dim == 2
-                 else (4.0 / 3.0) * math.pi * rad_default ** 3)
+            v = _v_mass if _v_mass else (math.pi * rad_default ** 2 if dim == 2
+                                         else (4.0 / 3.0) * math.pi * rad_default ** 3)
             out.append((sname, v, int(sv["per_parent"]), n_par))
             continue
         # THE ENGINE'S EXACT ALLOCATION, replicated rather than approximated: engine.py:610 gives
@@ -688,6 +702,8 @@ def _body_volumes(spec, dim):
                 v = 1.0
                 for k in range(dim):
                     v *= abs(float(b[dim + k]) - float(b[k]))
+            elif _v_mass:
+                v = _v_mass                       # sized by particle_mass, as entities.py does
             else:
                 r = float(t.get("radius", rad_default))
                 v = math.pi * r ** 2 if dim == 2 else (4.0 / 3.0) * math.pi * r ** 3

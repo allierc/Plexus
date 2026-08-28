@@ -49,6 +49,16 @@ PY = os.environ.get("PLEXUS_PYTHON") or os.sys.executable
 PREVIEW_FRAMES = 2
 
 
+def fail(what: str, detail: str = "") -> None:
+    """Print a failure to the server's own terminal, framed so it cannot be missed in a log."""
+    print("\n" + "=" * 78, flush=True)
+    print(f"[studio] CANNOT GENERATE: {what}", flush=True)
+    if detail:
+        for line in str(detail).rstrip().splitlines()[-30:]:
+            print(f"         {line}", flush=True)
+    print("=" * 78 + "\n", flush=True)
+
+
 def _claude_bin() -> str:
     from shutil import which
     return which("claude") or "claude"
@@ -79,9 +89,34 @@ Hard requirements:
   * `surface_tension` in N/m, and only WITH `csf_rho` set to the liquid density; otherwise omit it.
   * Obstacles are axis-aligned boxes [x0,y0,z0,x1,y1,z1] or spheres [cx,cy,cz,r], in metres.
 
-DO NOT SET these -- the interface owns them and will overwrite whatever you write:
+HOW A BODY GETS ITS SIZE. Particle count, particle mass, density and body volume are ONE relation,
+not four numbers:
+
+    V_body  =  N * particle_mass / density          N = per_parent * sets.cell.n
+
+so any three of them fix the fourth, and `particles-per-cell` -- the thing that decides whether the
+grid can see the material at all -- follows:
+
+    ppc  =  N * dx^3 / V_body                       dx = world / n_grid   (aim for 8)
+
+There are exactly TWO ways to say how big a body is, and you must use one of them:
+
+  * `block: [x0,y0,z0,x1,y1,z1]` in METRES, per type. The block states the volume outright and
+    PLACES the particles; the mass then only says what each particle represents. This is the normal
+    case -- prefer it.
+  * No block, plus `shape: cube` or `shape: ball` and a `start`. Then the volume is DERIVED from
+    `per_parent * particle_mass / density` and the shape only decides how that volume is arranged.
+    This is the only way to get a sphere, because there is no radius key. If you use it you MUST
+    write `per_parent` and `particle_mass` so the intended volume is unambiguous.
+
+THE INTERFACE OWNS THE COUNT, AND PRESERVES YOUR VOLUME. It overwrites
   general.n_frames, general.world, fields.*.n_grid, sets.mpm_particle.per_parent,
-  sets.mpm_particle.particle_mass.
+  sets.mpm_particle.particle_mass
+-- but it reads your V_body FIRST (from the block, or from your per_parent x particle_mass) and
+re-derives the mass as `density * V_body / N_new`, so the body you described keeps its size at
+whatever particle count the user asked for. Never set a mass and a block that disagree: the engine
+warns and then believes the mass, so the picture and the physics come apart.
+
 Place bodies as FRACTIONS of the world box you are given, so they stay put when the box is resized.
 
 OUTPUT: the YAML document ONLY, in a single ```yaml fenced block. No preamble, no explanation, no
@@ -216,10 +251,93 @@ def apply_knobs(spec: dict, k: dict) -> dict:
     n_bodies = max(1, int(((spec.get("sets") or {}).get("cell") or {}).get("n", 1) or 1))
     rho = float(mp.get("density", 1000.0) or 1000.0)
     V = _body_volume(spec)                       # BEFORE per_parent / particle_mass are touched
+    if V <= 1e-11:
+        # NEITHER WAY OF SAYING THE SIZE WAS USED. No `block`, and no per_parent x particle_mass to
+        # derive one from -- so there is no volume to preserve and any mass chosen here would be
+        # invented. Say so rather than shipping a body of 1e-12 m^3.
+        raise ValueError(
+            "the spec does not say how big its body is: give every type a `block:` in metres, or "
+            "(for a sphere) `shape: ball` with `per_parent` and `particle_mass`, since "
+            "V_body = N * particle_mass / density is the only way the size is expressed")
     mp["per_parent"] = max(1, n_tot // n_bodies)
     mp["particle_mass"] = float(f"{rho * V / max(n_bodies * mp['per_parent'], 1):.6g}")
     spec["_body_volume_m3"] = V                  # so knob_report does not recompute it circularly
     return spec
+
+
+# THE TWO NUMBERS THAT DECIDE WHETHER A RUN IS WORTH STARTING, and their bands.
+#
+# ppc -- particles per cell, N*dx^3/V. 8 is the target (two per axis, what the quadratic B-spline
+# needs to see a filled cell). Below 1 the grid cannot see the material at all; far above it the
+# extra particles buy nothing the grid can represent and cost time linearly. Both failure modes are
+# invisible in the picture until it is too late, which is why they get a light each.
+#
+# CFL -- the declared substep against the stability limit, micro_dt / dt_cfl. Over 1.0 the step is
+# unstable AS WRITTEN; the CFL pass then shrinks it and the substep count rises to pay for it, so
+# red here means "this will be slower than you think", not "this will explode".
+def metrics(spec: dict, k: dict) -> dict:
+    """CFL and particles-per-cell for this spec, BOTH from the engine's own reporters.
+
+    Neither number is recomputed here. `particles_per_cell` already walks the declared bodies, sizes
+    each from its block or radius, and divides by the CELL SIZE rather than n_grid^dim (the two agree
+    only on a unit box -- on a 0.1 m box the naive form is wrong by 1000x). `Courant_..._condition`
+    already knows the elastic and capillary limits and which one binds. Reimplementing either here
+    would give the studio a second opinion, and a second opinion is exactly what a gauge must not be.
+
+    THE WORST BODY IS THE ONE REPORTED. A spec with a well-sampled pool and an under-sampled drop is
+    an under-sampled spec: the drop is what will fracture.
+    """
+    import contextlib
+    import io
+    import tempfile
+    import yaml as _y
+    from plexus.generators.mpm_cfl import (PPC_FLOOR, PPC_TARGET,
+                                           Courant_Friedrichs_Lewy_condition as CFL,
+                                           particles_per_cell)
+    dim = int((spec.get("general") or {}).get("dim", 3))
+    target = PPC_TARGET if dim == 3 else 4.0
+    floor = target * PPC_FLOOR                       # the engine's own under-sampled line
+
+    ppc = {"color": "dim", "text": "--", "value": 0.0}
+    cfl = {"color": "dim", "text": "not an MPM spec", "value": 0.0, "ok": False}
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            _y.safe_dump(spec, f, sort_keys=False, default_flow_style=False)
+            tmp = f.name
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            rows = particles_per_cell(tmp)
+            changed, info = CFL(tmp)
+        if rows:
+            label, v, cells, n = min(rows, key=lambda r: r[1])
+            col = "red" if v < floor else ("green" if v <= target * 4 else "amber")
+            note = (f"  UNDER-SAMPLED (< {floor:.0f})" if v < floor
+                    else f"  oversampled, {v / target:.0f}x the target" if v > target * 4 else "")
+            ppc = {"value": round(v, 2), "color": col,
+                   "text": f"{v:.1f} per cell   {label}   {n:,.0f} over {cells:,.0f} cells{note}"}
+        if info:
+            # TWO SHAPES OF `info`, because the pass either accepted the step or replaced it: the
+            # accepting branch reports `micro_dt`/`dt_cfl`, the correcting one `dt_old`/`over_by`.
+            # Reading only the first raised KeyError on every spec that needed correcting -- which
+            # is to say on exactly the specs the gauge exists for.
+            r = float(info.get("over_by") or
+                      (float(info["micro_dt"]) / max(float(info["dt_cfl"]), 1e-30)))
+            after = _y.safe_load(open(tmp))
+            blk = next((b for b in (after.get("schedule") or [])
+                        if isinstance(b, dict) and "substep_dt" in b), None)
+            subs = round(float(after["general"]["dt"]) / float(blk["substep_dt"])) if blk else 0
+            col = "green" if r <= 0.8 else ("amber" if r <= 1.0 else "red")
+            cfl = {"value": round(r, 3), "ok": r <= 1.0, "color": col,
+                   "text": (f"{r:.2f}x of the limit   {subs} substeps/frame   "
+                            f"c {float(info['cmax']):.0f} m/s   binds: {info.get('binds', '-')}"
+                            + ("   WAS CORRECTED" if changed else ""))}
+    except Exception as e:                                              # noqa: BLE001
+        cfl = {"value": 0.0, "ok": False, "color": "red",
+               "text": f"{type(e).__name__}: {e}"[:130]}
+    finally:
+        if tmp and os.path.exists(tmp):
+            os.unlink(tmp)
+    return {"ppc": ppc, "cfl": cfl}
 
 
 def knob_report(spec: dict, k: dict) -> str:
@@ -275,6 +393,12 @@ class Job:
         if self.rc != 0:
             tail = [l for l in self.lines if l.strip()][-6:]
             self.error = " / ".join(tail) or f"exited {self.rc}"
+            # IN THE TERMINAL, NOT ONLY IN THE BROWSER. A run that cannot be generated is the one
+            # thing you most need the full text of -- a schema message, a CUDA OOM, a missing
+            # operator -- and a status line in a web page truncates it. This prints where you
+            # started the server, next to everything else the pipeline says.
+            fail(f"{self.tag or 'run'} {self.name!r} exited {self.rc}",
+                 "\n".join(self.lines[-25:]) or "(no output)")
 
     def kill(self):
         try:
@@ -418,6 +542,17 @@ CSS = """
   .chk { display:flex; gap:7px; align-items:center; font-size:11px; color:var(--dim);
          margin-top:8px; cursor:pointer; }
   .chk input { width:auto; }
+  /* Two lights. The left edge carries the colour so the state is readable at a glance without
+     reading the number, and the number is there for when the glance is not enough. */
+  .gauge { border:1px solid var(--line); border-left-width:4px; border-left-color:#444;
+           padding:6px 9px; margin-top:7px; }
+  .gauge b { display:block; font-size:9px; letter-spacing:.16em; color:var(--dim);
+             font-weight:600; margin-bottom:2px; }
+  .gauge span { font-size:11px; font-variant-numeric:tabular-nums; }
+  .gauge.green { border-left-color:var(--green); } .gauge.green span { color:var(--green); }
+  .gauge.amber { border-left-color:var(--amber); } .gauge.amber span { color:var(--amber); }
+  .gauge.red   { border-left-color:var(--red);   } .gauge.red   span { color:var(--red); }
+  .gauge.dim   { border-left-color:#444; } .gauge.dim span { color:var(--dim); }
 """
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8">
@@ -439,6 +574,8 @@ renders or validates on its own &mdash; the preview and the full run are the sam
       <div class="k"><span class="label">Width (cm)</span><input id="width" value="10"></div>
     </div>
     <div class="stat" id="knobstat" style="min-height:16px"></div>
+    <div class="gauge" id="g_ppc"><b>PARTICLES / CELL</b><span id="t_ppc">--</span></div>
+    <div class="gauge" id="g_cfl"><b>CFL</b><span id="t_cfl">--</span></div>
     <div class="label" style="margin-top:2px">Device</div>
     <select id="dev"><option>cuda:1</option><option>cuda:0</option><option>cpu</option></select>
     <div class="label" style="margin-top:6px">Model</div>
@@ -519,8 +656,21 @@ async function select(name) {
   $("yaml").value = d.raw || "";
   $("edstat").textContent = d.valid ? "valid" : ("INVALID: " + (d.error||""));
   $("edstat").className = "stat " + (d.valid ? "ok" : "bad");
-  showing = "png"; paint(d);
+  showing = "png"; paint(d); gauges();
 }
+
+async function gauges() {
+  if (!cur) { ["ppc","cfl"].forEach(k => { $("g_"+k).className = "gauge dim";
+                                           $("t_"+k).textContent = "--"; }); return; }
+  const m = await api("/api/studio/metrics", {name: cur, knobs: knobs()});
+  if (m.error) return;
+  ["ppc","cfl"].forEach(k => {
+    $("g_"+k).className = "gauge " + (m[k].color || "dim");
+    $("t_"+k).textContent = m[k].text;
+  });
+}
+["frames","particles","ngrid","width"].forEach(id =>
+  document.addEventListener("DOMContentLoaded", () => {}));
 
 function paint(d) {
   const S = $("scene");
@@ -573,7 +723,8 @@ $("preview").onclick = async () => {
 };
 $("newspec").onclick = () => { cur = null; $("prompt").focus(); $("yaml").value = "";
   $("scene").innerHTML = '<span class="empty">no scene yet</span>';
-  refresh(); say("new scene -- describe it and press PREVIEW"); };
+  ["particles","ngrid","width"].forEach(id => $(id).addEventListener("change", gauges));
+refresh(); say("new scene -- describe it and press PREVIEW"); };
 $("gen").onclick = () => { if (cur) api("/api/studio/run",
     {name: cur, device: $("dev").value, preview: false}).then(watch); };
 $("stop").onclick = () => api("/api/studio/stop", {name: cur}).then(() => say("stopped", "warn"));
@@ -610,6 +761,7 @@ $("save").onclick = async () => {
   $("edstat").className = "stat " + (d.saved ? "ok" : "bad");
 };
 
+["particles","ngrid","width"].forEach(id => $(id).addEventListener("change", gauges));
 refresh();
 """
 
