@@ -22,16 +22,18 @@ def main(argv=None):
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true")
+    ap.add_argument("--studio", action="store_true",
+                    help="open the prompt-to-scene studio instead of the node editor")
     args = ap.parse_args(argv)
 
     httpd = serve(args.host, args.port)
-    url = f"http://{args.host}:{args.port}/"
-    if args.spec:
+    url = f"http://{args.host}:{args.port}/" + ("studio" if args.studio else "")
+    if args.spec and not args.studio:
         sp = os.path.abspath(os.path.expanduser(args.spec))
         if os.path.isfile(sp):
             url += f"?spec={quote(sp)}"
 
-    print(f"  Plexus spec editor  ->  {url}")
+    print(f"  {'Plexus Studio' if args.studio else 'Plexus spec editor'}  ->  {url}")
     print("  (Ctrl-C to stop)")
 
     if not args.no_browser:

@@ -159,6 +159,17 @@ def _dump_yaml(spec: dict) -> str:
                           default_flow_style=False, allow_unicode=True)
 
 
+def _studio_name(prompt: str) -> str:
+    """A filesystem name from the prompt's first few words, uniquified against what is there."""
+    import re as _re
+    base = "_".join(_re.findall(r"[a-z0-9]+", prompt.lower())[:4]) or "scene"
+    from plexus.gui import studio
+    n, i = base, 2
+    while os.path.exists(os.path.join(studio.CONFIG_DIR, n + ".yaml")):
+        n, i = f"{base}_{i}", i + 1
+    return n
+
+
 def _validate(spec: dict):
     """Run the real schema validator on a temp copy. Returns (ok, error)."""
     tmp = None
@@ -302,6 +313,39 @@ class Handler(BaseHTTPRequestHandler):
             full = os.path.join(STATIC, rel)
             return self._send_file(full, _ctype(full))
 
+        if route == "/studio":
+            from plexus.gui import studio
+            body = studio.page().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+
+        if route == "/api/studio/list":
+            from plexus.gui import studio
+            return self._send_json({"specs": studio.list_specs()})
+
+        if route == "/api/studio/spec":
+            from plexus.gui import studio
+            name = (q.get("name") or [""])[0]
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            if not name or not os.path.exists(sp):
+                return self._send_json({"error": "no such spec"}, 404)
+            raw = open(sp).read()
+            try:
+                ok, err = _validate(yaml.safe_load(raw) or {})
+            except Exception as e:                                       # noqa: BLE001
+                ok, err = False, str(e)
+            return self._send_json({"name": name, "path": sp, "raw": raw,
+                                    "valid": ok, "error": err, **studio.artefacts(name)})
+
+        if route == "/api/studio/progress":
+            from plexus.gui import studio
+            j = studio.JOBS.get((q.get("name") or [""])[0])
+            return self._send_json(j.status() if j else {"done": True, "rc": 0,
+                                                         "frame": 0, "total": 0, "pct": 0})
+
         if route == "/api/catalog":
             return self._send_json(catalog())
 
@@ -344,6 +388,79 @@ class Handler(BaseHTTPRequestHandler):
             data = self._read_json()
         except Exception as e:  # noqa: BLE001
             return self._send_json({"error": f"bad json: {e}"}, 400)
+
+        if route == "/api/studio/author":
+            # THE SERVER OWNS THE FILE. Claude runs read-only and hands back text; nothing reaches
+            # config/studio/ until `plexus.schema.load` -- the same validator the engine trusts --
+            # has accepted it. An invalid spec is returned as an error with the schema's own
+            # message, so what you see is what the engine would have said.
+            from plexus.gui import studio
+            prompt = (data.get("prompt") or "").strip()
+            if not prompt:
+                return self._send_json({"error": "empty prompt"}, 400)
+            os.makedirs(studio.CONFIG_DIR, exist_ok=True)
+            # AN EXISTING NAME MEANS EDIT, NOT REPLACE. "make the ball bigger" is only meaningful
+            # against the spec on screen, so the current YAML goes with the request and the reply
+            # is written back over the same file. A missing name starts a new one.
+            name = data.get("name") or _studio_name(prompt)
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            current = open(sp).read() if os.path.exists(sp) else ""
+            res = studio.author_spec(prompt, name, current=current,
+                                     model=data.get("model") or "sonnet",
+                                     deep=bool(data.get("deep")))
+            if not res["yaml"]:
+                return self._send_json({"error": f"Claude returned no YAML (rc={res['rc']}, "
+                                                 f"{res['seconds']}s)",
+                                        "detail": (res["log"] or res["raw"])[-600:],
+                                        "seconds": res["seconds"]})
+            try:
+                spec = yaml.safe_load(res["yaml"]) or {}
+            except Exception as e:                                       # noqa: BLE001
+                return self._send_json({"error": f"not YAML: {e}", "seconds": res["seconds"],
+                                        "detail": res["yaml"][:600]})
+            spec = studio.apply_knobs(spec, data.get("knobs") or {})
+            spec.setdefault("general", {})["name"] = name
+            ok, err = _validate(spec)
+            if not ok:
+                return self._send_json({"error": "schema rejected the spec", "detail": err,
+                                        "seconds": res["seconds"]})
+            with open(sp, "w") as f:
+                f.write(_dump_yaml(spec))
+            return self._send_json({"name": name, "seconds": res["seconds"], "valid": True,
+                                    "report": studio.knob_report(spec, data.get("knobs") or {})})
+
+        if route == "/api/studio/save":
+            from plexus.gui import studio
+            name = data.get("name") or ""
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            if not name or not os.path.exists(sp):
+                return self._send_json({"saved": False, "error": "no such spec"}, 404)
+            try:
+                spec = yaml.safe_load(data.get("raw") or "") or {}
+            except Exception as e:                                       # noqa: BLE001
+                return self._send_json({"saved": False, "error": f"not YAML: {e}"})
+            ok, err = _validate(spec)
+            if not ok:
+                return self._send_json({"saved": False, "error": err})
+            # THE TEXT YOU TYPED IS WHAT IS WRITTEN, not a re-dump of the parse. A round-trip
+            # through yaml.safe_dump silently reorders keys and drops the layout you were reading,
+            # which makes SAVE feel like it edited your file behind you.
+            with open(sp, "w") as f:
+                f.write(data.get("raw") or "")
+            return self._send_json({"saved": True, "valid": True})
+
+        if route == "/api/studio/run":
+            from plexus.gui import studio
+            return self._send_json(studio.start_run(data.get("name") or "",
+                                                    data.get("device") or "cuda:1",
+                                                    bool(data.get("preview"))))
+
+        if route == "/api/studio/stop":
+            from plexus.gui import studio
+            j = studio.JOBS.get(data.get("name") or "")
+            if j:
+                j.kill()
+            return self._send_json({"stopped": bool(j)})
 
         if route == "/api/validate":
             ok, err = _validate(data.get("spec", {}))
