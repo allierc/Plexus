@@ -170,7 +170,13 @@ class LiveMovie:
             if _sm <= 0:
                 raise ValueError(f"plotting.slow_motion must be > 0, got {_sm}")
             n_rendered = max(1, self.n_frames // self.stride)
-            fps = n_rendered / (self.duration_s * _sm)
+            # A ZERO-LENGTH RUN HAS NO DURATION TO DIVIDE BY. `n_frames: 0` is a legitimate request
+            # -- it renders the seeded scene and nothing else, which is what the studio's preview
+            # wants -- but `duration_s` is then 0 and this was a ZeroDivisionError inside the movie
+            # writer, so the run died after building the whole hierarchy. A single frame has no
+            # playback rate to get right; 1 fps is as true as any other.
+            _dur = self.duration_s * _sm
+            fps = (n_rendered / _dur) if _dur > 0 else 1.0
             self.slow_motion = _sm
             self.speed = float(fps) * self.stride * frame_s      # world-seconds per video-second
             self.fps = fps                                       # <- what open_movie must use
