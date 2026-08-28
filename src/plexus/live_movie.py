@@ -468,7 +468,16 @@ class LiveMovie:
             pos = self._xyz(lvl)
             self.cloud = self.pv.PolyData(pos)
             self.cloud["rgb"] = self._rgb(H, lvl, pos)
-            self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **FLAT,
+            # POINT SPRITES AND THE CHART OVERLAY DO NOT COEXIST. `add_chart` inserts a
+            # vtkContextActor, and with one present `render_points_as_spheres=True` draws nothing at
+            # all: measured on this scene, 3,701 blue pixels with the panel and 61,331 without, from
+            # an identical simulation whose colour array was uniformly [76, 158, 255] either way.
+            # Plain GL points render correctly alongside the chart and are visually identical at the
+            # 1-2 px these dots are drawn at, so the panel costs the sprite, not the picture.
+            _flat = dict(FLAT)
+            if self.cs is not None:
+                _flat["render_points_as_spheres"] = False
+            self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                             point_size=self._dot_px(pos))
             self.t0 = time.perf_counter()
             return
