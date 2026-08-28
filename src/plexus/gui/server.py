@@ -460,6 +460,19 @@ class Handler(BaseHTTPRequestHandler):
                 f.write(data.get("raw") or "")
             return self._send_json({"saved": True, "valid": True})
 
+        if route == "/api/studio/dev":
+            from plexus.gui import studio
+            p = (data.get("prompt") or "").strip()
+            if not p:
+                return self._send_json({"error": "empty prompt"}, 400)
+            return self._send_json(studio.start_dev(p, model=data.get("model") or "sonnet"))
+
+        if route == "/api/studio/devstatus":
+            from plexus.gui import studio
+            d = dict(studio.DEV.get("dev") or {"running": False})
+            d["text"] = (d.get("text") or "")[:400]      # the full text went to the terminal
+            return self._send_json(d)
+
         if route == "/api/studio/metrics":
             from plexus.gui import studio
             sp = os.path.join(studio.CONFIG_DIR, (data.get("name") or "") + ".yaml")
