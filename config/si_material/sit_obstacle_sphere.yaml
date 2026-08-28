@@ -1,37 +1,19 @@
 general:
-  name: si_snow_funnel
+  name: sit_obstacle_sphere
   seed: 0
-  n_frames: 1200
+  n_frames: 2400
   dt: 0.0008333333333333334
   boundary: wall
-  obstacles:
-  - - 0.0
-    - 0.0
-    - 0.09
-    - 0.5
-  - - 0.09
-    - 0.0
-    - 0.15
-    - 0.275
-  - - 0.15
-    - 0.0
-    - 0.21
-    - 0.16
-  - - 0.29
-    - 0.0
-    - 0.35
-    - 0.16
-  - - 0.35
-    - 0.0
-    - 0.41
-    - 0.275
-  - - 0.41
-    - 0.0
-    - 0.5
-    - 0.5
+  dim: 3
   world:
   - 0.5
   - 0.5
+  - 0.5
+  obstacles:
+  - - 0.25
+    - 0.15
+    - 0.25
+    - 0.065
   save_data: false
   units:
     length_um: 1000000.0
@@ -40,29 +22,32 @@ general:
 sets:
   cell:
     n: 1
-    start:
-    - 0.25
-    - 0.4
-    - 0.25
-    - 0.4
     types:
-      snow:
+      water:
         fraction: 1.0
+        block:
+        - 0.18
+        - 0.29
+        - 0.18
+        - 0.32
+        - 0.43
+        - 0.32
         layers:
         - frac: 1.0
-          material: snow
-          youngs: 500000.0
-        youngs: 500000.0
+          material: liquid
+          bulk_modulus: 981000.0
+        bulk_modulus: 981000.0
+        material: liquid
   mpm_particle:
     parent: cell
-    per_parent: 30000
-    radius: 0.09
-    density: 400.0
-    particle_mass: 4.0715e-05
+    per_parent: 1242990
+    radius: 0.025
+    density: 1000.0
+    particle_mass: 2.20758e-06
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -71,33 +56,53 @@ operators:
   g: 9.81
 - op: mpm_strain
   at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
 - op: mpm_scatter
   at: mpm_particle
   to: mpm_grid
   drag: 0.0
   a_max: 200.0
+  implementation: warp
+  polar: higham
 - op: mpm_grid_update
   at: mpm_grid
+  wall_damp: 0.9
   surface_tension: 0.0
-  wall_damp: 0.5
-  implementation: nosync
-  csf_rho: 400.0
-  csf_band: 0.2
+  csf_rho: 1000.0
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
-  wall_damp: 0.5
+  wall_damp: 0.9
   vmax: 1000000000.0
+  implementation: warp
 schedule:
 - aggregate
 - gravity
 - substep_dt: 8.333333333333333e-05
   steps:
   - mpm_strain
+  - mpm_viscosity
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
 plotting:
   background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: dots
   dot_size: 1.2
+  splat_res: 620
+  box_frame: true
+  hide_sets:
+  - cell
+  colors:
+    water:
+    - 0.3
+    - 0.62
+    - 1.0
   slow_motion: 4

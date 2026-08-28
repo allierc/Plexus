@@ -84,7 +84,7 @@ operators:
 schedule:
 - aggregate
 - gravity
-- substep_dt: 8.333333333333333e-05
+- substep_dt: 1.602564e-05
   steps:
   - mpm_strain
   - mpm_viscosity

@@ -1,7 +1,7 @@
 general:
-  name: si_obstacle_sphere
+  name: sit_obstacle_pillars
   seed: 0
-  n_frames: 900
+  n_frames: 2400
   dt: 0.0008333333333333334
   boundary: wall
   dim: 3
@@ -10,10 +10,30 @@ general:
   - 0.5
   - 0.5
   obstacles:
-  - - 0.25
+  - - 0.15
+    - 0.0
     - 0.15
-    - 0.25
-    - 0.065
+    - 0.19
+    - 0.275
+    - 0.19
+  - - 0.31
+    - 0.0
+    - 0.15
+    - 0.35
+    - 0.275
+    - 0.19
+  - - 0.15
+    - 0.0
+    - 0.31
+    - 0.19
+    - 0.275
+    - 0.35
+  - - 0.31
+    - 0.0
+    - 0.31
+    - 0.35
+    - 0.275
+    - 0.35
   save_data: false
   units:
     length_um: 1000000.0
@@ -26,27 +46,28 @@ sets:
       water:
         fraction: 1.0
         block:
-        - 0.18
-        - 0.29
-        - 0.18
-        - 0.32
-        - 0.43
-        - 0.32
+        - 0.15
+        - 0.31
+        - 0.15
+        - 0.35
+        - 0.45
+        - 0.35
         layers:
         - frac: 1.0
           material: liquid
           bulk_modulus: 981000.0
         bulk_modulus: 981000.0
+        material: liquid
   mpm_particle:
     parent: cell
-    per_parent: 155373
+    per_parent: 2536715
     radius: 0.025
     density: 1000.0
-    particle_mass: 1.76607e-05
+    particle_mass: 2.20758e-06
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -68,14 +89,13 @@ operators:
   polar: higham
 - op: mpm_grid_update
   at: mpm_grid
-  wall_damp: 0.9
-  surface_tension: 0.072
+  wall_damp: 0.85
+  surface_tension: 0.0
   csf_rho: 1000.0
-  csf_band: 0.2
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
-  wall_damp: 0.9
+  wall_damp: 0.85
   vmax: 1000000000.0
   implementation: warp
 schedule:

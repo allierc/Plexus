@@ -1,10 +1,12 @@
 general:
-  name: si_crown_splash
+  name: sit_water_st000
   seed: 0
-  n_frames: 1200
+  n_frames: 2400
   dt: 0.0008333333333333334
   boundary: wall
+  dim: 3
   world:
+  - 0.1
   - 0.1
   - 0.1
   save_data: false
@@ -14,42 +16,37 @@ general:
     force_nN: 1000000000.0
 sets:
   cell:
-    n: 2
+    n: 1
     start:
-    - 0.05
-    - 0.08600000000000001
-    - 0.05
-    - 0.08600000000000001
+    - - 0.05
+      - 0.05500000000000001
+      - 0.05
     types:
       water:
-        fraction: 0.5
+        fraction: 1.0
         block:
-        - 0.003
-        - 0.003
-        - 0.097
-        - 0.038000000000000006
+        - 0.034
+        - 0.042
+        - 0.034
+        - 0.066
+        - 0.082
+        - 0.066
         layers:
         - frac: 1.0
           material: liquid
           bulk_modulus: 196200.0
         bulk_modulus: 196200.0
-      ball:
-        fraction: 0.5
-        layers:
-        - frac: 1.0
-          material: elastic
-          youngs: 1000000.0
-        youngs: 1000000.0
+        material: liquid
   mpm_particle:
     parent: cell
-    per_parent: 97000
-    radius: 0.010000000000000002
+    per_parent: 2319282
+    radius: 0.022000000000000002
     density: 1000.0
-    particle_mass: 1.69588e-05
+    particle_mass: 1.76606e-08
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 192
 operators:
 - op: aggregate
   at: cell
@@ -58,6 +55,7 @@ operators:
   g: 9.81
 - op: mpm_strain
   at: mpm_particle
+  implementation: warp
 - op: mpm_viscosity
   at: mpm_particle
   eta: 0.001
@@ -66,18 +64,19 @@ operators:
   to: mpm_grid
   drag: 0.0
   a_max: 200.0
+  implementation: warp
+  polar: higham
 - op: mpm_grid_update
   at: mpm_grid
-  surface_tension: 0.072
-  wall_damp: 0.5
-  implementation: nosync
+  wall_damp: 0.9
+  surface_tension: 0.0
   csf_rho: 1000.0
-  csf_band: 0.2
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
-  wall_damp: 0.5
+  wall_damp: 1.0
   vmax: 1000000000.0
+  implementation: warp
 schedule:
 - aggregate
 - gravity
@@ -90,5 +89,20 @@ schedule:
   - mpm_gather
 plotting:
   background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
   dot_size: 1.2
+  render_3d: dots
+  splat_size: 2.4
+  splat_res: 560
+  camera_turns: 0.0
+  colors:
+    water:
+    - 0.3
+    - 0.62
+    - 1.0
   slow_motion: 4
