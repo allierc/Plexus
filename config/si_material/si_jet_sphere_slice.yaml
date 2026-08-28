@@ -8,11 +8,11 @@ general:
   dim: 3
   world:
   - 0.1
-  - 0.1
+  - 0.05
   - 0.1
   obstacles:
   - - 0.05
-    - 0.0825
+    - 0.0325
     - 0.05
     - 0.002
   save_data: false
@@ -32,14 +32,14 @@ sets:
         eta: 0.001
   mpm_particle:
     parent: cell
-    per_parent: 170000
+    per_parent: 1000000
     radius: 0.5
     density: 1000.0
-    particle_mass: 1.41285e-07
+    particle_mass: 5.23278e-09
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 96
+    n_grid: 144
 operators:
 - op: aggregate
   at: cell
@@ -52,10 +52,10 @@ operators:
   speed: 0.8
   ppc: 8.0
   patch:
-  - 0.42
-  - 0.42
-  - 0.58
-  - 0.58
+  - 0.46
+  - 0.46
+  - 0.54
+  - 0.54
 - op: mpm_drain
   at: mpm_particle
   face: -y
@@ -109,7 +109,7 @@ plotting:
   hide_sets:
   - cell
   render_3d: dots
-  dot_size: 1.2
+  dot_size: 1.0
   slow_motion: 4
   colors:
     jet:
@@ -119,6 +119,6 @@ plotting:
   cross_section:
     axis: z
     at: 0.5
-    thickness: 4
+    thickness: 2.88
     max_points: 8000
     only: true
