@@ -456,7 +456,10 @@ def apply_knobs(spec: dict, k: dict) -> dict:
             "V_body = N * particle_mass / density is the only way the size is expressed")
     mp["per_parent"] = max(1, n_tot // n_bodies)
     mp["particle_mass"] = float(f"{rho * V / max(n_bodies * mp['per_parent'], 1):.6g}")
-    spec["_body_volume_m3"] = V                  # so knob_report does not recompute it circularly
+    # NOT STASHED ON THE SPEC. A scratch key here is written straight into config/studio/<name>.yaml
+    # by the save that follows, and `_body_volume_m3: 1.257e-05` duly appeared at the bottom of every
+    # generated spec -- harmless to the engine, which ignores unknown top-level keys, and exactly the
+    # kind of thing that gets copied into a hand-written spec later because it looks official.
     return spec
 
 
@@ -573,7 +576,7 @@ def knob_report(spec: dict, k: dict) -> str:
     ng = int(k.get("n_grid", DEFAULTS["n_grid"]))
     n = int(k.get("particles", DEFAULTS["particles"]))
     dx = w / ng
-    V = float(spec.pop("_body_volume_m3", 0.0)) or _body_volume(spec)
+    V = _body_volume(spec)
     return (f"{n:,} particles  |  {ng}^3 cells, dx {dx * 1000:.2f} mm  |  body {V * 1e6:.1f} cm^3"
             f"  |  ppc {n * dx ** 3 / V:.1f}")
 
