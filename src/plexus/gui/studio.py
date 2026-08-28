@@ -99,7 +99,15 @@ REFERENCES = ("si_laplace_r10",        # zero g, surface tension, csf_rho/csf_ba
               "si_crown_drop",         # two liquid types, capillary scale
               "si_split_merge",        # frame-gated operators: before_frame / after_frame
               "si_viscous_spread",     # mpm_viscosity
-              "si_restitution")        # elastic solids, several types at once
+              "si_restitution",        # elastic solids, four blocks in ONE cell
+              # N SEPARATE BODIES, WHICH NOTHING ELSE HERE SHOWED. "add 10 balls" failed because the
+              # corpus had no example of the idiom that does it: `n: N` with N `start` positions and
+              # `shape: ball`, one body per cell. si_restitution LOOKS like several bodies but is one
+              # cell holding four blocks, and a block cannot be a sphere -- so a model reading only
+              # that has no way to reach ten balls except by writing ten blocks, which is not what
+              # was asked and does not scale.
+              "si_two_drops3d_s144",   # n + start + shape: ball -- two bodies, generalises to N
+              "si_balls_bouncy")       # n = 3, per-body types and colours
 TEX_SECTIONS = ((125, 258),      # The language: operators, sets, states, fields, hierarchy
                 (934, 1045))     # Schedules, model specification, units
 
@@ -120,6 +128,14 @@ Hard requirements:
   * gravity `g: 9.81` unless the scene is explicitly weightless.
   * `surface_tension` in N/m, and only WITH `csf_rho` set to the liquid density; otherwise omit it.
   * Obstacles are axis-aligned boxes [x0,y0,z0,x1,y1,z1] or spheres [cx,cy,cz,r], in metres.
+
+N SEPARATE BODIES -- "ten balls", "three drops", "a row of cubes" -- is `sets.cell.n: N` with N
+entries under `sets.cell.start` (one [x,y,z] per body, in metres) and a type carrying `shape: ball`
+or `shape: cube`. ONE body per cell, placed at its start. Give each type a `fraction` summing to 1;
+several types split the bodies between them and each can have its own colour under plotting.colors.
+Do NOT write N `block:` entries to make N bodies -- a block is one box at fixed coordinates, it
+cannot be a sphere, and it does not scale past a handful. See si_two_drops3d_s144 (n: 2) and
+si_balls_bouncy (n: 3) in the material above.
 
 HOW A BODY GETS ITS SIZE. Particle count, particle mass, density and body volume are ONE relation,
 not four numbers:
@@ -1174,12 +1190,18 @@ $("preview").onclick = async () => {
 $("newspec").onclick = () => { cur = null; $("prompt").focus(); $("yaml").value = "";
   $("scene").innerHTML = '<span class="empty">no scene yet</span>';
   ["particles","ngrid","width"].forEach(id => $(id).addEventListener("change", gauges));
+$("effort").addEventListener("change", readyPoll);      // the line names the effort in use
 async function readyPoll() {
   const s = await api("/api/studio/session");
   const R = $("ready");
   if (s.state === "ready") {
-    R.textContent = `Claude ready -- ${(s.chars||0).toLocaleString()} chars primed `
-      + `(${s.specs} specs + operator registry + plexus2.tex) in ${s.seconds}s, effort high`;
+    // "in 0s, effort high" was two small lies at once: 0 s means the session was REUSED from
+    // disk rather than primed in no time, and the effort shown was hardcoded while the selector
+    // said otherwise. Both now report what is actually the case.
+    R.textContent = `Claude ready -- ${(s.chars||0).toLocaleString()} chars `
+      + `(${s.specs} specs + operator registry + plexus2.tex), `
+      + (s.seconds > 0 ? `primed in ${s.seconds}s` : "session reused from disk")
+      + `, effort ${$("effort").value}`;
     R.className = "stat ok";
   } else if (s.state === "priming") {
     R.textContent = "Claude: loading configs and plexus2.tex into a session ...";
@@ -1306,12 +1328,18 @@ $("save").onclick = async () => {
 };
 
 ["particles","ngrid","width"].forEach(id => $(id).addEventListener("change", gauges));
+$("effort").addEventListener("change", readyPoll);      // the line names the effort in use
 async function readyPoll() {
   const s = await api("/api/studio/session");
   const R = $("ready");
   if (s.state === "ready") {
-    R.textContent = `Claude ready -- ${(s.chars||0).toLocaleString()} chars primed `
-      + `(${s.specs} specs + operator registry + plexus2.tex) in ${s.seconds}s, effort high`;
+    // "in 0s, effort high" was two small lies at once: 0 s means the session was REUSED from
+    // disk rather than primed in no time, and the effort shown was hardcoded while the selector
+    // said otherwise. Both now report what is actually the case.
+    R.textContent = `Claude ready -- ${(s.chars||0).toLocaleString()} chars `
+      + `(${s.specs} specs + operator registry + plexus2.tex), `
+      + (s.seconds > 0 ? `primed in ${s.seconds}s` : "session reused from disk")
+      + `, effort ${$("effort").value}`;
     R.className = "stat ok";
   } else if (s.state === "priming") {
     R.textContent = "Claude: loading configs and plexus2.tex into a session ...";
