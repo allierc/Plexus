@@ -115,6 +115,11 @@ class LiveMovie:
             self.cs_at = float(_cs.get("at", 0.35))          # fraction of the box along that axis
             self.cs_cells = float(_cs.get("thickness", 4.0))  # slab half-width, in CELLS
             self.cs_max = int(_cs.get("max_points", 6000))
+            # `only: true` REPLACES the 3D view rather than sitting in its corner. A slice IS the
+            # better picture for a jet: the 3D column is an opaque silhouette that hides its own
+            # interior, and the wake behind an obstacle is exactly the thing a silhouette cannot
+            # show. As an inset it is legible but small; as the whole frame it is the movie.
+            self.cs_only = bool(_cs.get("only", False))
             self.cs_cfg = _cs
         self.px_used = None
         self.up = int(up)
@@ -308,7 +313,11 @@ class LiveMovie:
             self.p.camera.parallel_projection = True
             self.p.camera.parallel_scale = radius * 1.45
 
-        self._draw_obstacles(span)
+        # WITH `only`, NOTHING 3D IS DRAWN AT ALL -- no obstacles, and below, no particle cloud.
+        # Leaving them in would put the silhouette back behind a transparent chart, which is the
+        # picture this option exists to replace.
+        if not getattr(self, "cs_only", False):
+            self._draw_obstacles(span)
         # A FRAGMENTED MP4, SO THE FILE IS READABLE WHILE IT IS STILL BEING WRITTEN.
         # A plain mp4 keeps its index -- the moov atom -- at the END, so nothing before close()
         # plays and copying the file mid-run copies an unreadable prefix. That is why killing a run
@@ -327,7 +336,8 @@ class LiveMovie:
         if self.cs is None and getattr(self, "cs_cfg", None) is not None:
             ax = self.cs_axis
             lat = [k for k in range(3) if k != ax][:2]
-            ch = pv.Chart2D(size=(0.26, 0.26), loc=(0.015, 0.645))
+            ch = (pv.Chart2D(size=(0.80, 0.86), loc=(0.12, 0.07)) if self.cs_only
+                  else pv.Chart2D(size=(0.26, 0.26), loc=(0.015, 0.645)))
             ch.background_color = (0, 0, 0, 0.55)
             ch.border_color = "#9a9a9a"
             names = "xyz"
@@ -351,8 +361,10 @@ class LiveMovie:
                 _a.grid = False
             ch.legend_visible = False
             _c = list((style or {}).get("colors", {}).values())
-            self._cs_series = ch.scatter([0.0], [0.0], size=3, style="o",
-                                         color=(tuple(_c[0]) if _c else (0.3, 0.62, 1.0)))
+            self._cs_size = 6 if self.cs_only else 3
+            self._cs_colour = tuple(_c[0]) if _c else (0.3, 0.62, 1.0)
+            self._cs_series = ch.scatter([0.0], [0.0], size=self._cs_size, style="o",
+                                         color=self._cs_colour)
             self.p.add_chart(ch)
             self.cs = ch
             self._cs_lat = lat
@@ -477,8 +489,11 @@ class LiveMovie:
             _flat = dict(FLAT)
             if self.cs is not None:
                 _flat["render_points_as_spheres"] = False
-            self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
-                            point_size=self._dot_px(pos))
+            if not getattr(self, "cs_only", False):
+                self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
+                                point_size=self._dot_px(pos))
+            else:
+                self.px_used = self._dot_px(pos)      # still reported in the header
             self.t0 = time.perf_counter()
             return
         if tick % self.stride:
@@ -521,7 +536,6 @@ class LiveMovie:
             if occ is not None:
                 X = X[occ > 0]
             if X.shape[0] == 0:
-                self._cs_series.update([], [])
                 return
             ax, (a, b) = self.cs_axis, self._cs_lat
             dx = float(self.world[ax]) / 96.0
@@ -535,7 +549,22 @@ class LiveMovie:
             if P.shape[0] > self.cs_max:            # a slab of a big jet is tens of thousands
                 step = P.shape[0] // self.cs_max + 1
                 P = P[::step]
-            self._cs_series.update(P[:, a].cpu().numpy(), P[:, b].cpu().numpy())
+            # THE SERIES IS REPLACED, NOT UPDATED. `update()` swaps the arrays and the rendered
+            # panel keeps whatever it drew first: 81,583 particles spanning the full column were
+            # handed over every frame while the picture still showed the inlet sheet from frame 0.
+            # `Modified()` on the plot and the chart did not shift it either. Removing the plot and
+            # adding a fresh one does, and at <= max_points it is a few thousand values a frame.
+            #
+            # Counting the array said "live" the whole time, which is why tools/viz_smoke.py
+            # compares PIXELS between frames rather than state.
+            xs = P[:, a].cpu().numpy()
+            ys = P[:, b].cpu().numpy()
+            try:
+                self.cs.remove_plot(self._cs_series)
+            except Exception:                            # noqa: BLE001
+                pass
+            self._cs_series = self.cs.scatter(xs, ys, size=self._cs_size, style="o",
+                                              color=self._cs_colour)
         except Exception as e:                       # noqa: BLE001 -- a panel must never kill a run
             if not getattr(self, "_cs_warned", False):
                 self._cs_warned = True
