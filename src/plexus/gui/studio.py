@@ -954,7 +954,7 @@ renders or validates on its own &mdash; the preview and the full run are the sam
     <div style="margin-top:14px">
       <div class="promptrow">
         <span class="plexus">Plexus:</span>
-        <textarea id="prompt" rows="3" placeholder="describe a scene">a 2 cm water drop falls down</textarea>
+        <textarea id="prompt" rows="3" placeholder="describe a scene -- Enter to preview, Shift+Enter for a new line">a 2 cm water drop falls down</textarea>
       </div>
       <div class="row">
         <button id="preview">Preview</button>
@@ -1204,6 +1204,22 @@ $("devgo").onclick = async () => {
       $("devstat").className = "stat ok"; }
   }, 1500);
 };
+
+// ENTER PREVIEWS, SHIFT+ENTER IS A NEWLINE -- the chat-box convention, because that is what this
+// box now behaves like. A bare Enter in a <textarea> would otherwise insert a line nobody wanted:
+// these prompts are one line ("make the ball bigger"), and reaching for the mouse to run a one-line
+// prompt is the friction the whole loop exists to remove. Shift+Enter keeps multi-line available
+// for the occasional long scene description.
+function submitOnEnter(box, btn) {
+  $(box).addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      if (!$(btn).disabled) $(btn).click();
+    }
+  });
+}
+submitOnEnter("prompt", "preview");
+submitOnEnter("devprompt", "devgo");
 
 $("view").onclick = () => $("ed").classList.toggle("on");
 $("showpng").onclick = () => { showing = "png"; repaint(); };
