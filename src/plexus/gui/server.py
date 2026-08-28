@@ -606,6 +606,7 @@ def serve(host="127.0.0.1", port=8765, prime=True):
         try:
             from plexus.gui import studio
             studio.prime_async()
+            studio.worker_ready_async()      # imports torch/warp/pyvista once, off the hot path
         except Exception as e:                                       # noqa: BLE001
             print(f"[studio] could not start priming: {e}", flush=True)
     return httpd

@@ -674,12 +674,46 @@ def start_dev(prompt: str, model: str = "sonnet", timeout: int = 900) -> dict:
 
 
 # --------------------------------------------------------------------------------- run tracking
-class Job:
-    """One `Plexus_Main.py -o generate` subprocess, with its tqdm counter scraped for a bar.
+WORKER: dict = {"p": None, "lock": threading.Lock(), "ready": False, "started": 0.0}
 
-    NOT a reimplementation of the generator: it starts the same command a person would type and
-    reads its stdout. The frame counter tqdm already prints is the progress bar's only source, so
-    the bar cannot claim progress the run has not made.
+
+def worker_start() -> bool:
+    """Start (or restart) the warm process. Returns True once it says it is ready."""
+    w = WORKER.get("p")
+    if w is not None and w.poll() is None and WORKER.get("ready"):
+        return True
+    t0 = time.time()
+    p = subprocess.Popen([PY, "-u", "-m", "plexus.gui.worker"], cwd=REPO,
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True, bufsize=1,
+                         env={**os.environ, "PYTHONPATH": os.path.join(REPO, "src")})
+    WORKER.update(p=p, ready=False, started=t0)
+    for raw in p.stdout:                                             # type: ignore[union-attr]
+        if raw.startswith("[worker] ready"):
+            WORKER["ready"] = True
+            print(f"[studio] warm worker up in {time.time() - t0:.1f}s "
+                  f"(torch, warp, pyvista and the operator atlas imported once)", flush=True)
+            return True
+        if p.poll() is not None:
+            break
+        print(f"[studio/worker] {raw.rstrip()}", flush=True)
+    fail("the warm worker did not come up; falling back to a fresh process per run")
+    WORKER.update(p=None, ready=False)
+    return False
+
+
+def worker_ready_async() -> None:
+    threading.Thread(target=worker_start, daemon=True).start()
+
+
+class Job:
+    """One generate, with its tqdm counter scraped for a bar.
+
+    NOT a reimplementation of the generator: it runs `Plexus_Main.main()` with the argv a person
+    would type -- in the warm worker when there is one, in a fresh process when there is not. The
+    frame counter tqdm already prints is the progress bar's only source, so the bar cannot claim
+    progress the run has not made, and the two routes produce identical output because they are the
+    same code.
     """
 
     _RE = re.compile(r"(\d+)/(\d+)\s*\[")            # tqdm's "  184/801 [04:43<15:54, ...]"
@@ -691,13 +725,25 @@ class Job:
         self.done, self.rc, self.error = False, None, None
         self.lines: list[str] = []
         self.started = time.time()
-        cmd = [PY, "-u", MAIN, "-o", "generate", f"studio/{name}",
-               "--device", device, "--no-describe", "--force",
-               "--render-n", str(render_n)]
-        self.cmd = cmd
-        self.p = subprocess.Popen(cmd, cwd=REPO, stdout=subprocess.PIPE,
-                                  stderr=subprocess.STDOUT, text=True, bufsize=1,
-                                  env={**os.environ, "PYTHONPATH": os.path.join(REPO, "src")})
+        argv = ["-o", "generate", f"studio/{name}", "--device", device,
+                "--no-describe", "--force", "--render-n", str(render_n)]
+        self.cmd = argv
+        self.p = None
+        self.warm = bool(WORKER.get("ready") and WORKER["p"] and WORKER["p"].poll() is None)
+        if self.warm:
+            from plexus.gui.worker import SENTINEL                   # noqa: F401
+            WORKER["lock"].acquire()                                 # ONE run at a time: one GPU
+            try:
+                WORKER["p"].stdin.write(json.dumps({"argv": argv}) + "\n")
+                WORKER["p"].stdin.flush()
+            except Exception:                                        # noqa: BLE001
+                WORKER["lock"].release()
+                self.warm = False
+        if not self.warm:
+            self.p = subprocess.Popen([PY, "-u", MAIN] + argv, cwd=REPO,
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                      text=True, bufsize=1,
+                                      env={**os.environ, "PYTHONPATH": os.path.join(REPO, "src")})
         threading.Thread(target=self._pump, daemon=True).start()
 
     def _pump(self):
@@ -705,32 +751,51 @@ class Job:
         # unless it is told, and a background render that prints only on failure looks identical to
         # one that never started.
         last = 0.0
-        print(f"\n[studio] {self.tag} {self.name!r} on {self.device} -> "
-              f"{' '.join(self.cmd[-6:])}", flush=True)
-        for raw in self.p.stdout:                                        # type: ignore[union-attr]
-            for chunk in raw.replace("\r", "\n").split("\n"):
-                if not chunk.strip():
-                    continue
-                m = self._RE.search(chunk)
-                if m:
-                    self.frame, self.total = int(m.group(1)), int(m.group(2))
-                    now = time.time()
-                    if now - last > 5.0:
-                        last = now
-                        pct = 100.0 * self.frame / max(self.total, 1)
-                        print(f"[studio]   {self.tag} {self.name}  {self.frame}/{self.total}"
-                              f"  {pct:5.1f}%  {now - self.started:6.1f}s", flush=True)
-                elif len(self.lines) < 400:
-                    self.lines.append(chunk[:400])
-        self.rc = self.p.wait()
-        self.done = True
+        print(f"\n[studio] {self.tag} {self.name!r} on {self.device}"
+              f"{' [warm]' if self.warm else ' [cold process]'}", flush=True)
+        from plexus.gui.worker import SENTINEL
+        try:
+            stream = (WORKER["p"].stdout if self.warm else self.p.stdout)
+            for raw in stream:                                       # type: ignore[union-attr]
+                if self.warm and raw.startswith(SENTINEL):
+                    self.rc = int(raw.strip()[len(SENTINEL):] or 1)
+                    break
+                for chunk in raw.replace("\r", "\n").split("\n"):
+                    if not chunk.strip():
+                        continue
+                    m = self._RE.search(chunk)
+                    if m:
+                        self.frame, self.total = int(m.group(1)), int(m.group(2))
+                        now = time.time()
+                        if now - last > 5.0:
+                            last = now
+                            pct = 100.0 * self.frame / max(self.total, 1)
+                            print(f"[studio]   {self.tag} {self.name}  {self.frame}/{self.total}"
+                                  f"  {pct:5.1f}%  {now - self.started:6.1f}s", flush=True)
+                    elif len(self.lines) < 400:
+                        self.lines.append(chunk[:400])
+            if not self.warm:
+                self.rc = self.p.wait()
+        except Exception as e:                                       # noqa: BLE001
+            self.lines.append(f"{type(e).__name__}: {e}")
+            if self.rc is None:
+                self.rc = 1
+        finally:
+            # RELEASED IN `finally`, ALWAYS. The worker lock serialises runs onto one GPU; leaking
+            # it once -- a stream that raises, a worker that dies mid-read -- would hang every run
+            # after it, with no error and nothing in the log to say why.
+            if self.warm:
+                try:
+                    WORKER["lock"].release()
+                except RuntimeError:
+                    pass
+            self.done = True
         if self.rc != 0:
             tail = [l for l in self.lines if l.strip()][-6:]
             self.error = " / ".join(tail) or f"exited {self.rc}"
             # IN THE TERMINAL, NOT ONLY IN THE BROWSER. A run that cannot be generated is the one
             # thing you most need the full text of -- a schema message, a CUDA OOM, a missing
-            # operator -- and a status line in a web page truncates it. This prints where you
-            # started the server, next to everything else the pipeline says.
+            # operator -- and a status line in a web page truncates it.
             fail(f"{self.tag or 'run'} {self.name!r} exited {self.rc}",
                  "\n".join(self.lines[-25:]) or "(no output)")
         else:
@@ -738,8 +803,16 @@ class Job:
                   f"{time.time() - self.started:.1f}s\n", flush=True)
 
     def kill(self):
+        # KILLING A WARM RUN KILLS THE WORKER, and that is the honest thing: there is no way to
+        # interrupt `main()` from outside the process running it, and a half-stopped run left
+        # holding the GPU is worse than a restart that costs 10 s once.
         try:
-            self.p.terminate()
+            if self.warm and WORKER.get("p"):
+                WORKER["p"].kill()
+                WORKER.update(p=None, ready=False)
+                worker_ready_async()
+            elif self.p:
+                self.p.terminate()
         except Exception:                                                # noqa: BLE001
             pass
 
