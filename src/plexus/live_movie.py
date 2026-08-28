@@ -32,6 +32,7 @@ import os
 import time
 
 import numpy as np
+import torch
 
 FLAT = dict(render_points_as_spheres=True, lighting=False, ambient=1.0, diffuse=0.0, specular=0.0)
 _CS_AXIS = {"x": 0, "y": 1, "z": 2}
@@ -247,7 +248,13 @@ class LiveMovie:
         # never fire, because the line above had just overwritten the thing it tested. Every 2D run
         # was therefore drawn as an angled 3D cube with the particles lying on its floor.
         w = [float(x) for x in world]
-        self.world = w                 # the per-axis box, kept for the cross-section panel
+        self.world = w                 # the per-axis box, kept for the cross-section slab
+        # THE SLAB'S HALF-WIDTH IS IN CELLS, so it needs the cell size -- read from the spec's own
+        # n_grid rather than assumed, since `thickness: 4` must mean four of the grid's cells and
+        # not four of some default's.
+        _ng = next((int(fc["n_grid"]) for fc in ((getattr(sim, "fields", None) or {}) or {}).values()
+                    if isinstance(fc, dict) and "n_grid" in fc), 96)
+        self._cs_dx = (w[1] if len(w) > 1 else w[0]) / float(_ng)
         self.is2d = len(w) < 3
         if self.is2d:
             self.up = 1
@@ -313,11 +320,7 @@ class LiveMovie:
             self.p.camera.parallel_projection = True
             self.p.camera.parallel_scale = radius * 1.45
 
-        # WITH `only`, NOTHING 3D IS DRAWN AT ALL -- no obstacles, and below, no particle cloud.
-        # Leaving them in would put the silhouette back behind a transparent chart, which is the
-        # picture this option exists to replace.
-        if not getattr(self, "cs_only", False):
-            self._draw_obstacles(span)
+        self._draw_obstacles(span)
         # A FRAGMENTED MP4, SO THE FILE IS READABLE WHILE IT IS STILL BEING WRITTEN.
         # A plain mp4 keeps its index -- the moov atom -- at the END, so nothing before close()
         # plays and copying the file mid-run copies an unreadable prefix. That is why killing a run
@@ -333,11 +336,16 @@ class LiveMovie:
         # It costs a little size (no global index, a fragment header per frame) and it means a
         # long run can be WATCHED from the file at any moment, with no duplicate and no second
         # writer, which is what `3d.png` was standing in for.
-        if self.cs is None and getattr(self, "cs_cfg", None) is not None:
+        # `only` DRAWS THE SLICE IN THE 3D VIEW ITSELF -- no chart at all. Keeping the ordinary
+        # renderer means the slice arrives with the box, the obstacles, the camera, the colours and
+        # the scale bar already correct, and the sphere the jet is hitting is simply THERE, drawn as
+        # the 3D actor it is. A 2D chart had to reproduce every one of those and reproduced none:
+        # it showed no obstacle, needed its own axes, disabled point sprites by existing, and froze
+        # unless its series was rebuilt each frame.
+        if self.cs is None and getattr(self, "cs_cfg", None) is not None and not self.cs_only:
             ax = self.cs_axis
             lat = [k for k in range(3) if k != ax][:2]
-            ch = (pv.Chart2D(size=(0.80, 0.86), loc=(0.12, 0.07)) if self.cs_only
-                  else pv.Chart2D(size=(0.26, 0.26), loc=(0.015, 0.645)))
+            ch = pv.Chart2D(size=(0.26, 0.26), loc=(0.015, 0.645))
             ch.background_color = (0, 0, 0, 0.55)
             ch.border_color = "#9a9a9a"
             names = "xyz"
@@ -439,7 +447,22 @@ class LiveMovie:
         # float32, NOT float64. VTK stores points in whatever dtype it is handed; float64 doubles
         # both the host copy and VTK's resident buffer (10 M points: 240 MB against 120 MB) to carry
         # digits that never survive the projection to a 1280 px frame.
-        pos = lvl.get("pos")[self.idx].detach().cpu().numpy().astype(np.float32)
+        _p = lvl.get("pos")[self.idx].detach()
+        if getattr(self, "cs_only", False):
+            # OUTSIDE THE SLAB IS PARKED, NOT REMOVED. The drawn cloud has a fixed length -- its
+            # colours were bound to it at t=0 and `cloud.points = ...` replaces an array of the same
+            # size -- so a particle is hidden by being put where the camera is not, exactly as the
+            # dormant pool is. Filtering the array instead would change its length every frame and
+            # detach it from its colours.
+            _ax, _w = self.cs_axis, float(self.world[self.cs_axis])
+            _sel = (_p[:, _ax] - self.cs_at * _w).abs() < self.cs_cells * self._cs_dx
+            # PARKED JUST OUTSIDE, NOT FAR OUTSIDE. VTK sizes `render_points_as_spheres` sprites
+            # from the ACTOR'S BOUNDS, so hiding particles at -9 m beside a 0.1 m box made the
+            # bounding box 90x the domain and shrank every drawn dot to nothing: 17,338 lit pixels,
+            # none of them coloured. Two centimetres outside the wall is just as invisible -- the
+            # gather clamps the domain at 2*dx -- and leaves the bounds essentially the box's own.
+            _p = torch.where(_sel[:, None], _p, torch.full_like(_p, -0.02 * _w))
+        pos = _p.cpu().numpy().astype(np.float32)
         if pos.shape[1] == 2:                         # pad a 2D run into the z=0 plane
             pos = np.concatenate([pos, np.zeros((pos.shape[0], 1))], 1)
         return pos
@@ -489,11 +512,8 @@ class LiveMovie:
             _flat = dict(FLAT)
             if self.cs is not None:
                 _flat["render_points_as_spheres"] = False
-            if not getattr(self, "cs_only", False):
-                self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
-                                point_size=self._dot_px(pos))
-            else:
-                self.px_used = self._dot_px(pos)      # still reported in the header
+            self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
+                            point_size=self._dot_px(pos))
             self.t0 = time.perf_counter()
             return
         if tick % self.stride:
