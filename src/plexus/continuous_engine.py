@@ -236,8 +236,9 @@ class MPMDrain(Operator):
         self.at = params.get("_at", "mpm_particle")
         self.axis, self.sign = _face(params["face"])
         self.frac = float(params.get("at_fraction", 0.04))    # plane, as a fraction of the box
-        self.sponge = float(params.get("sponge", 4.0))        # cells of damping above it
-        self.damp = float(params.get("damp", 0.5))            # velocity kept per frame in the sponge
+        self.sponge = float(params.get("sponge", 8.0))        # cells of damping above the plane
+        self.damp = float(params.get("damp", 0.15))           # velocity kept AT the plane; 1.0 at
+        #                                                       the top of the band, ramped between
 
     def forward(self, H, mask=None):
         p = H.level(self.at)
@@ -258,8 +259,22 @@ class MPMDrain(Operator):
             gone = live & (x > plane)
             insponge = live & (x > plane - band) & (x <= plane)
 
+        # A GRADED SPONGE, NOT A STEP. `v *= damp` over a flat band leaves fluid arriving at nearly
+        # full speed at the top of the sponge and stopping abruptly at the bottom, which is a
+        # stagnation the grid answers by pushing the fluid SIDEWAYS: it turns into a radial sheet
+        # that runs outward ABOVE the kill plane, never descends again, and curls up at its rim.
+        # That rim is the "bounce".
+        #
+        # Ramping the damping with depth -- untouched entering the band, `damp` at the plane --
+        # takes the momentum out over several cells instead of at one, and the fluid arrives slow
+        # enough to be removed rather than deflected. The drain still runs ONCE PER FRAME while the
+        # substep loop runs 25 times, so it cannot be instantaneous; the sponge is what covers that
+        # gap, and it is why the band has to be several cells wide rather than a plane.
         v = p.get("vel")
-        v[insponge] = v[insponge] * self.damp
+        if bool(insponge.any()):
+            _d = (x[insponge] - plane).abs() / max(band, 1e-12)      # 0 at the plane, 1 at the top
+            _f = self.damp + (1.0 - self.damp) * _d.clamp(0.0, 1.0)
+            v[insponge] = v[insponge] * _f[:, None]
         if bool(gone.any()):
             p.occ[gone] = 0.0
             if hasattr(p, "mass"):
