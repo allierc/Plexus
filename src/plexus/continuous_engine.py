@@ -118,7 +118,13 @@ class MPMEmit(Operator):
         `block`/`shape` placed a body where we want an empty box.
         """
         p.occ.zero_()
-        p.state[:, :box.numel()] = -1.0 * box                 # far outside; never drawn, never sensed
+        # PARKED JUST OUTSIDE, NOT FAR OUTSIDE. `-1.0 * box` put the dormant pool a whole box-width
+        # away, which doubles the point cloud's BOUNDING BOX -- and VTK sizes `render_points_as_
+        # spheres` sprites relative to actor bounds, so every drawn particle shrank until the jet
+        # was invisible. Measured: 3,701 blue pixels parked far, 102,032 with sprites off. Parking
+        # two cells outside the wall is just as invisible (the domain is clipped at 2*dx anyway) and
+        # leaves the bounds essentially the domain's own.
+        p.state[:, :box.numel()] = -0.02 * box
         if getattr(p, "Jp", None) is not None:
             p.Jp.fill_(1.0)
 
