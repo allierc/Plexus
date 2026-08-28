@@ -107,7 +107,12 @@ REFERENCES = ("si_laplace_r10",        # zero g, surface tension, csf_rho/csf_ba
               # that has no way to reach ten balls except by writing ten blocks, which is not what
               # was asked and does not scale.
               "si_two_drops3d_s144",   # n + start + shape: ball -- two bodies, generalises to N
-              "si_balls_bouncy")       # n = 3, per-body types and colours
+              "si_balls_bouncy",       # n = 3, per-body types and colours
+              # PER-TYPE eta, WHICH THE BRIEF ALONE DID NOT ACHIEVE. Told only in prose that `eta`
+              # may sit on a type, the model kept writing three liquid types with no eta at all and
+              # one operator scalar -- so a "gel" ball came out identical to the water one. A spec
+              # that does it is worth more than a paragraph that describes it.
+              "si_three_viscosities")  # eta per type: water 1e-3, gel 1.0, snow none
 # THE SOURCE, NOT THE PAPER. plexus2.tex describes the language in prose; it does not say which
 # SET carries `node_type`, and that omission cost two passes on a real request. "three balls with
 # different viscosity" produced `at: mpm_particle[type=...]`, which is an AttributeError every time,
@@ -144,9 +149,19 @@ Hard requirements:
     `mpm_particle` does NOT, so `at: mpm_particle[type=water]` is always
     "AttributeError: 'Level' object has no attribute 'node_type'". See _assign_types below.
     An operator that acts on the particles acts on ALL of them: `at: mpm_particle`, no selector.
-    So a per-body parameter that the operator carries as a single scalar (mpm_viscosity's `eta`,
-    mpm_scatter's `drag`) CANNOT differ between bodies of one particle set. If the request needs
-    that, say so in a comment rather than writing a selector that cannot work.
+
+PER-BODY MATERIAL PROPERTIES GO ON THE TYPE, NOT ON THE OPERATOR. Anything that differs between
+bodies is declared under `sets.cell.types.<name>`, and the engine expands it to a per-particle
+buffer:
+    material, bulk_modulus (liquids), youngs (solids/snow), density, and `eta` -- the DYNAMIC
+    VISCOSITY in Pa s, per type.
+So "one ball of water and one of gel" is `eta: 0.001` on the water type and `eta: 1.0` on the gel
+type. `mpm_viscosity` still carries an `eta` of its own; that is only the FALLBACK, used for types
+that do not declare one. Water is 1e-3 Pa s, olive oil ~0.08, honey ~10, and anything past ~50
+stops flowing on a one-second run.
+
+What genuinely CANNOT vary per body is a parameter the operator owns rather than the material:
+mpm_scatter's `drag`, mpm_grid_update's `surface_tension`. Those are one value for the whole run.
 
 N SEPARATE BODIES -- "ten balls", "three drops", "a row of cubes" -- is `sets.cell.n: N` with N
 entries under `sets.cell.start` (one [x,y,z] per body, in metres) and a type carrying `shape: ball`
