@@ -85,6 +85,10 @@ class Spec:
     dim: int = 2                                     # spatial dimensions (the global dimension contract)
     world_size: list = field(default_factory=lambda: [1.0, 1.0])   # per-axis box [w0 .. w_{D-1}]
     plotting: dict = field(default_factory=dict)     # render STYLE (colormap, point_size, ...) — read by plexus.plot
+    # WHICH DRIVER RUNS THE SCHEDULE. `default` is plexus.engine.run; a name N resolves to
+    # plexus.<N>_engine.run. A mode of RUNNING, not a different physics -- `continuous` still
+    # delegates to the same loop and exists only to refuse specs its operators cannot check.
+    engine: str = "default"
     record_cap: int = 10000                          # max recorded SET (position) frames; the trajectory is strided if n_frames exceeds it
     field_record_cap: int = 256                      # max recorded FIELD (grid) frames — fields are large, so a tighter cap
     # THE PHYSICAL SCALE, declared once under `general.units:` and never inferred. Three base scales
@@ -470,6 +474,7 @@ def load(path: str) -> Spec:
         dim=dim,
         world_size=world_size,
         plotting=raw.get("plotting", {}),
+        engine=str(gv("engine", "default")).lower(),
         record_cap=int(gv("record_cap", 10000)),
         field_record_cap=int(gv("field_record_cap", 256)),
         units=parse_units(gv("units", None)),

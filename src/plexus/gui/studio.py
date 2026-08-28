@@ -374,6 +374,13 @@ def author_spec(prompt: str, name: str, current: str = "", timeout: int = 600,
         timeout = max(timeout, 150)
     else:
         cmd += ["--allowedTools", ""]                     # no tools: the reference is inline
+    # SAY IT IN THE TERMINAL, AT BOTH ENDS. The browser shows a spinner; the terminal showed
+    # nothing at all between pressing PREVIEW and the spec landing, so a 25 s call and a hung one
+    # looked identical from where the server was started -- the same reason the dev channel streams
+    # its reads and the render job has a heartbeat.
+    _kind = "second pass" if error.strip() else ("edit" if current.strip() else "new spec")
+    print(f"\n[studio/claude] {_kind}, effort {effort}"
+          f"{' [deep]' if deep else ''}: {prompt.strip()[:110]}", flush=True)
     t0 = time.time()
     try:
         r = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, timeout=timeout)
@@ -382,7 +389,10 @@ def author_spec(prompt: str, name: str, current: str = "", timeout: int = 600,
         out = (e.stdout or b"").decode("utf8", "replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
         err, rc = f"timed out after {timeout}s", -1
     dt = time.time() - t0
-    return {"yaml": _extract_yaml(out).strip(), "log": (err or "")[-4000:], "rc": rc,
+    _y = _extract_yaml(out).strip()
+    print(f"[studio/claude] {'done' if _y else 'NO YAML'} in {dt:.1f}s"
+          f"{f' ({len(_y):,} chars)' if _y else f' (rc={rc})'}", flush=True)
+    return {"yaml": _y, "log": (err or "")[-4000:], "rc": rc,
             "seconds": round(dt, 1), "raw": out[-8000:]}
 
 
