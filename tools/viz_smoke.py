@@ -163,7 +163,9 @@ def main():
           f"          {'PASS' if row_mov else 'FAIL'}")
 
     cs = (sim.plotting or {}).get("cross_section")
-    if cs:
+    # `only` HAS NO PANEL TO CHECK -- it filters the 3D cloud to the slab instead, so the `moving`
+    # row already covers it. Testing a panel region that does not exist reported FROZEN forever.
+    if cs and not (cs is not True and cs.get("only")):
         # THE PANEL GETS ITS OWN COMPARISON. A moving 3D view would otherwise carry a dead panel
         # through the `moving` row -- which is exactly the fault this row was written for.
         only = bool(cs is not True and cs.get("only"))
