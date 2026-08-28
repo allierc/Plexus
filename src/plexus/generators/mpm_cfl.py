@@ -766,7 +766,14 @@ def particles_per_cell(yaml_path: str) -> list:
         seen[key] = [label, 1]
         if ppc < target * PPC_FLOOR:
             # `n_grid` for the target, and the particle count for the target, so the reader can pick
-            want_grid = int(round((n_per_parent / (target * vol)) ** (1.0 / dim)))
+            # THE WORLD WIDTH BELONGS IN THIS FORMULA. ppc = N*dx^dim/vol with dx = W/n_grid, so
+            #     n_grid = W * (N / (target*vol))^(1/dim)
+            # and dropping W is right only on a unit box. On si_gate (W = 0.1 m) it suggested
+            # n_grid 368 as the cure for under-sampling when the answer is 37 -- ten times too fine,
+            # in the direction that makes ppc WORSE, and labelled "coarser". Same class of error as
+            # the `vol * n_grid**dim` cell count this file already fixed a few lines above.
+            _W = float((spec.get("general") or {}).get("world", [1.0])[0] or 1.0)
+            want_grid = max(1, int(round(_W * (n_per_parent / (target * vol)) ** (1.0 / dim))))
             want_n = int(target * cells)
             warn(f"{name}: {label} has {ppc:.2f} particles per grid cell "
                  f"({n_per_parent:,.0f} particles over {cells:,.0f} cells at n_grid={n_grid}) -- "

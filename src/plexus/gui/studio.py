@@ -324,7 +324,7 @@ def author_spec(prompt: str, name: str, current: str = "", timeout: int = 600,
 
 
 # THE FOUR KNOBS THE INTERFACE OWNS, and their defaults.
-DEFAULTS = {"frames": 500, "particles": 10_000, "n_grid": 96, "width": 0.10}
+DEFAULTS = {"frames": 500, "particles": 100_000, "n_grid": 96, "width": 0.10}
 
 
 def _body_volume(spec: dict) -> float:
@@ -444,9 +444,11 @@ def metrics(spec: dict, k: dict) -> dict:
     dim = int((spec.get("general") or {}).get("dim", 3))
     target = PPC_TARGET if dim == 3 else 4.0
     floor = target * PPC_FLOOR                       # the engine's own under-sampled line
+    ng = int(k.get("n_grid", DEFAULTS["n_grid"]))
+    dx = float(k.get("width", DEFAULTS["width"])) / max(ng, 1)
 
-    ppc = {"color": "dim", "text": "--", "value": 0.0}
-    cfl = {"color": "dim", "text": "not an MPM spec", "value": 0.0, "ok": False}
+    ppc = {"color": "dim", "text": "--", "value": 0.0, "suggest": ""}
+    cfl = {"color": "dim", "text": "not an MPM spec", "value": 0.0, "ok": False, "suggest": ""}
     tmp = None
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
@@ -458,10 +460,26 @@ def metrics(spec: dict, k: dict) -> dict:
         if rows:
             label, v, cells, n = min(rows, key=lambda r: r[1])
             col = "red" if v < floor else ("green" if v <= target * 4 else "amber")
-            note = (f"  UNDER-SAMPLED (< {floor:.0f})" if v < floor
-                    else f"  oversampled, {v / target:.0f}x the target" if v > target * 4 else "")
-            ppc = {"value": round(v, 2), "color": col,
-                   "text": f"{v:.1f} per cell   {label}   {n:,.0f} over {cells:,.0f} cells{note}"}
+            # THE SAME TWO CURES THE ENGINE'S OWN WARNING OFFERS, with the numbers filled in: the
+            # grid that would put this body at the target, and the particle count that would. Both
+            # are given because they are not equivalent -- one changes what the grid can resolve,
+            # the other only changes cost -- and choosing between them is not this tool's call.
+            vol = cells * (dx ** dim)
+            W = float(k.get("width", DEFAULTS["width"]))
+            want_grid = max(1, int(round(W * (n / (target * vol)) ** (1.0 / dim))))
+            want_n = int(target * cells)
+            # "coarser"/"finer" is DERIVED, not asserted. Saying it the wrong way round is worse
+            # than saying nothing: it sends you in the direction that makes the number worse.
+            way = "coarser" if want_grid < ng else "finer"
+            sug = ""
+            if v < floor:
+                sug = (f"UNDER-SAMPLED: the grid cannot see this body. "
+                       f"n_grid {want_grid} ({way}), or {want_n:,} particles.")
+            elif v > target * 4:
+                sug = (f"oversampled {v / target:.0f}x: costs time, resolves nothing more. "
+                       f"n_grid {want_grid} ({way}), or {want_n:,} particles.")
+            ppc = {"value": round(v, 2), "color": col, "suggest": sug,
+                   "text": f"{v:.1f} per cell   {label}   {n:,.0f} over {cells:,.0f} cells"}
         if info:
             # TWO SHAPES OF `info`, because the pass either accepted the step or replaced it: the
             # accepting branch reports `micro_dt`/`dt_cfl`, the correcting one `dt_old`/`over_by`.
@@ -474,12 +492,26 @@ def metrics(spec: dict, k: dict) -> dict:
                         if isinstance(b, dict) and "substep_dt" in b), None)
             subs = round(float(after["general"]["dt"]) / float(blk["substep_dt"])) if blk else 0
             col = "green" if r <= 0.8 else ("amber" if r <= 1.0 else "red")
-            cfl = {"value": round(r, 3), "ok": r <= 1.0, "color": col,
+            # SUBSTEPS SCALE WITH n_grid, which is the lever worth naming. The stable step is
+            # cfl*dx/c and dx = world/n_grid, so substeps per frame go as n_grid: halving the grid
+            # halves the cost of every frame. The other lever is the stiffness -- substeps go as
+            # sqrt(K) -- and it changes the physics, so it is named second and last.
+            sug = ""
+            if changed or r > 1.0:
+                half = max(16, int(ng / 2))
+                sug = (f"the declared step was {r:.1f}x too big and has been corrected to "
+                       f"{subs} substeps/frame. Substeps scale with n_grid: {half} would cost "
+                       f"about {max(1, int(subs / 2))}. A softer bulk_modulus also helps "
+                       f"(substeps go as sqrt(K)) but changes the physics.")
+            elif subs > 200:
+                sug = (f"{subs} substeps/frame is the run's real cost. n_grid "
+                       f"{max(16, int(ng / 2))} would roughly halve it.")
+            cfl = {"value": round(r, 3), "ok": r <= 1.0, "color": col, "suggest": sug,
                    "text": (f"{r:.2f}x of the limit   {subs} substeps/frame   "
                             f"c {float(info['cmax']):.0f} m/s   binds: {info.get('binds', '-')}"
-                            + ("   WAS CORRECTED" if changed else ""))}
+                            + ("   CORRECTED" if changed else ""))}
     except Exception as e:                                              # noqa: BLE001
-        cfl = {"value": 0.0, "ok": False, "color": "red",
+        cfl = {"value": 0.0, "ok": False, "color": "red", "suggest": "",
                "text": f"{type(e).__name__}: {e}"[:130]}
     finally:
         if tmp and os.path.exists(tmp):
@@ -874,6 +906,8 @@ CSS = """
   .gauge b { display:block; font-size:9px; letter-spacing:.16em; color:var(--dim);
              font-weight:600; margin-bottom:2px; }
   .gauge span { font-size:11px; font-variant-numeric:tabular-nums; }
+  .gauge i { display:block; font-style:normal; margin-top:3px; color:var(--dim);
+             font-size:10px; line-height:1.4; }
   .gauge.green { border-left-color:var(--green); } .gauge.green span { color:var(--green); }
   .gauge.amber { border-left-color:var(--amber); } .gauge.amber span { color:var(--amber); }
   .gauge.red   { border-left-color:var(--red);   } .gauge.red   span { color:var(--red); }
@@ -894,7 +928,7 @@ renders or validates on its own &mdash; the preview and the full run are the sam
     <div class="list" id="list"></div>
     <div class="knobs">
       <div class="k"><span class="label">Frames</span><input id="frames" value="500"></div>
-      <div class="k"><span class="label">Particles</span><input id="particles" value="10000"></div>
+      <div class="k"><span class="label">Particles</span><input id="particles" value="100000"></div>
       <div class="k"><span class="label">Grid</span><input id="ngrid" value="96"></div>
       <div class="k"><span class="label">Width (cm)</span><input id="width" value="10"></div>
     </div>
@@ -967,7 +1001,7 @@ JS = r"""
 const $ = id => document.getElementById(id);
 let cur = null, poll = null, showing = "png";
 
-const knobs = () => ({frames:+$("frames").value||500, particles:+$("particles").value||10000,
+const knobs = () => ({frames:+$("frames").value||500, particles:+$("particles").value||100000,
                       n_grid:+$("ngrid").value||96, width:(+$("width").value||10)/100});
 
 const api = async (u, body) => {
@@ -1006,7 +1040,8 @@ async function gauges() {
   if (m.error) return;
   ["ppc","cfl"].forEach(k => {
     $("g_"+k).className = "gauge " + (m[k].color || "dim");
-    $("t_"+k).textContent = m[k].text;
+    $("t_"+k).innerHTML = m[k].text
+      + (m[k].suggest ? `<i>${m[k].suggest.replace(/</g,"&lt;")}</i>` : "");
   });
 }
 ["frames","particles","ngrid","width"].forEach(id =>
@@ -1053,6 +1088,7 @@ $("preview").onclick = async () => {
     if (d.error) { $("preview").disabled = false; $("gen").disabled = false;
       return say("FAILED: " + d.error + (d.detail ? "\n" + d.detail : ""), "bad"); }
     $("knobstat").textContent = d.report || "";
+    lastPrompt = p; lastKnobs = knobKey();
     await select(d.name);
     $("prompt").value = "";
   } else if (!cur) {
@@ -1085,8 +1121,43 @@ readyPoll();
 refresh();
 $("prompt").focus();
 $("prompt").setSelectionRange($("prompt").value.length, $("prompt").value.length); say("new scene -- describe it and press PREVIEW"); };
-$("gen").onclick = () => { if (cur) api("/api/studio/run",
-    {name: cur, device: $("dev").value, preview: false}).then(watch); };
+// GENERATE DOES WHATEVER THE STATE ASKS FOR, so there is no wrong order of buttons:
+//   * prompt changed since this spec was authored -> author it, then render. No preview step: you
+//     already know what you want and a preview would only be a slower way to get there.
+//   * only the knobs changed -> re-apply them server-side and render. Claude has nothing to say
+//     about a particle count; calling it would cost 20 s to receive back the spec it already wrote.
+//   * nothing changed -> render.
+let lastPrompt = "", lastKnobs = "";
+const knobKey = () => JSON.stringify(knobs());
+$("gen").onclick = async () => {
+  const p = $("prompt").value.trim();
+  $("gen").disabled = true; $("preview").disabled = true;
+  try {
+    if (p && p !== lastPrompt) {
+      say(cur ? `applying "${p}" to ${cur}, then rendering ...` : "asking Claude, then rendering ...");
+      const d = await api("/api/studio/author",
+        {prompt: p, model: $("model").value, deep: $("deep").checked, effort: $("effort").value,
+         name: cur || null, knobs: knobs()});
+      $("ptime").textContent = `claude ${d.seconds||0}s (effort ${$("effort").value})`;
+      if (d.error) { $("gen").disabled = false; $("preview").disabled = false;
+        return say("FAILED: " + d.error + (d.detail ? "\n" + d.detail : ""), "bad"); }
+      lastPrompt = p; await select(d.name); $("prompt").value = "";
+    } else if (cur && knobKey() !== lastKnobs) {
+      say("knobs changed -- re-sizing the spec without asking Claude ...");
+      const d = await api("/api/studio/apply", {name: cur, knobs: knobs()});
+      if (d.error) { $("gen").disabled = false; $("preview").disabled = false;
+        return say("FAILED: " + d.error, "bad"); }
+      await select(cur);
+    } else if (!cur) {
+      $("gen").disabled = false; $("preview").disabled = false;
+      return say("nothing to generate -- write a prompt first", "warn");
+    }
+    lastKnobs = knobKey();
+    api("/api/studio/run", {name: cur, device: $("dev").value, preview: false}).then(watch);
+  } catch (e) {
+    $("gen").disabled = false; $("preview").disabled = false; say("FAILED: " + e, "bad");
+  }
+};
 $("stop").onclick = () => api("/api/studio/stop", {name: cur}).then(() => say("stopped", "warn"));
 
 function watch(j) {
