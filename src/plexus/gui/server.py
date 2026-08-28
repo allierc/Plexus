@@ -409,6 +409,8 @@ class Handler(BaseHTTPRequestHandler):
                                      model=data.get("model") or "sonnet",
                                      deep=bool(data.get("deep")))
             if not res["yaml"]:
+                studio.fail(f"Claude returned no YAML for {prompt!r} "
+                            f"(rc={res['rc']}, {res['seconds']}s)", res["log"] or res["raw"])
                 return self._send_json({"error": f"Claude returned no YAML (rc={res['rc']}, "
                                                  f"{res['seconds']}s)",
                                         "detail": (res["log"] or res["raw"])[-600:],
@@ -416,12 +418,21 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 spec = yaml.safe_load(res["yaml"]) or {}
             except Exception as e:                                       # noqa: BLE001
+                studio.fail(f"the reply is not YAML: {e}", res["yaml"])
                 return self._send_json({"error": f"not YAML: {e}", "seconds": res["seconds"],
                                         "detail": res["yaml"][:600]})
-            spec = studio.apply_knobs(spec, data.get("knobs") or {})
+            try:
+                spec = studio.apply_knobs(spec, data.get("knobs") or {})
+            except Exception as e:                                       # noqa: BLE001
+                studio.fail(str(e), res["yaml"])
+                return self._send_json({"error": str(e), "seconds": res["seconds"]})
             spec.setdefault("general", {})["name"] = name
             ok, err = _validate(spec)
             if not ok:
+                # THE SCHEMA'S OWN WORDS, IN FULL, IN THE TERMINAL. The browser gets a truncated
+                # copy; the reason a scene could not be built belongs where the pipeline speaks.
+                studio.fail(f"the schema rejected the spec for {prompt!r}",
+                            f"{err}\n\n--- the spec it rejected ---\n{res['yaml'][:3000]}")
                 return self._send_json({"error": "schema rejected the spec", "detail": err,
                                         "seconds": res["seconds"]})
             with open(sp, "w") as f:
@@ -448,6 +459,17 @@ class Handler(BaseHTTPRequestHandler):
             with open(sp, "w") as f:
                 f.write(data.get("raw") or "")
             return self._send_json({"saved": True, "valid": True})
+
+        if route == "/api/studio/metrics":
+            from plexus.gui import studio
+            sp = os.path.join(studio.CONFIG_DIR, (data.get("name") or "") + ".yaml")
+            if not os.path.exists(sp):
+                return self._send_json({"error": "no such spec"}, 404)
+            try:
+                return self._send_json(studio.metrics(yaml.safe_load(open(sp)) or {},
+                                                      data.get("knobs") or {}))
+            except Exception as e:                                       # noqa: BLE001
+                return self._send_json({"error": str(e)}, 400)
 
         if route == "/api/studio/run":
             from plexus.gui import studio
