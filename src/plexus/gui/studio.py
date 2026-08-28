@@ -28,6 +28,7 @@ THE CLAUDE CALL IS AGENTIC BUT READ-ONLY, and both halves of that matter.
 from __future__ import annotations
 
 import glob
+import json
 import os
 import re
 import subprocess
@@ -351,6 +352,141 @@ def knob_report(spec: dict, k: dict) -> str:
             f"  |  ppc {n * dx ** 3 / V:.1f}")
 
 
+# ------------------------------------------------------------------------------ the dev channel
+DEV_BRIEF = """\
+You are asked for something the current Plexus2 cannot express. Do NOT write a spec, and do NOT
+edit any file. Produce an ANALYSIS of what the engine would need.
+
+Read first, and say what you read: src/plexus/operators/ (the operator library -- registry-driven,
+one class per operator with PARAM_ROLES, EMIT, SUPPORTED_DIMS), src/plexus/models/registry.py
+(how an operator is registered and dispatched), src/plexus/schema.py (what a spec is allowed to
+say), and paper/plexus2.tex for the vocabulary and the intent.
+
+Answer these, in this order, and nothing else:
+
+  1. WHAT IS MISSING. State precisely which part of the request the current operators cannot
+     express, and name the operators that come closest and why they fall short. If it IS already
+     expressible, say so and give the spec fragment that does it -- that is the most useful
+     possible answer and it ends here.
+  2. THE MECHANISM. The physics or rule to be added, as an equation or a clear procedure, with the
+     quantity each symbol denotes and its units.
+  3. THE OPERATOR. Its name, `family`, `kind`, which set or field it acts `at`, what it reads,
+     what it EMITs, its parameters with roles, units and defaults. Say whether it is a NEW operator
+     or a new `implementation:` of an existing one -- the latter is much cheaper and is right
+     whenever the mechanism is unchanged and only the numerics differ.
+  4. THE EDIT. The files to touch and what changes in each, concretely. Flag anything that would
+     alter existing runs, because that is the expensive part.
+  5. THE TEST. One closed form, invariant or limiting case that would show the new operator is
+     right rather than merely running.
+
+Be specific and short. Cite file:line where you can. If the request is under-determined, say which
+decision you would need from a person rather than choosing for them.
+"""
+
+DEV: dict[str, dict] = {}
+
+
+def report(title: str, body: str) -> None:
+    """Print an analysis to the server's own terminal, framed."""
+    print("\n" + "=" * 78, flush=True)
+    print(f"[studio/dev] {title}", flush=True)
+    print("=" * 78, flush=True)
+    for line in str(body).rstrip().splitlines():
+        print(line, flush=True)
+    print("=" * 78 + "\n", flush=True)
+
+
+def start_dev(prompt: str, model: str = "sonnet", timeout: int = 900) -> dict:
+    """Ask what Plexus would need in order to do this. Runs in a thread; result goes to stdout.
+
+    FULL READ ACCESS AND A LONG LEASH, unlike the spec path. Writing a spec is a 30 s job precisely
+    because the interface hands over the reference and owns the sizing; working out which operator
+    is missing is the opposite -- it needs the operator library, the registry and the schema, and
+    there is no shortcut that keeps it honest. So this one reads the repo, takes minutes, and is
+    polled rather than awaited.
+
+    IT WRITES NOTHING, AND THAT IS ENFORCED BY DENY, NOT BY ALLOW. `--allowedTools Read Glob Grep`
+    turned out to be a permission HINT, not a restriction: the first run happily made 26 tool calls
+    of which several were Bash. `--disallowedTools` is the half that actually forbids, so the write
+    and shell tools are named there explicitly. Measured before and after.
+
+    FIFTEEN MINUTES, because the first attempt died at 150 s mid-read having called 26 tools and
+    produced nothing at all -- a cap that stops an analysis before its conclusion buys nothing and
+    throws away the work. It is a background task that prints its progress; it can take its time.
+    """
+    key = "dev"
+    if DEV.get(key, {}).get("running"):
+        return {"error": "an analysis is already running"}
+    DEV[key] = {"running": True, "prompt": prompt, "started": time.time(),
+                "text": "", "error": None, "seconds": 0}
+
+    def _go():
+        # STREAMED, NOT AWAITED IN SILENCE. A minutes-long background call that prints only at the
+        # end is indistinguishable from a hung one, and the interesting part of an analysis is
+        # WHICH FILES it went to -- that is how you tell an answer grounded in the operator library
+        # from one grounded in a guess. `--output-format stream-json --verbose` emits an event per
+        # step, so each tool call becomes one line here as it happens.
+        cmd = [_claude_bin(), "-p", prompt,
+               "--append-system-prompt", DEV_BRIEF,
+               "--allowedTools", "Read", "Glob", "Grep",
+               # NAMES THAT EXIST. "MultiEdit" is not a tool and the CLI warns "matches no known
+               # tool" for it, which is the kind of line that trains you to ignore warnings.
+               "--disallowedTools", "Write", "Edit", "NotebookEdit", "Bash",
+               "WebFetch", "WebSearch", "Task",
+               "--add-dir", os.path.join(REPO, "src"),
+               "--add-dir", os.path.join(REPO, "config"),
+               "--add-dir", os.path.join(REPO, "paper"),
+               "--model", model,
+               "--output-format", "stream-json", "--verbose"]
+        t0 = time.time()
+        print(f"\n[studio/dev] {prompt}", flush=True)
+        print(f"[studio/dev] reading src/plexus, config/, paper/ ... (cap {timeout}s)", flush=True)
+        out, err, n_tool = "", "", 0
+        try:
+            pr = subprocess.Popen(cmd, cwd=REPO, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  text=True, bufsize=1)
+            for line in pr.stdout:                                   # type: ignore[union-attr]
+                if time.time() - t0 > timeout:
+                    pr.kill(); err = f"timed out after {timeout}s"; break
+                line = line.strip()
+                if not line.startswith("{"):
+                    continue
+                try:
+                    ev = json.loads(line)
+                except Exception:                                    # noqa: BLE001
+                    continue
+                t = ev.get("type")
+                if t == "assistant":
+                    for c in (ev.get("message") or {}).get("content") or []:
+                        if c.get("type") == "tool_use":
+                            n_tool += 1
+                            inp = c.get("input") or {}
+                            what = (inp.get("file_path") or inp.get("pattern")
+                                    or inp.get("path") or "")
+                            what = str(what).replace(REPO + "/", "")
+                            print(f"[studio/dev]   {time.time() - t0:6.1f}s  "
+                                  f"{c.get('name', '?'):<5} {what[:88]}", flush=True)
+                        elif c.get("type") == "text" and c.get("text", "").strip():
+                            DEV[key]["text"] = c["text"]
+                elif t == "result":
+                    out = (ev.get("result") or "").strip() or DEV[key].get("text", "")
+            pr.wait(timeout=10)
+            err = err or (pr.stderr.read().strip() if pr.stderr else "")
+        except Exception as e:                                       # noqa: BLE001
+            err = f"{type(e).__name__}: {e}"
+        dt = round(time.time() - t0, 1)
+        out = out or DEV[key].get("text", "")
+        DEV[key].update(running=False, text=out, error=(err if not out else None), seconds=dt,
+                        tools=n_tool)
+        if out:
+            report(f"{prompt}   [{dt}s, {n_tool} file reads]", out)
+        else:
+            fail(f"dev analysis produced nothing for {prompt!r}", err)
+
+    threading.Thread(target=_go, daemon=True).start()
+    return {"started": True}
+
+
 # --------------------------------------------------------------------------------- run tracking
 class Job:
     """One `Plexus_Main.py -o generate` subprocess, with its tqdm counter scraped for a bar.
@@ -379,6 +515,12 @@ class Job:
         threading.Thread(target=self._pump, daemon=True).start()
 
     def _pump(self):
+        # A HEARTBEAT IN THE TERMINAL, every 5 s. The browser has the bar; the terminal has nothing
+        # unless it is told, and a background render that prints only on failure looks identical to
+        # one that never started.
+        last = 0.0
+        print(f"\n[studio] {self.tag} {self.name!r} on {self.device} -> "
+              f"{' '.join(self.cmd[-6:])}", flush=True)
         for raw in self.p.stdout:                                        # type: ignore[union-attr]
             for chunk in raw.replace("\r", "\n").split("\n"):
                 if not chunk.strip():
@@ -386,6 +528,12 @@ class Job:
                 m = self._RE.search(chunk)
                 if m:
                     self.frame, self.total = int(m.group(1)), int(m.group(2))
+                    now = time.time()
+                    if now - last > 5.0:
+                        last = now
+                        pct = 100.0 * self.frame / max(self.total, 1)
+                        print(f"[studio]   {self.tag} {self.name}  {self.frame}/{self.total}"
+                              f"  {pct:5.1f}%  {now - self.started:6.1f}s", flush=True)
                 elif len(self.lines) < 400:
                     self.lines.append(chunk[:400])
         self.rc = self.p.wait()
@@ -399,6 +547,9 @@ class Job:
             # started the server, next to everything else the pipeline says.
             fail(f"{self.tag or 'run'} {self.name!r} exited {self.rc}",
                  "\n".join(self.lines[-25:]) or "(no output)")
+        else:
+            print(f"[studio]   {self.tag} {self.name} DONE in "
+                  f"{time.time() - self.started:.1f}s\n", flush=True)
 
     def kill(self):
         try:
@@ -535,6 +686,7 @@ CSS = """
   .promptrow { display:flex; gap:10px; align-items:flex-start; }
   .plexus { font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
             color:var(--dim); padding-top:8px; white-space:nowrap; letter-spacing:.04em; }
+  .plexus.dev { color:var(--amber); }
   .ok { color:var(--green); } .bad { color:var(--red); } .warn { color:var(--amber); }
   .knobs { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .knobs .k { display:flex; flex-direction:column; gap:3px; }
@@ -597,6 +749,18 @@ renders or validates on its own &mdash; the preview and the full run are the sam
       <div class="row">
         <button id="preview">Preview</button>
         <span class="stat" id="ptime" style="margin:0"></span>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="promptrow">
+        <span class="plexus dev">dev:</span>
+        <textarea id="devprompt" rows="2" placeholder="something Plexus cannot do yet -- e.g. two immiscible fluids with a real contact angle at the wall"></textarea>
+      </div>
+      <div class="row">
+        <button id="devgo">Analyse</button>
+        <span class="stat" id="devstat" style="margin:0">reads src/plexus/operators, the registry
+          and the schema, then prints what would have to change. Writes nothing.</span>
       </div>
     </div>
 
@@ -749,6 +913,30 @@ function watch(j) {
     }
   }, 900);
 }
+
+// THE DEV CHANNEL ANSWERS INTO THE TERMINAL, not into this page. What comes back is a file-by-file
+// analysis with citations -- the shape of thing you read in an editor next to the code, not in a
+// status line -- so the browser only reports that it arrived and how long it took.
+$("devgo").onclick = async () => {
+  const p = $("devprompt").value.trim();
+  if (!p) return ($("devstat").textContent = "describe what Plexus cannot do yet");
+  $("devgo").disabled = true;
+  $("devstat").textContent = "reading src/plexus/operators, registry.py, schema.py, plexus2.tex ...";
+  $("devstat").className = "stat";
+  const r = await api("/api/studio/dev", {prompt: p, model: $("model").value});
+  if (r.error) { $("devgo").disabled = false;
+                 $("devstat").textContent = r.error; $("devstat").className = "stat bad"; return; }
+  const t = setInterval(async () => {
+    const s = await api("/api/studio/devstatus");
+    if (s.running) { $("devstat").textContent =
+      `analysing ... ${Math.round((Date.now()/1000) - s.started)}s`; return; }
+    clearInterval(t); $("devgo").disabled = false;
+    if (s.error) { $("devstat").textContent = "FAILED: " + s.error; $("devstat").className="stat bad"; }
+    else { $("devstat").textContent =
+      `analysis printed in the terminal (${s.seconds}s, ${(s.text||"").length} chars)`;
+      $("devstat").className = "stat ok"; }
+  }, 1500);
+};
 
 $("view").onclick = () => $("ed").classList.toggle("on");
 $("showpng").onclick = () => { showing = "png"; repaint(); };
