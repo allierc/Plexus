@@ -48,11 +48,20 @@ MAIN = os.path.join(REPO, "Plexus_Main.py")
 PY = os.environ.get("PLEXUS_PYTHON") or os.sys.executable
 
 # THE PREVIEW IS THE SAME RUN, ONE FRAME LONG. Not a separate renderer: the generator already writes
-# `3d.png` at the end of a run, so a run of length PREVIEW_FRAMES leaves a picture of the scene just
-# after it starts moving -- enough to see whether a body is inside the box, sitting on the obstacle
-# it should sit on, and the size it was meant to be. Frame 0 exactly would show the seed before
-# gravity has touched it, which hides a body that is about to fall through the floor.
-PREVIEW_FRAMES = 2
+# `3d.png` at the end of a run, so `n_frames: 0` leaves a picture of the seeded scene.
+#
+# THE ENGINE ITERATES `range(n_frames + 1)`, so this is one MORE than the frames rendered: 2 gave
+# three (the bar read 0/3) and 1 gives two. It is not 0, which would be one frame and is the
+# obvious thing to want: at `n_frames: 0` the run completes and writes a trajectory but the
+# renderer produces NO movie, NO stills and NO 3d.png, so the preview has nothing to show. (It also
+# used to crash outright inside LiveMovie on a division by the run's duration -- that guard is
+# worth keeping either way, but it only got as far as producing nothing.)
+#
+# THE SAVING IS SMALL AND WORTH SAYING SO. Measured at 10k particles: 3 frames 16.0 s, 2 frames
+# 14.1 s, and capture off vs on 15.2 s vs 16.8 s. Roughly 12 s of every preview is interpreter and
+# warp import before a single particle moves, so the frame count is not where a fast preview would
+# come from -- a warm worker process would be.
+PREVIEW_FRAMES = 1
 
 
 def fail(what: str, detail: str = "") -> None:
@@ -315,7 +324,7 @@ def author_spec(prompt: str, name: str, current: str = "", timeout: int = 600,
 
 
 # THE FOUR KNOBS THE INTERFACE OWNS, and their defaults.
-DEFAULTS = {"frames": 1000, "particles": 100_000, "n_grid": 96, "width": 0.10}
+DEFAULTS = {"frames": 500, "particles": 10_000, "n_grid": 96, "width": 0.10}
 
 
 def _body_volume(spec: dict) -> float:
@@ -735,6 +744,16 @@ def start_run(name: str, device: str = "cuda:1", preview: bool = False) -> dict:
         s["general"]["n_frames"] = PREVIEW_FRAMES
         s["general"]["name"] = run_name = PREVIEW_PREFIX + name
         s["general"]["save_data"] = False
+        # NO COMPILE AND NO GRAPH CAPTURE FOR A TWO-FRAME RUN. Both are amortised optimisations:
+        # torch.compile pays tens of seconds of tracing to make later substeps cheaper, and the
+        # CUDA-graph capture runs the substep three times to warm up and once more to record. Over
+        # 2400 frames that is free; over PREVIEW_FRAMES it is the entire cost, and the preview
+        # exists to be fast. The full GENERATE keeps both -- it is the run that has frames to
+        # amortise them over.
+        for blk in s.get("schedule", []):
+            if isinstance(blk, dict) and "substep_dt" in blk:
+                blk["compile"] = False
+                blk["capture"] = False
         _y.safe_dump(s, open(os.path.join(CONFIG_DIR, run_name + ".yaml"), "w"),
                      sort_keys=False, default_flow_style=False)
     j = Job(run_name, device, tag="preview" if preview else "generate",
@@ -750,22 +769,30 @@ def out_dir(name: str) -> str:
 
 
 def artefacts(name: str) -> dict:
-    """What this spec has produced, preferring the FULL run's frame over the preview's.
+    """What this spec has produced, showing the NEWEST frame of the two places one can land.
 
-    Both write a `3d.png`, into `studio/<name>/` and `studio/__preview__<name>/`. The full run's is
-    the better picture (more frames, more particles drawn), so it wins when both exist; the preview
-    is what you see until then.
+    Both a full run and a preview write a `3d.png`, into `studio/<name>/` and
+    `studio/__preview__<name>/`. Preferring the full run's outright was wrong the moment the loop
+    became iterative: edit a generated spec, press PREVIEW, and the fresh preview frame was hidden
+    behind the stale picture of the run before the edit -- Claude answered, the render succeeded,
+    and the scene did not change. Newest wins, which is the only rule that means "what you are
+    looking at is what you last asked for".
     """
     full, prev = out_dir(name), out_dir(PREVIEW_PREFIX + name)
-    png = next((p for p in (os.path.join(full, "3d.png"), os.path.join(prev, "3d.png"))
-                if os.path.exists(p)), None)
+    cands = [p for p in (os.path.join(full, "3d.png"), os.path.join(prev, "3d.png"))
+             if os.path.exists(p)]
+    png = max(cands, key=os.path.getmtime) if cands else None
     mp4 = os.path.join(full, "movie.mp4")
     stills = sorted(glob.glob(os.path.join(full, "still_*.png")))
     return {"dir": full,
             "png": png,
             "mp4": mp4 if os.path.exists(mp4) else None,
             "still": stills[-1] if stills else None,
-            "png_mtime": os.path.getmtime(png) if png else 0}
+            "png_mtime": os.path.getmtime(png) if png else 0,
+            # THE VIDEO NEEDS A BUSTER TOO. `Cache-Control: no-store` covers the browser, but the
+            # <video> element keeps whatever it already decoded for a src it has seen before, so a
+            # second GENERATE at the same path replayed the first one's movie.
+            "mp4_mtime": os.path.getmtime(mp4) if os.path.exists(mp4) else 0}
 
 
 def list_specs() -> list[dict]:
@@ -866,8 +893,8 @@ renders or validates on its own &mdash; the preview and the full run are the sam
     <div class="label">Specs</div>
     <div class="list" id="list"></div>
     <div class="knobs">
-      <div class="k"><span class="label">Frames</span><input id="frames" value="1000"></div>
-      <div class="k"><span class="label">Particles</span><input id="particles" value="100000"></div>
+      <div class="k"><span class="label">Frames</span><input id="frames" value="500"></div>
+      <div class="k"><span class="label">Particles</span><input id="particles" value="10000"></div>
       <div class="k"><span class="label">Grid</span><input id="ngrid" value="96"></div>
       <div class="k"><span class="label">Width (cm)</span><input id="width" value="10"></div>
     </div>
@@ -940,7 +967,7 @@ JS = r"""
 const $ = id => document.getElementById(id);
 let cur = null, poll = null, showing = "png";
 
-const knobs = () => ({frames:+$("frames").value||1000, particles:+$("particles").value||100000,
+const knobs = () => ({frames:+$("frames").value||500, particles:+$("particles").value||10000,
                       n_grid:+$("ngrid").value||96, width:(+$("width").value||10)/100});
 
 const api = async (u, body) => {
@@ -989,7 +1016,8 @@ function paint(d) {
   const S = $("scene");
   const png = d.png, mp4 = d.mp4;
   if (showing === "mp4" && mp4) {
-    S.innerHTML = `<video controls autoplay loop src="/media?path=${encodeURIComponent(mp4)}"></video>`;
+    S.innerHTML = `<video controls autoplay loop `
+      + `src="/media?path=${encodeURIComponent(mp4)}&t=${d.mp4_mtime||0}"></video>`;
   } else if (png) {
     S.innerHTML = `<img src="/media?path=${encodeURIComponent(png)}&t=${d.png_mtime||0}">`;
   } else {
