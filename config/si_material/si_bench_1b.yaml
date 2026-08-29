@@ -164,10 +164,7 @@ plotting:
   hide_sets:
   - cell
   render_3d: dots
-  splat_res: 1280
   up_axis: 1
-  renderer: gpu_splat
-  movie_max_frames: 60
 schedule:
 - gravity
 - capture: false
@@ -176,7 +173,7 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
-  substep_dt: 1.636364e-04
+  substep_dt: 0.0001636364
 sets:
   cell:
     n: 27
