@@ -6,7 +6,7 @@ general:
   boundary: wall
   dim: 3
   dt: 0.0036
-  n_frames: 1000
+  n_frames: 150
   name: si_bench_800m
   record_cap: 2
   seed: 0
@@ -173,7 +173,7 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
-  substep_dt: 0.0001796258
+  substep_dt: 1.714286e-04
 sets:
   cell:
     n: 27
