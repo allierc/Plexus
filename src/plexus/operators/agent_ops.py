@@ -626,8 +626,46 @@ class Centroid(Aggregate):
                 f"{parent.name}.{self.into} is {px1 - px0}.")
         D = px1 - px0
         cpos = child.get(self.block); cocc = child.occ
-        s = torch.zeros(parent.n, D, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
-        w = torch.zeros(parent.n, device=dev).index_add_(0, pidx, cocc)
+        # ONE PARENT MEANS THE INDEX CARRIES NO INFORMATION -- SO DO NOT PAY TO SCATTER BY IT.
+        #
+        # `index_add_(0, pidx, v)` asks "add each row of v into the slot pidx says". When the parent
+        # set has ONE slot, every row of `pidx` is 0 and the answer is just the sum of all the rows;
+        # the index lookup, and the machinery that makes concurrent writes to the same slot safe, are
+        # both pure overhead. `sum(0)` is that answer computed directly, as a tree reduction.
+        #
+        # Measured on an RTX A6000, [570760, 3] reduced into [1, 3]:
+        #
+        #     index_add_, deterministic  140.98 ms      index_add_, atomics  1.00 ms
+        #     sum(0)                       0.016 ms
+        #
+        # 63x against plain atomics, 8,800x against the deterministic form the engine used to force
+        # on every run. On si_waterfall the two calls below were 214 ms of a 255 ms frame -- 84% of
+        # the simulation spent taking the centroid of a set with one member, while the four MPM
+        # operators together took 41 ms. Replacing them at n == 1 takes that frame to 58.2 ms.
+        #
+        # SAFE WITHOUT ANY ASSUMPTION ABOUT `pidx`: with one parent slot there is nowhere else a
+        # child could be summed to, so the sum over all children IS the segment sum. No host sync,
+        # no cached predicate, nothing to invalidate when `agent_divide` rewrites parenthood.
+        #
+        # IT IS ALSO THE MORE ACCURATE OF THE TWO, which was not the expected result and is the
+        # reason this is a fix and not a trade. The segment scan adds 570,760 terms one after
+        # another, so the running total is ~1e5 while each new term is ~0.25 and every addition
+        # rounds off a piece of it: the error grows with N. `sum` reduces as a tree -- pairs, then
+        # pairs of pairs -- so both operands stay the same size and the error grows with log N.
+        # Against a float64 evaluation of the same sum on frame 6 of si_waterfall (true 2.7546e5):
+        #
+        #     sum(0)       error 2.1e-2   = 7.7e-8 relative, one float32 ulp
+        #     index_add_   error 5.9e+2   = 2.2e-3 relative, 28,000x worse
+        #
+        # -- so the centroid moves by up to 1.6e-3 m on a 0.5 m box when this path is taken, and it
+        # moves TOWARDS the right answer. It is also still bit-reproducible run to run, which is what
+        # the determinism flag was for; deterministic was never the same claim as correct.
+        if parent.n == 1:
+            s = (cpos * cocc[:, None]).sum(0, keepdim=True)
+            w = cocc.to(s.dtype).sum(0, keepdim=True)
+        else:
+            s = torch.zeros(parent.n, D, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
+            w = torch.zeros(parent.n, device=dev).index_add_(0, pidx, cocc)
         centroid = s / w.clamp(min=1.0)[:, None]
         # IN PLACE. `new = parent.state.clone(); parent.state = new` gave the parent level a NEW
         # state tensor on every tick, which is invisible in eager and fatal for a captured CUDA

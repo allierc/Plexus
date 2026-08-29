@@ -21,8 +21,6 @@ general:
   name: material_aniso_cardio
   seed: 0
 operators:
-- at: cell
-  op: aggregate
 - op: apply_material_map
   at: mpm_particle
   from: stiffness_map
@@ -76,7 +74,6 @@ operators:
   wall_contact: 0.06
   wall_damp: 0.5
 schedule:
-- aggregate
 - apply_material_map
 - pacemaker
 - activation_pulse

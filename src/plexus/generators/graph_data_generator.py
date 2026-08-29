@@ -98,6 +98,22 @@ def data_generate(
         _cfg = dict(live_movie)
         _ns = _cfg.pop("render_n")
         _ns = [int(x) for x in (_ns if isinstance(_ns, (list, tuple)) else [_ns])]
+        # `plotting.renderer: gpu_splat` DRAWS EVERY PARTICLE and never touches VTK. At 100 M the
+        # pyvista path is copying 1.2 GB to the host per rendered frame before VTK sees a point,
+        # which is why `render_n` exists at all; the splat keeps the positions where they already
+        # are. `render_n` is then a no-op and the movie is named for the full count.
+        if str((sim.plotting or {}).get("renderer", "")).lower() == "gpu_splat":
+            from plexus.splat_movie import SplatMovie
+            movs.append(SplatMovie(out=os.path.join(data_dir, "movie.mp4"),
+                                   world=list(sim.world_size), n_frames=sim.n_frames,
+                                   up=int((sim.plotting or {}).get("up_axis", 2)),
+                                   name=sim.name, sim=sim, style=(sim.plotting or {}),
+                                   **{k: v for k, v in _cfg.items()
+                                      if k in ("max_frames", "dt", "time_s", "stills")}))
+            # NOT `hooks.extend(movs)` HERE -- the extend below covers every movie in `movs`, and
+            # doing both registered the splat hook TWICE, so every rendered frame was rendered and
+            # written twice (16 stills for a requested 4, each tick appearing in consecutive files).
+            _ns = []
         for _n in _ns:
             _tag = "" if len(_ns) == 1 else f"_{_n // 1000000}M" if _n >= 1000000 else f"_{_n // 1000}k"
             movs.append(LiveMovie(out=os.path.join(data_dir, f"movie{_tag}.mp4"),
