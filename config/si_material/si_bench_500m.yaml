@@ -164,9 +164,7 @@ plotting:
   hide_sets:
   - cell
   render_3d: dots
-  splat_res: 1280
   up_axis: 1
-  renderer: gpu_splat
 schedule:
 - gravity
 - capture: false
