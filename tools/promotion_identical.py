@@ -39,12 +39,13 @@ row keeps it. A tolerance would have to be justified by a floor above zero; ther
 
     DETERMINISM IS ASSERTED, NOT ASSUMED
     ------------------------------------
-`plexus/engine.py` sets `torch.use_deterministic_algorithms(True, warn_only=True)` -- "bit-
-reproducible runs: deterministic scatter/index_add (else GPU atomics differ)". `warn_only` silently
-downgrades any kernel with no deterministic implementation, and a downgraded kernel is exactly where
-two runs of one spec stop matching. Each side therefore runs with `PLEXUS_STRICT_DETERMINISM=1`,
-which turns the downgrade into an exception, and a side that dies of it FAILS rather than passing on
-a comparison it never earned.
+`plexus/engine.py` leaves CUDA reductions on their fast atomic default, because forcing
+`use_deterministic_algorithms(True)` on every run cost a measured 4.4x on si_waterfall and no spec
+in the corpus asked for it. Determinism is therefore the PROPERTY OF THIS TOOL, not of the engine:
+each side runs with `PLEXUS_STRICT_DETERMINISM=1`, which turns it on with `warn_only=False`, so a
+kernel with no deterministic implementation raises instead of quietly downgrading -- and a
+downgraded kernel is exactly where two runs of one spec stop matching. A side that dies of it FAILS
+rather than passing on a comparison it never earned.
 
     THE SIDES
     ---------

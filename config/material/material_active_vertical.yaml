@@ -15,8 +15,6 @@ general:
   name: material_active_vertical
   seed: 0
 operators:
-- at: cell
-  op: aggregate
 - at: activation
   duration: 30
   name: beat
@@ -58,7 +56,6 @@ operators:
   wall_contact: 0.06
   wall_damp: 0.5
 schedule:
-- aggregate
 - pacemaker
 - activation_pulse
 - active_stress

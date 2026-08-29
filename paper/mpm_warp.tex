@@ -35,6 +35,7 @@
         belowskip=4pt}
 
 \input{mpm_warp_tables}
+\input{mpm_perf_tables}
 
 \title{\vspace{-1.6cm}\textbf{Two implementations of the same MPM}\\[3pt]
 \large \code{default} against \code{warp}, line by line, with the tensors each one allocates}
@@ -440,11 +441,83 @@ disagreement. Total grid mass matches to six digits.
 implementations, so the \code{implementation} field is part of a run's identity and must be recorded
 with it. Anything that needs byte-identity --- the promotion twins --- stays on \code{default}.
 
+\section{The sweep, one year on: what is fastest now}
+
+Everything above compares \code{default} against \code{warp} on \emph{one} scene at a fixed
+$96^3$ grid. Two things have changed since, and both move the answer: \code{mpm\_grid\_update} now
+has a \code{warp} implementation (\S8.1 below), and a defect outside the MPM operators entirely was
+costing $4.4\times$ on every run in the repository.
+
+\subsection{The aggregate, and why it dominated everything}
+
+\code{engine.py} used to set \code{torch.use\_deterministic\_algorithms(True)} at import, so that two
+runs of one spec agreed bit for bit. That flag reroutes CUDA \code{index\_add\_} from atomics to a
+sort-and-segment kernel whose cost is driven by the longest run of \emph{duplicate} indices --- and
+\code{aggregate}, reducing 570{,}760 particles into a set with a \emph{single} parent, hands it
+570{,}760 copies of the index \code{0}. Measured on an RTX A6000, \code{index\_add\_} of
+$[570760,3]$ into $[1,3]$:
+
+\begin{center}\footnotesize
+\begin{tabular}{@{}lrr@{}}
+\toprule
+ & \multicolumn{1}{c}{time} & \multicolumn{1}{c}{vs \code{sum(0)}} \\
+\midrule
+\code{index\_add\_}, deterministic & 140.98\,ms & $8{,}800\times$ \\
+\code{index\_add\_}, atomics       &   1.00\,ms & $63\times$ \\
+\code{sum(0)}                      &   0.016\,ms & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+On \code{si\_waterfall} those two calls were 214\,ms of a 255\,ms frame --- \textbf{84\% of the
+simulation spent taking the centroid of a set with one member}, while the four MPM operators
+together took 41\,ms. With one parent the index carries no information, so the segment sum
+\emph{is} the sum; \code{sum(0)} is also the more accurate of the two, because a tree reduction's
+error grows with $\log N$ where the sequential scan's grows with $N$ (against a float64 evaluation:
+$2.1\times10^{-2}$ against $5.9\times10^{2}$ on a sum of $2.75\times10^{5}$). Determinism is now
+opt-in through \code{PLEXUS\_STRICT\_DETERMINISM=1}, which the promotion gate already exported; no
+spec in the corpus of 2{,}456 ever asked for it.
+
+\subsection{Which implementation, on two scenes and two cards}
+
+\begin{center}\scriptsize\tblImplSweep\end{center}
+
+\noindent
+\textbf{\code{warp} is $25$--$32\times$ \code{default}} on the A100, and the fused grid solve adds
+another $1.22\times$ at 570\,k and $1.34\times$ at 5\,M --- more at the larger scene because its grid
+is $8\times$ bigger while its particle count is $8.8\times$, so $O(\text{cells})$ work is a larger
+share. \textbf{Capture is worth only $1.02$--$1.09\times$ here}, against the $1.73\times$ quoted in
+\S5.4: at these particle counts the kernels are large enough that the launch queue is no longer the
+constraint, which is exactly what \S8.1 predicted would happen once the two remaining \code{default}
+operators were ported.
+
+\code{loop27} is a third implementation of \code{mpm\_gather}, written to test whether the
+$[N,27,D,D]$ temporaries are the cost rather than the arithmetic: it walks the 27 stencil offsets in
+python and accumulates $[N,D]$. It is $3.70\times$ the batched torch gather on the operator
+($34.20\to9.24$\,ms per call) and $1.75\times$ end to end, which localises the batched form's cost to
+its intermediates and not to its indexing.
+
+\subsection{How far one GPU goes}
+
+\begin{center}\footnotesize\tblScaling\end{center}
+
+\noindent
+The marginal cost is \textbf{276\,B per particle}, measured two-point, so an 80\,GiB H100 holds
+$\approx$290\,M and a 267.7\,GiB B300 $\approx$970\,M. One billion particles fits with about 9\,GiB
+to spare, and only with \code{PYTORCH\_CUDA\_ALLOC\_CONF=expandable\_segments:True} --- without it the
+run dies asking for the 33.5\,GiB \code{F} buffer against 13.6\,GiB free and 5.6\,GiB lost to
+fragmentation. \textbf{Throughput improves with size}: 2.08\,ns per particle-substep at 200\,M
+against 0.86 at 1\,B, because a bigger problem hides the launch and tail effects a smaller one
+cannot.
+
 \section{What is left}
 
 \begin{enumerate}
-\item \textbf{\code{mpm\_strain} and \code{mpm\_grid\_update} are still \code{default}} and are now
-  the whole remaining frame: \bpstrain\,B and \bpgridupdate\,B per particle-substep against
+\item \textbf{\code{mpm\_strain} is still \code{default}}; \code{mpm\_grid\_update} no longer is
+  (\S8.2), and porting it moved that operator from 42.7\% of the frame to 11.2\% --- $1.860\to
+  0.328$\,ms per call, $5.67\times$. The scatter is now 58.6\% and is the next target. What follows
+  was written before either change and is kept because its accounting still holds: \bpstrain\,B and \bpgridupdate\,B per particle-substep against
   \code{warp}'s zero for the other two. \code{strain} is a $[N,3,3]$ matrix product and fuses
   trivially; \code{grid\_update} is $O(\text{cells})$ and is a different kernel shape. Porting them
   also settles \S5.4: capture exists to paper over exactly these two, so its $1.73\times$ should be

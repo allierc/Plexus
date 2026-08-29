@@ -45,6 +45,7 @@ from . import field_ops             # noqa: F401  the grid field, deposit, diffu
 from . import mpm_ops               # noqa: F401  mpm_grid + p2g/grid_update/g2p/strain, anchor,
 from . import mpm_triton         # noqa: F401  mpm_scatter[implementation: triton] -- one fused kernel
 from . import mpm_warp           # noqa: F401  mpm_scatter[implementation: warp]
+from . import mpm_loop           # noqa: F401  mpm_gather[implementation: loop27]
 #                                                 spin, apply_material_map, and the fenced oracle
 from . import agent_ops             # noqa: F401  agent_scatter/gather/remodel, agent_divide/grow,
 #                                                 polarity, active force+stress, aggregate/broadcast,

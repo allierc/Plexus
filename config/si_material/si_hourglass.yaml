@@ -137,8 +137,6 @@ fields:
     frame: mpm_grid
     n_grid: 96
 operators:
-- op: aggregate
-  at: cell
 - op: gravity
   at: cell
   g: 9.81
@@ -162,7 +160,6 @@ operators:
   vmax: 1000000000.0
   implementation: warp
 schedule:
-- aggregate
 - gravity
 - substep_dt: 3.333333e-05
   steps:

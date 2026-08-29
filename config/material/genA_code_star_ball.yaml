@@ -51,8 +51,6 @@ fields:
     frame: mpm_grid
     n_grid: 192
 operators:
-- op: aggregate
-  at: star
 - op: gravity
   at: star
   gy: -10.0
@@ -76,7 +74,6 @@ operators:
   wall_contact: 0.06
   vmax: 1.0e9
 schedule:
-- aggregate
 - gravity
 - substep_dt: 1.894737e-04
   steps:

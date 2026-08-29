@@ -29,7 +29,7 @@ from __future__ import annotations
 import torch
 
 from plexus.models.registry import register_operator
-from plexus.operators.mpm_ops import MPMGather, MPMScatter, MPMStrain
+from plexus.operators.mpm_ops import MPMGather, MPMGridUpdate, MPMScatter, MPMStrain
 
 try:
     import warp as wp
@@ -599,4 +599,282 @@ class MPMStrainWarp(MPMStrain):
                               wp.from_torch(tau), wp.from_torch(p.Jp.contiguous()),
                               wp.from_torch(occ), float(dt), int(has_liq),
                               int(bool(has_vis)), int(bool(has_snw))])
+        return {}
+
+
+# ==========================================================================================================
+# GRID SOLVE -- `mpm_grid_update[implementation: warp]`
+#
+# WHY. With the aggregate's deterministic index_add removed, `mpm_grid_update` is the LARGEST
+# remaining item in the warp frame -- 42.7% of si_waterfall (24.2 ms of 56.6), against the scatter's
+# 40.2% and the gather's 4.8%. It is also the one whose cost has nothing to do with the physics it
+# computes. Two separate inefficiencies stack:
+#
+#   IT VISITS EVERY CELL, AND ALMOST NONE OF THEM HOLD ANYTHING. Grid nodes carrying mass are
+#   3.3-4.0% of si_waterfall's 884,736 and 2.5-2.6% of the 5M scene's 7,077,888 -- so ~96% of the
+#   work is on empty space. (A sparse grid is the fix for that one; this is not it.)
+#
+#   IT VISITS EACH CELL ~40 TIMES. The torch form is a chain of whole-grid tensor ops: twelve
+#   `torch.roll`s per substep for `grad` and `kappa` alone, each one a full 3.5 MB copy in and
+#   3.5 MB out, plus the elementwise chain and the boundary slabs. Measured ~450 MB of traffic per
+#   call for a grid whose entire state is 14 MB, at ~240 GB/s of an A6000's 768 -- so it is not even
+#   bandwidth-bound, it is kernel-count-bound.
+#
+# This fixes the SECOND one only, and does it in the cheapest way available: the same arithmetic in
+# two warp kernels instead of forty torch ones. No data structure changes, nothing to rebuild, and
+# capture still works.
+#
+# TWO KERNELS, NOT ONE, AND THE REASON IS THE CURVATURE. `kappa = -div(n)` needs the unit normal at
+# the six face neighbours, and each of those needs `grad(c)` at that neighbour, i.e. `c` two cells
+# out. One pass would make every thread evaluate the gradient seven times over a 25-point stencil.
+# Splitting after `grad` costs one [n_cells, 3] scratch buffer (10.6 MB at 96^3) and leaves each
+# thread reading seven gradients it did not compute. `nrm` is NOT stored: it is `grad/(|grad|+eps)`,
+# recovered in the second kernel from the gradients it is already reading.
+#
+# WHAT IT REFUSES, LOUDLY. A fused kernel that quietly skipped a term would be far worse than no
+# fused kernel, so every feature outside the 3D non-periodic normalised-CSF path raises rather than
+# being ignored: 2D, periodic, `csf_smooth > 0`, the legacy unnormalised colour (`csf_rho == 0`,
+# whose interface test is a reduction over the whole grid), and the plate BC. Those specs keep the
+# default implementation, which is why this is an `implementation:` and not a rewrite.
+#
+# NOT BIT-IDENTICAL to `default`: same operations in the same order per cell, but float addition is
+# not associative across a different lowering. `tools/mpm_grid_gate.py` measures the difference
+# against the torch operator on real state rather than asserting it.
+# ==========================================================================================================
+if HAVE_WARP:
+
+    @wp.kernel
+    def grid_colour_grad(gc: wp.array(dtype=wp.float32),
+                         grad: wp.array(dtype=wp.vec3),
+                         nx: int, ny: int, nz: int,
+                         inv_cell_mass: float, half_inv_dx: float):
+        """grad(c) by central differences, with `torch.roll`'s WRAPAROUND at the box faces.
+
+        The torch form uses `torch.roll`, which is periodic even on a non-periodic run, so a cell on
+        the -x face differences against the +x face. That is arguably wrong and it is what every
+        existing run did; reproducing it is the point of an alternative implementation.
+        """
+        t = wp.tid()
+        k = t % nz
+        j = (t // nz) % ny
+        i = t // (nz * ny)
+        ip = (i + 1) % nx
+        im = (i - 1 + nx) % nx
+        jp = (j + 1) % ny
+        jm = (j - 1 + ny) % ny
+        kp = (k + 1) % nz
+        km = (k - 1 + nz) % nz
+        # `c` is formed BEFORE the difference, as the torch code forms the whole `c` field first.
+        gx = (gc[(ip * ny + j) * nz + k] * inv_cell_mass
+              - gc[(im * ny + j) * nz + k] * inv_cell_mass) * half_inv_dx
+        gy = (gc[(i * ny + jp) * nz + k] * inv_cell_mass
+              - gc[(i * ny + jm) * nz + k] * inv_cell_mass) * half_inv_dx
+        gz = (gc[(i * ny + j) * nz + kp] * inv_cell_mass
+              - gc[(i * ny + j) * nz + km] * inv_cell_mass) * half_inv_dx
+        grad[t] = wp.vec3(gx, gy, gz)
+
+    @wp.func
+    def _unit(g: wp.vec3, eps: float) -> wp.vec3:
+        """n = grad / (|grad| + eps) -- the CSF normal, with the same additive regularisation the
+        torch path uses. NOT `wp.normalize`, which divides by |g| alone and blows up in the bulk."""
+        m = wp.sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) + eps
+        return wp.vec3(g[0] / m, g[1] / m, g[2] / m)
+
+    @wp.kernel
+    def grid_solve(gm: wp.array(dtype=wp.float32),
+                   gmv: wp.array(dtype=wp.vec3),
+                   gc: wp.array(dtype=wp.float32),
+                   grad: wp.array(dtype=wp.vec3),
+                   walls: wp.array(dtype=wp.uint8),
+                   bf: wp.array(dtype=wp.vec3),
+                   gv: wp.array(dtype=wp.vec3),
+                   nx: int, ny: int, nz: int,
+                   dt: float, half_inv_dx: float, cell_vol: float,
+                   mass_floor: float, csf_floor: float,
+                   surf: float, inv_cell_mass: float, band: float, gain: float, eps: float,
+                   full_mass: float, wd: float,
+                   buoy: float, rho_ref: float, bdir: wp.vec3,
+                   has_bf: int, has_csf: int, has_walls: int, has_buoy: int):
+        t = wp.tid()
+        k = t % nz
+        j = (t // nz) % ny
+        i = t // (nz * ny)
+
+        m = gm[t]
+        mv = gmv[t]
+        mc = wp.max(m, mass_floor)
+        v = wp.vec3(mv[0] / mc, mv[1] / mc, mv[2] / mc)
+
+        if has_bf == 1:                                  # `body_force: grid` handover from the scatter
+            a = bf[t]
+            v = wp.vec3(v[0] + dt * a[0], v[1] + dt * a[1], v[2] + dt * a[2])
+
+        if has_csf == 1:
+            ip = (i + 1) % nx
+            im = (i - 1 + nx) % nx
+            jp = (j + 1) % ny
+            jm = (j - 1 + ny) % ny
+            kp = (k + 1) % nz
+            km = (k - 1 + nz) % nz
+            nxp = _unit(grad[(ip * ny + j) * nz + k], eps)
+            nxm = _unit(grad[(im * ny + j) * nz + k], eps)
+            nyp = _unit(grad[(i * ny + jp) * nz + k], eps)
+            nym = _unit(grad[(i * ny + jm) * nz + k], eps)
+            nzp = _unit(grad[(i * ny + j) * nz + kp], eps)
+            nzm = _unit(grad[(i * ny + j) * nz + km], eps)
+            # kappa = -div(n), summed left to right exactly as the torch generator expression is.
+            kap = -(((nxp[0] - nxm[0]) * half_inv_dx + (nyp[1] - nym[1]) * half_inv_dx)
+                    + (nzp[2] - nzm[2]) * half_inv_dx)
+            c = gc[t] * inv_cell_mass
+            fm = float(0.0)
+            if c > band and c < 1.0 - band and m > band * full_mass:
+                fm = gain
+            inv_m = cell_vol / wp.max(m, csf_floor)
+            gr = grad[t]
+            v = wp.vec3(v[0] + dt * (surf * kap * gr[0] * fm) * inv_m,
+                        v[1] + dt * (surf * kap * gr[1] * fm) * inv_m,
+                        v[2] + dt * (surf * kap * gr[2] * fm) * inv_m)
+
+        # REFLECTIVE BOX WALLS, IN THE TORCH ORDER, WHICH IS NOT SYMMETRIC AND MATTERS.
+        # The torch loop writes axis k's clamped component back before damping the OTHER components
+        # on that axis's slabs, and axis 1 then reads a y-velocity axis 0 may already have damped.
+        # Keeping `v` in registers and walking k in the same order reproduces that exactly. Note the
+        # slabs are asymmetric -- `idx < 3` is three cells, `idx > n - 3` is two -- because the torch
+        # test is strict at the top; this is behaviour, not a bug being fixed here.
+        lo0 = i < 3
+        hi0 = i > nx - 3
+        lo1 = j < 3
+        hi1 = j > ny - 3
+        lo2 = k < 3
+        hi2 = k > nz - 3
+        vx = v[0]
+        vy = v[1]
+        vz = v[2]
+        if lo0:
+            vx = wp.max(vx, 0.0)
+        if hi0:
+            vx = wp.min(vx, 0.0)
+        if wd != 1.0 and (lo0 or hi0):
+            vy = vy * wd
+            vz = vz * wd
+        if lo1:
+            vy = wp.max(vy, 0.0)
+        if hi1:
+            vy = wp.min(vy, 0.0)
+        if wd != 1.0 and (lo1 or hi1):
+            vx = vx * wd
+            vz = vz * wd
+        if lo2:
+            vz = wp.max(vz, 0.0)
+        if hi2:
+            vz = wp.min(vz, 0.0)
+        if wd != 1.0 and (lo2 or hi2):
+            vx = vx * wd
+            vy = vy * wd
+        v = wp.vec3(vx, vy, vz)
+
+        if has_walls == 1 and walls[t] != wp.uint8(0):   # no-slip inside a solid obstacle
+            v = wp.vec3(0.0, 0.0, 0.0)
+
+        if has_buoy == 1:
+            rho = m / cell_vol
+            f = float(0.0)
+            if rho > 1.0e-9:
+                f = (rho - rho_ref) / wp.max(rho, 1.0e-9)
+            v = wp.vec3(v[0] + dt * buoy * f * bdir[0],
+                        v[1] + dt * buoy * f * bdir[1],
+                        v[2] + dt * buoy * f * bdir[2])
+
+        gv[t] = v
+
+
+@register_operator("mpm_grid_update", implementation="warp", family="mpm",
+                   set="field", kind="field")
+class MPMGridUpdateWarp(MPMGridUpdate):
+    """The 3D grid solve -- mass normalisation, CSF surface tension, box walls, obstacles,
+    buoyancy -- as two Warp kernels instead of ~40 whole-grid torch ops."""
+
+    MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions", "fused_kernel"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+
+    def forward(self, H, mask=None):
+        if not HAVE_WARP:
+            raise RuntimeError("mpm_grid_update[warp] needs warp-lang")
+        from plexus.operators.mpm_ops import sub_dt
+        g = H.field(self.at); dev = g.m.device
+        D = g.dim
+        if D != 3 or str(dev) == "cpu" or bool(getattr(H, "periodic", False)):
+            raise RuntimeError("mpm_grid_update[warp] is 3D, non-periodic, CUDA only")
+        if self.csf_smooth:
+            raise RuntimeError("mpm_grid_update[warp] does not implement csf_smooth "
+                               "(it needs a third pass); drop `implementation: warp`")
+        if self.plate_axis is not None:
+            raise RuntimeError("mpm_grid_update[warp] does not implement the plate BC; "
+                               "drop `implementation: warp`")
+        if self.surface_tension > 0.0 and self.csf_rho <= 0.0:
+            raise RuntimeError("mpm_grid_update[warp] does not implement the LEGACY unnormalised "
+                               "colour (csf_rho unset): its interface test is a reduction over the "
+                               "whole grid. Set csf_rho, or drop `implementation: warp`")
+        dt = sub_dt(H, self.dt_sub)
+        dx = float(g.dx); inv_dx = float(g.inv_dx)
+        cell_vol = dx ** 3
+        n = int(g.m.numel())
+        nx, ny, nz = g.shape
+
+        # CACHED ONCE, at a stable address so a captured graph keeps reading the buffer the run
+        # keeps writing. `grad` is scratch between the two kernels and never leaves this operator.
+        if getattr(self, "_grad", None) is None or self._grad.shape[0] != n:
+            self._grad = torch.zeros(n, 3, device=dev)
+            self._zero3 = torch.zeros(1, 3, device=dev)
+        # RESOLVED ONCE. `bool(mask.any())` is a device->host sync: run per substep it drains the
+        # launch queue 13 times a frame, and inside a CUDA-graph capture it is illegal outright.
+        # The obstacle set is a run constant (`_walls3d` itself caches on the grid shape), so the
+        # flag is settled on the first call and read from an int thereafter.
+        if getattr(self, "_wall_u8", None) is None or self._wall_u8.numel() != n:
+            walls = self._walls3d(H, g, dev)
+            self._wall_u8 = walls.to(torch.uint8).contiguous()
+            self._has_walls = 1 if bool(self._wall_u8.any()) else 0
+        has_walls = self._has_walls
+
+        if getattr(self, "_c_csf", None) is None:
+            self._c_csf = bool(self.surface_tension > 0.0 and bool((g.c > 0).any()))
+        has_csf = 1 if self._c_csf else 0
+        inv_cell_mass = 1.0 / (self.csf_rho * cell_vol) if self.csf_rho > 0.0 else 1.0
+        gain = 1.0 / max(1.0 - 2.0 * self.csf_band, 1e-6) if self.csf_band > 0 else 1.0
+        if self.csf_band <= 0.0 and has_csf:
+            raise RuntimeError("mpm_grid_update[warp] needs csf_band > 0 when surface tension is "
+                               "on: the band-free interface test is a global reduction")
+
+        _bf = getattr(H, "_mpm_body_accel", None)
+        bf = _bf if _bf is not None else self._zero3
+        buoy_dir = [0.0, -1.0, 0.0]
+        if self.buoy_dir is not None:
+            for _i, _x in enumerate(self.buoy_dir[:3]):
+                buoy_dir[_i] = float(_x)
+
+        if has_csf:
+            _wp_launch(grid_colour_grad, n, dev,
+                       [wp.from_torch(g.c.contiguous()),
+                        wp.from_torch(self._grad, dtype=wp.vec3),
+                        int(nx), int(ny), int(nz),
+                        float(inv_cell_mass), float(0.5 * inv_dx)])
+        _wp_launch(grid_solve, n, dev,
+                   [wp.from_torch(g.m.contiguous()),
+                    wp.from_torch(g.mv.view(-1, 3), dtype=wp.vec3),
+                    wp.from_torch(g.c.contiguous()),
+                    wp.from_torch(self._grad, dtype=wp.vec3),
+                    wp.from_torch(self._wall_u8),
+                    wp.from_torch(bf.view(-1, 3), dtype=wp.vec3),
+                    wp.from_torch(g.v.view(-1, 3), dtype=wp.vec3),
+                    int(nx), int(ny), int(nz),
+                    float(dt), float(0.5 * inv_dx), float(cell_vol),
+                    float(self._const("mass_floor", g)), float(self._const("csf_mass_floor", g)),
+                    float(self.surface_tension), float(inv_cell_mass),
+                    float(self.csf_band), float(gain), float(self._const("csf_eps", g)),
+                    float(self.csf_rho * cell_vol), float(self.wall_damp),
+                    float(self.buoyancy), float(self.rho_ref),
+                    wp.vec3(buoy_dir[0], buoy_dir[1], buoy_dir[2]),
+                    int(_bf is not None), int(has_csf), int(has_walls),
+                    int(self.buoyancy != 0.0)])
         return {}

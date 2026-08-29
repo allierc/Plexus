@@ -38,20 +38,33 @@ import math
 import numpy as np
 import torch
 
-# bit-reproducible runs: deterministic scatter/index_add (else GPU atomics differ)
+# BIT-REPRODUCIBLE RUNS ARE NOW OPT-IN, and the reason is a measured factor of 4.4 on a real spec.
 #
-# `warn_only` IS THE DEFAULT AND IT DOWNGRADES SILENTLY. A kernel with no deterministic
-# implementation warns once and runs the nondeterministic path anyway, so a run can be
-# irreproducible while this line says the opposite -- and an irreproducible kernel is exactly where
-# two runs of one spec stop matching. Ordinary runs keep the lenient setting, because a warning is
-# better than a crash in the middle of a campaign.
+# This line used to read `torch.use_deterministic_algorithms(True, warn_only=True)` unconditionally,
+# so every run in the repo paid for reproducibility whether or not anything was comparing two runs.
+# The flag reroutes CUDA `index_add_` / `scatter_add_` from atomics to a sort-and-segment kernel
+# whose cost is driven by the longest run of DUPLICATE indices. Measured on an RTX A6000:
 #
-# `PLEXUS_STRICT_DETERMINISM=1` turns the downgrade into an exception, and the promotion gate
-# (`tools/promotion_identical.py`) sets it on both sides: a comparison that passes because a kernel
-# quietly went nondeterministic has proved nothing, so it must fail loudly instead.
+#   index_add_ of [570760, 3] into [1, 3]     deterministic 140.98 ms    atomics 1.00 ms   141x
+#   si_waterfall, whole frame, warp path      deterministic  245.2 ms    atomics  55.3 ms  4.43x
+#   si_waterfall, whole frame, torch path     deterministic 1374.9 ms    atomics 985.7 ms  1.39x
+#
+# -- and the aggregate alone was 84% of the warp frame. Nothing in the corpus asked for this: of
+# 2,456 specs, ZERO declare determinism (the three files that match the word are comments about
+# kT = 0 and noise-free steering). The only callers that need it are the promotion gate and the
+# gate runner, and both already export `PLEXUS_STRICT_DETERMINISM=1` -- so the setting now follows
+# the thing that actually wants it instead of taxing everything that does not.
+#
+# STRICT MEANS STRICT: `warn_only=False`. The old default downgraded SILENTLY -- a kernel with no
+# deterministic implementation warned once and ran the nondeterministic path anyway, so a run could
+# be irreproducible while this line claimed otherwise. There is no longer a lenient middle setting,
+# because it was the worst of the three: it cost the full 4.4x and did not guarantee the property it
+# was paying for. A comparison that passes because a kernel quietly went nondeterministic has proved
+# nothing, so it must fail loudly instead.
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 STRICT_DETERMINISM = os.environ.get("PLEXUS_STRICT_DETERMINISM", "") not in ("", "0", "false")
-torch.use_deterministic_algorithms(True, warn_only=not STRICT_DETERMINISM)
+if STRICT_DETERMINISM:
+    torch.use_deterministic_algorithms(True, warn_only=False)
 
 from plexus.models.base import Hierarchy, Level
 from plexus.models.state import spatial_schema, schema_from_spec, StateSchema, BOUNDARY_WORLD
