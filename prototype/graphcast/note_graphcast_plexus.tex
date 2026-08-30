@@ -1,0 +1,99 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage[a4paper,margin=2.3cm]{geometry}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{enumitem}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.6em}{}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\op}[1]{\texttt{\small #1}}
+\definecolor{cpass}{HTML}{2ea043}
+\definecolor{cfail}{HTML}{cf222e}
+\definecolor{cskip}{HTML}{8b949e}
+\newcommand{\gpass}[1]{\textcolor{cpass}{\textbf{#1}}}
+\newcommand{\gfail}[1]{\textcolor{cfail}{\textbf{#1}}}
+\newcommand{\gskip}[1]{\textcolor{cskip}{#1}}
+
+\input{gates_table.tex}
+
+\title{A GraphCast-style fitting model as Plexus2 operators}
+\author{\code{prototype/graphcast} --- nothing promoted}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Mechanism}
+
+Every model in \code{connectome-gnn} is a one-step message-passing network on a \emph{given}
+connectome. Two things wanted now sit outside that: a deeper, edge-stateful processor
+(GraphCast's), and datasets with no connectome at all. ZAPBench has $71{,}721$ neurons of which
+about $481$ are matched to an electron-microscopy reconstruction; the redox organoid is a
+three-dimensional field with no segmentation. In both, the coupling has to come from \emph{space}
+rather than from wiring.
+
+The arithmetic that decides what can be represented: a ZAPBench volume is acquired plane by plane,
+$72$ planes at $12.0$\,ms, so one volume takes $0.851$\,s against a $0.914$\,s frame interval ---
+$93\%$ of the frame period. Neurons at different depths are therefore \emph{not} sampled
+simultaneously, which is precisely what a message-passing operator assumes. That fact is data, not
+a modelling choice: the per-plane acquisition times are recorded, and the model is conditioned on
+the offset rather than pretending it away.
+
+\section{Equations and symbols}
+
+\emph{To be written at stage 2, when the operator exists.} The two message forms this prototype
+selects between are
+\begin{align}
+\text{\code{simple}}\quad & \mathbf{m}_i = \sum_{j} W_{ij}\, g_\phi(v_j, a_j) ,
+\qquad \dot v_i = f_\theta(v_i, a_i, \mathbf{m}_i, b_i s(t))
+\label{eq:simple}\\[4pt]
+\text{\code{graphcast}}\quad & e_{ij} \leftarrow e_{ij} + \mathrm{LN}\big(\mathrm{MLP}_e([e_{ij}\|v_j\|v_i])\big),
+\qquad v_i \leftarrow v_i + \mathrm{LN}\big(\mathrm{MLP}_v([v_i\|\textstyle\sum_j e_{ij}])\big)
+\label{eq:graphcast}
+\end{align}
+with $a_i$ the per-neuron embedding carrying heterogeneity invisible in the state, and $b_i$ the
+per-neuron gain on the external stimulus $s(t)$.
+
+\section{The Plexus2 container}
+
+\emph{To be written as the operators land.} Sets: \code{neuron}. Fields: \code{stim} (playback),
+\code{mesh} (only when the encoder/decoder option is on). The four architectural choices are
+\emph{config options}, not forks --- \code{encoder\_decoder}, \code{message}, \code{n\_passes},
+\code{embedding} --- which is why the gate table below counts $24$ combinations.
+
+\section{Gates}
+
+A gate is a number with a threshold decided \emph{before} the run and a stated consequence if it
+fails. A threshold chosen after seeing the number is not a threshold, so every threshold below is
+a literal in \code{gates.py} and predates the code it gates. Three tiers, and only the third is a
+statement about biology; this table is \tierProportion, so two thirds of it is verification. That
+is the expected shape and is stated rather than hidden.
+
+A gate's threshold belongs in the unit of the phenomenon, not of the mesh --- a threshold in grid
+cells is denominated in the currency in which it is easiest to pass, and a green row of that kind
+reads as an endorsement the interface has not earned. Every row therefore carries what its number
+is \emph{of}, and the measurement tier is only available because the spec declares
+\code{general.units:}.
+
+\smallskip
+\tblGates
+
+\medskip
+\noindent
+\textbf{What the gates license, so far.} Only stage 0 has run. G1 establishes that all $24$ option
+combinations parse, G2 that no dataset path, name or dimension appears anywhere in the prototype's
+code, and G7 that the spec declares its units --- so the measurement-tier rows below are
+\emph{available} to be denominated in seconds and micrometres rather than in cells. Nothing about
+any model is licensed yet: no operator has been built, and every closed-form and measurement row is
+still \gskip{SKIP}. G5 is the one to watch, because it is what will establish that the
+\code{simple} option is arithmetically the existing \code{NeuralGNN} and therefore that everything
+after it is a controlled variation on something already known to work.
+
+\end{document}

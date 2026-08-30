@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+log/
+*.aux
+*.fdb_latexmk
+*.fls
+*.out
+*.toc
+*.synctex.gz
+!gates.csv
+!gates_table.tex
