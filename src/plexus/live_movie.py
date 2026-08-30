@@ -32,8 +32,10 @@ import os
 import time
 
 import numpy as np
+import torch
 
 FLAT = dict(render_points_as_spheres=True, lighting=False, ambient=1.0, diffuse=0.0, specular=0.0)
+_CS_AXIS = {"x": 0, "y": 1, "z": 2}
 
 
 def _biggest_particle_set(H):
@@ -64,7 +66,17 @@ class LiveMovie:
 
     def __init__(self, out, world, n_frames, up=2, render_n=400_000, max_frames=300,
                  fps=20, px=1280, dot=None, fill=0.9, elev=18.0, azim=-58.0, name="", seed=0,
-                 sim=None, style=None, stills=10, keep_stills=False):
+                 sim=None, style=None, stills=10, keep_stills=False,
+                 dt=None, time_s=None, real_time=True, length_um=None):
+        # THE SPEC'S `plotting.fps` WAS DECORATIVE. `style` carries it, `fps` was a separate
+        # keyword defaulting to 20, and nothing connected them -- so every movie was written at 20
+        # regardless of what the spec asked for. It matters twice over now: `fps` sets the mp4's
+        # framerate AND the render stride that makes playback real time, and the two must agree or
+        # the clock in the overlay is a claim about a file that does not keep it. si_gate at
+        # fps 20 took stride 60 and held 30 frames for 1.5 s of world -- arithmetically real time,
+        # but so heavily aliased that it reads as several times too fast. At 60 it is stride 20 and
+        # 90 frames, the same 1.5 s, smooth.
+        fps = float((style or {}).get("fps", fps))
         from plexus.render_vtk import offscreen
         offscreen()                                   # kill the Xlib chatter before VTK loads
         import pyvista as pv
@@ -89,10 +101,118 @@ class LiveMovie:
         if dot is None:
             dot = self.style.get("dot_size", "auto")
         self.dot, self.fill = dot, float(fill)
+        # A CROSS SECTION, AS AN OVERLAY. `plotting.cross_section` selects a slab normal to one axis
+        # and scatters what is inside it in the plane of the other two -- for a jet falling in -y an
+        # xz slice shows the stream's footprint, so a round column and a broken-up turbulent one look
+        # different at a glance where the 3D view shows only its silhouette.
+        #
+        # It is a vtkChartXY OVERLAY on the same renderer, not a second render pass: the frame still
+        # costs one `write_frame()`, and the stills keep coming out of that same image.
+        _cs = (style or {}).get("cross_section")
+        self.cs = None
+        if _cs:
+            _cs = {} if _cs is True else dict(_cs)
+            self.cs_axis = _CS_AXIS[str(_cs.get("axis", "y")).lower()]
+            self.cs_at = float(_cs.get("at", 0.35))          # fraction of the box along that axis
+            # THICKNESS IS THE FULL SLAB, IN CELLS, and halved here. It read as a half-width
+            # before, so `thickness: 4` cut a slab 8 cells (8.3 mm) thick -- two diameters of a 4 mm
+            # sphere seen at once, which is why the column looked solid rather than a sheet.
+            self.cs_cells = float(_cs.get("thickness", 4.0)) / 2.0
+            self.cs_max = int(_cs.get("max_points", 6000))
+            # `only: true` REPLACES the 3D view rather than sitting in its corner. A slice IS the
+            # better picture for a jet: the 3D column is an opaque silhouette that hides its own
+            # interior, and the wake behind an obstacle is exactly the thing a silhouette cannot
+            # show. As an inset it is legible but small; as the whole frame it is the movie.
+            self.cs_only = bool(_cs.get("only", False))
+            self.cs_cfg = _cs
         self.px_used = None
         self.up = int(up)
         # (reset to 1 for 2D below, once the world tells us the run is planar)
         self.stride = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
+        # REAL TIME, WHICH IS ONLY MEANINGFUL ONCE A RUN HAS UNITS. One simulated frame lasts
+        # `dt * time_s` SECONDS, so playing at `fps` shows real time exactly when the render stride
+        # is 1/(fps * dt * time_s). Without a `units:` block `time_s` is 1.0 by default and the run
+        # is dimensionless, so this computes a stride for a second that means nothing -- hence it
+        # only engages when the units were DECLARED, and otherwise the movie is what it always was.
+        #
+        # It cannot always be reached: a run whose frames are further apart than 1/fps of real time
+        # is already faster than real when every frame is drawn, and one with a huge frame count
+        # would need a stride so large the motion aliases. Both are reported rather than silently
+        # accepted, because "this movie is real time" is a claim.
+        # REAL TIME BY DERIVING THE FRAMERATE, not by thinning the movie.
+        #
+        # The movie is capped at `max_frames` (300) because that is what bounds the file, and the
+        # stride follows from it: ceil(n_frames / max_frames). What makes playback real time is then
+        # the FRAMERATE, which is not a free choice at all --
+        #
+        #     fps = frames_rendered / (n_frames * dt * time_s)
+        #
+        # -- because the video must last exactly as long as the world it shows. For a 1.5 s run cut
+        # to 300 frames that is 200 fps. High, and legal in H.264; a player that cannot honour it
+        # shows the movie SLOWER than real, never faster, which is the safe direction to fail in.
+        #
+        # This replaces a `playback` speed knob, which was a way of asking for slow motion and is
+        # not what a movie with units should do: it should show the world at the rate the world
+        # ran, and if that is too fast to watch, the answer is a longer run, not a slower film.
+        self.dt, self.time_s, self.real_time = dt, time_s, bool(real_time)
+        self.length_um = length_um
+        # THE GRID, BESIDE THE PARTICLE COUNT. The two together are what actually determines
+        # whether a run resolves anything: 100M particles on a 96^3 grid is 8,176 per cell and a
+        # picture of nothing in particular, while the same 100M on 330^3 is the MPM convention of 8.
+        # The particle count alone has been the headline on every movie in this corpus and it is the
+        # half that flatters.
+        self._grid_label = ""
+        _fl = getattr(sim, "fields", None) or {}
+        _ng = next((int(fc["n_grid"]) for fc in _fl.values()
+                    if isinstance(fc, dict) and "n_grid" in fc), None)
+        if _ng:
+            _d = len(world) if world is not None else 3
+            _cells = _ng ** _d
+            _c = (f"{_cells / 1e6:.1f}M" if _cells >= 1e6 else f"{_cells / 1e3:.0f}k")
+            self._grid_label = (f"   grid {_ng}^{_d} = {_c} cells")
+            if length_um:                       # with units, the cell has a SIZE worth quoting
+                _dx = float(world[1] if len(world) > 1 else world[0]) / _ng \
+                    * float(length_um) / 1.0e6
+                self._grid_label += (f", dx {_dx * 1e3:.3g} mm" if _dx < 1.0
+                                     else f", dx {_dx:.3g} m")
+        self._box_label = ""
+        if length_um and time_s is not None:
+            _m = float(length_um) / 1.0e6
+            _w = [float(x) * _m for x in world]
+            _f = (lambda v: f"{v * 1e3:g} mm" if v < 0.01 else f"{v * 100:g} cm"
+                  if v < 1.0 else f"{v:g} m" if v < 1000.0 else f"{v / 1000:g} km")
+            self._box_label = ("   box " + " x ".join(_f(v) for v in _w)
+                               if len(set(_w)) > 1 else f"   box {_f(_w[0])} cube")
+        self.speed = None
+        if self.real_time and dt and time_s:
+            frame_s = float(dt) * float(time_s)
+            self.duration_s = self.n_frames * frame_s
+            # SLOW MOTION AS A DECLARED FACTOR, not as a thinner movie. The frame COUNT is fixed
+            # by max_frames and the stride follows from it; slowing the film down is then purely a
+            # matter of the framerate, `fps = frames / (duration * slow_motion)`. Nothing is
+            # dropped, nothing is resampled -- the same 300 frames simply take 4x longer to play,
+            # which is what slow motion is. `slow_motion: 1` is real time.
+            _sm = float((style or {}).get("slow_motion", 1.0))
+            if _sm <= 0:
+                raise ValueError(f"plotting.slow_motion must be > 0, got {_sm}")
+            n_rendered = max(1, self.n_frames // self.stride)
+            # A ZERO-LENGTH RUN HAS NO DURATION TO DIVIDE BY. `n_frames: 0` is a legitimate request
+            # -- it renders the seeded scene and nothing else, which is what the studio's preview
+            # wants -- but `duration_s` is then 0 and this was a ZeroDivisionError inside the movie
+            # writer, so the run died after building the whole hierarchy. A single frame has no
+            # playback rate to get right; 1 fps is as true as any other.
+            _dur = self.duration_s * _sm
+            fps = (n_rendered / _dur) if _dur > 0 else 1.0
+            self.slow_motion = _sm
+            self.speed = float(fps) * self.stride * frame_s      # world-seconds per video-second
+            self.fps = fps                                       # <- what open_movie must use
+            _how = "real time" if abs(_sm - 1.0) < 1e-9 else f"{_sm:g}x slow motion"
+            print(f"[live-movie] {self.n_frames} frames of {self.duration_s:.4g} s -> stride "
+                  f"{self.stride}, {n_rendered} movie frames at {fps:.4g} fps = {_how} "
+                  f"({n_rendered / fps:.4g} s of video)"
+                  + ("" if 5.0 <= fps <= 120.0 else
+                     f"  (NOTE: {fps:.4g} fps is outside the 5-120 most players honour; if it is "
+                     f"clamped the movie runs SLOW, not fast)"), flush=True)
         # STILLS COME OUT OF THE MOVIE'S OWN RENDER, not a second one. `Plotter.image` is the frame
         # `write_frame()` just rasterised, so a PNG costs a file write and nothing else -- no extra
         # render pass, and no second copy of the camera/palette/dot-size code to drift out of sync
@@ -131,6 +251,13 @@ class LiveMovie:
         # never fire, because the line above had just overwritten the thing it tested. Every 2D run
         # was therefore drawn as an angled 3D cube with the particles lying on its floor.
         w = [float(x) for x in world]
+        self.world = w                 # the per-axis box, kept for the cross-section slab
+        # THE SLAB'S HALF-WIDTH IS IN CELLS, so it needs the cell size -- read from the spec's own
+        # n_grid rather than assumed, since `thickness: 4` must mean four of the grid's cells and
+        # not four of some default's.
+        _ng = next((int(fc["n_grid"]) for fc in ((getattr(sim, "fields", None) or {}) or {}).values()
+                    if isinstance(fc, dict) and "n_grid" in fc), 96)
+        self._cs_dx = (w[1] if len(w) > 1 else w[0]) / float(_ng)
         self.is2d = len(w) < 3
         if self.is2d:
             self.up = 1
@@ -153,6 +280,36 @@ class LiveMovie:
         else:
             self.p.add_mesh(pv.Box((0, span[0], 0, span[1], 0, span[2])).extract_all_edges(),
                             color="#4a4a4a", line_width=1.0, lighting=False)
+            # A SCALE BAR, AND ONLY WHERE THERE IS A SCALE. Without `general.units` the box is
+            # a number of nothing and a bar labelled "20" would be a lie. The length is the largest
+            # round number (1, 2 or 5 times a power of ten) fitting in a third of the box, so it
+            # sizes itself: 20 m for a 100 m box, 2 cm for a 0.1 m one, with nothing to set.
+            #
+            # A PLAIN SEGMENT: no end ticks, and the label in the same font and size as the
+            # top-left print, so it reads as one annotation rather than two competing ones.
+            if self.time_s is not None and getattr(self, "length_um", None):
+                _m = float(self.length_um) / 1.0e6            # metres per simulation length unit
+                _ax0 = [i for i in range(3) if i != self.up][0]
+                _tgt = float(span[_ax0]) / 3.0
+                _p10 = 10.0 ** np.floor(np.log10(max(_tgt, 1e-30)))
+                _len = max([f * _p10 for f in (1.0, 2.0, 5.0) if f * _p10 <= _tgt] or [_p10])
+                _other = [i for i in range(3) if i not in (self.up, _ax0)][0]
+                _a = np.zeros(3); _b = np.zeros(3)
+                _a[_ax0] = 0.0; _b[_ax0] = _len
+                _a[_other] = _b[_other] = -0.04 * float(span[_other])
+                self.p.add_mesh(pv.Line(_a, _b), color="white", line_width=4.0, lighting=False)
+                _v = _len * _m
+                _lab = (f"{_v * 1e3:g} mm" if _v < 0.01 else f"{_v * 100:g} cm" if _v < 1.0
+                        else f"{_v:g} m" if _v < 1000.0 else f"{_v / 1000:g} km")
+                _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.05 * float(span[self.up])
+                # TWICE THE HEADER'S NUMBER TO GET THE SAME HEIGHT. `add_text` and
+                # `add_point_labels` do not interpret `font_size` the same way -- both set to 11 and
+                # the label renders about half the cap height of the top-left print. 22 matches it,
+                # and at that size the label spans roughly two thirds of the bar, which is what
+                # makes the two read as one annotation.
+                self.p.add_point_labels([_mid], [_lab], font_size=22, text_color="white",
+                                        shape=None, show_points=False, always_visible=True,
+                                        justification_horizontal="center")
             centre, radius = 0.5 * span, float(span.max()) * 0.55
             e, az = np.radians(elev), np.radians(azim)
             ax_h = [i for i in range(3) if i != self.up]
@@ -167,7 +324,64 @@ class LiveMovie:
             self.p.camera.parallel_scale = radius * 1.45
 
         self._draw_obstacles(span)
-        self.p.open_movie(out, framerate=int(fps), quality=8)
+        # A FRAGMENTED MP4, SO THE FILE IS READABLE WHILE IT IS STILL BEING WRITTEN.
+        # A plain mp4 keeps its index -- the moov atom -- at the END, so nothing before close()
+        # plays and copying the file mid-run copies an unreadable prefix. That is why killing a run
+        # used to lose the movie, and why SIGINT (which lets close() run) saved a 10-hour job's
+        # 98.9 MB where SIGKILL would have left 52 MB of rubble.
+        #
+        # `frag_keyframe+empty_moov` writes a self-contained fragment per keyframe and `-g 1` makes
+        # every frame a keyframe, but neither is enough on its own: MEASURED, both leave the file at
+        # 36 bytes after 40 frames because ffmpeg buffers. `-flush_packets 1` is the one that
+        # matters -- with it the same file reads 30 frames at frame 40, and is still a valid
+        # complete movie after close.
+        #
+        # It costs a little size (no global index, a fragment header per frame) and it means a
+        # long run can be WATCHED from the file at any moment, with no duplicate and no second
+        # writer, which is what `3d.png` was standing in for.
+        # `only` DRAWS THE SLICE IN THE 3D VIEW ITSELF -- no chart at all. Keeping the ordinary
+        # renderer means the slice arrives with the box, the obstacles, the camera, the colours and
+        # the scale bar already correct, and the sphere the jet is hitting is simply THERE, drawn as
+        # the 3D actor it is. A 2D chart had to reproduce every one of those and reproduced none:
+        # it showed no obstacle, needed its own axes, disabled point sprites by existing, and froze
+        # unless its series was rebuilt each frame.
+        if self.cs is None and getattr(self, "cs_cfg", None) is not None and not self.cs_only:
+            ax = self.cs_axis
+            lat = [k for k in range(3) if k != ax][:2]
+            ch = pv.Chart2D(size=(0.26, 0.26), loc=(0.015, 0.645))
+            ch.background_color = (0, 0, 0, 0.55)
+            ch.border_color = "#9a9a9a"
+            names = "xyz"
+            ch.title = (f"{names[lat[0]]}{names[lat[1]]} slice at "
+                        f"{names[ax]} = {self.cs_at:.2f} of the box")
+            # FIXED RANGES, NOT AUTOSCALED. An autoscaling axis rescales to whatever is in the slab,
+            # so a jet that thins to a thread would fill the panel exactly as a full one does and the
+            # thing the panel exists to show would be the one thing it hides.
+            ch.x_axis.range = [0.0, float(self.world[lat[0]])]
+            ch.y_axis.range = [0.0, float(self.world[lat[1]])]
+            # LABELS AND TICKS ON, EXPLICITLY. The first build drew a bare rectangle: `.label` is
+            # set here but a chart at this size hides its decorations unless asked, so the panel had
+            # no axes, no ticks and no title -- an empty box that could equally have meant "no data"
+            # or "not working".
+            ch.x_axis.label = f"{names[lat[0]]} (m)"
+            ch.y_axis.label = f"{names[lat[1]]} (m)"
+            for _a in (ch.x_axis, ch.y_axis):
+                _a.label_visible = True
+                _a.ticks_visible = True
+                _a.tick_labels_visible = True
+                _a.grid = False
+            ch.legend_visible = False
+            _c = list((style or {}).get("colors", {}).values())
+            self._cs_size = 6 if self.cs_only else 3
+            self._cs_colour = tuple(_c[0]) if _c else (0.3, 0.62, 1.0)
+            self._cs_series = ch.scatter([0.0], [0.0], size=self._cs_size, style="o",
+                                         color=self._cs_colour)
+            self.p.add_chart(ch)
+            self.cs = ch
+            self._cs_lat = lat
+        self.p.open_movie(out, framerate=max(1, int(round(getattr(self, "fps", fps)))), quality=8,
+                          output_params=["-movflags", "frag_keyframe+empty_moov+default_base_moof",
+                                         "-g", "1", "-flush_packets", "1"])
 
     def _draw_obstacles(self, span):
         """The world's solid geometry, which the simulation sees and this renderer did not.
@@ -203,15 +417,61 @@ class LiveMovie:
             # OPAQUE AND LIT, unlike the particles. The dots are flat and unshaded so density reads
             # as brightness; an obstacle drawn the same way would be a featureless silhouette, and
             # in 3D you could not tell a sphere from a disc.
+            #
+            # MATTE, NOT GLOSSY, AND FLAT-SHADED. `specular=0.2` with `smooth_shading=True` put a
+            # moving highlight on every box and rounded the edges of shapes that are exactly
+            # axis-aligned boxes -- the stair in si_avalanche read as polished metal and its steps
+            # had soft corners they do not have. `specular=0` removes the sheen; flat shading gives
+            # each face one constant tone, so a box looks like a box and the geometry is legible
+            # from its face brightnesses alone. Depth then comes from the shadows below, not from
+            # a highlight sliding across the surface.
             self.p.add_mesh(m, color="#9a9a9a", opacity=1.0, lighting=not self.is2d,
-                            specular=0.2, smooth_shading=True)
+                            specular=0.0, specular_power=1.0, ambient=0.28, diffuse=0.85,
+                            smooth_shading=False)
         self.n_obstacles = len(obs)
+        # REAL SHADOWS, once, and only when there is something to cast them. VTK's shadow pass
+        # costs a second render of the scene per light, which is why it is not on by default; with
+        # obstacles present it is what separates a body resting ON a step from one floating above
+        # it, and that ambiguity is exactly what a flat-shaded scene cannot resolve on its own.
+        # SHADOWS ARE OPT-IN, `plotting.shadows: true`, and default OFF. They make obstacle
+        # geometry legible -- which is why they were added -- but VTK's shadow pass RE-LIGHTS every
+        # actor, including the particle cloud that explicitly asked for `lighting=False`. Measured on
+        # si_jet_sphere_wide: a cloud whose colour array is uniformly [76, 158, 255] renders at
+        # [134, 135, 137] with shadows on and [98, 104, 112] with them off. The blue water came out
+        # grey, and nothing about the colour pipeline was wrong -- the lighting was.
+        if obs and not self.is2d and bool(self.style.get("shadows", False)):
+            try:
+                self.p.enable_shadows()
+            except Exception as e:                      # not fatal: the movie is still readable
+                print(f"[live-movie] shadows unavailable ({type(e).__name__}: {e}); "
+                      f"obstacles are flat-shaded without them", flush=True)
 
     def _xyz(self, lvl):
         # float32, NOT float64. VTK stores points in whatever dtype it is handed; float64 doubles
         # both the host copy and VTK's resident buffer (10 M points: 240 MB against 120 MB) to carry
         # digits that never survive the projection to a 1280 px frame.
-        pos = lvl.get("pos")[self.idx].detach().cpu().numpy().astype(np.float32)
+        _p = lvl.get("pos")[self.idx].detach()
+        if getattr(self, "cs_only", False):
+            # OUTSIDE THE SLAB IS PARKED, NOT REMOVED. The drawn cloud has a fixed length -- its
+            # colours were bound to it at t=0 and `cloud.points = ...` replaces an array of the same
+            # size -- so a particle is hidden by being put where the camera is not, exactly as the
+            # dormant pool is. Filtering the array instead would change its length every frame and
+            # detach it from its colours.
+            _ax, _w = self.cs_axis, float(self.world[self.cs_axis])
+            _sel = (_p[:, _ax] - self.cs_at * _w).abs() < self.cs_cells * self._cs_dx
+            if not getattr(self, "_cs_said", False):
+                self._cs_said = True
+                print(f"[live-movie] cross section: slab {2 * self.cs_cells * self._cs_dx * 1000:.2f}"
+                      f" mm thick ({2 * self.cs_cells:.2f} cells) at "
+                      f"{'xyz'[_ax]} = {self.cs_at * _w * 1000:.1f} mm, "
+                      f"{int(_sel.sum()):,} of {_sel.numel():,} drawn", flush=True)
+            # PARKED JUST OUTSIDE, NOT FAR OUTSIDE. VTK sizes `render_points_as_spheres` sprites
+            # from the ACTOR'S BOUNDS, so hiding particles at -9 m beside a 0.1 m box made the
+            # bounding box 90x the domain and shrank every drawn dot to nothing: 17,338 lit pixels,
+            # none of them coloured. Two centimetres outside the wall is just as invisible -- the
+            # gather clamps the domain at 2*dx -- and leaves the bounds essentially the box's own.
+            _p = torch.where(_sel[:, None], _p, torch.full_like(_p, -0.02 * _w))
+        pos = _p.cpu().numpy().astype(np.float32)
         if pos.shape[1] == 2:                         # pad a 2D run into the z=0 plane
             pos = np.concatenate([pos, np.zeros((pos.shape[0], 1))], 1)
         return pos
@@ -252,7 +512,16 @@ class LiveMovie:
             pos = self._xyz(lvl)
             self.cloud = self.pv.PolyData(pos)
             self.cloud["rgb"] = self._rgb(H, lvl, pos)
-            self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **FLAT,
+            # POINT SPRITES AND THE CHART OVERLAY DO NOT COEXIST. `add_chart` inserts a
+            # vtkContextActor, and with one present `render_points_as_spheres=True` draws nothing at
+            # all: measured on this scene, 3,701 blue pixels with the panel and 61,331 without, from
+            # an identical simulation whose colour array was uniformly [76, 158, 255] either way.
+            # Plain GL points render correctly alongside the chart and are visually identical at the
+            # 1-2 px these dots are drawn at, so the panel costs the sprite, not the picture.
+            _flat = dict(FLAT)
+            if self.cs is not None:
+                _flat["render_points_as_spheres"] = False
+            self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                             point_size=self._dot_px(pos))
             self.t0 = time.perf_counter()
             return
@@ -261,13 +530,74 @@ class LiveMovie:
         self.cloud.points = self._xyz(lvl)
         el = time.perf_counter() - self.t0
         sub = f", {self.drawn:,} drawn" if self.drawn < self.n else ""
-        self.p.add_text(f"{self.name}\n{self.n:,} particles{sub}\n"
-                        f"frame {tick}/{self.n_frames}   {el / max(tick, 1) * 1000:.0f} ms/frame",
+        # THE CLOCK, WHEN THERE IS ONE. With units declared the overlay carries the world's own
+        # time and how fast the movie is running against it, so nobody has to ask.
+        # THE WORLD'S OWN CLOCK, and nothing else. The playback rate is a property of the FILE,
+        # reported once when the movie opens; repeating it on every frame said the same thing 300
+        # times and crowded out the number that changes. `ms/frame compute` stays because it is the
+        # machine's speed and it is genuinely useful while a run is in flight.
+        clk = ""
+        if self.speed is not None:
+            clk = f"\nt = {tick * float(self.dt) * float(self.time_s):.4g} s"
+            if abs(getattr(self, "slow_motion", 1.0) - 1.0) > 1e-9:
+                clk += f"   {self.slow_motion:g}x slow"
+        self.p.add_text(f"{self.name}{self._box_label}\n"
+                        f"{self.n:,} particles{sub}{self._grid_label}\n"
+                        f"frame {tick}/{self.n_frames}   "
+                        f"{el / max(tick, 1) * 1000:.0f} ms/frame compute{clk}",
                         position="upper_left", font_size=11, color="white", name="hdr")
+        if self.cs is not None:
+            self._update_cross_section(H)
         self.p.write_frame()
         self.rendered += 1
         if tick in self.still_ticks:
             self._still(tick)
+
+    def _update_cross_section(self, H):
+        """Scatter whatever is inside the slab, in the plane of the other two axes."""
+        try:
+            lvl = H.level(self.set_name) if getattr(self, "set_name", None) else None
+            if lvl is None:
+                from plexus.live_movie import _biggest_particle_set
+                lvl = H.level(_biggest_particle_set(H))
+            X = lvl.get("pos").detach()
+            occ = getattr(lvl, "occ", None)
+            if occ is not None:
+                X = X[occ > 0]
+            if X.shape[0] == 0:
+                return
+            ax, (a, b) = self.cs_axis, self._cs_lat
+            dx = float(self.world[ax]) / 96.0
+            for fc in getattr(H, "fields", {}).values():
+                if hasattr(fc, "dx"):
+                    dx = float(fc.dx)
+                    break
+            y0 = self.cs_at * float(self.world[ax])
+            sel = (X[:, ax] - y0).abs() < self.cs_cells * dx
+            P = X[sel]
+            if P.shape[0] > self.cs_max:            # a slab of a big jet is tens of thousands
+                step = P.shape[0] // self.cs_max + 1
+                P = P[::step]
+            # THE SERIES IS REPLACED, NOT UPDATED. `update()` swaps the arrays and the rendered
+            # panel keeps whatever it drew first: 81,583 particles spanning the full column were
+            # handed over every frame while the picture still showed the inlet sheet from frame 0.
+            # `Modified()` on the plot and the chart did not shift it either. Removing the plot and
+            # adding a fresh one does, and at <= max_points it is a few thousand values a frame.
+            #
+            # Counting the array said "live" the whole time, which is why tools/viz_smoke.py
+            # compares PIXELS between frames rather than state.
+            xs = P[:, a].cpu().numpy()
+            ys = P[:, b].cpu().numpy()
+            try:
+                self.cs.remove_plot(self._cs_series)
+            except Exception:                            # noqa: BLE001
+                pass
+            self._cs_series = self.cs.scatter(xs, ys, size=self._cs_size, style="o",
+                                              color=self._cs_colour)
+        except Exception as e:                       # noqa: BLE001 -- a panel must never kill a run
+            if not getattr(self, "_cs_warned", False):
+                self._cs_warned = True
+                print(f"[live-movie] cross section unavailable ({type(e).__name__}: {e})", flush=True)
 
     def _rgb(self, H, lvl, pos):
         """Per-particle colour, FIXED AT t=0 and carried with the particle.

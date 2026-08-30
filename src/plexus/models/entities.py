@@ -162,6 +162,58 @@ class MPMParticle:
                 # is the fallback the layer overrides.
                 type_mat[tid] = (t["material"], float(t.get("tau", 0.0)))
 
+        # THE VOLUME CAN COME FROM THE MASS INSTEAD OF FROM A BOX. `per_parent` is the hierarchy's
+        # own call -- how many children a parent has -- and it should not double as an MPM sampling
+        # knob. So a spec may instead say what ONE PARTICLE WEIGHS, and the body's volume follows:
+        #
+        #     p_vol = particle_mass / density        V = per_parent * p_vol       side = V^(1/3)
+        #
+        # and the particles are seeded in a cube of that side centred on their parent. Declaring N
+        # and m_p fixes the volume; declaring N and a block fixes the mass. Both together is one
+        # statement too many, which is what `_volume_conflict` below is for.
+        _pm = s.get("particle_mass")
+        if _pm is not None and float(_pm) <= 0:
+            raise ValueError(f"particle_mass must be > 0, got {_pm}")
+        if _pm is not None:
+            _side = None
+            for tid, t in enumerate(type_list):
+                if t.get("block") is not None:
+                    continue                                  # an explicit box wins; see the check
+                bm = ntp[pidx] == tid
+                nb = int(bm.sum())
+                if nb == 0:
+                    continue
+                _rho_t = float(t.get("density", rho if not torch.is_tensor(rho) else 1.0))
+                _pv = float(_pm) / _rho_t
+                _vol = float(ppc) * _pv                       # ppc here is per_parent, the count
+                # THE SHAPE THE VOLUME TAKES. A cube by default, because it is what a `block` would
+                # have given; `shape: ball` makes it a sphere of the same volume instead, which is
+                # what you want for anything thrown, dropped or rolled. Either way the VOLUME is
+                # the derived quantity and the shape only decides how it is arranged.
+                _shape = str(t.get("shape", "cube")).lower()
+                if _shape in ("ball", "sphere"):
+                    _r = (_vol * 3.0 / (4.0 * math.pi)) ** (1.0 / 3.0) if D == 3 \
+                        else (_vol / math.pi) ** 0.5
+                    # UNIFORM IN THE BALL, not in the radius: a direction on the sphere times
+                    # r * u^(1/D). Scattering r uniformly would pile the particles at the centre
+                    # and give the wrong density profile before anything had moved.
+                    _n = torch.randn(nb, D, generator=H.rng, device=device)
+                    _n = _n / _n.norm(dim=1, keepdim=True).clamp(min=1e-12)
+                    _u = torch.rand(nb, 1, generator=H.rng, device=device) ** (1.0 / D)
+                    pos[bm] = cpos[bm] + _n * _u * _r
+                    _side = 2.0 * _r                          # reported as the extent
+                elif _shape == "cube":
+                    _side = _vol ** (1.0 / D)
+                    _u = torch.rand(nb, D, generator=H.rng, device=device) - 0.5
+                    pos[bm] = cpos[bm] + _u * _side           # a cube of the derived size
+                else:
+                    raise ValueError(f"shape must be 'cube' or 'ball', got {_shape!r}")
+            if _side is not None:
+                print(f"[build] {lvl.name}: particle_mass {float(_pm):.4g} / density -> p_vol "
+                      f"{float(_pm) / float(rho if not torch.is_tensor(rho) else 1.0):.4g}, "
+                      f"{ppc:,} per parent -> body side {_side:.6g} (volume {_side ** D:.4g})",
+                      flush=True)
+
         # block-fill: a type FILLS an axis-aligned box (pool/cube) instead of a disc
         # around the centre. 2D block = [x0,y0,x1,y1]; 3D block = [x0,y0,z0,x1,y1,z1].
         for tid, t in enumerate(type_list):
@@ -242,6 +294,48 @@ class MPMParticle:
         mu, la = _lame(p_y)
         mu = torch.where(is_liquid, torch.zeros_like(mu), mu)    # liquid: no shear modulus -> pressure only
                                                                  # (viscoelastic KEEPS mu -- it relaxes F, not mu)
+        # `bulk_modulus` -- SAY WHAT A LIQUID ACTUALLY HAS. Young's modulus is defined by pulling a
+        # rod with free sides: it stretches AND thins. A fluid at rest carries no shear, so it cannot
+        # hold that stress state at all; formally nu -> 1/2 and E = 3K(1-2nu) -> 0 while K stays
+        # finite. Water's Young's modulus is ZERO and its bulk modulus is 2.2 GPa.
+        #
+        # What `youngs: 200` on a liquid in this codebase actually sets, once `mu` is zeroed on the
+        # line above, is K = la = E*nu/((1+nu)(1-2nu)) = 55.6 at the default nu = 0.2 -- a roundabout
+        # bulk modulus reached through a modulus the material does not possess and a Poisson ratio
+        # that is wrong for it. `bulk_modulus` sets K directly, in the same units as any other
+        # stress, and is the only sane way to write a liquid in a spec that carries units.
+        #
+        # WHY IT MATTERS BEYOND TIDINESS. K is the number that sets the Mach number, and four
+        # separate defects measured in this codebase are one defect in K being far too low:
+        # a "water" impacting at Mach 0.449 with 10.1% self-weight volumetric strain; a drop that
+        # compacts monotonically and never settles; a mean(J) that creeps for the whole run; and a
+        # surface-tension implosion in which the Laplace pressure 2*sigma/R reaches 0.47 OF K and the
+        # drop squeezes itself to a point. Real water in a 0.1 m box has 2*sigma/R / K = 1.3e-8.
+        #
+        # LIQUID ONLY, and an ERROR alongside `youngs`, because two ways to set one number is two
+        # chances to disagree. Absent -> every existing spec is byte-identical.
+        _bk = [t for t in type_list if t.get("bulk_modulus") is not None]
+        if _bk:
+            k_c = torch.full((parent.n,), float("nan"), device=device)
+            for tid, t in enumerate(type_list):
+                K = t.get("bulk_modulus")
+                if K is None:
+                    continue
+                if t.get("youngs") is not None:
+                    raise ValueError(
+                        f"a material type declares BOTH youngs={t['youngs']} and "
+                        f"bulk_modulus={K}. For a liquid `mu` is zeroed, so `youngs` is only a "
+                        f"roundabout way of setting the same K -- give one or the other.")
+                if str(t.get("material", "elastic")) != "liquid":
+                    raise ValueError(
+                        f"bulk_modulus={K} on material {t.get('material', 'elastic')!r}. It is "
+                        f"defined here for `material: liquid` only, where mu = 0 makes K = lambda "
+                        f"exactly; on a solid the bulk modulus is K = lambda + 2*mu/3 and setting "
+                        f"lambda from it would silently be the wrong number.")
+                k_c[ntp == tid] = float(K)
+            _has_k = ~torch.isnan(k_c[pidx])
+            la = torch.where(_has_k, torch.nan_to_num(k_c[pidx]), la)   # mu is already 0 -> K = la
+
 
         # per-particle volume: ball footprint (disc pi*r^2 in 2D, sphere 4/3 pi r^3 in
         # 3D) / ppc, or the box volume / ppc for a block-filled pool.
@@ -255,11 +349,63 @@ class MPMParticle:
                 for k in range(D):
                     vol *= abs(v[D + k] - v[k])
                 p_vol = torch.where(ntp[pidx] == tid, torch.full_like(p_vol, vol / ppc), p_vol)
+        # A DECLARED PARTICLE MASS SETS p_vol OUTRIGHT, and then the geometry is only a placement.
+        # WARN, DO NOT SILENTLY PICK ONE: a block says the body occupies THIS much space and a
+        # particle mass says it occupies THAT much, and when they disagree the run means neither.
+        # The tolerance is 1% because a block is usually written to 3 figures.
+        if _pm is not None:
+            _rho_scalar = float(rho) if not torch.is_tensor(rho) else None
+            for tid, t in enumerate(type_list):
+                _rt = float(t.get("density", _rho_scalar if _rho_scalar is not None else 1.0))
+                _pv = float(_pm) / _rt
+                _sel = ntp[pidx] == tid
+                if not bool(_sel.any()):
+                    continue
+                blk = t.get("block")
+                if blk is not None:
+                    v = [float(x) for x in blk]
+                    _vg = 1.0
+                    for k in range(D):
+                        _vg *= abs(v[D + k] - v[k])
+                    _vm = float(ppc) * _pv
+                    if abs(_vm / _vg - 1.0) > 0.01:
+                        import warnings
+                        warnings.warn(
+                            f"{lvl.name}: TWO VOLUMES, AND THEY DISAGREE. The `block` on type "
+                            f"{(list(types.keys())[tid] if types else tid)!r} encloses "
+                            f"{_vg:.6g}, while per_parent {ppc:,} x particle_mass {float(_pm):.4g} "
+                            f"/ density {_rt:g} = {_vm:.6g} -- a factor of {_vm / _vg:.4g}. The "
+                            f"particle_mass wins for p_vol (and therefore for the physics); the "
+                            f"block only places the particles. Drop one of the two.",
+                            RuntimeWarning, stacklevel=2)
+                p_vol = torch.where(_sel, torch.full_like(p_vol, _pv), p_vol)
 
         lvl.register_buffer("C", torch.zeros(Np, D, D, device=device))
         lvl.register_buffer("F", torch.eye(D, device=device).expand(Np, D, D).contiguous())
         lvl.register_buffer("mu", mu)
         lvl.register_buffer("la", la)
+        # PER-TYPE VISCOSITY, built the same way mu and la are. `eta` was the one material property
+        # that lived on the OPERATOR rather than on the particle, so every body in a set shared it:
+        # a spec with a water drop, a gel blob and a snowball got one eta for all three, and the
+        # obvious fix -- `at: mpm_particle[type=jelly]` -- cannot work, because the types are on the
+        # PARENT and only a set declaring `types:` carries node_type.
+        #
+        # Registered ONLY when some type actually declares `eta`. Absent, `mpm_viscosity` uses its
+        # own scalar exactly as before, so every existing spec is byte-identical.
+        _etas = [t.get("eta") for t in type_list]
+        _own_etas = [t.get("eta") for t in _ct] if _ct else []
+        if any(e is not None for e in _etas + _own_etas):
+            _eta = torch.full((Np,), float("nan"), device=device)
+            for _tid, _t in enumerate(type_list):           # the PARENT's types, per particle
+                if _t.get("eta") is not None:
+                    _eta = torch.where(ntp[pidx] == _tid,
+                                       torch.full_like(_eta, float(_t["eta"])), _eta)
+            if _ct and _cnt is not None:                    # a child set's OWN types win
+                for _tid, _t in enumerate(_ct):
+                    if _t.get("eta") is not None:
+                        _eta = torch.where(_cnt == _tid,
+                                           torch.full_like(_eta, float(_t["eta"])), _eta)
+            lvl.register_buffer("eta", _eta)                # NaN = "not declared, use the operator's"
         lvl.register_buffer("is_liquid", is_liquid)
         lvl.register_buffer("is_snow", is_snow)
         lvl.register_buffer("is_visco", is_visco)

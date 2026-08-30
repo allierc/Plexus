@@ -101,25 +101,53 @@ _OFFSETS = stencil_offsets(2)
 
 @register_field("mpm_grid")
 class MPMGrid(Field):
-    """MLS-MPM background grid on [0,width]x[0,1](x[0,1]) with square cells dx = 1/n_grid.
+    """MLS-MPM background grid over the world box, with square cells dx = world_size[1] / n_grid.
     Channels: m (mass), mv (momentum [.,dim]), c (liquid colour for CSF), v (velocity
     [.,dim]). Pure scratch: p2g zeroes + scatters into it each substep, grid_update
-    solves on it, g2p reads it back."""
+    solves on it, g2p reads it back.
+
+    THE CELL SIZE COMES FROM THE WORLD, which it did not before. This used to read
+    `dx = 1.0 / n_grid` with axes 1.. assumed to span [0,1] and only axis 0 scaled by `width`, so
+    `n_grid` meant "cells per unit length". On a box that is not 1 unit across -- a 0.1 m water
+    scene, say -- that puts a 1.0-wide grid on a 0.1-wide world: the cell is 10x too large, only
+    ~10 of 96 cells per axis carry any mass, and the failure is not subtle. `MPMGather` clamps
+    positions into [2*dx, box[k] - 2*dx] with `box` correct and `dx` wrong, which crushes a 0.1 m
+    cube into a 0.058 m slab on the first substep.
+
+    `n_grid` now means CELLS ACROSS AXIS 1. The two readings coincide when world_size[1] == 1.0,
+    and they always did here: of the 1,744 specs under config/, 152 are MPM, 94 declare
+    `general.world` and ALL 94 are exactly [1.0, 1.0, 1.0]; the other 58 are 2D and omit it, which
+    schema.py defaults to [1.0, 1.0]. So every existing spec keeps the identical dx and the
+    identical node count, and no spec sets `width` on this field.
+
+    inv_dx IS NOT 1.0/dx. `1.0 / (1.0 / n) != float(n)` for 640 of the first 4,096 integers -- the
+    first offender is n = 49 -- so the reciprocal round-trip is exact only by luck at the n_grid
+    values in use (48, 64, 96, 128, 192). Deriving it from the integer directly keeps byte-identity
+    on the corpus, and keeps it for a spec that picks n_grid = 49 tomorrow.
+    """
 
     RECORD = False                                   # transient scratch -- not recorded/rendered
 
-    def __init__(self, name, width=1.0, n_grid=128, dim=2, device="cpu", **kw):
+    def __init__(self, name, width=1.0, n_grid=128, dim=2, device="cpu", world_size=None, **kw):
         super().__init__(name)
         self.dim = int(dim)
-        self.ny = int(n_grid)                        # cells per unit length (axes 1..)
-        self.nx = int(round(float(width) * self.ny)) # axis 0 spans the world width
-        self.width = float(width)
-        self.dx = 1.0 / self.ny
-        self.inv_dx = float(self.ny)
+        # `width` is the legacy axis-0 scalar and stays the fallback: a caller that does not pass
+        # the per-axis box gets exactly the old geometry, [width] x [1] x [1].
+        box = [float(w) for w in world_size] if world_size else \
+              [float(width)] + [1.0] * (self.dim - 1)
+        if len(box) != self.dim:
+            raise ValueError(f"MPMGrid: world_size has {len(box)} entries but dim={self.dim}")
+        self.world_size = box
+        self.width = box[0]
+        self.n_grid = int(n_grid)                    # cells across axis 1
+        self.inv_dx = float(n_grid) / box[1]         # NOT 1.0/dx -- see the note above
+        self.dx = box[1] / float(n_grid)
+        n_k = [max(1, int(round(box[k] * self.inv_dx))) for k in range(self.dim)]
+        self.nx, self.ny = n_k[0], n_k[1]
         if self.dim == 2:
             self.shape = (self.nx, self.ny)
-        else:                                        # 3D cube: axes 1,2 span [0,1]
-            self.nz = self.ny
+        else:
+            self.nz = n_k[2]
             self.shape = (self.nx, self.ny, self.nz)
         n = 1
         for s in self.shape:
@@ -216,6 +244,51 @@ def _polar_higham(F, iters=6):
     return R
 
 
+# ==========================================================================================================
+# DIMENSIONAL CONSTANTS, EXPRESSED RELATIVE TO THEIR OWN NATURAL SCALE
+# ==========================================================================================================
+_REF_DX, _REF_RHO = 1.0 / 96, 1.0          # the box every one of these numbers was chosen against
+
+#   name -> (historical value, exponent of density, exponent of length)
+#   a mass is rho * L^3;  a length is L;  a reciprocal length is L^-1.
+_CONST_DIMS = {
+    "mass_floor":     (1e-10, 1, 3),
+    "csf_mass_floor": (1e-8, 1, 3),
+    "ring":           (0.04, 0, 1),
+    "csf_eps":        (1e-6, 0, -1),
+}
+
+
+def _scale_constant(name, dx, rho=1.0):
+    """The value a dimensional constant takes at this (dx, rho).
+
+    WHY THESE ARE NOT NUMBERS. Each was chosen against a UNIT BOX at n_grid 96 with density 1, and
+    each means something else the moment any of the three changes. `wall_contact: 0.04` -- the first
+    one converted -- was the plain case: in a 0.1 m box it selected everything but a 0.02 m sliver,
+    so the whole fluid read as permanently in wall contact and was permanently damped.
+
+    The others are quieter and one of them is already costing accuracy. The CSF regulariser `eps` in
+    n = grad(c)/(|grad c| + eps) has units of 1/LENGTH, and it is why `csf_rho` is not a pure gain
+    rescaling: at the parity tension sigma = 120/192^2, material_two_drops_st reproduces only to
+    2.376% RMS in CSF force, 32.7% once `csf_band` is on, because an absolute epsilon added to
+    |grad c| bites differently once the colour is divided by rho*dx^D.
+
+    CALIBRATED TO REPRODUCE THE HISTORICAL NUMBER EXACTLY at the reference, so no existing spec
+    moves: at rho = 1 and dx = 1/96 both ratios are exactly 1.0 and the result is the original float,
+    not a value close to it.
+
+    NOT EVERY CONSTANT BELONGS HERE, and the ones left out are left out for a reason:
+      a_max 200   an acceleration. The natural scale is `g`, which DIFFERS BETWEEN SPECS (14, 16,
+                  9.81), so no single multiple reproduces them all -- converting it would be a
+                  behaviour change dressed as a refactor.
+      vmax 1e9    a velocity, and inert: the binding cap is min(vmax, 0.4*dx/dt) in the gather, so
+                  the absolute default never applies.
+      spin_k 30   a rate, and there is no natural time scale in the operator to divide it by.
+    """
+    v0, a, b = _CONST_DIMS[name]
+    return v0 * (float(rho) / _REF_RHO) ** a * (float(dx) / _REF_DX) ** b
+
+
 def _hand_body_force_to_grid(op, H, a_ext, dev, D):
     """WHERE A BODY FORCE BELONGS. Canonical MLS-MPM applies gravity ON THE GRID, as an
     acceleration, AFTER the momentum has been divided by nodal mass -- Taichi's mpm88/mpm99 read
@@ -272,6 +345,9 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []        # no required params — `to` defaults to mpm_grid, all knobs optional
     REQUIRES_TYPE_PROPS = ["youngs"]
+    # a liquid has no Young's modulus (nu -> 1/2 makes E = 3K(1-2nu) -> 0); it has a bulk modulus,
+    # and for mu = 0 that IS lambda. Either spelling satisfies the requirement.
+    TYPE_PROP_ALTERNATIVES = {"youngs": ("bulk_modulus",)}
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate"]
     PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt", "drag": "Stokes drag coefficient",
                    "a_max": "external-acceleration clamp",
@@ -532,7 +608,7 @@ class MPMGridUpdate(FieldUpdate):
         self.at = params.get("_at", "mpm_grid")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.surface_tension = float(params.get("surface_tension", 0.0))
-        self.mass_floor = float(params.get("mass_floor", 1e-10))
+        self.mass_floor = params.get("mass_floor", None)      # None -> derived from dx, rho
         # THE SAME DEFECT, A HUNDRED TIMES LARGER. The CSF surface-tension term converts a nodal
         # force to an acceleration with `dx^D / gm.clamp(min=1e-8)`, and 1e-8 is TEN THOUSAND times
         # the per-particle mass of a 10M-particle run (1.4e-09). Measured on that run at frame 500:
@@ -543,7 +619,7 @@ class MPMGridUpdate(FieldUpdate):
         # SWEEP DID NOTHING: that was measured to be the missing colour normalisation below, a factor
         # of 1/(rho*dx^D) ~ 1e6, against this floor's median 18x on half the nodes. Both are real;
         # they differ by five orders of magnitude, and setting `csf_rho` makes this floor inert.
-        self.csf_mass_floor = float(params.get("csf_mass_floor", 1e-8))
+        self.csf_mass_floor = params.get("csf_mass_floor", None)   # None -> derived
         # WHAT "COLOUR = 1" MEANS -- WHICH THIS BLOCK NEVER KNEW, AND THE REASON THE PARAGRAPH ABOVE
         # IS TREATING A SYMPTOM. `mpm_scatter` deposits `weight * mass * is_liquid`, so `gc` is a
         # liquid MASS PER NODE in absolute units, not the dimensionless volume fraction (0 in air,
@@ -589,6 +665,7 @@ class MPMGridUpdate(FieldUpdate):
         # change the trajectory (r90 0.302 unsmoothed vs 0.306 smoothed at Bond 1) and it leaks
         # colour into empty cells, which is why the band below carries an explicit mass clause.
         self.csf_smooth = int(params.get("csf_smooth", 0))
+        self.csf_eps = params.get("csf_eps", None)                 # None -> derived (a 1/length)
         # A BAND WITHOUT A REFERENCE DENSITY IS A SILENT OFF-SWITCH: `c` would still be a mass, of
         # order rho*dx^D ~ 1e-6, so `c > 0.2` is false everywhere, the mask is empty and the term
         # vanishes without a word. Refuse the combination rather than run it.
@@ -795,9 +872,23 @@ class MPMGridUpdate(FieldUpdate):
             gv[:, hiy, 0] = gv[:, hiy, 0] * wd
         return gv.view(nx * ny, 2)
 
+    def _const(self, name, g):
+        """A declared value wins; otherwise the constant is derived from THIS grid's cell size and
+        the liquid's own density. `csf_rho` is that density when it is given (it is, by definition,
+        the divisor that turns deposited mass into a volume fraction); `rho_ref` otherwise, whose
+        default 1.0 is exactly the reference these numbers were chosen against."""
+        v = getattr(self, name)
+        if v is not None:
+            return float(v)
+        rho = self.csf_rho if self.csf_rho > 0.0 else self.rho_ref
+        return _scale_constant(name, float(g.dx), rho)
+
     def forward(self, H, mask=None):
         g = H.field(self.at); dev = g.m.device
         dt = sub_dt(H, self.dt_sub)
+        _mass_floor = self._const("mass_floor", g)
+        _csf_floor = self._const("csf_mass_floor", g)
+        _csf_eps = self._const("csf_eps", g)
         nx, ny, inv_dx, dx = g.nx, g.ny, g.inv_dx, g.dx
         D = g.dim
         periodic = bool(getattr(H, "periodic", False))
@@ -815,7 +906,7 @@ class MPMGridUpdate(FieldUpdate):
         #
         # Kept as a PARAMETER at its historical value so no existing run changes; a spec whose
         # particle mass has outgrown it sets `mass_floor` smaller.
-        gv = gmv / gm.clamp(min=self.mass_floor)[:, None]
+        gv = gmv / gm.clamp(min=_mass_floor)[:, None]
         # THE BODY FORCE, IF mpm_scatter HANDED IT OVER (`body_force: grid`). Applied here and not
         # in the scatter because this is after the division by nodal mass: as a pure addition to a
         # velocity it carries no mass factor, so `gm.clamp` cannot attenuate it and a node holding
@@ -853,18 +944,19 @@ class MPMGridUpdate(FieldUpdate):
                         c = 0.25 * torch.roll(c, 1, k) + 0.5 * c + 0.25 * torch.roll(c, -1, k)
                 cx = (torch.roll(c, -1, 0) - torch.roll(c, 1, 0)) * (0.5 * inv_dx)
                 cy = (torch.roll(c, -1, 1) - torch.roll(c, 1, 1)) * (0.5 * inv_dx)
-                gmag = torch.sqrt(cx * cx + cy * cy); eps = 1e-6
+                gmag = torch.sqrt(cx * cx + cy * cy); eps = _csf_eps
                 nxg, nyg = cx / (gmag + eps), cy / (gmag + eps)
                 kappa = -((torch.roll(nxg, -1, 0) - torch.roll(nxg, 1, 0)) * (0.5 * inv_dx)
                           + (torch.roll(nyg, -1, 1) - torch.roll(nyg, 1, 1)) * (0.5 * inv_dx))
+                _gain2 = 1.0 / max(1.0 - 2.0 * self.csf_band, 1e-6) if self.csf_band > 0 else 1.0
                 if self.csf_band > 0.0:
                     _mfull = self.csf_rho * dx * dx
                     fmask = ((c > self.csf_band) & (c < 1.0 - self.csf_band)
-                             & (gm.view(nx, ny) > self.csf_band * _mfull)).to(c.dtype)
+                             & (gm.view(nx, ny) > self.csf_band * _mfull)).to(c.dtype) * _gain2
                 else:
                     fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
                 stfx = (surf * kappa * cx * fmask).view(-1); stfy = (surf * kappa * cy * fmask).view(-1)
-                inv_m = (dx * dx) / gm.clamp(min=self.csf_mass_floor)
+                inv_m = (dx * dx) / gm.clamp(min=_csf_floor)
                 gv = gv + dt * torch.stack([stfx * inv_m, stfy * inv_m], dim=1)
 
             if not periodic:
@@ -909,7 +1001,7 @@ class MPMGridUpdate(FieldUpdate):
                 grad = [(torch.roll(c, -1, k) - torch.roll(c, 1, k)) * (0.5 * inv_dx)
                         for k in range(D)]
                 gmag = torch.sqrt(sum(gk * gk for gk in grad))
-                eps = 1e-6
+                eps = _csf_eps
                 nrm = [gk / (gmag + eps) for gk in grad]
                 kappa = -sum((torch.roll(nrm[k], -1, k) - torch.roll(nrm[k], 1, k)) * (0.5 * inv_dx)
                              for k in range(D))
@@ -919,13 +1011,33 @@ class MPMGridUpdate(FieldUpdate):
                 # `csf_mass_floor` inert rather than load-bearing: the lightest node admitted holds
                 # csf_band * rho * dx^D = 2.3e-7 at band 0.2 on the drop, 23x the 1e-8 floor, so
                 # masked nodes with gm == 0 go 2.6% -> 0.0% and floor-binding 16.6% -> 0.0%.
+                # THE BAND IS A GAIN, NOT ONLY A FILTER -- COMPENSATE FOR IT.
+                # The CSF force is f = sigma*kappa*grad(c), and the TOTAL impulse across an
+                # interface telescopes: int grad(c) dx = c_in - c_out. Restricting the force to
+                # `band < c < 1-band` therefore delivers exactly (1 - 2*band) OF THE TENSION,
+                # whatever the shape of the profile -- it is the fundamental theorem, not an
+                # approximation. The default band 0.2 was throwing away 40% of sigma by
+                # construction.
+                #
+                # MEASURED on a Young-Laplace ladder (a sphere in zero gravity compresses until
+                # K(1-J) = 2 sigma/R, so mean(J) = 1 - 2 sigma/(R K), nothing fitted), R = 10 mm,
+                # sigma 0.072, K 1e4, delivered fraction of the declared tension:
+                #     band 0.20 -> 0.472      band 0.10 -> 0.736
+                #     band 0.05 -> 0.887      band 0.02 -> 0.972
+                # against the predicted 0.60 / 0.80 / 0.90 / 0.96. The trend is the band's, and it
+                # goes to 1 as the band closes.
+                #
+                # Dividing by (1 - 2*band) restores the magnitude while keeping the band doing its
+                # real job, which is to keep the force OFF the bulk: the interface test was never
+                # about how much tension to apply, only about where.
+                _gain = 1.0 / max(1.0 - 2.0 * self.csf_band, 1e-6) if self.csf_band > 0 else 1.0
                 if self.csf_band > 0.0:
                     _mfull = self.csf_rho * dx ** D
                     fmask = ((c > self.csf_band) & (c < 1.0 - self.csf_band)
-                             & (gm.view(*g.shape) > self.csf_band * _mfull)).to(c.dtype)
+                             & (gm.view(*g.shape) > self.csf_band * _mfull)).to(c.dtype) * _gain
                 else:
                     fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
-                inv_m = (dx ** D) / gm.clamp(min=self.csf_mass_floor)   # force -> acceleration
+                inv_m = (dx ** D) / gm.clamp(min=_csf_floor)   # force -> acceleration
                 gv = gv + dt * torch.stack(
                     [(surf * kappa * grad[k] * fmask).view(-1) * inv_m for k in range(D)], dim=1)
             if not periodic:
@@ -965,14 +1077,38 @@ class MPMGridUpdate(FieldUpdate):
             # dx^D its volume, so this is a genuine density and the comparison with `rho_ref` is
             # dimensionally honest rather than a tuned ratio.
             _rho = gm / (dx ** D)
-            _act = _rho > 1e-9                                  # empty nodes have no buoyancy
-            _f = torch.zeros_like(_rho)
-            _f[_act] = (_rho[_act] - self.rho_ref) / _rho[_act]
-            _dir = torch.zeros(D, device=dev, dtype=gv.dtype)
-            if self.buoy_dir is not None:
-                _dir[:len(self.buoy_dir)] = torch.as_tensor(self.buoy_dir, device=dev, dtype=gv.dtype)
-            else:
-                _dir[1 if D == 2 else 2] = -1.0                 # "down" is -y in 2D, -z in 3D
+            # BRANCH-FREE, BECAUSE A BOOLEAN-MASK ASSIGNMENT CANNOT BE CAPTURED. `_f[_act] = ...`
+            # compiles to index_put, which needs `nonzero`, which is a device->host sync -- and a
+            # sync inside a CUDA graph capture is `cudaErrorStreamCaptureUnsupported`, not a
+            # slowdown. Both 3D buoyancy scenes died on it at the first captured substep with
+            # "operation not permitted when stream is capturing". `torch.where` is the same
+            # arithmetic with no data-dependent control flow; the clamp keeps the empty-node
+            # division finite before the `where` discards it.
+            _safe = _rho.clamp(min=1e-9)
+            _f = torch.where(_rho > 1e-9, (_rho - self.rho_ref) / _safe,
+                             torch.zeros_like(_rho))            # empty nodes have no buoyancy
+            # BUILT ONCE, NOT PER SUBSTEP. Writing a python float into a device tensor --
+            # `_dir[1] = -1.0` -- is a host-to-device copy, and that is as uncapturable as the
+            # boolean mask above was: the same run died again, four lines further down, on the same
+            # `cudaErrorStreamCaptureUnsupported`. The direction is a run constant, so it is
+            # assembled on the host and moved once; the captured region only ever reads it.
+            _key = (D, str(dev), gv.dtype)
+            if getattr(self, "_dir_key", None) != _key:
+                _v = [0.0] * D
+                if self.buoy_dir is not None:
+                    for _i, _x in enumerate(self.buoy_dir[:D]):
+                        _v[_i] = float(_x)
+                else:
+                    # DOWN IS WHEREVER GRAVITY SAYS IT IS, and `gravity` says -y: it defaults to
+                    # `gy = -g, gz = 0` in 3D as well as in 2D. This line used to read -z in 3D, so
+                    # on every 3D spec buoyancy pushed at RIGHT ANGLES to the weight it is supposed
+                    # to oppose -- a bubble drifting sideways rather than rising. One shipped spec
+                    # is affected (config/cell/cell_one.yaml, buoyancy 4.0, no explicit direction),
+                    # and it was wrong before this change, not after. `buoyancy_dir` overrides.
+                    _v[1] = -1.0
+                self._dir_cache = torch.tensor(_v, device=dev, dtype=gv.dtype)
+                self._dir_key = _key
+            _dir = self._dir_cache
             gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
         g.v.copy_(gv)                       # in place: a captured graph holds this address
         return {}
@@ -1047,7 +1183,17 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
         self.frm = params.get("from", "mpm_grid")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.wall_damp = float(params.get("wall_damp", 1.0))
-        self.wall_contact = float(params.get("wall_contact", 0.04))
+        # A LENGTH, AND THEREFORE A TRAP IN ANY BOX THAT IS NOT 1 UNIT WIDE. The contact test is
+        # `(x < cb) | (x > box[k] - cb)`, so in a 0.1 m box the historical 0.04 selects everything
+        # but a 0.02 m sliver -- the entire fluid reads as permanently in wall contact and is
+        # permanently damped. `wall_contact_cells` states it in the only scale the grid has:
+        # 0.04 / (1/96) = 3.84 cells, so the default reproduces 0.04 exactly at n_grid 96 and
+        # follows the world everywhere else. An explicit `wall_contact` still wins, for the specs
+        # that tuned it.
+        self.wall_contact_cells = float(params.get("wall_contact_cells", 3.84))
+        self.wall_contact = params.get("wall_contact", None)
+        if self.wall_contact is not None:
+            self.wall_contact = float(self.wall_contact)
         # HOW OFTEN `wall_damp` IS APPLIED, and it is the difference between a restitution
         # coefficient and a decay rate. See the note in `forward`. `per_substep` is the historical
         # behaviour and stays the default so no existing run changes.
@@ -1056,6 +1202,12 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
             raise ValueError(f"mpm_gather: wall_damp_mode must be 'per_substep' or 'per_impact', "
                              f"got {self.wall_damp_mode!r}")
         self.vmax = float(params.get("vmax", 1e9))
+
+    def _contact_band(self, g):
+        """The contact-layer thickness, in world length. An explicit `wall_contact` wins; otherwise
+        it is `wall_contact_cells * dx`, which follows the box instead of assuming it is 1 wide."""
+        return self.wall_contact if self.wall_contact is not None \
+            else self.wall_contact_cells * float(g.dx)
 
     def forward(self, H, mask=None):
         p = H.level(self.at); g = H.field(self.frm); dev = p.state.device
@@ -1080,7 +1232,7 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
         new_C = 4 * inv_dx * (weight[..., None, None] * (gvn[..., :, None] @ dpos_grid[..., None, :])).sum(1)
         new_V = torch.nan_to_num(new_V)
         if self.wall_damp != 1.0 and not periodic:                 # inelastic wall contact (solids)
-            cb = self.wall_contact
+            cb = self._contact_band(g)
             near = torch.zeros(p.n, dtype=torch.bool, device=dev)
             for k in range(D):
                 near = near | (X[:, k] < cb) | (X[:, k] > box[k] - cb)
@@ -1157,6 +1309,15 @@ class MPMStrain(Lateral):
         super().__init__(params, device)
         self.at = params.get("_at", "mpm_particle")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
+        # HOW A LIQUID'S VOLUME IS ADVANCED. `det` (the default) carries J through F exactly as
+        # every existing spec has; `trace` uses J *= 1 + dt*tr(C) instead. See the long note in
+        # forward() -- `det` loses a column's pressure at ~1.1%/s at rest and gets worse as the mesh
+        # is refined. This is OPT-IN because it changes the numbers of all 179 MPM specs, and the
+        # default stays where it is until the gate says what the new numbers are.
+        self.liquid_volume = str(params.get("liquid_volume", "det")).lower()
+        if self.liquid_volume not in ("det", "trace"):
+            raise ValueError(f"liquid_volume must be 'det' or 'trace', got "
+                             f"{self.liquid_volume!r}")
 
     def forward(self, H, mask=None):
         p = H.level(self.at); dev = p.state.device
@@ -1171,6 +1332,40 @@ class MPMStrain(Lateral):
             J = torch.linalg.det(F)
         liquid = getattr(p, "is_liquid", None)
         if _const_any(self, "_c_liquid", liquid):                  # LIQUID: drop shape memory
+            if self.liquid_volume == "trace":
+                # A LIQUID AT REST BLEEDS ITS PRESSURE AWAY, and this is why.
+                #
+                # The liquid already drops SHAPE memory (F becomes isotropic below), so its whole
+                # state is the volume J -- and J is carried through F, i.e. multiplied by
+                # det(I + dt*C) every substep. The law it is discretising is dJ/dt = J*tr(C), whose
+                # exact step is J *= exp(dt*tr C). Those two agree to first order and NOT to second:
+                #
+                #     det(I + dt C)  = 1 + dt*trC + dt^2*(trC^2 - tr(C^2))/2 + dt^3*det C
+                #     exp(dt*trC)    = 1 + dt*trC + dt^2* trC^2            /2 + ...
+                #
+                # The difference is -dt^2*tr(C^2)/2, and tr(C^2) is a SUM OF SQUARES: it is positive
+                # whatever the sign of the noise, so it does not average out. Every substep multiplies
+                # J by slightly less than it should, and a column that is not moving at all loses its
+                # stored compression.
+                #
+                # MEASURED, on si_hydrostatic -- a 40 mm confined column whose free surface holds to
+                # 0.001 mm, i.e. mechanically dead still. The hydrostatic gradient dp/dd decays
+                # monotonically in TIME, -8.66% of rho*g at 0.33 s to -12.96% at 4.0 s: about
+                # 1.1% of the pressure per second, at rest.
+                #
+                # AND THE SCALING IDENTIFIES IT. Grid noise gives C ~ v_noise/dx and CFL gives
+                # dt ~ dx, so the accumulated bias over a fixed TIME goes as dt*tr(C^2) ~ v^2/dx --
+                # it gets WORSE as the mesh is refined. Measured -5.52% / -8.45% / -12.15% at
+                # n_grid 40 / 64 / 96, very nearly linear in 1/dx. It is also why `drag` HELPED
+                # (-8.44% with it, -12.11% without): drag suppresses exactly the v_noise that drives
+                # it. Wall contact was tested and is not involved (-8.44% vs -8.39% with it off).
+                #
+                # THE FIX, and it is what Taichi's mpm88/mpm99 do for water: advance the volume by
+                # its OWN first-order law, J *= 1 + dt*tr(C). That is no more accurate in dt than
+                # det(I + dt*C) -- both are first-order -- but it does not couple to the deviatoric
+                # part of C at all, so noise no longer has a preferred direction to push J in.
+                trC = p.C.diagonal(dim1=-2, dim2=-1).sum(-1)
+                J = torch.where(liquid, torch.linalg.det(p.F) * (1.0 + dt * trC), J)
             Jc = J.clamp(min=1e-6)
             Jl = torch.sqrt(Jc) if D == 2 else Jc.pow(1.0 / D)     # volume-preserving isotropic reset
             F = torch.where(liquid[:, None, None], eye * Jl[:, None, None], F)
@@ -1365,7 +1560,16 @@ class MPMViscosity(Lateral):
     def forward(self, H, mask=None):
         p = H.level(self.at)
         C = p.C
-        tau = self.eta * (C + C.transpose(-2, -1))
+        # PER-PARTICLE eta WHERE THE SPEC DECLARED ONE, this operator's scalar everywhere else.
+        # `entities.py` builds the buffer from the type table exactly as it builds mu and la, and
+        # leaves NaN where a type said nothing -- so a spec that never mentions per-type eta has no
+        # buffer at all and this is the same multiply it always was.
+        _pe = getattr(p, "eta", None)
+        if _pe is not None:
+            _e = torch.where(torch.isnan(_pe), torch.full_like(_pe, self.eta), _pe)
+            tau = _e[:, None, None] * (C + C.transpose(-2, -1))
+        else:
+            tau = self.eta * (C + C.transpose(-2, -1))
         if self.liquid_only:
             liq = getattr(p, "is_liquid", None)
             if _const_any(self, "_c_liquid", liq):
@@ -1399,25 +1603,53 @@ class MPMAnchor(Lateral):
         super().__init__(params, device)
         self.k = float(params["k"])
         self.mode = str(params.get("mode", "boundary"))       # "boundary" ring | "substrate" all
-        self.ring = float(params.get("ring", 0.04))           # ring width (world units) for mode=boundary
+        self.ring = params.get("ring", None)                  # None -> derived (a length)
+        # WHICH CONFIGURATION IS "REST"? Until now it was whenever the operator first ran, which is
+        # frame 0 for an ungated operator and therefore looked like a choice. It is not: gate this
+        # operator with `after_frame` and the rest state silently becomes whatever the run had
+        # drifted to by then. For a merge-then-separate sequence that is exactly wrong -- the anchor
+        # would hold the MERGED drop rather than pull back to the two it started as.
+        # `anchor_frame` names the frame whose positions are the rest state, and the operator
+        # captures them there even when its force is switched on later.
+        self.anchor_frame = params.get("anchor_frame", None)
+        self._armed = False
         self.at = params.get("_at", "particle")
         self._rest = None
         self._sel = None
 
-    def _init(self, lvl):
+    def _init(self, lvl, H=None):
+        # THE BAND IS A LENGTH, AND ITS NATURAL SCALE IS THE CELL. An anchor ring narrower than a
+        # couple of cells cannot be resolved by the grid that carries the force, so `dx` is the
+        # right yardstick -- 3.84 cells, which is exactly 0.04 at n_grid 96 and therefore leaves
+        # every existing spec where it was. Falls back to the historical constant when no MPM grid
+        # is in the run (the operator does not require one).
         self._rest = lvl.get("pos").clone()                   # undeformed sheet (frame 0)
+        if self.ring is None:
+            # H.fields is a torch ModuleDict: it supports `in` and `[...]` but NOT `.get`.
+            _fl = getattr(H, "fields", None) if H is not None else None
+            _g = _fl["mpm_grid"] if (_fl is not None and "mpm_grid" in _fl) else None
+            self._ring = (_scale_constant("ring", float(_g.dx)) if _g is not None
+                          else _CONST_DIMS["ring"][0])
+        else:
+            self._ring = float(self.ring)
         if self.mode == "substrate":
             self._sel = torch.ones(self._rest.shape[0], dtype=torch.bool, device=self._rest.device)
         else:                                                 # outer ring of the tissue's rest extent
             lo = self._rest.min(0).values
             hi = self._rest.max(0).values
-            near = ((self._rest - lo) < self.ring) | ((hi - self._rest) < self.ring)   # [N,2]
+            near = ((self._rest - lo) < self._ring) | ((hi - self._rest) < self._ring)  # [N,2]
             self._sel = near.any(dim=1)
+
+    def capture_rest(self, H):
+        """Take the rest configuration now, whatever the gate says. Called by the engine at
+        `anchor_frame` so a later-gated anchor still remembers where the body started."""
+        if self._rest is None:
+            self._init(H.level(self.at), H)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         if self._rest is None:
-            self._init(lvl)
+            self._init(lvl, H)
         acc = self.k * (self._rest - lvl.get("pos")) * (self._sel * lvl.occ)[:, None].float()
         if mask is not None:
             acc = acc * mask[:, None].float()
@@ -1785,7 +2017,10 @@ class MLSMPMMechanics(Exchange):
     #   (advection)      engine     pos/vel integration of the returned G2P delta
 
     # --- declared dependencies (no longer hidden inside the substep) ----- #
-    REQUIRES_TYPE_PROPS = ["youngs"]                      # per-cell-type stiffness -> mu, la
+    REQUIRES_TYPE_PROPS = ["youngs"]
+    # a liquid has no Young's modulus (nu -> 1/2 makes E = 3K(1-2nu) -> 0); it has a bulk modulus,
+    # and for mu = 0 that IS lambda. Either spelling satisfies the requirement.
+    TYPE_PROP_ALTERNATIVES = {"youngs": ("bulk_modulus",)}                      # per-cell-type stiffness -> mu, la
     REQUIRES_BUFFERS = ["C", "F", "mass", "mu", "la", "p_vol"]  # per-particle (mpm_particle entity provisions them)
     REQUIRES_HSTATE = []                                  # body force = the PARENT set's accumulated delta (H.delta)
 
@@ -1822,7 +2057,17 @@ class MLSMPMMechanics(Exchange):
                              f"got {self.body_force!r}")    # clamp broadcast accel
         self.drag = float(params.get("drag", 40.0))       # Stokes drag (overdamped)
         self.wall_damp = float(params.get("wall_damp", 1.0))  # 1.0=elastic wall; <1 loses energy on bounce
-        self.wall_contact = float(params.get("wall_contact", 0.04))  # contact-layer thickness damped on bounce
+        # A LENGTH, AND THEREFORE A TRAP IN ANY BOX THAT IS NOT 1 UNIT WIDE. The contact test is
+        # `(x < cb) | (x > box[k] - cb)`, so in a 0.1 m box the historical 0.04 selects everything
+        # but a 0.02 m sliver -- the entire fluid reads as permanently in wall contact and is
+        # permanently damped. `wall_contact_cells` states it in the only scale the grid has:
+        # 0.04 / (1/96) = 3.84 cells, so the default reproduces 0.04 exactly at n_grid 96 and
+        # follows the world everywhere else. An explicit `wall_contact` still wins, for the specs
+        # that tuned it.
+        self.wall_contact_cells = float(params.get("wall_contact_cells", 3.84))
+        self.wall_contact = params.get("wall_contact", None)
+        if self.wall_contact is not None:
+            self.wall_contact = float(self.wall_contact)  # contact-layer thickness damped on bounce
         self.surface_tension = float(params.get("surface_tension", 0.0))  # liquid cohesion (CSF coefficient)
         self.vmax = float(params.get("vmax", 1e9))        # max cell speed (default: CFL only)
         self.dx = 1.0 / self.n_grid

@@ -92,7 +92,8 @@ if HAVE_WARP:
                    ACT: wp.array(dtype=wp.mat33),
                    GM: wp.array(dtype=float), GMV: wp.array(dtype=wp.vec3),
                    GC: wp.array(dtype=float),
-                   ng: int, dx: float, dt: float, drag: float, iters: int,
+                   ngx: int, ngy: int, ngz: int,
+                   dx: float, dt: float, drag: float, iters: int,
                    has_snw: int, has_liq: int, has_turg: int, has_act: int):
         p = wp.tid()
         inv_dx = 1.0 / dx
@@ -175,10 +176,16 @@ if HAVE_WARP:
                     else:
                         wk = 0.5 * (fx[2] - 0.5) * (fx[2] - 0.5)
                     w = wi * wj * wk
-                    gi = wp.clamp(int(base[0]) + i, 0, ng - 1)
-                    gj = wp.clamp(int(base[1]) + j, 0, ng - 1)
-                    gk = wp.clamp(int(base[2]) + k, 0, ng - 1)
-                    idx = (gi * ng + gj) * ng + gk
+                    # THREE COUNTS, AS THE GATHER ALREADY TAKES. This kernel clamped and flattened
+                    # with ONE `ng` while `g2p` used ngx/ngy/ngz, so on any non-cubic box the
+                    # scatter wrote to different nodes than the gather read -- silently, since a
+                    # cubic box makes the two identical and every MPM spec until now was cubic.
+                    # `MPMGrid` has derived per-axis counts since the world-box change (P0); this is
+                    # the half of the pair that never caught up.
+                    gi = wp.clamp(int(base[0]) + i, 0, ngx - 1)
+                    gj = wp.clamp(int(base[1]) + j, 0, ngy - 1)
+                    gk = wp.clamp(int(base[2]) + k, 0, ngz - 1)
+                    idx = (gi * ngy + gj) * ngz + gk
                     dpos = wp.vec3((float(i) - fx[0]) * dx,
                                    (float(j) - fx[1]) * dx,
                                    (float(k) - fx[2]) * dx)
@@ -290,7 +297,8 @@ class MPMScatterWarp(MPMScatter):
                     wp.from_torch(_act, dtype=wp.mat33),
                     wp.from_torch(gm), wp.from_torch(gmv.view(-1, 3), dtype=wp.vec3),
                     wp.from_torch(g.c),
-                    int(g.nx), float(g.dx), float(dt), float(self.drag), int(self.polar_iters),
+                    int(g.nx), int(g.ny), int(g.nz),
+                    float(g.dx), float(dt), float(self.drag), int(self.polar_iters),
                     int(_has_snw), int(_has_liq), int(_has_turg), int(_has_act)])
         return {}
 
@@ -441,7 +449,7 @@ class MPMGatherWarp(MPMGather):
                           wp.from_torch(occ), wp.from_torch(liqf), wp.from_torch(_near),
                           int(pa), int(va), int(g.shape[0]), int(g.shape[1]), int(g.shape[2]),
                           float(g.dx), float(dt),
-                          float(self.wall_damp), float(self.wall_contact), float(vmax),
+                          float(self.wall_damp), float(self._contact_band(g)), float(vmax),
                           float(bx), float(by), float(bz), int(has_liq),
                           int(self.wall_damp_mode == "per_impact")])
         return {}

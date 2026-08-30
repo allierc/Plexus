@@ -109,3 +109,15 @@ plotting:
   splat_res: 560
   panels: true
   panels_thick: 0.1
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of yellow particles is positioned within a 3D bounding box. Over
+      the course of the simulation, the cluster moves downward along the vertical axis. The internal distribution
+      of the particles remains relatively stable as the entire mass descends. By the final frame, the
+      cluster has reached the bottom of the defined domain.
+    objects: The primary object is a dense, spherical cluster composed of numerous small yellow particles.
+      These particles are tightly packed together to form a cohesive, roughly circular shape in the cross-section.
+      The surrounding environment is a black void bounded by a white wireframe cube. The zoomed-in view
+      on the right shows the individual point-like particles that make up the larger cluster.

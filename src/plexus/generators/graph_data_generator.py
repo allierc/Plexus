@@ -117,8 +117,22 @@ def data_generate(
             for h in _hs:
                 h(H, tick)
 
+    # WHICH ENGINE. `general.engine` selects the driver; the default is plexus.engine.run and every
+    # existing spec omits the key, so nothing changes for them. A named engine is a MODE OF RUNNING,
+    # not a different physics -- `continuous` still delegates to the same loop, and exists to refuse
+    # a spec that its operators alone cannot check.
+    _engine = str(getattr(sim, "engine", "default") or "default").lower()
+    _run = run
+    if _engine not in ("", "default"):
+        try:
+            import importlib
+            _run = importlib.import_module(f"plexus.{_engine}_engine").run
+            print(f"[engine] using the {_engine!r} engine (plexus.{_engine}_engine.run)", flush=True)
+        except Exception as e:                                       # noqa: BLE001
+            raise ValueError(f"general.engine: {_engine!r} -- no such engine "
+                             f"(expected plexus/{_engine}_engine.py with a run(); {e})") from e
     try:
-        H, out = run(sim, out_path=out_path, device=device, progress=True, on_frame=on_frame)
+        H, out = _run(sim, out_path=out_path, device=device, progress=True, on_frame=on_frame)
     finally:
         for _m in movs:
             _m.close()

@@ -85,6 +85,10 @@ class Spec:
     dim: int = 2                                     # spatial dimensions (the global dimension contract)
     world_size: list = field(default_factory=lambda: [1.0, 1.0])   # per-axis box [w0 .. w_{D-1}]
     plotting: dict = field(default_factory=dict)     # render STYLE (colormap, point_size, ...) — read by plexus.plot
+    # WHICH DRIVER RUNS THE SCHEDULE. `default` is plexus.engine.run; a name N resolves to
+    # plexus.<N>_engine.run. A mode of RUNNING, not a different physics -- `continuous` still
+    # delegates to the same loop and exists only to refuse specs its operators cannot check.
+    engine: str = "default"
     record_cap: int = 10000                          # max recorded SET (position) frames; the trajectory is strided if n_frames exceeds it
     field_record_cap: int = 256                      # max recorded FIELD (grid) frames — fields are large, so a tighter cap
     # THE PHYSICAL SCALE, declared once under `general.units:` and never inferred. Three base scales
@@ -92,6 +96,8 @@ class Spec:
     # plexus/units.py). Absent => the run is dimensionless and no result from it may carry a unit.
     # `time_s` defaults to 1.0, i.e. THE CONVENTION IS THAT `dt` IS IN SECONDS.
     units: "Units" = field(default_factory=lambda: Units(declared=False))
+    # SAVE THE TRAJECTORY, OR DO NOT. None = the legacy `record_cap` path.
+    save_data: bool = None
 
 
 _RESERVED = {"op", "at", "to", "from", "implementation", "model"}
@@ -326,10 +332,16 @@ def load(path: str) -> Spec:
                 raise ValueError(
                     f"operator {name!r} requires per-type property {prop!r}, but neither "
                     f"{sel.set!r} nor its parents declare `types`.")
+            # ONE PROPERTY, MORE THAN ONE WAY TO SPELL IT. `youngs` and `bulk_modulus` are two
+            # routes to the same Lame pair -- for a liquid, where mu = 0, they are the SAME number
+            # reached differently -- so requiring the first by name would forbid the second. The
+            # operator declares the alternatives and the type satisfies any one of them.
+            alts = getattr(cls, "TYPE_PROP_ALTERNATIVES", {}).get(prop, ())
             for tname, t in set_types.items():
-                if prop not in t:
+                if prop not in t and not any(a in t for a in alts):
+                    also = f" (or {' / '.join(alts)})" if alts else ""
                     raise ValueError(
-                        f"operator {name!r} requires property {prop!r} on every type of "
+                        f"operator {name!r} requires property {prop!r}{also} on every type of "
                         f"{owner!r}; missing on type {tname!r}. "
                         f"(declared in {cls.__name__}.REQUIRES_TYPE_PROPS)")
         opspec = OpSpec(op=name, on=sel, to=o.get("to"), frm=o.get("from"),
@@ -393,8 +405,11 @@ def load(path: str) -> Spec:
     # asking to be a fluid silently built as whatever its parent cell was. The provision hook reads
     # all three today -- per the PARTICLE's own type, not its parent's -- so the warning would now
     # be false where it used to be the only notice anyone got.
+    # `bulk_modulus` is read by mpm_scatter via TYPE_PROP_ALTERNATIVES rather than by name, so the
+    # used_props scan does not see it and it would be reported as read by no operator.
     _KNOWN_TYPE_KEYS = {"fraction", "core", "layers", "block",
-                        "material", "density", "tau"} | used_props
+                        "material", "density", "tau", "bulk_modulus", "shape",
+                        "eta"} | used_props          # per-type dynamic viscosity (mpm_viscosity)
     for sname, s in raw["sets"].items():
         for tname, t in s.get("types", {}).items():
             for k in t:
@@ -459,7 +474,9 @@ def load(path: str) -> Spec:
         dim=dim,
         world_size=world_size,
         plotting=raw.get("plotting", {}),
+        engine=str(gv("engine", "default")).lower(),
         record_cap=int(gv("record_cap", 10000)),
         field_record_cap=int(gv("field_record_cap", 256)),
         units=parse_units(gv("units", None)),
+        save_data=gv("save_data", None),
     )

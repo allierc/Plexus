@@ -1,0 +1,45 @@
+# zf_Tectum_16384 -- 16570 larval-zebrafish neurons of the Tectum, the largest of the scale
+# series (1000 / 4096 / 8192 / 16384). `p` is 20/N = 0.001207, holding MEAN
+# IN-DEGREE at ~20 so scale does not confound connectivity.
+general:
+  name: zf_Tectum_16384
+  seed: 0
+  n_frames: 2000
+  dt: 0.05
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 2001
+  field_record_cap: 250
+  units:
+    length_um: 184.41015625
+    time_s: 1.0
+sets:
+  brain: {n: 1}
+  assembly: {parent: brain, per_parent: 1}
+  neuron:
+    parent: assembly
+    per_parent: 16570
+    types:
+      slow_quiet:  {fraction: 0.25, p: [1.0, 0.0, 1.2, 0.5, 1.00, 0.0]}
+      slow_bursty: {fraction: 0.25, p: [1.0, 0.0, 1.2, 1.6, 0.50, 0.0]}
+      fast_quiet:  {fraction: 0.25, p: [2.5, 0.0, 1.2, 0.5, 2.00, 0.0]}
+      fast_bursty: {fraction: 0.25, p: [2.5, 0.0, 1.2, 1.6, 0.25, 0.0]}
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/zf_Tectum_16384/connectome.npz
+fields:
+  neural_activity: {frame: grid, res: 128, components: 1, couples_to: assembly}
+seed:
+  - {op: neural_seed, at: neuron, region: zf_Tectum_16384, v0_mean: 0.0, v0_sd: 0.5}
+operators:
+  - {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.01}
+  - {op: neuron_signal, at: neuron, model: type_pairwise, edge_set: synapse, activation: tanh}
+  - {op: aggregate, at: assembly, child: neuron, block: voltage, into: activity}
+  - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
+      sigma: 6.0, normalize: none}
+schedule: [neuron_update, neuron_signal, aggregate, voxelize]
+plotting: {background: black, point_size: 4.0}

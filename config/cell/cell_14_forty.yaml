@@ -298,3 +298,17 @@ plotting:
   panels_thick: 0.1
   panels_dot: 1.0
   panels_dot_section: 2.2
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a cluster of spherical entities that remain relatively stationary
+      in a 3D domain. Over the course of the frames, the internal distribution of the particles within
+      each sphere appears to fluctuate slightly. The overall structure of the multi-sphere assembly does
+      not undergo any significant deformation or movement. The cross-sectional view on the right remains
+      consistent, showing a stable linear arrangement of the spheres.
+    objects: The scene contains a cluster of approximately nine spherical objects arranged in a roughly
+      linear, slightly staggered formation. Each sphere is composed of a dense collection of blue and
+      yellow particles, with yellow concentrated in the center. The spheres vary slightly in size, with
+      the central ones appearing larger than those at the ends. The entire assembly is contained within
+      a large, transparent cubic bounding box.

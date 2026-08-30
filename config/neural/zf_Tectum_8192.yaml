@@ -1,0 +1,87 @@
+# zf_Tectum_8192 -- 8255 larval-zebrafish neurons of the Tectum, the largest of the
+# scale series (1000 / 4096 / 8192). `p` is 20/N = 0.00242, holding MEAN
+# IN-DEGREE at ~20 so scale does not confound connectivity.
+general:
+  name: zf_Tectum_8192
+  seed: 0
+  n_frames: 2000
+  dt: 0.05
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 2001
+  field_record_cap: 250
+  units:
+    length_um: 114.16796875
+    time_s: 1.0
+sets:
+  brain: {n: 1}
+  assembly: {parent: brain, per_parent: 1}
+  neuron:
+    parent: assembly
+    per_parent: 8255
+    types:
+      slow_quiet:  {fraction: 0.25, p: [1.0, 0.0, 1.2, 0.5, 1.00, 0.0]}
+      slow_bursty: {fraction: 0.25, p: [1.0, 0.0, 1.2, 1.6, 0.50, 0.0]}
+      fast_quiet:  {fraction: 0.25, p: [2.5, 0.0, 1.2, 0.5, 2.00, 0.0]}
+      fast_bursty: {fraction: 0.25, p: [2.5, 0.0, 1.2, 1.6, 0.25, 0.0]}
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/zf_Tectum_8192/connectome.npz
+fields:
+  neural_activity: {frame: grid, res: 128, components: 1, couples_to: assembly}
+seed:
+  - {op: neural_seed, at: neuron, region: zf_Tectum_8192, v0_mean: 0.0, v0_sd: 0.5}
+operators:
+  - {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.01}
+  - {op: neuron_signal, at: neuron, model: type_pairwise, edge_set: synapse, activation: tanh}
+  - {op: aggregate, at: assembly, child: neuron, block: voltage, into: activity}
+  - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
+      sigma: 6.0, normalize: none}
+schedule: [neuron_update, neuron_signal, aggregate, voxelize]
+plotting: {background: black, point_size: 4.0}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_assembly:
+    description: A single blue point remains stationary in the center of a black field throughout the
+      entire sequence. There is no movement, expansion, or change in the position of the object over time.
+      The scene is static, showing a constant state without any evolution or interaction. The video represents
+      a fixed point in space with no dynamic progression.
+    objects: The scene contains a single, small point located at the center of the frame. This object
+      is a bright blue color, contrasting sharply against the background. It is a singular, isolated point
+      with no connections to other objects. The size of the point is very small relative to the large,
+      black surrounding area.
+  movie_brain:
+    description: A single blue point remains stationary in the center of a black field throughout the
+      entire sequence. There is no movement, expansion, or change in the position of the object over time.
+      The scene is static, showing a constant state without any evolution or interaction. The video represents
+      a fixed point in space with no dynamic progression.
+    objects: The scene contains a single, small point located at the center of the frame. This object
+      is a bright blue color, providing a sharp contrast against the background. It is a singular, isolated
+      point with no connections to other objects or structures. The size of the point is very small relative
+      to the large, black rectangular field.
+  movie_neural_activity:
+    description: The simulation shows a cluster of bright, amorphous particles that gradually shift and
+      reorganize their internal structure. Over time, the individual components appear to merge and separate,
+      creating a dynamic, fluid-like motion. The overall shape of the cluster remains relatively stable
+      while the internal density fluctuates. By the final frame, the particles have settled into a slightly
+      more compact and defined configuration.
+    objects: The scene contains a collection of irregular, blob-like particles clustered together in a
+      central mass. These objects are rendered in shades of white and light gray against a solid black
+      background. They are interconnected in a dense, overlapping topology that resembles a porous solid
+      or a cloud of gas. The individual particles vary in size, with some appearing as large, dominant
+      masses and others as smaller, peripheral fragments.
+  movie_neuron:
+    description: The simulation shows a dense cloud of blue particles forming two distinct rectangular
+      blocks. These blocks are oriented diagonally and appear to be slightly shifting or vibrating in
+      place. The overall structure remains stable throughout the sequence without significant expansion
+      or contraction. The particles maintain a consistent density, creating a steady, static-like appearance
+      over time.
+    objects: The scene contains a large collection of small, blue point-like particles. These particles
+      are organized into two primary rectangular volumes that are joined or positioned very closely together.
+      The blocks are oriented at a roughly 45-degree angle relative to the frame. Each individual particle
+      is tiny and uniform in size, contributing to a grainy, textured appearance of the larger shapes.
