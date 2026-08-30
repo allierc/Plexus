@@ -1,20 +1,96 @@
 general:
   name: toy_small
   seed: 42
-  dim: 3
+  n_frames: 4000
+  dt: 0.02
+  dim: 2
+  world: 1.0
+  boundary: wall
   units:
     length_um: 10.0
     time_s: 0.02
+
+sets:
+  brain:
+    n: 1
+  neuron:
+    parent: brain
+    per_parent: 1024
+    radius: 0.5
+    types:
+      t0: {fraction: 0.125, p: [0.50, 0.20, 1.00, 0.10, 1.00, 0.0]}
+      t1: {fraction: 0.125, p: [0.75, 0.30, 1.15, 0.14, 1.00, 0.0]}
+      t2: {fraction: 0.125, p: [1.00, 0.40, 1.30, 0.18, 1.00, 0.0]}
+      t3: {fraction: 0.125, p: [1.25, 0.50, 1.45, 0.22, 1.00, 0.0]}
+      t4: {fraction: 0.125, p: [1.50, 0.60, 1.60, 0.26, 1.00, 0.0]}
+      t5: {fraction: 0.125, p: [1.75, 0.70, 1.75, 0.30, 1.00, 0.0]}
+      t6: {fraction: 0.125, p: [2.00, 0.80, 1.90, 0.34, 1.00, 0.0]}
+      t7: {fraction: 0.125, p: [2.50, 0.90, 2.10, 0.40, 1.00, 0.0]}
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges:
+    - [0, 1]
+    weights:
+    - 0.0
+
+fields:
+  omega:
+    frame: grid
+    res: 64
+    components: 1
+
+operators:
+  - op: pacemaker
+    at: omega
+    name: pacemaker
+    period: 60
+    duration: 30
+  - op: activation_pulse
+    at: omega
+    period: 60
+    duration: 30
+    radius: 0.35
+    center: [0.35, 0.5]
+  - op: neuron_field_input
+    at: neuron
+    from: omega
+    offset: 1.0
+  - op: neuron_update
+    at: neuron
+    model: leaky_tanh
+    noise: 0.0005
+  - op: neuron_signal
+    at: neuron
+    model: shared
+    edge_set: synapse
+    activation: tanh
+    field: omega
+
+schedule:
+  - pacemaker
+  - activation_pulse
+  - neuron_field_input
+  - neuron_update
+  - neuron_signal
 
 data:
   source: simulate
   state: voltage
   positions: positions
-  stimulus: stim
-  types: type_id
+  stimulus: omega
+  types: node_type
   graph:
     kind: knn
     k: 16
+  toy:
+    set: neuron
+    edge_set: synapse
+    amplitude: 0.15
+    length_scale: 0.08
+    inhibitory_fraction: 0.25
   split:
     train: [0, 3000]
     val: [3000, 3500]

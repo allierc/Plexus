@@ -28,6 +28,8 @@ for p in (_HERE, _PLEXUS_SRC):
 
 import gates as gates_mod
 import spec_schema
+import toy as toy_mod
+import viz
 
 
 # --------------------------------------------------------------------------------------- #
@@ -64,7 +66,7 @@ def gate_G1_parse(spec_path: str):
     with open(spec_path) as f:
         raw = yaml.safe_load(f)
     combos = _all_option_combinations()
-    ok, failures = 0, []
+    ok, failures, flags = 0, [], []
     for combo in combos:
         r = copy.deepcopy(raw)
         r.setdefault("model", {}).update(combo)
@@ -76,32 +78,64 @@ def gate_G1_parse(spec_path: str):
         try:
             spec_schema.load(tmp)
             ok += 1
+            flags.append(True)
         except Exception as e:                      # noqa: BLE001 -- the gate wants the message
             failures.append(f"{combo}: {type(e).__name__}: {e}")
+            flags.append(False)
         finally:
             os.unlink(tmp)
     note = f"{len(combos)} enumerated" + ("" if not failures else f"; first failure: {failures[0]}")
-    return float(ok), note
+    return float(ok), note, [viz.option_matrix(combos, flags, os.path.join(_ARTDIR[0], "G1_options.png"))]
 
 
 def gate_G2_no_hardcoding(_spec_path: str):
-    """Scan the prototype's own .py for dataset identity. Patterns and exemptions are part of the
-    gate's definition and live in `gates.py`, so this walker never reads its own rules."""
-    offenders = []
+    """Scan the prototype's own .py for dataset identity, on the AST rather than on the text.
+
+    THE DISTINCTION THE FIRST VERSION MISSED. A line-by-line regex flagged `toy.py`'s module
+    docstring for the word "ZAPBench", which is prose explaining why a toy exists -- documentation,
+    not a hardcoded value. Stripping docstrings from the scan would have hidden the opposite case
+    too, because a hardcoded path IS a string literal. So the scan walks the AST and checks every
+    string and numeric constant EXCEPT docstrings: a dataset path or dimension used as a value
+    still fails, and naming a dataset in prose does not. Patterns and exemptions live in gates.py.
+    """
+    import ast
+
+    offenders, counts = [], {}
     for root, dirs, files in os.walk(_HERE):
         dirs[:] = [d for d in dirs if d not in gates_mod.G2_EXEMPT_DIRS]
         for fn in files:
             if not fn.endswith(".py") or fn in gates_mod.G2_EXEMPT_FILES:
                 continue
             path = os.path.join(root, fn)
-            with open(path) as f:
-                for i, line in enumerate(f, 1):
-                    code = line.split("#", 1)[0]
-                    for pat, why in gates_mod.FORBIDDEN_PATTERNS:
-                        if re.search(pat, code, re.I):
-                            offenders.append(f"{os.path.relpath(path, _HERE)}:{i} {why}")
-    note = "; ".join(offenders[:3]) if offenders else f"scanned .py under {os.path.basename(_HERE)}/"
-    return float(len(offenders)), note
+            rel = os.path.relpath(path, _HERE)
+            src = open(path).read()
+            counts[rel] = len(src.splitlines())
+            tree = ast.parse(src, filename=path)
+            docstrings = {id(ast.get_docstring(n, clean=False)) for n in ast.walk(tree)
+                          if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                            ast.AsyncFunctionDef))}
+            doc_nodes = set()
+            for n in ast.walk(tree):
+                if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                    body = getattr(n, "body", [])
+                    if body and isinstance(body[0], ast.Expr) and \
+                            isinstance(body[0].value, ast.Constant) and \
+                            isinstance(body[0].value.value, str):
+                        doc_nodes.add(id(body[0].value))
+            for n in ast.walk(tree):
+                if not isinstance(n, ast.Constant) or id(n) in doc_nodes:
+                    continue
+                text = n.value if isinstance(n.value, str) else (
+                    repr(n.value) if isinstance(n.value, (int, float)) else None)
+                if text is None:
+                    continue
+                for pat, why in gates_mod.FORBIDDEN_PATTERNS:
+                    if re.search(pat, str(text), re.I):
+                        offenders.append(f"{rel}:{n.lineno} {why}")
+    note = "; ".join(offenders[:3]) if offenders else (
+        f"{len(counts)} files, {sum(counts.values())} lines, constants only (docstrings exempt)")
+    return float(len(offenders)), note, [viz.scan_coverage(counts, offenders,
+                                          os.path.join(_ARTDIR[0], "G2_scan.png"))]
 
 
 def gate_G7_units(spec_path: str):
@@ -114,28 +148,58 @@ def gate_G7_units(spec_path: str):
     ok = fit.units.declared and not bad
     note = (f"length_um={fit.units.length_um}, time_s={fit.units.time_s}"
             + ("" if not bad else f"; measurement gates in mesh units: {bad}"))
-    return float(bool(ok)), note
+    return float(bool(ok)), note, [viz.unit_ladder(fit.units,
+                                    os.path.join(_ARTDIR[0], "G7_units.png"))]
+
+
+def gate_G16_types_are_spatially_mixed(spec_path: str):
+    """G16: the toy's types must be unlearnable from position, or G11/G12 prove nothing."""
+    fit = spec_schema.load(spec_path)
+    gt_path = os.path.join(_ARTDIR[0], "ground_truth.npz")
+    if not os.path.exists(gt_path):
+        raise FileNotFoundError(f"{gt_path} not found -- run `-o generate {spec_path}` first")
+    import numpy as np
+    gt = np.load(gt_path)
+    by_res = {r: toy_mod.spatial_type_purity(gt["positions"], gt["node_type"], r)
+              for r in (2, 4, 8, 16, 32)}
+    worst = max(by_res.values())
+    png = viz.toy_summary(gt, os.path.join(_ARTDIR[0], "G16_toy.png"), purity_by_res=by_res)
+    mp4 = viz.state_movie(gt["voltage"], gt["positions"],
+                          os.path.join(_ARTDIR[0], "G16_state.mp4"))
+    note = "worst over " + ", ".join(f"{r}:{v:.2f}" for r, v in sorted(by_res.items()))
+    return float(worst), note, [p for p in (png, mp4) if p]
+
+
+_ARTDIR = [os.path.join(_HERE, "log")]           # set by run_gates to the run's own directory
 
 
 STAGE_CHECKS = {
     "G1": gate_G1_parse,
     "G2": gate_G2_no_hardcoding,
     "G7": gate_G7_units,
+    "G16": gate_G16_types_are_spatially_mixed,
 }
 
 
 def run_gates(spec_path: str, out_dir: str, only: list[str] | None = None) -> int:
     table = gates_mod.build_table()
+    _ARTDIR[0] = out_dir
     todo = [g for g in (only or list(STAGE_CHECKS)) if g in STAGE_CHECKS]
     for gid in todo:
+        arts = []
         try:
-            measured, note = STAGE_CHECKS[gid](spec_path)
+            measured, note, arts = STAGE_CHECKS[gid](spec_path)
         except Exception as e:                      # noqa: BLE001
             measured, note = None, f"check raised {type(e).__name__}: {e}"
-        table[gid].record(measured, note)
+        table[gid].record(measured, note, arts)
 
     csv_path = gates_mod.write_csv(table, os.path.join(out_dir, "gates.csv"))
-    tex_path = gates_mod.write_tex(table, os.path.join(out_dir, "gates_table.tex"))
+    # Two copies of the table, and the difference is the figure paths. The run-dir copy is the
+    # archive, with paths relative to itself; the prototype-root copy is what the note \input's,
+    # with paths relative to the note so \includegraphics resolves where latexmk runs.
+    gates_mod.write_tex(table, os.path.join(out_dir, "gates_table.tex"))
+    tex_path = gates_mod.write_tex(table, os.path.join(_HERE, "gates_table.tex"), rel_to=_HERE)
+    gates_mod.write_csv(table, os.path.join(_HERE, "gates.csv"))
 
     width = max(len(g.what) for g in table.values())
     print(f"\ngate table for {os.path.basename(spec_path)}")
@@ -190,7 +254,10 @@ def main(argv=None) -> int:
     if task == "gates":
         return run_gates(config, out_dir, args.gate)
     if task == "generate":
-        _not_yet(task, 1)
+        summary = toy_mod.generate(fit, out_dir, device="cpu")
+        for k, v in summary.items():
+            print(f"  {k:14s} {v}")
+        return 0
     if task in ("train", "test", "plot"):
         _not_yet(task, 2)
     ap.error(f"unknown task {task!r} (expected generate|train|test|plot|gates)")

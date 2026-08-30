@@ -90,6 +90,7 @@ class DataSpec:
     graph: GraphSpec = field(default_factory=GraphSpec)
     split: dict = field(default_factory=dict)    # {train: [a,b], val: [...], test: [...]}
     subsample_neurons: Optional[int] = None
+    toy: dict = field(default_factory=dict)      # only for source == "simulate"
 
     @classmethod
     def parse(cls, raw: dict) -> "DataSpec":
@@ -98,6 +99,13 @@ class DataSpec:
         source = _one_of(raw.get("source"), DATA_SOURCES, "data.source")
         if source != "simulate" and not raw.get("path"):
             raise ValueError(f"data.source is {source!r} but data.path is not set")
+        toy = raw.get("toy", {}) or {}
+        if source == "simulate":
+            need = ("set", "edge_set", "amplitude", "length_scale", "inhibitory_fraction")
+            missing = [k for k in need if k not in toy]
+            if missing:
+                raise ValueError(f"data.source is 'simulate' but data.toy is missing {missing}; "
+                                 f"the toy's kernel is a config value, never a default")
         split = raw.get("split", {}) or {}
         for name, rng in split.items():
             if not (isinstance(rng, (list, tuple)) and len(rng) == 2 and rng[0] < rng[1]):
@@ -113,6 +121,7 @@ class DataSpec:
             split=split,
             subsample_neurons=(None if raw.get("subsample_neurons") is None
                                else int(raw["subsample_neurons"])),
+            toy=toy,
         )
 
 
