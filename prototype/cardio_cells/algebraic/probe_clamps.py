@@ -25,7 +25,7 @@ import torch
 from plexus import schema
 from plexus import engine as E
 from plexus.paths import config_path
-from plexus.operators.mpm_grid import stencil_offsets, bspline
+from plexus.operators.mpm_ops import stencil_offsets, bspline
 
 
 def main():

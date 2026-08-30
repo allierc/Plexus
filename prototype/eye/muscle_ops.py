@@ -42,8 +42,8 @@ import torch
 from plexus.models.base import Lateral, Aggregate, Exchange, Rewire
 from plexus.models.registry import register_operator, register_entity
 from plexus.models.entities import MPMParticle
-from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
-from plexus.operators.mpm_scatter import _polar_higham
+from plexus.operators.mpm_ops import stencil_offsets, bspline, sub_dt
+from plexus.operators.mpm_ops import _polar_higham
 
 import eye_anatomy as EA
 
@@ -574,7 +574,7 @@ class MPMScatterAccumulate(Exchange):
         self.a_max = float(params.get("a_max", 200.0))
         self.polar = str(params.get("polar", "svd")).lower()
         self.polar_iters = int(params.get("polar_iters", 6))
-        self.store_stress = bool(params.get("store_stress", False))   # see plexus.operators.mpm_scatter
+        self.store_stress = bool(params.get("store_stress", False))   # see plexus.operators.mpm_ops
 
     def forward(self, H, mask=None):
         p = H.level(self.at); g = H.field(self.to); dev = p.state.device
@@ -616,7 +616,7 @@ class MPMScatterAccumulate(Exchange):
         if act is not None:
             stress = stress + act
         if self.store_stress:
-            # Same capture as the stock implementation -- see `plexus.operators.mpm_scatter`. Present
+            # Same capture as the stock implementation -- see `plexus.operators.mpm_ops`. Present
             # here too because a second body sharing the grid is still a material with a stress, and a
             # diagnostic that worked for one set and silently returned nothing for the other would be
             # the exact producer-with-no-consumer defect this project keeps finding.

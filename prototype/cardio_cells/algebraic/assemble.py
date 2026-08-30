@@ -278,7 +278,7 @@ class System:
 
     def wall_diag(self):
         """How much wall machinery is live at the frozen state (the known kink sources)."""
-        from plexus.operators.mpm_grid import stencil_offsets, bspline
+        from plexus.operators.mpm_ops import stencil_offsets, bspline
         self.restore()
         mu, la = _lame(self.E_true[self.cid])
         self.p.mu, self.p.la = mu, la

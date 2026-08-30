@@ -335,7 +335,7 @@ def _amax(a, b):
 
 
 def test_deposit(device="cpu"):
-    from plexus.operators.deposit import Deposit
+    from plexus.operators.field_ops import Deposit
     H, p, S = _tiny_H(device); fld = H.fields["chemical"]; lvl = H.level("cell")
     g0, pos, nt = fld.grid.clone(), lvl.get("pos"), lvl.node_type
     Deposit({"to": "chemical", "amount": p[0], "_at": "cell"}, device).forward(H)   # engine, in place
@@ -345,7 +345,7 @@ def test_deposit(device="cpu"):
 
 
 def test_diffuse(device="cpu"):
-    from plexus.operators.diffuse import Diffuse
+    from plexus.operators.field_ops import Diffuse
     H, p, S = _tiny_H(device); fld = H.fields["chemical"]
     g0 = fld.grid.clone()
     Diffuse({"_at": "chemical", "rate": p[1]}, device).forward(H)
@@ -355,7 +355,7 @@ def test_diffuse(device="cpu"):
 
 
 def test_decay(device="cpu"):
-    from plexus.operators.decay import Decay
+    from plexus.operators.field_ops import Decay
     H, p, S = _tiny_H(device); fld = H.fields["chemical"]
     g0 = fld.grid.clone()
     Decay({"_at": "chemical", "rate": p[2]}, device).forward(H)
@@ -378,7 +378,7 @@ def test_sense(device="cpu"):
     """Surrogate: report correlation between predicted E[turn] and the engine's
     (stochastic) actual turn, plus sign-agreement among cells that turned."""
     import math, numpy as np
-    from plexus.operators.sense import Sense
+    from plexus.operators.field_ops import Sense
     H, p, S = _tiny_H(device); fld = H.fields["chemical"]; lvl = H.level("cell")
     h0 = lvl.heading.clone()
     Sense({"from": "chemical", "cross": p[3], "_at": "cell"}, device).forward(H)
