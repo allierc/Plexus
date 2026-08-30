@@ -70,12 +70,24 @@ def adjusted_rand(a: np.ndarray, labels: np.ndarray) -> float:
 
 # --------------------------------------------------------------------------------------- #
 
-def load_toy(run_dir: str, device: str):
+def load_toy(run_dir: str, device: str, fit_stimulus_is_none: bool = False):
     gt = np.load(os.path.join(run_dir, "ground_truth.npz"))
     v = torch.tensor(gt["voltage"], dtype=torch.float32, device=device)[:, :, None]
     ei = torch.tensor(gt["edge_index"], dtype=torch.long, device=device)
-    stim_t = torch.tensor(gt["stim_t"], dtype=torch.float32, device=device)
-    return gt, v, ei, stim_t
+    # WITHHOLDING THE DRIVE IS THE POINT ON THE WAVE TOY, not an omission. For a travelling wave
+    # u = f(x - ct) the gradient is du/dx = -(1/c) du/dt, so a model handed u_i can recover the
+    # gradient from that node's own history and the graph is never necessary -- measured: loss
+    # 0.005 with r2_grad 0.000. With the drive withheld the phase can only come from the SPATIAL
+    # pattern of the neighbours, and since each neighbour's state is its own signed gain times
+    # that gradient, the model has to learn the gains to read them. That is what makes the
+    # heterogeneity load-bearing rather than incidental.
+    if fit_stimulus_is_none:
+        return gt, v, ei, torch.zeros(v.shape[0], v.shape[1], device=device)
+    key = "stim" if "stim" in gt.files else "stim_t"
+    st = torch.tensor(gt[key], dtype=torch.float32, device=device)
+    if st.ndim == 1:                       # a global clock, broadcast to every node
+        st = st[:, None].expand(-1, v.shape[1])
+    return gt, v, ei, st.contiguous()
 
 
 def build_schedule(tc):
@@ -93,7 +105,7 @@ def train(fit, run_dir: str, device: str = "cuda") -> dict:
     device = device if torch.cuda.is_available() else "cpu"
     tc, ms = fit.training, fit.model
     torch.manual_seed(tc.seed)
-    gt, v, ei, stim_t = load_toy(run_dir, device)
+    gt, v, ei, stim_t = load_toy(run_dir, device, str(fit.data.stimulus).lower() in ("none", "null", ""))
     T, N, _ = v.shape
     E = ei.shape[1]
 
@@ -139,7 +151,7 @@ def train(fit, run_dir: str, device: str = "cuda") -> dict:
         for g, b in zip(opt.param_groups, base):
             g["lr"] = b * lr_at(step)
         idx = torch.randint(tr0, min(tr1, T - 1), (tc.batch_frames,), device=device)
-        pred = torch.stack([net(v[t], ei, stim_t[t].expand(N, 1)) for t in idx])
+        pred = torch.stack([net(v[t], ei, stim_t[t][:, None]) for t in idx])
         loss = (((pred - dv[idx]) * s) ** 2).mean()
         opt.zero_grad(set_to_none=True)
         loss.backward()
@@ -151,7 +163,7 @@ def train(fit, run_dir: str, device: str = "cuda") -> dict:
             m.update(step=step, loss=float(loss))
             hist.append(m)
             print(f"  step {step:6d}  loss {float(loss):.5f}  "
-                  + "  ".join(f"{k} {m[k]:.3f}" for k in ("r2_W", "r2_W_raw", "r2_tau", "ari_a", "r2_b")))
+                  + "  ".join(f"{k} {m[k]:.3f}" for k in ("r2_grad", "r2_gain", "r2_tau", "ari_a")))
     torch.save(net.state_dict(), os.path.join(run_dir, "model.pt"))
     np.savez(os.path.join(run_dir, "history.npz"),
              **{k: np.array([h[k] for h in hist]) for k in hist[0]})
@@ -176,7 +188,7 @@ def effective_tau(net, v, ei, stim, device, n_frames: int = 8) -> np.ndarray:
     N = v.shape[1]
     for t in np.linspace(0, v.shape[0] - 2, n_frames).astype(int):
         x = v[t].clone().requires_grad_(True)
-        out = net(x, ei, stim[t].expand(N, 1))
+        out = net(x, ei, stim[t][:, None])
         g = torch.autograd.grad(out.sum(), x, retain_graph=False)[0]
         slopes.append(g.detach().squeeze(-1).cpu().numpy())
     leak = -np.mean(slopes, axis=0)
@@ -202,12 +214,40 @@ def gauge_normalise(W: np.ndarray, sender: np.ndarray) -> np.ndarray:
     return out
 
 
-def measure(net, gt, v, ei, stim, device) -> dict:
+def measure(net, gt, v, ei, stim, device, n_frames: int = 12) -> dict:
+    """The closed-form gates, restated for the two-scale wave toy.
+
+    The fine rule is dv_i = -v_i/tau_i + g_i du/dx(r_i), so the two things to recover are a
+    SPATIAL DERIVATIVE (does the message become a gradient operator?) and a SIGNED PER-NODE GAIN
+    (the heterogeneity). Both are read off the trained operator rather than off a named parameter,
+    so the same measurement works for either message form.
+    """
     W, a, b = _learned_arrays(net, device)
-    sender = gt["edge_index"][0]
-    out = {"r2_W_raw": r2(gt["weights"], W),
-           "r2_W": r2(gauge_normalise(gt["weights"], sender), gauge_normalise(W, sender)),
-           "r2_b": r2(gt["b_i"], b)}
-    out["r2_tau"] = r2(gt["tau"], effective_tau(net, v, ei, stim, device))
+    N = v.shape[1]
+    ts = np.linspace(0, v.shape[0] - 2, n_frames).astype(int)
+
+    msgs, dvs, slopes = [], [], []
+    for t in ts:
+        x = v[t].clone().requires_grad_(True)
+        out, m = net(x, ei, stim[t][:, None], return_msg=True)
+        g = torch.autograd.grad(out.sum(), x, retain_graph=False)[0]
+        slopes.append(g.detach().squeeze(-1).cpu().numpy())
+        msgs.append(m.detach().squeeze(-1).cpu().numpy())
+        dvs.append(out.detach().squeeze(-1).cpu().numpy())
+    leak = -np.mean(slopes, axis=0)
+    msg = np.stack(msgs)                                     # [n_frames, N]
+
+    # G9: the message against the true field gradient, per node, pooled
+    grad = gt["grad"][ts]
+    out = {"r2_grad": r2(grad.reshape(-1), msg.reshape(-1))}
+    # per-node gain: d(dv)/d(msg) via the ratio of the model's own emitted dv to its message,
+    # fitted per node across frames -- the slope IS the gain up to the message's own scale.
+    gains = []
+    dv_hat = np.stack(dvs)
+    for i in range(N):
+        A = np.stack([msg[:, i], np.ones(len(ts))]).T
+        gains.append(np.linalg.lstsq(A, dv_hat[:, i], rcond=None)[0][0])
+    out["r2_gain"] = r2(gt["gain"], np.array(gains))
+    out["r2_tau"] = r2(gt["tau"], 1.0 / np.clip(leak, 1e-6, None))
     out["ari_a"] = adjusted_rand(a, gt["node_type"]) if a is not None else float("nan")
     return out

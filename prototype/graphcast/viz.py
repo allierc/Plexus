@@ -106,18 +106,26 @@ def unit_ladder(units, path):
 def toy_summary(gt, path, purity_by_res=None):
     """G16 and the toy's own sanity: four panels that would have caught all three defects."""
     pos, nt, v = gt["positions"], gt["node_type"], gt["voltage"]
-    dist, w = gt["distance"], gt["weights"]
+    dist = gt["distance"]
+    w = gt["weights"] if "weights" in gt.files else None
     fig, axes = plt.subplots(2, 2, figsize=(10.5, 7.5), facecolor=BG)
 
     ax = axes[0, 0]; _panel(ax, "a  positions coloured by type")
     ax.scatter(pos[:, 0], pos[:, 1], c=nt, cmap="tab10", s=7)
     ax.set_aspect("equal")
 
-    ax = axes[0, 1]; _panel(ax, "b  interaction kernel vs distance")
-    ax.scatter(dist, w, s=2, c="#58a6ff", alpha=0.25)
-    ax.axhline(0, color="#666666", lw=0.6)
-    ax.set_xlabel("distance (length units)", color="#cccccc", fontsize=8)
-    ax.set_ylabel("edge weight", color="#cccccc", fontsize=8)
+    ax = axes[0, 1]
+    if w is not None:
+        _panel(ax, "b  interaction kernel vs distance")
+        ax.scatter(dist, w, s=2, c="#58a6ff", alpha=0.25)
+        ax.axhline(0, color="#666666", lw=0.6)
+        ax.set_ylabel("edge weight", color="#cccccc", fontsize=8)
+    else:
+        _panel(ax, "b  signed gain in space (the heterogeneity)")
+        lim = float(np.abs(gt["gain"]).max()) or 1.0
+        ax.scatter(pos[:, 0], pos[:, 1], c=gt["gain"], cmap="coolwarm", vmin=-lim, vmax=lim, s=8)
+        ax.set_aspect("equal")
+    ax.set_xlabel("distance (length units)" if w is not None else "x", color="#cccccc", fontsize=8)
 
     ax = axes[1, 0]; _panel(ax, "c  voltage traces, 12 neurons")
     for i in np.linspace(0, v.shape[1] - 1, 12).astype(int):
@@ -156,3 +164,82 @@ def state_movie(v, pos, path, stride=8, fps=20):
         plt.close(fig)
     imageio.mimsave(path, frames, fps=fps, macro_block_size=1)
     return path
+
+
+# --------------------------------------------------------------------------------------- #
+#  stage 1b -- the toy as a test bed: the field, the heterogeneity, the identifiability
+# --------------------------------------------------------------------------------------- #
+
+def field_movie(grid, path, fps=20, stride=1):
+    """The coarse field over time. A wave that is not travelling, or is identically zero, is
+    unmistakable here -- and both of those shipped past a scalar check on an earlier toy."""
+    try:
+        import imageio.v2 as imageio
+    except ImportError:
+        return None
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    g = np.asarray(grid)
+    if g.ndim == 4:
+        g = g[:, 0]
+    lim = float(np.abs(g).max()) or 1.0
+    frames = []
+    for t in range(0, g.shape[0], stride):
+        fig, ax = plt.subplots(figsize=(4.2, 4.0), facecolor=BG)
+        _panel(ax, f"u(x, y)   t = {t}")
+        ax.imshow(g[t].T, origin="lower", cmap="RdBu_r", vmin=-lim, vmax=lim)
+        ax.set_xticks([]); ax.set_yticks([])
+        fig.canvas.draw()
+        frames.append(np.asarray(fig.canvas.buffer_rgba())[..., :3].copy())
+        plt.close(fig)
+    imageio.mimsave(path, frames, fps=fps, macro_block_size=1)
+    return path
+
+
+def heterogeneity_map(pos, gain, node_type, path):
+    """Where the heterogeneity lives: the signed per-node gain, in space and by type."""
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.0), facecolor=BG)
+    lim = float(np.abs(gain).max()) or 1.0
+
+    ax = axes[0]; _panel(ax, "a  signed gain in space")
+    sc = ax.scatter(pos[:, 0], pos[:, 1], c=gain, cmap="coolwarm", vmin=-lim, vmax=lim, s=9)
+    ax.set_aspect("equal")
+    cb = fig.colorbar(sc, ax=ax, fraction=0.046); cb.ax.tick_params(colors="#aaaaaa", labelsize=7)
+
+    ax = axes[1]; _panel(ax, "b  gain by type")
+    for k in range(int(node_type.max()) + 1):
+        m = node_type == k
+        ax.scatter(np.full(m.sum(), k), gain[m], s=5, alpha=0.5)
+    ax.axhline(0, color=FG, lw=0.7, ls="--")
+    ax.set_xlabel("type", color="#cccccc", fontsize=8)
+    ax.set_ylabel("gain", color="#cccccc", fontsize=8)
+
+    ax = axes[2]; _panel(ax, "c  type in space (must look random)")
+    ax.scatter(pos[:, 0], pos[:, 1], c=node_type, cmap="tab10", s=9)
+    ax.set_aspect("equal")
+    return _save(fig, path)
+
+
+def identifiability_panels(stats, path):
+    """The four stage-1b numbers, each as a picture rather than a scalar."""
+    fig, axes = plt.subplots(2, 2, figsize=(10.5, 7.5), facecolor=BG)
+
+    ax = axes[0, 0]; _panel(ax, "a  per-node R2 of dv on (v, grad u)")
+    ax.hist(stats["r2_rule"], bins=40, color="#2ea043")
+    ax.axvline(0.90, color="#cf222e", ls=":", lw=1.0)
+    ax.set_xlabel("R2", color="#cccccc", fontsize=8)
+
+    ax = axes[0, 1]; _panel(ax, "b  gradient from neighbours")
+    ax.hist(stats["r2_grad_nb"], bins=40, color="#58a6ff")
+    ax.axvline(0.95, color="#cf222e", ls=":", lw=1.0)
+    ax.set_xlabel("R2", color="#cccccc", fontsize=8)
+
+    ax = axes[1, 0]; _panel(ax, "c  fitted gain vs true gain")
+    ax.scatter(stats["gain_true"], stats["gain_fit"], s=6, c="#d29922", alpha=0.6)
+    ax.set_xlabel("true g_i", color="#cccccc", fontsize=8)
+    ax.set_ylabel("fitted", color="#cccccc", fontsize=8)
+
+    ax = axes[1, 1]; _panel(ax, "d  |corr| between connected nodes")
+    ax.hist(stats["nb_corr"], bins=40, color="#8957e5")
+    ax.axvline(0.80, color="#cf222e", ls=":", lw=1.0)
+    ax.set_xlabel("|Pearson r|", color="#cccccc", fontsize=8)
+    return _save(fig, path)
