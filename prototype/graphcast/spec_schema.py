@@ -33,6 +33,12 @@ import yaml
 
 from plexus import schema as plexus_schema
 from plexus.units import Units
+# POPULATES THE OPERATOR REGISTRY. `plexus.schema.load` validates every `op:` line against the
+# registry and reports "Available: []" if nothing has registered yet, so importing the operator
+# package is a precondition of loading a spec, not an optimisation. Importing it here means a
+# caller cannot forget -- the first version of this module did, and the failure looked like a
+# missing operator rather than a missing import.
+import plexus.operators  # noqa: F401,E402
 
 
 # --- the option vocabularies -------------------------------------------------------------- #

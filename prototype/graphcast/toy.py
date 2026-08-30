@@ -143,15 +143,27 @@ def generate(fit, out_dir: str, device: str = "cpu") -> dict:
     voltage = np.asarray(z[toy["set"]]["state"][fit.data.state][:, :, 0], dtype=np.float32)
     type_p = np.array([t["p"] for t in raw["sets"][toy["set"]]["types"].values()], dtype=np.float32)
     tau_per_type = 1.0 / type_p[:, 0]
-    omega = lvl2.get("omega").detach().cpu().numpy().reshape(-1).astype(np.float32)
+    # THE STIMULUS, FACTORISED the way the model represents it: a global clock s(t) times a
+    # per-neuron gain b_i. Saving only the final omega would make b_i a constant bias rather than
+    # a gain, and G13 would then be scoring the wrong object.
+    pulse = next(o for o in raw["operators"] if o["op"] == "activation_pulse")
+    pace = next(o for o in raw["operators"] if o["op"] == "pacemaker")
+    period, duration = float(pace["period"]), float(pace["duration"])
+    frames = np.arange(voltage.shape[0], dtype=np.float32)
+    ph = np.mod(frames, period)
+    stim_t = np.where(ph < duration, np.sin(np.pi * ph / max(duration, 1e-9)), 0.0).astype(np.float32)
+    ctr = np.array(pulse.get("center", [0.5, 0.5]), dtype=np.float32)[: pos.shape[1]]
+    sigma = float(pulse.get("radius", 0.12))
+    bump = np.exp(-((pos - ctr) ** 2).sum(1) / (2 * sigma * sigma)).astype(np.float32)
     gain_per_type = type_p[:, 2]
-    b_i = (gain_per_type[node_type] * omega).astype(np.float32)
+    b_i = (gain_per_type[node_type] * bump).astype(np.float32)
 
     gt_path = os.path.join(out_dir, "ground_truth.npz")
     np.savez(gt_path,
              positions=pos, node_type=node_type, edge_index=edge_index, weights=weights,
              distance=dist, tau_per_type=tau_per_type, tau=tau_per_type[node_type],
-             gain_per_type=gain_per_type, b_i=b_i, type_p=type_p, voltage=voltage)
+             gain_per_type=gain_per_type, b_i=b_i, type_p=type_p, voltage=voltage,
+             stim_t=stim_t, bump=bump)
 
     return {"n_neurons": int(pos.shape[0]), "n_types": n_types,
             "n_edges": int(edge_index.shape[1]), "n_frames": int(voltage.shape[0]),
