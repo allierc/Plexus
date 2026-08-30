@@ -9,6 +9,9 @@
 \usepackage{parskip}
 \usepackage{titlesec}
 \usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
 
 \titleformat{\section}{\large\bfseries}{\thesection.}{0.6em}{}
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
@@ -95,5 +98,17 @@ any model is licensed yet: no operator has been built, and every closed-form and
 still \gskip{SKIP}. G5 is the one to watch, because it is what will establish that the
 \code{simple} option is arithmetically the existing \code{NeuralGNN} and therefore that everything
 after it is a controlled variation on something already known to work.
+
+\section{The evidence}
+
+Every gate above points to a figure, and a gate with no artifact is reported as \gskip{SKIP}
+rather than passed. That is not bookkeeping for its own sake: three defects in the toy were found
+this way and each was a number that looked plausible --- a circuit sitting at a fixed point
+(spatial spread $9.29$ against a temporal spread of $0.065$), a stimulus field that was
+\emph{identically zero} for three generations because \op{activation\_pulse} reads a clock no
+operator was writing, and a spatial type purity of $6.1\times$ chance that was the grid being finer
+than the sampling. All three are obvious in a panel and invisible in a scalar.
+
+\gateFigures
 
 \end{document}
