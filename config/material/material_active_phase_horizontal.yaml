@@ -18,8 +18,6 @@ general:
   name: material_active_phase_horizontal
   seed: 0
 operators:
-- at: cell
-  op: aggregate
 - op: activation_pulse
   at: activation
   delay_from: delay_map
@@ -53,7 +51,6 @@ operators:
   wall_contact: 0.06
   wall_damp: 0.5
 schedule:
-- aggregate
 - activation_pulse
 - active_stress
 - drag

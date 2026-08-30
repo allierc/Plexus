@@ -31,8 +31,6 @@ fields:
     frame: mpm_grid
     n_grid: 192
 operators:
-- op: aggregate
-  at: cell
 - op: pacemaker
   at: activation
   name: beat
@@ -73,7 +71,6 @@ operators:
   wall_damp: 0.5
   wall_contact: 0.06
 schedule:
-- aggregate
 - pacemaker
 - activation_pulse
 - active_force

@@ -35,9 +35,10 @@
         belowskip=4pt}
 
 \input{mpm_warp_tables}
+\input{mpm_perf_tables}
 
 \title{\vspace{-1.6cm}\textbf{Two implementations of the same MPM}\\[3pt]
-\large \code{default} against \code{warp}, line by line, with the tensors each one allocates}
+\large \code{default} against \code{warp}: where the time goes, and why}
 \author{}
 \date{}
 
@@ -45,46 +46,52 @@
 \maketitle
 \vspace{-1.1cm}
 
-\section{What this is}
+\section{The result}
 
 The four MLS-MPM operators --- \code{mpm\_strain}, \code{mpm\_scatter}, \code{mpm\_grid\_update},
-\code{mpm\_gather} --- now exist in two forms that a spec selects by name on the
-\code{implementation} axis:
+\code{mpm\_gather} --- exist in two forms a spec picks by name on the \code{implementation} axis.
+\code{default} is pure PyTorch: 2D and 3D, CPU or CUDA, and differentiable in use, not merely in
+principle (\code{engine.run(\ldots, grad=True)} keeps the tape across a rollout and
+\code{discovery\_cardio\_mpm/train.py} backpropagates through exactly these four). \code{warp} is
+one NVIDIA Warp kernel per operator, 3D and CUDA only. Same equations, so they sit on the
+\code{implementation} axis and not the \code{model} axis: swapping one for the other asserts the
+physics did not change, and \S6 tests that assertion.
 
-\begin{itemize}
-\item \gd{\code{default}} --- the prior MPM. Pure PyTorch, dimension-generic (2D and 3D from one
-  body), runs on CPU and on any CUDA device, and \textbf{differentiable in use, not merely in
-  principle}: \code{engine.run(\ldots, grad=True)} keeps the autograd tape across the rollout
-  (\code{engine.py:1498}) and \code{discovery\_cardio\_mpm/train.py} calls \code{loss.backward()}
-  through exactly these four operators. This is the reference: every claim below is measured against
-  it.
-\item \gd{\code{warp}} --- the refactor. \code{mpm\_scatter} and \code{mpm\_gather} become one NVIDIA
-  Warp kernel each: one CUDA thread per particle, and the particle's whole 27-node loop runs inside
-  that thread with the running sums held in registers (\S4). 3D and CUDA only.
-  \code{mpm\_strain} and \code{mpm\_grid\_update} are unchanged and still run the \code{default}
-  bodies.
-\end{itemize}
+\paragraph{On \code{si\_waterfall} --- 570\,760 particles, $96^3$ grid, 13 substeps, A100:}
+\bd{973.8\,ms/frame} for \code{default} against \gd{31.8\,ms/frame} for \code{warp} with the grid
+solve fused and the substep captured --- \gd{$30.6\times$}. At 5\,M particles on a $192^3$ grid it is
+16\,965 against 441\,ms, \gd{$38.5\times$}. One RTX A6000 runs 150\,M particles; one B300 runs
+\gd{one billion}.
 
-\code{paper/mpm\_warp\_code.pdf} is the companion to this note: \textbf{every line of both versions
-of all four operators}, extracted from the source at build time by
-\code{tools/mpm\_code\_appendix.py} rather than transcribed, with the line spans stamped on each
-listing. It also states plainly which two operators have no \code{warp} twin yet.
+\paragraph{The mechanism is traffic, not memory held.} \textbf{Traffic here means bytes moved
+between the GPU's DRAM and its compute units} --- read into the streaming multiprocessors and written
+back out. It is the quantity a memory-bound kernel actually spends its time on. Every intermediate
+tensor an operator allocates is one DRAM write plus at least one DRAM read by whatever consumes it;
+a value held in a register never leaves the chip and costs none. \code{default}'s gather materialises
+two $[N,27,3,3]$ tensors --- 918.5\,MB each at 945\,k particles --- to produce a $[N,3,3]$ result of
+34.0\,MB. The Warp kernel accumulates the same sum in nine registers and writes none of it.
 
-They are the same mechanism and the same equations, so they sit on the \code{implementation} axis
-rather than the \code{model} axis: a spec that swaps one for the other is asserting that the biology
-did not change. That assertion is what \S6 tests.
+It is tempting to read the peak-memory drop (2.94\,GiB $\to$ 0.35\,GiB) as the cause. \textbf{Peak
+memory is a stock and traffic is a flow}, and \S5.2 separates them: on one substep of the gather at
+570\,760 particles, the batched form allocates \bd{3511.9\,MB} and the loop form \gd{1924.7\,MB} ---
+$1.82\times$ less traffic, $1.25\times$ less peak, and $3.70\times$ less time. Time tracks the flow,
+not the stock.
 
-\paragraph{The headline.} On \Ntrace{} particles, seven substeps per frame, one RTX A6000:
-\bd{1150.8\,ms/frame} for \code{default} against \gd{79.4\,ms/frame} for \code{warp}
-(\gd{14.5$\times$}), and \gd{52.2\,ms/frame} with the substep loop additionally captured as a CUDA
-graph (\gd{22.0$\times$}). Peak allocated memory falls from 2.94\,GiB to 0.35\,GiB, which is the
-reason for the speedup and not a side effect of it.
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.72\textwidth]{figures/si_waterfall_5m}
+\caption{\code{si\_waterfall\_5m}: 5\,000\,000 particles of water in a 50\,cm cube on a $192^3$ grid
+($\Delta x = 2.6$\,mm), 26 substeps per frame, at $t=2$\,s. Every particle is simulated; the picture
+is taken off the GPU as the run proceeds. This spec is one of the two the sweep in \S7 uses, and it
+is dimensional --- the box, the scale bar and $\Delta x$ are in real units, so \code{4497\,ms/frame}
+buys 2 seconds of water rather than 2 seconds of nothing in particular.}
+\end{figure}
 
-\section{The cycle, and what each operator owes}
+\section{The cycle}
 
-MLS-MPM carries the material on particles $p$ and solves on a background grid $i$ that is thrown
-away every substep. Per substep, with $\Delta x$ the cell size, $w_{ip}$ the quadratic B-spline
-weight of node $i$ at particle $p$, and $\mathbf{x}_{ip}=\mathbf{x}_i-\mathbf{x}_p$:
+MLS-MPM carries material on particles $p$ and solves on a background grid $i$ thrown away every
+substep. With $\Delta x$ the cell size, $w_{ip}$ the quadratic B-spline weight of node $i$ at
+particle $p$, and $\mathbf{x}_{ip}=\mathbf{x}_i-\mathbf{x}_p$:
 
 \begin{align}
 \textbf{strain}\quad & \mathbf{F}_p \leftarrow (\mathbf{I}+\Delta t\,\mathbf{C}_p)\,\mathbf{F}_p \\
@@ -101,71 +108,52 @@ weight of node $i$ at particle $p$, and $\mathbf{x}_{ip}=\mathbf{x}_i-\mathbf{x}
   \qquad \mathbf{x}_p \leftarrow \mathbf{x}_p + \Delta t\,\mathbf{v}_p
 \end{align}
 
-$\mathbf{F}_p$ is the \textbf{deformation gradient} --- one $D{\times}D$ matrix per particle
-($3{\times}3$ in 3D, so \code{p.F} is $[N,3,3]$, initialised to the identity at
-\code{entities.py:238}). It is the Jacobian $\partial\mathbf{x}/\partial\mathbf{X}$ of the map from a
-particle's reference position to its current one, so it carries the accumulated stretch, shear and
-rotation since $t=0$; strain and stress are derived \emph{from} it, and it is not itself a strain
-tensor. $\mathbf{R}_p$ is its orthogonal polar factor (the rotation part) and $J=\det\mathbf{F}_p$ is
-the volume ratio, $1$ for undeformed material;
-$\mathbf{o}_i\in\{0,1,2\}^3$ is the node's offset within the stencil and $\mathbf{f}_p$ the
-particle's fractional cell position, so $\mathbf{o}_i-\mathbf{f}_p$ is $\mathbf{x}_{ip}$ in cell
-units. \textbf{The stencil is $3^3=27$ nodes, not $3^2=9$}: the quadratic B-spline has support of
-three cells \emph{per axis}, and in three dimensions the tensor product of three axes is $27$. Every
-per-particle cost in this note carries that factor of $27$.
+$\mathbf{F}_p$ is the deformation gradient, one $3{\times}3$ per particle: the Jacobian of the map
+from a particle's reference position to its current one, carrying accumulated stretch, shear and
+rotation since $t=0$. $\mathbf{R}_p$ is its rotation part and $J=\det\mathbf{F}_p$ the volume ratio.
+$\mathbf{o}_i-\mathbf{f}_p$ is $\mathbf{x}_{ip}$ in cell units. \textbf{The stencil is $3^3=27$
+nodes}, because a quadratic B-spline spans three cells per axis and three dimensions multiply. Every
+per-particle cost below carries that 27.
 
-\paragraph{The contract both implementations sign.} \code{mpm\_scatter} reads
-\code{pos, vel, C, F, mass, mu, la, pvol} and the parent's acceleration, and accumulates into
-\code{mpm\_grid.m} and \code{.mv} \emph{in place}. It must \textbf{not} touch \code{F} --- an earlier
-attempt fused the strain update into the scatter kernel for free, and advanced \code{F} twice per
-substep; the grid mass still agreed to eleven digits while \code{F} disagreed at $3.3\times10^{-4}$.
-\code{mpm\_gather} reads \code{mpm\_grid.v}, writes \code{pos}, \code{vel} and \code{C} in place, and
-leaves dormant particles (\code{occ}$=0$, the growth reservoir) exactly where they were.
+\paragraph{The contract both sign.} \code{mpm\_scatter} reads \code{pos, vel, C, F, mass, mu, la,
+pvol} and the parent's acceleration, and accumulates into \code{mpm\_grid.m} and \code{.mv} in place.
+It must \textbf{not} touch \code{F}: an early attempt fused the strain update into the scatter for
+free and advanced \code{F} twice per substep --- grid mass still agreed to eleven digits while
+\code{F} disagreed at $3.3\times10^{-4}$. \code{mpm\_gather} reads \code{mpm\_grid.v}, writes
+\code{pos}, \code{vel}, \code{C} in place, and leaves dormant particles where they are.
 
-\section{\code{default}, line by line: what each line allocates}
+\section{Why \code{default} is slow}
 
-The gather is the shorter of the two and makes the point completely. This is
-\code{mpm\_ops.py} lines 790--845, with the tensors folded in; $N$ is the particle count, $S=27$,
-$D=3$.
+The gather is the shorter operator and makes the point completely. $N$ is the particle count,
+$S=27$, $D=3$; sizes are at $N=\Ntrace$.
 
 \begin{lstlisting}[numbers=none]
-offsets = stencil_offsets(D, dev); S = offsets.shape[0]          # [27,3]   memoised, free
-X, V = p.get("pos"), p.get("vel")                                # views    free
 fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
-    base   = (X * inv_dx - 0.5).floor().long()                   # [N,3]    i64   22.7 MB
-    fx     = X * inv_dx - base.float()                           # [N,3]    f32   11.3 MB
-    w      = stack(3 quadratic terms)                            # [N,3,3]  f32   34.0 MB
-    weight = ones(N,S); for k: weight *= w[:, oidx[:,k], k]       # [N,27]   f32  102.1 MB x6
     gpos   = base[:,None,:] + oidx[None]                         # [N,27,3] i64  612.4 MB
-    comps  = [gpos[...,k].clamp(0, shape[k]-1) for k in 0..2]    # [N,27]   i64  204.1 MB x3
     flat   = ((c0 * ny) + c1) * nz + c2                          # [N,27]   i64  204.1 MB x4
 gvn = g.v[flat].view(p.n, S, D)                                  # [N,27,3] f32  306.2 MB
 new_V = (weight[..., None] * gvn).sum(1)                         # [N,27,3] f32  306.2 MB
 dpos_grid = offsets[None] - fx[:, None, :]                       # [N,27,3] f32  306.2 MB
 new_C = 4*inv_dx*(weight[...,None,None] *
         (gvn[...,:,None] @ dpos_grid[...,None,:])).sum(1)        # [N,27,3,3] f32 918.5 MB x2
-...
 \end{lstlisting}
 
 \noindent
-The last line is the whole story. \code{gvn[...,:,None] @ dpos\_grid[...,None,:]} is $N\times27$
-independent $3{\times}1$ by $1{\times}3$ outer products; PyTorch has no way to express ``form this
-$3{\times}3$, weight it, add it to a running sum, discard it''. It must \textbf{materialise all
-$N\times27$ of them}, write \gd{918.5\,MB} to global memory, read it back to multiply by
-\code{weight}, write \gd{another 918.5\,MB}, read \emph{that} back to reduce over the stencil axis,
-and only then produce the $[N,3,3]$ that is actually wanted --- \gd{34.0\,MB}. The useful output is
-\gd{1.8\%} of the traffic spent producing it.
+The last line is the whole story. That expression is $N\times27$ independent $3{\times}1$ by
+$1{\times}3$ outer products, and PyTorch has no way to say ``form this $3{\times}3$, weight it, add
+it to a running sum, discard it''. It must materialise all $N\times27$: write \gd{918.5\,MB}, read it
+back to multiply by \code{weight}, write \gd{another 918.5\,MB}, read that back to reduce over the
+stencil axis, and only then produce the $[N,3,3]$ anyone wanted --- \gd{34.0\,MB}. \textbf{The useful
+output is 1.8\% of the traffic spent producing it.}
 
 \subsection{The full bill, measured}
 
-The listing above is read off the source; the tables below are \emph{measured}. A
-\code{TorchDispatchMode} records every \code{aten} call one real substep makes and the shape and
-dtype of every tensor it allocates --- including the ones the source never names: the broadcast
-temporaries, the \code{index} gathers hiding behind \code{w[:, oidx[:,k], k]}, the int64 index
-arithmetic. Views (\code{expand}, \code{unsqueeze}, \code{view}, \code{select}) are \textbf{excluded}
---- they return a new tensor object over the same storage and move nothing, and counting them would
-inflate \code{default}'s bill with bytes it never touches. Rows below 40\,MB are omitted; the totals
-include everything. Regenerate with \code{python tools/mpm\_warp\_note.py --trace}.
+The listing is read off the source; the tables are measured. A \code{TorchDispatchMode} records every
+\code{aten} call one real substep makes and the shape and dtype of everything it allocates ---
+including what the source never names: broadcast temporaries, the \code{index} gathers hiding behind
+\code{w[:, oidx[:,k], k]}, the int64 index arithmetic. Views are excluded, since they move nothing
+and counting them would inflate \code{default}'s bill with bytes it never touches. Rows below 40\,MB
+are omitted; totals include everything.
 
 \begin{center}
 \footnotesize
@@ -180,61 +168,47 @@ include everything. Regenerate with \code{python tools/mpm\_warp\_note.py --trac
 \end{center}
 
 \noindent
-Per particle per substep, the four \code{default} operators allocate
-\bd{\bpstrain\,B} (strain) $+$ \bd{\bpscatter\,B} (scatter) $+$ \bd{\bpgridupdate\,B} (grid) $+$
-\bd{\bpgather\,B} (gather). The \emph{essential} traffic --- what any correct MLS-MPM must move, and
-the constant \code{tools/mpm\_bench.py} divides by --- is 216 floats $=864$\,B: read
+Per particle per substep the four \code{default} operators allocate \bd{\bpstrain\,B} $+$
+\bd{\bpscatter\,B} $+$ \bd{\bpgridupdate\,B} $+$ \bd{\bpgather\,B}. The \emph{essential} traffic ---
+what any correct MLS-MPM must move --- is 216 floats $=864$\,B: read
 \code{pos/vel/C/F/mass/mu/la}, scatter mass and momentum to 27 nodes, gather velocity back from 27.
-So \code{default} moves \bd{\ampltotal$\times$} more bytes than the algorithm requires, and the two
+\code{default} moves \bd{\ampltotal$\times$} the algorithm's requirement, and the two
 $[N,27,3,3]$ tensors are most of it.
 
-\section{\code{warp}, line by line: the same arithmetic, nowhere to put it}
+\section{Why \code{warp} is fast}
 
-The Warp kernel is one thread per particle. Everything the table above lists as a tensor is, here, a
-local variable --- and a local variable in a CUDA thread is a register, which is not memory.
+One thread per particle. Everything the tables list as a tensor is a local variable, and a local
+variable in a CUDA thread is a register, which is not memory.
 
-\paragraph{Nothing is ever 27 wide, and that is the point.} It would be wrong to picture 27 nodes
-held at once: a thread has $\approx$64 registers to work with, nowhere near enough for 27 copies of
-(weight, node velocity, offset). The loop instead \emph{visits} the 27 nodes one at a time and
-\textbf{accumulates}. Only two things persist across iterations --- \code{newv} (3 floats) and
-\code{newC} (9 floats), twelve registers of running sum --- and each node's weight, velocity and
-offset live for exactly one iteration before the next node overwrites them. The register cost is
-therefore $O(1)$ in the stencil size, not $O(27)$, which is precisely what PyTorch cannot express:
-having no way to say ``form this, add it to a running sum, discard it'', it must make the loop a
-tensor axis and materialise all 27 slices at once.
+\paragraph{Nothing is ever 27 wide.} A thread has $\approx$64 registers --- nowhere near enough for
+27 copies of (weight, node velocity, offset). The loop \emph{visits} the 27 nodes one at a time and
+accumulates. Only \code{newv} (3 floats) and \code{newC} (9 floats) persist across iterations; each
+node's weight, velocity and offset live for one iteration. The register cost is $O(1)$ in the stencil
+size, not $O(27)$ --- exactly what PyTorch cannot express, having no way to form a value, add it to a
+running sum and discard it, and so making the loop a tensor axis instead.
 
-\code{ptxas -arch=sm\_86 -O3 --verbose} on Warp's emitted PTX confirms the arithmetic worked out:
-\gd{64 registers, 0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads} for both
-\code{g2p} and \code{p2g\_atomic}. \textbf{Zero spill is the load-bearing number} --- had the working
-set exceeded the register file, the compiler would have quietly pushed the overflow to local memory,
-which is global memory wearing a different name, and the fusion would have bought nothing.
+\code{ptxas -arch=sm\_86 -O3 --verbose} confirms the arithmetic fits: \gd{64 registers, 0 bytes stack
+frame, 0 spill stores, 0 spill loads} for both \code{g2p} and \code{p2g\_atomic}. \textbf{Zero spill
+is the load-bearing number}: had the working set exceeded the register file, the compiler would have
+pushed the overflow to local memory --- global memory under another name --- and the fusion would
+have bought nothing.
 
 \begin{lstlisting}[numbers=none]
 @wp.kernel                                    # src/plexus/operators/mpm_warp.py:193
 def g2p(X, STATE, C, GV, OCC, LIQ, pa, va, ngx, ngy, ngz, dx, dt, ...):
     p = wp.tid()                              # one thread per particle
-    x    = X[p]                                            # vec3   -> 3 registers
-    base = wp.vec3(floor(x[k]*inv_dx - 0.5) for k)         # vec3   -> 3 registers
-    fx   = x*inv_dx - base                                 # vec3   -> 3 registers
     newv = wp.vec3(0,0,0)                                  # vec3   -> 3 registers
     newC = wp.mat33(0,...,0)                               # mat33  -> 9 registers
     for i in range(3):                        # the 27-node stencil, UNROLLED by the compiler
-      wi = <quadratic in fx[0]>               #   the [N,3,3] `w` tensor: 1 register, reused
       for j in range(3):
-        wj = <quadratic in fx[1]>
         for k in range(3):
-          wk = <quadratic in fx[2]>
           w    = wi*wj*wk                     #   the [N,27] `weight` tensor: 1 register
           gv   = GV[(gi*ngy + gj)*ngz + gk]   #   the [N,27,3] `gvn` tensor: 3 registers
           dpos = wp.vec3(i-fx[0], j-fx[1], k-fx[2])   #   the [N,27,3] `dpos_grid`: 3 registers
           newv = newv + w*gv                          #   the [N,27,3] product: never exists
           newC = newC + (4*inv_dx*w)*wp.outer(gv, dpos)  # the [N,27,3,3]: NEVER EXISTS
-    ...
     STATE[p, pa+0..2] = xn ; STATE[p, va+0..2] = newv ; C[p] = newC   # the only writes
 \end{lstlisting}
-
-\noindent
-The correspondence is exact, term for term. What changes is where the intermediate lives:
 
 \begin{center}
 \footnotesize
@@ -257,160 +231,135 @@ outer product $\mathbf{v}_i\otimes\mathbf{x}_{ip}$ & \code{[N,27,3,3]} f32 & \bd
 \end{center}
 
 \noindent
-The traced \code{warp} run confirms it: \code{mpm\_scatter} and \code{mpm\_gather} do not appear in
-the allocating-op trace \emph{at all}. What remains is \code{mpm\_strain} (\bpstrain\,B/particle) and
-\code{mpm\_grid\_update} (\bpgridupdate\,B/particle), both still \code{default} bodies, for a total of
-\gd{\ampltotalwarp$\times$} the essential traffic against \code{default}'s \bd{\ampltotal$\times$}.
+The traced run confirms it: \code{mpm\_scatter} and \code{mpm\_gather} do not appear in the
+allocating-op trace at all.
 
-\paragraph{The scatter differs in one way the gather does not.} Grid$\rightarrow$particle is a pure
-read: no two threads write the same place, so there is nothing to coordinate. Particle$\rightarrow$
-grid is the opposite --- many particles land on the same node, and the kernel uses
-\code{wp.atomic\_add}, 108 of them per particle ($27$ nodes $\times$ (1 mass $+$ 3 momentum)). That is
-why the two fusions do not cost the same and do not buy the same (\S5), and it is the remaining wall
-(\S7).
+\paragraph{The scatter differs from the gather in one way.} Grid$\rightarrow$particle is a pure read:
+no two threads write the same place, so there is nothing to coordinate. Particle$\rightarrow$grid is
+the opposite --- many particles land on one node --- and the kernel uses \code{wp.atomic\_add}, 108
+per particle ($27$ nodes $\times$ (1 mass $+$ 3 momentum)). That is why the two fusions do not cost
+the same, and it is the remaining wall (\S8).
 
-\paragraph{Differentiability is not lost in principle, only unwired here.} Warp emits a backward
-kernel next to every forward one --- \code{g2p\_\ldots\_cuda\_kernel\_backward} sits in the same PTX
-file --- so the reason \code{warp} carries \code{DIFFERENTIABLE = False} is not that the tool cannot
-do it. It is that this port launches with a plain \code{wp.launch} outside a \code{wp.Tape}, and
-\code{wp.from\_torch} wraps the tensors without \code{requires\_grad}, so no backward is registered
-with autograd. Wiring it up is a separate job; until it is done, anything that needs a gradient ---
-\code{discovery\_cardio\_mpm}'s training loop above all --- must stay on \code{default}, and that is
-a second reason (alongside byte-identity, \S6) why \code{default} is not going away.
-
-\paragraph{One convenience worth naming.} \code{wp.mat33} is a first-class type with
-\code{determinant}, \code{inverse}, \code{transpose} and \code{outer}, so the polar iteration
-$\mathbf{R}\leftarrow\frac{1}{2}(\mathbf{R}+\mathbf{R}^{-\top})$ is three lines. The same kernel
-written in Triton needed twenty-seven hand-rolled cofactor expressions, because Triton has no matrix
-type. Fewer lines is not the argument; \emph{fewer places to put a cofactor sign error} is.
+\paragraph{Differentiability is unwired, not lost.} Warp emits a backward kernel beside every forward
+one, so \code{DIFFERENTIABLE = False} is not a statement about the tool. This port launches with a
+plain \code{wp.launch} outside a \code{wp.Tape}, and \code{wp.from\_torch} wraps tensors without
+\code{requires\_grad}, so no backward is registered with autograd. Until that is wired, anything
+needing a gradient stays on \code{default} --- which, with byte-identity (\S6), is why
+\code{default} is not going away.
 
 \section{What it buys}
 
 \subsection{Which fusion did what}
 
-Each operator was switched on its own, on the \Ntrace-particle benchmark, RTX A6000, 12 timed frames
-after 4 warm-up frames.
+Each operator switched on its own, \Ntrace{} particles, RTX A6000, 12 timed frames after 4 warm-up.
 
 \begin{center}\footnotesize\tblAblation\end{center}
 
 \noindent
-\textbf{The two fusions are superlinear together.} Alone they are worth $2.5\times$ and $1.5\times$ on
-the frame; together they are worth $14.5\times$, and $2.5\times1.5=3.75$, not $14.5$. The reason is in
-the memory column, which only moves when \emph{both} land: 2.94\,GiB $\to$ 2.80 $\to$ 2.94 $\to$
-\gd{0.35}. Fusing one end still leaves the other end's $918.5$\,MB temporary alive, so the allocator's
-high-water mark is unchanged, the caching allocator keeps thrashing, and every other kernel in the
-substep keeps paying for it. The last $918.5$\,MB is not one seventh of the problem --- it is the
+\textbf{The two fusions are superlinear together.} Alone they are worth $2.5\times$ and $1.5\times$;
+together $14.5\times$, and $2.5\times1.5=3.75$. Fusing one end leaves the other end's 918.5\,MB
+temporary alive, so the allocator's high-water mark does not move and every other kernel in the
+substep keeps paying for it. The last 918.5\,MB is not one seventh of the problem --- it is the
 problem.
 
-\subsection{Scaling: 20 million particles now run}
+\subsection{The control: removing the temporaries \emph{without} leaving PyTorch}
 
-RTX A6000 (48\,GiB, peak 768\,GB/s), \code{warp}, capture off, 12 timed frames:
+\code{mpm\_gather[torch\_loop27]} is a third implementation written to separate two explanations that
+the ablation above cannot: is \code{warp} fast because it moves fewer bytes, or because it holds less
+memory? It walks the 27 stencil offsets in a Python loop and accumulates $[N,D]$ --- so it has
+\code{warp}'s traffic profile and \code{default}'s everything else.
+
+\textbf{And traffic is measurable, so it need not be inferred from the memory proxy.} The same
+\code{TorchDispatchMode} that produces the tables in \S3.1 sums the bytes of every tensor an
+\code{aten} call allocates over one substep --- which is the DRAM traffic, up to the reads that
+consume each write. On the gather at $N=570\,760$:
+
+\begin{center}\footnotesize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\code{mpm\_gather} & \multicolumn{1}{c}{\code{aten} allocs} & \multicolumn{1}{c}{allocated} &
+\multicolumn{1}{c}{B/particle} & \multicolumn{1}{c}{ms/call} \\
+\midrule
+\code{default} (batched)   &  79 & \bd{3511.9\,MB} & 6452 & \bd{34.20} \\
+\code{torch\_loop27}       & 292 & \gd{1924.7\,MB} & 3536 & \gd{9.24} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+\gd{$1.82\times$ less traffic, $3.70\times$ less time}, against \gd{$1.25\times$} less peak memory
+(1.74 $\to$ 1.39\,GiB). All three move the same way, but only traffic moves far enough to account for
+the speed: \textbf{peak allocation is the weakest of the three predictors and the one the headline
+used to quote.} The speedup exceeding the traffic ratio is the caching allocator and the L2 --- a
+918.5\,MB temporary is evicted before anything reads it, a $[N,3]$ one is not --- so 1.82 is a lower
+bound on what removing the tensors was worth, not a proportionality constant.
+
+\code{torch\_loop27} also stays 12--27$\times$ slower than \code{warp} (\S7), which prices what a
+Python loop cannot recover: 292 kernel launches where the Warp kernel is one, and no registers.
+\code{warp} wins on traffic \emph{and} on launches, and this is the measurement that says so rather
+than assuming it.
+
+\subsection{Scaling}
+
+RTX A6000 (48\,GiB, peak 768\,GB/s), \code{warp}, capture off:
 
 \begin{center}\footnotesize\tblSweepAsix\end{center}
 
 \noindent
-Throughput is \gd{flat at $\approx$75\,GB/s across a 106$\times$ range in problem size} --- 73.4\,GB/s
-at 945\,k and 75.9\,GB/s at 100\,M --- and memory is linear at \gd{0.309\,GiB per million particles}.
-There is no knee anywhere: the cost per particle at 100\,M is the cost per particle at 945\,k.
-
-\textbf{The target the exercise was set for --- 20\,k cells $\times$ 1000 particles $=$ 20\,M --- fits
-on one A6000 at 1.61\,s/frame and 6.23\,GiB}, with room for five times more. One hundred million
-particles run on the same 48\,GiB card at 7.97\,s/frame and 30.9\,GiB. The comparison that makes that
-number legible: on the A100, \code{default} at \textbf{10\,M} needed \textbf{30.5\,GiB} and
-\textbf{11.60\,s/frame}. \code{warp} therefore fits \gd{ten times the particles in the same memory},
-and a frame of 100\,M costs \gd{less} than a frame of 10\,M did.
-
-Under \code{default} 20\,M does not run at all --- not on this card and, as \S5.3 measures, not on
-an 80\,GiB A100 either.
-
-\subsection{A100 baseline}
-
-NVIDIA A100-SXM4-80GB (peak 1555\,GB/s), \code{warp}, both capture settings:
+Throughput is \gd{flat at $\approx$75\,GB/s across a $106\times$ range} --- 73.4\,GB/s at 945\,k,
+75.9 at 100\,M --- and memory linear at 0.309\,GiB per million particles. No knee anywhere. On the
+A100, \code{default} at \textbf{10\,M} needed \textbf{30.5\,GiB} and \textbf{11.60\,s/frame};
+\code{warp} fits \gd{ten times the particles in the same memory}, and a 100\,M frame costs
+\emph{less} than a 10\,M \code{default} frame did.
 
 \begin{center}\footnotesize\tblAhunPair\end{center}
-
-\noindent
-And the same card running \code{default}, which is where the sweep stops:
-
 \begin{center}\footnotesize\tblAhunDefault\end{center}
 
 \noindent
 \bd{\code{default} does not reach 20\,M on an 80\,GiB card.} It dies asking for \bd{18.11\,GiB in a
-single allocation} at 20\,M and \bd{60.35\,GiB} at 100\,M --- those are individual temporaries, not
-totals. \code{warp} runs 100\,M on a 48\,GiB A6000.
+single allocation} at 20\,M and \bd{60.35\,GiB} at 100\,M --- individual temporaries, not totals.
 
-\paragraph{The most informative row in this note is a \code{default} row.} On the A100, \code{default}
-runs at \bd{5.2\,GB/s}; on the A6000 it runs at \bd{5.0\,GB/s}. A card with twice the memory
-bandwidth buys the prior implementation \bd{4\%}. That is the proof that \code{default} was never
-bandwidth-bound: it was bound by the count of kernel launches and by allocator work, neither of which
-a faster card improves. Fusion is not an optimisation of the old design; it is the only thing that
-could have helped.
+\paragraph{The most informative row in this note is a \code{default} row.} On the A100 \code{default}
+runs at \bd{5.2\,GB/s}; on the A6000, \bd{5.0}. Twice the memory bandwidth buys the prior
+implementation \bd{4\%}. It was never bandwidth-bound --- it was bound by kernel-launch count and
+allocator work, neither of which a faster card improves. \textbf{And \code{warp} is not
+bandwidth-bound either}: at 100\,M it runs 7853.9\,ms on the A100 against 7968.9 on the A6000, 1.5\%
+for twice the bandwidth. Both land at $\approx$77\,GB/s --- 5\% of A100 peak, 10\% of A6000 peak. The
+\emph{same absolute} throughput on very different hardware is the signature of a serialised
+bottleneck, which is the scatter's atomics.
 
-\paragraph{And \code{warp} is not bandwidth-bound either.} At 100\,M with capture off it runs at
-7853.9\,ms on the A100 against 7968.9\,ms on the A6000 --- \bd{1.5\% for twice the bandwidth}. Both
-cards land at $\approx$77\,GB/s, which is $\approx$5\% of A100 peak and $\approx$10\% of A6000 peak:
-the \emph{same absolute} throughput on very different hardware, which is the signature of a serialised
-bottleneck rather than a memory one. That bottleneck is the scatter's atomics (\S7).
+\subsection{CUDA-graph capture}
 
-\subsection{CUDA-graph capture: what it is, what it removes, and when it stops earning its keep}
+\code{capture: true} records a substep block once as a \code{torch.cuda.CUDAGraph} and replays it,
+instead of re-issuing kernels through Python. It is orthogonal to \code{implementation}.
 
-\code{capture: true} on a schedule's substep block tells the engine to record that block's four
-operators \emph{once} as a \code{torch.cuda.CUDAGraph} and then replay the recording seven times a
-frame, instead of re-issuing the kernels through Python each substep. It is orthogonal to the
-\code{implementation} axis: \code{default} and \code{warp} can each be captured or not, and the
-benchmark tables above report both settings for exactly that reason.
+\textbf{What it removes is not launch latency.} It was worth $1.73\times$ at 100\,M
+($7853.9\to4551.0$\,ms) --- but at 4.5\,s a frame, 28 elided launches are nanoseconds against
+seconds. The memory column names the real mechanism: peak \emph{rises} $30.89\to42.81$\,GiB, because
+a captured graph allocates from a private pool that stays resident, so the un-fused operators'
+$[N,3,3]$ intermediates are allocated once instead of seven times a frame. Capture was buying the
+removal of the caching allocator --- the same thing fusion buys, for the operators fusion had not
+reached.
 
-\paragraph{What it removes is not launch latency.} Capture is worth \gd{1.73$\times$} at 100\,M
-(7853.9 $\to$ 4551.0\,ms/frame) --- but at 4.5\,s a frame, the 28 kernel launches it elides are
-nanoseconds against seconds, so launch overhead cannot be the mechanism. The memory column names it:
-peak \emph{rises} \gd{30.89 $\to$ 42.81\,GiB} under capture, a 39\% increase. A captured graph
-allocates from a private pool that stays resident, so \code{mpm\_strain}'s and
-\code{mpm\_grid\_update}'s $[N,3,3]$ intermediates are allocated \emph{once} instead of being
-malloc'd and freed seven times a frame. Capture is buying the removal of the caching allocator ---
-the same thing fusion bought, for the two operators fusion has not reached.
+\textbf{That prediction has now been tested and held.} With \code{mpm\_grid\_update} ported (\S7),
+capture is worth \gd{$1.02$--$1.09\times$} (\S7.2). It was a stand-in for un-fused operators, and as
+they are fused it evaporates while its 39\% memory cost remains. It should default to off once
+\code{mpm\_strain} lands.
 
-\paragraph{Which means it has an expiry date, and that is the point.} Everything capture earns here,
-it earns on behalf of the un-fused half. \code{mpm\_scatter[warp]} and \code{mpm\_gather[warp]}
-allocate nothing (\S4), so there is nothing for the private pool to hold on their behalf; the
-\gd{1.73$\times$} is \code{mpm\_strain}'s 313\,B and \code{mpm\_grid\_update}'s 151\,B per particle
-per substep, being allocated once rather than seven times. \textbf{When those two are ported, capture's
-benefit should largely evaporate while its 39\% memory cost remains} --- so the right sequence is to
-fuse them and \emph{re-measure} capture, not to leave a flag on because it once helped. If it falls
-to a few percent it should default to off.
-
-\paragraph{It fails silently, and that is its real cost today.} A capture pool that does not fit does
-not raise. The allocator retries, so the run sits at 100\% CPU with no output, no error and no
-progress --- indefinitely. That is what a 100\,M render did on a 48\,GiB A6000: 42.8\,GiB of capture
-pool, plus a live renderer, plus 3.6\,GB of recording buffers. The diagnostic is an \emph{absence}:
-the engine prints \code{substep captured as a CUDA graph} when a capture completes, and that line
-never appeared. \code{Plexus\_Main.py} now projects the footprint before the run --- measured at
-0.42\,GiB per million particles captured against 0.309 eager --- compares it with \emph{that card's}
-memory rather than against a particle count or a card name, warns when it exceeds 80\%, and offers
-\code{--no-capture}. A fixed threshold would have nagged on an 80\,GiB H100, where 100\,M is
-unremarkable, and stayed silent on a 24\,GiB card, where 50\,M is not.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.60\textwidth]{figures/mpm_1m_frame30}
-\caption{One frame of \code{material\_3d\_water\_bench\_1m} rendered by
-\code{tools/mpm\_live\_movie.py}: 999\,999 particles simulated, 300\,000 of them drawn, colour fixed
-at $t=0$ by height so that mixing stays visible. \textbf{The picture is taken off the GPU while the
-run proceeds and no trajectory is written} --- at 100\,M a single recorded frame is 1.2\,GB, so a
-60-frame clip would need 72\,GB on disk before a renderer saw a pixel. The tool is separate from
-\code{tools/mpm\_bench.py}, which renders nothing: the \code{ms/frame} stamped on the movie includes
-the device$\to$host copy and the render and is slower than the benchmark's by construction.}
-\end{figure}
+\textbf{It fails silently, which is its real cost.} A capture pool that does not fit does not raise;
+the allocator retries, so the run sits at 100\% CPU with no output, no error and no progress,
+indefinitely. The diagnostic is an \emph{absence} --- the engine prints \code{substep captured as a
+CUDA graph} on success, and that line never appears. \code{Plexus\_Main.py} now projects the
+footprint before the run (0.42\,GiB per million captured against 0.309 eager), compares it with
+\emph{that card's} memory, and warns past 80\%. A fixed threshold would nag on an 80\,GiB H100 and
+stay silent on a 24\,GiB card.
 
 \section{Precision}
 
-\code{warp} is \textbf{not} byte-identical to \code{default} and cannot be, for two independent
-reasons: the 27-tap sums are reassociated (the kernel accumulates sequentially, PyTorch's
-\code{.sum(1)} reduces pairwise), and \code{wp.atomic\_add} in the scatter commits in whatever order
-the hardware schedules. So this is an \code{implementation} with a tolerance gate, not a promotion
-twin with \code{tools/mpm\_identity\_gate.py}.
-
-Measured after 2 frames $\times$ 7 substeps on 108\,k particles, both implementations run from the
-same seed:
+\code{warp} is not byte-identical to \code{default} and cannot be: the 27-tap sums are reassociated
+(sequential in the kernel, pairwise in \code{.sum(1)}), and \code{wp.atomic\_add} commits in whatever
+order the hardware schedules. So this is an \code{implementation} with a tolerance gate, not a
+promotion twin. Measured after 2 frames $\times$ 7 substeps on 108\,k particles from one seed:
 
 \begin{center}
 \footnotesize
@@ -420,10 +369,7 @@ switched & quantity & max $|\Delta|$ & max relative & reference scale \\
 \midrule
 gather only  & \code{pos} & $1.79\times10^{-7}$ & $4.3\times10^{-7}$ & $|x|\approx0.40$ \\
 gather only  & \code{F}   & $8.34\times10^{-7}$ & $8.3\times10^{-7}$ & $|F|\approx0.33$ \\
-gather only  & grid \code{m} & $3.07\times10^{-12}$ & --- & total mass identical to 6 digits \\
-\midrule
 both         & \code{pos} & $1.79\times10^{-7}$ & $5.3\times10^{-7}$ & $|x|\approx0.40$ \\
-both         & \code{F}   & $8.34\times10^{-7}$ & $8.3\times10^{-7}$ & $|F|\approx0.33$ \\
 both         & grid \code{mv} & $1.46\times10^{-11}$ & --- & $|mv|\approx1.8\times10^{-8}$ \\
 \bottomrule
 \end{tabular}
@@ -431,44 +377,95 @@ both         & grid \code{mv} & $1.46\times10^{-11}$ & --- & $|mv|\approx1.8\tim
 
 \noindent
 Float32 has $\epsilon=1.19\times10^{-7}$, so a position of $0.40$ has an ulp of $2.98\times10^{-8}$
-and the observed $1.79\times10^{-7}$ is \gd{6 ulp after 14 substeps} --- round-off, accumulated at
-the rate reassociation predicts. The large \emph{relative} figures on the grid (up to
-$1.2\times10^{-4}$) are on nodes whose mass is $\approx10^{-8}$: a tiny denominator, not a
-disagreement. Total grid mass matches to six digits.
+and the observed $1.79\times10^{-7}$ is \gd{6 ulp after 14 substeps} --- round-off at the rate
+reassociation predicts. The large \emph{relative} figures on the grid are on nodes whose mass is
+$\approx10^{-8}$: a tiny denominator, not a disagreement. Total grid mass matches to six digits.
 
-\paragraph{What this costs, stated plainly.} A run cannot be reproduced bit-for-bit across the two
-implementations, so the \code{implementation} field is part of a run's identity and must be recorded
-with it. Anything that needs byte-identity --- the promotion twins --- stays on \code{default}.
+A run therefore cannot be reproduced bit-for-bit across the two, so \code{implementation} is part of
+a run's identity and must be recorded with it. Anything needing byte-identity stays on
+\code{default}.
+
+\section{The sweep, one year on}
+
+Everything above compares one scene at a fixed $96^3$ grid. Two things have changed:
+\code{mpm\_grid\_update} now has a \code{warp} implementation, and a defect outside the MPM operators
+entirely was costing $4.4\times$ on every run in the repository.
+
+\subsection{The aggregate, and why it dominated everything}
+
+\code{engine.py} used to set \code{torch.use\_deterministic\_algorithms(True)} at import, so two runs
+of a spec would agree bit for bit. That flag reroutes CUDA \code{index\_add\_} from atomics to a
+sort-and-segment kernel whose cost is driven by the longest run of \emph{duplicate} indices --- and
+\code{aggregate}, reducing 570\,760 particles into a set with a \emph{single} parent, hands it
+570\,760 copies of the index \code{0}. On an RTX A6000, \code{index\_add\_} of $[570760,3]$ into
+$[1,3]$: \bd{140.98\,ms} deterministic, 1.00\,ms with atomics, \gd{0.016\,ms} for \code{sum(0)}.
+
+Those two calls were \textbf{214\,ms of a 255\,ms frame --- 84\% of the simulation spent taking the
+centroid of a set with one member}, while the four MPM operators together took 41\,ms. With one
+parent the index carries no information, so the segment sum \emph{is} the sum. \code{sum(0)} is also
+the more accurate of the two: a tree reduction's error grows with $\log N$ where the sequential
+scan's grows with $N$, and against a float64 evaluation of the same sum ($2.75\times10^{5}$) the
+errors are $2.1\times10^{-2}$ and $5.9\times10^{2}$. Determinism is now opt-in through
+\code{PLEXUS\_STRICT\_DETERMINISM=1}, which the promotion gate already exported; no spec in the
+corpus of 2\,456 ever asked for it.
+
+\subsection{Which implementation, two scenes, two cards}
+
+\begin{center}\scriptsize\tblImplSweep\end{center}
+
+\noindent
+\code{warp} is $25$--$32\times$ \code{default}. The fused grid solve adds \gd{$1.22\times$} on the
+A100 and \gd{$1.51\times$} on the A6000 --- \emph{more on the weaker card}, because the A100 gets
+through the torch grid update fast enough that removing it matters less. Capture is worth only
+$1.02$--$1.09\times$, against $1.73\times$ before the port, exactly as \S5.4 predicted.
+
+\subsection{How far one GPU goes}
+
+\begin{center}\footnotesize\tblScaling\end{center}
+
+\noindent
+The marginal cost is \textbf{276\,B per particle}, measured two-point, so an 80\,GiB H100 holds
+$\approx$290\,M and a 267.7\,GiB B300 $\approx$970\,M. \textbf{One billion particles fits} with about
+9\,GiB to spare, and only with \code{PYTORCH\_CUDA\_ALLOC\_CONF=expandable\_segments:True} --- without
+it the run dies asking for the 33.5\,GiB \code{F} buffer against 13.6\,GiB free and 5.6 lost to
+fragmentation. \textbf{Throughput improves with size}: 2.08\,ns per particle-substep at 200\,M
+against 0.86 at 1\,B, because a bigger problem hides the launch and tail effects a smaller one
+cannot.
 
 \section{What is left}
 
 \begin{enumerate}
-\item \textbf{\code{mpm\_strain} and \code{mpm\_grid\_update} are still \code{default}} and are now
-  the whole remaining frame: \bpstrain\,B and \bpgridupdate\,B per particle-substep against
-  \code{warp}'s zero for the other two. \code{strain} is a $[N,3,3]$ matrix product and fuses
-  trivially; \code{grid\_update} is $O(\text{cells})$ and is a different kernel shape. Porting them
-  also settles \S5.4: capture exists to paper over exactly these two, so its $1.73\times$ should be
-  re-measured once they are gone.
-\item \textbf{The atomics are the wall.} \code{warp} sits at $\approx$8--10\% of peak on both cards
-  and does not improve when the card gets faster, which is the same signature \code{default} showed
-  for a different reason. The fix is the node-centric P2G that NVIDIA's own \code{warp.fem} MPM uses:
-  sort particles by cell into CSR, one thread \emph{per grid node}, each summing its own
-  contributions with a plain \code{+=} --- zero atomics. The read amplification that argument was
-  rejected on earlier ($27\times$) is a coalesced streaming read, not the same kind of cost as a
-  serialised atomic write.
-\item \textbf{Memory is no longer the constraint, and that is new.} At 0.309\,GiB per million
-  particles an 80\,GiB A100 holds $\approx$250\,M and a 48\,GiB A6000 $\approx$150\,M. Past
-  $\approx$20\,M the fixed $96^3$ grid of this benchmark stops being a discretisation anyone would
-  choose, so the next question is not how many particles fit but what grid they need --- and a finer
-  grid costs substeps through the CFL bound $\Delta t \le \mathrm{cfl}\cdot\Delta x/c$, which is a
-  different scaling problem from this one.
+\item \textbf{\code{mpm\_strain} is the only \code{default} operator left} --- \bpstrain\,B per
+  particle-substep against \code{warp}'s zero for the other three. It is a $[N,3,3]$ matrix product
+  and should fuse trivially. \code{mpm\_grid\_update} was ported and moved from 42.7\% of the frame
+  to 11.2\% ($1.860\to0.328$\,ms per call, $5.67\times$).
+\item \textbf{The scatter is now 58.6\% of the frame, and the wall is atomics.} \code{warp} sits at
+  8--10\% of peak on both cards and does not improve when the card gets faster --- the same signature
+  \code{default} showed for a different reason. The fix is the node-centric P2G that NVIDIA's own
+  \code{warp.fem} MPM uses: sort particles by cell into CSR, one thread \emph{per grid node}, each
+  summing its own contributions with a plain \code{+=}, zero atomics. The $27\times$ read
+  amplification that argument was once rejected on is a coalesced streaming read, which is not the
+  same kind of cost as a serialised atomic write.
+\item \textbf{Resolution is the constraint now, not memory.} A billion particles run on one B300, so
+  the question is no longer how many fit but what grid they need. A finer grid costs substeps through
+  the CFL bound $\Delta t \le \mathrm{cfl}\cdot\Delta x/c$: the 1\,B run needs $320^3$ and 22
+  substeps where 200\,M needs $192^3$ and 13, so cost grows faster than particle count. That is a
+  different scaling problem from this one and the next thing worth measuring.
+\item \textbf{Half precision does not help and was not kept.} \code{torch.autocast(float16)} around
+  the substep, with fp32 state and integration, made \code{warp} slower ($34.4\to37.3$\,ms/frame) and
+  \code{torch} \emph{much} slower ($952.6\to1772.4$) --- cast traffic on every intermediate, and it
+  cannot see Warp kernels at all, since autocast rewrites \code{aten} ops and Warp compiles its own
+  types. \code{torch.linalg.det} has no half kernel either.
 \end{enumerate}
 
-\paragraph{Provenance.} Benchmarks: \code{tools/mpm\_bench.py}, tables regenerated by
-\code{tools/mpm\_warp\_note.py}. Specs: \code{material\_3d\_water\_bench\_500k} through
-\code{\_200m} under \code{config/material/} --- 27 blobs of radius 0.05 in a unit box, $96^3$ grid,
-$\Delta t=3.6\times10^{-3}$ in 7 substeps, \emph{held fixed across the sweep} so the only variable is
-particle count. A production 20\,M run would use a finer grid and correspondingly more substeps; this
-sweep deliberately does not, because a benchmark that changes two things at once measures neither.
+\paragraph{Provenance.} Benchmarks: \code{tools/mpm\_bench.py} (bandwidth sweep) and
+\code{tools/mpm\_perf.py} (implementation sweep, \S7); tables regenerated by
+\code{tools/mpm\_warp\_note.py} and \code{tools/mpm\_perf.py --latex}. Gates:
+\code{tools/mpm\_impl\_gate.py}. Specs: \code{material\_3d\_water\_bench\_500k} through
+\code{\_200m} for \S3--\S6 --- 27 blobs in a unit box, $96^3$ grid, $\Delta t=3.6\times10^{-3}$ in 7
+substeps, held fixed so the only variable is particle count --- and \code{si\_waterfall},
+\code{si\_waterfall\_5m}, \code{si\_bench\_200m/800m/1b} for \S7. A production run would use a finer
+grid and more substeps; these sweeps deliberately do not, because a benchmark that changes two things
+at once measures neither.
 
 \end{document}

@@ -46,8 +46,6 @@ fields:
     frame: mpm_grid
     n_grid: 192
 operators:
-- op: aggregate
-  at: cell
 - op: gravity
   at: cell
   g: 0.0
@@ -82,7 +80,6 @@ operators:
   anchor_frame: 0
   after_frame: 400
 schedule:
-- aggregate
 - gravity
 - substep_dt: 6.536713410100344e-05
   steps:
