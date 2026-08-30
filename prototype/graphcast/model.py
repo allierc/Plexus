@@ -117,7 +117,7 @@ class GraphCastModel(nn.Module):
 
         h, nh = ms.hidden_dim, ms.n_hidden_layers
         if ms.message == "simple":
-            self.g_phi = mlp([1 + self.emb_dim] + [h] * nh + [1])
+            self.g_phi = mlp([2 + self.emb_dim] + [h] * nh + [1])
             self.f_theta = mlp([1 + self.emb_dim + 1 + 1] + [h] * nh + [1])
         else:
             d = ms.latent_dim
@@ -144,19 +144,31 @@ class GraphCastModel(nn.Module):
         return torch.cat([p for p in parts if p is not None], dim=-1)
 
     def forward(self, v: torch.Tensor, edge_index: torch.Tensor,
-                stim: torch.Tensor) -> torch.Tensor:
-        """v [N,1] state, edge_index [2,E] as (pre, post), stim [N,1] the external drive."""
+                stim: torch.Tensor, return_msg: bool = False):
+        """v [N,1] state, edge_index [2,E] as (pre, post), stim [N,1] the per-node drive.
+
+        `return_msg` also hands back the aggregated message, which is what G9 scores against the
+        true field gradient: on this toy the fine rule IS a spatial derivative, so "did the model
+        recover the interaction" and "did the message become a gradient operator" are the same
+        question, and the second is the one that can be measured directly.
+        """
         pre, post = edge_index[0], edge_index[1]
         a = self.embedding()
         drive = self.b[:, None] * stim
 
         if self.ms.message == "simple":
-            feat = self._cat(v[pre], None if a is None else a[pre])
+            # THE SENDER'S DRIVE IS PART OF THE MESSAGE. The fine rule is du/dx, so the message
+            # has to carry the neighbour's value of u; built from v alone it could only ever
+            # approximate the gradient through the states u already produced, which is a
+            # different and much weaker signal. NeuralGNN passes only (v_j, a_j) because its
+            # excitation is per-receiver; here the drive is per-sender and spatial.
+            feat = self._cat(v[pre], stim[pre], None if a is None else a[pre])
             g = self.g_phi(feat)                                   # [E, 1]
             edge_msg = self.W[:, None] * g
             msg = torch.zeros(self.n_nodes, 1, device=v.device, dtype=v.dtype)
             msg = msg.index_add(0, post, edge_msg)                 # sum over incoming edges
-            return self.f_theta(self._cat(v, a, msg, drive))
+            out = self.f_theta(self._cat(v, a, msg, drive))
+            return (out, msg) if return_msg else out
 
         hv = self.encode_v(self._cat(v, a, drive))
         he = self.encode_e(self.W[:, None])
@@ -164,7 +176,8 @@ class GraphCastModel(nn.Module):
             he = he + self.ln_e[k](self.mlp_e[k](torch.cat([he, hv[pre], hv[post]], dim=-1)))
             agg = torch.zeros_like(hv).index_add(0, post, he)
             hv = hv + self.ln_v[k](self.mlp_v[k](torch.cat([hv, agg], dim=-1)))
-        return self.decode(hv)
+        out = self.decode(hv)
+        return (out, agg[:, :1]) if return_msg else out
 
 
 def copy_weights_from_neural_gnn(dst: "GraphCastModel", src) -> None:

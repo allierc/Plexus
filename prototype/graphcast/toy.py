@@ -39,6 +39,7 @@ import numpy as np
 import torch
 import yaml
 
+import ops_graphcast  # noqa: F401  registers wave_field / gradient_gain
 from plexus import engine as plexus_engine
 from plexus import schema as plexus_schema
 
@@ -91,6 +92,8 @@ def kernel_weights(dist: np.ndarray, pre_type: np.ndarray, n_types: int,
 
 def generate(fit, out_dir: str, device: str = "cpu") -> dict:
     """Run the toy forward and write trajectory + ground truth. Returns a summary dict."""
+    if (fit.data.toy or {}).get("kind") == "wave_gradient":
+        return generate_wave(fit, out_dir, device)
     with open(fit.path) as f:
         raw = yaml.safe_load(f)
     toy = fit.data.toy
@@ -206,3 +209,53 @@ def spatial_type_purity(pos: np.ndarray, node_type: np.ndarray, cells_per_axis: 
     null = np.mean([_mean_cell_purity(key, rng.permutation(node_type), n_types)
                     for _ in range(n_permutations)])
     return float(observed / max(null, 1e-12))
+
+
+def generate_wave(fit, out_dir: str, device: str = "cpu") -> dict:
+    """The two-scale toy: a travelling wave (coarse) read by per-node signed gains (fine).
+
+    There is NO edge set in the spec, because the generator's fine rule reads the field directly.
+    The graph is the MODEL's problem: it sees only the drive sampled at each node and has to
+    reconstruct a spatial derivative from its neighbours. Building the generator on the same graph
+    the model is given would hand it the answer.
+    """
+    import zarr
+    with open(fit.path) as f:
+        raw = yaml.safe_load(f)
+    toy = fit.data.toy
+    os.makedirs(out_dir, exist_ok=True)
+
+    spec = plexus_schema.load(fit.path)
+    traj = os.path.join(out_dir, "toy.zarr")
+    H, _ = plexus_engine.run(spec, traj, device=device, progress=False)
+
+    z = zarr.open(traj, "r")
+    voltage = np.asarray(z[toy["set"]]["state"][fit.data.state][:, :, 0], dtype=np.float32)
+    pos = np.asarray(z[toy["set"]]["pos"][0], dtype=np.float32)
+    lvl = H.level(toy["set"])
+    node_type = lvl.node_type.detach().cpu().numpy().astype(np.int64)
+    type_p = np.array([t["p"] for t in raw["sets"][toy["set"]]["types"].values()], dtype=np.float32)
+    tau = (1.0 / type_p[:, 0])[node_type].astype(np.float32)
+    gain = type_p[:, 2][node_type].astype(np.float32)
+
+    # the drive each node sees, and the true gradient it responds to, both analytic from the
+    # coarse rule -- no need to re-sample the recorded grid, which is strided.
+    wf = next(o for o in raw["operators"] if o["op"] == "wave_field")
+    gg = next(o for o in raw["operators"] if o["op"] == "gradient_gain")
+    A, lam, per = float(wf["amplitude"]), float(wf["wavelength"]), float(wf["period"])
+    ax = int(wf.get("axis", 0))
+    T = voltage.shape[0]
+    t = np.arange(T, dtype=np.float32)[:, None]
+    ph = 2.0 * np.pi * (pos[None, :, ax] / lam - t / per)
+    stim = (A * np.sin(ph)).astype(np.float32)                     # [T, N] u(r_i, t)
+    grad = (A * (2.0 * np.pi / lam) * np.cos(ph)).astype(np.float32)   # [T, N] du/dx(r_i, t)
+
+    edge_index, dist = knn_edges(pos, fit.data.graph.k)
+    gt_path = os.path.join(out_dir, "ground_truth.npz")
+    np.savez(gt_path, positions=pos, node_type=node_type, tau=tau, gain=gain,
+             edge_index=edge_index, distance=dist, voltage=voltage,
+             stim=stim, grad=grad, type_p=type_p,
+             tau_per_type=1.0 / type_p[:, 0], gain_per_type=type_p[:, 2])
+    return {"n_neurons": int(pos.shape[0]), "n_types": int(node_type.max()) + 1,
+            "n_edges": int(edge_index.shape[1]), "n_frames": int(T),
+            "trajectory": traj, "ground_truth": gt_path}

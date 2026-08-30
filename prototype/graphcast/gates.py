@@ -149,6 +149,25 @@ def build_table() -> dict[str, Gate]:
         Gate("G16", "closed_form", "types are spatially mixed by construction",
              "spatial-cell type purity within 20% of chance (1/n_types)",
              "purity as a multiple of chance", 1, _lt(1.2)),
+        # ---- stage 1b: the toy is a valid test bed (data only, no model) ----------------- #
+        # Added after three toys failed for reasons that had nothing to do with the model: a
+        # circuit at a fixed point, a stimulus field that was identically zero, and a travelling
+        # wave whose gradient is recoverable node-locally (du/dx = -(1/c) du/dt) so the graph was
+        # never necessary. In every case training was run before the data was known to pose the
+        # problem it claimed to. These need no model and each would have caught one of them.
+        # Thresholds are principled: a deterministic rule is recoverable at R^2 > 0.95 by
+        # definition, and 0.80 excludes collinearity rather than describing what was seen.
+        Gate("G21", "closed_form", "the coarse field is a travelling wave, cyclic left to right",
+             "phase drift per frame within 5% of lambda/period", "fraction of lambda/period",
+             1, _lt(0.05)),
+        Gate("G22", "closed_form", "the fine rule is exactly recoverable from (v, grad u)",
+             "minimum per-node R^2 > 0.90", "R^2, worst node", 1, _gt(0.90)),
+        Gate("G23", "closed_form", "the gradient is reconstructible from neighbours' states",
+             "R^2 > 0.95, else the graph cannot carry the fine rule", "R^2", 1, _gt(0.95)),
+        Gate("G24", "closed_form", "the heterogeneity is linearly readable",
+             "corr(fitted gain, true g_i) > 0.90", "Pearson correlation", 1, _gt(0.90)),
+        Gate("G25", "closed_form", "connected nodes are not collinear",
+             "mean |corr| between connected nodes < 0.80", "Pearson correlation", 1, _lt(0.80)),
         # ---- tier 3: measurement -------------------------------------------------------- #
         Gate("G17", "measurement", "ZAPBench held-out prediction of d(dF/F)/dt",
              "R^2 > 0.268, the parameter-free kNN spatial pool", "held-out R^2", 6, _gt(0.268)),

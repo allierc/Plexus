@@ -26,6 +26,7 @@ for p in (_HERE, _PLEXUS_SRC):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import numpy as np
 import gates as gates_mod
 import spec_schema
 import toy as toy_mod
@@ -170,6 +171,118 @@ def gate_G16_types_are_spatially_mixed(spec_path: str):
     return float(worst), note, [p for p in (png, mp4) if p]
 
 
+def _toy_stats(spec_path: str):
+    """The stage-1b numbers, computed once and shared by G21-G25. DATA ONLY -- no model exists."""
+    import numpy as np
+    fit = spec_schema.load(spec_path)
+    gt = np.load(os.path.join(_ARTDIR[0], "ground_truth.npz"))
+    v, grad, ei = gt["voltage"], gt["grad"], gt["edge_index"]
+    pre, post = ei
+    N = v.shape[1]
+    lo, hi = 200, min(v.shape[0] - 1, 2200)
+    sl = slice(lo, hi)
+    dv, V, G = np.diff(v, axis=0)[sl], v[sl], grad[sl]
+
+    r2_rule, gain_fit = [], []
+    for i in range(N):
+        y = dv[:, i]
+        A = np.stack([V[:, i], G[:, i], np.ones(len(y))]).T
+        c = np.linalg.lstsq(A, y, rcond=None)[0]
+        r2_rule.append(1 - ((y - A @ c) ** 2).sum() / max(((y - y.mean()) ** 2).sum(), 1e-30))
+        gain_fit.append(c[1])
+    dt = float(fit.plexus.dt)
+    gain_fit = np.array(gain_fit) / max(dt, 1e-12)
+
+    r2_nb = []
+    for i in range(0, N, 8):
+        nb = pre[post == i]
+        A = np.concatenate([V[:, nb] - V[:, i:i + 1], np.ones((len(V), 1))], axis=1)
+        y = G[:, i]
+        c = np.linalg.lstsq(A, y, rcond=None)[0]
+        r2_nb.append(1 - ((y - A @ c) ** 2).sum() / max(((y - y.mean()) ** 2).sum(), 1e-30))
+
+    nb_corr = [abs(np.corrcoef(V[:, post[e]], V[:, pre[e]])[0, 1])
+               for e in range(0, ei.shape[1], 37)]
+    nb_corr = np.array([c for c in nb_corr if np.isfinite(c)])
+    return gt, {"r2_rule": np.array(r2_rule), "r2_grad_nb": np.array(r2_nb),
+                "gain_true": gt["gain"], "gain_fit": gain_fit, "nb_corr": nb_corr}
+
+
+_STATS = {}
+
+
+def _stats_for(spec_path):
+    if spec_path not in _STATS:
+        _STATS[spec_path] = _toy_stats(spec_path)
+    return _STATS[spec_path]
+
+
+def gate_G21_travelling_wave(spec_path: str):
+    """The coarse rule really is a wave moving left to right, at the speed the spec asked for."""
+    import numpy as np
+    import zarr
+    fit = spec_schema.load(spec_path)
+    z = zarr.open(os.path.join(_ARTDIR[0], "toy.zarr"), "r")
+    fname = next(iter(fit.plexus.fields))
+    grid = np.asarray(z[fname]["grid"])          # [frames, channels, nx, ny], strided
+    g = grid[:, 0].mean(axis=2)                  # average out y -> [frames, nx]
+    nx = g.shape[1]
+    # PHASE FROM THE FFT of the dominant spatial mode, not from argmax. argmax on a 128-cell grid
+    # quantises to whole cells, and the wave moves about half a cell per frame, so the estimator's
+    # own resolution was coarser than the quantity it measured -- the same class of mistake as
+    # measuring type purity on a grid finer than the sampling.
+    # PROJECT ONTO THE KNOWN WAVELENGTH, not onto the nearest integer FFT bin. With nx = 128 and
+    # lambda = 0.15 the true mode is k = 1/lambda = 6.67 bins, and rounding it to 7 biases the
+    # speed by exactly 6.67/7 = 0.952 -- which is the 5% this gate first reported. The estimator
+    # has to be as sharp as the threshold it is judged against.
+    wf0 = next(o for o in fit.plexus.operators if o.op == "wave_field")
+    lam = float(wf0.params.get("wavelength", 0.5))
+    xs = (np.arange(nx) + 0.5) / nx
+    basis = np.exp(-2j * np.pi * xs / lam)
+    proj = (g - g.mean(axis=1, keepdims=True)) @ basis
+    phase = np.unwrap(np.angle(proj))
+    d = -np.diff(phase) * lam * nx / (2 * np.pi)    # cells per recorded frame
+    stride = max(1, int(round(fit.plexus.n_frames / max(grid.shape[0] - 1, 1))))
+    wf = next(o for o in fit.plexus.operators if o.op == "wave_field")
+    expect = nx * float(wf.params.get("wavelength", 0.5)) / float(wf.params.get("period", 100.0))
+    measured = float(np.median(np.abs(d))) / stride
+    rel = abs(measured - expect) / max(expect, 1e-9)
+    png = viz.field_movie(grid, os.path.join(_ARTDIR[0], "G21_field.mp4"), stride=1)
+    return rel, (f"measured {measured:.3f} cells/frame vs {expect:.3f} expected, "
+                 f"{grid.shape[0]} recorded frames"), [p for p in (png,) if p]
+
+
+def gate_G22_rule_recoverable(spec_path: str):
+    gt, st = _stats_for(spec_path)
+    png = viz.identifiability_panels(st, os.path.join(_ARTDIR[0], "G22_identifiability.png"))
+    return float(st["r2_rule"].min()), (
+        f"mean {st['r2_rule'].mean():.4f}, median {np.median(st['r2_rule']):.4f}"), [png]
+
+
+def gate_G23_gradient_from_neighbours(spec_path: str):
+    gt, st = _stats_for(spec_path)
+    png = viz.identifiability_panels(st, os.path.join(_ARTDIR[0], "G22_identifiability.png"))
+    return float(np.mean(st["r2_grad_nb"])), (
+        f"worst node {np.min(st['r2_grad_nb']):.4f}"), [png]
+
+
+def gate_G24_heterogeneity_readable(spec_path: str):
+    gt, st = _stats_for(spec_path)
+    c = float(np.corrcoef(st["gain_fit"], st["gain_true"])[0, 1])
+    png = viz.heterogeneity_map(gt["positions"], gt["gain"], gt["node_type"],
+                                os.path.join(_ARTDIR[0], "G24_heterogeneity.png"))
+    ratio = float(np.median(st["gain_fit"] / np.where(np.abs(st["gain_true"]) > 1e-6,
+                                                      st["gain_true"], np.nan)))
+    return c, f"fitted/true gain ratio {ratio:.3f} (1.0 == exact)", [png]
+
+
+def gate_G25_not_collinear(spec_path: str):
+    gt, st = _stats_for(spec_path)
+    png = viz.identifiability_panels(st, os.path.join(_ARTDIR[0], "G22_identifiability.png"))
+    return float(st["nb_corr"].mean()), (
+        f"max {st['nb_corr'].max():.3f} over {len(st['nb_corr'])} sampled edges"), [png]
+
+
 _ARTDIR = [os.path.join(_HERE, "log")]           # set by run_gates to the run's own directory
 
 
@@ -178,6 +291,11 @@ STAGE_CHECKS = {
     "G2": gate_G2_no_hardcoding,
     "G7": gate_G7_units,
     "G16": gate_G16_types_are_spatially_mixed,
+    "G21": gate_G21_travelling_wave,
+    "G22": gate_G22_rule_recoverable,
+    "G23": gate_G23_gradient_from_neighbours,
+    "G24": gate_G24_heterogeneity_readable,
+    "G25": gate_G25_not_collinear,
 }
 
 
