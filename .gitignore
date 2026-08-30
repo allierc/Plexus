@@ -130,3 +130,11 @@ discovery_okuda/*.fdb_latexmk
 # the .blend cut is a cache: parts.npz is already ignored, and the PLY exports
 # regenerate from it with `read_blend.py --ply`
 prototype/eye/archive/run_03/blend_parts/meshes/
+
+# Plexus Studio scratch. The GUI writes every prompt it answers into config/studio/ -- the spec it
+# generated and a `__preview__` twin for the frame-0 render -- and names them from the prompt slug,
+# de-duplicating with a numeric suffix (`a_2_cm_water_2` .. `_8`). None of it is authored: it is the
+# transcript of a session, regenerated the moment the same prompt is typed again. Twenty-one had
+# been committed by the time this rule was written, so they are untracked in the same commit; a
+# Studio spec worth keeping gets copied into config/si_material/ under a name someone chose.
+config/studio/
