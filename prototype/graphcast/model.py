@@ -144,7 +144,8 @@ class GraphCastModel(nn.Module):
         return torch.cat([p for p in parts if p is not None], dim=-1)
 
     def forward(self, v: torch.Tensor, edge_index: torch.Tensor,
-                stim: torch.Tensor, return_msg: bool = False):
+                stim: torch.Tensor, return_msg: bool = False,
+                return_edge_feat: bool = False):
         """v [N,1] state, edge_index [2,E] as (pre, post), stim [N,1] the per-node drive.
 
         `return_msg` also hands back the aggregated message, which is what G9 scores against the
@@ -168,6 +169,8 @@ class GraphCastModel(nn.Module):
             msg = torch.zeros(self.n_nodes, 1, device=v.device, dtype=v.dtype)
             msg = msg.index_add(0, post, edge_msg)                 # sum over incoming edges
             out = self.f_theta(self._cat(v, a, msg, drive))
+            if return_edge_feat:
+                return out, feat
             return (out, msg) if return_msg else out
 
         hv = self.encode_v(self._cat(v, a, drive))
@@ -177,6 +180,8 @@ class GraphCastModel(nn.Module):
             agg = torch.zeros_like(hv).index_add(0, post, he)
             hv = hv + self.ln_v[k](self.mlp_v[k](torch.cat([hv, agg], dim=-1)))
         out = self.decode(hv)
+        if return_edge_feat:
+            return out, None            # the graphcast path has no separable g_phi to regularise
         return (out, agg[:, :1]) if return_msg else out
 
 

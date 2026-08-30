@@ -90,6 +90,61 @@ def load_toy(run_dir: str, device: str, fit_stimulus_is_none: bool = False):
     return gt, v, ei, st.contiguous()
 
 
+def regularisers(net, tc, feat, anneal: float = 1.0):
+    """The penalty terms connectome-gnn's production configs run with, ported.
+
+    Four families, and only the first two are ordinary weight decay:
+
+      W_L1 / W_L2         sparsity on the interaction weights themselves.
+      msg/update weight   L1 and L2 on the message and update MLP matrices.
+      msg_smooth          the `coeff_g_phi_diff` prior. g_phi is evaluated on the batch's edge
+                          features and again on a random permutation of them, and the penalty is
+                          the squared output difference over the squared INPUT distance -- a
+                          Lipschitz bound. It stops the message function absorbing per-edge
+                          structure that belongs in W, which is exactly the degeneracy that makes
+                          W unidentifiable. It carries coefficient 750 in production, by far the
+                          largest term there.
+      msg_input_group     group lasso over g_phi's INPUT BLOCKS (the sender's state, the sender's
+                          drive, the sender's embedding), each block being all the first-layer
+                          columns that read it. This is the discard mechanism the weekend
+                          benchmark measured at +0.153 in R^2_W on 5 of 5 folds -- it works by
+                          removing a degeneracy, not by preferring simple models, which is why the
+                          accuracy went UP rather than trading off.
+    """
+    reg = feat.new_zeros(())
+    if tc.coeff_W_L1:
+        reg = reg + anneal * tc.coeff_W_L1 * net.W.abs().mean()
+    if tc.coeff_W_L2:
+        reg = reg + anneal * tc.coeff_W_L2 * (net.W ** 2).mean()
+
+    msg_mlp = getattr(net, "g_phi", None)
+    upd_mlp = getattr(net, "f_theta", None)
+    for mlp_, l1, l2 in ((msg_mlp, tc.coeff_msg_weight_L1, tc.coeff_msg_weight_L2),
+                         (upd_mlp, tc.coeff_update_weight_L1, tc.coeff_update_weight_L2)):
+        if mlp_ is None or not (l1 or l2):
+            continue
+        for m in mlp_:
+            if isinstance(m, torch.nn.Linear):
+                if l1:
+                    reg = reg + anneal * l1 * m.weight.abs().mean()
+                if l2:
+                    reg = reg + anneal * l2 * (m.weight ** 2).mean()
+
+    if msg_mlp is not None and tc.coeff_msg_smooth:
+        perm = torch.randperm(feat.shape[0], device=feat.device)
+        g0, g1 = msg_mlp(feat), msg_mlp(feat[perm])
+        d2 = ((feat - feat[perm]) ** 2).sum(-1, keepdim=True).clamp(min=1e-6)
+        reg = reg + tc.coeff_msg_smooth * (((g0 - g1) ** 2) / d2).mean()
+
+    if msg_mlp is not None and tc.coeff_msg_input_group:
+        first = next(m for m in msg_mlp if isinstance(m, torch.nn.Linear))
+        blocks = [(0, 1), (1, 2), (2, first.in_features)]      # v_j | s_j | a_j
+        gl = sum(first.weight[:, a:b].pow(2).sum().add(1e-12).sqrt()
+                 for a, b in blocks if b > a)
+        reg = reg + anneal * tc.coeff_msg_input_group * gl
+    return reg
+
+
 def build_schedule(tc):
     def lr_at(step):
         if tc.lr_scheduler == "none":
@@ -139,7 +194,14 @@ def train(fit, run_dir: str, device: str = "cuda") -> dict:
     if net.a is not None:
         groups.append({"params": [net.a], "lr": tc.lr_embedding or tc.lr, "weight_decay": 0.0})
         struct = [q for q in struct if q is not net.a]
-    groups.append({"params": struct, "lr": tc.lr, "weight_decay": 0.0})
+    # W ON ITS OWN RATE: every production config in connectome-gnn sets lr_W separately from lr
+    # and lr_embedding (0.0009 / 0.0018 / 0.002325), and the three differ by more than 2x.
+    struct_W = [q for q in struct if q is net.W]
+    struct_rest = [q for q in struct if q is not net.W]
+    if struct_W:
+        groups.append({"params": struct_W, "lr": tc.lr_W or tc.lr, "weight_decay": 0.0})
+    if struct_rest:
+        groups.append({"params": struct_rest, "lr": tc.lr, "weight_decay": 0.0})
     opt = torch.optim.AdamW(groups, betas=tc.betas)
     lr_at = build_schedule(tc)
     base = [g["lr"] for g in opt.param_groups]
@@ -151,8 +213,16 @@ def train(fit, run_dir: str, device: str = "cuda") -> dict:
         for g, b in zip(opt.param_groups, base):
             g["lr"] = b * lr_at(step)
         idx = torch.randint(tr0, min(tr1, T - 1), (tc.batch_frames,), device=device)
-        pred = torch.stack([net(v[t], ei, stim_t[t][:, None]) for t in idx])
+        pred, feats = [], []
+        for t in idx:
+            out, mfeat = net(v[t], ei, stim_t[t][:, None], return_edge_feat=True)
+            pred.append(out); feats.append(mfeat)
+        pred = torch.stack(pred)
         loss = (((pred - dv[idx]) * s) ** 2).mean()
+        if feats[0] is not None:
+            anneal = 1.0 if tc.regul_annealing_rate <= 0 else float(
+                np.exp(-tc.regul_annealing_rate * step))
+            loss = loss + regularisers(net, tc, feats[0], anneal)
         opt.zero_grad(set_to_none=True)
         loss.backward()
         if tc.grad_clip > 0:
