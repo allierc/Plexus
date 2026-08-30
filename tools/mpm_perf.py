@@ -51,21 +51,25 @@ CONFIG = os.path.join(ROOT, "config", "si_material")
 ROWS = os.path.join(ROOT, "graphs_data", "si_material", "_perf")
 
 # THE SWEEP. `impl` is what goes on mpm_strain / mpm_scatter / mpm_gather; None means the default
-# torch operator. `gather` overrides the gather alone, which is the whole point of the loop27 rows:
-# strain and scatter stay on the torch path so the column isolates ONE kernel.
+# torch operator. `gather` overrides the gather alone, which is the whole point of the
+# torch_loop27 rows: strain and scatter stay on the torch path so the column isolates ONE kernel.
+#
+# THE `torch_` / `warp_` PREFIX IS THE PARTITION THE TABLE IS READ BY: every `torch_*` row is pure
+# PyTorch and every `warp_*` row lowers at least one operator through NVIDIA Warp. `torch_loop27`
+# carries the prefix for that reason -- it is a PyTorch gather, not a third backend.
 VARIANTS = [
-    # name suffix      strain/scatter  gather     grid_update  capture
-    ("warp_cap",       "warp",         "warp",    None,        True),
-    ("warp_eager",     "warp",         "warp",    None,        False),
+    # name suffix          strain/scatter  gather          grid_update  capture
+    ("warp_cap",           "warp",         "warp",         None,        True),
+    ("warp_eager",         "warp",         "warp",         None,        False),
     # THE GRID SOLVE IS THE FOURTH AXIS, and it is orthogonal to the other three: it is O(cells)
     # while they are O(particles), so it has to be swept separately or its share is invisible.
     # `warpgrid` is `warp` plus the fused two-kernel grid update -- one row against one row.
-    ("warpgrid_cap",   "warp",         "warp",    "warp",      True),
-    ("warpgrid_eager", "warp",         "warp",    "warp",      False),
-    ("torch_cap",      None,           None,      None,        True),
-    ("torch_eager",    None,           None,      None,        False),
-    ("loop27_cap",     None,           "loop27",  None,        True),
-    ("loop27_eager",   None,           "loop27",  None,        False),
+    ("warpgrid_cap",       "warp",         "warp",         "warp",      True),
+    ("warpgrid_eager",     "warp",         "warp",         "warp",      False),
+    ("torch_cap",          None,           None,           None,        True),
+    ("torch_eager",        None,           None,           None,        False),
+    ("torch_loop27_cap",   None,           "torch_loop27", None,        True),
+    ("torch_loop27_eager", None,           "torch_loop27", None,        False),
 ]
 # TWO SCENES, AND THE SECOND ONE IS NOT A BIGGER COPY OF THE FIRST. si_waterfall_5m is 8.8x the
 # particles AND 8x the grid cells AND 2x the substeps, so it is where a per-particle intermediate
@@ -132,7 +136,7 @@ def run_one(name, device, timed, warmup, tag=None):
     try:
         import plexus.operators.mpm_loop                             # noqa: F401
     except ImportError:
-        pass                                                         # loop27 not on this checkout
+        pass                                                    # torch_loop27 not on this checkout
     from plexus.engine import run
     from plexus.schema import load
 

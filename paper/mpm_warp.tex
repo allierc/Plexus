@@ -492,7 +492,7 @@ share. \textbf{Capture is worth only $1.02$--$1.09\times$ here}, against the $1.
 constraint, which is exactly what \S8.1 predicted would happen once the two remaining \code{default}
 operators were ported.
 
-\code{loop27} is a third implementation of \code{mpm\_gather}, written to test whether the
+\code{torch\_loop27} is a third implementation of \code{mpm\_gather}, written to test whether the
 $[N,27,D,D]$ temporaries are the cost rather than the arithmetic: it walks the 27 stencil offsets in
 python and accumulates $[N,D]$. It is $3.70\times$ the batched torch gather on the operator
 ($34.20\to9.24$\,ms per call) and $1.75\times$ end to end, which localises the batched form's cost to
