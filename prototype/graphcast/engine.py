@@ -258,7 +258,12 @@ def main(argv=None) -> int:
         for k, v in summary.items():
             print(f"  {k:14s} {v}")
         return 0
-    if task in ("train", "test", "plot"):
+    if task == "train":
+        import train as train_mod
+        out = train_mod.train(fit, out_dir, device=fit.training.device)
+        print("  final:", {k: round(v, 4) for k, v in out["history"][-1].items()})
+        return 0
+    if task in ("test", "plot"):
         _not_yet(task, 2)
     ap.error(f"unknown task {task!r} (expected generate|train|test|plot|gates)")
 
