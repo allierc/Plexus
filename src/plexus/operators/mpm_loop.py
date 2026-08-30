@@ -1,4 +1,4 @@
-"""`mpm_gather[implementation: loop27]` -- the same G2P, written as 27 small passes.
+"""`mpm_gather[implementation: torch_loop27]` -- the same G2P, written as 27 small passes.
 
 WHAT IS DIFFERENT, IN ONE LINE. The default torch gather builds the whole stencil at once as
 `[N, 27, D]` and `[N, 27, D, D]` tensors and reduces them; this one walks the 27 offsets in python
@@ -45,7 +45,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_ops import MPMGather, stencil_offsets, sub_dt
 
 
-@register_operator("mpm_gather", implementation="loop27", family="mpm",
+@register_operator("mpm_gather", implementation="torch_loop27", family="mpm",
                    set="particle", kind="exchange")
 class MPMGatherLoop27(MPMGather):
     """G2P by 27 sequential passes over the stencil instead of one batched reduction."""
@@ -61,7 +61,7 @@ class MPMGatherLoop27(MPMGather):
         inv_dx, dx = g.inv_dx, g.dx
         D = p.F.shape[-1]
         if D != 3:
-            raise ValueError("mpm_gather[loop27] is 3D only; drop `implementation` for 2D")
+            raise ValueError("mpm_gather[torch_loop27] is 3D only; drop `implementation` for 2D")
         periodic = bool(getattr(H, "periodic", False))
         if getattr(self, "_box", None) is None:
             self._box = [float(b) for b in

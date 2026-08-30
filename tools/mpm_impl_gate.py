@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """CORRECTNESS GATE for an alternative `implementation:` of an MPM operator.
 
-    python tools/mpm_impl_gate.py --op mpm_gather      --impl loop27 --device cuda:0
+    python tools/mpm_impl_gate.py --op mpm_gather      --impl torch_loop27 --device cuda:0
     python tools/mpm_impl_gate.py --op mpm_grid_update --impl warp   --device cuda:0
 
 WHAT IS COMPARED, AND WHY THIS SHAPE OF TEST. Both implementations are run on the SAME live state --
@@ -42,7 +42,7 @@ OPS = {
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--op", default="mpm_gather", choices=sorted(OPS))
-    ap.add_argument("--impl", default="loop27")
+    ap.add_argument("--impl", default="torch_loop27")
     ap.add_argument("--spec", default=None)
     ap.add_argument("--frames", type=int, default=30)
     ap.add_argument("--device", default="cuda:0")
