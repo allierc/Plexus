@@ -212,14 +212,22 @@ def spatial_type_purity(pos: np.ndarray, node_type: np.ndarray, cells_per_axis: 
 
 
 def generate_wave(fit, out_dir: str, device: str = "cpu") -> dict:
-    """The two-scale toy: a travelling wave (coarse) read by per-node signed gains (fine).
+    """The two-scale toy: a coarse field rule read by per-node signed gains.
 
     There is NO edge set in the spec, because the generator's fine rule reads the field directly.
     The graph is the MODEL's problem: it sees only the drive sampled at each node and has to
     reconstruct a spatial derivative from its neighbours. Building the generator on the same graph
     the model is given would hand it the answer.
+
+    GROUND TRUTH IS EVALUATED THROUGH THE OPERATOR, not from a formula written again here. An
+    earlier version re-derived du/dx analytically while the operator computed it by a finite
+    difference on a sampled grid; the two disagreed enough to drop the per-node recovery R^2 from
+    ~1.0 to 0.645, which read as a defect in the toy and was a defect in the bookkeeping. The
+    operator instance is the single source of truth for what the coarse rule IS.
     """
     import zarr
+    from plexus.models.registry import get_operator
+
     with open(fit.path) as f:
         raw = yaml.safe_load(f)
     toy = fit.data.toy
@@ -238,24 +246,34 @@ def generate_wave(fit, out_dir: str, device: str = "cpu") -> dict:
     tau = (1.0 / type_p[:, 0])[node_type].astype(np.float32)
     gain = type_p[:, 2][node_type].astype(np.float32)
 
-    # the drive each node sees, and the true gradient it responds to, both analytic from the
-    # coarse rule -- no need to re-sample the recorded grid, which is strided.
-    wf = next(o for o in raw["operators"] if o["op"] == "wave_field")
-    gg = next(o for o in raw["operators"] if o["op"] == "gradient_gain")
-    A, lam, per = float(wf["amplitude"]), float(wf["wavelength"]), float(wf["period"])
-    ax = int(wf.get("axis", 0))
+    # --- the coarse rule, evaluated through the operator the run actually used -------------- #
+    wf_line = next(o for o in raw["operators"] if o["op"] == "wave_field")
+    gg_line = next(o for o in raw["operators"] if o["op"] == "gradient_gain")
+    model_name = wf_line.get("model", "travelling")
+    cls = get_operator("wave_field", variant=model_name)
+    op = cls({**wf_line, "_at": wf_line.get("at")}, device="cpu")
+    ax, delta = int(wf_line.get("axis", 0)), float(gg_line.get("delta", 0.005))
+
     T = voltage.shape[0]
-    t = np.arange(T, dtype=np.float32)[:, None]
-    ph = 2.0 * np.pi * (pos[None, :, ax] / lam - t / per)
-    stim = (A * np.sin(ph)).astype(np.float32)                     # [T, N] u(r_i, t)
-    grad = (A * (2.0 * np.pi / lam) * np.cos(ph)).astype(np.float32)   # [T, N] du/dx(r_i, t)
+    P = torch.tensor(pos, dtype=torch.float32)
+    off = torch.zeros_like(P)
+    off[:, ax] = delta
+    stim = np.zeros((T, pos.shape[0]), dtype=np.float32)
+    grad = np.zeros((T, pos.shape[0]), dtype=np.float32)
+    for t in range(T):
+        cols = [P[:, d] for d in range(P.shape[1])]
+        up = op._u([c + (delta if d == ax else 0.0) for d, c in enumerate(cols)], float(t))
+        um = op._u([c - (delta if d == ax else 0.0) for d, c in enumerate(cols)], float(t))
+        stim[t] = op._u(cols, float(t)).numpy()
+        grad[t] = ((up - um) / (2.0 * delta)).numpy()
 
     edge_index, dist = knn_edges(pos, fit.data.graph.k)
     gt_path = os.path.join(out_dir, "ground_truth.npz")
     np.savez(gt_path, positions=pos, node_type=node_type, tau=tau, gain=gain,
              edge_index=edge_index, distance=dist, voltage=voltage,
              stim=stim, grad=grad, type_p=type_p,
-             tau_per_type=1.0 / type_p[:, 0], gain_per_type=type_p[:, 2])
-    return {"n_neurons": int(pos.shape[0]), "n_types": int(node_type.max()) + 1,
-            "n_edges": int(edge_index.shape[1]), "n_frames": int(T),
-            "trajectory": traj, "ground_truth": gt_path}
+             tau_per_type=1.0 / type_p[:, 0], gain_per_type=type_p[:, 2],
+             coarse_model=np.array(model_name))
+    return {"n_nodes": int(pos.shape[0]), "n_types": int(node_type.max()) + 1,
+            "coarse_rule": model_name, "n_edges": int(edge_index.shape[1]),
+            "n_frames": int(T), "trajectory": traj, "ground_truth": gt_path}

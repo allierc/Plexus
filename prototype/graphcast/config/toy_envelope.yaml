@@ -1,0 +1,102 @@
+general:
+  name: toy_envelope
+  seed: 42
+  n_frames: 3000
+  dt: 0.05
+  dim: 2
+  world: 1.0
+  boundary: wall
+  units:
+    length_um: 100.0
+    time_s: 0.05
+
+sets:
+  neuron:
+    n: 1024
+    spawn: random
+    types:
+      g_neg_fast:  {fraction: 0.1667, p: [2.00, 0.0, -1.60, 0.0, 1.0, 0.0]}
+      g_neg_slow:  {fraction: 0.1667, p: [0.60, 0.0, -0.90, 0.0, 1.0, 0.0]}
+      g_zero:      {fraction: 0.1667, p: [1.20, 0.0,  0.05, 0.0, 1.0, 0.0]}
+      g_pos_weak:  {fraction: 0.1667, p: [1.60, 0.0,  0.60, 0.0, 1.0, 0.0]}
+      g_pos_fast:  {fraction: 0.1666, p: [2.40, 0.0,  1.30, 0.0, 1.0, 0.0]}
+      g_pos_slow:  {fraction: 0.1666, p: [0.50, 0.0,  1.90, 0.0, 1.0, 0.0]}
+
+fields:
+  u:
+    frame: grid
+    res: 128
+    components: 1
+
+operators:
+  - op: wave_field
+    at: u
+    model: envelope
+    amplitude: 1.0
+    wavelength: 0.15
+    period: 120.0
+    envelope_scale: 0.35
+    axis: 0
+  - op: gradient_gain
+    at: neuron
+    from: u
+    axis: 0
+    delta: 0.005
+    noise: 0.002
+
+schedule:
+  - wave_field
+  - gradient_gain
+
+data:
+  source: simulate
+  state: voltage
+  positions: positions
+  stimulus: u
+  types: node_type
+  graph:
+    kind: knn
+    k: 12
+  toy:
+    set: neuron
+    edge_set: synapse
+    kind: wave_gradient
+    amplitude: 0.0
+    length_scale: 1.0
+    inhibitory_fraction: 0.0
+  split:
+    train: [0, 2200]
+    val: [2200, 2600]
+    test: [2600, 3000]
+
+model:
+  encoder_decoder: off
+  message: simple
+  n_passes: 1
+  embedding: free
+  embedding_dim: 2
+  latent_dim: 64
+  hidden_dim: 64
+  n_hidden_layers: 1
+  observation: identity
+
+training:
+  n_iter: 8000
+  batch_frames: 16
+  lr: 2.0e-3
+  lr_embedding: 1.0e-2
+  lr_scheduler: linear_warmup_cosine
+  warmup_iters: 400
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+  grad_clip: 32.0
+  target: increment
+  target_norm: inverse_increment_variance
+  rollout:
+    schedule: [1]
+    tail:
+      fraction: 0.0
+      lr_scale: 1.0e-3
+  checkpoint_every: 1000
+  seed: 42
+  device: cuda

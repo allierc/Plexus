@@ -276,6 +276,38 @@ def gate_G24_heterogeneity_readable(spec_path: str):
     return c, f"fitted/true gain ratio {ratio:.3f} (1.0 == exact)", [png]
 
 
+def gate_G26_graph_is_necessary(spec_path: str):
+    """Can a node-local predictor reproduce dv from that node's OWN history alone?
+
+    If it can, the graph is decoration and no result about a graph model means anything. The
+    baseline is deliberately generous -- the node's state, its drive, and both of their recent
+    histories -- because the gate is only informative if the thing it rules out was given every
+    chance. It uses no neighbour, and that is the whole of the comparison.
+    """
+    gt, st = _stats_for(spec_path)
+    fit = spec_schema.load(spec_path)
+    v, stim = gt["voltage"], gt["stim"]
+    lo, hi = 200, min(v.shape[0] - 1, 2200)
+    withheld = str(fit.data.stimulus).lower() in ("none", "null", "")
+    lags = 4
+    r2 = []
+    for i in range(0, v.shape[1], 8):
+        cols = [v[lo - k:hi - k, i] for k in range(lags)]
+        if not withheld:
+            cols += [stim[lo - k:hi - k, i] for k in range(lags)]
+        A = np.stack(cols + [np.ones(hi - lo)]).T
+        y = np.diff(v, axis=0)[lo:hi, i]
+        c = np.linalg.lstsq(A, y, rcond=None)[0]
+        r2.append(1 - ((y - A @ c) ** 2).sum() / max(((y - y.mean()) ** 2).sum(), 1e-30))
+    r2 = np.array(r2)
+    png = viz.necessity_panel(r2, st["r2_rule"], os.path.join(_ARTDIR[0], "G26_necessity.png"),
+                              withheld=withheld, coarse=str(gt["coarse_model"]))
+    return float(np.median(r2)), (
+        f"coarse rule '{gt['coarse_model']}', drive "
+        f"{'withheld' if withheld else 'observed'}; node-local mean {r2.mean():.3f}, "
+        f"neighbour-informed mean {st['r2_rule'].mean():.3f}"), [png]
+
+
 def gate_G25_not_collinear(spec_path: str):
     gt, st = _stats_for(spec_path)
     png = viz.identifiability_panels(st, os.path.join(_ARTDIR[0], "G22_identifiability.png"))
@@ -296,6 +328,7 @@ STAGE_CHECKS = {
     "G23": gate_G23_gradient_from_neighbours,
     "G24": gate_G24_heterogeneity_readable,
     "G25": gate_G25_not_collinear,
+    "G26": gate_G26_graph_is_necessary,
 }
 
 

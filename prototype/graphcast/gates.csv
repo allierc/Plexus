@@ -1,27 +1,29 @@
 id,tier,stage,gate,threshold,unit,measured,outcome,artifacts,note
-G1,bookkeeping,0,all four options PARSE (24 combinations),24 of 24 option combinations load,configs,24,PASS,/workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G1_options.png,24 enumerated
+G1,bookkeeping,0,all four options PARSE (24 combinations),24 of 24 option combinations load,configs,24,PASS,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G1_options.png,24 enumerated
 G1b,bookkeeping,2,all four options BUILD and take one step,24 of 24 option combinations run one forward step,configs,,SKIP,,
-G2,bookkeeping,0,nothing dataset-specific is hardcoded,0 offending literals outside config/,literals,0,PASS,/workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G2_scan.png,"8 files, 1989 lines, constants only (docstrings exempt)"
+G2,bookkeeping,0,nothing dataset-specific is hardcoded,0 offending literals outside config/,literals,0,PASS,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G2_scan.png,"8 files, 2263 lines, constants only (docstrings exempt)"
 G3,bookkeeping,4,scatter->gather round trip on a constant field,< 1e-6 of the field value,fraction of the field value,,SKIP,,
 G4,bookkeeping,4,transfer weights are a partition of unity,|sum(w) - 1| < 1e-6,dimensionless,,SKIP,,
 G5,bookkeeping,2,simple + 1 pass + no enc/dec is arithmetically NeuralGNN,< 1e-5 of the voltage range,fraction of the voltage range,,SKIP,,
 G6,bookkeeping,3,residual blocks start at identity: 1 vs 16 passes at init,bit-identical (max |delta| == 0),absolute,,SKIP,,
-G7,bookkeeping,0,"units declared, and every measurement threshold is in phenomenon units",1 = declared and checked,boolean,1,PASS,/workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G7_units.png,"length_um=100.0, time_s=0.05"
+G7,bookkeeping,0,"units declared, and every measurement threshold is in phenomenon units",1 = declared and checked,boolean,1,PASS,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G7_units.png,"length_um=100.0, time_s=0.05"
 G8,bookkeeping,3,a K=20 rollout on the toy does not diverge,state norm stays < 2x the ground-truth norm,ratio to the GT norm,,SKIP,,
-G9,closed_form,2,recover the spatial interaction kernel (toy_small),R^2 > 0.90 against the GT kernel,R^2 against the GT kernel,,SKIP,,
-G10,closed_form,2,"recover per-type time constants, GT graph supplied",R^2 > 0.95 against the known tau,R^2 against known tau,,SKIP,,
-G11,closed_form,2,a_i recovers the types (toy_small),ARI > 0.70 against the 8 true types,adjusted Rand index,,SKIP,,
-G12,closed_form,5,a_i recovers the types (toy_large),ARI > 0.70 against the 65 true types,adjusted Rand index,,SKIP,,
-G13,closed_form,2,recover the per-neuron stimulus gain b_i,R^2 > 0.90 against the true gain,R^2 against the true b_i,,SKIP,,
-G14,closed_form,4,encoder/decoder is a genuine option: on vs off,|delta R^2(kernel)| < 0.03,R^2 difference,,SKIP,,
+G9,closed_form,2,the message becomes a gradient operator,R^2 > 0.90 against the true field gradient,R^2 against du/dx,,SKIP,,
+G10,closed_form,2,recover the per-node time constant,R^2 > 0.95 against the known tau,R^2 against known tau,,SKIP,,
+G11,closed_form,2,the embedding recovers the types (small toy),ARI > 0.70 against the 6 true types,adjusted Rand index,,SKIP,,
+G12,closed_form,5,the embedding recovers the types (large toy),ARI > 0.70 against the 65 true types,adjusted Rand index,,SKIP,,
+G13,closed_form,2,recover the per-node SIGNED GAIN (the heterogeneity),R^2 > 0.90 against the true g_i,R^2 against the true g_i,,SKIP,,
+G14,closed_form,4,encoder/decoder is a genuine option: on vs off,|delta R^2(gradient)| < 0.03,R^2 difference,,SKIP,,
 G15,closed_form,3,"graphcast vs simple message is RESOLVED, either way","|delta| reported against the 3-seed floor; below it is UNRESOLVED, not ranked",R^2 difference vs the measured floor,,SKIP,,
-G16,closed_form,1,types are spatially mixed by construction,spatial-cell type purity within 20% of chance (1/n_types),purity as a multiple of chance,1.13123,PASS,/workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G16_toy.png /workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G16_state.mp4,"worst over 2:1.13, 4:1.03, 8:1.06, 16:1.04, 32:1.01"
+G16,closed_form,1,types are spatially mixed by construction,spatial-cell type purity within 20% of chance (1/n_types),purity as a multiple of chance,1.13123,PASS,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G16_toy.png /workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G16_state.mp4,"worst over 2:1.13, 4:1.03, 8:1.06, 16:1.04, 32:1.01"
 G17,measurement,6,ZAPBench held-out prediction of d(dF/F)/dt,"R^2 > 0.268, the parameter-free kNN spatial pool",held-out R^2,,SKIP,,
 G18,measurement,6,the learned stimulus gain b_i is spatially structured,"Moran's I > 0.2 over the soma graph, against a permutation null",Moran's I,,SKIP,,
 G19,measurement,6,fitted calcium decay time constant,0.5 - 2 s (GCaMP6),seconds,,SKIP,,
 G20,measurement,7,redox field fit reproduces the washout response,"THRESHOLD TO BE FIXED from Development_Time_Trend.xlsx, before the run",minutes and sign,,SKIP,,
-G21,closed_form,1,"the coarse field is a travelling wave, cyclic left to right",phase drift per frame within 5% of lambda/period,fraction of lambda/period,0.00522436,PASS,/workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G21_field.mp4,"measured 0.159 cells/frame vs 0.160 expected, 251 recorded frames"
-G22,closed_form,1,"the fine rule is exactly recoverable from (v, grad u)",minimum per-node R^2 > 0.90,"R^2, worst node",0.99812,PASS,/workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G22_identifiability.png,"mean 0.9997, median 1.0000"
-G23,closed_form,1,the gradient is reconstructible from neighbours' states,"R^2 > 0.95, else the graph cannot carry the fine rule",R^2,1,PASS,/workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G22_identifiability.png,worst node 1.0000
-G24,closed_form,1,the heterogeneity is linearly readable,"corr(fitted gain, true g_i) > 0.90",Pearson correlation,0.980654,PASS,/workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G24_heterogeneity.png,fitted/true gain ratio 1.029 (1.0 == exact)
-G25,closed_form,1,connected nodes are not collinear,mean |corr| between connected nodes < 0.80,Pearson correlation,0.607392,PASS,/workspace/Plexus/prototype/graphcast/log/toy_wave_noed_simple_p1_free/G22_identifiability.png,max 1.000 over 333 sampled edges
+G21,closed_form,1,"the coarse field is a travelling wave, cyclic left to right",phase drift per frame within 5% of lambda/period,fraction of lambda/period,0.00463429,PASS,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G21_field.mp4,"measured 0.159 cells/frame vs 0.160 expected, 251 recorded frames"
+G22,closed_form,1,"the fine rule is exactly recoverable from (v, grad u)",minimum per-node R^2 > 0.90,"R^2, worst node",0.303777,FAIL,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G22_identifiability.png,"mean 0.9961, median 1.0000"
+G23,closed_form,1,the gradient is reconstructible from neighbours' states,"R^2 > 0.95, else the graph cannot carry the fine rule",R^2,1,PASS,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G22_identifiability.png,worst node 1.0000
+G24,closed_form,1,the heterogeneity is linearly readable,"corr(fitted gain, true g_i) > 0.90",Pearson correlation,0.933716,PASS,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G24_heterogeneity.png,fitted/true gain ratio 1.032 (1.0 == exact)
+G25,closed_form,1,connected nodes are not collinear,mean |corr| between connected nodes < 0.80,Pearson correlation,0.606286,PASS,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G22_identifiability.png,max 1.000 over 333 sampled edges
+G26,closed_form,2,the graph is NECESSARY: a node-local baseline cannot fit,"node-local R^2 < 0.50 while (v, grad u) exceeds 0.90",R^2 of a node-local predictor,0.999974,FAIL,/workspace/Plexus/prototype/graphcast/log/toy_envelope_noed_simple_p1_free/G26_necessity.png,"coarse rule 'envelope', drive observed; node-local mean 0.999, neighbour-informed mean 0.996"
+G27,closed_form,6,which coarse rule forces the graph,"the three toys ranked by G26; reported, not tuned",spread in node-local R^2 across the three coarse rules,,SKIP,,

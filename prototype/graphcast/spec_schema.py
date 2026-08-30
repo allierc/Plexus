@@ -189,6 +189,16 @@ class RolloutSpec:
     schedule: list = field(default_factory=lambda: [1])
     tail_fraction: float = 0.0        # fraction of n_iter spent in the rollout tail
     tail_lr_scale: float = 1.0e-3
+    # THE KNOBS THE WEEKEND GRID SEPARATED (papers/weekend_experiment_2026_08_28.md, task 1).
+    # Its result: plain t+1 wins. `pushforward` (bptt_window 1) costs 0.082 in R^2_W, so the long
+    # gradient chain is load-bearing; `last` (endpoint-only) costs 0.028, so dense per-step
+    # supervision earns its keep. Both are the two arms that cleared the 0.015 resolution floor,
+    # and both are things GraphCast also refuses to do. They are implemented so the finding can be
+    # reproduced here rather than assumed.
+    bptt_window: Optional[int] = None      # None = full BPTT; 1 = pushforward
+    shooting_stride: Optional[int] = None  # re-anchor on real data every n steps
+    step_weighting: str = "uniform"        # uniform | discount | last
+    discount: float = 0.5
 
     @classmethod
     def parse(cls, raw: dict) -> "RolloutSpec":
@@ -197,9 +207,18 @@ class RolloutSpec:
         sched = [int(k) for k in raw.get("schedule", [1])]
         if any(k < 1 for k in sched):
             raise ValueError(f"training.rollout.schedule entries must be >= 1, got {sched}")
+        sw = str(raw.get("step_weighting", "uniform"))
+        if sw not in ("uniform", "discount", "last"):
+            raise ValueError(f"training.rollout.step_weighting: {sw!r} is not one of "
+                             f"'uniform', 'discount', 'last'")
         return cls(schedule=sched,
                    tail_fraction=float(tail.get("fraction", 0.0)),
-                   tail_lr_scale=float(tail.get("lr_scale", 1.0e-3)))
+                   tail_lr_scale=float(tail.get("lr_scale", 1.0e-3)),
+                   bptt_window=(None if raw.get("bptt_window") is None
+                                else int(raw["bptt_window"])),
+                   shooting_stride=(None if raw.get("shooting_stride") is None
+                                    else int(raw["shooting_stride"])),
+                   step_weighting=sw, discount=float(raw.get("discount", 0.5)))
 
 
 @dataclass
@@ -211,7 +230,21 @@ class TrainingSpec:
     n_iter: int = 10_000
     batch_frames: int = 8
     lr: float = 1.0e-3
+    lr_W: Optional[float] = None            # W gets its OWN rate in every production config
     lr_embedding: Optional[float] = None
+    # --- the regularisers connectome-gnn's production configs actually run with -------------- #
+    # (config/fly/flyvis_noise_005_calib_nominal_l4.yaml). These are not decoration: the weekend
+    # benchmark measured the group lasso recovering +0.153 in R^2_W on 5/5 folds, by removing a
+    # degeneracy rather than by expressing a preference for simple models.
+    coeff_W_L1: float = 0.0
+    coeff_W_L2: float = 0.0
+    coeff_msg_weight_L1: float = 0.0        # g_phi weight L1
+    coeff_msg_weight_L2: float = 0.0
+    coeff_update_weight_L1: float = 0.0     # f_theta weight L1
+    coeff_update_weight_L2: float = 0.0
+    coeff_msg_smooth: float = 0.0           # the g_phi_diff smoothness prior
+    coeff_msg_input_group: float = 0.0      # group lasso over g_phi's input blocks
+    regul_annealing_rate: float = 0.0
     lr_scheduler: str = "linear_warmup_cosine"
     warmup_iters: int = 1_000
     weight_decay: float = 0.1
@@ -233,7 +266,17 @@ class TrainingSpec:
             n_iter=int(raw.get("n_iter", 10_000)),
             batch_frames=int(raw.get("batch_frames", 8)),
             lr=float(raw.get("lr", 1.0e-3)),
+            lr_W=(None if raw.get("lr_W") is None else float(raw["lr_W"])),
             lr_embedding=(None if raw.get("lr_embedding") is None else float(raw["lr_embedding"])),
+            coeff_W_L1=float(raw.get("coeff_W_L1", 0.0)),
+            coeff_W_L2=float(raw.get("coeff_W_L2", 0.0)),
+            coeff_msg_weight_L1=float(raw.get("coeff_msg_weight_L1", 0.0)),
+            coeff_msg_weight_L2=float(raw.get("coeff_msg_weight_L2", 0.0)),
+            coeff_update_weight_L1=float(raw.get("coeff_update_weight_L1", 0.0)),
+            coeff_update_weight_L2=float(raw.get("coeff_update_weight_L2", 0.0)),
+            coeff_msg_smooth=float(raw.get("coeff_msg_smooth", 0.0)),
+            coeff_msg_input_group=float(raw.get("coeff_msg_input_group", 0.0)),
+            regul_annealing_rate=float(raw.get("regul_annealing_rate", 0.0)),
             lr_scheduler=str(raw.get("lr_scheduler", "linear_warmup_cosine")),
             warmup_iters=int(raw.get("warmup_iters", 1_000)),
             weight_decay=float(raw.get("weight_decay", 0.1)),

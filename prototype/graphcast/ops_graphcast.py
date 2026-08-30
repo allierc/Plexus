@@ -40,17 +40,30 @@ from plexus.models.base import Exchange, Operator
 from plexus.models.registry import register_operator
 
 
-@register_operator("wave_field", family="fields", set="field", kind="field")
+@register_operator("wave_field", family="fields", set="field", kind="field",
+                   model="travelling")
 class WaveField(Operator):
-    """COARSE RULE: a travelling wave written onto the grid, cyclic along axis 0.
+    """COARSE RULE, three models. Each is a different claim about what the coarse scale does, and
+    the difference decides whether the fine scale can be solved without a graph at all.
 
-    u(x, t) = amplitude * sin(2 pi (x / wavelength - t / period))
+        travelling   u = A sin(2 pi (x/lam - t/T))
+                     The exact solution of du/dt + c du/dx = 0. But for ANY u = f(x - ct),
+                     du/dx = -(1/c) du/dt, so a model that can see u recovers the gradient from
+                     that node's own history and the graph is never necessary. Measured: loss
+                     0.005 with gradient recovery 0.000. Usable only with the drive WITHHELD.
 
-    This is prescribed rather than stepped, and that is a deliberate choice rather than a
-    shortcut: it is the exact solution of du/dt + c du/dx = 0, so the coarse scale obeys an
-    advection PDE with no discretisation error of its own to confound the fine scale's recovery.
-    The wave is the only thing driving the system, so any error here would be indistinguishable
-    from an error in the rule being tested.
+        counter      u = A sin(2 pi (x/lam - t/T)) + A2 sin(2 pi (x/lam2 + t/T2))
+                     Two waves travelling in OPPOSITE directions at different wavelengths. u is no
+                     longer a function of a single (x - ct), so its value does not determine its
+                     slope, and the graph is required EVEN WHEN THE DRIVE IS OBSERVED. This is the
+                     case that resembles the real datasets, where the stimulus is known.
+
+        envelope     u = A(x, y) sin(2 pi (x/lam - t/T)),  A(x,y) a fixed smooth envelope
+                     The sinusoid's gradient is still locally available, but the envelope's
+                     dA/dx is not. A graded case: part of the gradient needs neighbours.
+
+    `model:` selects between them in the spec, so which coarse rule actually forces the graph is an
+    experiment the gates decide rather than an assumption baked into the code.
     """
 
     EMIT = None                       # writes the field in place; no integrable set delta
@@ -64,31 +77,76 @@ class WaveField(Operator):
     REQUIRES_PARAMS: list = []
     MECHANISM_TAGS = ["advection", "travelling_wave", "external_drive"]
     PARAM_ROLES = {"amplitude": "wave_amplitude", "wavelength": "wave_length_scale",
-                   "period": "wave_period_frames", "axis": "propagation_axis"}
+                   "period": "wave_period_frames", "axis": "propagation_axis",
+                   "wavelength2": "counter_wave_length_scale",
+                   "period2": "counter_wave_period_frames",
+                   "envelope_scale": "envelope_length_scale"}
+    KIND_NAME = "travelling"
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.field_name = params.get("_at") or params.get("to")
         self.channel = int(params.get("channel", 0))
         self.amplitude = self.tunable(params.get("amplitude"), 1.0)
-        self.wavelength = self.tunable(params.get("wavelength"), 0.5)
-        self.period = self.tunable(params.get("period"), 100.0)
+        self.wavelength = self.tunable(params.get("wavelength"), 0.15)
+        self.period = self.tunable(params.get("period"), 120.0)
         self.axis = int(params.get("axis", 0))
+        self.amplitude2 = self.tunable(params.get("amplitude2"), 0.8)
+        self.wavelength2 = self.tunable(params.get("wavelength2"), 0.23)
+        self.period2 = self.tunable(params.get("period2"), 77.0)
+        self.envelope_scale = self.tunable(params.get("envelope_scale"), 0.35)
+
+    def _coords(self, grid):
+        """Per-axis coordinates of each cell centre, in world units 0..1, broadcast to the grid."""
+        res = grid.shape
+        out = []
+        for d, n in enumerate(res):
+            c = (torch.arange(n, device=grid.device, dtype=grid.dtype) + 0.5) / n
+            shape = [1] * len(res)
+            shape[d] = n
+            out.append(c.reshape(shape).expand(res))
+        return out
+
+    def _u(self, coords, t):
+        x = coords[self.axis]
+        return self.amplitude * torch.sin(
+            2.0 * math.pi * (x / self.wavelength - t / self.period))
 
     def forward(self, H, mask=None):
         fld = H.fields[self.field_name]
-        grid = fld.grid[self.channel]
-        res = grid.shape
-        # coordinates of each cell centre along the propagation axis, in world units 0..1
-        n = res[self.axis]
-        coord = (torch.arange(n, device=grid.device, dtype=grid.dtype) + 0.5) / n
-        shape = [1] * len(res)
-        shape[self.axis] = n
-        x = coord.reshape(shape).expand(res)
-        t = float(getattr(H, "frame", 0))
-        fld.grid[self.channel] = self.amplitude * torch.sin(
-            2.0 * math.pi * (x / self.wavelength - t / self.period))
+        coords = self._coords(fld.grid[self.channel])
+        fld.grid[self.channel] = self._u(coords, float(getattr(H, "frame", 0)))
         return {}
+
+
+@register_operator("wave_field", family="fields", set="field", kind="field", model="counter")
+class WaveFieldCounter(WaveField):
+    """Two counter-propagating waves. u no longer determines du/dx, so the graph is required even
+    when the drive is observed -- the property `travelling` lacks."""
+
+    KIND_NAME = "counter"
+
+    def _u(self, coords, t):
+        x = coords[self.axis]
+        return (self.amplitude * torch.sin(2.0 * math.pi * (x / self.wavelength - t / self.period))
+                + self.amplitude2 * torch.sin(
+                    2.0 * math.pi * (x / self.wavelength2 + t / self.period2)))
+
+
+@register_operator("wave_field", family="fields", set="field", kind="field", model="envelope")
+class WaveFieldEnvelope(WaveField):
+    """A travelling wave under a fixed smooth envelope. The carrier's gradient is locally
+    available; the envelope's is not, so only part of du/dx needs neighbours."""
+
+    KIND_NAME = "envelope"
+
+    def _u(self, coords, t):
+        x = coords[self.axis]
+        other = coords[1] if len(coords) > 1 else coords[0]
+        env = 0.5 + 0.5 * torch.cos(2.0 * math.pi * x / max(float(self.envelope_scale), 1e-6)) \
+            * torch.cos(2.0 * math.pi * other / max(float(self.envelope_scale), 1e-6))
+        return self.amplitude * env * torch.sin(
+            2.0 * math.pi * (x / self.wavelength - t / self.period))
 
 
 @register_operator("gradient_gain", family="signalling", set="neuron", kind="exchange")
