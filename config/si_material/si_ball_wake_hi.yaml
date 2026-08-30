@@ -1,0 +1,181 @@
+general:
+  name: si_ball_wake_hi
+  seed: 0
+  n_frames: 700
+  dt: 0.000178
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.3
+  - 0.03333333333333333
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 60
+    start:
+    - &id001
+      - 0.05
+      - 0.288
+      - 0.016666666666666666
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    types:
+      ball:
+        fraction: 0.016666666666666666
+        material: elastic
+        youngs: 5000000.0
+        density: 7850.0
+        shape: ball
+      water:
+        fraction: 0.9833333333333333
+        material: liquid
+        bulk_modulus: 3000000.0
+        density: 1000.0
+        eta: 0.001
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.1
+        - 0.3
+        - 0.03333333333333333
+  mpm_particle:
+    parent: cell
+    per_parent: 450000
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 3.7584e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 450
+operators:
+- op: gravity
+  at: cell
+  g: 88.29
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 1800.0
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+schedule:
+- gravity
+- substep_dt: 4.810811e-06
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 2
+    only: true
+    max_points: 1000000
+  color_field: vorticity
+  color_range:
+  - 1.0
+  - 1000.0
+  field_log: true
+  field_cmap: turbo
+  colors:
+    ball:
+    - 0.95
+    - 0.35
+    - 0.3
+    water:
+    - 0.3
+    - 0.62
+    - 1.0

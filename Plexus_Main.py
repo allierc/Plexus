@@ -65,8 +65,14 @@ def main():
                         help="NO RENDERING AT ALL: no live mp4, no live png snapshots, no plot pass, "
                              "no captioning. This is how a throughput measurement is taken -- the "
                              "ms/frame a render is folded into is not the simulation's")
-    parser.add_argument("--render-n", default="400000",
-                        help="particles DRAWN in the live mp4; the run still simulates all of them. "
+    # DRAW EVERYTHING BY DEFAULT, capped at 500 M. 400,000 was a 2018-era guess and it silently
+    # turned every large run into a picture of 0.4% of itself: at 5 M drawn/simulated a body that is
+    # 2% of the scene got 2% of 8% and read as absent, which cost a real debugging session. The cap
+    # is a cap, not a target -- a spec asking for fewer still gets fewer, and the render is a small
+    # share of frame time next to the substeps at every size measured here.
+    parser.add_argument("--render-n", default="500000000",
+                        help="particles DRAWN in the live mp4 (default: all, capped at 500 M); "
+                             "the run still simulates all of them. "
                              "COMMA-SEPARATED writes one movie per value (movie_10M.mp4, "
                              "movie_50M.mp4, ...) from the SAME simulation -- the only way to see a "
                              "run at several draw counts when its trajectory is too big to store")

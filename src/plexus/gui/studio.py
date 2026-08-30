@@ -397,7 +397,8 @@ def author_spec(prompt: str, name: str, current: str = "", timeout: int = 600,
 
 
 # THE FOUR KNOBS THE INTERFACE OWNS, and their defaults.
-DEFAULTS = {"frames": 500, "particles": 100_000, "n_grid": 96, "width": 0.10}
+DEFAULTS = {"frames": 500, "particles": 100_000, "n_grid": 96, "width": 0.10,
+            "steps": 25}
 
 
 def _body_volume(spec: dict) -> float:
@@ -426,6 +427,94 @@ def _body_volume(spec: dict) -> float:
         rho = float(mp.get("density") or 1000.0)
         tot = n * m / rho if (n and m and rho) else 0.0
     return max(tot, 1e-12)
+
+
+def type_coverage(spec: dict) -> list[str]:
+    """Types that will receive ZERO members, with the reason. Empty list means every type lands.
+
+    `fraction` PARTITIONS THE PARENT SET, NOT THE PARTICLES -- `engine.py:623` computes
+    `k = round(fraction * n_cells)` and gives the remainder to the last type. So a two-material
+    scene written as one cell with fractions 0.02 / 0.98 puts BOTH materials in the same single
+    cell, rounds the first to zero, and the last type absorbs everything. The spec is valid, the
+    run succeeds, and the body simply is not there -- which reads as a rendering fault and is not
+    one. Measured on a ball-in-a-pool spec: 0 of 200,000 particles above the pool surface, cell
+    node_type = [1].
+
+    The cure is `n: <one cell per body>` with a `start` per cell, which is what
+    si_two_drops3d_s144 shows; fractions are for MANY cells of mixed kind, not for two bodies.
+    """
+    out = []
+    cell = (spec.get("sets") or {}).get("cell") or {}
+    types = cell.get("types") or {}
+    n = int(cell.get("n", 1) or 1)
+    if len(types) < 2:
+        return out
+    names = list(types)
+    start = 0
+    for i, nm in enumerate(names):
+        k = (n - start) if i == len(names) - 1 else int(round(float(types[nm].get("fraction", 0)) * n))
+        if k <= 0:
+            out.append(f"type '{nm}' gets 0 of {n} cell{'s' if n != 1 else ''} "
+                       f"(fraction {float(types[nm].get('fraction', 0)):.4g} x {n} rounds to 0) "
+                       f"-- it will not exist. `fraction` splits CELLS, not particles: give each "
+                       f"body its own cell (`n: {len(names)}` with a `start` per body).")
+        start += k
+    return out
+
+
+def _cells_for_fractions(spec: dict) -> str:
+    """Raise `cell.n` until every declared type gets at least one cell. Returns a note, or "".
+
+    THE MODEL KEEPS WRITING `n: 1` FOR A TWO-BODY SCENE, and the result is not an error: the spec
+    validates, the run succeeds, and one of the bodies is simply absent. `fraction` partitions the
+    PARENT SET -- engine.py:623 is `k = round(fraction * n_cells)`, with the last type taking the
+    remainder -- so a ball at fraction 0.0909 in ONE cell rounds to zero and the water absorbs
+    everything. Measured twice on the studio's own output: 0 of 100,000 particles above the pool.
+
+    ONE CELL PER BODY IS THE WRONG FIX, and that is why this raises `n` instead. `per_parent` is per
+    cell and uniform, so `n: 2` would give a 1 cm ball and a 10 cm pool 550,000 particles each. With
+    `n = ceil(1/min_fraction)` the CELL COUNTS carry the ratio: 11 cells at 100k is 1 ball cell and
+    10 water cells, i.e. exactly the "100k ball, 1M pool" the prompt asked for.
+
+    THE STARTS ARE ALL THE SAME POINT, deliberately. Which cell gets which type is a random
+    permutation (engine.py:618), so `start[i]` cannot be matched to a type by index. A type carrying
+    a `block` is placed by that block and ignores `start`, so replicating the one position the model
+    gave leaves the block bodies where they are and puts the sphere where it was meant to go --
+    verified: ball at y 0.068-0.082 around 0.075, water filling y 0-0.025.
+    """
+    cell = ((spec.get("sets") or {}).get("cell") or {})
+    types = cell.get("types") or {}
+    if len(types) < 2:
+        return ""
+    fr = [float(t.get("fraction", 0.0) or 0.0) for t in types.values()]
+    if min(fr) <= 0.0:
+        return ""
+
+    def _lands(n):                       # the engine's own assignment, replayed
+        start, out = 0, []
+        for i, f in enumerate(fr):
+            k = (n - start) if i == len(fr) - 1 else int(round(f * n))
+            out.append(k); start += k
+        return out
+
+    n0 = int(cell.get("n", 1) or 1)
+    if all(k >= 1 for k in _lands(n0)):
+        return ""
+    n = n0
+    for cand in range(max(n0, 2), 401):
+        if all(k >= 1 for k in _lands(cand)):
+            n = cand
+            break
+    else:
+        return ""
+    cell["n"] = n
+    st = cell.get("start")
+    if st:
+        cell["start"] = [list(st[0]) for _ in range(n)]
+    got = _lands(n)
+    return (f"cell.n {n0} -> {n} so every type gets a cell "
+            f"({', '.join(f'{nm} {c}' for nm, c in zip(types, got))}); "
+            f"at n={n0} the smallest would have rounded to 0 and not existed")
 
 
 def apply_knobs(spec: dict, k: dict) -> dict:
@@ -464,6 +553,22 @@ def apply_knobs(spec: dict, k: dict) -> dict:
         st = (spec.get("sets") or {}).get("cell") or {}
         if st.get("start"):
             st["start"] = [[float(x) * r for x in p] for p in st["start"]]
+    # STEPS / FRAME IS A COST CONTROL, AND IT IS THE BIGGEST ONE. Substeps multiply frame time
+    # linearly, and the CFL bound dt <= cfl*dx/c makes them explode as the box shrinks: a 10 cm box
+    # at n_grid 96 asks for 231 substeps where the 50 cm benchmark asks 26, which is 8.1 s/frame
+    # against 0.9. A preview exists to show whether the geometry is right, and 231 substeps of
+    # accuracy buys nothing towards that. `cfl_lock` stops Plexus_Main's CFL pass from quietly
+    # putting the number back -- it still prints the full verdict and the factor it is over by, so
+    # the trade is stated rather than hidden. Raise it (or clear the field) before a real run.
+    _split_note = _cells_for_fractions(spec)
+    if _split_note:
+        print(f"[studio] {_split_note}", flush=True)
+    steps = max(1, int(k.get("steps", DEFAULTS["steps"]) or DEFAULTS["steps"]))
+    _dt = float(g.get("dt", 1.0 / 1200.0))
+    for blk in (spec.get("schedule") or []):
+        if isinstance(blk, dict) and "steps" in blk:
+            blk["substep_dt"] = float(f"{_dt / steps:.7g}")
+    g["cfl_lock"] = True
     for fc in (spec.get("fields") or {}).values():
         if isinstance(fc, dict) and "n_grid" in fc:
             fc["n_grid"] = ng
@@ -595,6 +700,34 @@ def metrics(spec: dict, k: dict) -> dict:
     return {"ppc": ppc, "cfl": cfl}
 
 
+def particles_from_prompt(text: str) -> int | None:
+    """A particle count NAMED IN THE PROMPT, or None.
+
+    The knobs normally own this number (see `apply_knobs`), because particles-per-cell couples it to
+    n_grid and the model choosing both independently produces a body the grid cannot see. But a
+    prompt that says "5m particles" is not the model guessing -- it is the person asking -- and
+    silently running 100k instead is the interface overruling its user without saying so. When the
+    prompt names a count it wins, and the field is updated to show what actually ran.
+
+    Reads `5m`, `5 M`, `5 million`, `100k`, `1,000,000`, each optionally followed by `particles`.
+    """
+    import re as _re
+    t = text.lower().replace(",", "")
+    m = _re.search(r"(\d+(?:\.\d+)?)\s*(m\b|million|k\b|thousand)?\s*particle", t)
+    if not m:
+        m = _re.search(r"(\d+(?:\.\d+)?)\s*(m\b|million|k\b|thousand)\s", t + " ")
+        if not m:
+            return None
+    v = float(m.group(1))
+    unit = (m.group(2) or "").strip()
+    if unit in ("m", "million"):
+        v *= 1e6
+    elif unit in ("k", "thousand"):
+        v *= 1e3
+    v = int(round(v))
+    return v if 1_000 <= v <= 2_000_000_000 else None
+
+
 def knob_report(spec: dict, k: dict) -> str:
     """What the knobs came out to, in the terms that decide whether the run is sane."""
     w = float(k.get("width", DEFAULTS["width"]))
@@ -602,8 +735,11 @@ def knob_report(spec: dict, k: dict) -> str:
     n = int(k.get("particles", DEFAULTS["particles"]))
     dx = w / ng
     V = _body_volume(spec)
-    return (f"{n:,} particles  |  {ng}^3 cells, dx {dx * 1000:.2f} mm  |  body {V * 1e6:.1f} cm^3"
+    base = (f"{n:,} particles  |  {ng}^3 cells, dx {dx * 1000:.2f} mm  |  body {V * 1e6:.1f} cm^3"
             f"  |  ppc {n * dx ** 3 / V:.1f}")
+    # A BODY THAT WILL NOT EXIST OUTRANKS EVERY OTHER NUMBER HERE, so it goes first and in words.
+    gone = type_coverage(spec)
+    return ("!! " + "  ".join(gone) + "\n" + base) if gone else base
 
 
 # ------------------------------------------------------------------------------ the dev channel
@@ -751,6 +887,31 @@ def start_dev(prompt: str, model: str = "sonnet", timeout: int = 900) -> dict:
 
 # --------------------------------------------------------------------------------- run tracking
 WORKER: dict = {"p": None, "lock": threading.Lock(), "ready": False, "started": 0.0}
+
+
+def worker_stop(timeout: float = 4.0) -> None:
+    """Stop the warm worker, and make sure it is actually gone.
+
+    IT HOLDS A CUDA CONTEXT AND THE STUDIO'S STDOUT PIPE, so a server that exits without it leaves
+    a process pinning GPU memory and, if it is mid-render, writing into a directory nobody is
+    watching. `terminate` first because the worker's loop is a plain `for line in sys.stdin` and
+    closing stdin ends it cleanly; `kill` after the timeout because a warp kernel compile does not
+    check for signals and will outlast a polite request.
+    """
+    w = WORKER.get("p")
+    if w is None or w.poll() is not None:
+        return
+    try:
+        if w.stdin:
+            w.stdin.close()
+        w.terminate()
+        w.wait(timeout=timeout)
+    except Exception:                                                # noqa: BLE001
+        try:
+            w.kill()
+        except Exception:                                            # noqa: BLE001
+            pass
+    WORKER.update(ready=False)
 
 
 def worker_start() -> bool:
@@ -938,7 +1099,11 @@ def start_run(name: str, device: str = "cuda:1", preview: bool = False) -> dict:
         _y.safe_dump(s, open(os.path.join(CONFIG_DIR, run_name + ".yaml"), "w"),
                      sort_keys=False, default_flow_style=False)
     j = Job(run_name, device, tag="preview" if preview else "generate",
-            render_n=200_000 if preview else 400_000)
+            # DRAW EVERY PARTICLE. 200k of 5.1M is 3.9%, and a body that is 2% of the scene then
+            # gets 2% of 3.9% -- a few hundred dots that read as absent. A preview whose job is
+            # "is the geometry right" cannot answer it on a sample; the render is a small share of
+            # a preview's cost anyway (the substeps are the cost, see `steps` in apply_knobs).
+            render_n=10**9)
     j.for_spec = name                                                    # type: ignore[attr-defined]
     JOBS[name] = j
     return {"started": True, "name": name, "run_name": run_name, "tag": j.tag}
@@ -1117,6 +1282,7 @@ renders or validates on its own &mdash; the preview and the full run are the sam
       <div class="k"><span class="label">Particles</span><input id="particles" value="100000"></div>
       <div class="k"><span class="label">Grid</span><input id="ngrid" value="96"></div>
       <div class="k"><span class="label">Width (cm)</span><input id="width" value="10"></div>
+      <div class="k"><span class="label">Steps / frame</span><input id="steps" value="25"></div>
     </div>
     <div class="stat" id="knobstat" style="min-height:16px"></div>
     <div class="gauge" id="g_ppc"><b>PARTICLES / CELL</b><span id="t_ppc">--</span></div>
@@ -1129,6 +1295,7 @@ renders or validates on its own &mdash; the preview and the full run are the sam
     <select id="effort"><option>low</option><option>medium</option><option>high</option></select>
     <label class="chk"><input type="checkbox" id="deep"> deep (read config/ + paper, slower)</label>
     <button class="wide" id="newspec" style="margin-top:6px">New scene</button>
+    <button class="wide" id="quit" style="margin-top:6px;border-color:#7a3b3b;color:#c98b8b">Quit studio</button>
   </div>
 
   <div>
@@ -1140,7 +1307,7 @@ renders or validates on its own &mdash; the preview and the full run are the sam
     <div style="margin-top:14px">
       <div class="promptrow">
         <span class="plexus">Plexus:</span>
-        <textarea id="prompt" rows="3" placeholder="describe a scene -- Enter to preview, Shift+Enter for a new line">a 2 cm water ball at 3/4 of the scene height, falling down</textarea>
+        <textarea id="prompt" rows="3" placeholder="describe a scene -- Enter to preview, Shift+Enter for a new line">a 1 cm solid ball 100k at 3/4 height of the scene falls into a 1M particles water pool at 1/4 height of the scene</textarea>
       </div>
       <div class="row">
         <button id="preview">Preview</button>
@@ -1193,8 +1360,17 @@ JS = r"""
 const $ = id => document.getElementById(id);
 let cur = null, poll = null, showing = "png";
 
+$("quit").onclick = async () => {
+  if (!confirm("Quit the studio? The server exits and port 8765 is released.")) return;
+  say("shutting down -- the port is released, relaunch with python Plexus_gui.py", "warn");
+  try { await fetch("/api/studio/quit", {method:"POST", body:"{}"}); } catch (e) {}
+  document.body.innerHTML =
+    "<div style='padding:40px;font:14px ui-monospace,monospace;color:#888'>" +
+    "studio stopped. port 8765 released.<br><br>relaunch: <b>python Plexus_gui.py</b></div>";
+};
 const knobs = () => ({frames:+$("frames").value||500, particles:+$("particles").value||100000,
-                      n_grid:+$("ngrid").value||96, width:(+$("width").value||10)/100});
+                      n_grid:+$("ngrid").value||96, width:(+$("width").value||10)/100,
+                      steps:+$("steps").value||25});
 
 const api = async (u, body) => {
   const r = await fetch(u, body ? {method:"POST", headers:{"Content-Type":"application/json"},
@@ -1277,6 +1453,10 @@ $("preview").onclick = async () => {
     const d = await authorRetrying(p);
     if (d.error) { $("preview").disabled = false; $("gen").disabled = false;
       return say("FAILED: " + d.error + (d.detail ? "\n" + d.detail : ""), "bad"); }
+    // THE FIELD FOLLOWS THE PROMPT. If the prompt named a particle count the server used it, so the
+    // box has to show what actually ran -- otherwise the next preview silently reverts to the stale
+    // number in the field.
+    if (d.particles) $("particles").value = d.particles;
     $("knobstat").textContent = d.report || "";
     lastPrompt = p; lastKnobs = knobKey();
     await select(d.name);
