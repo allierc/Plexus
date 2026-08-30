@@ -638,6 +638,72 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
         lvl.register_buffer(k, buf)
 
 
+
+# ==========================================================================================================
+# WHICH IMPLEMENTATION RUNS WHEN THE SPEC DOES NOT SAY
+# ==========================================================================================================
+MPM_WARP_DEFAULT = ("mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather")
+
+
+def _resolve_default_impl(sim, device: str, grad: bool = False) -> list[str]:
+    """Fill in `implementation: warp` for the MPM operators a spec left unspecified.
+
+    WHY THIS IS THE DEFAULT NOW, and it is a measured claim, not a preference. On si_waterfall
+    (570,760 particles, 96^3, 13 substeps) the whole-frame cost is 973.8 ms for the torch bodies,
+    38.7 ms with scatter/strain/gather on warp, and 31.8 ms with the grid solve on warp too -- the
+    last being fastest on BOTH cards and BOTH scenes of the sweep, by 1.22x on an A100 and 1.51x on
+    an A6000 over warp-without-the-grid-solve. Capture is already the engine's default
+    (`step.get("capture", True)`), so `warp` + capture is what a spec now gets for saying nothing.
+
+    IT FALLS BACK RATHER THAN FAILING, because `warp` is not a drop-in for every spec and a default
+    that raised would break 58 shipped 2D specs on the day it landed. Each condition below is a
+    thing the warp path genuinely cannot do:
+
+      dim != 3            the kernels are 3D; the 2D corpus stays on the torch bodies
+      device is cpu       warp kernels here are CUDA-only
+      periodic            the warp gather clamps at the box and does not wrap
+      grad=True           DIFFERENTIABLE = False -- no backward is registered with autograd, so an
+                          inverse run would silently get no gradient through the MPM cycle
+      legacy CSF          `mpm_grid_update[warp]` refuses surface_tension without csf_rho: that
+                          interface test is a reduction over the whole grid (54 specs)
+      csf_smooth, plate   not implemented in the fused kernel
+
+    WHAT IT COSTS THE CORPUS. `warp` is NOT bit-identical to the torch bodies -- reassociated 27-tap
+    sums and non-deterministic atomics, 6 ulp after 14 substeps -- so every 3D CUDA MPM spec that
+    named no implementation now produces slightly different numbers than it did. That is why the
+    resolution is written back onto the spec and printed: `implementation` is part of a run's
+    identity (section 6 of paper/mpm_warp.pdf), and a run must be able to say which one it used.
+    `implementation: default` forces the torch body back.
+    """
+    picked = []
+    # `implementation: default` IS AN ESCAPE HATCH, NOT A VARIANT NAME. Nothing is registered under
+    # that name, so it is normalised to None -- which is what selects the base torch body. The
+    # operators that asked are remembered, because the warp pass below keys on `impl is None` and
+    # would otherwise hand the hatch straight back to warp (it did, on the first attempt).
+    _forced = set()
+    for o in sim.operators:
+        if str(o.impl or "").lower() == "default":
+            o.impl = None
+            _forced.add(id(o))
+    if int(getattr(sim, "dim", 2)) != 3 or not str(device).startswith("cuda"):
+        return picked
+    if grad or str(getattr(sim, "boundary", "wall")).lower() == "periodic":
+        return picked
+    for o in sim.operators:
+        if o.op not in MPM_WARP_DEFAULT or o.impl is not None or id(o) in _forced:
+            continue
+        if o.op == "mpm_grid_update":
+            q = o.params
+            _st = float(q.get("surface_tension", 0.0) or 0.0)
+            if (_st > 0.0 and float(q.get("csf_rho", 0.0) or 0.0) <= 0.0
+                    or int(q.get("csf_smooth", 0) or 0)
+                    or q.get("plate_axis") is not None):
+                continue
+        o.impl = "warp"
+        picked.append(o.op)
+    return picked
+
+
 def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     """Construct the Hierarchy (levels + fields) from a validated `sim`, in three passes.
 
@@ -1281,6 +1347,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     returned `H`. And a structural operator must apply its writes FUNCTIONALLY (clone, write,
     publish) or it severs the tape for everything downstream of it -- see `agent_divide`.
     """
+    _picked = _resolve_default_impl(sim, device, grad)
+    if _picked:
+        print(f"[engine] implementation: warp for {', '.join(_picked)} "
+              f"(unset in the spec; `implementation: default` forces the torch body)", flush=True)
     H = build(sim, device)                    # 1) build the Hierarchy: every set (level) + field, from the spec
     seed(H, sim, device)                      # 1.5) x_0 = S(theta_S): the seed: section, exactly once
     H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
