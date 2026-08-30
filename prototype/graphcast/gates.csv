@@ -1,0 +1,22 @@
+id,tier,stage,gate,threshold,unit,measured,outcome,note
+G1,bookkeeping,0,all four options PARSE (24 combinations),24 of 24 option combinations load,configs,24,PASS,24 enumerated
+G1b,bookkeeping,2,all four options BUILD and take one step,24 of 24 option combinations run one forward step,configs,,SKIP,
+G2,bookkeeping,0,nothing dataset-specific is hardcoded,0 offending literals outside config/,literals,0,PASS,scanned .py under graphcast/
+G3,bookkeeping,4,scatter->gather round trip on a constant field,< 1e-6 of the field value,fraction of the field value,,SKIP,
+G4,bookkeeping,4,transfer weights are a partition of unity,|sum(w) - 1| < 1e-6,dimensionless,,SKIP,
+G5,bookkeeping,2,simple + 1 pass + no enc/dec is arithmetically NeuralGNN,< 1e-5 of the voltage range,fraction of the voltage range,,SKIP,
+G6,bookkeeping,3,residual blocks start at identity: 1 vs 16 passes at init,bit-identical (max |delta| == 0),absolute,,SKIP,
+G7,bookkeeping,0,"units declared, and every measurement threshold is in phenomenon units",1 = declared and checked,boolean,1,PASS,"length_um=10.0, time_s=0.02"
+G8,bookkeeping,3,a K=20 rollout on the toy does not diverge,state norm stays < 2x the ground-truth norm,ratio to the GT norm,,SKIP,
+G9,closed_form,2,recover the spatial interaction kernel (toy_small),R^2 > 0.90 against the GT kernel,R^2 against the GT kernel,,SKIP,
+G10,closed_form,2,"recover per-type time constants, GT graph supplied",R^2 > 0.95 against the known tau,R^2 against known tau,,SKIP,
+G11,closed_form,2,a_i recovers the types (toy_small),ARI > 0.70 against the 8 true types,adjusted Rand index,,SKIP,
+G12,closed_form,5,a_i recovers the types (toy_large),ARI > 0.70 against the 65 true types,adjusted Rand index,,SKIP,
+G13,closed_form,2,recover the per-neuron stimulus gain b_i,R^2 > 0.90 against the true gain,R^2 against the true b_i,,SKIP,
+G14,closed_form,4,encoder/decoder is a genuine option: on vs off,|delta R^2(kernel)| < 0.03,R^2 difference,,SKIP,
+G15,closed_form,3,"graphcast vs simple message is RESOLVED, either way","|delta| reported against the 3-seed floor; below it is UNRESOLVED, not ranked",R^2 difference vs the measured floor,,SKIP,
+G16,closed_form,1,types are spatially mixed by construction,spatial-cell type purity within 20% of chance (1/n_types),purity as a multiple of chance,,SKIP,
+G17,measurement,6,ZAPBench held-out prediction of d(dF/F)/dt,"R^2 > 0.268, the parameter-free kNN spatial pool",held-out R^2,,SKIP,
+G18,measurement,6,the learned stimulus gain b_i is spatially structured,"Moran's I > 0.2 over the soma graph, against a permutation null",Moran's I,,SKIP,
+G19,measurement,6,fitted calcium decay time constant,0.5 - 2 s (GCaMP6),seconds,,SKIP,
+G20,measurement,7,redox field fit reproduces the washout response,"THRESHOLD TO BE FIXED from Development_Time_Trend.xlsx, before the run",minutes and sign,,SKIP,
