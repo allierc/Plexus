@@ -1,0 +1,482 @@
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 320
+general:
+  boundary: wall
+  dim: 3
+  dt: 0.0036
+  n_frames: 180
+  name: si_bench_1b
+  record_cap: 2
+  seed: 0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  save_data: false
+operators:
+- at: cell
+  g: 16.0
+  op: gravity
+- at: mpm_particle
+  implementation: warp
+  op: mpm_strain
+- a_max: 200
+  at: mpm_particle
+  drag: 0.05
+  implementation: warp
+  op: mpm_scatter
+  polar: higham
+  polar_iters: 4
+  to: mpm_grid
+- at: mpm_grid
+  csf_mass_floor: 1.7e-15
+  mass_floor: 1.7e-15
+  op: mpm_grid_update
+  surface_tension: 0.0
+  wall_damp: 0.9
+  implementation: warp
+- at: mpm_particle
+  from: mpm_grid
+  implementation: warp
+  op: mpm_gather
+  vmax: 1000000000.0
+  wall_contact: 0.04
+  wall_damp: 1.0
+plotting:
+  background: black
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  colors:
+    w00:
+    - 1.0
+    - 0.0
+    - 0.0
+    w01:
+    - 1.0
+    - 0.208
+    - 0.0
+    w02:
+    - 1.0
+    - 0.417
+    - 0.0
+    w03:
+    - 1.0
+    - 0.649
+    - 0.0
+    w04:
+    - 1.0
+    - 0.857
+    - 0.0
+    w05:
+    - 0.911
+    - 1.0
+    - 0.0
+    w06:
+    - 0.703
+    - 1.0
+    - 0.0
+    w07:
+    - 0.471
+    - 1.0
+    - 0.0
+    w08:
+    - 0.263
+    - 1.0
+    - 0.0
+    w09:
+    - 0.031
+    - 1.0
+    - 0.0
+    w10:
+    - 0.0
+    - 1.0
+    - 0.177
+    w11:
+    - 0.0
+    - 1.0
+    - 0.409
+    w12:
+    - 0.0
+    - 1.0
+    - 0.617
+    w13:
+    - 0.0
+    - 1.0
+    - 0.849
+    w14:
+    - 0.0
+    - 0.943
+    - 1.0
+    w15:
+    - 0.0
+    - 0.711
+    - 1.0
+    w16:
+    - 0.0
+    - 0.503
+    - 1.0
+    w17:
+    - 0.0
+    - 0.271
+    - 1.0
+    w18:
+    - 0.0
+    - 0.063
+    - 1.0
+    w19:
+    - 0.169
+    - 0.0
+    - 1.0
+    w20:
+    - 0.378
+    - 0.0
+    - 1.0
+    w21:
+    - 0.609
+    - 0.0
+    - 1.0
+    w22:
+    - 0.818
+    - 0.0
+    - 1.0
+    w23:
+    - 0.996
+    - 0.0
+    - 0.946
+    w24:
+    - 1.0
+    - 0.0
+    - 0.742
+    w25:
+    - 1.0
+    - 0.0
+    - 0.511
+    w26:
+    - 1.0
+    - 0.0
+    - 0.302
+  dot_size: 1.2
+  fps: 60
+  hide_sets:
+  - cell
+  render_3d: dots
+  up_axis: 1
+schedule:
+- gravity
+- capture: false
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  substep_dt: 0.0001636364
+sets:
+  cell:
+    n: 27
+    types:
+      w00:
+        block:
+        - 0.024
+        - 0.024
+        - 0.024
+        - 0.176
+        - 0.296
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w01:
+        block:
+        - 0.024
+        - 0.024
+        - 0.344
+        - 0.176
+        - 0.296
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w02:
+        block:
+        - 0.024
+        - 0.024
+        - 0.664
+        - 0.176
+        - 0.296
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w03:
+        block:
+        - 0.024
+        - 0.304
+        - 0.024
+        - 0.176
+        - 0.576
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w04:
+        block:
+        - 0.024
+        - 0.304
+        - 0.344
+        - 0.176
+        - 0.576
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w05:
+        block:
+        - 0.024
+        - 0.304
+        - 0.664
+        - 0.176
+        - 0.576
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w06:
+        block:
+        - 0.024
+        - 0.584
+        - 0.024
+        - 0.176
+        - 0.856
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w07:
+        block:
+        - 0.024
+        - 0.584
+        - 0.344
+        - 0.176
+        - 0.856
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w08:
+        block:
+        - 0.024
+        - 0.584
+        - 0.664
+        - 0.176
+        - 0.856
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w09:
+        block:
+        - 0.184
+        - 0.024
+        - 0.024
+        - 0.336
+        - 0.296
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w10:
+        block:
+        - 0.184
+        - 0.024
+        - 0.344
+        - 0.336
+        - 0.296
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w11:
+        block:
+        - 0.184
+        - 0.024
+        - 0.664
+        - 0.336
+        - 0.296
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w12:
+        block:
+        - 0.184
+        - 0.304
+        - 0.024
+        - 0.336
+        - 0.576
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w13:
+        block:
+        - 0.184
+        - 0.304
+        - 0.344
+        - 0.336
+        - 0.576
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w14:
+        block:
+        - 0.184
+        - 0.304
+        - 0.664
+        - 0.336
+        - 0.576
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w15:
+        block:
+        - 0.184
+        - 0.584
+        - 0.024
+        - 0.336
+        - 0.856
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w16:
+        block:
+        - 0.184
+        - 0.584
+        - 0.344
+        - 0.336
+        - 0.856
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w17:
+        block:
+        - 0.184
+        - 0.584
+        - 0.664
+        - 0.336
+        - 0.856
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w18:
+        block:
+        - 0.344
+        - 0.024
+        - 0.024
+        - 0.496
+        - 0.296
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w19:
+        block:
+        - 0.344
+        - 0.024
+        - 0.344
+        - 0.496
+        - 0.296
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w20:
+        block:
+        - 0.344
+        - 0.024
+        - 0.664
+        - 0.496
+        - 0.296
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w21:
+        block:
+        - 0.344
+        - 0.304
+        - 0.024
+        - 0.496
+        - 0.576
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w22:
+        block:
+        - 0.344
+        - 0.304
+        - 0.344
+        - 0.496
+        - 0.576
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w23:
+        block:
+        - 0.344
+        - 0.304
+        - 0.664
+        - 0.496
+        - 0.576
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w24:
+        block:
+        - 0.344
+        - 0.584
+        - 0.024
+        - 0.496
+        - 0.856
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w25:
+        block:
+        - 0.344
+        - 0.584
+        - 0.344
+        - 0.496
+        - 0.856
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w26:
+        block:
+        - 0.344
+        - 0.584
+        - 0.664
+        - 0.496
+        - 0.856
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+  mpm_particle:
+    density: 1.0
+    parent: cell
+    per_parent: 37037037
+    vel_init: 0.0

@@ -42,8 +42,6 @@ fields:
     frame: mpm_grid
     n_grid: 96
 operators:
-- op: aggregate
-  at: cell
 - op: gravity
   at: cell
   g: 14.0
@@ -72,7 +70,6 @@ operators:
   at: mpm_particle
   eta: 0.0003
 schedule:
-- aggregate
 - gravity
 - substep_dt: 0.0002
   steps:

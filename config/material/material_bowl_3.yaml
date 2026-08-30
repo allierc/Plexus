@@ -63,8 +63,6 @@ fields:
     frame: mpm_grid
     n_grid: 192
 operators:
-- op: aggregate
-  at: cell
 - op: gravity
   at: cell
   g: 12.0
@@ -87,7 +85,6 @@ operators:
   wall_contact: 0.05
   vmax: 1000000000.0
 schedule:
-- aggregate
 - gravity
 - substep_dt: 0.00015
   steps:

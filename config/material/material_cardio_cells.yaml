@@ -15,8 +15,6 @@ general:
   name: material_cardio_cells
   seed: 0
 operators:
-- at: tissue
-  op: aggregate
 - op: seed_from_segmentation
   at: mpm_particle
   from: cells
@@ -65,7 +63,6 @@ operators:
   wall_contact: 0.06
   wall_damp: 0.5
 schedule:
-- aggregate
 - seed_from_segmentation
 - pacemaker
 - activation_pulse

@@ -32,8 +32,6 @@ general:
   - 1.0
 operators:
 - at: cell
-  op: aggregate
-- at: cell
   g: 16.0
   op: gravity
 - at: mpm_particle
@@ -59,7 +57,6 @@ operators:
   wall_contact: 0.04
   wall_damp: 1.0
 schedule:
-- aggregate
 - gravity
 - capture: false
   steps:

@@ -38,20 +38,33 @@ import math
 import numpy as np
 import torch
 
-# bit-reproducible runs: deterministic scatter/index_add (else GPU atomics differ)
+# BIT-REPRODUCIBLE RUNS ARE NOW OPT-IN, and the reason is a measured factor of 4.4 on a real spec.
 #
-# `warn_only` IS THE DEFAULT AND IT DOWNGRADES SILENTLY. A kernel with no deterministic
-# implementation warns once and runs the nondeterministic path anyway, so a run can be
-# irreproducible while this line says the opposite -- and an irreproducible kernel is exactly where
-# two runs of one spec stop matching. Ordinary runs keep the lenient setting, because a warning is
-# better than a crash in the middle of a campaign.
+# This line used to read `torch.use_deterministic_algorithms(True, warn_only=True)` unconditionally,
+# so every run in the repo paid for reproducibility whether or not anything was comparing two runs.
+# The flag reroutes CUDA `index_add_` / `scatter_add_` from atomics to a sort-and-segment kernel
+# whose cost is driven by the longest run of DUPLICATE indices. Measured on an RTX A6000:
 #
-# `PLEXUS_STRICT_DETERMINISM=1` turns the downgrade into an exception, and the promotion gate
-# (`tools/promotion_identical.py`) sets it on both sides: a comparison that passes because a kernel
-# quietly went nondeterministic has proved nothing, so it must fail loudly instead.
+#   index_add_ of [570760, 3] into [1, 3]     deterministic 140.98 ms    atomics 1.00 ms   141x
+#   si_waterfall, whole frame, warp path      deterministic  245.2 ms    atomics  55.3 ms  4.43x
+#   si_waterfall, whole frame, torch path     deterministic 1374.9 ms    atomics 985.7 ms  1.39x
+#
+# -- and the aggregate alone was 84% of the warp frame. Nothing in the corpus asked for this: of
+# 2,456 specs, ZERO declare determinism (the three files that match the word are comments about
+# kT = 0 and noise-free steering). The only callers that need it are the promotion gate and the
+# gate runner, and both already export `PLEXUS_STRICT_DETERMINISM=1` -- so the setting now follows
+# the thing that actually wants it instead of taxing everything that does not.
+#
+# STRICT MEANS STRICT: `warn_only=False`. The old default downgraded SILENTLY -- a kernel with no
+# deterministic implementation warned once and ran the nondeterministic path anyway, so a run could
+# be irreproducible while this line claimed otherwise. There is no longer a lenient middle setting,
+# because it was the worst of the three: it cost the full 4.4x and did not guarantee the property it
+# was paying for. A comparison that passes because a kernel quietly went nondeterministic has proved
+# nothing, so it must fail loudly instead.
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 STRICT_DETERMINISM = os.environ.get("PLEXUS_STRICT_DETERMINISM", "") not in ("", "0", "false")
-torch.use_deterministic_algorithms(True, warn_only=not STRICT_DETERMINISM)
+if STRICT_DETERMINISM:
+    torch.use_deterministic_algorithms(True, warn_only=False)
 
 from plexus.models.base import Hierarchy, Level
 from plexus.models.state import spatial_schema, schema_from_spec, StateSchema, BOUNDARY_WORLD
@@ -623,6 +636,72 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
         for tid, t in enumerate(type_list):
             buf[node_type == tid] = float(t.get(k, 0.0))
         lvl.register_buffer(k, buf)
+
+
+
+# ==========================================================================================================
+# WHICH IMPLEMENTATION RUNS WHEN THE SPEC DOES NOT SAY
+# ==========================================================================================================
+MPM_WARP_DEFAULT = ("mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather")
+
+
+def _resolve_default_impl(sim, device: str, grad: bool = False) -> list[str]:
+    """Fill in `implementation: warp` for the MPM operators a spec left unspecified.
+
+    WHY THIS IS THE DEFAULT NOW, and it is a measured claim, not a preference. On si_waterfall
+    (570,760 particles, 96^3, 13 substeps) the whole-frame cost is 973.8 ms for the torch bodies,
+    38.7 ms with scatter/strain/gather on warp, and 31.8 ms with the grid solve on warp too -- the
+    last being fastest on BOTH cards and BOTH scenes of the sweep, by 1.22x on an A100 and 1.51x on
+    an A6000 over warp-without-the-grid-solve. Capture is already the engine's default
+    (`step.get("capture", True)`), so `warp` + capture is what a spec now gets for saying nothing.
+
+    IT FALLS BACK RATHER THAN FAILING, because `warp` is not a drop-in for every spec and a default
+    that raised would break 58 shipped 2D specs on the day it landed. Each condition below is a
+    thing the warp path genuinely cannot do:
+
+      dim != 3            the kernels are 3D; the 2D corpus stays on the torch bodies
+      device is cpu       warp kernels here are CUDA-only
+      periodic            the warp gather clamps at the box and does not wrap
+      grad=True           DIFFERENTIABLE = False -- no backward is registered with autograd, so an
+                          inverse run would silently get no gradient through the MPM cycle
+      legacy CSF          `mpm_grid_update[warp]` refuses surface_tension without csf_rho: that
+                          interface test is a reduction over the whole grid (54 specs)
+      csf_smooth, plate   not implemented in the fused kernel
+
+    WHAT IT COSTS THE CORPUS. `warp` is NOT bit-identical to the torch bodies -- reassociated 27-tap
+    sums and non-deterministic atomics, 6 ulp after 14 substeps -- so every 3D CUDA MPM spec that
+    named no implementation now produces slightly different numbers than it did. That is why the
+    resolution is written back onto the spec and printed: `implementation` is part of a run's
+    identity (section 6 of paper/mpm_warp.pdf), and a run must be able to say which one it used.
+    `implementation: default` forces the torch body back.
+    """
+    picked = []
+    # `implementation: default` IS AN ESCAPE HATCH, NOT A VARIANT NAME. Nothing is registered under
+    # that name, so it is normalised to None -- which is what selects the base torch body. The
+    # operators that asked are remembered, because the warp pass below keys on `impl is None` and
+    # would otherwise hand the hatch straight back to warp (it did, on the first attempt).
+    _forced = set()
+    for o in sim.operators:
+        if str(o.impl or "").lower() == "default":
+            o.impl = None
+            _forced.add(id(o))
+    if int(getattr(sim, "dim", 2)) != 3 or not str(device).startswith("cuda"):
+        return picked
+    if grad or str(getattr(sim, "boundary", "wall")).lower() == "periodic":
+        return picked
+    for o in sim.operators:
+        if o.op not in MPM_WARP_DEFAULT or o.impl is not None or id(o) in _forced:
+            continue
+        if o.op == "mpm_grid_update":
+            q = o.params
+            _st = float(q.get("surface_tension", 0.0) or 0.0)
+            if (_st > 0.0 and float(q.get("csf_rho", 0.0) or 0.0) <= 0.0
+                    or int(q.get("csf_smooth", 0) or 0)
+                    or q.get("plate_axis") is not None):
+                continue
+        o.impl = "warp"
+        picked.append(o.op)
+    return picked
 
 
 def build(sim: Spec, device: str = "cpu") -> Hierarchy:
@@ -1268,6 +1347,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     returned `H`. And a structural operator must apply its writes FUNCTIONALLY (clone, write,
     publish) or it severs the tape for everything downstream of it -- see `agent_divide`.
     """
+    _picked = _resolve_default_impl(sim, device, grad)
+    if _picked:
+        print(f"[engine] implementation: warp for {', '.join(_picked)} "
+              f"(unset in the spec; `implementation: default` forces the torch body)", flush=True)
     H = build(sim, device)                    # 1) build the Hierarchy: every set (level) + field, from the spec
     seed(H, sim, device)                      # 1.5) x_0 = S(theta_S): the seed: section, exactly once
     H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
