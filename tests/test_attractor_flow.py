@@ -17,7 +17,7 @@ import plexus.schema as S
 from plexus.schema import Spec, OpSpec, Selector
 from plexus.engine import build, run as engine_run
 from plexus.models.registry import get_operator
-from plexus.operators.attractor_flow import attractor_velocity, ATTRACTOR_SYSTEMS
+from plexus.operators.motion_ops import attractor_velocity, ATTRACTOR_SYSTEMS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(HERE, "..", "config", "attractors")

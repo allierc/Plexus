@@ -22,11 +22,14 @@ other is how anyone can tell which one a spec is getting.
                          local update, the signalling through W, and the field modulating it
     observation          NOT a mechanism: how the state is looked at (voxelize)
 
-EVERY OLD MODULE NAME STILL IMPORTS. `plexus.operators.drag`, `plexus.operators.mpm_grid` and the
-rest are re-export shims, because five prototypes reach for them by name -- `prototype/eye`,
-`prototype/cardio_cells` (three files) and `prototype/inverse_slime`. They are not imported here:
-each is covered by the module it points at, and importing both would register nothing twice but
-would put the old names back in the reader's way.
+THE OLD MODULE NAMES ARE GONE. `plexus.operators.drag`, `plexus.operators.mpm_grid` and 43 others
+were one-line re-export shims left behind when the operators were grouped into the modules above.
+Their docstrings said thirty files imported them; by the time they were removed the true number was
+SEVEN, all rewritten to import from the grouped module directly. A shim that outlives its callers
+is not compatibility, it is a second name for the same thing -- and `mpm_grid`, `mpm_scatter` and
+`mpm_gather` were the worst of them, because they read as three separate operator modules when they
+are three operators in one file. Anything still importing an old name gets an ImportError naming
+the module, which is the correct answer and not a regression.
 
 WHAT IS NOT IN THE CORE. `mpm_boundary` and `bm_strain` are registered in `discovery_okuda` only.
 `AUDIT.md` rejects both -- the first overwrites grid-node velocity, so the constraint is kinematic

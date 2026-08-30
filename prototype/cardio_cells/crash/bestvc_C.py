@@ -59,7 +59,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 for _p in ("/workspace/Plexus/src", ALG, DISC, HERE):
     sys.path.insert(0, _p)
 
-from plexus.operators.mpm_grid import stencil_offsets, bspline    # noqa: E402
+from plexus.operators.mpm_ops import stencil_offsets, bspline    # noqa: E402
 from plexus.models.entities import _lame                          # noqa: E402
 from recover import theta_scale                                   # noqa: E402
 import crash_test as CT                                           # noqa: E402

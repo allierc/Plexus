@@ -275,7 +275,7 @@ class Probe:
         """After mpm_grid_update, before mpm_gather: does the CFL speed cap or the position
         clamp bite? Both are hard nonlinearities in mpm_gather."""
         g, p = self.g, self.p
-        from plexus.operators.mpm_grid import stencil_offsets, bspline
+        from plexus.operators.mpm_ops import stencil_offsets, bspline
         X = p.get("pos")
         offsets = stencil_offsets(2, X.device)
         fx, weight, flat = bspline(X, g.inv_dx, offsets, g.shape, False)
