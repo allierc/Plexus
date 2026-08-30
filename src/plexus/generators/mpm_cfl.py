@@ -12,6 +12,26 @@ rewrites the spec.yaml in place, lowering it to the stable value while PRESERVIN
 per-frame simulated time (same physics, now stable). Idempotent: a corrected spec is
 left unchanged on re-run.
 
+THE ELASTIC WAVE IS NOT THE ONLY WAVE. A liquid with `surface_tension` also carries CAPILLARY
+waves, and the shortest one the mesh admits (wavelength 2*dx) has its own explicit limit,
+
+    dt_cap <= cfl * sqrt(rho_liquid * dx^D / (2*pi*sigma))    (Brackbill/Kothe/Zemach 1992),
+
+which is INDEPENDENT of the elastic one and can be much smaller. It only became reachable when
+`mpm_grid_update` learned to normalise its colour field (`csf_rho`): before that `surface_tension`
+was a tension divided by a cell mass, 1e6 too small, and no spec could get near this limit. So the
+capillary term is computed ONLY when `csf_rho` is set, and is +inf otherwise -- an unnormalised
+`surface_tension` is not a physical tension and putting it in this formula would produce a
+nonsense limit for every legacy spec.
+
+CALIBRATION, MEASURED, NOT ASSUMED (material_3d_water_drop, 290k particles, n_grid 96, 60 frames,
+csf_rho 1.0, csf_band 0.2, at a FIXED sigma of 1.12 = Bond 0.5 so only dt varies): the peak node
+mass, in units of one FULL liquid cell rho*dx^D, reads 1.80 / 10.7 / 60.8 at dt/dt_cap_raw =
+0.50 / 0.80 / 1.00. A clean run sits at ~1.8 full cells (the sigma = 0 twin reads 2.0), so the raw
+Brackbill limit is already 34x into pile-up and half of it is clean -- hence the same `cfl` safety
+factor the elastic limit uses (0.4 by default) is applied to it, leaving 1.25x of margin on the
+measured edge.
+
 It handles BOTH MPM spec forms:
   * the ORACLE op `mls_mpm_mechanics`: micro-timestep `dt_sub` + an explicit `substeps`
     on the op line -- it lowers `dt_sub` and raises `substeps` (per-frame = substeps*dt_sub).
@@ -68,16 +88,27 @@ def _max_wave_speed(spec, rho_default=1.0) -> float:
     # So: for every set that declares a density, find the sets whose types describe ITS material --
     # itself, and its parent if it names one -- and pair them.
     sets = spec.get("sets") or {}
+    # DECLARED DENSITIES FIRST, DEFAULTS ONLY WHERE NOTHING WAS DECLARED. The previous form did
+    # `setdefault(sname, st.get("density", rho_default))` and then `min(existing, child_density)`;
+    # since `cell` is listed before `mpm_particle`, the parent got the DEFAULT 1.0 first and the
+    # min() then kept it. Invisible while every spec used density 1.0, and worth a factor of
+    # sqrt(1000) = 31.6 in the wave speed the moment one does not: an SI water spec at rho 1000
+    # with K 1e5 read c = 316.2 m/s instead of 10.0 and was re-timed to 633 substeps a frame
+    # instead of 21.
+    rho_decl = {sn: float(st["density"]) for sn, st in sets.items()
+                if isinstance(st, dict) and "density" in st}
     rho_for = {}
     for sname, st in sets.items():
         if not isinstance(st, dict):
             continue
-        rho_for.setdefault(sname, float(st.get("density", rho_default)))
+        rho_for[sname] = rho_decl.get(sname, rho_default)
         par = st.get("parent")
-        if par in sets and "density" in st:
+        if par in sets and sname in rho_decl:
             # the child's particles carry the child's density, and their material comes from the
-            # parent's type table; attribute the lower of the two to the parent so it is not missed
-            rho_for[par] = min(rho_for.get(par, float("inf")), float(st["density"]))
+            # parent's type table; attribute the lower of the DECLARED densities to the parent so a
+            # heavy child is not missed -- but never let an undeclared parent's default win.
+            cand = [rho_decl[sname]] + ([rho_decl[par]] if par in rho_decl else [])
+            rho_for[par] = min(cand)
     cmax = 0.0
     for sname, st in sets.items():
         if not isinstance(st, dict):
@@ -87,17 +118,266 @@ def _max_wave_speed(spec, rho_default=1.0) -> float:
             if not isinstance(t, dict):
                 continue
             rho = float(t.get("density", rho_set))          # per-type density wins (light/heavy cytosol)
-            layers = list(t.get("layers") or [{"youngs": t.get("youngs", 100.0),
+            layers = list(t.get("layers") or [{"youngs": t.get("youngs"),
+                                               "bulk_modulus": t.get("bulk_modulus"),
                                                "material": t.get("material", "elastic")}])
             if t.get("core"):
                 layers.append(t["core"])
             for L in layers:
-                E = float(L.get("youngs", t.get("youngs", 100.0)))
-                mu, la = _lame(E)
-                if L.get("material", t.get("material", "elastic")) == "liquid":
-                    mu = 0.0                 # liquid carries no shear modulus
+                mat = L.get("material", t.get("material", "elastic"))
+                # `bulk_modulus` IS lambda for a liquid (mu = 0), so it goes straight in; without it
+                # the pass would fall back to the youngs default of 100 and report a wave speed for
+                # a material the spec never declared -- which is how an SI spec first read c = 5.3
+                # instead of 10.0.
+                K = L.get("bulk_modulus", t.get("bulk_modulus"))
+                if K is not None and mat == "liquid":
+                    mu, la = 0.0, float(K)
+                else:
+                    E = L.get("youngs", t.get("youngs"))
+                    mu, la = _lame(float(E if E is not None else 100.0))
+                    if mat == "liquid":
+                        mu = 0.0             # liquid carries no shear modulus
                 cmax = max(cmax, math.sqrt(max(la + 2 * mu, 0.0) / max(rho, 1e-12)))
     return cmax
+
+
+def _similarity(spec, dx: float, dim: int) -> list:
+    """The dimensionless groups of an MPM scene, reported at build.
+
+    WHY A REPORT AND NOT A CHECK. Every diagnosis in this campaign came from computing these by hand
+    AFTER a run: that the corpus "water" impacts at MACH 0.449 with 10.1% volumetric strain and is a
+    compressible foam; that a drop was sampled at 283 PARTICLES PER CELL against a convention of 8;
+    that 64 mL spread over a 0.3 m floor lands 0.34 OF ONE CELL deep and can never be a body. Not one
+    of those is visible in a spec, and every one of them is arithmetic on numbers the spec already
+    contains. Printing them costs nothing and turns a wasted cluster run into a line of output.
+
+    WHAT IT REFUSES TO GUESS. Reynolds needs a viscosity, Bond and Weber need a surface tension, and
+    a Mach number needs a sound speed -- so each is emitted only when the spec actually declares what
+    it is built from. A group computed from a default is a number about the default.
+    """
+    import math as _m
+    out = []
+    sets = spec.get("sets") or {}
+    gen = spec.get("general") or {}
+    w = gen.get("world", 1.0)
+    box = [float(x) for x in w] if isinstance(w, (list, tuple)) else [float(w)] * dim
+    H = box[1] if len(box) > 1 else box[0]
+    g = 0.0
+    for o in (spec.get("operators") or []):
+        if isinstance(o, dict) and o.get("op") == "gravity":
+            g = abs(float(o.get("g", 0.0) or 0.0))
+    rho = 1.0
+    for st in sets.values():
+        if isinstance(st, dict) and "density" in st:
+            rho = float(st["density"])
+    K, R = _liquid_scale(spec, dim)
+    if not (K < float("inf")):
+        # NOT A LIQUID, BUT STILL A WAVE. A solid or a snow body has lambda + 2*mu, and Mach is what
+        # decides whether it is being simulated or merely deformed -- si_freefall's snowball impacts
+        # at Mach 1.85, which is real and worth saying rather than skipping because `is_liquid` is
+        # false. Only the surface-tension groups genuinely need a liquid.
+        c_s = _max_wave_speed(spec)
+        if c_s <= 0:
+            return out
+        # _max_wave_speed returns a SPEED. K = rho*c^2, or `c = sqrt(K/rho)` below divides by rho
+        # a second time -- which read snow's 19.7 m/s as 0.986 and its Mach as 37.6.
+        K, R = rho * c_s * c_s, float("inf")
+    c = _m.sqrt(K / max(rho, 1e-30))
+    # THE FALL AND THE BODY'S OWN HEIGHT, from a `block` if one is written and from the DERIVED
+    # volume if not -- a spec that declares `particle_mass` has no block at all, and reading the box
+    # instead would report the room's height as the water's. That is the difference between a
+    # self-weight strain of 25.2% and the 10.1% the body actually carries.
+    y0, hgt = None, None
+    for st in sets.values():
+        if not isinstance(st, dict):
+            continue
+        for t in ((st.get("types")) or {}).values():
+            b = (t or {}).get("block")
+            if b and len(b) >= 2 * dim:
+                y0 = float(b[1]) if y0 is None else min(y0, float(b[1]))
+                _h = abs(float(b[dim + 1]) - float(b[1]))
+                hgt = _h if hgt is None else max(hgt, _h)
+    if y0 is None:                                    # derived volume: N * m_p / rho, on `start`
+        for sn, st in sets.items():
+            if not isinstance(st, dict) or "particle_mass" not in st:
+                continue
+            _n = int(st.get("per_parent", 0) or 0)
+            _mp = float(st["particle_mass"]); _r = float(st.get("density", 1.0) or 1.0)
+            _side = (_n * _mp / _r) ** (1.0 / dim)
+            _par = sets.get(st.get("parent")) or {}
+            _st = (_par.get("start") or [[0.0] * dim])[0]
+            y0 = float(_st[1]) - _side / 2.0
+            hgt = _side
+    fall = max((y0 or 0.0) - 2.0 * dx, 0.0)
+    U = _m.sqrt(2.0 * g * fall) if g > 0 else 0.0
+    L = R if R < float("inf") else (hgt if hgt else H)
+    Hb = hgt if hgt else H                            # the BODY's height, for the self-weight strain
+    out.append(f"c = sqrt(K/rho) = {c:.4g}  (K {K:.4g}, rho {rho:g})")
+    if U > 0:
+        out.append(f"Mach {U / c:.3f}  ->  drho/rho ~ {100 * (U / c) ** 2:.2f}%"
+                   + ("   <- WARN: above 0.2, this is a compressible foam, not a liquid"
+                      if U / c > 0.2 else ""))
+        out.append(f"Froude {U / _m.sqrt(g * L):.3f}   (U {U:.4g}, L {L:.4g})")
+    if g > 0:
+        out.append(f"self-weight volumetric strain rho*g*H/K = {100 * rho * g * Hb / K:.3f}%"
+                   f"   (H = the body's own height, {Hb:.4g})")
+    sig, eta, sig_legacy = 0.0, 0.0, 0.0
+    for o in (spec.get("operators") or []):
+        if not isinstance(o, dict):
+            continue
+        if o.get("op") == "mpm_grid_update":
+            _s = float(o.get("surface_tension", 0.0) or 0.0)
+            if o.get("csf_rho"):
+                sig = _s
+            elif _s > 0:
+                sig_legacy = _s
+        if o.get("op") == "mpm_viscosity":
+            eta = float(o.get("eta", 0.0) or 0.0)
+    if eta > 0 and U > 0:
+        out.append(f"Reynolds rho*U*L/eta = {rho * U * L / eta:.4g}")
+    if sig_legacy > 0:
+        # THE 54 SPECS THIS REPORT WAS SUPPOSED TO EXPOSE, AND WAS NOT. Bond was computed only when
+        # `csf_rho` was set, so every spec still on the legacy mass-colour scale -- the ones whose
+        # surface tension is meaningless and where saying so is the entire point -- printed nothing
+        # at all about it. Silence read as "no surface tension here".
+        #
+        # WHAT THE NUMBER IN THE YAML ACTUALLY IS. Without `csf_rho` the colour field is a MASS per
+        # node (~rho*dx^D), not a volume fraction, so `grad c` and with it the whole CSF force carry
+        # that factor: the effective physical tension is sigma * rho * dx^D. At rho 1 and n_grid 96
+        # that is 1.13e-6, which is why `surface_tension: 60` moves nothing. It is also why the
+        # number changes meaning when n_grid is touched, with no error and no warning.
+        _se = sig_legacy * rho * dx ** dim
+        out.append(f"surface_tension {sig_legacy:g} is UNNORMALISED (no csf_rho): the effective "
+                   f"tension is sigma*rho*dx^{dim} = {_se:.4g}, {sig_legacy / max(_se, 1e-300):.3g}x "
+                   f"smaller, and it RESCALES WITH n_grid")
+        if g > 0 and _se > 0:
+            out.append(f"Bond rho*g*L^2/sigma_effective = {rho * g * L * L / _se:.4g}"
+                       + ("   <- WARN: above 100, gravity beats surface tension by orders of "
+                          "magnitude and this spec's surface tension does nothing"
+                          if rho * g * L * L / _se > 100 else ""))
+    if sig > 0:
+        if g > 0:
+            out.append(f"Bond rho*g*L^2/sigma = {rho * g * L * L / sig:.4g}")
+            lc = _m.sqrt(sig / (rho * g))
+            out.append(f"capillary length sqrt(sigma/rho g) = {lc:.4g} = {lc / dx:.1f} cells"
+                       + ("   <- WARN: under 2 cells, nothing shaped by surface tension is resolved"
+                          if lc / dx < 2.0 else ""))
+        if U > 0:
+            out.append(f"Weber rho*U^2*L/sigma = {rho * U * U * L / sig:.4g}")
+    return out
+
+
+def _cell_size(spec, n_grid: int, dim: int) -> float:
+    """The background cell size, `world_size[1] / n_grid`, matching MPMGrid.
+
+    THIS USED TO BE `1.0 / n_grid`, with a comment asserting "world is unit-width". That is true of
+    every spec written so far -- of 1,744 specs, the 94 MPM ones that declare `general.world` all
+    declare [1.0, 1.0, 1.0] -- and it is exactly the assumption a metres-and-seconds spec breaks. It
+    matters here more than almost anywhere else in the codebase: dx enters this guard as
+    `dt <= cfl * dx / c`, so a dx ten times too large BLESSES A SUBSTEP TEN TIMES TOO LARGE. The one
+    pass whose job is to stop a blow-up would wave it through.
+
+    Reads the same `general.world` that schema.py parses, with the same scalar/list handling.
+    """
+    w = (spec.get("general") or {}).get("world", 1.0)
+    if isinstance(w, (list, tuple)):
+        box = [float(x) for x in w]
+    else:
+        box = [float(w)] + [1.0] * (dim - 1)         # scalar: axis-0 width, the rest unit
+    return box[1] / float(n_grid) if len(box) > 1 else box[0] / float(n_grid)
+
+
+def _capillary_limit(spec, dx: float, dim: int):
+    """The Brackbill/Kothe/Zemach capillary-wave limit, or (inf, 0, 0) when it does not apply.
+
+        dt_cap_raw = sqrt(rho_liquid * dx^D / (2*pi*sigma))
+
+    is the period of the shortest capillary wave the mesh can hold (wavelength 2*dx) divided by
+    2*pi; an explicit scheme that steps past it grows that wave instead of propagating it. It is
+    the liquid's OWN limit and has nothing to do with `youngs`, so a pure-liquid spec -- exactly
+    the case where the elastic limit is loosest -- is where it bites hardest.
+
+    ONLY WHEN THE COLOUR IS NORMALISED. `mpm_grid_update` applies f = sigma*kappa*grad(c) to a
+    colour `c` that is a liquid MASS PER NODE unless `csf_rho` is set, so without `csf_rho` the
+    yaml's `surface_tension` is a tension divided by rho*dx^D -- 1e6 too small at n_grid 96, and a
+    different physical tension at every n_grid. Feeding that number to this formula would invent a
+    limit ~1e3 too small and re-time every legacy spec on the corpus for a force that is not there.
+    So: no `csf_rho`, no capillary term. This function is a no-op for every spec written before the
+    normalisation existed, which is all of them but the water_st ladder.
+
+    rho is the LIQUID's density and `csf_rho` IS that density by definition (it is the divisor that
+    turns the deposited mass into a volume fraction), so it is read from the same place rather than
+    re-derived from the sets -- one number, one meaning. Brackbill writes rho_avg = (rho_1+rho_2)/2
+    for two fluids; here the second phase is vacuum, so rho_avg = rho_liquid/2 would be the strict
+    reading and using rho_liquid is the LOOSER of the two by sqrt(2). The `cfl` factor applied by
+    the caller (0.4) is 3.5x tighter than that sqrt(2), so nothing is lost by the simpler choice.
+
+    Several `mpm_grid_update` operators (a spec may carry more than one) -> the SMALLEST limit."""
+    dt_cap, sig_at, rho_at = float("inf"), 0.0, 0.0
+    for o in (spec.get("operators") or []):
+        if not isinstance(o, dict):
+            continue
+        try:
+            sigma = float(o.get("surface_tension", 0.0) or 0.0)
+            rho_l = float(o.get("csf_rho", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if sigma <= 0.0 or rho_l <= 0.0:
+            continue                                 # legacy / unnormalised / tension off
+        d = math.sqrt(rho_l * dx ** dim / (2.0 * math.pi * sigma))
+        if d < dt_cap:
+            dt_cap, sig_at, rho_at = d, sigma, rho_l
+    return dt_cap, sig_at, rho_at
+
+
+def _liquid_scale(spec, dim: int):
+    """(softest liquid bulk modulus K, smallest liquid body radius R) -- (inf, inf) if no liquid.
+
+    A liquid in MLS-MPM has mu = 0, so its bulk modulus IS lambda = E*nu/((1+nu)(1-2nu)); at the
+    corpus default nu = 0.2 that is 0.2778*E, i.e. `youngs: 200` buys a bulk modulus of 55.6 and
+    NOT 200. The SOFTEST liquid and the SMALLEST body are taken because both are the worst case
+    for the ratio below: least resistance, largest curvature.
+
+    R is an equivalent radius from the declared extent (`block`) or `radius`, so it is the body as
+    WRITTEN, before it falls and spreads. Curvature only grows as a drop breaks up, so this is
+    again the optimistic end and the report below is a floor on the real number."""
+    sets = spec.get("sets") or {}
+    K, R = float("inf"), float("inf")
+    for sname, st in sets.items():
+        if not isinstance(st, dict):
+            continue
+        rad_default = float(st.get("radius", 0.05) or 0.05)
+        for t in (st.get("types") or {}).values():
+            if not isinstance(t, dict):
+                continue
+            layers = list(t.get("layers") or [{"youngs": t.get("youngs"),
+                                               "bulk_modulus": t.get("bulk_modulus"),
+                                               "material": t.get("material", "elastic")}])
+            if t.get("core"):
+                layers.append(t["core"])
+            liq = [L for L in layers
+                   if L.get("material", t.get("material", "elastic")) == "liquid"]
+            if not liq:
+                continue
+            for L in liq:
+                # `bulk_modulus` says it outright; `youngs` reaches the same number through a
+                # modulus a liquid does not have. Either way mu = 0, so the bulk modulus IS lambda.
+                _K = L.get("bulk_modulus", t.get("bulk_modulus"))
+                if _K is None:
+                    _E = L.get("youngs", t.get("youngs"))
+                    _mu, _K = _lame(float(_E if _E is not None else 100.0))
+                K = min(K, float(_K))
+            b = t.get("block")
+            if b and len(b) >= 2 * dim:
+                v = 1.0
+                for k in range(dim):
+                    v *= abs(float(b[dim + k]) - float(b[k]))
+                r = (math.sqrt(v / math.pi) if dim == 2
+                     else (3.0 * v / (4.0 * math.pi)) ** (1.0 / 3.0))
+            else:
+                r = float(t.get("radius", rad_default))
+            R = min(R, r) if r > 0 else R
+    return K, R
 
 
 def _snap_to_frame(dt_target: float, dt_frame: float) -> float:
@@ -144,7 +424,25 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
                     if isinstance(s, dict) and "substep_dt" in s
                     and MPM_STEPS & set(s.get("steps", []))), None)
         if blk is None:
-            return False, None                                       # neither form -> not an MPM spec, nothing to do
+            # A FLAT MPM SCHEDULE STILL GETS ITS REPORT, and is told that nothing bounds its step.
+            # Returning here meant a spec that runs the MPM cycle at the FRAME timestep -- no
+            # substep block, so no `substep_dt` to correct -- got no CFL check and no [similarity]
+            # line at all. One spec is in that state (config/cell/cell_one.yaml) and it was the
+            # single hole in "the report prints for every MPM spec". There is no key to rewrite, so
+            # this warns rather than corrects.
+            _ops = {o.get("op") for o in (spec.get("operators") or []) if isinstance(o, dict)}
+            if MPM_STEPS & _ops:
+                _nm = spec.get("general", {}).get("name", os.path.basename(yaml_path))
+                _d = int(spec.get("general", {}).get("dim", 3))
+                _ng = next((int(fc["n_grid"]) for fc in spec.get("fields", {}).values()
+                            if isinstance(fc, dict) and "n_grid" in fc), 128)
+                for _ln in _similarity(spec, _cell_size(spec, _ng, _d), _d):
+                    print(f"[similarity] {_nm}: {_ln}", flush=True)
+                print(f"[grid-CFL] {_nm}: NO substep block -- the MPM cycle runs once per frame at "
+                      f"general.dt={spec.get('general', {}).get('dt')}, so nothing here checks it "
+                      f"against the elastic or capillary limit. Wrap the mpm_* steps in "
+                      f"{{substep_dt: ..., steps: [...]}} to get the guard.", flush=True)
+            return False, None                                       # nothing to correct either way
         token = "substep_dt"
         micro_dt = float(blk.get("substep_dt", 2e-4))
         substeps = None                                              # implicit: round(general.dt / substep_dt)
@@ -174,14 +472,95 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
         _divide_fix = _snap_to_frame(micro_dt, _dtf) if _err > 1e-5 else None
 
     # --- the stability limit (same physics either form) ------------------------ #
-    dx = 1.0 / n_grid                            # grid CELL SIZE (world is unit-width)
+    dim = int((spec.get("general") or {}).get("dim", 2))
+    dx = _cell_size(spec, n_grid, dim)           # grid CELL SIZE, from the WORLD BOX
     cmax = _max_wave_speed(spec)                 # FASTEST elastic P-wave over EVERY set, c = sqrt((la+2mu)/rho)
-    if cmax <= 0.0:
-        return False, None                       # no elastic material (pure liquid, mu=0) -> no wave, nothing to bound
+    # TWO WAVES, TWO LIMITS, AND THE SMALLER ONE IS THE LIMIT. Elastic is the P-wave; capillary is
+    # the shortest surface wave the mesh holds, and it exists only where the CSF colour has been
+    # normalised (`csf_rho`) -- see `_capillary_limit`. `cap_raw` is Brackbill's bare limit; the
+    # SAME `cfl` safety factor is applied to it as to the elastic one, because at the bare limit
+    # the drop already piles 60.8 full cells of mass on one node against 1.8 for a clean run.
+    cap_raw, sigma, rho_liq = _capillary_limit(spec, dx, dim)
+
+    _nm = (spec.get("general") or {}).get("name", os.path.basename(yaml_path))
+    for _line in _similarity(spec, dx, dim):
+        if "WARN" in _line:
+            warn(f"[similarity] {_nm}: {_line}")
+        else:
+            print(f"[similarity] {_nm}: {_line}", flush=True)
+    dt_cap = cfl * cap_raw
+    if cmax <= 0.0 and dt_cap == float("inf"):
+        return False, None                       # no elastic material AND no tension -> nothing to bound
     # Courant limit: a wave may cross at most `cfl` of a cell per micro-step. A `micro_dt` larger
     # than this makes the explicit MPM substep UNSTABLE (blows up).
-    dt_cfl = cfl * dx / cmax
+    dt_el = cfl * dx / cmax if cmax > 0.0 else float("inf")
+    dt_cfl = min(dt_el, dt_cap)                  # THE binding limit
+    binds = "capillary" if dt_cap < dt_el else "elastic"
+    # by what margin one limit beats the other -- 1.0 means they coincide
+    _ratio = (max(dt_el, dt_cap) / min(dt_el, dt_cap)
+              if min(dt_el, dt_cap) > 0 and math.isfinite(max(dt_el, dt_cap)) else float("inf"))
+    _why = ""
+    if math.isfinite(dt_cap):
+        _why = (f"; {binds} binds"
+                + (f" by {_ratio:.2f}x over " + ("elastic" if binds == "capillary" else "capillary")
+                   if math.isfinite(_ratio) else "")
+                + f" [elastic {dt_el:.2e} (c_max={cmax:.1f}), capillary {dt_cap:.2e} "
+                  f"(sigma={sigma:g}, rho_liq={rho_liq:g})]")
     name = spec.get("general", {}).get("name", yaml_path)
+
+    # ------------------------------------------------------------------------------------------
+    # THE OTHER CAPILLARY LIMIT, AND IT HAS NO dt IN IT. Shrinking the substep does not save a
+    # drop whose surface tension is stronger than its own liquid. `mpm_strain` gives a liquid
+    # mu = 0, so the ONLY thing resisting the CSF's inward pull is the bulk modulus K = lambda,
+    # and the pull is the Laplace pressure 2*sigma/R (1*sigma/R in 2D). Their ratio
+    #
+    #     La = 2*sigma / (R * K)        the fraction of its own volume the tension asks for
+    #
+    # is a CONSTITUTIVE number, not a stability one: past La ~ 0.4 the drop crushes to a point no
+    # matter how the run is timed. MEASURED on material_3d_water_drop (290k particles, n_grid 96,
+    # 40 frames, csf_rho 1.0, csf_band 0.2, substep_dt 6.4e-5 = 0.19-0.25 of the RAW Brackbill
+    # limit, so the capillary CFL above is nowhere near binding), R = 0.214 (the equivalent radius
+    # of the 0.32 x 0.40 x 0.32 block, exactly as `_liquid_scale` computes it), reading mean(det F)
+    # over all particles at the end -- 1.0 is the birth volume:
+    #
+    #     La  0.19 (sigma 1.12, K 55.6) -> mean J 0.937,  peak node mass 1.7 full cells    clean
+    #     La  0.27 (sigma 1.60, K 55.6) -> mean J 0.902,  1.9 full cells                   clean
+    #     La  0.38 (sigma 2.24, K 55.6) -> mean J 0.757,  13.7 full cells                  degraded
+    #     La  0.47 (sigma 2.80, K 55.6) -> mean J 1.0e-6, 12,729 full cells                COLLAPSE
+    #     La  0.31 (sigma 3.73, K 111 ) -> mean J 0.810,  5.6 full cells                   marginal
+    #     La  0.38 (sigma 4.48, K 111 ) -> mean J 0.732,  46.7 full cells                  degraded
+    #     La  0.47 (sigma 5.60, K 111 ) -> mean J 1.0e-6, 13,630 full cells                COLLAPSE
+    #
+    # THE TWO K FAMILIES AGREE ON La AND DISAGREE ON sigma BY 2x, which is what makes La the number:
+    # doubling `youngs` 200 -> 400 turned the sigma-2.8 collapse into a clean run (mean J 0.875)
+    # with no change to the timestep, while five substeps from 2.0e-4 down to 6.4e-5 all collapsed
+    # alike at sigma 2.8. Particle count is NOT the lever either -- 145k and 580k particles (0.5x
+    # and 2x of 290k) both collapsed at sigma 2.8. So this is REPORTED, never corrected: the cures
+    # (stiffer liquid, weaker tension, bigger drop, `csf_smooth`, a wider `csf_band`) each change
+    # what the run IS. Same discipline as the particles-per-cell report below.
+    _La = 0.0
+    if sigma > 0.0 and rho_liq > 0.0:
+        _K, _R = _liquid_scale(spec, dim)
+        if math.isfinite(_K) and math.isfinite(_R) and _K > 0 and _R > 0:
+            _La = (dim - 1) * sigma / (_R * _K)      # 2*sigma/(R*K) in 3D, sigma/(R*K) in 2D
+            if _La > 0.35:
+                warn(f"{name}: surface tension asks for more compression than this liquid can "
+                     f"refuse -- Laplace/bulk La = {(dim - 1)}*sigma/(R*K) = {_La:.2f} "
+                     f"(sigma={sigma:g}, R={_R:.3g}, K=lambda={_K:.4g}, from youngs at nu={_NU}). "
+                     f"Measured on material_3d_water_drop at n_grid 96: La 0.38 costs 24-27% of "
+                     f"the drop's birth volume and La 0.47 collapses it to a point (mean det F = "
+                     f"1e-6, 13,000 full cells of mass on one node). LOWERING substep_dt DOES NOT "
+                     f"HELP -- five steps from 2.0e-4 to 6.4e-5 collapsed alike, and so did 0.5x "
+                     f"and 2x the particle count. Raise `youngs` (K scales with it), lower "
+                     f"`surface_tension`, or mollify the curvature: `csf_smooth: 4` took that same "
+                     f"collapsing run to mean J 0.875, and `csf_band: 0.35` to mean J 0.878.")
+            elif _La > 0.15:
+                print(f"[grid-CFL] {name}: Laplace/bulk La = {_La:.2f} (sigma={sigma:g}, "
+                      f"R={_R:.3g}, K={_K:.4g}) -- the tension asks for {_La * 100:.0f}% of the "
+                      f"liquid's volume at first order; measured 6.3% loss of mean det F at "
+                      f"La 0.19, 9.8% at La 0.27, 24% at La 0.38, total collapse at La 0.47.",
+                      flush=True)
+
     # Already stable? Leave it. The 1% slack makes this IDEMPOTENT: it absorbs the 3-sig-fig
     # rounding of a value WE wrote last run, so a corrected spec is not re-bumped every generate.
     # THE CLOCK FIX IS APPLIED, NOT ANNOUNCED. This used to `warn(...)` and leave the spec alone,
@@ -207,18 +586,24 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
         # is unclaimed speed: cell_02 and cell_03 were at 3.7x. It is only reported, never acted
         # on -- CFL bounds STABILITY, not accuracy, and shortening a run is the caller's call.
         head = dt_cfl / micro_dt
-        if head >= 1.5:
+        # A CAPILLARY-BOUND SPEC ALWAYS REPORTS, at any headroom. The 1.5x gate above exists to
+        # keep a routine elastic pass quiet, and it would have hidden the whole new limit: on
+        # material_3d_water_st560 the step sits 1.13x under the capillary limit, i.e. inside the
+        # noise of "silent", while the same spec at 5x the tension is 1.97x OVER it. The margin is
+        # the number the reader needs and 1.13 is exactly the value worth printing.
+        if head >= 1.5 or binds == "capillary":
             # substeps: explicit on the oracle form, implicit as round(general.dt / substep_dt)
             dt_frame = (substeps * micro_dt if substeps is not None
                         else float((spec.get("general") or {}).get("dt", 0.0)))
             now = round(dt_frame / micro_dt) if dt_frame else None
             could = max(1, round(dt_frame / dt_cfl)) if dt_frame else None
             extra = (f"; {now} substeps/frame where {could} would be stable ({now / could:.1f}x)"
-                     if now and could else "")
-            print(f"[grid-CFL] {name}: {token}={micro_dt:.2e} is {head:.1f}x BELOW the stability "
-                  f"limit {dt_cfl:.2e} (c_max={cmax:.1f}){extra}.", flush=True)
+                     if now and could and head >= 1.5 else "")
+            print(f"[grid-CFL] {name}: {token}={micro_dt:.2e} is {head:.2f}x BELOW the stability "
+                  f"limit {dt_cfl:.2e} (c_max={cmax:.1f}){extra}{_why}.", flush=True)
         return False, {"name": name, "cmax": cmax, "micro_dt": micro_dt, "dt_cfl": dt_cfl,
-                       "ok": True, "headroom": head}
+                       "ok": True, "headroom": head, "La": _La, "binds": binds, "dt_elastic": dt_el,
+                       "dt_capillary": dt_cap, "sigma": sigma, "csf_rho": rho_liq}
 
     # --- too big: shrink the micro-timestep to the limit, KEEPING per-frame time ---------- #
     # oracle: per-frame time = substeps*dt_sub, so raise substeps as dt_sub falls (new_sub).
@@ -229,12 +614,15 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     dt_new = dt_cfl if substeps is not None else _snap_to_frame(dt_cfl, _dtf)
     new_sub = int(math.ceil(substeps * micro_dt / dt_cfl)) if substeps is not None else None
     info = {"name": name, "cmax": cmax, "token": token, "dt_old": micro_dt, "dt_new": dt_new,
-            "sub_old": substeps, "sub_new": new_sub}
+            "sub_old": substeps, "sub_new": new_sub, "La": _La, "binds": binds, "dt_elastic": dt_el,
+            "dt_capillary": dt_cap, "sigma": sigma, "csf_rho": rho_liq,
+            "over_by": micro_dt / dt_cfl}
     sub_note = (f", substeps {substeps}->{new_sub}" if new_sub is not None
                 else f" ({round(_dtf / dt_new)} substeps, dividing general.dt exactly)" if _dtf
                 else " (substeps auto = round(dt/substep_dt))")
     print(f"[grid-CFL] {name}: {token}={micro_dt:.2e} > limit {dt_cfl:.2e} "
-          f"(c_max={cmax:.1f}, dx={dx:.2e}, cfl={cfl}); correcting spec -> "
+          f"({micro_dt / dt_cfl:.2f}x OVER) (c_max={cmax:.1f}, dx={dx:.2e}, cfl={cfl})"
+          f"{_why}; correcting spec -> "
           f"{token}={dt_new:.4e}{sub_note} (per-frame time preserved).", flush=True)
     if write:
         # Rewrite ONLY the relevant token(s) in the raw text (regex, count=1) so comments/layout survive.
@@ -269,7 +657,10 @@ PPC_FLOOR = 0.5                  # fraction of target below which the material i
 
 
 def _body_volumes(spec, dim):
-    """(name, volume) for every declared body type, from its `block` extent or its radius."""
+    """(name, volume) for every declared body type: from `particle_mass`, `block`, or `radius`.
+
+    The order matches models/entities.py, which is the only place the answer is authoritative.
+    """
     out = []
     sets = spec.get("sets") or {}
     for sname, sv in sets.items():
@@ -279,9 +670,20 @@ def _body_volumes(spec, dim):
         types = parent.get("types") or {}
         rad_default = float(sv.get("radius", parent.get("radius", 0.05)) or 0.05)
         n_par = int(parent.get("n", 1))
+        # THE MASS-DERIVED BODY, WHICH THIS FUNCTION USED TO MISS ENTIRELY. models/entities.py sizes
+        # a body three ways in this order: from `particle_mass` (V = per_parent * mass / density,
+        # arranged by `shape`), from an explicit `block`, or from `radius`. Only the last two were
+        # read here, so every spec that declares its size through the mass -- which is all of
+        # si_material/ -- fell through to `radius`, and `radius` is a FRACTION, not a length. With
+        # `radius: 0.5` that is a body of 0.524 m^3: si_gate was reported as 100,000 particles over
+        # 463,246,686 cells, i.e. 0.0 per cell, on a spec that is correctly sampled. The warning
+        # fired on healthy specs and the number was meaningless.
+        _pm = sv.get("particle_mass")
+        _rho = float(sv.get("density", 1.0) or 1.0)
+        _v_mass = (float(sv["per_parent"]) * float(_pm) / _rho) if _pm and _rho else None
         if not types:
-            v = (math.pi * rad_default ** 2 if dim == 2
-                 else (4.0 / 3.0) * math.pi * rad_default ** 3)
+            v = _v_mass if _v_mass else (math.pi * rad_default ** 2 if dim == 2
+                                         else (4.0 / 3.0) * math.pi * rad_default ** 3)
             out.append((sname, v, int(sv["per_parent"]), n_par))
             continue
         # THE ENGINE'S EXACT ALLOCATION, replicated rather than approximated: engine.py:610 gives
@@ -300,6 +702,8 @@ def _body_volumes(spec, dim):
                 v = 1.0
                 for k in range(dim):
                     v *= abs(float(b[dim + k]) - float(b[k]))
+            elif _v_mass:
+                v = _v_mass                       # sized by particle_mass, as entities.py does
             else:
                 r = float(t.get("radius", rad_default))
                 v = math.pi * r ** 2 if dim == 2 else (4.0 / 3.0) * math.pi * r ** 3
@@ -345,8 +749,12 @@ def particles_per_cell(yaml_path: str) -> list:
     # DEDUPED. A spec with 27 identical blobs would otherwise emit 27 identical warnings, and a
     # message repeated 27 times is one nobody reads.
     seen = {}
+    # CELLS FROM THE CELL SIZE, not from n_grid^dim -- the two agree only on a unit box. On a 0.1 m
+    # box a 1e-3 m^3 body holds 884,736 cells and `vol * n_grid**dim` reports 884, so a spec that is
+    # correctly sampled would be told it is oversampled by 1000x.
+    _dx_ppc = _cell_size(spec, n_grid, dim)
     for label, vol, n_per_parent, _n_par in _body_volumes(spec, dim):
-        cells = vol * n_grid ** dim
+        cells = vol / (_dx_ppc ** dim)
         if cells <= 0:
             continue
         ppc = n_per_parent / cells
@@ -358,7 +766,14 @@ def particles_per_cell(yaml_path: str) -> list:
         seen[key] = [label, 1]
         if ppc < target * PPC_FLOOR:
             # `n_grid` for the target, and the particle count for the target, so the reader can pick
-            want_grid = int(round((n_per_parent / (target * vol)) ** (1.0 / dim)))
+            # THE WORLD WIDTH BELONGS IN THIS FORMULA. ppc = N*dx^dim/vol with dx = W/n_grid, so
+            #     n_grid = W * (N / (target*vol))^(1/dim)
+            # and dropping W is right only on a unit box. On si_gate (W = 0.1 m) it suggested
+            # n_grid 368 as the cure for under-sampling when the answer is 37 -- ten times too fine,
+            # in the direction that makes ppc WORSE, and labelled "coarser". Same class of error as
+            # the `vol * n_grid**dim` cell count this file already fixed a few lines above.
+            _W = float((spec.get("general") or {}).get("world", [1.0])[0] or 1.0)
+            want_grid = max(1, int(round(_W * (n_per_parent / (target * vol)) ** (1.0 / dim))))
             want_n = int(target * cells)
             warn(f"{name}: {label} has {ppc:.2f} particles per grid cell "
                  f"({n_per_parent:,.0f} particles over {cells:,.0f} cells at n_grid={n_grid}) -- "

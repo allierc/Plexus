@@ -1,0 +1,89 @@
+# zf_Diencephalon_2192 -- 2210 larval-zebrafish neurons of the Diencephalon, the intermediate scale
+# between the 1000- and 4096-neuron sets. DERIVED WITHOUT A FETCH: the parent
+# zf_Diencephalon_4096 cube was shrunk about its own centre from 82.95 um
+# to 68.85 um until 2210 somas remained, so this is a genuine cube of tissue at the
+# SAME DENSITY as its parent rather than a thinned subsample of it. `p` is 20/N =
+# 0.00905, holding MEAN IN-DEGREE at ~20 as at 1000 (p=0.02) and 4096 (p=0.005).
+general:
+  name: zf_Diencephalon_2192
+  seed: 0
+  n_frames: 2000
+  dt: 0.05
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 2001
+  field_record_cap: 250
+  units:
+    length_um: 68.85433197021484
+    time_s: 1.0
+sets:
+  brain: {n: 1}
+  assembly: {parent: brain, per_parent: 1}
+  neuron:
+    parent: assembly
+    per_parent: 2210
+    types:
+      slow_quiet:  {fraction: 0.25, p: [1.0, 0.0, 1.2, 0.5, 1.00, 0.0]}
+      slow_bursty: {fraction: 0.25, p: [1.0, 0.0, 1.2, 1.6, 0.50, 0.0]}
+      fast_quiet:  {fraction: 0.25, p: [2.5, 0.0, 1.2, 0.5, 2.00, 0.0]}
+      fast_bursty: {fraction: 0.25, p: [2.5, 0.0, 1.2, 1.6, 0.25, 0.0]}
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/zf_Diencephalon_2192/connectome.npz
+fields:
+  neural_activity: {frame: grid, res: 128, components: 1, couples_to: assembly}
+seed:
+  - {op: neural_seed, at: neuron, region: zf_Diencephalon_2192, v0_mean: 0.0, v0_sd: 0.5}
+operators:
+  - {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.01}
+  - {op: neuron_signal, at: neuron, model: type_pairwise, edge_set: synapse, activation: tanh}
+  - {op: aggregate, at: assembly, child: neuron, block: voltage, into: activity}
+  - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
+      sigma: 6.0, normalize: none}
+schedule: [neuron_update, neuron_signal, aggregate, voxelize]
+plotting: {background: black, point_size: 4.0}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_assembly:
+    description: A single blue point remains stationary in the center of a black field throughout the
+      entire sequence. There is no movement, expansion, or change in the position of the object over time.
+      The scene is static, showing a constant state without any evolution or interaction. The video represents
+      a fixed point in space with no dynamic progression.
+    objects: The scene contains a single, small point located at the center of the frame. This object
+      is a bright blue color, contrasting sharply against the background. It is a singular, isolated point
+      with no connections to other objects. The size of the point is very small relative to the large,
+      black surrounding area.
+  movie_brain:
+    description: A single blue point remains stationary in the center of a black field throughout the
+      entire sequence. There is no movement, expansion, or change in the position of the object over time.
+      The scene is static, showing a constant state without any evolution or interaction. The video represents
+      a fixed point in space with no dynamic progression.
+    objects: The scene contains a single, small point located at the center of the frame. This object
+      is a bright blue color, providing a sharp contrast against the background. It is a singular, isolated
+      point with no connections to other objects or structures. The size of the point is very small relative
+      to the large, black rectangular field.
+  movie_neural_activity:
+    description: The simulation shows a cluster of irregular, bright particles shifting and rotating against
+      a black background. As time progresses, the internal arrangement of the bright masses undergoes
+      subtle structural changes and reorientations. The overall shape of the cluster remains relatively
+      stable while the internal components appear to flow or reorganize. The final frames show a slight
+      rotation and compression of the central mass.
+    objects: The scene contains a collection of irregular, bright white and grey particles clustered together.
+      These particles are arranged in a dense, interconnected group that forms a roughly diamond-shaped
+      mass. Each individual particle varies in size, with some appearing as large blobs and others as
+      smaller fragments. The objects are set against a solid black background, creating a high-contrast
+      visual of the evolving cluster.
+  movie_neuron:
+    description: The video shows a static distribution of blue particles against a black background. There
+      is no movement or evolution of the particles over the sequence of frames. The spatial arrangement
+      of the points remains constant throughout the entire duration. The simulation appears to be a still
+      image repeated multiple times.
+    objects: The scene contains a large number of small, blue, point-like particles. These particles are
+      organized into two distinct, elongated clusters that are oriented diagonally. The clusters are separated
+      by a narrow gap in the center of the frame. Each individual particle is uniform in size and color,
+      creating a dense, speckled texture.

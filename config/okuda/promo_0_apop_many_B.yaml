@@ -1,0 +1,296 @@
+general:
+  name: promo_0_apop_many_B
+  seed: 0
+  n_frames: 600
+  dt: 1.0
+  record_cap: 602
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 60000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 120000
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 60000
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: mesh_seed
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  seed: 0
+  vseed_cv: 0.15
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+- op: cell_geometry
+  at: cell
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: cell_die
+  at: vertex
+  cell_set: cell
+  p0: 3.5
+  mode: list
+  cells:
+  - 3
+  - 13
+  - 23
+  - 33
+  - 43
+  - 53
+  - 63
+  - 73
+  - 83
+  - 93
+  - 103
+  - 113
+  - 123
+  - 133
+  - 143
+  - 153
+  - 163
+  - 173
+  - 183
+  - 193
+  - 203
+  - 213
+  - 223
+  - 233
+  - 243
+  - 253
+  - 263
+  - 273
+  - 283
+  - 293
+  - 303
+  - 313
+  - 323
+  - 333
+  - 343
+  - 353
+  - 363
+  - 373
+  - 383
+  - 393
+  - 403
+  - 413
+  - 423
+  - 433
+  - 443
+  - 453
+  - 463
+  - 473
+  - 483
+  - 493
+  - 503
+  - 513
+  - 523
+  - 533
+  - 543
+  - 553
+  - 563
+  - 573
+  - 583
+  - 593
+  - 603
+  - 613
+  - 623
+  - 633
+  - 643
+  - 653
+  - 663
+  - 673
+  - 683
+  - 693
+  - 703
+  - 713
+  - 723
+  - 733
+  - 743
+  - 753
+  - 763
+  - 773
+  - 783
+  - 793
+  - 803
+  - 813
+  - 823
+  - 833
+  - 843
+  - 853
+  - 863
+  - 873
+  - 883
+  - 893
+  - 903
+  - 913
+  - 923
+  - 933
+  - 943
+  - 953
+  - 963
+  - 973
+  - 983
+  - 993
+  - 1003
+  - 1013
+  - 1023
+  - 1033
+  - 1043
+  - 1053
+  - 1063
+  - 1073
+  - 1083
+  - 1093
+  - 1103
+  - 1113
+  - 1123
+  - 1133
+  - 1143
+  - 1153
+  - 1163
+  - 1173
+  - 1183
+  - 1193
+  - 1203
+  - 1213
+  - 1223
+  - 1233
+  - 1243
+  - 1253
+  - 1263
+  - 1273
+  - 1283
+  - 1293
+  - 1303
+  - 1313
+  - 1323
+  - 1333
+  - 1343
+  - 1353
+  - 1363
+  - 1373
+  - 1383
+  - 1393
+  - 1403
+  - 1413
+  - 1423
+  - 1433
+  - 1443
+  - 1453
+  - 1463
+  - 1473
+  - 1483
+  - 1493
+  - 1503
+  - 1513
+  - 1523
+  - 1533
+  - 1543
+  - 1553
+  - 1563
+  - 1573
+  - 1583
+  - 1593
+  - 1603
+  - 1613
+  - 1623
+  - 1633
+  - 1643
+  - 1653
+  - 1663
+  - 1673
+  - 1683
+  - 1693
+  - 1703
+  - 1713
+  - 1723
+  - 1733
+  - 1743
+  - 1753
+  - 1763
+  - 1773
+  - 1783
+  - 1793
+  - 1803
+  - 1813
+  - 1823
+  - 1833
+  - 1843
+  - 1853
+  - 1863
+  - 1873
+  - 1883
+  - 1893
+  - 1903
+  - 1913
+  - 1923
+  - 1933
+  - 1943
+  - 1953
+  - 1963
+  - 1973
+  - 1983
+  - 1993
+  shrink_rate: 0.05
+  critical_frac: 0.15
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- mesh_seed
+- cell_geometry
+- cell_mechanics
+- cell_die
+- edge_flip
+- topo_record
+_basis:
+  why: apop_one with 200 deaths instead of 1, and SCATTERED rather than a patch. The
+    stride of 10 runs along the Fibonacci-sphere index order, which is a spiral, so
+    the marked cells are spread over the whole surface and no two are neighbours --
+    the `keep` permutation handed to `Hierarchy.renumber_set` is interleaved rather
+    than a contiguous block, which is the case a renumber written as a truncation
+    passes and a renumber written as a gather has to get right. `apop_one` moves one
+    row; the three geometric death specs move a contiguous patch; this one moves 200
+    rows out of order.
+  deaths: 200
+  mode: list, stride 10
+  parent: apop_one

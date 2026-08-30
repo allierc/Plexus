@@ -1,0 +1,189 @@
+general:
+  name: si_hourglass
+  seed: 0
+  n_frames: 2400
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.3
+  - 0.3
+  - 0.3
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  obstacles:
+  - - 0.0
+    - 0.02
+    - 0.0
+    - 0.045
+    - 0.05
+    - 0.3
+  - - 0.255
+    - 0.02
+    - 0.0
+    - 0.3
+    - 0.05
+    - 0.3
+  - - 0.0
+    - 0.05
+    - 0.0
+    - 0.066
+    - 0.08
+    - 0.3
+  - - 0.23399999999999999
+    - 0.05
+    - 0.0
+    - 0.3
+    - 0.08
+    - 0.3
+  - - 0.0
+    - 0.08
+    - 0.0
+    - 0.087
+    - 0.11
+    - 0.3
+  - - 0.213
+    - 0.08
+    - 0.0
+    - 0.3
+    - 0.11
+    - 0.3
+  - - 0.0
+    - 0.11
+    - 0.0
+    - 0.108
+    - 0.14
+    - 0.3
+  - - 0.192
+    - 0.11
+    - 0.0
+    - 0.3
+    - 0.14
+    - 0.3
+  - - 0.0
+    - 0.15
+    - 0.0
+    - 0.126
+    - 0.19
+    - 0.3
+  - - 0.174
+    - 0.15
+    - 0.0
+    - 0.3
+    - 0.19
+    - 0.3
+  - - 0.0
+    - 0.19
+    - 0.0
+    - 0.09899999999999999
+    - 0.23
+    - 0.3
+  - - 0.201
+    - 0.19
+    - 0.0
+    - 0.3
+    - 0.23
+    - 0.3
+  - - 0.0
+    - 0.23
+    - 0.0
+    - 0.072
+    - 0.27
+    - 0.3
+  - - 0.22799999999999998
+    - 0.23
+    - 0.0
+    - 0.3
+    - 0.27
+    - 0.3
+  - - 0.0
+    - 0.27
+    - 0.0
+    - 0.044999999999999984
+    - 0.3
+    - 0.3
+  - - 0.255
+    - 0.27
+    - 0.0
+    - 0.3
+    - 0.3
+    - 0.3
+sets:
+  cell:
+    n: 1
+    types:
+      snow:
+        material: snow
+        youngs: 500000.0
+        block:
+        - 0.115
+        - 0.16
+        - 0.02
+        - 0.185
+        - 0.29
+        - 0.28
+        fraction: 1.0
+  mpm_particle:
+    parent: cell
+    per_parent: 620232
+    radius: 0.5
+    density: 400.0
+    particle_mass: 1.52588e-06
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.85
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.85
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- aggregate
+- gravity
+- substep_dt: 3.333333e-05
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    snow:
+    - 0.92
+    - 0.94
+    - 1.0

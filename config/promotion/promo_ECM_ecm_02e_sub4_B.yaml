@@ -1,0 +1,122 @@
+general:
+  name: promo_ECM_ecm_02e_sub4_B
+  seed: 0
+  n_frames: 720
+  dt: 0.0032
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    start:
+    - - 0.5
+      - 0.44
+      - 0.5
+    types: &id001
+      s0:
+        fraction: 0.125
+        youngs: 120.0
+      s1:
+        fraction: 0.125
+        youngs: 120.0
+      s2:
+        fraction: 0.125
+        youngs: 120.0
+      s3:
+        fraction: 0.125
+        youngs: 120.0
+      s4:
+        fraction: 0.125
+        youngs: 120.0
+      s5:
+        fraction: 0.125
+        youngs: 120.0
+      s6:
+        fraction: 0.125
+        youngs: 120.0
+      s7:
+        fraction: 0.125
+        youngs: 120.0
+  mpm_particle:
+    parent: cell
+    per_parent: 90000
+    radius: 0.48
+    density: 1.0
+    types: *id001
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: aggregate
+  at: cell
+- op: ecm_seed
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.44
+  - 0.5
+  block:
+  - 0.3
+  - 0.28
+  - 0.3
+  - 0.7
+  - 0.6
+  - 0.7
+  cavity_r: 0.07
+  cavity_h: 0.07
+  axis: 1
+  cavity_sphere: true
+  margin: 0.02
+  n_fibres: 1500
+  fibre_len: 0.09
+  align: 0.0
+  align_dir:
+  - 1.0
+  - 0.0
+  - 0.0
+  seed: 0
+- op: gravity
+  at: cell
+  g: 2.5
+- op: ecm_stress
+  at: mpm_particle
+  scale: 2.0e-05
+  bands: 8
+  measure: vonmises
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 2.0
+  a_max: 300.0
+  store_stress: true
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1000000000.0
+schedule:
+- aggregate
+- ecm_seed
+- gravity
+- ecm_stress
+- substep_dt: 0.0004
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  box_frame: true

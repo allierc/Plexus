@@ -1,0 +1,63 @@
+{
+  "n_frames": 460,
+  "program": "pairs",
+  "synergies": {
+    "LR": {
+      "label": "LR",
+      "window": [
+        40,
+        240
+      ],
+      "gaze_excursion_deg": [
+        -10.8,
+        3.52,
+        3.11
+      ],
+      "peak_abs_deg": [
+        10.8,
+        3.52,
+        3.11
+      ],
+      "expected": "horizontal -",
+      "ok": true
+    }
+  },
+  "radius_worst_pct": 1.22,
+  "strain_p99": 0.0447,
+  "peak_shortening_pct": 75.78,
+  "max_shortening_pct": {
+    "LR": 75.78,
+    "SR": 3.0,
+    "MR": 2.92,
+    "IR": 2.31,
+    "SO": 3.62,
+    "IO": 3.68
+  },
+  "geometry": {
+    "source": "260802_s2_EYE_MUSCLES_MODEL.blend",
+    "side": "R",
+    "scale": 0.16768,
+    "axial_ratio": 0.7178,
+    "semi_axes": [
+      0.1241,
+      0.1059,
+      0.0825
+    ],
+    "rest_lengths": {
+      "LR": 0.1577,
+      "SR": 0.1561,
+      "MR": 0.1961,
+      "IR": 0.1667,
+      "SO": 0.2006,
+      "IO": 0.2133
+    },
+    "muscle_volumes": {
+      "LR": 1.48875e-05,
+      "SR": 2.25246e-05,
+      "MR": 1.45764e-05,
+      "IR": 2.28027e-05,
+      "SO": 2.5405e-05,
+      "IO": 2.91811e-05
+    }
+  }
+}

@@ -65,7 +65,14 @@ from . import neural                # noqa: F401  neural_seed, neuron_update (ph
 #                                                 (psi: shared | type_pre | type_pairwise),
 #                                                 neuron_field_input (Omega)
 from . import observation           # noqa: F401  voxelize -- a REPRESENTATION, not a mechanism
+# THE CONTINUOUS-FLOW OPERATORS LIVE WITH THEIR ENGINE, BUT MUST REGISTER WITH THE ATLAS. `mpm_emit`
+# and `mpm_drain` are defined in plexus/continuous_engine.py, next to the run() that refuses a spec
+# using one without the other. Importing them only when that engine is selected is too late:
+# `schema.load` validates every operator NAME before anything chooses an engine, so a spec naming
+# mpm_emit died with KeyError before the engine key was read. It imports models.base and
+# models.registry only, so there is no cycle back into this package.
+from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["interaction_ops", "motion_ops", "field_ops", "mpm_ops", "agent_ops",
            "mpm_triton", "mpm_warp", "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "neural", "observation"]
+           "contact_ops", "neural", "observation", "continuous_engine"]

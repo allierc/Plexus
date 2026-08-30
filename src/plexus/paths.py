@@ -86,6 +86,18 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("boids",       ("boids", "flock", "swarm")),
     ("slime",       ("slime", "physarum", "trail")),
     ("material",    ("material",)),
+    # The SI family lives apart from `material/` because the two are not interchangeable: an
+    # si_material spec declares metres, seconds and pascals via `general.units`, and a material one
+    # declares nothing. Sharing a folder made `si_` a prefix doing a directory's job. Listed BEFORE
+    # any rule that could match on a substring of the name, and matched by folder anyway.
+    ("si_material", ("si_material", "si_water", "si_fill", "si_splash", "si_gate")),
+    # WHERE THE STUDIO PUTS WHAT IT WRITES. `plexus.gui.studio` authors specs from a prompt, and
+    # they must land somewhere `Plexus_Main.py` will actually run: `validate_pre_folder` admits only
+    # a known simulation TYPE, so an unregistered folder is refused before anything renders. Kept
+    # separate from `material/` and `si_material/` because these are drafts -- generated, edited in
+    # the browser, and thrown away -- and mixing them into a curated family would make the family
+    # untrustworthy.
+    ("studio",      ("studio",)),
     ("active_matter", ("active_matter", "vicsek", "flock_am")),
     ("mpm",         ("mpm", "tissue", "elastic", "soft")),
     ("divide",      ("divide", "grow", "mitosis", "morula")),

@@ -1,0 +1,195 @@
+[eye_G] /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/eye_G/E130_kopt3000_spec.yaml
+[eye_G] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718)
+[eye_G] muscle volumes (sim units^3): LR=1.49e-05  SR=2.25e-05  MR=1.46e-05  IR=2.28e-05  SO=2.54e-05  IO=2.92e-05
+[engine] 1540 sim frames -> recording 1541 set frames (stride 1), fields every 1541 steps (<= 1)
+[engine] === eye_G_blend_synergies ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=1540
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(6)  orbit(1)  mpm_particle(45000)  muscle_particle(13200)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: blend_globe, blend_muscles   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, bone_anchor, muscle_sleeve, orbit_socket   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather
+[blend_globe] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718)
+[blend_globe] 45000 points, volume 0.00241, 13347 on the shell, 5941 lens, 1482 cornea
+[blend_globe] [1m[32mfill 24.5%[0m of the bounding box was inside the mesh
+[blend_muscles] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718)
+[blend_muscles] 6 straps x 2200 points; standoff +0.008 / embed -0.006
+[blend_muscles] fibre smoothing: off (raw geodesic s)
+[blend_muscles] rest lengths:
+    LR=0.143 (fill [1m[32m3.0%[0m, moved 16%, tendon +0.0000 in)
+    SR=0.150 (fill [1m[32m3.8%[0m, moved 26%, tendon +0.0011 in)
+    MR=0.180 (fill [1m[32m2.6%[0m, moved 0%, tendon +0.0000 in)
+    IR=0.159 (fill [1m[32m2.8%[0m, moved 36%, tendon +0.0012 in)
+    SO=0.177 (fill [1m[32m2.4%[0m, moved 0%, tendon +0.0002 in)
+    IO=0.169 (fill [1m[32m2.1%[0m, moved 17%, tendon +0.0010 in)
+
+  what each synergy did (open loop, so this is the geometry talking):
+    SR+SO  up (SR+SO, the two dorsal insertions)      gaze [-1.15, 9.0, 5.39]  expected vertical +   OK
+    IR+IO  down (IR+IO, the two ventral insertions)   gaze [-4.87, -13.33, -6.21]  expected vertical -   OK
+    LR     temporal (LR, the caudal insertion)        gaze [7.62, 5.4, 0.43]  expected horizontal + OK
+    MR     nasal (MR, the rostral insertion)          gaze [-7.28, 2.71, -0.64]  expected horizontal - OK
+
+  [1m[32mworkspace: 14.9 deg horizontal x 22.3 deg vertical[0m
+
+{
+  "n_frames": 1540,
+  "program": "pairs",
+  "synergies": {
+    "SR+SO": {
+      "label": "up (SR+SO, the two dorsal insertions)",
+      "window": [
+        40,
+        240
+      ],
+      "gaze_excursion_deg": [
+        -1.15,
+        9.0,
+        5.39
+      ],
+      "peak_abs_deg": [
+        1.15,
+        9.0,
+        5.39
+      ],
+      "expected": "vertical +",
+      "ok": true
+    },
+    "IR+IO": {
+      "label": "down (IR+IO, the two ventral insertions)",
+      "window": [
+        400,
+        600
+      ],
+      "gaze_excursion_deg": [
+        -4.87,
+        -13.33,
+        -6.21
+      ],
+      "peak_abs_deg": [
+        4.87,
+        13.33,
+        6.21
+      ],
+      "expected": "vertical -",
+      "ok": true
+    },
+    "LR": {
+      "label": "temporal (LR, the caudal insertion)",
+      "window": [
+        760,
+        960
+      ],
+      "gaze_excursion_deg": [
+        7.62,
+        5.4,
+        0.43
+      ],
+      "peak_abs_deg": [
+        7.62,
+        5.4,
+        0.86
+      ],
+      "expected": "horizontal +",
+      "ok": true
+    },
+    "MR": {
+      "label": "nasal (MR, the rostral insertion)",
+      "window": [
+        1120,
+        1320
+      ],
+      "gaze_excursion_deg": [
+        -7.28,
+        2.71,
+        -0.64
+      ],
+      "peak_abs_deg": [
+        7.28,
+        2.71,
+        0.64
+      ],
+      "expected": "horizontal -",
+      "ok": true
+    }
+  },
+  "radius_worst_pct": 0.11,
+  "strain_p99": 0.0161,
+  "peak_shortening_pct": 27.26,
+  "max_shortening_pct": {
+    "LR": 22.91,
+    "SR": 22.92,
+    "MR": 23.2,
+    "IR": 19.88,
+    "SO": 27.26,
+    "IO": 27.11
+  },
+  "geometry": {
+    "source": "260802_s2_EYE_MUSCLES_MODEL.blend",
+    "side": "R",
+    "scale": 0.16768,
+    "axial_ratio": 0.7178,
+    "semi_axes": [
+      0.1241,
+      0.1059,
+      0.0825
+    ],
+    "rest_lengths": {
+      "LR": 0.1577,
+      "SR": 0.1561,
+      "MR": 0.1961,
+      "IR": 0.1667,
+      "SO": 0.2006,
+      "IO": 0.2133
+    },
+    "muscle_volumes": {
+      "LR": 1.48875e-05,
+      "SR": 2.25246e-05,
+      "MR": 1.45764e-05,
+      "IR": 2.28027e-05,
+      "SO": 2.5405e-05,
+      "IO": 2.91811e-05
+    }
+  }
+}
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h08u16>
+Subject: Job 153479393: <eye_G_kopt_3000> in cluster <Janelia> Done
+
+Job <eye_G_kopt_3000> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Thu Aug 20 10:16:39 2026
+Job was executed on host(s) <8*h08u16>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Thu Aug 20 10:18:14 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Thu Aug 20 10:18:14 2026
+Terminated at Thu Aug 20 10:28:15 2026
+Results reported at Thu Aug 20 10:28:15 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_kopt_3000.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   591.90 sec.
+    Max Memory :                                 3148 MB
+    Average Memory :                             1956.88 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               119732.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                11
+    Run time :                                   601 sec.
+    Turnaround time :                            696 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_kopt_3000.err> for stderr output of this job.
+
