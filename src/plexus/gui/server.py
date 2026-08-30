@@ -13,10 +13,13 @@ trusts -- so "valid in the editor" == "runnable". Binds to localhost.
 
 from __future__ import annotations
 
+import errno
 import io
 import json
 import os
 import posixpath
+import re
+import subprocess
 import tempfile
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -435,8 +438,16 @@ class Handler(BaseHTTPRequestHandler):
                 studio.fail(f"the reply is not YAML: {e}", res["yaml"])
                 return self._send_json({"error": f"not YAML: {e}", "seconds": res["seconds"],
                                         "detail": res["yaml"][:600]})
+            # A COUNT NAMED IN THE PROMPT BEATS THE FIELD, and then updates it. The knobs own this
+            # number so the model cannot decouple it from n_grid -- but "5m particles" in the prompt
+            # is the person asking, not the model guessing, and running 100k instead would be the
+            # interface overruling its user in silence.
+            _kn = dict(data.get("knobs") or {})
+            _pp = studio.particles_from_prompt(prompt or "")
+            if _pp:
+                _kn["particles"] = _pp
             try:
-                spec = studio.apply_knobs(spec, data.get("knobs") or {})
+                spec = studio.apply_knobs(spec, _kn)
             except Exception as e:                                       # noqa: BLE001
                 studio.fail(str(e), res["yaml"])
                 return self._send_json({"error": str(e), "seconds": res["seconds"]})
@@ -452,7 +463,30 @@ class Handler(BaseHTTPRequestHandler):
             with open(sp, "w") as f:
                 f.write(_dump_yaml(spec))
             return self._send_json({"name": name, "seconds": res["seconds"], "valid": True,
-                                    "report": studio.knob_report(spec, data.get("knobs") or {})})
+                                    "particles": _kn.get("particles"),
+                                    "report": studio.knob_report(spec, _kn)})
+
+        if route == "/api/studio/quit":
+            # SHUT THE SOCKET, NOT JUST THE PROCESS. A studio killed with the port still bound --
+            # or suspended with Ctrl-Z, which is how this bit us -- leaves 8765 held and the next
+            # launch dies on "Address already in use" with a traceback that looks like a bug in the
+            # server. `shutdown()` must be called from ANOTHER thread than serve_forever, hence the
+            # timer; `server_close()` is what actually releases the listening socket.
+            from plexus.gui import studio
+            import threading as _th
+
+            def _bye():
+                try:
+                    studio.worker_stop()
+                finally:
+                    try:
+                        self.server.shutdown()
+                        self.server.server_close()
+                    finally:
+                        os._exit(0)
+            self._send_json({"bye": True})
+            _th.Timer(0.25, _bye).start()
+            return
 
         if route == "/api/studio/save":
             from plexus.gui import studio
@@ -603,8 +637,51 @@ def _ctype(path):
     }.get(ext, "application/octet-stream")
 
 
+def _port_holder(port: int) -> str:
+    """Who is listening on `port`, in words -- or "" if it cannot be determined."""
+    try:
+        out = subprocess.run(["ss", "-ltnp"], capture_output=True, text=True, timeout=3).stdout
+    except Exception:                                                # noqa: BLE001
+        return ""
+    for line in out.splitlines():
+        cols = line.split()
+        if len(cols) < 5 or not cols[3].endswith(f":{port}"):        # the Local Address:Port column
+            continue
+        m = re.search(r"pid=(\d+)", line)
+        if not m:
+            return "another process (run `ss -ltnp` to see which)"
+        pid = m.group(1)
+        try:
+            cmd = open(f"/proc/{pid}/cmdline").read().replace("\x00", " ").strip()
+            st = open(f"/proc/{pid}/stat").read().split(") ", 1)[1].split()[0]
+        except Exception:                                            # noqa: BLE001
+            cmd, st = "?", "?"
+        # STOPPED IS THE CASE THAT LOOKS LIKE A HANG. A studio suspended with Ctrl-Z keeps the
+        # socket and accepts connections the kernel queues, but never answers one -- so the browser
+        # spins and the port is unavailable, with nothing in either place saying why.
+        stopped = "  [STOPPED by Ctrl-Z -- holds the port, answers nothing; kill -9 it]" if st == "T" else ""
+        return f"pid {pid} ({cmd}){stopped}"
+    return ""
+
+
 def serve(host="127.0.0.1", port=8765, prime=True):
-    httpd = ThreadingHTTPServer((host, port), Handler)
+    # A BOUND PORT IS NOT A CRASH, AND A TRACEBACK SAYS IT IS. `Address already in use` almost
+    # always means a studio is ALREADY RUNNING and doing its job -- open it. The other case is a
+    # studio suspended with Ctrl-Z, which keeps the socket while answering nothing, and the two need
+    # opposite responses. Neither is discoverable from a socketserver stack trace, so say which it
+    # is, name the process, and give the three ways out.
+    try:
+        httpd = ThreadingHTTPServer((host, port), Handler)
+    except OSError as e:
+        if e.errno != errno.EADDRINUSE:
+            raise
+        who = _port_holder(port)
+        print(f"\n[studio] port {port} is already in use"
+              f"{' by ' + who if who else ''}.\n"
+              f"  open it      http://{host}:{port}/studio\n"
+              f"  stop it      the 'Quit studio' button in that page (releases the port cleanly)\n"
+              f"  or elsewhere python Plexus_gui.py --port {port + 25}\n", flush=True)
+        raise SystemExit(1)
     if prime:
         # PRIME WHILE THE BROWSER IS STILL OPENING. Loading the corpus into a session takes a few
         # seconds and happens once; doing it lazily would make the FIRST prompt -- the one someone

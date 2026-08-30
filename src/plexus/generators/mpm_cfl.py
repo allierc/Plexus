@@ -404,6 +404,13 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     # text rewrite so comments/formatting survive; `spec` is the parsed view we compute from.
     text = open(yaml_path).read()
     spec = yaml.safe_load(text)
+    # A DECLARED SUBSTEP COUNT IS A DECISION, NOT A DRAFT. `general.cfl_lock: true` says the spec's
+    # substep_dt was chosen deliberately -- by the Studio's steps/frame field, or by hand -- and this
+    # function must REPORT the stability verdict without rewriting it. Substeps are a straight linear
+    # multiplier on frame time (231 of them is 8 s/frame where 25 is 0.9), so silently correcting a
+    # cheap preview back up to the stability limit takes away the only knob that makes previewing
+    # viable, and does it without saying so. The warning still prints, in full, with the factor.
+    _lock = bool((spec.get("general") or {}).get("cfl_lock", False))
 
     # --- locate the MPM micro-timestep. Two spec forms carry it ---------------- #
     # (1) the ORACLE `mls_mpm_mechanics` op: `dt_sub` + an explicit `substeps` on the op line.
@@ -574,7 +581,7 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
               f"({_err * 100:.1f}% of a frame lost per frame); corrected -> {_divide_fix:.4e} "
               f"for exactly {_n_new} substeps.", flush=True)
         micro_dt = _divide_fix
-        if write:
+        if write and not _lock:
             text = re.sub(rf"(\b{token}:\s*)[0-9.eE+\-]+",
                           lambda m: f"{m.group(1)}{_divide_fix:.6e}", text, count=1)
             open(yaml_path, "w").write(text)
@@ -623,8 +630,14 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     print(f"[grid-CFL] {name}: {token}={micro_dt:.2e} > limit {dt_cfl:.2e} "
           f"({micro_dt / dt_cfl:.2f}x OVER) (c_max={cmax:.1f}, dx={dx:.2e}, cfl={cfl})"
           f"{_why}; correcting spec -> "
-          f"{token}={dt_new:.4e}{sub_note} (per-frame time preserved).", flush=True)
-    if write:
+          f"{token}={dt_new:.4e}{sub_note} (per-frame time preserved)."
+          if not _lock else
+          f"[grid-CFL] {name}: {token}={micro_dt:.2e} > limit {dt_cfl:.2e} "
+          f"({micro_dt / dt_cfl:.2f}x OVER) (c_max={cmax:.1f}, dx={dx:.2e}, cfl={cfl}){_why}; "
+          f"NOT corrected -- general.cfl_lock is set, so this substep_dt is the spec's own choice. "
+          f"The run may be unstable; {round(_dtf / dt_new) if _dtf else new_sub} substeps/frame "
+          f"would be stable.", flush=True)
+    if write and not _lock:
         # Rewrite ONLY the relevant token(s) in the raw text (regex, count=1) so comments/layout survive.
         text = re.sub(rf"(\b{token}:\s*)[0-9.eE+\-]+", lambda m: f"{m.group(1)}{dt_new:.6e}", text, count=1)
         if new_sub is not None:                  # oracle form only: also bump the explicit substeps

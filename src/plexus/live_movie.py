@@ -511,7 +511,13 @@ class LiveMovie:
             self.drawn = k
             pos = self._xyz(lvl)
             self.cloud = self.pv.PolyData(pos)
-            self.cloud["rgb"] = self._rgb(H, lvl, pos)
+            # RESOLVED BEFORE IT IS ASSIGNED. Writing `cloud["rgb"] = None` and testing afterwards
+            # cannot work: pyvista raises "Empty array unable to be added" ON THE ASSIGNMENT, so the
+            # fallback line was unreachable and every spec WITHOUT `color_field` lost its movie --
+            # silently, because LiveMovie swallows its own errors to avoid killing a long run. Three
+            # A100 jobs rendered nothing before this was noticed.
+            _rgbv = self._rgb_field(H, lvl)
+            self.cloud["rgb"] = _rgbv if _rgbv is not None else self._rgb(H, lvl, pos)
             # POINT SPRITES AND THE CHART OVERLAY DO NOT COEXIST. `add_chart` inserts a
             # vtkContextActor, and with one present `render_points_as_spheres=True` draws nothing at
             # all: measured on this scene, 3,701 blue pixels with the panel and 61,331 without, from
@@ -528,6 +534,11 @@ class LiveMovie:
         if tick % self.stride:
             return
         self.cloud.points = self._xyz(lvl)
+        # A FIELD COLOUR IS A PROPERTY OF NOW, so unlike the body hue it is recomputed each frame.
+        if str(self.style.get("color_field", "") or ""):
+            _c = self._rgb_field(H, lvl)
+            if _c is not None:
+                self.cloud["rgb"] = _c
         el = time.perf_counter() - self.t0
         sub = f", {self.drawn:,} drawn" if self.drawn < self.n else ""
         # THE CLOCK, WHEN THERE IS ONE. With units declared the overlay carries the world's own
@@ -599,6 +610,74 @@ class LiveMovie:
                 self._cs_warned = True
                 print(f"[live-movie] cross section unavailable ({type(e).__name__}: {e})", flush=True)
 
+    def _field(self, H, lvl):
+        """A per-particle SCALAR to colour by, recomputed every frame. None when not asked for.
+
+        WHY VORTICITY IS THE DEFAULT AND NOT PRESSURE. `mpm_particle.C` is the affine velocity
+        GRADIENT the MLS transfer already carries, so its antisymmetric part is curl(v) exactly --
+        no extra state, no extra pass. Vortex cores and shear layers are what |omega| lights up, and
+        those are what "turbulence" means to look at. Pressure and deformation are the SAME field
+        for an MPM liquid (mu = 0, so stress is isotropic and p = K(1-J)), and in a tall column they
+        are dominated by the hydrostatic ramp -- 0.88% top to bottom on si_ball_wake -- so a wake
+        worth 1e-4 of J sits invisible on top of it unless rho*g*h is subtracted first.
+
+        THE RANGE IS FIXED, NOT PER-FRAME. Auto-scaling each frame makes a colour mean a different
+        number in every frame, so a brightening wake could be the wake growing or the rest of the
+        field calming down, and the movie cannot tell you which. `plotting.color_range: [lo, hi]`.
+        """
+        want = str(self.style.get("color_field", "") or "").lower()
+        if want not in ("vorticity", "speed", "pressure"):
+            return None, ""
+        import torch
+        idx = self.idx
+        if want == "speed":
+            v = lvl.get("vel")[idx]
+            return v.norm(dim=1), "|v| (m/s)"
+        if want == "vorticity":
+            C = lvl.C[idx]                                   # [N,3,3] velocity gradient
+            w = torch.stack([C[:, 2, 1] - C[:, 1, 2],
+                             C[:, 0, 2] - C[:, 2, 0],
+                             C[:, 1, 0] - C[:, 0, 1]], 1)    # curl(v) = 2 * antisym(C)
+            return w.norm(dim=1), "|curl v| (1/s)"
+        J = torch.linalg.det(lvl.F[idx].float())             # volume ratio
+        K = float(self.style.get("pressure_K", 3.0e6))
+        return K * (1.0 - J), "p = K(1-J) (Pa)"
+
+    def _rgb_field(self, H, lvl):
+        """Map `_field` through a colormap with a FIXED range -> uint8 RGB, or None."""
+        val, label = self._field(H, lvl)
+        if val is None:
+            return None
+        import math
+        import matplotlib.pyplot as plt
+        import torch
+        want = str(self.style.get("color_field", "") or "").lower()
+        rng = self.style.get("color_range")
+        if rng and len(rng) == 2:
+            lo, hi = float(rng[0]), float(rng[1])
+        else:                                                # settled ONCE, on the first frame
+            if getattr(self, "_frng", None) is None:
+                q = torch.quantile(val.float()[:: max(1, val.numel() // 200_000)],
+                                   torch.tensor([0.02, 0.98], device=val.device))
+                self._frng = (float(q[0]), float(q[1]))
+            lo, hi = self._frng
+        # LOG BY DEFAULT FOR VORTICITY, because the quantity spans decades and a linear ramp shows
+        # one of them. Measured on si_ball_wake, water |curl v|: median 0.6 -> 163 1/s over the run
+        # and 0.6 -> 1305 within the last frame. On a linear [0, 2000] the median sits at 8% of the
+        # map, so the column reads as one flat colour and the wake -- which IS there -- is the same
+        # dark purple as the still fluid. log10 puts three decades across the ramp instead of one.
+        if bool(self.style.get("field_log", want == "vorticity")):
+            eps = max(lo, hi * 1e-4)
+            t = ((torch.log10(val.clamp(min=eps)) - math.log10(eps))
+                 / max(math.log10(hi) - math.log10(eps), 1e-12)).clamp(0, 1).detach().cpu().numpy()
+            self._lut = f"log [{eps:.3g}, {hi:.3g}]"
+        else:
+            t = ((val - lo) / max(hi - lo, 1e-12)).clamp(0, 1).detach().cpu().numpy()
+            self._lut = f"[{lo:.3g}, {hi:.3g}]"
+        cm = plt.get_cmap(self.style.get("field_cmap", "turbo"))
+        self.colour_by = f"{label} {self._lut} ({self.style.get('field_cmap','turbo')})"
+        return (cm(t)[:, :3] * 255).astype(np.uint8)
+
     def _rgb(self, H, lvl, pos):
         """Per-particle colour, FIXED AT t=0 and carried with the particle.
 
@@ -649,8 +728,16 @@ class LiveMovie:
         on a sample: it is a property of how the material was seeded, and re-measuring it every
         frame would make the dots breathe as the fluid compresses.
         """
+        # A SLICE THINS THE CLOUD, SO THE DOTS MUST GROW. `cross_section.only` keeps a slab a few
+        # cells thick and parks the rest outside the box, so of the particles that remain VISIBLE
+        # only a few percent survive -- 2 of 41 z-cells on si_ball_wake. The dot size was measured
+        # against the spacing of the DRAWN set, which still counts the parked ones, so the slab
+        # renders as sparse specks with gaps between them and reads as a much emptier fluid than it
+        # is. Doubling the diameter restores roughly the coverage the full cloud had.
+        _slab = bool(self.cs is not None or (self.style or {}).get("cross_section"))
+        _k = 2.0 if _slab else 1.0
         if self.dot != "auto":
-            self.px_used = float(self.dot)
+            self.px_used = float(self.dot) * _k
             return self.px_used
         q = pos[:, :3]
         if len(q) > 20000:                          # the median converges long before the full set
@@ -663,12 +750,12 @@ class LiveMovie:
             sp = 0.0
         span = float((self.hi - self.lo).max()) or 1.0
         if sp <= 0:
-            self.px_used = 1.5
+            self.px_used = 1.5 * _k
         else:
             # world -> px through the parallel projection: the camera frames `parallel_scale`
             # half-heights over the window's half-height.
             world_per_px = (2.0 * self.p.camera.parallel_scale) / max(self.p.window_size[1], 1)
-            self.px_used = float(np.clip(self.fill * sp / max(world_per_px, 1e-12), 0.7, 24.0))
+            self.px_used = float(np.clip(_k * self.fill * sp / max(world_per_px, 1e-12), 0.7, 24.0))
         print(f"[live-movie] dot {self.px_used:.2f} px  (median spacing of the {len(pos):,} drawn "
               f"= {sp:.3e} world, box {span:.3g})", flush=True)
         return self.px_used

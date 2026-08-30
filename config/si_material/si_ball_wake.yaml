@@ -1,0 +1,165 @@
+general:
+  name: si_ball_wake
+  seed: 0
+  n_frames: 700
+  dt: 0.000178
+  boundary: wall
+  dim: 3
+  world:
+  - 0.03333333333333333
+  - 0.3
+  - 0.03333333333333333
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 21
+    start:
+    - &id001
+      - 0.016666666666666666
+      - 0.288
+      - 0.016666666666666666
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    types:
+      ball:
+        fraction: 0.047619047619047616
+        material: elastic
+        youngs: 5000000.0
+        density: 7850.0
+        shape: ball
+      water:
+        fraction: 0.9523809523809523
+        material: liquid
+        bulk_modulus: 3000000.0
+        density: 1000.0
+        eta: 0.001
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.03333333333333333
+        - 0.3
+        - 0.03333333333333333
+  mpm_particle:
+    parent: cell
+    per_parent: 250000
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 6.62377e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 370
+operators:
+- op: gravity
+  at: cell
+  g: 88.29
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 1800.0
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+schedule:
+- gravity
+- substep_dt: 5.741935e-06
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 2
+    only: true
+    max_points: 600000
+  colors:
+    ball:
+    - 0.95
+    - 0.35
+    - 0.3
+    water:
+    - 0.3
+    - 0.62
+    - 1.0
+  color_field: vorticity
+  color_range:
+  - 1.0
+  - 1000.0
+  field_cmap: turbo
+  field_log: true
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A dense cluster of particles at the bottom of a vertical tube begins to move upward as
+      a cohesive mass. As the mass rises, it encounters a resistance that causes it to elongate and eventually
+      break into a distinct, spherical bubble-like structure. This bubble travels toward the top of the
+      tube while leaving a trail of dispersed particles in its wake. Finally, the bubble reaches the upper
+      boundary and begins to dissipate or merge with the surrounding field.
+    objects: The primary objects are thousands of small, point-like particles arranged in a vertical,
+      cylindrical column. These particles transition in color from a bright cyan and green at the bottom
+      to a darker blue and red as they form a concentrated sphere. The central sphere is approximately
+      1 cm in diameter and is surrounded by a diffuse cloud of smaller particles. The entire simulation
+      is contained within a transparent, rectangular bounding box with a scale bar indicating a 1 cm width.
+  movie_mpm_particle:
+    description: The video shows a static, three-dimensional blue rectangular prism. There is no movement
+      or change in the object's position, orientation, or shape throughout the sequence. The lighting
+      and shading on the prism remain constant across all frames. The background remains a solid black
+      color for the entire duration.
+    objects: The scene contains a single, tall rectangular prism. It is colored in a gradient of blue,
+      with lighter shades on the front faces and darker shades on the side faces. The object is oriented
+      vertically and occupies the center of the frame. It has a large height relative to its narrow width
+      and depth.
