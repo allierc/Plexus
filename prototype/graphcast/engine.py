@@ -444,7 +444,7 @@ def main(argv=None) -> int:
     if task == "gates":
         return run_gates(config, out_dir, args.gate)
     if task == "generate":
-        summary = toy_mod.generate(fit, out_dir, device="cpu")
+        summary = toy_mod.generate(fit, out_dir, device=fit.data.device)
         for k, v in summary.items():
             print(f"  {k:14s} {v}")
         return 0

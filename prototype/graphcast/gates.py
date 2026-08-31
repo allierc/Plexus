@@ -385,6 +385,74 @@ def build_table() -> dict[str, Gate]:
                      "necessary, and a rule that only passes after being adjusted until it passes "
                      "has told us nothing. G12, which scored the embedding against 65 types on a "
                      "flyvis-scale toy, was removed when that toy was dropped from the plan."),
+        # ---- tier 2b: KNOWN-ODE recovery, the upper bound before any network --------------- #
+        # THE THREE 2-D DATASETS, AND WHY IT IS THREE AND NOT ONE. `toy2d_coarse` holds only the
+        # transport, `toy2d_fine` only the oscillators, `toy2d` their sum. Fitting the same model
+        # to all three separates "can this parameter be recovered at all" from "can it be recovered
+        # THROUGH THE SUM", and only the second is the prototype's actual question. A failure on
+        # G28 or G29 is a broken toy; a failure on G30 alone is a real result about separability.
+        Gate("G28", "closed_form", "known-ODE recovers the coarse speed c from the coarse field",
+             "|c_hat - c| / c < 0.01", "relative error in c", 3, _lt(0.01),
+             explain="THE EQUATION FITTED IS  du/dt = -c du/dx  (C1), one unknown scalar: c, the "
+                     "phase speed in DOMAIN WIDTHS PER FRAME, true value 0.000833333 -- one full "
+                     "traverse of the domain in 1,200 frames. The model is the equation itself "
+                     "with c as an nn.Parameter, no network, exactly as connectome-gnn's "
+                     "known_ode.py replaces every constant of the true ODE with a parameter and "
+                     "learns nothing else. (C1) is LINEAR in c, so the batch least-squares answer "
+                     "c* = -<du/dt, du/dx> / <du/dx, du/dx> is available in closed form, and the "
+                     "gate is really asking whether the trainer lands on a number it could have "
+                     "computed. That is the point: it is the cheapest check that the training loop "
+                     "is wired correctly, and it cannot be passed by a lucky architecture."),
+        Gate("G28a", "closed_form", "the coarse data SUPPORTS the true speed, before any trainer",
+             "|c* - c| / c < 0.01", "relative error in the closed-form c*", 2, _lt(0.01),
+             explain="G28's PRECONDITION, and a tier-2a data gate rather than a training one -- it "
+                     "runs before a trainer exists. It computes the least-squares answer "
+                     "c* = -<du/dt, du/dx> / <du/dx, du/dx> directly from the recorded coarse "
+                     "field and asks whether THAT lands on the true 0.000833333. Without it, G28 "
+                     "confounds two failures that want opposite fixes: if the finite differences, "
+                     "the recording stride or the operator itself do not support the true speed, "
+                     "then a trainer that misses it is behaving correctly and the toy is what is "
+                     "broken. With it, G28a passing and G28 failing means the TRAINING LOOP is "
+                     "wrong -- the loss is on the wrong quantity, the gradient does not reach the "
+                     "parameter, or a sign is flipped -- which is the only thing G28 is for. "
+                     "Measured 0.335% with R^2 0.9632 for (C1) at c*; the 3.7% that (C1) does not "
+                     "explain is the transport operator's INTEGER-CELL ROLL, which delivers a step "
+                     "of 1.280 cells per recorded frame as alternating 1s and 2s. That is a "
+                     "documented property of the operator, not a defect, and it is the floor G28's "
+                     "1% is judged against -- a margin of only 3x, so the trainer has to land on "
+                     "the least-squares answer and not merely near it."),
+        Gate("G29", "closed_form", "known-ODE recovers K and omega_i from the fine field",
+             "|K_hat - K| / K < 0.05 AND R^2(omega_hat, omega) > 0.90",
+             "worse of the two, as a pass fraction", 3, _gt(0.90),
+             explain="THE EQUATIONS FITTED ARE the Kuramoto rule written in the observables: "
+                     "r_i = omega_i + K SUM_j (v_j w_i - w_j v_i)  (F3), dv_i/dt = w_i r_i m_i "
+                     "(F4), dw_i/dt = -v_i r_i m_i  (F5), where v = sin(phi), w = cos(phi) and m "
+                     "is the known region mask. TWO UNKNOWNS OF DIFFERENT KIND: K, one coupling "
+                     "shared by every pixel, true value 0.90; and omega_i, ONE NATURAL FREQUENCY "
+                     "PER PIXEL -- this is the heterogeneity, the thing a_i exists to carry, drawn "
+                     "as a per-region mean (0.6/0.95/1.3/1.65 x 0.035 rad per unit time) plus a "
+                     "per-pixel offset of half-width 0.012. K is scored by relative error because "
+                     "it is one number; omega_i by R^2 because it is a field of a million, and a "
+                     "map that is right in pattern and off by a constant has still found the "
+                     "heterogeneity. (F3) IS ALREADY A MESSAGE-PASSING LAYER -- K is the edge "
+                     "weight, omega_i the additive node embedding, and (w_i, -v_i) the receiver "
+                     "gauge -- so a GNN that passes this has recovered a graph rule, not fitted a "
+                     "curve."),
+        Gate("G30", "closed_form", "known-ODE recovers BOTH rules from the SUM alone",
+             "c within 5%, K within 10%, R^2(omega_hat, omega) > 0.80",
+             "worse of the three, as a pass fraction", 3, _gt(0.80),
+             explain="The only one of the three that asks the prototype's real question. The model "
+                     "sees s = u + v, one field, and must fit (C1) and (F3)-(F5) TOGETHER without "
+                     "being told which part of the signal belongs to which rule. Thresholds are "
+                     "deliberately looser than G28/G29 -- 5%, 10%, 0.80 against 1%, 5%, 0.90 -- "
+                     "because separation is a strictly harder problem than recovery and a gate "
+                     "that demanded the same numbers would be measuring the difficulty of the "
+                     "decomposition as if it were a defect. What makes the separation possible at "
+                     "all is that the two rules DO NOT COUPLE and live at different resolutions "
+                     "and rates: the coarse traverse is 1,200 frames and the fine period is about "
+                     "30, a 40x separation, verified in the generator's summary.json rather than "
+                     "assumed. If G30 fails while G28 and G29 pass, the finding is that the sum is "
+                     "not identifiable at this rate ratio, and the ratio is a config knob."),
         # ---- tier 3: measurement -------------------------------------------------------- #
         Gate("G17", "measurement", "ZAPBench held-out prediction of d(dF/F)/dt",
              "R^2 > 0.268, the parameter-free kNN spatial pool", "held-out R^2", 6, _gt(0.268)),
