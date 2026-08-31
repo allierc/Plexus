@@ -139,6 +139,44 @@ def gate_G2_no_hardcoding(_spec_path: str):
                                           os.path.join(_ARTDIR[0], "G2_scan.png"))]
 
 
+def gate_G4_partition_of_unity(spec_path: str):
+    """The transfer weights must sum to one, or every application changes the total.
+
+    Tested directly on `plexus.operators.mpm_ops.bspline`, the transfer the encoder/decoder option
+    wraps -- so this needs no model and no wiring, which is why its stage is 0 rather than 5.
+    Swept over 2-D and 3-D and three resolutions, because a stencil bug can be dimension-specific.
+    """
+    import torch
+    from plexus.operators.mpm_ops import bspline, stencil_offsets
+
+    torch.manual_seed(0)
+    errs, worst = [], 0.0
+    for D in (2, 3):
+        for res in (32, 64, 128):
+            off = stencil_offsets(D)
+            X = torch.rand(20000, D)
+            _, w, _ = bspline(X, float(res), off, (res,) * D, False)
+            e = float((w.sum(1) - 1.0).abs().max())
+            errs.append((D, res, e))
+            worst = max(worst, e)
+
+    # negative control: drop the middle B-spline lobe and confirm the check notices
+    D, res = 2, 64
+    off = stencil_offsets(D)
+    X = torch.rand(5000, D)
+    fx = X * res - (X * res - 0.5).floor()
+    bad = torch.stack([0.5 * (1.5 - fx) ** 2, torch.zeros_like(fx),
+                       0.5 * (fx - 0.5) ** 2], dim=1)
+    wbad = torch.ones(X.shape[0], off.shape[0])
+    for k in range(D):
+        wbad = wbad * bad[:, off.long()[:, k], k]
+    control = float((wbad.sum(1) - 1.0).abs().max())
+
+    png = viz.partition_of_unity(errs, control, os.path.join(_ARTDIR[0], "G4_partition.png"))
+    return worst, (f"worst over D=2,3 x res=32,64,128; float32 eps is 1.2e-7; "
+                   f"negative control (middle lobe dropped) reads {control:.3g}"), [png]
+
+
 def gate_G7_units(spec_path: str):
     """Units declared, and every measurement-tier threshold carries a phenomenon unit."""
     fit = spec_schema.load(spec_path)
@@ -321,6 +359,7 @@ _ARTDIR = [os.path.join(_HERE, "log")]           # set by run_gates to the run's
 STAGE_CHECKS = {
     "G1": gate_G1_parse,
     "G2a": gate_G2_no_hardcoding,
+    "G4": gate_G4_partition_of_unity,
     "G7": gate_G7_units,
     "G16": gate_G16_types_are_spatially_mixed,
     "G21": gate_G21_travelling_wave,

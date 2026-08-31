@@ -290,3 +290,29 @@ def necessity_panel(r2_local, r2_neighbour, path, withheld: bool, coarse: str):
     fig.suptitle(f"coarse rule: {coarse}   |   drive "
                  f"{'withheld' if withheld else 'observed'}", fontsize=FS, y=1.04)
     return _save(fig, path)
+
+
+def partition_of_unity(errs, control_err, path):
+    """G4: how far the transfer weights are from summing to one, per dimension and resolution.
+
+    Plotted on a log axis against the threshold and against float32 machine epsilon, because a
+    conservation error at machine precision and one at 1e-3 are the same colour in a table and
+    completely different claims.
+    """
+    fig, ax = plt.subplots(figsize=(FIGW, 3.0))
+    _panel(ax, "a  |sum(w) - 1| for the quadratic B-spline transfer")
+    labels = [f"D={d}\nres={r}" for d, r, _ in errs]
+    vals = [e for _, _, e in errs]
+    ax.bar(range(len(vals)), vals, color="#4f81bd")
+    ax.axhline(1e-6, color="#c0504d", ls="--", lw=1.0)
+    ax.axhline(1.19e-7, color="#777777", ls=":", lw=1.0)
+    ax.text(len(vals) - 0.4, 1.1e-6, "threshold 1e-6", color="#c0504d", fontsize=FS - 1, ha="right")
+    ax.text(len(vals) - 0.4, 1.3e-7, "float32 eps", color="#777777", fontsize=FS - 1, ha="right")
+    ax.set_yscale("log")
+    ax.set_xticks(range(len(vals))); ax.set_xticklabels(labels, fontsize=FS - 2)
+    ax.set_ylabel("max |sum(w) - 1|")
+    ax.set_ylim(1e-8, max(1e-5, control_err * 2))
+    ax.plot([len(vals) - 0.5], [control_err], "v", color="#c0504d", ms=7)
+    ax.text(len(vals) - 0.55, control_err, " negative control ", color="#c0504d",
+            fontsize=FS - 1, ha="right", va="center")
+    return _save(fig, path)
