@@ -1,6 +1,6 @@
 # Gate report
 
-9 pass, 2 fail, 18 not yet run (of 29: 11 bookkeeping, 14 closed form, 4 measurement)
+5 pass, 0 fail, 24 not yet run (of 29: 11 bookkeeping, 14 closed form, 4 measurement)
 
 `status` is not `outcome`. **Outcome** is what the number did against the threshold;
 **status** is whether the gate has been walked through — definition written, estimator
@@ -58,12 +58,12 @@ still be pending review.
 | G14 | encoder/decoder is a genuine option | \|delta R^2(gradient)\| < 0.03 | — | · | pending | — |
 | G15 | graphcast vs simple is RESOLVED, either way | \|delta\| reported against a 3-seed floor; below it is UNRESOLVED, not ranked | — | · | pending | — |
 | G16 | the types cannot be read off position | spatial-cell purity within 20% of a label-permutation null | 1.131 | **PASS** | pending | [G16_toy.png](log/toy_counter_noed_simple_p1_free/G16_toy.png), [G16_state.mp4](log/toy_counter_noed_simple_p1_free/G16_state.mp4) |
-| G21 | the coarse field is the rule it claims | phase speed within 5% of lambda/period | 0.01241 | **PASS** | pending | [G21_field.mp4](log/toy_counter_noed_simple_p1_free/G21_field.mp4) |
-| G22 | the fine rule is recoverable from state and gradient | minimum per-node R^2 > 0.90 | 0.638 | **FAIL** | pending | [G22_identifiability.png](log/toy_counter_noed_simple_p1_free/G22_identifiability.png) |
-| G23 | the gradient is reconstructible from neighbours | R^2 > 0.95, else the graph cannot carry the fine rule | 1 | **PASS** | pending | [G22_identifiability.png](log/toy_counter_noed_simple_p1_free/G22_identifiability.png) |
-| G24 | the heterogeneity is linearly readable | corr(fitted gain, true g_i) > 0.90 | 0.9959 | **PASS** | pending | [G24_heterogeneity.png](log/toy_counter_noed_simple_p1_free/G24_heterogeneity.png) |
-| G25 | connected nodes are not collinear | mean \|corr\| between connected nodes < 0.80 | 0.576 | **PASS** | pending | [G22_identifiability.png](log/toy_counter_noed_simple_p1_free/G22_identifiability.png) |
-| G26 | the graph is NECESSARY: a node-local baseline cannot fit | node-local R^2 < 0.50 while (v, grad u) exceeds 0.90 | 1 | **FAIL** | pending | [G26_necessity.png](log/toy_counter_noed_simple_p1_free/G26_necessity.png) |
+| G21 | the coarse field is the rule it claims | phase speed within 5% of lambda/period | — | · | pending | — |
+| G22 | the fine rule is recoverable from state and gradient | minimum per-node R^2 > 0.90 | — | · | pending | — |
+| G23 | the gradient is reconstructible from neighbours | R^2 > 0.95, else the graph cannot carry the fine rule | — | · | pending | — |
+| G24 | the heterogeneity is linearly readable | corr(fitted gain, true g_i) > 0.90 | — | · | pending | — |
+| G25 | connected nodes are not collinear | mean \|corr\| between connected nodes < 0.80 | — | · | pending | — |
+| G26 | the graph is NECESSARY: a node-local baseline cannot fit | node-local R^2 < 0.50 while (v, grad u) exceeds 0.90 | — | · | pending | — |
 | G27 | which coarse rule forces the graph | the three toys ranked by G26; reported, not tuned | — | · | pending | — |
 
 ### What each closed form gate is for

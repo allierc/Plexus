@@ -1,0 +1,47 @@
+general:
+  name: toy2d_fine
+  seed: 42
+  n_frames: 1200
+  dt: 1.0
+  dim: 2
+  world: 1.0
+  boundary: periodic
+  field_record_cap: 240
+  units: {length_um: 1024.0, time_s: 1.0}
+sets:
+  probe: {n: 1, spawn: random}
+fields:
+  v: {frame: grid, res: 1024, components: 1}
+operators:
+- op: kuramoto_field
+  at: v
+  model: phase
+  K: 0.9
+  omega_mean: 0.035
+  omega_spread: 0.012
+  dt: 0.25
+  substeps: 12
+  seed: 7
+  discs:
+  - [0.25, 0.28, 0.115]
+  - [0.72, 0.24, 0.095]
+  - [0.3, 0.74, 0.105]
+  - [0.76, 0.71, 0.125]
+schedule: [kuramoto_field]
+data:
+  source: simulate
+  state: voltage
+  positions: positions
+  stimulus: v
+  graph: {kind: none, k: 0}
+  toy: {set: probe, edge_set: none, kind: two_scale_field, amplitude: 1.0, length_scale: 0.5,
+    inhibitory_fraction: 0.0, part: fine}
+  split:
+    train: [0, 900]
+    val: [900, 1050]
+    test: [1050, 1200]
+model: {encoder_decoder: false, message: simple, n_passes: 1, embedding: none, embedding_dim: 2,
+  latent_dim: 64, hidden_dim: 64, n_hidden_layers: 1, observation: identity}
+training: {n_iter: 1, batch_frames: 1, lr: 0.001, lr_scheduler: none, warmup_iters: 0,
+  grad_clip: 32.0, target: increment, target_norm: none, checkpoint_every: 1, seed: 42,
+  device: cpu}

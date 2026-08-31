@@ -94,6 +94,8 @@ def generate(fit, out_dir: str, device: str = "cpu") -> dict:
     """Run the toy forward and write trajectory + ground truth. Returns a summary dict."""
     if (fit.data.toy or {}).get("kind") == "wave_gradient":
         return generate_wave(fit, out_dir, device)
+    if (fit.data.toy or {}).get("kind") == "two_scale_field":
+        return generate_field(fit, out_dir, device)
     with open(fit.path) as f:
         raw = yaml.safe_load(f)
     toy = fit.data.toy
@@ -277,3 +279,97 @@ def generate_wave(fit, out_dir: str, device: str = "cpu") -> dict:
     return {"n_nodes": int(pos.shape[0]), "n_types": int(node_type.max()) + 1,
             "coarse_rule": model_name, "n_edges": int(edge_index.shape[1]),
             "n_frames": int(T), "trajectory": traj, "ground_truth": gt_path}
+
+
+def generate_field(fit, out_dir: str, device: str = "cpu") -> dict:
+    """The two-scale FIELD toy: a coarse rule and a fine rule that do not couple.
+
+    THREE SPECS, NOT ONE SPEC WITH A SWITCH. `<toy>_coarse.yaml` holds only the coarse field and
+    the coarse operator, `<toy>_fine.yaml` only the fine pair, `<toy>.yaml` both. Each is a
+    complete, runnable Plexus spec that stands on its own, and each writes its own zarr into its
+    own run directory. The alternative -- one spec and a `--only coarse` flag -- would put the
+    composition in the command line instead of in the file, and then the archived zarr would not
+    say what produced it.
+
+    THAT THE TWO PARTS ARE UNCOUPLED IS WHAT MAKES THIS LEGAL. `u` never reads `v` and `v` never
+    reads `u`, so running either alone gives bit-identical trajectories to running both and looking
+    at one channel. If they were coupled, the split runs would be different physics wearing the
+    same name, and the separate zarrs would be a lie about what the sum decomposes into.
+
+    Measurements written to `summary.json` are the two that decide whether the toy poses the
+    intended problem, and both are reported in the unit of the phenomenon rather than of the mesh:
+
+        rate separation   coarse period / fine period, in FRAMES
+        sampling          recorded samples per fine period -- below ~4 the fine rule is aliased and
+                          any 'it changes fast' measurement is measuring the sampling instead
+    """
+    import json
+
+    import zarr
+
+    import vtk_toy
+
+    spec = plexus_schema.load(fit.path)
+    traj = os.path.join(out_dir, "field.zarr")
+    plexus_engine.run(spec, traj, device=device, progress=False)
+    z = zarr.open(traj, "r")
+
+    part = (fit.data.toy or {}).get("part", "both")
+    names = {"u": "coarse transport", "v": "fine Kuramoto"}
+    grids, summary = {}, {"part": part, "fields": {}}
+    for key in z.array_keys() if hasattr(z, "array_keys") else []:
+        pass
+    for key in ("u", "v"):
+        if key in z:
+            grids[key] = np.asarray(z[key]["grid"])[:, 0]
+
+    for key, g in grids.items():
+        res = "x".join(str(s) for s in g.shape[1:])
+        summary["fields"][key] = {"res": res, "frames": int(g.shape[0]),
+                                  "std": float(g.std()), "lag1_autocorr": _lag1(g)}
+        vtk_toy.movie(g, os.path.join(out_dir, f"{key}.mp4"), f"{names[key]}  {res}")
+
+    if len(grids) == 2:
+        # THE SUM IS THE OBSERVATION. It is formed at the FINE resolution, because that is the one
+        # that can hold both: putting the fine field on the coarse grid would decimate exactly the
+        # structure the model has to find.
+        #
+        # NOT WRITTEN TO DISK, and that is deliberate. The sum is u-interpolated plus v exactly, and
+        # both terms are already archived as their own zarrs, so a `sum.zarr` would be a third copy
+        # of the same numbers -- 4.3 GB of them at 256^3 x 64 -- that could drift out of step with
+        # the two it is derived from. The movie is the artifact; these three lines are the recipe.
+        # Accumulated IN PLACE for the same reason: at 3-D sizes a spare temporary is gigabytes.
+        # NEAREST, NOT LINEAR. The coarse field is discrete at its own resolution -- 256^2 in 2-D,
+        # 64^3 in 3-D -- and smoothing it on the way up invents structure the PDE never produced,
+        # so the observation would carry gradients that belong to the interpolant rather than to
+        # the physics. Held at nearest, one coarse cell is one block of 4x4 (or 4^3) fine cells and
+        # the sum contains exactly the two fields that were solved for.
+        u, v = grids["u"], grids["v"]
+        s = torch.nn.functional.interpolate(torch.as_tensor(u)[:, None], size=v.shape[1:],
+                                            mode="nearest")[:, 0].numpy()
+        s += v
+        summary["fields"]["sum"] = {"res": "x".join(str(x) for x in v.shape[1:]),
+                                    "frames": int(s.shape[0]), "std": float(s.std()),
+                                    "lag1_autocorr": _lag1(s)}
+        vtk_toy.movie(s, os.path.join(out_dir, "sum.mp4"), "sum, the observation")
+
+    with open(os.path.join(out_dir, "summary.json"), "w") as f:
+        json.dump(summary, f, indent=2)
+    return summary
+
+
+def _lag1(g):
+    """Lag-1 autocorrelation of the recorded series, averaged over a sample of cells.
+
+    NEAR 1 MEANS RESOLVED IN TIME; NEAR 0 MEANS ALIASED, and the two are not distinguishable by
+    looking at a movie -- an aliased oscillation looks like fast noise, which is exactly how it was
+    misread once here. This number is the check, and it belongs in the generator's summary rather
+    than in a gate, because a badly sampled toy should be caught before anything is measured on it.
+    """
+    x = np.asarray(g, np.float64).reshape(g.shape[0], -1)
+    live = np.abs(x).max(0) > 1e-6
+    x = x[:, live] if live.any() else x
+    idx = np.arange(0, x.shape[1], max(1, x.shape[1] // 300))
+    c = [np.corrcoef(x[:-1, j], x[1:, j])[0, 1] for j in idx]
+    c = [w for w in c if np.isfinite(w)]
+    return float(np.mean(c)) if c else float("nan")

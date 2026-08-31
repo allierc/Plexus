@@ -96,6 +96,12 @@ class DataSpec:
     graph: GraphSpec = field(default_factory=GraphSpec)
     split: dict = field(default_factory=dict)    # {train: [a,b], val: [...], test: [...]}
     subsample_neurons: Optional[int] = None
+    # WHERE THE GENERATOR RUNS, and it is a data question rather than a training one. A 256^3
+    # field stepped 1,200 times with 12 substeps is 22 billion lattice updates; on CPU that is
+    # tens of minutes and on GPU it is 205 seconds. It was hardcoded to "cpu" in engine.py, which
+    # is exactly the kind of value R5 says belongs in the spec -- and it silently made the 3-D
+    # toy look intractable when only the placement was wrong.
+    device: str = "cpu"
     toy: dict = field(default_factory=dict)      # only for source == "simulate"
 
     @classmethod
@@ -117,6 +123,7 @@ class DataSpec:
             if not (isinstance(rng, (list, tuple)) and len(rng) == 2 and rng[0] < rng[1]):
                 raise ValueError(f"data.split.{name} must be [start, stop] with start < stop, got {rng!r}")
         return cls(
+            device=str(raw.get("device", "cpu")),
             source=source,
             path=raw.get("path"),
             state=raw.get("state", "traces"),

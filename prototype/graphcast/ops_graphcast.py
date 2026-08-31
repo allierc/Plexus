@@ -40,6 +40,85 @@ from plexus.models.base import Exchange, Operator
 from plexus.models.registry import register_operator
 
 
+@register_operator("advect_field", family="fields", set="field", kind="field", model="transport")
+class AdvectField(Operator):
+    """COARSE RULE: pure transport, first order in time AND in space.
+
+        du/dt + c du/dx = 0
+
+    NOT A WAVE. A wave obeys d2u/dt2 = c2 d2u/dx2, which is second order in time, and nothing in
+    this prototype handles a second derivative -- the fine rule reads du/dx, a first derivative, so
+    the whole composition should stay first order. Transport gives the same left-to-right motion
+    with none of that.
+
+    STEPPED, NOT PRESCRIBED. An earlier version wrote the closed-form solution onto the grid every
+    frame, which is exact but is not an operator applying a rule -- it is an answer being copied
+    in. This advances the field it already holds.
+
+    THE SHIFT IS BY WHOLE CELLS ONLY, and that is the whole design of it. The obvious step is
+    semi-Lagrangian with linear interpolation, u_new(x) = u_old(x - c dt). That is exact when you
+    trace back to the INITIAL field in one hop, but applied every frame it re-interpolates an
+    already-interpolated field and the error compounds: measured, the profile lost 21% of its
+    amplitude over 1200 steps (0.785 of initial). A damping that large is indistinguishable from a
+    modelling choice once anything downstream depends on the field.
+
+    So the speed is carried in a fractional accumulator and the field is rolled by an INTEGER
+    number of cells whenever the accumulator crosses one. `torch.roll` on a periodic axis is a
+    permutation, so the amplitude is preserved to the bit and the mean speed is exactly the one
+    asked for. The cost is that motion advances in whole-cell increments rather than continuously,
+    which at 256 cells and roughly one cell every five frames is below anything that matters here.
+    """
+
+    EMIT = None
+    INPUTS: list = []
+    OUTPUTS: list = []
+    READS: list = []
+    WRITES: list = []
+    MAPS: list = []
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS: list = []
+    MECHANISM_TAGS = ["advection", "transport", "external_drive"]
+    PARAM_ROLES = {"speed": "phase_speed_domain_per_frame", "axis": "propagation_axis",
+                   "wavelength": "initial_profile_length_scale"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("_at") or params.get("to")
+        self.channel = int(params.get("channel", 0))
+        self.amplitude = self.tunable(params.get("amplitude"), 1.0)
+        self.wavelength = self.tunable(params.get("wavelength"), 0.5)
+        self.speed = self.tunable(params.get("speed"), 1.0 / 1200.0)   # domain widths per frame
+        self.axis = int(params.get("axis", 0))
+        self._seeded = False
+        self._carry = 0.0            # sub-cell displacement not yet applied
+
+    def _initial(self, grid):
+        """u(x, 0). A sinusoid by default -- the profile is data, the RULE is the transport."""
+        res = grid.shape
+        n = res[self.axis]
+        c = (torch.arange(n, device=grid.device, dtype=grid.dtype) + 0.5) / n
+        shape = [1] * len(res)
+        shape[self.axis] = n
+        return self.amplitude * torch.sin(2.0 * math.pi * c.reshape(shape).expand(res)
+                                          / self.wavelength)
+
+    def forward(self, H, mask=None):
+        fld = H.fields[self.field_name]
+        g = fld.grid[self.channel]
+        if not self._seeded:
+            fld.grid[self.channel] = self._initial(g)
+            self._seeded = True
+            return {}
+        n = g.shape[self.axis]
+        self._carry += float(self.speed) * n               # cells owed this frame
+        k = int(math.floor(self._carry))
+        if k:
+            self._carry -= k
+            fld.grid[self.channel] = torch.roll(g, shifts=k, dims=self.axis)
+        return {}
+
+
 @register_operator("wave_field", family="fields", set="field", kind="field",
                    model="travelling")
 class WaveField(Operator):
@@ -213,3 +292,130 @@ class GradientGain(Exchange):
         if mask is not None:
             dv = dv * mask.float()
         return {self.at: dv[:, None]}
+
+
+@register_operator("kuramoto_field", family="fields", set="field", kind="field", model="phase")
+class KuramotoField(Operator):
+    """FINE RULE: locally coupled phase oscillators, inside a mask, at high resolution.
+
+        dphi/dt = omega(x)  +  K * SUM_{4 neighbours} sin(phi_j - phi_i)
+
+    DIFFERENT IN KIND FROM THE COARSE RULE, which is the point. Transport moves a fixed profile
+    at a fixed speed; this synchronises, and where it fails to synchronise it makes phase defects.
+    Neither behaviour resembles the other, so a model that captures both has captured two
+    mechanisms rather than one rule at two settings.
+
+    ORDER, STATED PLAINLY. First order in time. The coupling is a sum over nearest neighbours of
+    sin(phi_j - phi_i), which in the SMALL-DIFFERENCE LIMIT is K times the discrete Laplacian --
+    so it is a second SPATIAL derivative in disguise, and that is worth knowing rather than
+    discovering. It is not second order in TIME, which is what a wave equation would have been.
+    Away from small differences the sine saturates and the behaviour is nothing like diffusion.
+
+    UNCOUPLED FROM THE COARSE FIELD by design. The two rules do not drive each other; they are
+    superposed in the observation. The model's task is therefore to SEPARATE two mechanisms
+    running at different resolutions and different rates, not to trace a cascade from one to the
+    other.
+
+    WHERE THE HETEROGENEITY LIVES: omega(x), the natural frequency, drawn per disc and per pixel.
+    A node's own rate is invisible in a single frame and only legible against its neighbours.
+    """
+
+    EMIT = None
+    INPUTS: list = []
+    OUTPUTS: list = []
+    READS: list = []
+    WRITES: list = []
+    MAPS: list = []
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS: list = []
+    MECHANISM_TAGS = ["synchronisation", "phase_coupling", "local_fast_dynamics"]
+    PARAM_ROLES = {"K": "coupling_strength", "omega_mean": "mean_natural_frequency",
+                   "omega_spread": "frequency_heterogeneity", "discs": "active_region_mask",
+                   "tubes": "active_region_mask",
+                   "dt": "fine_timestep"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("_at") or params.get("to")
+        self.channel = int(params.get("channel", 0))
+        self.K = self.tunable(params.get("K"), 0.6)
+        self.omega_mean = self.tunable(params.get("omega_mean"), 0.30)
+        self.omega_spread = self.tunable(params.get("omega_spread"), 0.15)
+        self.dt = self.tunable(params.get("dt"), 1.0)
+        self.substeps = int(params.get("substeps", 1))
+        self.discs = [[float(x) for x in d] for d in params.get("discs", [])]
+        self.tubes = [[float(x) for x in d] for d in params.get("tubes", [])]
+        self.seed = int(params.get("seed", 0))
+        self.emit = str(params.get("emit", "sin"))   # "sin" | "quadrature" (also writes cos)
+        if self.emit not in ("sin", "quadrature"):
+            raise ValueError(f"kuramoto_field emit must be 'sin' or 'quadrature', got {self.emit!r}")
+        self._init = False
+
+    def _build(self, g):
+        """Mask, natural frequencies and initial phase. DIMENSION-GENERIC, in two region shapes:
+
+            discs   [c_0, ..., c_{D-1}, r]        a ball: discs in 2-D, spheres in 3-D
+            tubes   [c_0, ..., c_{D-2}, r, axis]  a cylinder spanning the box along `axis`
+
+        WHY TUBES EXIST AND ARE THE 3-D DEFAULT. A ball of radius 0.1 sitting at the centre of a
+        256^3 volume is invisible from outside: a ray-cast volume render integrates through the
+        material in front of it, and an interior blob is behind ~100 cells of everything else. A
+        tube spans the box, so it MEETS TWO FACES, and the fine pattern is legible on the outside
+        of the cube without cutting it open. Same rule, same mask fraction, visible geometry.
+        """
+        D = g.dim()
+        axes = torch.meshgrid(*[(torch.arange(n, device=g.device, dtype=g.dtype) + 0.5) / n
+                                for n in g.shape], indexing="ij")
+        mask = torch.zeros_like(g)
+        omega = torch.zeros_like(g)
+        gen = torch.Generator(device="cpu").manual_seed(self.seed)
+        regions = [("disc", s) for s in self.discs] + [("tube", s) for s in self.tubes]
+        for i, (kind, spec) in enumerate(regions):
+            if kind == "disc":
+                if len(spec) != D + 1:
+                    raise ValueError(f"kuramoto_field disc {i} has {len(spec)} numbers; a {D}-D "
+                                     f"spec needs {D} centre coordinates plus a radius")
+                *centre, r = spec
+                dims = range(D)
+            else:
+                if len(spec) != D + 1:
+                    raise ValueError(f"kuramoto_field tube {i} has {len(spec)} numbers; a {D}-D "
+                                     f"spec needs {D - 1} centre coordinates, a radius and an axis")
+                *centre, r, ax = spec
+                dims = [d for d in range(D) if d != int(ax)]   # the axis is not in the distance
+            rr = sum((axes[d] - c) ** 2 for d, c in zip(dims, centre))
+            inside = rr <= r * r
+            mask = torch.where(inside, torch.ones_like(mask), mask)
+            # each disc has its own mean rate, and each pixel its own offset: the heterogeneity
+            per_disc = float(self.omega_mean) * (0.6 + 0.35 * i)   # one rate per region
+            jitter = (torch.rand(g.shape, generator=gen).to(g.device) - 0.5) \
+                * 2.0 * float(self.omega_spread)
+            omega = torch.where(inside, per_disc + jitter, omega)
+        phi = (torch.rand(g.shape, generator=gen).to(g.device) * 2.0 * math.pi) * mask
+        return mask, omega, phi
+
+    def forward(self, H, mask_sel=None):
+        fld = H.fields[self.field_name]
+        g = fld.grid[self.channel]
+        if not self._init:
+            self._mask, self._omega, self._phi = self._build(g)
+            self._init = True
+        phi, m = self._phi, self._mask
+        D = phi.dim()
+        for _ in range(max(1, self.substeps)):
+            coup = torch.zeros_like(phi)
+            for d in range(D):                       # 2D neighbours in D dimensions: 4, then 6
+                coup = coup + torch.sin(torch.roll(phi, 1, d) - phi) \
+                            + torch.sin(torch.roll(phi, -1, d) - phi)
+            phi = phi + float(self.dt) * m * (self._omega + self.K * coup)
+        self._phi = phi
+        fld.grid[self.channel] = torch.sin(phi) * m      # the OBSERVABLE, not the phase
+        if self.emit == "quadrature":
+            # w = cos(phi), THE OTHER HALF OF AN OBSERVABLE PAIR AND NOT A LEAK OF THE ANSWER.
+            # sin(phi) alone is a many-to-one observation -- it does not determine phi, so no rule
+            # written in phi can be fitted to it. With w recorded, the Kuramoto rule closes in the
+            # observables: sin(phi_j - phi_i) = v_j w_i - w_j v_i, which is the form the known-ODE
+            # operator and the GNN both fit. The phase itself is still never written out.
+            fld.grid[self.channel + 1] = torch.cos(phi) * m
+        return {}

@@ -36,6 +36,7 @@ import numpy as np
 
 FIGW = 7.0          # inches -- IDENTICAL for every figure, so \linewidth scales them all alike
 FS = 9              # the one point size; everything else is derived from it
+CMAP = "viridis"    # one colour map everywhere; sequential, so a field is read by level not sign
 
 BG = "#ffffff"
 FG = "#111111"
@@ -191,7 +192,7 @@ def state_movie(v, pos, path, stride=8, fps=20):
 #  stage 1b -- the toy as a test bed: the field, the heterogeneity, the identifiability
 # --------------------------------------------------------------------------------------- #
 
-def field_movie(grid, path, fps=20, stride=1):
+def field_movie(grid, path, fps=20, stride=1, label="field"):
     """The coarse field over time. A wave that is not travelling, or is identically zero, is
     unmistakable here -- and both of those shipped past a scalar check on an earlier toy."""
     try:
@@ -206,8 +207,8 @@ def field_movie(grid, path, fps=20, stride=1):
     frames = []
     for t in range(0, g.shape[0], stride):
         fig, ax = plt.subplots(figsize=(FIGW, FIGW * 0.95), facecolor=BG)
-        _panel(ax, f"coarse field u(x,y),  frame {t}")
-        ax.imshow(g[t].T, origin="lower", cmap="RdBu_r", vmin=-lim, vmax=lim)
+        _panel(ax, f"{label},  frame {t}")
+        ax.imshow(g[t].T, origin="lower", cmap=CMAP, vmin=-lim, vmax=lim)
         ax.set_xticks([]); ax.set_yticks([])
         fig.canvas.draw()
         frames.append(np.asarray(fig.canvas.buffer_rgba())[..., :3].copy())
@@ -315,4 +316,62 @@ def partition_of_unity(errs, control_err, path):
     ax.plot([len(vals) - 0.5], [control_err], "v", color="#c0504d", ms=7)
     ax.text(len(vals) - 0.55, control_err, " negative control ", color="#c0504d",
             fontsize=FS - 1, ha="right", va="center")
+    return _save(fig, path)
+
+
+def slice_movie(arr, path, axis=0, fps=24, lim=None, label="", stride=1):
+    """A movie of one slice through a 3-D field. A volume has no natural single view, so the slice
+    is stated in the label rather than left for the reader to guess."""
+    try:
+        import imageio.v2 as imageio
+    except ImportError:
+        return None
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    a = np.asarray(arr)
+    k = a.shape[1 + axis] // 2
+    lim = lim or (float(np.abs(a).max()) or 1.0)
+    frames = []
+    for t in range(0, a.shape[0], stride):
+        sl = np.take(a[t], k, axis=axis)
+        fig, ax = plt.subplots(figsize=(FIGW * 0.6, FIGW * 0.6))
+        _panel(ax, f"{label}  slice {'xyz'[axis]}={k},  frame {t}")
+        ax.imshow(sl.T, origin="lower", cmap=CMAP, vmin=-lim, vmax=lim)
+        ax.set_xticks([]); ax.set_yticks([])
+        fig.canvas.draw()
+        frames.append(np.asarray(fig.canvas.buffer_rgba())[..., :3].copy())
+        plt.close(fig)
+    imageio.mimsave(path, frames, fps=fps, macro_block_size=1)
+    return path
+
+
+def ortho_frame(arrs, labels, path, lims=None, at=None, projection=False):
+    """One frame of a 3-D field as three orthogonal slices per field.
+
+    `at` is a fractional (x, y, z) to slice THROUGH, defaulting to the volume centre. The default
+    is a trap and the first version fell into it: the four active balls sit off-centre, so cutting
+    through the middle of the volume passed between all of them and the panel rendered empty. A
+    slice plane has to be chosen to intersect the thing being shown.
+
+    `projection=True` takes a max-absolute projection instead, which shows every ball at once
+    regardless of where they sit -- the honest default when the content is sparse and localised.
+    """
+    n = len(arrs)
+    fig, axes = plt.subplots(n, 3, figsize=(FIGW, FIGW / 3 * 1.12 * n), squeeze=False)
+    for r, (a, lab) in enumerate(zip(arrs, labels)):
+        lim = (lims or [None] * n)[r] or (float(np.abs(a).max()) or 1.0)
+        for c, ax_i in enumerate(range(3)):
+            ax = axes[r][c]
+            if projection:
+                sl = np.abs(a).max(axis=ax_i) * np.sign(
+                    np.take_along_axis(a, np.abs(a).argmax(axis=ax_i, keepdims=True),
+                                       axis=ax_i).squeeze(ax_i))
+                tag = f"max|·| along {'xyz'[ax_i]}"
+            else:
+                frac = 0.5 if at is None else at[ax_i]
+                k = int(frac * a.shape[ax_i])
+                sl = np.take(a, k, axis=ax_i)
+                tag = f"{'xyz'[ax_i]}={k}"
+            _panel(ax, f"{lab}   {tag}" if c == 0 else tag)
+            ax.imshow(sl.T, origin="lower", cmap=CMAP, vmin=-lim, vmax=lim)
+            ax.set_xticks([]); ax.set_yticks([])
     return _save(fig, path)
