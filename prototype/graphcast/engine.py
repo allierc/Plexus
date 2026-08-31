@@ -320,7 +320,7 @@ _ARTDIR = [os.path.join(_HERE, "log")]           # set by run_gates to the run's
 
 STAGE_CHECKS = {
     "G1": gate_G1_parse,
-    "G2": gate_G2_no_hardcoding,
+    "G2a": gate_G2_no_hardcoding,
     "G7": gate_G7_units,
     "G16": gate_G16_types_are_spatially_mixed,
     "G21": gate_G21_travelling_wave,

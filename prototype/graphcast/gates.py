@@ -91,11 +91,18 @@ class Gate:
 # Dataset identity must never appear in code; paths and sizes are the two ways it leaks in. These
 # patterns live HERE, with the thresholds, for two reasons: they are part of the gate's definition
 # rather than of the runner, and a scanner whose pattern list sits in a scanned file finds itself.
+# NO WORD BOUNDARIES, and that is the fix rather than an oversight. The first version wrote
+# `\bzapbench\b`, which does not match inside "zapbench_dff_full.npy" because `_` is a word
+# character -- and a dataset name embedded in a filename is the single most likely way one would
+# actually appear. A planted-violation check caught 2 of 3 because of it. Substring matching can
+# in principle fire on an innocent superstring (7870 inside 178700); for a gate whose threshold is
+# zero that is the right direction to be wrong in, because a false positive fails loudly while a
+# false negative passes silently.
 FORBIDDEN_PATTERNS = [
     (r"/gr" + r"oups/", "an absolute data path"),
-    (r"\bzap" + r"bench\b", "a dataset name"),
-    (r"\bre" + r"dox\b", "a dataset name"),
-    (r"\b(717" + r"21|78" + r"70|137" + r"41)\b", "a dataset dimension"),
+    (r"zap" + r"bench", "a dataset name"),
+    (r"re" + r"dox", "a dataset name"),
+    (r"(717" + r"21|78" + r"70|137" + r"41)", "a dataset dimension"),
 ]
 # gates.py itself is exempt: it holds the pre-registered thresholds, some of which are DERIVED from
 # a dataset (G17's 0.268 is a ZAPBench baseline). Those are thresholds, not dataset parameters, and
@@ -141,15 +148,35 @@ def build_table() -> dict[str, Gate]:
                      "row that goes green having checked half its claim reads as an endorsement "
                      "it has not earned. It catches shape mismatches that appear only when two "
                      "particular options meet."),
-        Gate("G2", "bookkeeping", "no dataset identity anywhere in the code",
-             "0 offending literals outside config/", "literals", 0, _eq(0.0),
-             explain="One model has to serve three datasets, and it only does so if none of them "
-                     "has left a trace in the code. This scans the prototype's own Python on the "
-                     "ABSTRACT SYNTAX TREE rather than as text, checking every string and numeric "
-                     "constant except docstrings. That distinction is the point: naming a dataset "
-                     "in prose is documentation, while the same name used as a value is a "
-                     "hardcoded path. Scanning the text would flag the first; skipping strings "
-                     "entirely would miss the second, because a path IS a string."),
+        # G2 IS SPLIT FOR THE SAME REASON G1 IS. The scanner half can run today; the half that
+        # actually matters -- that ONE pipeline runs on three datasets with only the config
+        # changing -- cannot, because the ZAPBench and redox loaders do not exist yet. The scanner
+        # passing now is weak evidence: it passes partly because the most likely place for a
+        # hardcoded path has not been written. Marking that green would be a row claiming more
+        # than it has earned, which is the failure this whole form exists to prevent.
+        Gate("G2a", "bookkeeping", "no dataset identity appears as a VALUE in the code",
+             "0 offending constants outside config/", "literals", 0, _eq(0.0), status=DONE,
+             explain="A scan of the prototype's own Python on the ABSTRACT SYNTAX TREE rather "
+                     "than as text, checking every string and numeric constant except docstrings. "
+                     "That distinction is the point: naming a dataset in prose is documentation, "
+                     "while the same name used as a value is a hardcoded path. Scanning the text "
+                     "would flag the first; skipping strings entirely would miss the second, "
+                     "because a path IS a string. Reviewing it found a hole -- the patterns were "
+                     "word-bounded, so a name inside a filename slipped through and a "
+                     "planted-violation check caught only 2 of 3. The boundaries are gone and all "
+                     "4 are caught, while docstring prose and innocent constants still are not. "
+                     "Note what this does NOT establish: it is a necessary condition, not the "
+                     "claim. See G2b."),
+        Gate("G2b", "bookkeeping", "ONE pipeline actually runs on all three datasets",
+             "3 of 3 datasets complete generate/train/test with only the config changed",
+             "datasets", 8, _eq(3.0),
+             explain="The claim G2a only gestures at. The point of forbidding dataset identity in "
+                     "the code is that the same trainer should run on a toy, on a point-cloud "
+                     "recording and on a field recording with nothing changing but the yaml. That "
+                     "can only be checked once all three loaders exist and all three have been "
+                     "run end to end, which is stage 8. Until then the scanner is passing partly "
+                     "because the most likely place to hardcode a path -- the ZAPBench and redox "
+                     "loaders -- has not been written yet."),
         Gate("G3", "bookkeeping", "the transfer pair returns what it was given",
              "< 1e-6 of the field value", "fraction of the field value", 4, _lt(1e-6),
              explain="The encoder/decoder option moves state onto a background grid and back. If "
