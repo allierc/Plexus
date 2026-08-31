@@ -1,0 +1,108 @@
+general:
+  name: si_buckling_v40
+  seed: 0
+  n_frames: 500
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.16
+  - 0.1
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  engine: continuous
+sets:
+  cell:
+    n: 1
+    types:
+      water:
+        material: liquid
+        bulk_modulus: 144000.0
+        density: 1000.0
+        fraction: 1.0
+        shape: cube
+  mpm_particle:
+    parent: cell
+    per_parent: 12000000
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 6.400000000000002e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 200
+operators:
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_emit
+  at: mpm_particle
+  face: -y
+  speed: 0.35
+  ppc: 8.0
+  patch:
+  - 0.44
+  - 0.44
+  - 0.56
+  - 0.56
+- op: mpm_drain
+  at: mpm_particle
+  face: -y
+  at_fraction: 0.012
+  sponge: 6.0
+  damp: 0.6
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 4.0
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 392.40000000000003
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  surface_tension: 0.0
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- gravity
+- mpm_emit
+- mpm_drain
+- substep_dt: 1.893939393939394e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.05
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    water:
+    - 1.0
+    - 0.55
+    - 0.12
