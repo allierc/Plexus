@@ -189,7 +189,8 @@ Thresholds are literals in `gates.py`, never config. An artifact is a **conditio
 | G4 | the transfer conserves what it moves | \|sum(w) - 1\| < 1e-6 | pending |
 | G5 | the simple option IS the existing model, arithmetically | < 1e-5 of the voltage range | pending |
 | G6 | depth is an option, not a different model | bit-identical (max \|delta\| == 0) | pending |
-| G7 | the spec is allowed to carry a unit | 1 = declared and checked | pending |
+| G7 | the spec is allowed to carry a unit | units declared, and no measurement threshold in mesh units | done |
+| G7b | a measurement result is REPORTED in the declared unit | every tier-3 measured value carries its declared unit through the conversion | pending |
 | G8 | one-step accuracy is not stability | state norm stays < 2x the ground-truth norm | pending |
 
 `status` is not `outcome`. **Outcome** is what the number did against the threshold;
@@ -216,7 +217,9 @@ a number and evidence.
 
 **G6 — depth is an option, not a different model.** Both message-passing MLPs have their final layer initialised to zero, so every residual block is EXACTLY the identity before training. It follows that one pass and sixteen passes must give the same numbers at step zero. The threshold is exactly zero with no tolerance, because this is an algebraic identity rather than a numerical one. It catches a residual that is not a residual -- a missing skip connection, or an initialisation that makes the stack a different model at every depth.
 
-**G7 — the spec is allowed to carry a unit.** Two halves. The spec must declare a units block, because plexus/units.py is explicit that a model without one is dimensionless and no result from it may be quoted with a unit -- and every measurement-tier gate is a comparison against a quantity. And no measurement threshold may be denominated in grid cells, voxels or steps. That second half is the lesson from the ecm study: a penetration of 0.82 grid cells sounded small and was 15 microns, nearly two cell diameters. A threshold in the mesh's own currency is the easiest one to pass.
+**G7 — the spec is allowed to carry a unit.** Two halves, both with teeth. The spec must declare a units block, because plexus/units.py is explicit that a model without one is dimensionless and no result from it may be quoted with a unit -- and every measurement-tier gate is a comparison against a quantity. And no measurement threshold may be denominated in grid cells, voxels or steps; that half is the lesson from the ecm study, where a penetration of 0.82 grid cells sounded small and was 15 microns, nearly two cell diameters. A threshold in the mesh's own currency is the easiest one to pass. Both halves were checked against negative controls: a spec with no units block is refused, a spec declaring a DERIVED unit is refused, and poisoning one measurement gate's unit to 'grid cells' makes this gate fail and name the offender. WHAT IT DOES NOT ESTABLISH: it compares a unit LABEL against a blocklist, so it verifies that the declaration is honest in form, not that the number is really in that unit; and it says nothing about whether any result has actually been converted. See G7b.
+
+**G7b — a measurement result is REPORTED in the declared unit.** The half G7 cannot reach. Declaring length_um = 100 does not convert anything; it only makes a conversion possible. Whether a measured tier-3 value is actually reported in seconds or micrometres rather than in frames or cells can only be checked once a tier-3 gate has run, which is stage 7. Until then G7 establishes that the spec is ALLOWED to carry a unit, and nothing about whether it does.
 
 **G8 — one-step accuracy is not stability.** A model can predict the next increment almost perfectly and still blow up when it is fed its own output twenty times over, because a one-step fit never sees its own error compound. This runs a 20-step rollout and requires the state to stay bounded. The threshold is a RATIO to the ground-truth norm, so it is dimensionless and means the same thing on the toy and on real data.
 
