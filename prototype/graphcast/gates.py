@@ -258,56 +258,133 @@ def build_table() -> dict[str, Gate]:
         # On this toy the fine rule IS a spatial derivative, so "did the model recover the
         # interaction" and "did the message become a gradient operator" are the same question, and
         # the second is the one that can be measured directly.
-        Gate("G9", "closed_form", "the message becomes a gradient operator",
-             "R^2 > 0.90 against the true field gradient", "R^2 against du/dx", 2, _gt(0.90)),
-        Gate("G10", "closed_form", "recover the per-node time constant",
-             "R^2 > 0.95 against the known tau", "R^2 against known tau", 2, _gt(0.95)),
-        Gate("G11", "closed_form", "the embedding recovers the types (small toy)",
-             "ARI > 0.70 against the 6 true types", "adjusted Rand index", 2, _gt(0.70)),
-        Gate("G12", "closed_form", "the embedding recovers the types (large toy)",
-             "ARI > 0.70 against the 65 true types", "adjusted Rand index", 5, _gt(0.70)),
-        Gate("G13", "closed_form", "recover the per-node SIGNED GAIN (the heterogeneity)",
-             "R^2 > 0.90 against the true g_i", "R^2 against the true g_i", 2, _gt(0.90)),
-        Gate("G14", "closed_form", "encoder/decoder is a genuine option: on vs off",
-             "|delta R^2(gradient)| < 0.03", "R^2 difference", 4, _abs_lt(0.03)),
-        Gate("G15", "closed_form", "graphcast vs simple message is RESOLVED, either way",
-             "|delta| reported against the 3-seed floor; below it is UNRESOLVED, not ranked",
-             "R^2 difference vs the measured floor", 3, None),
-        Gate("G16", "closed_form", "types are spatially mixed by construction",
-             "spatial-cell type purity within 20% of chance (1/n_types)",
-             "purity as a multiple of chance", 1, _lt(1.2)),
-        # ---- stage 1b: the toy is a valid test bed (data only, no model) ----------------- #
-        # Added after three toys failed for reasons that had nothing to do with the model: a
-        # circuit at a fixed point, a stimulus field that was identically zero, and a travelling
-        # wave whose gradient is recoverable node-locally (du/dx = -(1/c) du/dt) so the graph was
-        # never necessary. In every case training was run before the data was known to pose the
-        # problem it claimed to. These need no model and each would have caught one of them.
+        # ---- tier 2a: the toy is a valid test bed (DATA only, no model) ------------------ #
+        # Added after three toys failed for reasons that had nothing to do with any model, and in
+        # every case training had been run before the data was known to pose the problem it
+        # claimed to. These need no model and each would have caught one of those failures.
         # Thresholds are principled: a deterministic rule is recoverable at R^2 > 0.95 by
         # definition, and 0.80 excludes collinearity rather than describing what was seen.
-        Gate("G21", "closed_form", "the coarse field is a travelling wave, cyclic left to right",
-             "phase drift per frame within 5% of lambda/period", "fraction of lambda/period",
-             1, _lt(0.05)),
-        Gate("G22", "closed_form", "the fine rule is exactly recoverable from (v, grad u)",
-             "minimum per-node R^2 > 0.90", "R^2, worst node", 1, _gt(0.90)),
-        Gate("G23", "closed_form", "the gradient is reconstructible from neighbours' states",
-             "R^2 > 0.95, else the graph cannot carry the fine rule", "R^2", 1, _gt(0.95)),
+        Gate("G16", "closed_form", "the types cannot be read off position",
+             "spatial-cell purity within 20% of a label-permutation null", "multiple of chance",
+             1, _lt(1.2),
+             explain="G11 asks whether the embedding recovers the node types. That is only a real "
+                     "test if the types cannot be read off position, because position is free "
+                     "information the model already has. The toy assigns types by a permutation "
+                     "independent of position and this measures that it worked, as the purity of "
+                     "a spatial cell against a LABEL-PERMUTATION null so that 1.0 is chance at any "
+                     "resolution. The null is empirical rather than 1/n_types, and that matters: "
+                     "at 32 cells per axis there are 1024 cells for 1024 nodes, so almost every "
+                     "occupied cell holds one node and its purity is 1.0 by construction. The "
+                     "first version read 6.1x chance and meant nothing but 'the grid is finer "
+                     "than the sampling'."),
+        Gate("G21", "closed_form", "the coarse field is the rule it claims",
+             "phase speed within 5% of lambda/period", "fraction of lambda/period", 2, _lt(0.05),
+             explain="The spec says a wave travels left to right at lambda over T. This checks "
+                     "that the field actually written does. It projects the recorded field onto "
+                     "the known wavelength, unwraps the phase and measures the drift per frame. "
+                     "It catches a field that is static, identically zero, or moving at the wrong "
+                     "speed -- an earlier toy ran three generations with a stimulus field of "
+                     "exactly zero, because the operator read a clock that nothing was writing. "
+                     "The estimator had to be sharpened twice: argmax on a 128-cell grid "
+                     "quantises to whole cells while the wave moves half a cell per frame, and an "
+                     "integer FFT bin then biased the speed by exactly 6.67/7. An estimator has "
+                     "to be sharper than the threshold it is judged against."),
+        Gate("G22", "closed_form", "the fine rule is recoverable from state and gradient",
+             "minimum per-node R^2 > 0.90", "R^2, worst node", 2, _gt(0.90),
+             explain="Before asking a model to learn dv from the state and the field gradient, "
+                     "check that dv IS a function of them. A per-node linear regression of dv on "
+                     "(v, grad u), reporting the WORST node rather than the mean -- because a "
+                     "mean of 0.98 can hide a third of the nodes at zero, and that is exactly "
+                     "what happened when 58.8% of nodes sat outside the field domain where "
+                     "sampling clamps and the gradient is identically zero."),
+        Gate("G23", "closed_form", "the gradient is reconstructible from neighbours",
+             "R^2 > 0.95, else the graph cannot carry the fine rule", "R^2", 2, _gt(0.95),
+             explain="The model has to build the field gradient out of its neighbours; this "
+                     "checks that doing so is possible at all. It regresses the true gradient at "
+                     "each node on the differences between its neighbours' states and its own. If "
+                     "it fails, no message-passing model can learn the fine rule and nothing "
+                     "downstream of it means anything."),
         Gate("G24", "closed_form", "the heterogeneity is linearly readable",
-             "corr(fitted gain, true g_i) > 0.90", "Pearson correlation", 1, _gt(0.90)),
-        # G26 IS THE GATE THAT WOULD HAVE CAUGHT THE TRAVELLING-WAVE DEFECT DIRECTLY. For any
-        # u = f(x - ct) the gradient is du/dx = -(1/c) du/dt, so a model that can see the drive
-        # recovers it from that node's own history and the graph is never needed -- measured, on
-        # the first wave toy, as a loss of 0.005 with gradient recovery of 0.000. A test bed whose
-        # fine rule is solvable node-locally cannot test a graph model at all, whatever else is
-        # true of it. The threshold is a gap, not a level: the node-local baseline must FAIL where
-        # the neighbour-informed fit succeeds.
+             "corr(fitted gain, true g_i) > 0.90", "Pearson correlation", 2, _gt(0.90),
+             explain="The signed gain g_i is what the embedding must carry, so it has to be "
+                     "present in the data before any model is asked to find it. From the same "
+                     "per-node regression as G22, the coefficient on the gradient IS dt times "
+                     "g_i; this correlates it against the truth. The fitted-to-true ratio should "
+                     "be 1.0 and reads 1.03, the residual being the finite-difference step "
+                     "against the sampled field rather than the analytic one."),
+        Gate("G25", "closed_form", "connected nodes are not collinear",
+             "mean |corr| between connected nodes < 0.80", "Pearson correlation", 2, _lt(0.80),
+             explain="If a node's neighbours are near-copies of it, their states carry nothing it "
+                     "does not already have and the graph is decoration. This measures the mean "
+                     "absolute correlation between the time series of connected nodes. It caught "
+                     "a real defect: at wavelength 0.5 a twelve-neighbour ball spans only 0.5 "
+                     "radians of phase, the measure read 0.84, and that is why an earlier fit "
+                     "drove the loss to 0.005 while recovering none of the mechanism. Shortening "
+                     "to 0.15 moved it to 0.61."),
         Gate("G26", "closed_form", "the graph is NECESSARY: a node-local baseline cannot fit",
              "node-local R^2 < 0.50 while (v, grad u) exceeds 0.90",
-             "R^2 of a node-local predictor", 2, _lt(0.50)),
+             "R^2 of a node-local predictor", 2, _lt(0.50),
+             explain="The strongest of the data gates and the one that would have caught the "
+                     "travelling-wave defect directly. A deliberately generous node-local "
+                     "baseline -- four lags of the node's own state, plus its own drive where "
+                     "observed, and NO neighbour -- must FAIL where the neighbour-informed fit "
+                     "succeeds. It is generous on purpose: the gate is only informative if the "
+                     "thing it rules out was given every chance. It catches a test bed whose fine "
+                     "rule is solvable without the graph at all, which is the case for any "
+                     "u = f(x - ct), since there du/dx = -(1/c) du/dt. It is currently FAILING at "
+                     "about 1.000 on all three coarse rules, and the reason is more general than "
+                     "the coarse rule: a linear per-node ODE driven by a smooth quasi-periodic "
+                     "field is autoregressively predictable from its own history whatever drives "
+                     "it, so no choice of field can rescue a fine rule that is locally solvable."),
+        # ---- tier 2b: closed form WITH a model ------------------------------------------- #
+        Gate("G9", "closed_form", "the message becomes a gradient operator",
+             "R^2 > 0.90 against the true field gradient", "R^2 against du/dx", 3, _gt(0.90),
+             explain="On this toy the fine rule IS a spatial derivative, so 'did the model recover "
+                     "the interaction' and 'did the aggregated message become du/dx' are the same "
+                     "question -- and the second can be measured directly against ground truth "
+                     "rather than through a proxy such as an edge-weight correlation."),
+        Gate("G10", "closed_form", "recover the per-node time constant",
+             "R^2 > 0.95 against the known tau", "R^2 against known tau", 3, _gt(0.95),
+             explain="Read off the trained operator's own Jacobian: d(dv_i)/dv_i is -1/tau_i for "
+                     "a leaky unit. Taken from the OPERATOR rather than from a named parameter, "
+                     "so the same measurement works for both message forms and does not assume "
+                     "the model wrote tau down anywhere."),
+        Gate("G11", "closed_form", "the embedding recovers the types",
+             "ARI > 0.70 against the true type labels", "adjusted Rand index", 3, _gt(0.70),
+             explain="The headline scientific readout, scored the way connectome-gnn scores it: "
+                     "cluster the embedding and take the adjusted Rand index against the true "
+                     "labels. The 0.70 threshold is the flyvis Ward-tree reference, which reaches "
+                     "0.702 against 65 cell types. It is only meaningful because G16 established "
+                     "that the types cannot be read off position instead."),
+        Gate("G13", "closed_form", "recover the per-node SIGNED GAIN (the heterogeneity)",
+             "R^2 > 0.90 against the true g_i", "R^2 against the true g_i", 3, _gt(0.90),
+             explain="The heterogeneity itself rather than a proxy for it, read as "
+                     "d(dv_i)/d(msg_i) from the trained operator. Signed matters: a model that "
+                     "recovers the magnitude and flips the sign fails, and it should, because an "
+                     "inverted gain is a different claim about the mechanism, not a small error."),
+        Gate("G14", "closed_form", "encoder/decoder is a genuine option",
+             "|delta R^2(gradient)| < 0.03", "R^2 difference", 5, _abs_lt(0.03),
+             explain="On a toy where the node set already IS the computation set, routing through "
+                     "a background grid should change the answer very little. The 0.03 threshold "
+                     "is twice the 0.015 run-to-run resolution floor measured on flyvis_A in the "
+                     "weekend benchmark. It catches an option that silently changes the model "
+                     "rather than the route it takes."),
+        Gate("G15", "closed_form", "graphcast vs simple is RESOLVED, either way",
+             "|delta| reported against a 3-seed floor; below it is UNRESOLVED, not ranked",
+             "R^2 difference vs the measured floor", 4, None,
+             explain="Not 'graphcast wins'. The weekend benchmark's discipline: report the "
+                     "difference against a floor measured from three seeds, and call anything "
+                     "below that floor UNRESOLVED rather than ranking it. It catches the "
+                     "temptation to read a 0.006 gap as a result -- which is how that benchmark "
+                     "found that four of its seven rollout arms were indistinguishable."),
         Gate("G27", "closed_form", "which coarse rule forces the graph",
              "the three toys ranked by G26; reported, not tuned",
-             "spread in node-local R^2 across the three coarse rules", 6, None),
-        Gate("G25", "closed_form", "connected nodes are not collinear",
-             "mean |corr| between connected nodes < 0.80", "Pearson correlation", 1, _lt(0.80)),
+             "spread in node-local R^2 across the three coarse rules", 6, None,
+             explain="Ranks the three coarse rules by G26 and reports the spread. Explicitly not "
+                     "a tuning target: the point is to learn which rule makes the graph "
+                     "necessary, and a rule that only passes after being adjusted until it passes "
+                     "has told us nothing. G12, which scored the embedding against 65 types on a "
+                     "flyvis-scale toy, was removed when that toy was dropped from the plan."),
         # ---- tier 3: measurement -------------------------------------------------------- #
         Gate("G17", "measurement", "ZAPBench held-out prediction of d(dF/F)/dt",
              "R^2 > 0.268, the parameter-free kNN spatial pool", "held-out R^2", 6, _gt(0.268)),
