@@ -348,8 +348,8 @@ def run_gates(spec_path: str, out_dir: str, only: list[str] | None = None) -> in
     # Two copies of the table, and the difference is the figure paths. The run-dir copy is the
     # archive, with paths relative to itself; the prototype-root copy is what the note \input's,
     # with paths relative to the note so \includegraphics resolves where latexmk runs.
-    gates_mod.write_tex(table, os.path.join(out_dir, "gates_table.tex"))
-    tex_path = gates_mod.write_tex(table, os.path.join(_HERE, "gates_table.tex"), rel_to=_HERE)
+    md_path = gates_mod.write_md(table, os.path.join(out_dir, "GATES.md"))
+    gates_mod.write_md(table, os.path.join(_HERE, "GATES.md"), rel_to=_HERE)
     gates_mod.write_csv(table, os.path.join(_HERE, "gates.csv"))
 
     width = max(len(g.what) for g in table.values())
@@ -362,7 +362,7 @@ def run_gates(spec_path: str, out_dir: str, only: list[str] | None = None) -> in
         print(f"  {g.gid:<4} {g.what:<{width}}  {meas:>12}  {g.outcome}"
               + (f"   [{g.note}]" if g.note else ""))
     print("\n" + gates_mod.summary(table))
-    print(f"wrote {csv_path}\nwrote {tex_path}")
+    print(f"wrote {csv_path}\nwrote {md_path}")
     return sum(1 for g in table.values() if g.outcome == gates_mod.FAIL)
 
 

@@ -39,6 +39,7 @@ from typing import Callable, Optional
 TIERS = ("bookkeeping", "closed_form", "measurement")
 
 PASS, FAIL, SKIP = "PASS", "FAIL", "SKIP"
+PENDING, DONE = "PENDING", "DONE"   # review status, orthogonal to outcome
 
 
 @dataclass
@@ -54,6 +55,12 @@ class Gate:
     outcome: str = SKIP
     note: str = ""
     artifacts: list = field(default_factory=list)   # PNG / MP4 paths, relative to the run dir
+    # STATUS IS NOT OUTCOME. `outcome` is what the number did against the threshold; `status` is
+    # whether the gate has been walked through -- definition written, estimator sanity-checked,
+    # negative control run, result read by a human. A gate can PASS mechanically and still be
+    # PENDING review, and that distinction is the difference between a number and evidence.
+    status: str = PENDING
+    explain: str = ""                               # plain English, coarse to specific
 
     def record(self, measured: Optional[float], note: str = "",
                artifacts: Optional[list] = None) -> "Gate":
@@ -112,24 +119,89 @@ def build_table() -> dict[str, Gate]:
         # G1 is split because the two halves become available at different stages, and a green
         # row that covers only half of what it claims is exactly the endorsement the reference
         # warns against. Both thresholds are set here, before either is run.
-        Gate("G1", "bookkeeping", "all four options PARSE (24 combinations)",
-             "24 of 24 option combinations load", "configs", 0, _eq(24.0)),
-        Gate("G1b", "bookkeeping", "all four options BUILD and take one step",
-             "24 of 24 option combinations run one forward step", "configs", 2, _eq(24.0)),
-        Gate("G2", "bookkeeping", "nothing dataset-specific is hardcoded",
-             "0 offending literals outside config/", "literals", 0, _eq(0.0)),
-        Gate("G3", "bookkeeping", "scatter->gather round trip on a constant field",
-             "< 1e-6 of the field value", "fraction of the field value", 4, _lt(1e-6)),
-        Gate("G4", "bookkeeping", "transfer weights are a partition of unity",
-             "|sum(w) - 1| < 1e-6", "dimensionless", 4, _lt(1e-6)),
-        Gate("G5", "bookkeeping", "simple + 1 pass + no enc/dec is arithmetically NeuralGNN",
-             "< 1e-5 of the voltage range", "fraction of the voltage range", 2, _lt(1e-5)),
-        Gate("G6", "bookkeeping", "residual blocks start at identity: 1 vs 16 passes at init",
-             "bit-identical (max |delta| == 0)", "absolute", 3, _eq(0.0)),
-        Gate("G7", "bookkeeping", "units declared, and every measurement threshold is in "
-             "phenomenon units", "1 = declared and checked", "boolean", 0, _eq(1.0)),
-        Gate("G8", "bookkeeping", "a K=20 rollout on the toy does not diverge",
-             "state norm stays < 2x the ground-truth norm", "ratio to the GT norm", 3, _lt(2.0)),
+        Gate("G1", "bookkeeping", "every option combination can be READ",
+             "24 of 24 option combinations load", "configs", 0, _eq(24.0), status=DONE,
+             explain="The model has four switches, and the whole premise is that any setting of "
+                     "them is a legal model -- options, not forks. This gate checks that "
+                     "literally: every combination must be readable. It takes the reference "
+                     "config, overwrites only the model block with each of the 24 settings, and "
+                     "calls the loader. Why 24: `simple` carries no edge state, so running it "
+                     "twice is a different model wearing the same name and the schema refuses it, "
+                     "which leaves four legal (message, n_passes) pairs times 2 encoder/decoder "
+                     "times 3 embeddings. It catches an option that exists only in the "
+                     "documentation, and a combination that silently falls back to a default "
+                     "instead of erroring."),
+        Gate("G1b", "bookkeeping", "every option combination can be RUN",
+             "24 of 24 option combinations run one forward step", "configs", 2, _eq(24.0),
+             explain="The other half of G1. Reading a config proves the vocabulary is right; it "
+                     "does not prove the model can be built from it. This gate constructs the "
+                     "model object for each of the 24 settings and pushes one forward pass "
+                     "through it. It is split from G1 because the two become available at "
+                     "different stages -- G1 needs only the schema, G1b needs a model -- and a "
+                     "row that goes green having checked half its claim reads as an endorsement "
+                     "it has not earned. It catches shape mismatches that appear only when two "
+                     "particular options meet."),
+        Gate("G2", "bookkeeping", "no dataset identity anywhere in the code",
+             "0 offending literals outside config/", "literals", 0, _eq(0.0),
+             explain="One model has to serve three datasets, and it only does so if none of them "
+                     "has left a trace in the code. This scans the prototype's own Python on the "
+                     "ABSTRACT SYNTAX TREE rather than as text, checking every string and numeric "
+                     "constant except docstrings. That distinction is the point: naming a dataset "
+                     "in prose is documentation, while the same name used as a value is a "
+                     "hardcoded path. Scanning the text would flag the first; skipping strings "
+                     "entirely would miss the second, because a path IS a string."),
+        Gate("G3", "bookkeeping", "the transfer pair returns what it was given",
+             "< 1e-6 of the field value", "fraction of the field value", 4, _lt(1e-6),
+             explain="The encoder/decoder option moves state onto a background grid and back. If "
+                     "it is sound, depositing a constant and gathering it again returns the "
+                     "constant. This is the end-to-end version of G4 and it catches what G4 "
+                     "cannot: a transfer pair that is not each other's adjoint, an off-by-one in "
+                     "the stencil, a normalisation applied on one side only. The threshold is a "
+                     "FRACTION of the field value, so it does not depend on what the field is."),
+        Gate("G4", "bookkeeping", "the transfer conserves what it moves",
+             "|sum(w) - 1| < 1e-6", "dimensionless", 4, _lt(1e-6),
+             explain="The local half of G3. Each transfer spreads a node's value over the corners "
+                     "of the grid cell it sits in, and those weights must sum to one, or the "
+                     "transfer quietly changes the total amount of stuff every time it is "
+                     "applied. Summing to one is also exactly the condition that makes "
+                     "interpolation reproduce a constant, which is why G3 tests the same property "
+                     "from the outside. Dimensionless by construction."),
+        Gate("G5", "bookkeeping", "the simple option IS the existing model, arithmetically",
+             "< 1e-5 of the voltage range", "fraction of the voltage range", 2, _lt(1e-5),
+             explain="The pivot of the whole prototype. With `simple`, one pass and no "
+                     "encoder/decoder, this model is meant to be connectome-gnn's NeuralGNN term "
+                     "for term. The gate copies NeuralGNN's weights across and requires the two "
+                     "to produce the same numbers. If it passes, everything downstream is a "
+                     "controlled variation on a model already known to reach R^2_W around 0.97. "
+                     "If it fails, no later result can be interpreted at all, because a new "
+                     "model's failure and a reimplementation bug are indistinguishable."),
+        Gate("G6", "bookkeeping", "depth is an option, not a different model",
+             "bit-identical (max |delta| == 0)", "absolute", 3, _eq(0.0),
+             explain="Both message-passing MLPs have their final layer initialised to zero, so "
+                     "every residual block is EXACTLY the identity before training. It follows "
+                     "that one pass and sixteen passes must give the same numbers at step zero. "
+                     "The threshold is exactly zero with no tolerance, because this is an "
+                     "algebraic identity rather than a numerical one. It catches a residual that "
+                     "is not a residual -- a missing skip connection, or an initialisation that "
+                     "makes the stack a different model at every depth."),
+        Gate("G7", "bookkeeping", "the spec is allowed to carry a unit",
+             "1 = declared and checked", "boolean", 0, _eq(1.0),
+             explain="Two halves. The spec must declare a units block, because plexus/units.py is "
+                     "explicit that a model without one is dimensionless and no result from it "
+                     "may be quoted with a unit -- and every measurement-tier gate is a "
+                     "comparison against a quantity. And no measurement threshold may be "
+                     "denominated in grid cells, voxels or steps. That second half is the lesson "
+                     "from the ecm study: a penetration of 0.82 grid cells sounded small and was "
+                     "15 microns, nearly two cell diameters. A threshold in the mesh's own "
+                     "currency is the easiest one to pass."),
+        Gate("G8", "bookkeeping", "one-step accuracy is not stability",
+             "state norm stays < 2x the ground-truth norm", "ratio to the GT norm", 3, _lt(2.0),
+             explain="A model can predict the next increment almost perfectly and still blow up "
+                     "when it is fed its own output twenty times over, because a one-step fit "
+                     "never sees its own error compound. This runs a 20-step rollout and requires "
+                     "the state to stay bounded. The threshold is a RATIO to the ground-truth "
+                     "norm, so it is dimensionless and means the same thing on the toy and on "
+                     "real data."),
         # ---- tier 2: closed form -------------------------------------------------------- #
         # RESTATED for the two-scale wave toy. The thresholds are unchanged and none of these has
         # been run; only the objects they name have, because the toy they will be run on changed.
@@ -218,13 +290,13 @@ def write_csv(table: dict[str, Gate], path: str) -> str:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["id", "tier", "stage", "gate", "threshold", "unit", "measured", "outcome",
-                    "artifacts", "note"])
+        w.writerow(["id", "tier", "stage", "status", "gate", "threshold", "unit", "measured",
+                    "outcome", "artifacts", "note", "explain"])
         for gid in sorted(table, key=_order):
             g = table[gid]
-            w.writerow([g.gid, g.tier, g.stage, g.what, g.threshold, g.unit,
+            w.writerow([g.gid, g.tier, g.stage, g.status, g.what, g.threshold, g.unit,
                         "" if g.measured is None else f"{g.measured:.6g}", g.outcome,
-                        " ".join(g.artifacts), g.note])
+                        " ".join(g.artifacts), g.note, g.explain])
     return path
 
 
@@ -251,10 +323,10 @@ def write_tex(table: dict[str, Gate], path: str, rel_to: str | None = None) -> s
              # without bound and crushes every X column beside it -- which is how the first version
              # of this table rendered its thresholds one word per line and ran its headers
              # together. Widths are explicit and sum to the text block.
-             r"\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.75cm}>{\raggedright\arraybackslash}p{4.7cm}>{\raggedright\arraybackslash}p{3.7cm}r@{\hspace{8pt}}>{\raggedright\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{2.4cm}@{}}",
+             r"\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.7cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{3.3cm}r@{\hspace{6pt}}>{\raggedright\arraybackslash}p{1.25cm}>{\raggedright\arraybackslash}p{1.35cm}>{\raggedright\arraybackslash}p{2.0cm}@{}}",
              r"\toprule",
              r"\textbf{id} & \textbf{gate} & \textbf{threshold} & \textbf{measured} & "
-             r"\textbf{outcome} & \textbf{figure}\\",
+             r"\textbf{outcome} & \textbf{status} & \textbf{figure}\\",
              r"\midrule"]
     label = {"bookkeeping": "Bookkeeping \\textnormal{--- does the code do what the operator says?}",
              "closed_form": "Closed form \\textnormal{--- does it reproduce the physics it was given?}",
@@ -263,7 +335,7 @@ def write_tex(table: dict[str, Gate], path: str, rel_to: str | None = None) -> s
         rows = [table[k] for k in sorted(table, key=_order) if table[k].tier == tier]
         if not rows:
             continue
-        lines.append(r"\addlinespace[2pt]\multicolumn{6}{@{}l}{\textbf{" + label[tier] + r"}}\\[1pt]")
+        lines.append(r"\addlinespace[2pt]\multicolumn{7}{@{}l}{\textbf{" + label[tier] + r"}}\\[1pt]")
         for g in rows:
             meas = "---" if g.measured is None else f"{g.measured:.4g}"
             # CLICKABLE, not just named: the artifact is the evidence, so the table has to take a
@@ -298,8 +370,24 @@ def write_tex(table: dict[str, Gate], path: str, rel_to: str | None = None) -> s
                         + _tex_escape(os.path.basename(a)) + r"}.\par\medskip")
     figs.append("}")
 
+    # PLAIN-ENGLISH DEFINITIONS, one per gate that has one. The table says what was measured;
+    # this says what the gate is FOR, which a threshold alone never conveys.
+    defs = [r"\newcommand{\gateDefinitions}{%"]
+    for tier in TIERS:
+        rows = [table[k] for k in sorted(table, key=_order)
+                if table[k].tier == tier and table[k].explain]
+        if not rows:
+            continue
+        defs.append(r"\subsection{" + label[tier].split(" \\textnormal")[0] + r"}")
+        for g in rows:
+            defs.append(r"\noindent\textbf{" + g.gid + r"} --- \emph{"
+                        + _tex_escape(g.what) + r"}. " + _tex_escape(g.explain)
+                        + r"\par\smallskip")
+    defs.append("}")
+
     counts = tier_counts(table)
     lines += [r"\bottomrule\end{tabular}}}",]
+    lines += defs
     lines += figs
     lines += [
               r"\newcommand{\tierProportion}{"
@@ -307,6 +395,55 @@ def write_tex(table: dict[str, Gate], path: str, rel_to: str | None = None) -> s
                 f"{counts['measurement']} measurement" + "}"]
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
+    return path
+
+
+def _md(text: str) -> str:
+    """Escape for a markdown TABLE CELL. The pipe is the column delimiter, so an unescaped one in
+    a threshold like |sum(w) - 1| < 1e-6 silently splits the row into extra columns."""
+    return str(text).replace("|", r"\|")
+
+
+def write_md(table: dict[str, Gate], path: str, rel_to: str | None = None) -> str:
+    """The gate report as markdown: a table, then a plain-English definition per gate.
+
+    Markdown rather than LaTeX because the report is read in the editor beside the code, not
+    printed. Figures are linked rather than embedded; a viewer that renders markdown shows them
+    inline anyway.
+    """
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    base = rel_to or os.path.dirname(os.path.abspath(path))
+    label = {"bookkeeping": "Tier 1 — bookkeeping: does the code do what the operator says?",
+             "closed_form": "Tier 2 — closed form: does it reproduce the physics it was given?",
+             "measurement": "Tier 3 — measurement: does it agree with something observed?"}
+    mark = {PASS: "**PASS**", FAIL: "**FAIL**", SKIP: "·"}
+    out = ["# Gate report", "",
+           f"{summary(table)}", "",
+           "`status` is not `outcome`. **Outcome** is what the number did against the threshold;",
+           "**status** is whether the gate has been walked through — definition written, estimator",
+           "sanity-checked, negative control run, result read. A gate can pass mechanically and",
+           "still be pending review.", ""]
+    for tier in TIERS:
+        rows = [table[k] for k in sorted(table, key=_order) if table[k].tier == tier]
+        if not rows:
+            continue
+        out += [f"## {label[tier]}", "",
+                "| id | gate | threshold | measured | outcome | status | figures |",
+                "|---|---|---|---|---|---|---|"]
+        for g in rows:
+            meas = "—" if g.measured is None else f"{g.measured:.4g}"
+            figs = ", ".join(f"[{os.path.basename(a)}]({os.path.relpath(a, base)})"
+                             for a in g.artifacts) or "—"
+            out.append(f"| {g.gid} | {_md(g.what)} | {_md(g.threshold)} | {meas} | "
+                       f"{mark[g.outcome]} | {g.status.lower()} | {figs} |")
+        out.append("")
+        described = [g for g in rows if g.explain]
+        if described:
+            out += [f"### What each {tier.replace('_', ' ')} gate is for", ""]
+            for g in described:
+                out += [f"**{g.gid} — {g.what}.** {g.explain}", ""]
+    with open(path, "w") as f:
+        f.write("\n".join(out) + "\n")
     return path
 
 
