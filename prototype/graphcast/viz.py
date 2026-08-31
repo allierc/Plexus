@@ -1,4 +1,4 @@
-"""Figures. Every gate points to one, because the failures that matter are visible and not scalar.
+r"""Figures. Every gate points to one, because the failures that matter are visible and not scalar.
 
 Three defects were found while building the toy, and each was a plausible-looking number:
 

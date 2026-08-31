@@ -1,6 +1,6 @@
 # Gate report
 
-8 pass, 2 fail, 18 not yet run (of 28: 9 bookkeeping, 15 closed form, 4 measurement)
+8 pass, 2 fail, 19 not yet run (of 29: 10 bookkeeping, 15 closed form, 4 measurement)
 
 `status` is not `outcome`. **Outcome** is what the number did against the threshold;
 **status** is whether the gate has been walked through — definition written, estimator
@@ -13,7 +13,8 @@ still be pending review.
 |---|---|---|---|---|---|---|
 | G1 | every option combination can be READ | 24 of 24 option combinations load | 24 | **PASS** | done | [G1_options.png](log/toy_counter_noed_simple_p1_free/G1_options.png) |
 | G1b | every option combination can be RUN | 24 of 24 option combinations run one forward step | — | · | pending | — |
-| G2 | no dataset identity anywhere in the code | 0 offending literals outside config/ | 0 | **PASS** | pending | [G2_scan.png](log/toy_counter_noed_simple_p1_free/G2_scan.png) |
+| G2a | no dataset identity appears as a VALUE in the code | 0 offending constants outside config/ | 0 | **PASS** | done | [G2_scan.png](log/toy_counter_noed_simple_p1_free/G2_scan.png) |
+| G2b | ONE pipeline actually runs on all three datasets | 3 of 3 datasets complete generate/train/test with only the config changed | — | · | pending | — |
 | G3 | the transfer pair returns what it was given | < 1e-6 of the field value | — | · | pending | — |
 | G4 | the transfer conserves what it moves | \|sum(w) - 1\| < 1e-6 | — | · | pending | — |
 | G5 | the simple option IS the existing model, arithmetically | < 1e-5 of the voltage range | — | · | pending | — |
@@ -27,7 +28,9 @@ still be pending review.
 
 **G1b — every option combination can be RUN.** The other half of G1. Reading a config proves the vocabulary is right; it does not prove the model can be built from it. This gate constructs the model object for each of the 24 settings and pushes one forward pass through it. It is split from G1 because the two become available at different stages -- G1 needs only the schema, G1b needs a model -- and a row that goes green having checked half its claim reads as an endorsement it has not earned. It catches shape mismatches that appear only when two particular options meet.
 
-**G2 — no dataset identity anywhere in the code.** One model has to serve three datasets, and it only does so if none of them has left a trace in the code. This scans the prototype's own Python on the ABSTRACT SYNTAX TREE rather than as text, checking every string and numeric constant except docstrings. That distinction is the point: naming a dataset in prose is documentation, while the same name used as a value is a hardcoded path. Scanning the text would flag the first; skipping strings entirely would miss the second, because a path IS a string.
+**G2a — no dataset identity appears as a VALUE in the code.** A scan of the prototype's own Python on the ABSTRACT SYNTAX TREE rather than as text, checking every string and numeric constant except docstrings. That distinction is the point: naming a dataset in prose is documentation, while the same name used as a value is a hardcoded path. Scanning the text would flag the first; skipping strings entirely would miss the second, because a path IS a string. Reviewing it found a hole -- the patterns were word-bounded, so a name inside a filename slipped through and a planted-violation check caught only 2 of 3. The boundaries are gone and all 4 are caught, while docstring prose and innocent constants still are not. Note what this does NOT establish: it is a necessary condition, not the claim. See G2b.
+
+**G2b — ONE pipeline actually runs on all three datasets.** The claim G2a only gestures at. The point of forbidding dataset identity in the code is that the same trainer should run on a toy, on a point-cloud recording and on a field recording with nothing changing but the yaml. That can only be checked once all three loaders exist and all three have been run end to end, which is stage 8. Until then the scanner is passing partly because the most likely place to hardcode a path -- the ZAPBench and redox loaders -- has not been written yet.
 
 **G3 — the transfer pair returns what it was given.** The encoder/decoder option moves state onto a background grid and back. If it is sound, depositing a constant and gathering it again returns the constant. This is the end-to-end version of G4 and it catches what G4 cannot: a transfer pair that is not each other's adjoint, an off-by-one in the stencil, a normalisation applied on one side only. The threshold is a FRACTION of the field value, so it does not depend on what the field is.
 
