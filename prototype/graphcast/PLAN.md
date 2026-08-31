@@ -186,7 +186,7 @@ Thresholds are literals in `gates.py`, never config. An artifact is a **conditio
 | G2a | no dataset identity appears as a VALUE in the code | 0 offending constants outside config/ | done |
 | G2b | ONE pipeline actually runs on all three datasets | 3 of 3 datasets complete generate/train/test with only the config changed | pending |
 | G3 | the transfer pair returns what it was given | < 1e-6 of the field value | pending |
-| G4 | the transfer conserves what it moves | \|sum(w) - 1\| < 1e-6 | pending |
+| G4 | the transfer conserves what it moves | \|sum(w) - 1\| < 1e-6 | done |
 | G5 | the simple option IS the existing model, arithmetically | < 1e-5 of the voltage range | pending |
 | G6 | depth is an option, not a different model | bit-identical (max \|delta\| == 0) | pending |
 | G7 | the spec is allowed to carry a unit | units declared, and no measurement threshold in mesh units | done |
@@ -211,7 +211,7 @@ a number and evidence.
 
 **G3 — the transfer pair returns what it was given.** The encoder/decoder option moves state onto a background grid and back. If it is sound, depositing a constant and gathering it again returns the constant. This is the end-to-end version of G4 and it catches what G4 cannot: a transfer pair that is not each other's adjoint, an off-by-one in the stencil, a normalisation applied on one side only. The threshold is a FRACTION of the field value, so it does not depend on what the field is.
 
-**G4 — the transfer conserves what it moves.** The local half of G3. Each transfer spreads a node's value over the corners of the grid cell it sits in, and those weights must sum to one, or the transfer quietly changes the total amount of stuff every time it is applied. Summing to one is also exactly the condition that makes interpolation reproduce a constant, which is why G3 tests the same property from the outside. Dimensionless by construction.
+**G4 — the transfer conserves what it moves.** The local half of G3. Each transfer spreads a node's value over the corners of the grid cell it sits in, and those weights must sum to one, or the transfer quietly changes the total amount of stuff every time it is applied. Summing to one is also exactly the condition that makes interpolation reproduce a constant, which is why G3 tests the same property from the outside. Dimensionless by construction. Its stage is 0, not 5, because it tests `mpm_ops.bspline` directly -- the transfer the encoder/decoder option wraps already exists, so no model and no wiring are needed. Measured 2.4e-07 over 2-D and 3-D at three resolutions, which is float32 machine precision, so the 1e-6 threshold is about eight epsilons: sharp enough to catch a real error, loose enough not to fail on rounding. The negative control -- dropping the middle B-spline lobe -- reads 9.4e-01.
 
 **G5 — the simple option IS the existing model, arithmetically.** The pivot of the whole prototype. With `simple`, one pass and no encoder/decoder, this model is meant to be connectome-gnn's NeuralGNN term for term. The gate copies NeuralGNN's weights across and requires the two to produce the same numbers. If it passes, everything downstream is a controlled variation on a model already known to reach R^2_W around 0.97. If it fails, no later result can be interpreted at all, because a new model's failure and a reimplementation bug are indistinguishable.
 
