@@ -223,29 +223,72 @@ a number and evidence.
 
 **G8 — one-step accuracy is not stability.** A model can predict the next increment almost perfectly and still blow up when it is fed its own output twenty times over, because a one-step fit never sees its own error compound. This runs a 20-step rollout and requires the state to stay bounded. The threshold is a RATIO to the ground-truth norm, so it is dimensionless and means the same thing on the toy and on real data.
 
-### Tier 2a — the toy is a valid test bed (DATA only, **before any training**)
-| id | gate | threshold |
-|---|---|---|
-| G21 | the coarse field is the rule it claims | phase speed within 5% of λ/T |
-| G22 | the fine rule is recoverable from `(v, ∇u)` | **min** per-node R² > 0.90 |
-| G23 | `∇u` is reconstructible from neighbours | R² > 0.95 |
-| G24 | the heterogeneity is linearly readable | corr(fitted, true `g_i`) > 0.90 |
-| G25 | connected nodes are not collinear | mean \|corr\| < 0.80 |
-| G26 | **the graph is necessary**: a node-local baseline cannot fit | node-local R² < 0.50 while `(v, ∇u)` > 0.90 |
-| G16 | types are spatially mixed | purity / permutation null < 1.2 |
+### Tier 2a — the toy is a valid test bed (DATA only, before any training)
 
-**G26 is new and is the gate that would have caught the travelling-wave defect directly.**
+Added after three toys failed for reasons that had nothing to do with any model, and in every
+case training had been run before the data was known to pose the problem it claimed to. These
+need no model. Thresholds are principled rather than fitted: a deterministic rule is
+recoverable at R² > 0.95 by definition, and 0.80 excludes collinearity rather than describing
+what was seen.
+
+**G26 is currently failing on all three toys and is what blocks the design.**
+
+| id | gate | threshold | status |
+|---|---|---|---|
+| G16 | the types cannot be read off position | spatial-cell purity within 20% of a label-permutation null | pending |
+| G21 | the coarse field is the rule it claims | phase speed within 5% of lambda/period | pending |
+| G22 | the fine rule is recoverable from state and gradient | minimum per-node R^2 > 0.90 | pending |
+| G23 | the gradient is reconstructible from neighbours | R^2 > 0.95, else the graph cannot carry the fine rule | pending |
+| G24 | the heterogeneity is linearly readable | corr(fitted gain, true g_i) > 0.90 | pending |
+| G25 | connected nodes are not collinear | mean \|corr\| between connected nodes < 0.80 | pending |
+| G26 | the graph is NECESSARY: a node-local baseline cannot fit | node-local R^2 < 0.50 while (v, grad u) exceeds 0.90 | pending |
+
+#### What each gate is for
+
+**G16 — the types cannot be read off position.** G11 asks whether the embedding recovers the node types. That is only a real test if the types cannot be read off position, because position is free information the model already has. The toy assigns types by a permutation independent of position and this measures that it worked, as the purity of a spatial cell against a LABEL-PERMUTATION null so that 1.0 is chance at any resolution. The null is empirical rather than 1/n_types, and that matters: at 32 cells per axis there are 1024 cells for 1024 nodes, so almost every occupied cell holds one node and its purity is 1.0 by construction. The first version read 6.1x chance and meant nothing but 'the grid is finer than the sampling'.
+
+**G21 — the coarse field is the rule it claims.** The spec says a wave travels left to right at lambda over T. This checks that the field actually written does. It projects the recorded field onto the known wavelength, unwraps the phase and measures the drift per frame. It catches a field that is static, identically zero, or moving at the wrong speed -- an earlier toy ran three generations with a stimulus field of exactly zero, because the operator read a clock that nothing was writing. The estimator had to be sharpened twice: argmax on a 128-cell grid quantises to whole cells while the wave moves half a cell per frame, and an integer FFT bin then biased the speed by exactly 6.67/7. An estimator has to be sharper than the threshold it is judged against.
+
+**G22 — the fine rule is recoverable from state and gradient.** Before asking a model to learn dv from the state and the field gradient, check that dv IS a function of them. A per-node linear regression of dv on (v, grad u), reporting the WORST node rather than the mean -- because a mean of 0.98 can hide a third of the nodes at zero, and that is exactly what happened when 58.8% of nodes sat outside the field domain where sampling clamps and the gradient is identically zero.
+
+**G23 — the gradient is reconstructible from neighbours.** The model has to build the field gradient out of its neighbours; this checks that doing so is possible at all. It regresses the true gradient at each node on the differences between its neighbours' states and its own. If it fails, no message-passing model can learn the fine rule and nothing downstream of it means anything.
+
+**G24 — the heterogeneity is linearly readable.** The signed gain g_i is what the embedding must carry, so it has to be present in the data before any model is asked to find it. From the same per-node regression as G22, the coefficient on the gradient IS dt times g_i; this correlates it against the truth. The fitted-to-true ratio should be 1.0 and reads 1.03, the residual being the finite-difference step against the sampled field rather than the analytic one.
+
+**G25 — connected nodes are not collinear.** If a node's neighbours are near-copies of it, their states carry nothing it does not already have and the graph is decoration. This measures the mean absolute correlation between the time series of connected nodes. It caught a real defect: at wavelength 0.5 a twelve-neighbour ball spans only 0.5 radians of phase, the measure read 0.84, and that is why an earlier fit drove the loss to 0.005 while recovering none of the mechanism. Shortening to 0.15 moved it to 0.61.
+
+**G26 — the graph is NECESSARY: a node-local baseline cannot fit.** The strongest of the data gates and the one that would have caught the travelling-wave defect directly. A deliberately generous node-local baseline -- four lags of the node's own state, plus its own drive where observed, and NO neighbour -- must FAIL where the neighbour-informed fit succeeds. It is generous on purpose: the gate is only informative if the thing it rules out was given every chance. It catches a test bed whose fine rule is solvable without the graph at all, which is the case for any u = f(x - ct), since there du/dx = -(1/c) du/dt. It is currently FAILING at about 1.000 on all three coarse rules, and the reason is more general than the coarse rule: a linear per-node ODE driven by a smooth quasi-periodic field is autoregressively predictable from its own history whatever drives it, so no choice of field can rescue a fine rule that is locally solvable.
 
 ### Tier 2b — closed form (does the fit reproduce the physics it was given?)
-| id | gate | threshold |
-|---|---|---|
-| G9 | the message becomes a gradient operator | R² > 0.90 against `∂u/∂x` |
-| G10 | recover the per-node time constant | R² > 0.95 against known `τ` |
-| G11 | the embedding recovers the types | ARI > 0.70 |
-| G13 | recover the per-node **signed gain** | R² > 0.90 against true `g_i` |
-| G14 | encoder/decoder is a genuine option | \|Δ R²\| < 0.03 (2× the measured floor) |
-| G15 | `graphcast` vs `simple` is resolved either way | Δ reported against a 3-seed floor |
-| G27 | which coarse rule forces the graph | rank the three toys by G26; report, do not tune |
+
+These need a trained model and so are unavailable until stage 3. G12, which scored the
+embedding against 65 types on a flyvis-scale toy, was removed when that toy was dropped.
+
+| id | gate | threshold | status |
+|---|---|---|---|
+| G9 | the message becomes a gradient operator | R^2 > 0.90 against the true field gradient | pending |
+| G10 | recover the per-node time constant | R^2 > 0.95 against the known tau | pending |
+| G11 | the embedding recovers the types | ARI > 0.70 against the true type labels | pending |
+| G13 | recover the per-node SIGNED GAIN (the heterogeneity) | R^2 > 0.90 against the true g_i | pending |
+| G14 | encoder/decoder is a genuine option | \|delta R^2(gradient)\| < 0.03 | pending |
+| G15 | graphcast vs simple is RESOLVED, either way | \|delta\| reported against a 3-seed floor; below it is UNRESOLVED, not ranked | pending |
+| G27 | which coarse rule forces the graph | the three toys ranked by G26; reported, not tuned | pending |
+
+#### What each gate is for
+
+**G9 — the message becomes a gradient operator.** On this toy the fine rule IS a spatial derivative, so 'did the model recover the interaction' and 'did the aggregated message become du/dx' are the same question -- and the second can be measured directly against ground truth rather than through a proxy such as an edge-weight correlation.
+
+**G10 — recover the per-node time constant.** Read off the trained operator's own Jacobian: d(dv_i)/dv_i is -1/tau_i for a leaky unit. Taken from the OPERATOR rather than from a named parameter, so the same measurement works for both message forms and does not assume the model wrote tau down anywhere.
+
+**G11 — the embedding recovers the types.** The headline scientific readout, scored the way connectome-gnn scores it: cluster the embedding and take the adjusted Rand index against the true labels. The 0.70 threshold is the flyvis Ward-tree reference, which reaches 0.702 against 65 cell types. It is only meaningful because G16 established that the types cannot be read off position instead.
+
+**G13 — recover the per-node SIGNED GAIN (the heterogeneity).** The heterogeneity itself rather than a proxy for it, read as d(dv_i)/d(msg_i) from the trained operator. Signed matters: a model that recovers the magnitude and flips the sign fails, and it should, because an inverted gain is a different claim about the mechanism, not a small error.
+
+**G14 — encoder/decoder is a genuine option.** On a toy where the node set already IS the computation set, routing through a background grid should change the answer very little. The 0.03 threshold is twice the 0.015 run-to-run resolution floor measured on flyvis_A in the weekend benchmark. It catches an option that silently changes the model rather than the route it takes.
+
+**G15 — graphcast vs simple is RESOLVED, either way.** Not 'graphcast wins'. The weekend benchmark's discipline: report the difference against a floor measured from three seeds, and call anything below that floor UNRESOLVED rather than ranking it. It catches the temptation to read a 0.006 gap as a result -- which is how that benchmark found that four of its seven rollout arms were indistinguishable.
+
+**G27 — which coarse rule forces the graph.** Ranks the three coarse rules by G26 and reports the spread. Explicitly not a tuning target: the point is to learn which rule makes the graph necessary, and a rule that only passes after being adjusted until it passes has told us nothing. G12, which scored the embedding against 65 types on a flyvis-scale toy, was removed when that toy was dropped from the plan.
 
 ### Tier 3 — measurement (does it agree with something observed?)
 | id | gate | threshold |
