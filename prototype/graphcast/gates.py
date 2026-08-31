@@ -212,15 +212,32 @@ def build_table() -> dict[str, Gate]:
                      "is not a residual -- a missing skip connection, or an initialisation that "
                      "makes the stack a different model at every depth."),
         Gate("G7", "bookkeeping", "the spec is allowed to carry a unit",
-             "1 = declared and checked", "boolean", 0, _eq(1.0),
-             explain="Two halves. The spec must declare a units block, because plexus/units.py is "
-                     "explicit that a model without one is dimensionless and no result from it "
-                     "may be quoted with a unit -- and every measurement-tier gate is a "
-                     "comparison against a quantity. And no measurement threshold may be "
-                     "denominated in grid cells, voxels or steps. That second half is the lesson "
-                     "from the ecm study: a penetration of 0.82 grid cells sounded small and was "
+             "units declared, and no measurement threshold in mesh units", "boolean", 0, _eq(1.0),
+             status=DONE,
+             explain="Two halves, both with teeth. The spec must declare a units block, because "
+                     "plexus/units.py is explicit that a model without one is dimensionless and "
+                     "no result from it may be quoted with a unit -- and every measurement-tier "
+                     "gate is a comparison against a quantity. And no measurement threshold may "
+                     "be denominated in grid cells, voxels or steps; that half is the lesson from "
+                     "the ecm study, where a penetration of 0.82 grid cells sounded small and was "
                      "15 microns, nearly two cell diameters. A threshold in the mesh's own "
-                     "currency is the easiest one to pass."),
+                     "currency is the easiest one to pass. Both halves were checked against "
+                     "negative controls: a spec with no units block is refused, a spec declaring "
+                     "a DERIVED unit is refused, and poisoning one measurement gate's unit to "
+                     "'grid cells' makes this gate fail and name the offender. WHAT IT DOES NOT "
+                     "ESTABLISH: it compares a unit LABEL against a blocklist, so it verifies "
+                     "that the declaration is honest in form, not that the number is really in "
+                     "that unit; and it says nothing about whether any result has actually been "
+                     "converted. See G7b."),
+        Gate("G7b", "bookkeeping", "a measurement result is REPORTED in the declared unit",
+             "every tier-3 measured value carries its declared unit through the conversion",
+             "boolean", 7, _eq(1.0),
+             explain="The half G7 cannot reach. Declaring length_um = 100 does not convert "
+                     "anything; it only makes a conversion possible. Whether a measured tier-3 "
+                     "value is actually reported in seconds or micrometres rather than in "
+                     "frames or cells can only be checked once a tier-3 gate has run, which is "
+                     "stage 7. Until then G7 establishes that the spec is ALLOWED to carry a "
+                     "unit, and nothing about whether it does."),
         Gate("G8", "bookkeeping", "one-step accuracy is not stability",
              "state norm stays < 2x the ground-truth norm", "ratio to the GT norm", 3, _lt(2.0),
              explain="A model can predict the next increment almost perfectly and still blow up "
