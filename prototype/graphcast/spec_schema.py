@@ -26,7 +26,9 @@ cannot be gated at that tier and the loader says so rather than warning.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
+from dataclasses import field as dc_field
 from typing import Any, Optional
 
 import yaml
@@ -49,6 +51,10 @@ OBSERVATION_KINDS = ("identity", "calcium")
 GRAPH_KINDS = ("knn", "radius", "none")
 DATA_SOURCES = ("simulate", "zarr", "tiff_stack")
 TARGET_KINDS = ("increment", "state")
+# The trainer's own vocabulary, kept apart from plexus.models.base.KINDS on purpose: KINDS say how
+# an operator moves data inside a hierarchy during a step, and a loss does not do that. Mirrored in
+# ops_trainer.ROLES, which is the registry that enforces it.
+TRAINER_ROLES = ("graph", "predict", "loss", "regularize", "step")
 TARGET_NORMS = ("none", "inverse_increment_variance")
 
 
@@ -300,6 +306,48 @@ class TrainingSpec:
 
 
 @dataclass
+class TrainerSpec:
+    """The `trainer:` section: a SCHEDULE of operators, the same shape as the simulation schedule.
+
+    WHY THIS EXISTS BESIDE `TrainingSpec` RATHER THAN INSIDE IT. `TrainingSpec` is a bag of
+    scalars -- `lr`, `coeff_W_L1`, `grad_clip` -- each of which is a number whose meaning lives in
+    whatever trainer happens to read it. `TrainerSpec` is a composition: every term is an operator
+    with a name, a role and its own params, and the objective is the list rather than a line of
+    code that consults the bag. The two coexist while the GNN path still reads the scalars; a spec
+    carries one or the other, and a spec with `trainer:` is run by `trainer.run`.
+
+    `model:` is nested here and is A PLEXUS SPEC FRAGMENT -- fields, operators, schedule -- because
+    the model under fit is a hierarchy, not a function. See `model_hierarchy.py`.
+    """
+    model: dict
+    operators: list
+    schedule: list
+    field: str
+    batch_frames: int = 4
+    record_stride: Optional[int] = None
+
+    @classmethod
+    def parse(cls, raw: Optional[dict]) -> Optional["TrainerSpec"]:
+        if not raw:
+            return None
+        for key in ("model", "operators", "schedule", "field"):
+            if key not in raw:
+                raise ValueError(f"trainer: section is missing required key {key!r}")
+        for key in ("fields", "operators", "schedule"):
+            if key not in raw["model"]:
+                raise ValueError(f"trainer.model: is a Plexus spec fragment and is missing "
+                                 f"{key!r}; it needs fields, operators and schedule")
+        bad = [r for r in raw["schedule"] if r not in TRAINER_ROLES]
+        if bad:
+            raise ValueError(f"trainer.schedule has unknown role(s) {bad}; "
+                             f"the roles are {list(TRAINER_ROLES)}")
+        return cls(model=raw["model"], operators=raw["operators"], schedule=raw["schedule"],
+                   field=str(raw["field"]), batch_frames=int(raw.get("batch_frames", 4)),
+                   record_stride=(None if raw.get("record_stride") is None
+                                  else int(raw["record_stride"])))
+
+
+@dataclass
 class FitSpec:
     """Everything one yaml declares: the Plexus forward spec plus data, model and training."""
     plexus: Any                       # plexus.schema.Spec, UNCHANGED
@@ -309,6 +357,23 @@ class FitSpec:
     units: Units
     name: str
     path: str
+    # THE RAW `general:` BLOCK. A FIT spec on recorded data declares no sets/fields/operators, so
+    # `plexus` is None on it -- but it still declares dim, dt, n_frames and the boundary, and the
+    # trainer needs them. Reaching through `fit.plexus` for those worked only for generate specs.
+    general: dict = dc_field(default_factory=dict)
+    trainer: Optional[TrainerSpec] = None
+
+    @property
+    def dim(self) -> int: return int(self.general.get("dim", 2))
+
+    @property
+    def n_frames(self) -> int: return int(self.general.get("n_frames", 1))
+
+    @property
+    def dt(self) -> float: return float(self.general.get("dt", 1.0))
+
+    @property
+    def seed(self) -> int: return int(self.general.get("seed", 42))
 
     @property
     def has_plexus_block(self) -> bool:
@@ -365,6 +430,8 @@ def load(path: str, require_plexus_block: Optional[bool] = None) -> FitSpec:
         data=DataSpec.parse(raw.get("data")),
         model=ModelSpec.parse(raw.get("model")),
         training=TrainingSpec.parse(raw.get("training")),
+        general=general,
+        trainer=TrainerSpec.parse(raw.get("trainer")),
         units=units,
         name=str(name),
         path=path,

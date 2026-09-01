@@ -40,6 +40,13 @@ from plexus.models.base import Exchange, Operator
 from plexus.models.registry import register_operator
 
 
+def _as_list(v, default):
+    """A scalar or a list, always returned as a list. A spec that gives one number keeps working."""
+    if v is None:
+        v = default
+    return [float(x) for x in v] if isinstance(v, (list, tuple)) else [float(v)]
+
+
 @register_operator("advect_field", family="fields", set="field", kind="field", model="transport")
 class AdvectField(Operator):
     """COARSE RULE: pure transport, first order in time AND in space.
@@ -62,11 +69,17 @@ class AdvectField(Operator):
     amplitude over 1200 steps (0.785 of initial). A damping that large is indistinguishable from a
     modelling choice once anything downstream depends on the field.
 
-    So the speed is carried in a fractional accumulator and the field is rolled by an INTEGER
-    number of cells whenever the accumulator crosses one. `torch.roll` on a periodic axis is a
-    permutation, so the amplitude is preserved to the bit and the mean speed is exactly the one
-    asked for. The cost is that motion advances in whole-cell increments rather than continuously,
-    which at 256 cells and roughly one cell every five frames is below anything that matters here.
+    So the velocity is carried in a fractional accumulator PER AXIS and the field is rolled by an
+    INTEGER number of cells on each axis whose accumulator has crossed one. `torch.roll` is a
+    permutation on a periodic axis, so the amplitude is preserved to the bit and the mean velocity
+    is exactly the one asked for -- and this holds for an OBLIQUE velocity too, since a roll on two
+    axes is still a permutation. The cost is that motion advances in whole-cell increments rather
+    than continuously, which at 256 cells and roughly one cell every five frames is below anything
+    that matters here.
+
+    THE VELOCITY IS A VECTOR, not a speed and an axis. An axis-aligned coarse field is constant
+    along every column, which makes a 256-cell grid indistinguishable from a 1024-cell one -- the
+    coarse mesh becomes invisible in exactly the figure meant to show it. See `_initial`.
     """
 
     EMIT = None
@@ -79,43 +92,113 @@ class AdvectField(Operator):
     DIFFERENTIABLE = True
     REQUIRES_PARAMS: list = []
     MECHANISM_TAGS = ["advection", "transport", "external_drive"]
-    PARAM_ROLES = {"speed": "phase_speed_domain_per_frame", "axis": "propagation_axis",
-                   "wavelength": "initial_profile_length_scale"}
+    PARAM_ROLES = {"velocity": "phase_velocity_domain_per_frame",
+                   "wavevectors": "initial_profile_wavevectors_cycles_per_domain",
+                   "amplitude": "initial_profile_component_amplitudes"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.field_name = params.get("_at") or params.get("to")
         self.channel = int(params.get("channel", 0))
-        self.amplitude = self.tunable(params.get("amplitude"), 1.0)
-        self.wavelength = self.tunable(params.get("wavelength"), 0.5)
-        self.speed = self.tunable(params.get("speed"), 1.0 / 1200.0)   # domain widths per frame
-        self.axis = int(params.get("axis", 0))
+        # A VELOCITY VECTOR and a LIST OF INTEGER WAVEVECTORS, one amplitude each. See `_initial`.
+        self.velocity = _as_list(params.get("velocity"), 1.0 / 1200.0)   # domain widths per frame
+        wv = params.get("wavevectors") or [[1] + [0] * (len(self.velocity) - 1)]
+        self.wavevectors = [[int(round(x)) for x in m] for m in wv]
+        self.amplitude = _as_list(params.get("amplitude"), 1.0)
+        if len(self.amplitude) != len(self.wavevectors):
+            raise ValueError(f"advect_field has {len(self.wavevectors)} wavevectors but "
+                             f"{len(self.amplitude)} amplitudes; give one amplitude per wavevector")
+        bad = [m for m in self.wavevectors if len(m) != len(self.velocity)]
+        if bad:
+            raise ValueError(f"advect_field wavevector(s) {bad} do not have "
+                             f"{len(self.velocity)} components, matching the velocity")
         self._seeded = False
-        self._carry = 0.0            # sub-cell displacement not yet applied
+        self._carry = [0.0] * len(self.velocity)   # sub-cell displacement per axis, not yet applied
 
     def _initial(self, grid):
-        """u(x, 0). A sinusoid by default -- the profile is data, the RULE is the transport."""
+        """u(x, 0) = SUM_k A_k sin(2 pi k (m . x)), m the INTEGER wavevector, k the harmonics.
+
+        The profile is data; the RULE is the transport. Two things are chosen here and both fix a
+        measured defect rather than expressing a taste.
+
+        THE WAVEVECTOR IS OBLIQUE, so the coarse grid is visible as a grid. An axis-aligned wave
+        makes the coarse field constant along every column, and a 256-cell column looks exactly
+        like a 1024-cell column -- the discretisation is invisible, and so is the whole point that
+        the coarse rule lives on a coarser mesh. An oblique crest crosses the cell boundaries, so
+        it renders as a staircase whose step IS the coarse cell, and the sum shows the coarse term
+        as piecewise-constant blocks against the fine term's smooth phase. `wavevector: [2, 1]` is
+        26.6 degrees off axis. Integer components are not optional: the phase above is in CYCLES,
+        and periodicity across the domain is exact only if every component is a whole number.
+
+        THE WAVEVECTORS ARE NOT ALL PARALLEL, AND THAT IS AN IDENTIFIABILITY REQUIREMENT rather
+        than a richer picture. A SINGLE plane wave u = f(m . x) has grad u = m f'(m . x), so its two
+        (three) partial derivatives are EXACTLY PROPORTIONAL to each other. The least-squares system
+        for the velocity in (C1) is then singular in every direction but one: measured on a profile
+        of harmonics 1 and 3 of one wavevector, the normal matrix had condition number 5.0e6, and
+        the recovered velocity was [0.0032, -0.0046] against a true [0.00075, 0.00037] -- 568% wrong
+        as a vector, while the component ALONG the wavevector was right to 0.542%. The data
+        determined the phase speed and said NOTHING about the perpendicular drift, so the fit put
+        whatever it liked there. Adding one non-parallel wavevector makes the gradients span the
+        space and the whole vector identifiable. It is exactly the failure the known-ODE stage
+        exists to catch: the parameter was not underdetermined by the model, it was underdetermined
+        BY THE DATA, and no network would have done better.
+
+        THE PROFILE IS A SUM OF HARMONICS, which is a leakage fix. Transport on a periodic domain
+        carries a fixed profile, so the field recurs exactly whenever the displacement dotted into
+        the wavevector reaches a whole number of cycles. With one wavelength 0.5 travelling along
+        the axis and one full traverse per 1,200 frames, that happened every 600 frames: recorded
+        frames 0, 100 and 200 were BIT-IDENTICAL, the run held 100 distinct records rather than
+        201, and the split train [0,900] / test [1050,1200] had the same coarse fields on both
+        sides of it. A split that leaks is worse than no split, because it reports a number.
+
+        The oblique velocity removes the recurrence outright rather than merely spacing it out.
+        Travelling along m = (2,1) at speed c, the phase advances c|m|/... -- concretely 1,200
+        frames cover 2.236 cycles of the k=1 harmonic and 6.708 of the k=3, neither a whole
+        number, so NO two recorded frames of the run are equal. Under the old axis-aligned setup
+        the endpoints still coincided; now nothing does.
+
+        The rule is untouched by any of this. (C1) du/dt = -(v . grad u) holds for ANY profile, so
+        G28 and G28a still apply -- with the unknown now the velocity VECTOR rather than one
+        scalar. It is still linear in the unknowns, so the closed form is still a least-squares
+        solve, now 2x2 (3x3 in 3-D), and a two-harmonic oblique profile makes it BETTER
+        conditioned than a single axis-aligned sinusoid, which excites only one direction.
+        """
         res = grid.shape
-        n = res[self.axis]
-        c = (torch.arange(n, device=grid.device, dtype=grid.dtype) + 0.5) / n
-        shape = [1] * len(res)
-        shape[self.axis] = n
-        return self.amplitude * torch.sin(2.0 * math.pi * c.reshape(shape).expand(res)
-                                          / self.wavelength)
+        axes = torch.meshgrid(*[(torch.arange(n, device=grid.device, dtype=grid.dtype) + 0.5) / n
+                                for n in res], indexing="ij")
+        out = torch.zeros_like(axes[0])
+        for a, m in zip(self.amplitude, self.wavevectors):
+            # phase in CYCLES, so periodicity is exact iff every component is a whole number
+            cycles = sum(float(mk) * axes[d] for d, mk in enumerate(m))
+            out = out + float(a) * torch.sin(2.0 * math.pi * cycles)
+        return out
 
     def forward(self, H, mask=None):
         fld = H.fields[self.field_name]
-        g = fld.grid[self.channel]
         if not self._seeded:
-            fld.grid[self.channel] = self._initial(g)
+            fld.grid[self.channel] = self._initial(fld.grid[self.channel])
             self._seeded = True
-            return {}
-        n = g.shape[self.axis]
-        self._carry += float(self.speed) * n               # cells owed this frame
-        k = int(math.floor(self._carry))
-        if k:
-            self._carry -= k
-            fld.grid[self.channel] = torch.roll(g, shifts=k, dims=self.axis)
+            # NO EARLY RETURN. Seeding used to consume the whole of tick 0, so the very first
+            # recorded pair spanned one frame LESS of motion than every other pair. With a record
+            # stride of 6 that is a 1-in-6 shortfall on one pair, and it was enough to move the
+            # pooled least-squares speed from 0.669% off the truth to 1.062% -- across G28a's 1%
+            # threshold, so a real off-by-one in the generator presented as a failing gate on the
+            # estimator. Every tick now advances the field by exactly one frame's worth of motion,
+            # including the tick that seeds it, so every recorded interval is the same interval.
+        g = fld.grid[self.channel]
+        # ONE FRACTIONAL ACCUMULATOR PER AXIS, and one integer roll per axis that has earned a
+        # whole cell. `torch.roll` with a tuple of shifts is still a permutation, so an OBLIQUE
+        # velocity preserves the amplitude to the bit exactly as an axis-aligned one does.
+        shifts, dims = [], []
+        for d, vd in enumerate(self.velocity):
+            self._carry[d] += float(vd) * g.shape[d]        # cells owed on this axis this frame
+            k = int(math.floor(self._carry[d]))             # floor, so a NEGATIVE velocity works
+            if k:
+                self._carry[d] -= k
+                shifts.append(k)
+                dims.append(d)
+        if shifts:
+            fld.grid[self.channel] = torch.roll(g, shifts=tuple(shifts), dims=tuple(dims))
         return {}
 
 

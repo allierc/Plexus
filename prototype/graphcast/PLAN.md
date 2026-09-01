@@ -651,3 +651,185 @@ squares answer.
 
 Artifacts (R11): a PNG of the loss curve and of `c` against iteration with `c*` and `c_true` drawn
 as horizontal lines, and an MP4 of the fitted field beside the observed one.
+
+---
+
+## 12. The two-resolution partition — the phenomenon, not a defect
+
+*Added after the coarse grid was dropped to 64² and the consequence was measured.*
+
+### What was found
+
+The coarse rule advances by **whole cells** (`AdvectField`: a fractional accumulator per axis, an
+integer `torch.roll` when it crosses one — a permutation, so amplitude is preserved to the bit). Its
+motion per recorded frame is therefore
+
+```
+cells per record  =  |v| × resolution × record_stride
+```
+
+At fixed velocity and stride, coarsening the mesh drives that below one, and when it goes below one
+**most consecutive records are bit-identical and `du/dt` is exactly zero on them**:
+
+| coarse grid | cells per record | consecutive records with no change |
+|---|---|---|
+| 256² | 1.28 | ~0 |
+| **64²** | **0.29** | **~0.7** |
+
+### Why this is the point of the prototype and not a bug
+
+The first instinct is to fix it — lengthen the stride, raise the speed, refine the mesh. That
+instinct is wrong, and naming why is the reason this section exists.
+
+**There is no timestep at which a 64² transport is a smooth motion.** The field is genuinely static
+for twenty frames and then jumps a whole cell. A single-resolution fit sees a field that mostly does
+not move and occasionally teleports, and no amount of tuning the observation cadence changes that,
+because the discreteness is in the *state*, not in the sampling. Any model forced to integrate this
+level on the observation's clock is being asked to represent a step function as a rate.
+
+**A multi-resolution model is exactly the thing that does not have to.** Each level carries its own
+clock: the coarse level is integrated at the cadence at which it actually moves, and the fine level
+at its own, much faster one. That is the same statement as the NGP/one-sided note's — a level
+represents what its band can represent and nothing else — expressed in time rather than in space.
+
+So the under-resolved coarse grid is the **target phenomenon**. It is what a real dataset looks
+like when a slow process is observed at a fast rate, and it is what the whole multi-level structure
+is being built to handle.
+
+### The partition
+
+Two coarse datasets per dimension, identical in every respect except the mesh — same velocity, same
+wavevector, same profile, same recording stride — so the difference between a fit on one and a fit
+on the other is attributable to the resolution and to nothing else:
+
+| dimension | resolved | under-resolved | fine |
+|---|---|---|---|
+| 2-D | `toy2d_coarse256` (256², 1.28 cells/record) | `toy2d_coarse64` (64², 0.29) | `toy2d_fine` (1024²) |
+| 3-D | `toy3d_coarse64` (64³) | `toy3d_coarse32` (32³) | `toy3d_fine` (256³) |
+
+`still_pair_fraction` is written into every run's `summary.json` beside the autocorrelation, so
+which side of the partition a dataset is on is a recorded property of the data rather than
+something a reader has to infer.
+
+**Why 3-D stops at 32³ and not 16³.** The coarse profile's highest harmonic (k = 3, wavevector
+component 2) has 6 cycles across the domain. At 32³ that is 5.3 cells per cycle — chunky, which is
+wanted. At 16³ it is 2.7, which is below the ~4 needed for a wave to read as a wave and close to
+outright aliasing: the grid would no longer represent the rule it claims to, and the dataset would
+be testing the wrong thing. **The partition is about the observation cadence, not about destroying
+the field.**
+
+### What this changes downstream
+
+- **G28/G28a run on BOTH coarse datasets.** On 256² the closed form is well conditioned (measured
+  R² 0.9632 for (C1)). On 64² the least-squares estimate stays **unbiased** — the accumulator
+  guarantees the mean velocity exactly — but the per-pair residual is dominated by the ~70% of
+  pairs with zero increment, so the R² will be far lower. **That gap is a result to report, not a
+  threshold to relax:** it is the quantitative statement of what the coarse level costs a
+  single-resolution fit.
+- The `predict` role acquires a per-level cadence. A level whose `still_pair_fraction` is high must
+  be integrated on its own clock; this is the first concrete requirement the multi-level model has
+  that a single-level one does not.
+
+---
+
+## 13. The trainer engine, and what G28 found
+
+*Written after the first fit ran end to end. Files: `model_hierarchy.py`, `trainer.py`,
+`ops_trainer.py`, `config/fit_transport256.yaml`.*
+
+### The model is a hierarchy, not a function
+
+The decision that mattered: `predict` does not wrap a `nn.Module`. The `model:` section of a fit
+spec **is a Plexus spec fragment** — fields, operators, schedule — loaded by `plexus.schema.load`
+and built by `plexus.engine.build`/`seed`, and one prediction is *running its schedule*:
+
+```
+load the observed frame into the hierarchy  ->  step its schedule K times  ->  read it back
+```
+
+A `forward()` would have kept the arithmetic and discarded all four of the paper's compositions.
+Keeping the hierarchy keeps two things a function cannot have: the learnable parameters live **on
+the operators**, so a residual is attributable to a named mechanism; and the schedule carries
+`every:`, so a level whose motion is slower than the observation cadence is integrated on **its own
+clock** — the multi-rate composition, which is the whole reason the 64² dataset exists.
+
+`known_ode` and `gnn` are therefore not two code paths. They are two lists of operators in a file.
+
+### What the trainer engine does and does not know
+
+`trainer.py` contains no loss expression, no coefficient, no learning rate, no optimiser choice, no
+clip value, no dataset name. It reads a batch out of a recorded zarr and runs two lists in order.
+Everything else is an operator with a role: `predict` / `loss` / `regularize` / `step`, plus
+`graph`, which is deliberately **not** a new kind — a kNN graph changes the edge set, which is
+already Plexus's `rewire`.
+
+### Three bugs the first run found, all in the same family
+
+Each was a quantity in the wrong unit, and each looked like a converged fit to the wrong answer.
+
+1. **The tape survived the iteration.** A hierarchy is persistent, so `fld.grid` still carried the
+   previous iteration's autograd history; writing into it in place made iteration two walk a freed
+   graph. The fix is a modelling statement, not a `retain_graph=True`: **the observation is data**,
+   so it enters as a leaf and only the operators' parameters carry gradient.
+2. **The stride was counted twice.** The model steps once at its own `dt`, so its increment is
+   already per sim-frame; only the *target* spans `stride` of them. Dividing both scaled the
+   recovered velocity by the stride exactly.
+3. **The velocity vector was not identifiable at all.** See below — the largest of the three.
+
+### G28's real finding: a single plane wave cannot determine a velocity
+
+For `u = f(m·x)`, `∇u = m f'(m·x)`, so the partial derivatives are **exactly proportional**. The
+least-squares system for `v` in (C1) is then singular in every direction but one. Measured on the
+original profile (harmonics 1 and 3 of one wavevector):
+
+| | value |
+|---|---|
+| condition number of the normal matrix | **5.0 × 10⁶** |
+| recovered `v` | `[0.00320, −0.00455]` — **568%** wrong as a vector |
+| recovered component **along** the wavevector | **0.542%** — right |
+| recovered component **perpendicular** | `−0.0055` against a true `0` — pure invention |
+
+The data determined the phase speed and said nothing about the perpendicular drift, so the fit put
+whatever it liked there. **This is precisely the failure the known-ODE stage exists to catch:** the
+parameter was underdetermined *by the data*, not by the model, and no network would have done
+better. Adding one non-parallel wavevector `[1,−3]` to the profile drops the condition number to
+**5.34** and makes the whole vector identifiable. The transport rule is untouched — it carries any
+profile.
+
+### G28a's finding: the estimator's own truncation error
+
+With the vector identifiable, the closed form still sat 1.06% from the truth — outside G28a's 1%.
+The cause is that (C1) approximates a finite shift by its first derivative, so the error grows with
+the displacement per recorded pair:
+
+| displacement per pair | speed error |
+|---|---|
+| 1.28 cells | 1.062% |
+| 2.56 cells | 2.688% |
+| 3.84 cells | 5.309% |
+| 7.68 cells | 18.126% |
+
+The threshold was **not** moved. The *sampling* was: recording the coarse datasets at stride 3
+rather than 6 puts the displacement at 0.64 cells and the closed form at **0.443%** — inside the
+gate. Both coarse specs moved together, so the mesh remains the only difference between them.
+
+### The diagnostic pair worked exactly as designed
+
+At that point G28a passed (0.443%) while G28 failed (1.482%), and *trainer vs closed form* was
+1.933%. By the gates' own logic that says the fault is the **training loop**, and it was: with 43%
+of pairs stationary at the finer stride, a batch of 8 sits on the gradient-noise floor. Raising the
+batch to 64:
+
+| | vx | vy | speed | vs true |
+|---|---|---|---|---|
+| closed form `v*` | 0.000742704 | 0.000369722 | 0.000829640 | 0.443% |
+| **trainer** | 0.000742843 | 0.000369511 | **0.000829671** | **0.439%** |
+| true `v` | 0.000745356 | 0.000372678 | 0.000833333 | — |
+
+**G28b PASS (cond 5.34 < 100). G28a PASS (0.443% < 1%). G28 PASS (0.439% < 1%).**
+
+And the number that mattered was never any of those: ***trainer vs closed form = 0.004%***. The
+training loop lands on the least-squares answer to four decimal places, which is the only thing a
+one-scalar fit can tell us and exactly the reason it is worth running before anything harder. The
+0.44% that both share is the estimator's own truncation error against the truth — a property of the
+data and the model class, not of the optimiser, and the two gates separate those cleanly.

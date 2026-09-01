@@ -418,6 +418,8 @@ def main(argv=None) -> int:
                     help="task (generate|train|test|plot|gates) followed by the config path")
     ap.add_argument("--out_root", default=None,
                     help="root for log/ output (default: the prototype's own log/)")
+    ap.add_argument("--data_dir", default=None,
+                    help="the recorded run directory a `-o train` fit reads its trajectory from")
     ap.add_argument("--gate", nargs="+", default=None,
                     help="run only these gate ids, e.g. --gate G1 G2")
     args = ap.parse_args(argv)
@@ -443,6 +445,19 @@ def main(argv=None) -> int:
 
     if task == "gates":
         return run_gates(config, out_dir, args.gate)
+    if task == "train" and fit.trainer is not None:
+        # A SPEC CARRYING `trainer:` IS RUN BY THE TRAINER ENGINE, not by the scalar train loop.
+        # Which one runs is a property of the FILE -- it declared a schedule or it declared a bag
+        # of scalars -- rather than of a flag someone has to remember to pass.
+        import trainer as trainer_mod
+        src = args.data_dir or os.path.join(args.out_root or os.path.join(_HERE, "log"),
+                                            fit.trainer.model.get("data_run", ""))
+        if not os.path.isdir(src):
+            ap.error(f"-o train needs the recorded run to fit; {src!r} is not a directory. "
+                     f"Pass --data_dir <run>, or set trainer.model.data_run.")
+        out = trainer_mod.run(fit, src, device=fit.training.device)
+        print("learned:", {k: v for k, v in out["learned"].items()})
+        return 0
     if task == "generate":
         summary = toy_mod.generate(fit, out_dir, device=fit.data.device)
         for k, v in summary.items():

@@ -326,7 +326,8 @@ def generate_field(fit, out_dir: str, device: str = "cpu") -> dict:
     for key, g in grids.items():
         res = "x".join(str(s) for s in g.shape[1:])
         summary["fields"][key] = {"res": res, "frames": int(g.shape[0]),
-                                  "std": float(g.std()), "lag1_autocorr": _lag1(g)}
+                                  "std": float(g.std()), "lag1_autocorr": _lag1(g),
+                                  "still_pair_fraction": _still_pairs(g)}
         vtk_toy.movie(g, os.path.join(out_dir, f"{key}.mp4"), f"{names[key]}  {res}")
 
     if len(grids) == 2:
@@ -373,3 +374,26 @@ def _lag1(g):
     c = [np.corrcoef(x[:-1, j], x[1:, j])[0, 1] for j in idx]
     c = [w for w in c if np.isfinite(w)]
     return float(np.mean(c)) if c else float("nan")
+
+
+def _still_pairs(g, tol=1e-12):
+    """Fraction of CONSECUTIVE RECORDED PAIRS between which the field does not change at all.
+
+    THE STATISTIC THAT DEFINES THE TWO-RESOLUTION PARTITION, and it is the prototype's target
+    phenomenon rather than a defect to be tuned away.
+
+    The coarse rule advances by whole cells (see `AdvectField`), so its motion per recorded frame
+    is the velocity times the resolution times the stride. Coarsen the mesh and that number falls;
+    below one cell per recorded frame, MOST CONSECUTIVE RECORDS ARE BIT-IDENTICAL and du/dt is
+    exactly zero on them. Measured at the same velocity and stride: 256^2 moves 1.28 cells per
+    record and this reads ~0; 64^2 moves 0.29 and it reads ~0.7.
+
+    A single-resolution fit sees the 64^2 case as a field that is mostly static and occasionally
+    jumps, and there is no timestep at which that is a smooth transport -- which is exactly the
+    situation a multi-resolution model exists for: the coarse level must be integrated on its OWN
+    clock, not on the observation's. So this number is reported next to the data, and the two
+    coarse specs per dimension exist to put a fit on both sides of it.
+    """
+    x = np.asarray(g, np.float64).reshape(g.shape[0], -1)
+    d = np.abs(x[1:] - x[:-1]).max(axis=1)
+    return float((d <= tol).mean())
