@@ -26,8 +26,8 @@ operators:
   - op: advect_field
     at: u
     model: transport
-    amplitude: 1.0
-    wavelength: 0.5
+    amplitude: [0.894427, 0.447214]
+    wavelength: [1.0, 0.333333]
     speed: 0.000833333
     axis: 0
 

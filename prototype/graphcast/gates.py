@@ -403,6 +403,25 @@ def build_table() -> dict[str, Gate]:
                      "gate is really asking whether the trainer lands on a number it could have "
                      "computed. That is the point: it is the cheapest check that the training loop "
                      "is wired correctly, and it cannot be passed by a lucky architecture."),
+        Gate("G28b", "closed_form", "the coarse profile makes the VELOCITY VECTOR identifiable",
+             "condition number of the least-squares normal matrix < 100",
+             "cond(A), dimensionless", 2, _lt(100.0),
+             explain="A PRECONDITION OF BOTH G28 AND G28a, and the one that fired hardest. (C1) is "
+                     "linear in the velocity, but linear does not mean determined: for a SINGLE "
+                     "plane wave u = f(m . x) the gradient is m f'(m . x), so every partial "
+                     "derivative is exactly proportional to every other and the normal matrix is "
+                     "singular in all directions but one. Measured on the first profile -- "
+                     "harmonics 1 and 3 of one wavevector -- cond(A) was 5.0e6, and the fit "
+                     "returned a velocity 568% wrong AS A VECTOR while its component ALONG the "
+                     "wavevector was right to 0.542%: the data determined the phase speed and said "
+                     "nothing at all about the perpendicular drift, so the optimiser put whatever "
+                     "it liked there and the loss did not care. Adding one non-parallel wavevector "
+                     "[1,-3] to the profile drops cond(A) to 5.34. The threshold is 100 because "
+                     "the two regimes are six orders of magnitude apart and nothing sensible lies "
+                     "between them. THIS IS THE FAILURE MODE THE KNOWN-ODE STAGE EXISTS FOR: the "
+                     "parameter was underdetermined BY THE DATA, not by the model, and a network "
+                     "asked the same question would have failed the same way while looking like a "
+                     "network problem."),
         Gate("G28a", "closed_form", "the coarse data SUPPORTS the true speed, before any trainer",
              "|c* - c| / c < 0.01", "relative error in the closed-form c*", 2, _lt(0.01),
              explain="G28's PRECONDITION, and a tier-2a data gate rather than a training one -- it "

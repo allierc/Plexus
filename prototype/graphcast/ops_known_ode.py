@@ -121,29 +121,80 @@ class TransportKnownODE(Operator):
     DIFFERENTIABLE = True
     REQUIRES_PARAMS: list = []
     MECHANISM_TAGS = ["advection", "transport", "known_ode"]
-    PARAM_ROLES = {"speed": "phase_speed_domain_per_frame", "axis": "propagation_axis"}
+    PARAM_ROLES = {"velocity": "phase_velocity_domain_per_frame"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.field_name = params.get("_at") or params.get("to")
         self.channel = int(params.get("channel", 0))
-        self.axis = int(params.get("axis", 0))
+        self.dim = int(params.get("dim", 2))
         self.dt = self.tunable(params.get("dt"), 1.0)
-        init = float(params.get("speed_init", 0.0))
-        self.c = nn.Parameter(torch.tensor(float(init), device=device))
+        init = params.get("velocity_init", 0.0)
+        init = [float(x) for x in init] if isinstance(init, (list, tuple)) \
+            else [float(init)] * self.dim
+        # ONE PARAMETER, A VECTOR. The generator's wave travels obliquely so that the coarse mesh
+        # is visible as a mesh, and an oblique wave is not described by a scalar down one axis.
+        # (C1) stays LINEAR in the unknown, so the closed form stays a least-squares solve -- it is
+        # a D x D normal-equation solve rather than a ratio of two scalars, and it is BETTER
+        # conditioned than the axis-aligned case, which excited only one direction.
+        self.v = nn.Parameter(torch.tensor(init, device=device))
 
     def rhs(self, u):
-        """du/dt from (C1), for a field of shape [n]*D."""
-        n = u.shape[self.axis]
-        return -self.c * _dx_centred(u, self.axis, n)
+        """du/dt from (C1) = -(v . grad u), for a field of shape [n]*D."""
+        out = torch.zeros_like(u)
+        for d in range(u.dim()):
+            out = out - self.v[d] * _dx_centred(u, d, u.shape[d])
+        return out
 
     @staticmethod
-    def c_closed_form(u_t, u_next, axis, dt=1.0):
-        """The least-squares `c` from a pair of frames, used as the reference `c*`."""
-        n = u_t.shape[axis]
-        gx = _dx_centred(u_t, axis, n)
-        dudt = (u_next - u_t) / dt
-        return float(-(dudt * gx).sum() / (gx * gx).sum().clamp_min(1e-30))
+    def v_closed_form(traj, dt=1.0, lo=None, hi=None, report=False):
+        """The least-squares velocity VECTOR over a WHOLE TRAJECTORY -- the reference `v*`.
+
+        Minimises || du/dt + SUM_d v_d du/dx_d ||^2 over v, whose normal equations are the D x D
+        system  A v = -b  with  A_de = <du/dx_d, du/dx_e>  and  b_d = <du/dt, du/dx_d>.
+
+        POOLED OVER EVERY PAIR INTO ONE SOLVE, not averaged over per-pair solves, and the
+        difference is not cosmetic. A single pair whose displacement happens to be near zero gives
+        an almost-singular system and an arbitrary answer; averaging those is averaging noise. On
+        the 64^2 dataset 71.5% of pairs move by nothing at all, so per-pair solving is not merely
+        worse there, it is undefined. Accumulating A and b first is what "batch least squares"
+        means, and it is unbiased whatever any individual pair does.
+
+        `report=True` also returns the condition number of A and the R^2 of (C1) at `v*` -- both
+        needed, because a small residual with a huge condition number means the fit found ONE
+        identifiable direction and invented the rest. That is exactly what a single plane wave
+        does: cond(A) = 5.0e6, R^2 = 0.88, and a velocity 568% wrong as a vector.
+
+        FORWARD TIME DIFFERENCE, deliberately, matching `forward()`'s own forward-Euler step. A
+        centred difference is the sharper estimator of the DATA (R^2 0.957 against 0.867) but it is
+        not what this model computes, and `v*` has to be the number this model could reach.
+        """
+        D = traj.dim() - 1
+        lo = 0 if lo is None else lo
+        hi = (traj.shape[0] - 1) if hi is None else hi
+        A = torch.zeros(D, D, dtype=torch.float64, device=traj.device)
+        b = torch.zeros(D, dtype=torch.float64, device=traj.device)
+        for t in range(lo, hi):
+            u = traj[t].double()
+            g = [_dx_centred(u, d, u.shape[d]) for d in range(D)]
+            dudt = (traj[t + 1].double() - u) / dt
+            for d in range(D):
+                b[d] += (dudt * g[d]).sum()
+                for e in range(D):
+                    A[d, e] += (g[d] * g[e]).sum()
+        v = torch.linalg.solve(A, -b)
+        if not report:
+            return v
+        num = den = 0.0
+        for t in range(lo, hi):
+            u = traj[t].double()
+            g = [_dx_centred(u, d, u.shape[d]) for d in range(D)]
+            dudt = (traj[t + 1].double() - u) / dt
+            r = dudt + sum(v[d] * g[d] for d in range(D))
+            num += float((r ** 2).sum())
+            den += float((dudt ** 2).sum())
+        return v, {"cond": float(torch.linalg.cond(A)), "r2": 1.0 - num / den,
+                   "pairs": hi - lo}
 
     def forward(self, H, mask=None):
         fld = H.fields[self.field_name]
