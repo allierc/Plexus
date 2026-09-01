@@ -325,6 +325,8 @@ class TrainerSpec:
     field: str
     batch_frames: int = 4
     record_stride: Optional[int] = None
+    # ROLLOUT, off by default. {recurrent: true, horizon: K, weighting: ..., gamma: ...}
+    rollout: dict = dc_field(default_factory=dict)
 
     @classmethod
     def parse(cls, raw: Optional[dict]) -> Optional["TrainerSpec"]:
@@ -344,7 +346,8 @@ class TrainerSpec:
         return cls(model=raw["model"], operators=raw["operators"], schedule=raw["schedule"],
                    field=str(raw["field"]), batch_frames=int(raw.get("batch_frames", 4)),
                    record_stride=(None if raw.get("record_stride") is None
-                                  else int(raw["record_stride"])))
+                                  else int(raw["record_stride"])),
+                   rollout=raw.get("rollout") or {})
 
 
 @dataclass

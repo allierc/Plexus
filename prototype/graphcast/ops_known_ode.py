@@ -308,5 +308,28 @@ class KuramotoKnownODE(Operator):
         for _ in range(self.substeps):
             dv, dw = self.rhs(v, w)
             v, w = v + self.dt * dv, w + self.dt * dw
-        fld.grid = torch.cat([torch.stack([v, w]), fld.grid[2:]], 0)
+            # PROJECT BACK ONTO THE UNIT CIRCLE, AND THIS IS NOT A NUMERICAL NICETY -- WITHOUT IT
+            # THE MODEL CANNOT REPRESENT THE TRUTH AT ALL.
+            #
+            # (v, w) = (sin phi, cos phi) lives on a circle, and (F4)-(F5) are a rotation at rate
+            # r_i. Explicit Euler on a rotation is unstable outward: one step takes the radius from
+            # 1 to sqrt(1 + (dt r)^2). At the generator's own settings -- dt 0.25, 12 substeps per
+            # tick -- and the TRUE K of 0.90, r reaches omega + K*4 = 3.6 and dt*r = 0.9, so the
+            # radius grows 1.35x per substep and 1.35^72 over one recorded interval. Measured: the
+            # rollout loss evaluated AT THE GROUND TRUTH was NaN.
+            #
+            # So the fits that came before this line were not finding a degenerate optimum -- they
+            # were being pushed away from the truth by an integrator that diverges there. K stalled
+            # at 4% one-step and 45% at horizon 2 while omega inflated 3.5x to compensate, and the
+            # obvious reading ("omega absorbs the coupling") was only half of it.
+            #
+            # The generator has no such problem because it integrates the PHASE and recomputes
+            # sin/cos, so its radius is 1 by construction. Renormalising is the same statement in
+            # the observables: the state is a phase, and a phase has unit modulus. It is
+            # differentiable, it is exact on the constraint manifold, and it changes nothing about
+            # what is learnable -- K and omega are untouched.
+            n = torch.sqrt(v * v + w * w).clamp_min(1e-12)
+            v, w = v / n, w / n
+        # outside the mask the field is identically zero, and dividing 0/0 would have put NaN there
+        fld.grid = torch.cat([torch.stack([v, w]) * self._mask, fld.grid[2:]], 0)
         return {}
