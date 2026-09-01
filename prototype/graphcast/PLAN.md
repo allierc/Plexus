@@ -833,3 +833,83 @@ training loop lands on the least-squares answer to four decimal places, which is
 one-scalar fit can tell us and exactly the reason it is worth running before anything harder. The
 0.44% that both share is the estimator's own truncation error against the truth — a property of the
 data and the model class, not of the optimiser, and the two gates separate those cleanly.
+
+---
+
+## 14. Why K was not identifiable, and what fixed it
+
+*The longest-running open number in this prototype. `fit_kuramoto2d` recovered K = 0.42 against a
+true 0.90 while its own loss fell monotonically. Three explanations were proposed and the first two
+were wrong; recording that is the point of this section.*
+
+### The rule, and what K is
+
+```
+r_i      = ω_i + K Σ_{j∈N(i)} (v_j w_i − w_j v_i)          (F3)
+dv_i/dt  =  w_i r_i m_i ,   dw_i/dt = −v_i r_i m_i          (F4,F5)
+```
+
+`K` is one coupling shared by every pixel; `ω_i` is one natural frequency per pixel — 1,048,576 of
+them. `(v,w) = (sin φ, cos φ)`.
+
+### Three explanations, in order
+
+**1. Capacity — WRONG.** "ω free per pixel can absorb K·coupling at any instant." Predicted that
+constraining ω would free K. Tested by replacing ω with a hash encoding (~90k correlated
+parameters): ω's *pattern* improved a great deal — Pearson 0.269 → **0.732** — and K got **worse**,
+0.42 → 0.017. Right about ω, wrong about K.
+
+**2. Optimisation — WRONG.** "The joint fit hasn't converged." Tested by freezing ω **at the truth**
+and fitting K alone, one parameter: K → 0.014. Nothing to do with ω.
+
+**3. Identifiability, and it depends on WHICH FRAMES.** With ω at the truth, the loss minimum in K:
+
+| starts used | minimum at |
+|---|---|
+| early 0–9 | **K = 0.9** ← the truth |
+| spread 0–216 (step 24) | K = 0.3 |
+| late 130–238 | K = 0.1 |
+
+**A coupling is identifiable only while it is still doing something.** Early on K is actively
+synchronising oscillators from random phases. Once domains lock, neighbours are in phase, the
+coupling term is ≈ 0 inside a domain, and any K > 0 only adds error at the walls. A loss over
+equilibrated frames asks the data about a parameter that has stopped mattering.
+
+### Neither learning rate nor batch size can substitute
+
+K fitted alone, ω frozen at the truth. True K = 0.90:
+
+| | all frames (0–287) | | | transient (0–19) | | |
+|---|---|---|---|---|---|---|
+| lr \ batch | 1 | 4 | 8 | 1 | 4 | 8 |
+| 0.005 | 0.032 | 0.026 | 0.022 | 0.272 | 0.429 | 0.525 |
+| 0.020 | 0.035 | 0.021 | 0.033 | 0.601 | 0.610 | **0.689** |
+| 0.050 | 0.027 | 0.018 | 0.031 | **0.656** | 0.519 | 0.675 |
+
+On all frames every cell lands between 0.018 and 0.035 — a 2× spread around a value 26× too small.
+On the transient the same two knobs take K from 0.27 to 0.69. **A knob only helps once the signal
+exists**, and no amount of either creates one.
+
+### Horizon, on the transient, is what finishes it
+
+The minimum moves onto the truth as the rollout lengthens, and sharpens
+(`loss(0.1)/loss(0.9)` rises from 1.6× to 2.2×):
+
+| horizon | 1 | 2 | 4 | 8 | 16 |
+|---|---|---|---|---|---|
+| minimum at K | 0.7 | 0.7 | 0.7 | **0.9** | **0.9** |
+| K fitted (ω frozen) | — | 0.723 | 0.752 | **0.888** | 0.879 |
+
+**Horizon 8 recovers K to 1.4%**, from 3% of true on all frames. 16 buys nothing for twice the tape.
+
+### What is still open
+
+`fit_kuramoto_transient` learns **both** K and ω, and gets K = 0.687 — better than 0.42, short of
+0.888. The reason is a genuine tension rather than a tuning failure: **K needs the transient and ω
+needs the equilibrated frames**, and a hard cut gives one what it needs by taking it from the other.
+Its 100-step rollout scores R² −0.543 with 9 usable steps, worse than the all-frames fit's 20,
+because ω is now fitted on 20 frames instead of 290.
+
+So the next move is a frame **weighting** rather than a split — the two parameters want different
+parts of the trajectory, and the objective should say so. This spec is the control that would be
+measured against.
