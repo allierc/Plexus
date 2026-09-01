@@ -184,6 +184,12 @@ class ModelHierarchy:
         Plexus composition -- `radius_graph` (rewire) followed by a message-passing `Lateral` over
         the edges it builds, which is how every interaction model in the codebase is written.
         """
+        #  EVALUATES THE SCHEDULE WITHOUT ADVANCING: a representation fit asks what the
+        # field IS at the frame already set on H, not what it becomes.
+        if n == 0:
+            for op, every in zip(self.ops, self.every):
+                op.forward(self.H)
+            return
         for _ in range(n):
             self.H.frame = self.tick
             if hasattr(self.H, "frame_t"):

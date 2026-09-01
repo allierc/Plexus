@@ -1,0 +1,37 @@
+# fit_represent_sum -- CAN THE ENCODING HOLD THE DATA AT ALL? No PDE, no dynamics, no rollout.
+#
+# Every other fit here asks what the field DOES: it is given a state and scored on the increment.
+# This asks what the field IS -- f(x, y, t) against what was recorded at that (x, y, t) -- and the
+# distinction matters because a model that cannot represent a field at all can still predict a
+# small increment of it well. `target: state` is that difference, in one word.
+#
+# THE DATA IS THE SUM, which is why it is the interesting case: 86.5% of its variance is the coarse
+# transport (std 0.707) and the rest is the fine Kuramoto (0.277), so the two components want
+# opposite things from one encoder. Measured on this store before the encoder was settled:
+#
+#   coarse u, 256^2    0.0% of its energy above 32 cycles across the frame; lag-1 autocorrelation
+#                      0.998, still correlated with frame 0 at 0.5 eighteen frames later
+#   fine   v, 1024^2   73.6% of its energy ABOVE 32 cycles, ~15 px per cycle inside a disc, on
+#                      15.4% of the pixels; lag-1 0.829, past 0.5 after ONE frame
+#
+# So the space axis wants ~4-8 px per finest cell and the TIME axis wants a cell per frame rather
+# than under it -- the opposite of the usual advice, and the reason `frames_per_finest_cell` is a
+# knob rather than a constant. A cap under one cell per frame throws away content the data has.
+general: {name: fit_represent_sum, seed: 42, n_frames: 1200, dt: 1.0, dim: 2, world: 1.0, boundary: periodic, units: {length_um: 1024.0, time_s: 1.0}}
+sets: {}
+fields:
+  s: {frame: grid, res: 1024, components: 1}
+operators:
+  - {op: hash_encoding, at: s, model: multires_hash, n_levels: 16, log2_hashmap_size: 19,
+     px_per_finest_cell: 4, frames_per_finest_cell: 1, use_time: true, n_frames: 401,
+     scale: 1.0, activation: gelu, learn: ["*"]}
+schedule: [hash_encoding]
+fit:
+  data: {run: toy2d_sum256_noed_simple_p1_none, field: s, target: state, frame_stride: 2,
+         split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
+  batch_frames: 2
+  trainer: {n_iter: 3000, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
+            groups: [{params: ["*"], lr: 0.005}]}
+  operators:
+    - {op: mse_loss, norm: none}
+  schedule: [mse_loss, step]

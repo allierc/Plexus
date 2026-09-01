@@ -125,6 +125,26 @@ def _predict_state(model, field, x, n_ticks):
     return torch.stack(out)
 
 
+def _train_step_state(train, model, field, losses, batch_frames, device, train_idx):
+    """A REPRESENTATION fit: no state is loaded and nothing is stepped.
+
+    The model is asked what the field IS at time t, and scored against what was recorded there.
+    That is a different question from every other fit here, which ask what the field DOES: those
+    give the model a state and score its increment, and a model that cannot represent the field at
+    all can still predict a small increment well. Here there is no increment and no dynamics --
+    only whether the encoding can hold the data.
+
+    `H.frame` is set to the record index, which is what a time-encoded operator reads.
+    """
+    j = torch.randint(0, train[field].shape[0], (batch_frames,), device=device)
+    out = []
+    for b in range(j.shape[0]):
+        model.H.frame = int(train_idx[int(j[b])])      # the RECORD index in the run, not in the array
+        model.step(0)                                # evaluate the schedule, integrate nothing
+        out.append(model.read(field))
+    return sum(op.forward(torch.stack(out), train[field][j]) for op in losses)
+
+
 def _train_step_nominal(train, model, field, losses, stride, batch_frames, device):
     """ONE STEP. The model takes a single tick and is scored against a single recorded increment.
 
@@ -212,6 +232,23 @@ def run(fit, out_root: str, device: str = "cuda", log_every: int = 50) -> dict:
     lo, hi = fb.split.get("train", [0, fit.n_frames])
     a, b = int(lo * n_rec / fit.n_frames), int(hi * n_rec / fit.n_frames)
     train = {k: v[a:b] for k, v in fields.items()}
+    # `frame_stride: n` TRAINS ON EVERY n-TH RECORD OF THE SPLIT, leaving the rest held out INSIDE
+    # the training range. That is the only way to ask a representation whether it INTERPOLATES: a
+    # trailing test block asks it to EXTRAPOLATE instead, and a hash table cannot -- past the last
+    # trained frame its cells are still at their +-1e-4 init. Measured on the sum: 0.98 inside the
+    # trained range, 0.04 beyond it, and the second number says nothing about the encoder.
+    fstride = int(fb.data.get("frame_stride", 1))
+    # THE RECORD INDEX TRAVELS WITH THE DATA. A time-encoded operator reads `H.frame` to place
+    # itself on the t axis, and after slicing or striding the position IN THE ARRAY is no longer
+    # the record index in the RUN. Setting H.frame from the array index put every sample at the
+    # wrong time -- off by `a` after the split, and by a further factor of `fstride` after the
+    # stride -- and the fit then failed on the frames it had trained on, which is what made it
+    # visible. Anything less than total failure would have read as a hard problem.
+    train_idx = np.arange(a, b)[::fstride]
+    if fstride > 1:
+        train = {k: v[::fstride] for k, v in train.items()}
+        print(f"frame_stride {fstride}: training on {train[field].shape[0]} of {b - a} records; "
+              f"the rest are held out INSIDE the range")
 
     # THE MODEL IS THE SPEC. Loaded from the same file, by plexus.schema, as a Plexus spec.
     model = ModelHierarchy(fit.path, device=device)
@@ -253,6 +290,9 @@ def run(fit, out_root: str, device: str = "cuda", log_every: int = 50) -> dict:
 
     ro = fb.rollout or {}
     recurrent, horizon = bool(ro.get("recurrent", False)), int(ro.get("horizon", 1))
+    target_kind = str(fb.data.get("target", "increment"))
+    if target_kind not in ("increment", "state"):
+        raise ValueError(f"fit.data.target must be increment|state, got {target_kind!r}")
     # THE COMPOSED ORDER, printed rather than duplicated in the file: the model's own schedule,
     # then the fitting half. This is the whole training iteration in one line.
     print(f"schedule  {' -> '.join(model.names)}  |  {' -> '.join(fb.schedule)}")
@@ -263,14 +303,17 @@ def run(fit, out_root: str, device: str = "cuda", log_every: int = 50) -> dict:
     print(f"  step  {step.describe()}")
     print(f"learn     {', '.join(f'{k}{tuple(v.shape)}' for k, v in named.items())}")
     print(f"data      {run_dir}  records [{a}, {b}) of {n_rec}, stride {stride} sim-frames")
-    print(f"objective {'rollout, horizon %d, %s' % (horizon, ro.get('weighting', 'uniform')) if recurrent else 'one step (t+1)'}")
+    print(f"objective {'representation (state at t)' if target_kind == 'state' else ('rollout, horizon %d, %s' % (horizon, ro.get('weighting', 'uniform')) if recurrent else 'one step (t+1)')}")
 
     hist = {"iter": [], "loss": [], **{k: [] for k in named}}
     for it in range(step.n_iter):
         # THE ONE BRANCH IN THE LOOP, and it is the same partition connectome-gnn's graph_trainer
         # makes between `run_nominal_train_step` and `run_recurrent_train_step`: each returns the
         # data loss and the caller owns backward, the step and the logging tail.
-        if recurrent:
+        if target_kind == "state":
+            total = _train_step_state(train, model, field, ops["loss"], fb.batch_frames,
+                                      device, train_idx)
+        elif recurrent:
             total = _train_step_recurrent(train, model, field, ops["loss"], stride,
                                           fb.batch_frames, device, horizon,
                                           ro.get("weighting", "uniform"),
