@@ -197,9 +197,12 @@ class TransportKnownODE(Operator):
                    "pairs": hi - lo}
 
     def forward(self, H, mask=None):
+        # THE GRID IS REBUILT, NOT WRITTEN INTO. See KuramotoKnownODE.forward for the failure this
+        # avoids; the same rule applies here even though a one-channel field happens to survive it.
         fld = H.fields[self.field_name]
         u = fld.grid[self.channel]
-        fld.grid[self.channel] = u + self.dt * self.rhs(u)
+        nxt = u + self.dt * self.rhs(u)
+        fld.grid = torch.cat([fld.grid[:self.channel], nxt[None], fld.grid[self.channel + 1:]], 0)
         return {}
 
 
@@ -243,7 +246,12 @@ class KuramotoKnownODE(Operator):
         self.dt = self.tunable(params.get("dt"), 0.25)
         self.substeps = int(params.get("substeps", 12))
         self.K = nn.Parameter(torch.tensor(float(params.get("K_init", 0.0)), device=device))
-        self._omega = None                      # allocated on the first field it sees
+        # REGISTERED AS `omega`, THE NAME `PARAM_ROLES` DECLARES, and registered as None here so
+        # the name exists before the shape does. The first version assigned `self._omega =
+        # nn.Parameter(...)` in `bind` and then re-registered it as "omega"; because
+        # `named_parameters` de-duplicates by tensor identity, only the FIRST name survived, so a
+        # trainer group asking for `omega` matched nothing while the parameter was there all along.
+        self.register_parameter("omega", None)
         self._mask = None
         self.device_ = device
 
@@ -255,10 +263,9 @@ class KuramotoKnownODE(Operator):
         lazily. `bind` is idempotent so a trainer may call it before every epoch without resetting
         what has been learned.
         """
-        if self._omega is None:
-            self._omega = nn.Parameter(torch.full(tuple(shape), float(omega_init),
-                                                  device=self.device_))
-            self.register_parameter("omega", self._omega)
+        if self.omega is None:
+            self.omega = nn.Parameter(torch.full(tuple(shape), float(omega_init),
+                                                 device=self.device_))
         self._mask = mask.to(self.device_)
         return self
 
@@ -277,15 +284,29 @@ class KuramotoKnownODE(Operator):
 
     def rhs(self, v, w):
         """(dv/dt, dw/dt) from (F3)-(F5)."""
-        r = self._omega + self.K * self.coupling(v, w)
+        r = self.omega + self.K * self.coupling(v, w)
         m = self._mask
         return w * r * m, -v * r * m
 
     def forward(self, H, mask=None):
+        """`substeps` explicit Euler steps of (F4)-(F5), then the grid is REBUILT.
+
+        NOT `fld.grid[0], fld.grid[1] = v, w`. `v` and `w` start as VIEWS of `fld.grid`, and the
+        substep loop needs those original values for its backward pass; assigning into the same
+        storage bumps its autograd version counter and the backward fails with
+
+            one of the variables needed for gradient computation has been modified by an
+            inplace operation ... is at version 2; expected version 0
+
+        This is the second instance of one rule, and it is a rule about HIERARCHIES rather than
+        about autograd: a hierarchy's buffers persist across calls, so an operator that wants a
+        gradient through itself must PRODUCE a new state rather than overwrite the old one. That is
+        also what plexus2.tex means by operators being pure transformations.
+        """
         fld = H.fields[self.field_name]
         v, w = fld.grid[0], fld.grid[1]
         for _ in range(self.substeps):
             dv, dw = self.rhs(v, w)
             v, w = v + self.dt * dv, w + self.dt * dw
-        fld.grid[0], fld.grid[1] = v, w
+        fld.grid = torch.cat([torch.stack([v, w]), fld.grid[2:]], 0)
         return {}

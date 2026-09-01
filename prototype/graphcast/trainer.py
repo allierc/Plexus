@@ -47,7 +47,7 @@ def _load_field(run_dir: str, name: str, device: str) -> torch.Tensor:
     if name not in z:
         raise KeyError(f"field {name!r} not in {run_dir}/field.zarr "
                        f"(has {sorted(z.group_keys())})")
-    return torch.as_tensor(np.asarray(z[name]["grid"])[:, 0], device=device)
+    return torch.as_tensor(np.asarray(z[name]["grid"]), device=device)   # [T, C, *res]
 
 
 def run(fit, run_dir: str, device: str = "cuda", log_every: int = 50) -> dict:
@@ -74,6 +74,12 @@ def run(fit, run_dir: str, device: str = "cuda", log_every: int = 50) -> dict:
                             "boundary": fit.general.get("boundary", "periodic"),
                             "units": fit.general.get("units")},
                            run_dir, device=device)
+    # THE SUPPORT OF THE FINE RULE, read off the data: a pixel the field is never non-zero at is
+    # outside the mask. Exact here because the generator multiplies by the mask, and it keeps the
+    # mask a property of the OBSERVATION rather than a second copy of the generator's config that
+    # could drift away from it.
+    mask = (u.abs().amax(dim=0).amax(dim=0) > 1e-12).to(u.dtype)   # over time AND channels
+    model.bind_shapes({n: mask for n in model.names})
 
     ctx = {"field": field, "dim": fit.dim, "device": device,
            "stride": stride, "model": model}
@@ -124,12 +130,26 @@ def run(fit, run_dir: str, device: str = "cuda", log_every: int = 50) -> dict:
             hist["iter"].append(it)
             hist["loss"].append(data_loss)
             for k, p in named.items():
-                hist[k].append(p.detach().cpu().numpy().tolist())
+                # A SCALAR IS LOGGED WHOLE; A FIELD IS LOGGED AS STATISTICS. `omega` is one number
+                # per pixel -- 1,048,576 of them -- and writing it 30 times produced a 7.5 MB
+                # trainer.json that no one can read and that says less than four numbers would.
+                v = p.detach()
+                hist[k].append(float(v) if v.ndim == 0 else
+                               {"mean": float(v.mean()), "std": float(v.std()),
+                                "min": float(v.min()), "max": float(v.max())})
 
     out = {"history": hist,
-           "learned": {k: p.detach().cpu().numpy().tolist() for k, p in named.items()},
+           "learned": {k: (float(p.detach()) if p.ndim == 0 else
+                           {"shape": list(p.shape), "mean": float(p.detach().mean()),
+                            "std": float(p.detach().std()), "file": f"{k}.npy"})
+                       for k, p in named.items()},
            "train_records": [a, b], "record_stride": stride, "n_iter": step.n_iter,
            "model_schedule": model.describe()}
+    # THE FIELDS THEMSELVES GO BESIDE THE JSON, as .npy. They are the scientific output -- omega
+    # IS the heterogeneity map -- so they must be kept; they just do not belong inside a summary.
+    for k, p in named.items():
+        if p.ndim:
+            np.save(os.path.join(run_dir, f"{k}.npy"), p.detach().cpu().numpy())
     with open(os.path.join(run_dir, "trainer.json"), "w") as f:
         json.dump(out, f, indent=2)
     return out

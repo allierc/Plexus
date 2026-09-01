@@ -39,7 +39,7 @@ import numpy as np
 import torch
 import yaml
 
-import ops_graphcast  # noqa: F401  registers wave_field / gradient_gain
+import ops_toy  # noqa: F401  registers the toy generator's rules
 from plexus import engine as plexus_engine
 from plexus import schema as plexus_schema
 

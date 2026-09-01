@@ -43,7 +43,7 @@ import os
 import torch
 import yaml
 
-import ops_graphcast   # noqa: F401  registers the generator's rules
+import ops_toy        # noqa: F401  registers the generator's rules
 import ops_known_ode   # noqa: F401  registers their known-ODE twins
 from plexus import engine as plexus_engine
 from plexus import schema as plexus_schema
@@ -89,6 +89,27 @@ class ModelHierarchy:
             self.names.append(line["op"])
         self.tick = 0
 
+    def bind_shapes(self, masks: dict | None = None):
+        """Let operators whose PARAMETER SHAPE is the field's allocate it, now that the field exists.
+
+        `KuramotoKnownODE.omega` is one natural frequency per pixel, so its shape is not knowable
+        when the operator is constructed from a spec line -- only once the hierarchy has a grid. An
+        operator that needs this declares a `bind(shape, mask)`; one that does not is untouched, so
+        this is a capability check rather than a special case for a named operator.
+
+        THE MASK IS GIVEN, NOT FITTED. `m_i` says where the fine rule acts. Learning the support as
+        well is a different experiment -- *where does the fast mechanism live* -- and confounding it
+        into the recovery of `K` and `omega` would make a failure of either unattributable.
+        """
+        for name, op in zip(self.names, self.ops):
+            if not hasattr(op, "bind"):
+                continue
+            fld = self.H.fields[getattr(op, "field_name", None) or self.spec.fields[0]]
+            shape = tuple(fld.grid.shape[1:])
+            m = (masks or {}).get(name)
+            op.bind(shape, torch.ones(shape, device=fld.grid.device) if m is None else m)
+        return self
+
     def named_parameters(self):
         out = {}
         for name, op in zip(self.names, self.ops):
@@ -96,7 +117,7 @@ class ModelHierarchy:
                 out[f"{name}.{k}"] = p
         return out
 
-    def load(self, field: str, value: torch.Tensor, channel: int = 0):
+    def load(self, field: str, value: torch.Tensor):
         """Put an observed frame into the hierarchy. The fit's initial condition is DATA.
 
         THE GRID IS REPLACED BY A DETACHED CLONE, NOT WRITTEN INTO, and the reason is a bug this
@@ -116,11 +137,13 @@ class ModelHierarchy:
         mechanism instead of to the trainer's bookkeeping.
         """
         fld = self.H.fields[field]
-        fld.grid = fld.grid.detach().clone()
-        fld.grid[channel] = value.detach()
+        # THE WHOLE GRID, EVERY CHANNEL. A phase oscillator's faithful state is the pair
+        # (sin phi, cos phi): sin alone is many-to-one, so no rule written in phi can be fitted to
+        # it. Loading channel 0 only would have left cos at whatever the seed put there.
+        fld.grid = value.detach().clone()
 
-    def read(self, field: str, channel: int = 0) -> torch.Tensor:
-        return self.H.fields[field].grid[channel]
+    def read(self, field: str) -> torch.Tensor:
+        return self.H.fields[field].grid
 
     def step(self, n: int = 1):
         """`n` ticks of the model's own schedule, honouring each operator's `every:`."""

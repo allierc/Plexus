@@ -206,3 +206,89 @@ def copy_weights_from_neural_gnn(dst: "GraphCastModel", src) -> None:
                                      f"{tuple(b_.weight.shape)}")
                 a_.weight.copy_(b_.weight)
                 a_.bias.copy_(b_.bias)
+
+
+class PositionHashEmbedding(nn.Module):
+    """a_i as an INSTANT-NGP encoding of the node's POSITION: spatial hash + corner interpolation.
+
+    THE TWO THINGS THAT MAKE AN NGP AN NGP, and that `MultiResNodeEmbedding` above does not have.
+    That class hashes a node's INDEX through a fixed random draw, so it has the collisions and the
+    level ladder but nothing spatial: two adjacent nodes get unrelated rows, and two distant nodes
+    are as likely to share one as two neighbours are. Here:
+
+        1. the index is a SPATIAL hash of the integer corner coordinates of the node's cell;
+        2. the 2^D corners of that cell are MULTILINEARLY INTERPOLATED.
+
+    Together those change the prior qualitatively rather than quantitatively. Nearby nodes share
+    corners, so their embeddings are correlated BY CONSTRUCTION -- spatial smoothness for free,
+    where `free` and the index-hash must learn it or not have it. And collisions become a property
+    of distance: at a level whose grid is finer than the table, the nodes sharing a row are far
+    apart, which is the structure the paper relies on.
+
+    WHAT THAT LAST PROPERTY MEANS HERE IS NOT WHAT IT MEANS IN A NeRF, and the difference is the
+    reason this is an experiment and not an improvement. With a pointwise decoder a shared row is
+    shared capacity and the concatenation across levels still separates the two points. With a
+    MESSAGE-PASSING decoder, two distant nodes sharing a feature is a manufactured long-range
+    coupling, and recovering which nodes couple to which is the entire deliverable. So the spatial
+    hash does not remove that risk -- it makes it a known function of distance instead of an
+    arbitrary draw, which is what makes it measurable.
+
+    WHAT IT DOES NOT BUY, stated because the opposite was assumed for a while. It does NOT make the
+    levels specialise by frequency: measured independently (fine/smooth energy ratio 0.58-1.14),
+    levels do not sort themselves into coarse and fine content. The multiresolution is the ladder
+    the spec sets -- `n_min`, `n_max`, `n_levels` -- plus sparsity, which spends capacity only where
+    samples land. On this toy that sparsity is the real win, because the fine rule occupies 15% of
+    the domain and the fine levels are simply unused over the other 85%.
+    """
+
+    # Müller et al. 2022, eq. 4. Coprime constants; pi_0 = 1 so the first axis is untouched.
+    PRIMES = (1, 2654435761, 805459861, 3674653429)
+
+    def __init__(self, dim: int, n_dim: int = 2, n_levels: int = 8, n_min: int = 4,
+                 n_max: int = 256, table_size: int = 2 ** 14, seed: int = 0):
+        super().__init__()
+        self.n_levels = n_levels
+        self.n_dim = n_dim          # SPATIAL dimension: decides when a level is dense, not 3
+        per = max(1, dim // n_levels)
+        self.slice_dims = [per] * (n_levels - 1) + [dim - per * (n_levels - 1)]
+        if self.slice_dims[-1] <= 0:
+            raise ValueError(f"embedding_dim {dim} cannot be split over {n_levels} levels")
+        # GEOMETRIC LADDER, the paper's eq. 3: b = exp((ln n_max - ln n_min) / (L - 1)).
+        b = 1.0 if n_levels == 1 else math.exp((math.log(n_max) - math.log(n_min)) / (n_levels - 1))
+        self.res = [int(round(n_min * b ** l)) for l in range(n_levels)]
+        self.table_size = table_size
+        g = torch.Generator().manual_seed(seed)
+        self.tables = nn.ParameterList()
+        for l in range(n_levels):
+            # A LEVEL COARSER THAN THE TABLE IS DENSE, not hashed -- (res+1)^D <= T means a 1:1
+            # map exists and collisions would be gratuitous. This is the paper's own rule and it is
+            # what makes the coarse levels unambiguous, which is what lets the fine ones collide.
+            rows = min(table_size, (self.res[l] + 1) ** n_dim)
+            self.tables.append(nn.Parameter(torch.empty(rows, self.slice_dims[l]).uniform_(
+                -1e-4, 1e-4, generator=g)))
+
+    def _hash(self, c: torch.Tensor, rows: int) -> torch.Tensor:
+        """XOR-product spatial hash of integer corner coordinates `c` [..., D]."""
+        h = torch.zeros(c.shape[:-1], dtype=torch.long, device=c.device)
+        for d in range(c.shape[-1]):
+            h = h ^ (c[..., d].long() * self.PRIMES[d])
+        return h % rows
+
+    def forward(self, pos: torch.Tensor) -> torch.Tensor:
+        """`pos` is [N, D] in [0, 1]. Returns [N, sum(slice_dims)]."""
+        N, D = pos.shape
+        # the 2^D corner offsets of a cell, as a [2^D, D] table of 0/1
+        off = torch.stack(torch.meshgrid(*[torch.tensor([0, 1], device=pos.device)] * D,
+                                         indexing="ij"), -1).reshape(-1, D)
+        out = []
+        for l, table in enumerate(self.tables):
+            x = pos * self.res[l]
+            c0 = torch.floor(x).long()                       # [N, D] lower corner
+            f = x - c0                                       # [N, D] fractional position in cell
+            corners = c0[:, None, :] + off[None, :, :]       # [N, 2^D, D]
+            idx = self._hash(corners, table.shape[0])        # [N, 2^D]
+            feat = table[idx]                                # [N, 2^D, F]
+            # multilinear weight of each corner: prod_d (f_d if off_d else 1 - f_d)
+            w = torch.where(off[None].bool(), f[:, None, :], 1.0 - f[:, None, :]).prod(-1)
+            out.append((feat * w[..., None]).sum(1))
+        return torch.cat(out, -1)

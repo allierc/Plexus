@@ -11,7 +11,7 @@ general:
 sets:
   probe: {n: 1, spawn: random}
 fields:
-  v: {frame: grid, res: 1024, components: 1}
+  v: {frame: grid, res: 1024, components: 2}
 operators:
 - op: kuramoto_field
   at: v
@@ -27,6 +27,7 @@ operators:
   - [0.72, 0.24, 0.095]
   - [0.3, 0.74, 0.105]
   - [0.76, 0.71, 0.125]
+  observables: quadrature
 schedule: [kuramoto_field]
 data:
   source: simulate

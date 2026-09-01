@@ -1,0 +1,53 @@
+general:
+  name: fit_transport64
+  seed: 42
+  n_frames: 1200
+  dt: 1.0
+  dim: 2
+  world: 1.0
+  boundary: periodic
+  units: {length_um: 1024.0, time_s: 1.0}
+data:
+  source: zarr
+  path: log/toy2d_coarse64_noed_simple_p1_none/field.zarr
+  state: voltage
+  positions: positions
+  stimulus: u
+  graph: {kind: none, k: 0}
+  split:
+    train: [0, 900]
+    val: [900, 1050]
+    test: [1050, 1200]
+model: {encoder_decoder: false, message: simple, n_passes: 1, embedding: none, embedding_dim: 2,
+  latent_dim: 64, hidden_dim: 64, n_hidden_layers: 1, observation: identity}
+training: {n_iter: 1, batch_frames: 1, lr: 0.001, lr_scheduler: none, warmup_iters: 0,
+  grad_clip: 32.0, target: increment, target_norm: none, checkpoint_every: 1, seed: 42,
+  device: cpu}
+trainer:
+  field: u
+  batch_frames: 64
+  model:
+    fields:
+      u: {frame: grid, res: 64, components: 1}
+    operators:
+    - op: transport_known_ode
+      at: u
+      model: transport_fit
+      learn: [v]
+      velocity_init: [0.0, 0.0]
+      dt: 1.0
+    schedule:
+    - {op: transport_known_ode, every: 1}
+  operators:
+  - {op: plexus_model, role: predict, field: u, steps: 1, target: increment}
+  - {op: mse_loss, role: loss, norm: none}
+  - op: adamw
+    role: step
+    n_iter: 8000
+    groups:
+    - params: [transport_known_ode.v]
+      lr: 2.0e-05
+    betas: [0.9, 0.95]
+    grad_clip: 32.0
+    scheduler: cosine_to_zero
+  schedule: [predict, loss, step]
