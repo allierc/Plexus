@@ -52,7 +52,7 @@ import math
 import torch
 from torch import nn
 
-from plexus.models.base import Operator
+from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 # Muller et al. 2022, eq. 4. Coprime; pi_0 = 1 leaves the first axis untouched.
@@ -109,7 +109,7 @@ class Ladder(nn.Module):
 
 
 @register_operator("ngp_embedding", family="fields", set="field", kind="field", model="hash_ladder")
-class NGPEmbedding(Operator):
+class NGPEmbedding(FieldUpdate):
     """Writes the ladder encoding of every cell's POSITION into the field it is `at:`.
 
     KIND IS `field`, NOT `broadcast`, and the distinction is not pedantry. `broadcast` in Plexus2
@@ -123,7 +123,6 @@ class NGPEmbedding(Operator):
     spec, where a reader can see it, rather than in this class.
     """
 
-    EMIT = None
     INPUTS: list = []
     OUTPUTS: list = []
     READS: list = []
@@ -132,6 +131,7 @@ class NGPEmbedding(Operator):
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS: list = []
+    REQUIRES_PARAMS = ["n_levels", "table_size"]
     MECHANISM_TAGS = ["encoding", "multiresolution", "heterogeneity"]
     PARAM_ROLES = {"tables": "hashed_multiresolution_feature_tables",
                    "n_levels": "ladder_length", "n_min": "coarsest_resolution",

@@ -82,7 +82,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from plexus.models.base import Operator
+from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
@@ -97,7 +97,7 @@ def _dx_centred(u, axis, n):
 
 @register_operator("transport_known_ode", family="fields", set="field", kind="field",
                    model="transport_fit")
-class TransportKnownODE(Operator):
+class TransportKnownODE(FieldUpdate):
     """Equation (C1) with `c` learnable. One parameter for the whole coarse field.
 
     THE ESTIMATE IS NOT AN OPTIMISATION PROBLEM AT ALL, in the one-step case, and that is worth
@@ -111,7 +111,6 @@ class TransportKnownODE(Operator):
     training loop is wired correctly, independent of any model.
     """
 
-    EMIT = None
     INPUTS: list = []
     OUTPUTS: list = []
     READS: list = []
@@ -208,7 +207,7 @@ class TransportKnownODE(Operator):
 
 @register_operator("kuramoto_known_ode", family="fields", set="field", kind="field",
                    model="phase_fit")
-class KuramotoKnownODE(Operator):
+class KuramotoKnownODE(FieldUpdate):
     """Equations (F3)-(F5) with `K` and `omega_i` learnable. The fine rule, network removed.
 
     TWO PARAMETER GROUPS, AND THEY ARE NOT THE SAME KIND OF THING, which is why they get separate
@@ -228,7 +227,6 @@ class KuramotoKnownODE(Operator):
     and not confounded into this one.
     """
 
-    EMIT = None
     INPUTS: list = []
     OUTPUTS: list = []
     READS: list = []

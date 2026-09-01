@@ -1,3 +1,12 @@
+# HOW THIS SPEC WAS MADE: start from toy2d_fine.yaml and change four things.
+#
+#   1. operators:  kuramoto_field  ->  kuramoto_known_ode   the learnable twin, written in the
+#                  K: 0.9, omega_mean/spread, discs        observables (v, w) = (sin phi, cos phi)
+#                  ->  K_init: 0.0, learn: [K, omega]      because sin alone is many-to-one
+#   2. schedule:   the twin's name replaces the original's
+#   3. fit:        added, and `rollout` is NOT optional here -- see below
+#   4. the mask is NOT carried over: it is read off the data, so it cannot drift from it
+#
 # fit_kuramoto2d -- recover K and omega_i of the fine rule from the recorded field.
 # The FITTING TWIN of toy2d_fine.yaml. `kuramoto_known_ode` is `kuramoto_field` written in the
 # observables (v, w) = (sin phi, cos phi) with its two constants made learnable:
@@ -20,12 +29,12 @@ operators:
 schedule: [kuramoto_known_ode]
 fit:
   data: {run: toy2d_fine_noed_simple_p1_none, field: v,
-          split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
+         split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
   batch_frames: 1
   rollout: {horizon: 2, recurrent: true, weighting: uniform}
+  trainer: {n_iter: 1200, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
+            groups: [{params: [kuramoto_known_ode.K], lr: 0.02},
+                     {params: [kuramoto_known_ode.omega], lr: 0.01}]}
   operators:
     - {op: mse_loss, norm: none}
-    - {op: adamw, n_iter: 1200, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
-       groups: [{params: [kuramoto_known_ode.K], lr: 0.02},
-              {params: [kuramoto_known_ode.omega], lr: 0.01}]}
-  schedule: [loss, step]
+  schedule: [mse_loss, step]

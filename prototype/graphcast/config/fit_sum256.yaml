@@ -1,3 +1,13 @@
+# HOW THIS SPEC WAS MADE: start from toy2d_sum256.yaml and replace BOTH rules by their twins.
+#
+#   1. operators:  advect_field   -> transport_known_ode     learn: [v]
+#                  kuramoto_field -> kuramoto_known_ode      learn: [K, omega]
+#                  observe_sum    -> observe_sum             UNCHANGED: the observation is not
+#                                                            a mechanism and nothing about it
+#                                                            is unknown
+#   2. schedule:   the two twins, then the same observe_sum
+#   3. fit:        the loss is on `s` ALONE -- neither u nor v appears in it
+#
 # fit_sum256 -- THE SEPARATION PROBLEM: recover BOTH rules from the OBSERVATION they are
 # superposed into. The fitting twin of toy2d_sum256.yaml, and the only spec here whose model has
 # more than one mechanism in its schedule.
@@ -26,14 +36,14 @@ operators:
   - {op: observe_sum, at: s, model: sum, sources: [u, v], channels: [0, 0]}
 schedule: [transport_known_ode, kuramoto_known_ode, observe_sum]
 fit:
-  data: {run: toy2d_sum256_noed_simple_p1_none, field: s, init: [u, v],
+  data: {run: toy2d_sum256_noed_simple_p1_none, field: s, init: ['u', 'v'],
          split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
   batch_frames: 1
   rollout: {recurrent: true, horizon: 2, weighting: uniform}
+  trainer: {n_iter: 1200, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
+            groups: [{params: [transport_known_ode.v], lr: 2.0e-5},
+                     {params: [kuramoto_known_ode.K], lr: 0.02},
+                     {params: [kuramoto_known_ode.omega], lr: 0.01}]}
   operators:
     - {op: mse_loss, norm: none}
-    - {op: adamw, n_iter: 1200, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
-       groups: [{params: [transport_known_ode.v], lr: 2.0e-5},
-                {params: [kuramoto_known_ode.K], lr: 0.02},
-                {params: [kuramoto_known_ode.omega], lr: 0.01}]}
-  schedule: [loss, step]
+  schedule: [mse_loss, step]

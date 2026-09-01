@@ -1,6 +1,6 @@
 # Gate report
 
-5 pass, 0 fail, 24 not yet run (of 29: 11 bookkeeping, 14 closed form, 4 measurement)
+1 pass, 0 fail, 33 not yet run (of 34: 11 bookkeeping, 19 closed form, 4 measurement)
 
 `status` is not `outcome`. **Outcome** is what the number did against the threshold;
 **status** is whether the gate has been walked through — definition written, estimator
@@ -11,15 +11,15 @@ still be pending review.
 
 | id | gate | threshold | measured | outcome | status | figures |
 |---|---|---|---|---|---|---|
-| G1 | every option combination can be READ | 24 of 24 option combinations load | 24 | **PASS** | done | [G1_options.png](log/toy_counter_noed_simple_p1_free/G1_options.png) |
+| G1 | every option combination can be READ | 24 of 24 option combinations load | 24 | **PASS** | done | [G1_options.png](log/toy3d_noed_simple_p1_none/G1_options.png) |
 | G1b | every option combination can be RUN | 24 of 24 option combinations run one forward step | — | · | pending | — |
-| G2a | no dataset identity appears as a VALUE in the code | 0 offending constants outside config/ | 0 | **PASS** | done | [G2_scan.png](log/toy_counter_noed_simple_p1_free/G2_scan.png) |
+| G2a | no dataset identity appears as a VALUE in the code | 0 offending constants outside config/ | — | · | done | — |
 | G2b | ONE pipeline actually runs on all three datasets | 3 of 3 datasets complete generate/train/test with only the config changed | — | · | pending | — |
 | G3 | the transfer pair returns what it was given | < 1e-6 of the field value | — | · | pending | — |
-| G4 | the transfer conserves what it moves | \|sum(w) - 1\| < 1e-6 | 2.384e-07 | **PASS** | done | [G4_partition.png](log/toy_counter_noed_simple_p1_free/G4_partition.png) |
+| G4 | the transfer conserves what it moves | \|sum(w) - 1\| < 1e-6 | — | · | done | — |
 | G5 | the simple option IS the existing model, arithmetically | < 1e-5 of the voltage range | — | · | pending | — |
 | G6 | depth is an option, not a different model | bit-identical (max \|delta\| == 0) | — | · | pending | — |
-| G7 | the spec is allowed to carry a unit | units declared, and no measurement threshold in mesh units | 1 | **PASS** | done | [G7_units.png](log/toy_counter_noed_simple_p1_free/G7_units.png) |
+| G7 | the spec is allowed to carry a unit | units declared, and no measurement threshold in mesh units | — | · | done | — |
 | G7b | a measurement result is REPORTED in the declared unit | every tier-3 measured value carries its declared unit through the conversion | — | · | pending | — |
 | G8 | one-step accuracy is not stability | state norm stays < 2x the ground-truth norm | — | · | pending | — |
 
@@ -57,7 +57,7 @@ still be pending review.
 | G13 | recover the per-node SIGNED GAIN (the heterogeneity) | R^2 > 0.90 against the true g_i | — | · | pending | — |
 | G14 | encoder/decoder is a genuine option | \|delta R^2(gradient)\| < 0.03 | — | · | pending | — |
 | G15 | graphcast vs simple is RESOLVED, either way | \|delta\| reported against a 3-seed floor; below it is UNRESOLVED, not ranked | — | · | pending | — |
-| G16 | the types cannot be read off position | spatial-cell purity within 20% of a label-permutation null | 1.131 | **PASS** | pending | [G16_toy.png](log/toy_counter_noed_simple_p1_free/G16_toy.png), [G16_state.mp4](log/toy_counter_noed_simple_p1_free/G16_state.mp4) |
+| G16 | the types cannot be read off position | spatial-cell purity within 20% of a label-permutation null | — | · | pending | — |
 | G21 | the coarse field is the rule it claims | phase speed within 5% of lambda/period | — | · | pending | — |
 | G22 | the fine rule is recoverable from state and gradient | minimum per-node R^2 > 0.90 | — | · | pending | — |
 | G23 | the gradient is reconstructible from neighbours | R^2 > 0.95, else the graph cannot carry the fine rule | — | · | pending | — |
@@ -65,6 +65,11 @@ still be pending review.
 | G25 | connected nodes are not collinear | mean \|corr\| between connected nodes < 0.80 | — | · | pending | — |
 | G26 | the graph is NECESSARY: a node-local baseline cannot fit | node-local R^2 < 0.50 while (v, grad u) exceeds 0.90 | — | · | pending | — |
 | G27 | which coarse rule forces the graph | the three toys ranked by G26; reported, not tuned | — | · | pending | — |
+| G28 | known-ODE recovers the coarse speed c from the coarse field | \|c_hat - c\| / c < 0.01 | — | · | pending | — |
+| G28a | the coarse data SUPPORTS the true speed, before any trainer | \|c* - c\| / c < 0.01 | — | · | pending | — |
+| G28b | the coarse profile makes the VELOCITY VECTOR identifiable | condition number of the least-squares normal matrix < 100 | — | · | pending | — |
+| G29 | known-ODE recovers K and omega_i from the fine field | \|K_hat - K\| / K < 0.05 AND R^2(omega_hat, omega) > 0.90 | — | · | pending | — |
+| G30 | known-ODE recovers BOTH rules from the SUM alone | c within 5%, K within 10%, R^2(omega_hat, omega) > 0.80 | — | · | pending | — |
 
 ### What each closed form gate is for
 
@@ -95,6 +100,16 @@ still be pending review.
 **G26 — the graph is NECESSARY: a node-local baseline cannot fit.** The strongest of the data gates and the one that would have caught the travelling-wave defect directly. A deliberately generous node-local baseline -- four lags of the node's own state, plus its own drive where observed, and NO neighbour -- must FAIL where the neighbour-informed fit succeeds. It is generous on purpose: the gate is only informative if the thing it rules out was given every chance. It catches a test bed whose fine rule is solvable without the graph at all, which is the case for any u = f(x - ct), since there du/dx = -(1/c) du/dt. It is currently FAILING at about 1.000 on all three coarse rules, and the reason is more general than the coarse rule: a linear per-node ODE driven by a smooth quasi-periodic field is autoregressively predictable from its own history whatever drives it, so no choice of field can rescue a fine rule that is locally solvable.
 
 **G27 — which coarse rule forces the graph.** Ranks the three coarse rules by G26 and reports the spread. Explicitly not a tuning target: the point is to learn which rule makes the graph necessary, and a rule that only passes after being adjusted until it passes has told us nothing. G12, which scored the embedding against 65 types on a flyvis-scale toy, was removed when that toy was dropped from the plan.
+
+**G28 — known-ODE recovers the coarse speed c from the coarse field.** THE EQUATION FITTED IS  du/dt = -c du/dx  (C1), one unknown scalar: c, the phase speed in DOMAIN WIDTHS PER FRAME, true value 0.000833333 -- one full traverse of the domain in 1,200 frames. The model is the equation itself with c as an nn.Parameter, no network, exactly as connectome-gnn's known_ode.py replaces every constant of the true ODE with a parameter and learns nothing else. (C1) is LINEAR in c, so the batch least-squares answer c* = -<du/dt, du/dx> / <du/dx, du/dx> is available in closed form, and the gate is really asking whether the trainer lands on a number it could have computed. That is the point: it is the cheapest check that the training loop is wired correctly, and it cannot be passed by a lucky architecture.
+
+**G28a — the coarse data SUPPORTS the true speed, before any trainer.** G28's PRECONDITION, and a tier-2a data gate rather than a training one -- it runs before a trainer exists. It computes the least-squares answer c* = -<du/dt, du/dx> / <du/dx, du/dx> directly from the recorded coarse field and asks whether THAT lands on the true 0.000833333. Without it, G28 confounds two failures that want opposite fixes: if the finite differences, the recording stride or the operator itself do not support the true speed, then a trainer that misses it is behaving correctly and the toy is what is broken. With it, G28a passing and G28 failing means the TRAINING LOOP is wrong -- the loss is on the wrong quantity, the gradient does not reach the parameter, or a sign is flipped -- which is the only thing G28 is for. Measured 0.335% with R^2 0.9632 for (C1) at c*; the 3.7% that (C1) does not explain is the transport operator's INTEGER-CELL ROLL, which delivers a step of 1.280 cells per recorded frame as alternating 1s and 2s. That is a documented property of the operator, not a defect, and it is the floor G28's 1% is judged against -- a margin of only 3x, so the trainer has to land on the least-squares answer and not merely near it.
+
+**G28b — the coarse profile makes the VELOCITY VECTOR identifiable.** A PRECONDITION OF BOTH G28 AND G28a, and the one that fired hardest. (C1) is linear in the velocity, but linear does not mean determined: for a SINGLE plane wave u = f(m . x) the gradient is m f'(m . x), so every partial derivative is exactly proportional to every other and the normal matrix is singular in all directions but one. Measured on the first profile -- harmonics 1 and 3 of one wavevector -- cond(A) was 5.0e6, and the fit returned a velocity 568% wrong AS A VECTOR while its component ALONG the wavevector was right to 0.542%: the data determined the phase speed and said nothing at all about the perpendicular drift, so the optimiser put whatever it liked there and the loss did not care. Adding one non-parallel wavevector [1,-3] to the profile drops cond(A) to 5.34. The threshold is 100 because the two regimes are six orders of magnitude apart and nothing sensible lies between them. THIS IS THE FAILURE MODE THE KNOWN-ODE STAGE EXISTS FOR: the parameter was underdetermined BY THE DATA, not by the model, and a network asked the same question would have failed the same way while looking like a network problem.
+
+**G29 — known-ODE recovers K and omega_i from the fine field.** THE EQUATIONS FITTED ARE the Kuramoto rule written in the observables: r_i = omega_i + K SUM_j (v_j w_i - w_j v_i)  (F3), dv_i/dt = w_i r_i m_i (F4), dw_i/dt = -v_i r_i m_i  (F5), where v = sin(phi), w = cos(phi) and m is the known region mask. TWO UNKNOWNS OF DIFFERENT KIND: K, one coupling shared by every pixel, true value 0.90; and omega_i, ONE NATURAL FREQUENCY PER PIXEL -- this is the heterogeneity, the thing a_i exists to carry, drawn as a per-region mean (0.6/0.95/1.3/1.65 x 0.035 rad per unit time) plus a per-pixel offset of half-width 0.012. K is scored by relative error because it is one number; omega_i by R^2 because it is a field of a million, and a map that is right in pattern and off by a constant has still found the heterogeneity. (F3) IS ALREADY A MESSAGE-PASSING LAYER -- K is the edge weight, omega_i the additive node embedding, and (w_i, -v_i) the receiver gauge -- so a GNN that passes this has recovered a graph rule, not fitted a curve.
+
+**G30 — known-ODE recovers BOTH rules from the SUM alone.** The only one of the three that asks the prototype's real question. The model sees s = u + v, one field, and must fit (C1) and (F3)-(F5) TOGETHER without being told which part of the signal belongs to which rule. Thresholds are deliberately looser than G28/G29 -- 5%, 10%, 0.80 against 1%, 5%, 0.90 -- because separation is a strictly harder problem than recovery and a gate that demanded the same numbers would be measuring the difficulty of the decomposition as if it were a defect. What makes the separation possible at all is that the two rules DO NOT COUPLE and live at different resolutions and rates: the coarse traverse is 1,200 frames and the fine period is about 30, a 40x separation, verified in the generator's summary.json rather than assumed. If G30 fails while G28 and G29 pass, the finding is that the sum is not identifiable at this rate ratio, and the ratio is a config knob.
 
 ## Tier 3 — measurement: does it agree with something observed?
 
