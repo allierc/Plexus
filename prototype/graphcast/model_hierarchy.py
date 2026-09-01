@@ -125,12 +125,16 @@ class ModelHierarchy:
         out = {}
         for name, op in zip(self.names, self.ops):
             want = self.learn.get(name, [])
+            # `learn: ["*"]` -- EVERY parameter of that operator. An encoder has a table and an MLP
+            # head with a dozen tensors between them; naming each in the spec would be listing an
+            # implementation detail, and the spec's claim is only "this operator is what is fitted".
+            allw = want == ["*"]
             for k, p in op.named_parameters():
-                p.requires_grad_(k in want)
-                if k in want:
+                p.requires_grad_(allw or k in want)
+                if allw or k in want:
                     out[f"{name}.{k}"] = p
         missing = [f"{n}.{k}" for n in self.learn for k in self.learn[n]
-                   if f"{n}.{k}" not in out]
+                   if k != "*" and f"{n}.{k}" not in out]
         if missing:
             raise ValueError(f"spec asks to learn {missing}, but no operator exposes them; "
                              f"available: {sorted(out)}")

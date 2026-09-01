@@ -206,7 +206,13 @@ class AdamW:
         groups, claimed = [], set()
         for g in self.groups_spec:
             want = g.get("params", ["*"])
-            hit = list(named) if want == ["*"] else [k for k in want if k in named]
+            # `"*"` IS A CATCH-ALL, NOT "EVERYTHING": it takes the parameters no earlier group has
+            # claimed. Reading it as "everything" makes it collide with any explicit group before
+            # it -- torch rejects a parameter in two groups -- and the whole point of writing
+            # `[{params: [K], lr: 0.02}, {params: ["*"], lr: 0.005}]` is "K gets its own rate, the
+            # rest share one". Order therefore matters, and it reads left to right like a match.
+            hit = ([k for k in named if k not in claimed] if want == ["*"]
+                   else [k for k in want if k in named])
             if not hit:
                 raise ValueError(f"adamw group {want} matches none of {sorted(named)}")
             claimed.update(hit)
