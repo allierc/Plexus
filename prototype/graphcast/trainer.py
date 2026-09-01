@@ -50,6 +50,87 @@ def _load_field(run_dir: str, name: str, device: str) -> torch.Tensor:
     return torch.as_tensor(np.asarray(z[name]["grid"]), device=device)   # [T, C, *res]
 
 
+def _step_weights(weighting: str, n_steps: int, gamma: float) -> list[float]:
+    """Per-step weights over a rollout: uniform | discount | linear_decay | last.
+
+    Copied in form from `connectome_gnn.models.recurrent_step._rollout_step_weights`, including the
+    property that matters: EVERY SCHEME RETURNS [1.0] AT K = 1, so the recurrent objective at
+    horizon 1 is arithmetically the nominal one and the two paths can be compared without a
+    confound. Unnormalised; the caller divides by the weight it actually applied.
+
+    The weekend benchmark measured `last` at -0.028 and `discount` at -0.002 in R^2_W against
+    `uniform`, and GraphCast scores every lead time uniformly. `uniform` is the default for both
+    reasons, and the others exist so that finding can be re-checked here rather than assumed.
+    """
+    if weighting == "uniform":
+        return [1.0] * n_steps
+    if weighting == "discount":
+        return [gamma ** k for k in range(n_steps)]
+    if weighting == "linear_decay":
+        return [(n_steps - k) / n_steps for k in range(n_steps)]
+    if weighting == "last":
+        return [0.0] * (n_steps - 1) + [1.0]
+    raise ValueError(f"unknown rollout weighting {weighting!r} (expected uniform, discount, "
+                     f"linear_decay or last)")
+
+
+def _train_step_nominal(train, predict, losses, stride, batch_frames, device):
+    """ONE STEP. The model takes a single tick and is scored against a single recorded increment.
+
+    The target is divided by the stride because a recorded pair spans that many simulation frames
+    while the model's tick is one; the PREDICTION is not, because it already is a per-frame
+    increment. Dividing both was a real bug here and scaled every recovered constant by the stride.
+    """
+    j = torch.randint(0, train.shape[0] - 1, (batch_frames,), device=device)
+    x = train[j]
+    target = (train[j + 1] - x) / stride
+    pred = predict.forward(x)
+    return sum(op.forward(pred, target) for op in losses)
+
+
+def _train_step_recurrent(train, predict, losses, stride, batch_frames, device,
+                          horizon, weighting, gamma):
+    """ROLLOUT. Unroll `horizon` records from one start, FEEDING THE MODEL ITS OWN OUTPUT, and score
+    every step against what was actually recorded.
+
+    WHY THIS EXISTS AND WHAT IT IS FOR HERE. It is not a general accuracy improvement -- the weekend
+    benchmark found plain t+1 wins as an objective, and GraphCast spends 96% of its updates at K=1
+    before a short tail at a learning rate 3,300x below peak. It is here because of a specific
+    IDENTIFIABILITY failure measured on this toy:
+
+        r_i = omega_i + K * coupling_i,   omega FREE PER PIXEL
+
+    At any single instant `omega` can absorb `K * coupling` entirely, so a one-step loss barely
+    constrains `K` -- measured, it reached 0.037 against a true 0.90 while omega's spread came out
+    almost exactly right. What distinguishes the two is that the coupling CHANGES OVER TIME and
+    omega does not, and a rollout is what puts that difference in front of the loss.
+
+    BPTT RUNS THROUGH THE WHOLE UNROLL, not a truncated window. GraphCast does not truncate, and the
+    benchmark's `pushforward` arm -- a one-step BPTT window -- was the worst of the five at -0.082.
+    The state is never detached between steps.
+
+    ONE STEP IS ONE RECORD, so the model takes `stride` ticks per rollout step; comparing a one-tick
+    prediction against a record that is `stride` frames later would silently fit a velocity that is
+    `stride` times too small.
+    """
+    K = int(horizon)
+    hi = train.shape[0] - K
+    if hi <= 0:
+        raise ValueError(f"rollout horizon {K} needs {K + 1} records; the split holds "
+                         f"{train.shape[0]}")
+    j = torch.randint(0, hi, (batch_frames,), device=device)
+    w = _step_weights(weighting, K, gamma)
+    s = train[j]
+    total, wsum = 0.0, 0.0
+    for k in range(K):
+        s = predict.state_after(s, stride)          # the model's own state, never re-anchored
+        if w[k] == 0.0:
+            continue
+        total = total + w[k] * sum(op.forward(s, train[j + k + 1]) for op in losses)
+        wsum += w[k]
+    return total / max(wsum, 1e-12)
+
+
 def run(fit, run_dir: str, device: str = "cuda", log_every: int = 50) -> dict:
     """Execute `fit.trainer` against the trajectory in `run_dir`. Returns the history."""
     tr = fit.trainer
@@ -109,16 +190,23 @@ def run(fit, run_dir: str, device: str = "cuda", log_every: int = 50) -> dict:
     print(f"learnable         {', '.join(f'{k}{tuple(v.shape)}' for k, v in named.items())}")
     print(f"train records     [{a}, {b}) of {n_rec}, stride {stride} sim-frames")
 
+    ro = tr.rollout or {}
+    recurrent = bool(ro.get("recurrent", False))
+    horizon = int(ro.get("horizon", 1))
+    print(f"objective         {'recurrent, horizon %d, %s weights' % (horizon, ro.get('weighting', 'uniform')) if recurrent else 'one step (t+1)'}")
+
     hist = {"iter": [], "loss": [], **{k: [] for k in named}}
     for it in range(step.n_iter):
-        j = torch.randint(0, train.shape[0] - 1, (tr.batch_frames,), device=device)
-        x = train[j]
-        target = (train[j + 1] - x) / stride            # increment per SIM-FRAME
-        # NOT DIVIDED BY THE STRIDE. The model steps its own schedule once at its own dt, so its
-        # increment is already per SIM-FRAME; the TARGET is what needs dividing, because a recorded
-        # pair spans `stride` of them. Dividing both scaled the recovered velocity by the stride.
-        pred = predict.forward(x)
-        total = sum(op.forward(pred, target) for op in ops["loss"])
+        # THE ONE BRANCH IN THE LOOP, and it is the same partition connectome-gnn's graph_trainer
+        # makes between `run_nominal_train_step` and `run_recurrent_train_step`: each returns the
+        # data loss and the caller owns backward, the step and the logging tail.
+        if recurrent:
+            total = _train_step_recurrent(train, predict, ops["loss"], stride, tr.batch_frames,
+                                          device, horizon, ro.get("weighting", "uniform"),
+                                          float(ro.get("gamma", 0.5)))
+        else:
+            total = _train_step_nominal(train, predict, ops["loss"], stride, tr.batch_frames,
+                                        device)
         data_loss = float(total.detach())
         for op in ops["regularize"]:
             pen = op.forward(named)

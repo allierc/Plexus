@@ -124,6 +124,21 @@ class PlexusModelPredict(TrainerOp):
     def parameters(self):
         return self.model.named_parameters()
 
+    def state_after(self, x, n_ticks: int):
+        """The model's STATE after `n_ticks` of its own schedule, starting from `x` [B, C, *res].
+
+        The recurrent path needs this rather than an increment: it advances the state record by
+        record and scores every one, so it must hand the model back its OWN prediction, not the
+        observation. `n_ticks` is the record stride -- the number of simulation frames between two
+        recorded frames -- because one recurrent step is one record.
+        """
+        out = []
+        for b in range(x.shape[0]):
+            self.model.load(self.field, x[b])
+            self.model.step(n_ticks)
+            out.append(self.model.read(self.field))
+        return torch.stack(out)
+
     def forward(self, x):
         """`x` is [B, *res]. Returns the prediction in the same shape as the target.
 
