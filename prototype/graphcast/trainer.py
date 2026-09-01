@@ -74,7 +74,32 @@ def _step_weights(weighting: str, n_steps: int, gamma: float) -> list[float]:
                      f"linear_decay or last)")
 
 
-def _train_step_nominal(train, predict, losses, stride, batch_frames, device):
+def _predict_increment(model, field, x, n_ticks):
+    """The model's INCREMENT over `n_ticks` of its own schedule, per tick. `x` is [B, C, *res].
+
+    ONE HIERARCHY, ONE SAMPLE AT A TIME. A Plexus hierarchy holds one system, not a batch of them,
+    so a batch is a loop rather than a leading tensor dimension. Slower, and honest: pretending a
+    hierarchy is batched is how a model stops being the thing it claims to simulate.
+    """
+    out = []
+    for b in range(x.shape[0]):
+        model.load(field, x[b])
+        model.step(n_ticks)
+        out.append(model.read(field) - x[b])
+    return torch.stack(out)
+
+
+def _predict_state(model, field, x, n_ticks):
+    """The model's STATE after `n_ticks`. The rollout path hands the model back its own output."""
+    out = []
+    for b in range(x.shape[0]):
+        model.load(field, x[b])
+        model.step(n_ticks)
+        out.append(model.read(field))
+    return torch.stack(out)
+
+
+def _train_step_nominal(train, model, field, losses, stride, batch_frames, device):
     """ONE STEP. The model takes a single tick and is scored against a single recorded increment.
 
     The target is divided by the stride because a recorded pair spans that many simulation frames
@@ -84,11 +109,11 @@ def _train_step_nominal(train, predict, losses, stride, batch_frames, device):
     j = torch.randint(0, train.shape[0] - 1, (batch_frames,), device=device)
     x = train[j]
     target = (train[j + 1] - x) / stride
-    pred = predict.forward(x)
+    pred = _predict_increment(model, field, x, 1)
     return sum(op.forward(pred, target) for op in losses)
 
 
-def _train_step_recurrent(train, predict, losses, stride, batch_frames, device,
+def _train_step_recurrent(train, model, field, losses, stride, batch_frames, device,
                           horizon, weighting, gamma):
     """ROLLOUT. Unroll `horizon` records from one start, FEEDING THE MODEL ITS OWN OUTPUT, and score
     every step against what was actually recorded.
@@ -123,7 +148,7 @@ def _train_step_recurrent(train, predict, losses, stride, batch_frames, device,
     s = train[j]
     total, wsum = 0.0, 0.0
     for k in range(K):
-        s = predict.state_after(s, stride)          # the model's own state, never re-anchored
+        s = _predict_state(model, field, s, stride)   # the model's own state, never re-anchored
         if w[k] == 0.0:
             continue
         total = total + w[k] * sum(op.forward(s, train[j + k + 1]) for op in losses)
@@ -131,10 +156,14 @@ def _train_step_recurrent(train, predict, losses, stride, batch_frames, device,
     return total / max(wsum, 1e-12)
 
 
-def run(fit, run_dir: str, device: str = "cuda", log_every: int = 50) -> dict:
-    """Execute `fit.trainer` against the trajectory in `run_dir`. Returns the history."""
-    tr = fit.trainer
-    field = tr.field
+def run(fit, out_root: str, device: str = "cuda", log_every: int = 50) -> dict:
+    """Fit the spec's own model to the run its `fit.data.run` names. Returns the history."""
+    fb = fit.fit
+    field = fb.field
+    run_dir = fb.run if os.path.isdir(fb.run) else os.path.join(out_root, fb.run)
+    if not os.path.isdir(run_dir):
+        raise FileNotFoundError(f"fit.data.run is {fb.run!r}; no such run directory "
+                                f"(looked in {out_root}). Generate it first.")
     u = _load_field(run_dir, field, device).float()
     n_rec = u.shape[0]
 
@@ -142,58 +171,46 @@ def run(fit, run_dir: str, device: str = "cuda", log_every: int = 50) -> dict:
     # so the increment between two records is that many frames of change. A rate quoted per FRAME
     # must divide by it. Getting this wrong scales every recovered constant by a constant factor
     # and looks exactly like a converged fit to the wrong answer -- the most expensive kind.
-    stride = tr.record_stride or max(1, round(fit.n_frames / max(1, n_rec - 1)))
-    lo, hi = fit.data.split["train"]
-    a = int(lo * n_rec / fit.n_frames)
-    b = int(hi * n_rec / fit.n_frames)
+    stride = fb.record_stride or max(1, round(fit.n_frames / max(1, n_rec - 1)))
+    lo, hi = fb.split.get("train", [0, fit.n_frames])
+    a, b = int(lo * n_rec / fit.n_frames), int(hi * n_rec / fit.n_frames)
     train = u[a:b]
 
-    model = ModelHierarchy(tr.model,
-                           {"name": f"{fit.name}_fit", "dim": fit.dim, "seed": fit.seed,
-                            "dt": fit.dt, "n_frames": 1,
-                            "world": fit.general.get("world", 1.0),
-                            "boundary": fit.general.get("boundary", "periodic"),
-                            "units": fit.general.get("units")},
-                           run_dir, device=device)
-    # THE SUPPORT OF THE FINE RULE, read off the data: a pixel the field is never non-zero at is
-    # outside the mask. Exact here because the generator multiplies by the mask, and it keeps the
-    # mask a property of the OBSERVATION rather than a second copy of the generator's config that
-    # could drift away from it.
-    mask = (u.abs().amax(dim=0).amax(dim=0) > 1e-12).to(u.dtype)   # over time AND channels
+    # THE MODEL IS THE SPEC. Loaded from the same file, by plexus.schema, as a Plexus spec.
+    model = ModelHierarchy(fit.path, device=device)
+    # THE SUPPORT, read off the data: a cell the field is never non-zero at is outside the mask.
+    # Exact here because the generator multiplies by it, and it keeps the mask a property of the
+    # OBSERVATION rather than a second copy of the generator's config that could drift from it.
+    mask = (u.abs().amax(dim=0).amax(dim=0) > 1e-12).to(u.dtype)
     model.bind_shapes({n: mask for n in model.names})
 
-    ctx = {"field": field, "dim": fit.dim, "device": device,
-           "stride": stride, "model": model}
+    ctx = {"field": field, "dim": fit.dim, "device": device, "stride": stride, "model": model}
     ops = {r: [] for r in ops_trainer.ROLES}
-    for line in tr.operators:
+    for line in fb.operators:
         op = ops_trainer.build(line, ctx)
         ops[op.ROLE].append(op)
-    for role in tr.schedule:
+    for role in fb.schedule:
         if not ops.get(role):
-            raise ValueError(f"trainer.schedule names role {role!r} but no operator declares it")
-    for role in ("predict", "step"):
-        if len(ops[role]) != 1:
-            raise ValueError(f"a trainer needs exactly one {role!r} operator, got {len(ops[role])}")
+            raise ValueError(f"fit.schedule names role {role!r} but no operator declares it")
+    if len(ops["step"]) != 1:
+        raise ValueError(f"a fit needs exactly one `step` operator, got {len(ops['step'])}")
+    if not ops["loss"]:
+        raise ValueError("a fit needs at least one `loss` operator")
 
-    predict, step = ops["predict"][0], ops["step"][0]
-    named = {k: p for k, p in predict.parameters().items() if p.requires_grad}
-    if not named:
-        raise ValueError("the model hierarchy exposes no learnable parameter; "
-                         "does an operator's `learn:` name anything?")
+    step = ops["step"][0]
+    named = model.named_parameters()
     step.bind(named)
 
-    print(f"model schedule    {model.describe()}")
-    print(f"trainer schedule  {' -> '.join(tr.schedule)}")
-    for role in tr.schedule:
+    ro = fb.rollout or {}
+    recurrent, horizon = bool(ro.get("recurrent", False)), int(ro.get("horizon", 1))
+    print(f"model     {model.describe()}")
+    print(f"fit       {' -> '.join(fb.schedule)}")
+    for role in fb.schedule:
         for op in ops[role]:
             print(f"  {op.describe()}")
-    print(f"learnable         {', '.join(f'{k}{tuple(v.shape)}' for k, v in named.items())}")
-    print(f"train records     [{a}, {b}) of {n_rec}, stride {stride} sim-frames")
-
-    ro = tr.rollout or {}
-    recurrent = bool(ro.get("recurrent", False))
-    horizon = int(ro.get("horizon", 1))
-    print(f"objective         {'recurrent, horizon %d, %s weights' % (horizon, ro.get('weighting', 'uniform')) if recurrent else 'one step (t+1)'}")
+    print(f"learn     {', '.join(f'{k}{tuple(v.shape)}' for k, v in named.items())}")
+    print(f"data      {run_dir}  records [{a}, {b}) of {n_rec}, stride {stride} sim-frames")
+    print(f"objective {'rollout, horizon %d, %s' % (horizon, ro.get('weighting', 'uniform')) if recurrent else 'one step (t+1)'}")
 
     hist = {"iter": [], "loss": [], **{k: [] for k in named}}
     for it in range(step.n_iter):
@@ -201,12 +218,13 @@ def run(fit, run_dir: str, device: str = "cuda", log_every: int = 50) -> dict:
         # makes between `run_nominal_train_step` and `run_recurrent_train_step`: each returns the
         # data loss and the caller owns backward, the step and the logging tail.
         if recurrent:
-            total = _train_step_recurrent(train, predict, ops["loss"], stride, tr.batch_frames,
-                                          device, horizon, ro.get("weighting", "uniform"),
+            total = _train_step_recurrent(train, model, field, ops["loss"], stride,
+                                          fb.batch_frames, device, horizon,
+                                          ro.get("weighting", "uniform"),
                                           float(ro.get("gamma", 0.5)))
         else:
-            total = _train_step_nominal(train, predict, ops["loss"], stride, tr.batch_frames,
-                                        device)
+            total = _train_step_nominal(train, model, field, ops["loss"], stride,
+                                        fb.batch_frames, device)
         data_loss = float(total.detach())
         for op in ops["regularize"]:
             pen = op.forward(named)

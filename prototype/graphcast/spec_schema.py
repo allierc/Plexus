@@ -54,7 +54,8 @@ TARGET_KINDS = ("increment", "state")
 # The trainer's own vocabulary, kept apart from plexus.models.base.KINDS on purpose: KINDS say how
 # an operator moves data inside a hierarchy during a step, and a loss does not do that. Mirrored in
 # ops_trainer.ROLES, which is the registry that enforces it.
-TRAINER_ROLES = ("graph", "predict", "loss", "regularize", "step")
+# Mirrored in ops_trainer.ROLES. No `predict`: the spec's own schedule is the model.
+TRAINER_ROLES = ("loss", "regularize", "step")
 TARGET_NORMS = ("none", "inverse_increment_variance")
 
 
@@ -272,8 +273,7 @@ class TrainingSpec:
 
     @classmethod
     def parse(cls, raw: dict) -> "TrainingSpec":
-        if not raw:
-            raise ValueError("spec is missing the required `training:` section")
+        raw = raw or {}
         betas = raw.get("betas", [0.9, 0.95])
         return cls(
             n_iter=int(raw.get("n_iter", 10_000)),
@@ -306,48 +306,57 @@ class TrainingSpec:
 
 
 @dataclass
-class TrainerSpec:
-    """The `trainer:` section: a SCHEDULE of operators, the same shape as the simulation schedule.
+class FitBlock:
+    """The `fit:` section: what to fit the spec's OWN model against, and how.
 
-    WHY THIS EXISTS BESIDE `TrainingSpec` RATHER THAN INSIDE IT. `TrainingSpec` is a bag of
-    scalars -- `lr`, `coeff_W_L1`, `grad_clip` -- each of which is a number whose meaning lives in
-    whatever trainer happens to read it. `TrainerSpec` is a composition: every term is an operator
-    with a name, a role and its own params, and the objective is the list rather than a line of
-    code that consults the bag. The two coexist while the GNN path still reads the scalars; a spec
-    carries one or the other, and a spec with `trainer:` is run by `trainer.run`.
+    A fit spec is a Plexus spec. Its `general` / `sets` / `fields` / `operators` / `schedule` are
+    the model -- the learnable twins of a simulation's operators, carrying a `learn:` list -- and
+    this block adds only the three things a simulation does not need: which recorded run to score
+    against, the objective, and the optimiser. So a fit spec and its simulation twin can be read
+    side by side and diffed, which is the point.
 
-    `model:` is nested here and is A PLEXUS SPEC FRAGMENT -- fields, operators, schedule -- because
-    the model under fit is a hierarchy, not a function. See `model_hierarchy.py`.
+        data       {run, field, split}   the recorded trajectory, and how it is divided
+        operators  a list, as above      loss / regularize / step, each with its params
+        schedule   a list of names       the order they run in, as a simulation's schedule is
+        rollout    {recurrent, horizon, weighting, gamma}   one step, or unrolled
     """
-    model: dict
+    data: dict
     operators: list
     schedule: list
-    field: str
+    rollout: dict = dc_field(default_factory=dict)
     batch_frames: int = 4
     record_stride: Optional[int] = None
-    # ROLLOUT, off by default. {recurrent: true, horizon: K, weighting: ..., gamma: ...}
-    rollout: dict = dc_field(default_factory=dict)
+
+    @property
+    def run(self) -> str: return str(self.data["run"])
+
+    @property
+    def field(self) -> str: return str(self.data["field"])
+
+    @property
+    def split(self) -> dict: return self.data.get("split", {})
 
     @classmethod
-    def parse(cls, raw: Optional[dict]) -> Optional["TrainerSpec"]:
+    def parse(cls, raw: Optional[dict]) -> Optional["FitBlock"]:
         if not raw:
             return None
-        for key in ("model", "operators", "schedule", "field"):
+        for key in ("data", "operators", "schedule"):
             if key not in raw:
-                raise ValueError(f"trainer: section is missing required key {key!r}")
-        for key in ("fields", "operators", "schedule"):
-            if key not in raw["model"]:
-                raise ValueError(f"trainer.model: is a Plexus spec fragment and is missing "
-                                 f"{key!r}; it needs fields, operators and schedule")
+                raise ValueError(f"fit: section is missing required key {key!r}")
+        for key in ("run", "field"):
+            if key not in raw["data"]:
+                raise ValueError(f"fit.data: is missing {key!r}; `run` names the recorded run "
+                                 f"directory and `field` the field to score against")
         bad = [r for r in raw["schedule"] if r not in TRAINER_ROLES]
         if bad:
-            raise ValueError(f"trainer.schedule has unknown role(s) {bad}; "
-                             f"the roles are {list(TRAINER_ROLES)}")
-        return cls(model=raw["model"], operators=raw["operators"], schedule=raw["schedule"],
-                   field=str(raw["field"]), batch_frames=int(raw.get("batch_frames", 4)),
+            raise ValueError(f"fit.schedule has unknown role(s) {bad}; the roles are "
+                             f"{list(TRAINER_ROLES)}. There is no `predict` role: the spec's own "
+                             f"`schedule:` is the model, and running it is the prediction.")
+        return cls(data=raw["data"], operators=raw["operators"], schedule=raw["schedule"],
+                   rollout=raw.get("rollout") or {},
+                   batch_frames=int(raw.get("batch_frames", 4)),
                    record_stride=(None if raw.get("record_stride") is None
-                                  else int(raw["record_stride"])),
-                   rollout=raw.get("rollout") or {})
+                                  else int(raw["record_stride"])))
 
 
 @dataclass
@@ -364,7 +373,7 @@ class FitSpec:
     # `plexus` is None on it -- but it still declares dim, dt, n_frames and the boundary, and the
     # trainer needs them. Reaching through `fit.plexus` for those worked only for generate specs.
     general: dict = dc_field(default_factory=dict)
-    trainer: Optional[TrainerSpec] = None
+    fit: Optional[FitBlock] = None
 
     @property
     def dim(self) -> int: return int(self.general.get("dim", 2))
@@ -430,11 +439,16 @@ def load(path: str, require_plexus_block: Optional[bool] = None) -> FitSpec:
 
     return FitSpec(
         plexus=plexus_spec,
-        data=DataSpec.parse(raw.get("data")),
-        model=ModelSpec.parse(raw.get("model")),
-        training=TrainingSpec.parse(raw.get("training")),
+        # A FIT SPEC DECLARES `fit:`; A GENERATE SPEC DECLARES `data:`. Neither needs the other's,
+        # so each is required only when the other is absent. Demanding both made every fit spec
+        # carry three blocks of dead scalars whose only job was to satisfy a parser.
+        data=DataSpec.parse(raw.get("data")) if raw.get("data") or not raw.get("fit") else None,
+        model=(ModelSpec.parse(raw.get("model")) if raw.get("model") or not raw.get("fit")
+               else ModelSpec.parse({})),
+        training=(TrainingSpec.parse(raw.get("training")) if raw.get("training")
+                  or not raw.get("fit") else TrainingSpec.parse({"device": "cuda"})),
         general=general,
-        trainer=TrainerSpec.parse(raw.get("trainer")),
+        fit=FitBlock.parse(raw.get("fit")),
         units=units,
         name=str(name),
         path=path,

@@ -52,41 +52,39 @@ from plexus import schema as plexus_schema
 class ModelHierarchy:
     """A Plexus hierarchy whose operators carry the learnable parameters."""
 
-    def __init__(self, model_cfg: dict, general: dict, out_dir: str, device: str = "cpu"):
-        spec_raw = {
-            "general": {**general, **(model_cfg.get("general") or {})},
-            "sets": model_cfg.get("sets") or {},
-            "fields": model_cfg["fields"],
-            "operators": model_cfg["operators"],
-            "schedule": [s["op"] if isinstance(s, dict) else s for s in model_cfg["schedule"]],
-        }
-        path = os.path.join(out_dir, "_model_spec.yaml")
-        with open(path, "w") as f:
-            yaml.safe_dump(spec_raw, f, sort_keys=False)
-        # LOADED THROUGH `plexus.schema`, so the model spec is validated by the same code that
-        # validates a forward spec. A model that would not run as a simulation is not a model.
-        self.spec = plexus_schema.load(path)
+    def __init__(self, spec_path: str, device: str = "cpu"):
+        """`spec_path` is the FIT SPEC ITSELF. It is a Plexus spec and is loaded as one.
+
+        There is no separate `model:` block and no temporary yaml. A fit spec declares the same
+        `general` / `sets` / `fields` / `operators` / `schedule` its simulation twin does -- the
+        only differences are that its operators are the LEARNABLE twins (`kuramoto_known_ode` for
+        `kuramoto_field`), that they carry a `learn:` list, and that a `fit:` section is appended.
+        `plexus.schema.load` ignores unknown top-level keys, so `fit:` costs nothing, and unknown
+        operator params are carried through, so `learn:` reaches the operator.
+
+        That is the whole point of the arrangement: a reader who knows the simulation spec can read
+        the fit spec, and the two can be diffed. An earlier version nested a `model:` dict inside a
+        `trainer:` block and reached it through an operator called `plexus_model` -- an indirection
+        that named the framework instead of the mechanism and told a reader nothing.
+        """
+        self.spec = plexus_schema.load(spec_path)
         self.H = plexus_engine.build(self.spec, device)
         plexus_engine.seed(self.H, self.spec, device)
 
-        # The operator INSTANCES, in schedule order, each with its own rate.
         from plexus.models.registry import get_operator
-        by_name = {o["op"]: o for o in model_cfg["operators"]}
-        self.ops, self.every, self.names = [], [], []
-        for entry in model_cfg["schedule"]:
+        with open(spec_path) as f:
+            raw = yaml.safe_load(f)
+        by_name = {o["op"]: o for o in raw["operators"]}
+        self.ops, self.every, self.names, self.learn = [], [], [], {}
+        for entry in raw["schedule"]:
             entry = {"op": entry} if isinstance(entry, str) else dict(entry)
             line = by_name[entry["op"]]
             cls = get_operator(line["op"], variant=line.get("model"))
-            if getattr(cls, "KIND", None) != "field":
-                raise NotImplementedError(
-                    f"{line['op']} has kind={cls.KIND!r}; ModelHierarchy steps FIELD operators "
-                    f"only, because for those the engine's delta stage is a no-op and a tick is "
-                    f"exactly the sequence of forward() calls made here. A set-carrying model must "
-                    f"go through plexus.engine.run(..., grad=True).")
             self.ops.append(cls({**line, "_at": line.get("at"), "dim": self.spec.dim},
                                 device=device))
             self.every.append(int(entry.get("every", 1)))
             self.names.append(line["op"])
+            self.learn[line["op"]] = list(line.get("learn", []))
         self.tick = 0
 
     def bind_shapes(self, masks: dict | None = None):
@@ -111,10 +109,25 @@ class ModelHierarchy:
         return self
 
     def named_parameters(self):
+        """`<operator>.<param>` for every parameter the spec's `learn:` lists.
+
+        ONLY WHAT `learn:` NAMES. A constant an operator owns but the spec does not list stays
+        frozen at its init, so "which constants are unknown" is a statement in the file rather than
+        a property of a class -- and the same operator can be an oracle in one spec and the thing
+        under test in another.
+        """
         out = {}
         for name, op in zip(self.names, self.ops):
+            want = self.learn.get(name, [])
             for k, p in op.named_parameters():
-                out[f"{name}.{k}"] = p
+                p.requires_grad_(k in want)
+                if k in want:
+                    out[f"{name}.{k}"] = p
+        missing = [f"{n}.{k}" for n in self.learn for k in self.learn[n]
+                   if f"{n}.{k}" not in out]
+        if missing:
+            raise ValueError(f"spec asks to learn {missing}, but no operator exposes them; "
+                             f"available: {sorted(out)}")
         return out
 
     def load(self, field: str, value: torch.Tensor):
@@ -146,14 +159,35 @@ class ModelHierarchy:
         return self.H.fields[field].grid
 
     def step(self, n: int = 1):
-        """`n` ticks of the model's own schedule, honouring each operator's `every:`."""
+        """`n` ticks of the model's own schedule, honouring each operator's `every:`.
+
+        ONE TICK IS WHAT THE ENGINE'S TICK IS: zero the deltas, run the schedule in order, let each
+        operator either mutate a field in place (`field`, `rewire`) or return a per-set delta
+        (`lateral`, `exchange`, `aggregate`, `broadcast`), then integrate. The integration is
+        `plexus.engine._integrate`, CALLED rather than reimplemented -- it resolves the order from
+        `H.emit_order`, reads each set's `StateSchema` to find which block is the coordinate, and
+        applies the boundary. Reproducing that here would be a second definition of what a state
+        is, and the two would drift.
+
+        An earlier version refused anything but `kind="field"` on the grounds that the delta stage
+        was a no-op for those. That was true and it was also the thing blocking the canonical
+        Plexus composition -- `radius_graph` (rewire) followed by a message-passing `Lateral` over
+        the edges it builds, which is how every interaction model in the codebase is written.
+        """
         for _ in range(n):
             self.H.frame = self.tick
             if hasattr(self.H, "frame_t"):
                 self.H.frame_t.fill_(float(self.tick))
+            if self.H.levels:        # a field-only model has no set, hence no accumulator
+                self.H.zero_delta()
             for op, every in zip(self.ops, self.every):
-                if self.tick % every == 0:
-                    op.forward(self.H)
+                if self.tick % every:
+                    continue
+                out = op.forward(self.H)
+                for set_name, delta in (out or {}).items():
+                    self.H.add_delta(set_name, delta)
+            if getattr(self.H, "emit_order", None):
+                plexus_engine._integrate(self.H, self.spec.dt)
             self.tick += 1
 
     def describe(self) -> str:

@@ -30,15 +30,22 @@ things, and `kind` is what the registry dispatches on. So trainer operators carr
 two vocabularies never mix.
 
     ROLE          signature                                    implementations here
-    predict       state, t -> state at t+1 (or its increment)  known_ode (via ops_known_ode), gnn
-    loss          prediction, target -> scalar                 mse
-    regularize    parameters -> scalar                         l1, l2
+    loss          prediction, target -> scalar                 mse_loss
+    regularize    parameters -> scalar                         l1_reg, l2_reg
     step          scalars, parameters -> updated parameters    adamw
 
-`graph` is the fifth role in the design and is deliberately NOT here: building a kNN graph over
-positions changes the edge set, which is ALREADY a Plexus kind (`rewire`), so it is a plain
-registered operator that can also sit in a forward schedule. Reusing that is the point; inventing a
-trainer-only duplicate of it would not be.
+THERE IS NO `predict` ROLE, AND THERE MUST NOT BE. The spec's OWN `operators:` and `schedule:` are
+the model -- a fit spec is a Plexus spec whose operators are the learnable twins of a simulation's.
+Prediction is therefore running that schedule, and an operator whose job is "run the model" would
+name the framework rather than a mechanism. An earlier version had exactly that, called
+`plexus_model`, and it was unreadable for precisely this reason.
+
+Nor is there a `graph` role. Building a neighbour graph changes the edge set, which is ALREADY a
+Plexus kind -- `radius_graph` is `kind="rewire"` in `operators/interaction_ops.py` -- so it belongs
+in the model's own schedule, exactly as `config/active_matter/vicsek_4t.yaml` writes it:
+
+    operators: [{op: radius_graph, at: particle, radius: 0.05}, {op: velocity_align, ...}]
+    schedule:  [radius_graph, velocity_align]
 """
 
 from __future__ import annotations
@@ -47,7 +54,7 @@ import math
 
 import torch
 
-ROLES = ("graph", "predict", "loss", "regularize", "step")
+ROLES = ("loss", "regularize", "step")
 
 _REGISTRY: dict[str, type] = {}
 
@@ -82,78 +89,6 @@ class TrainerOp:
     def describe(self) -> str:
         keys = [k for k in self.params if k != "op"]
         return f"{self.NAME}({self.ROLE}) " + " ".join(f"{k}={self.params[k]}" for k in keys)
-
-
-# ------------------------------------------------------------------ predict ---------------------
-@register_trainer_op("plexus_model")
-class PlexusModelPredict(TrainerOp):
-    """ROLE predict. THE MODEL IS A PLEXUS HIERARCHY AND PREDICTION IS RUNNING ITS SCHEDULE.
-
-    This is the one trainer operator that had to be got right, because it is where the framework's
-    claim is either honoured or quietly dropped. The alternative -- a `nn.Module` with a `forward`
-    -- would keep the arithmetic and throw away all four of plexus2.tex's compositions: the fields
-    the model is about, the several mechanisms that may act on one of them, the levels they reach
-    each other through, and the SCHEDULE that says in what order and HOW OFTEN each runs.
-
-    So `model:` in the yaml is a Plexus spec fragment, `ModelHierarchy` loads it through
-    `plexus.schema` and builds it through `plexus.engine`, and one prediction is:
-
-        load the observed frame into the hierarchy  ->  step its schedule K times  ->  read it back
-
-    Two consequences that a `forward()` does not have. The learnable parameters live on the
-    OPERATORS, so a residual is attributable to a named mechanism rather than to a model. And the
-    schedule carries `every:`, so a level whose motion is slower than the observation cadence is
-    integrated on ITS OWN CLOCK -- which is the whole reason the 64^2 coarse dataset exists.
-
-    `implementation:` selects which operators the model spec names -- `known_ode` for the true
-    equation with its constants learnable, `gnn` for a general learnable message-passing rule.
-    Nothing here branches on it: it is a different list of operators in the file, not a code path.
-    """
-
-    ROLE = "predict"
-
-    def __init__(self, params, ctx):
-        super().__init__(params, ctx)
-        self.model = ctx["model"]                    # a ModelHierarchy, built by the trainer engine
-        self.field = params.get("field", ctx["field"])
-        self.steps = int(params.get("steps", 1))
-        self.target = params.get("target", "increment")
-        if self.target not in ("increment", "state"):
-            raise ValueError(f"plexus_model target {self.target!r} is not increment|state")
-
-    def parameters(self):
-        return self.model.named_parameters()
-
-    def state_after(self, x, n_ticks: int):
-        """The model's STATE after `n_ticks` of its own schedule, starting from `x` [B, C, *res].
-
-        The recurrent path needs this rather than an increment: it advances the state record by
-        record and scores every one, so it must hand the model back its OWN prediction, not the
-        observation. `n_ticks` is the record stride -- the number of simulation frames between two
-        recorded frames -- because one recurrent step is one record.
-        """
-        out = []
-        for b in range(x.shape[0]):
-            self.model.load(self.field, x[b])
-            self.model.step(n_ticks)
-            out.append(self.model.read(self.field))
-        return torch.stack(out)
-
-    def forward(self, x):
-        """`x` is [B, *res]. Returns the prediction in the same shape as the target.
-
-        ONE HIERARCHY, ONE SAMPLE AT A TIME. A Plexus hierarchy holds one system, not a batch of
-        them, so a batch is a loop rather than a leading tensor dimension. That is slower and it is
-        honest: pretending a hierarchy is batched is how a model stops being the thing it claims to
-        simulate. For the field sizes here the loop is not the cost.
-        """
-        out = []
-        for b in range(x.shape[0]):
-            self.model.load(self.field, x[b])          # x[b] is [C, *res], every channel
-            self.model.step(self.steps)
-            after = self.model.read(self.field)
-            out.append(after - x[b] if self.target == "increment" else after)
-        return torch.stack(out)
 
 
 # ------------------------------------------------------------------ loss ------------------------

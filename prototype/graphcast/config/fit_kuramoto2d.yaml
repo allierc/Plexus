@@ -1,56 +1,31 @@
-general:
-  name: fit_kuramoto2d
-  seed: 42
-  n_frames: 1200
-  dt: 1.0
-  dim: 2
-  world: 1.0
-  boundary: periodic
-  units: {length_um: 1024.0, time_s: 1.0}
-data:
-  source: zarr
-  path: log/toy2d_fine_noed_simple_p1_none/field.zarr
-  state: voltage
-  positions: positions
-  stimulus: v
-  graph: {kind: none, k: 0}
-  split:
-    train: [0, 900]
-    val: [900, 1050]
-    test: [1050, 1200]
-model: {encoder_decoder: false, message: simple, n_passes: 1, embedding: none, embedding_dim: 2,
-  latent_dim: 64, hidden_dim: 64, n_hidden_layers: 1, observation: identity}
-training: {n_iter: 1, batch_frames: 1, lr: 0.001, lr_scheduler: none, warmup_iters: 0,
-  grad_clip: 32.0, target: increment, target_norm: none, checkpoint_every: 1, seed: 42,
-  device: cpu}
-trainer:
-  field: v
-  batch_frames: 4
-  model:
-    fields:
-      v: {frame: grid, res: 1024, components: 2}
-    operators:
-    - op: kuramoto_known_ode
-      at: v
-      model: phase_fit
-      learn: [K, omega]
-      K_init: 0.0
-      dt: 0.25
-      substeps: 12
-    schedule:
-    - {op: kuramoto_known_ode, every: 1}
+# fit_kuramoto2d -- recover K and omega_i of the fine rule from the recorded field.
+# The FITTING TWIN of toy2d_fine.yaml. `kuramoto_known_ode` is `kuramoto_field` written in the
+# observables (v, w) = (sin phi, cos phi) with its two constants made learnable:
+#
+#     r_i = omega_i + K SUM_j (v_j w_i - w_j v_i),   dv_i/dt = w_i r_i m_i,  dw_i/dt = -v_i r_i m_i
+#
+# K is ONE coupling shared by every pixel; omega_i is ONE PER PIXEL and is the heterogeneity. They
+# get separate learning rates for the same reason lr_W and lr_embedding differ in production: K
+# sees 10^6 gradient contributions per step and omega_i sees one.
+#
+# ROLLOUT IS NOT OPTIONAL HERE. omega is free per pixel, so at any single instant it can absorb
+# K*coupling entirely; only the coupling's variation IN TIME distinguishes them. Measured, a
+# one-step loss leaves K at 4% of its true value.
+general: {name: fit_kuramoto2d, seed: 42, n_frames: 1200, dt: 1.0, dim: 2, world: 1.0, boundary: periodic, units: {length_um: 1024.0, time_s: 1.0}}
+sets: {}
+fields:
+  v: {frame: grid, res: 1024, components: 2}   # (sin phi, cos phi)
+operators:
+  - {op: kuramoto_known_ode, at: v, dt: 0.25, substeps: 12, K_init: 0.0, learn: [K, omega]}
+schedule: [kuramoto_known_ode]
+fit:
+  data: {run: toy2d_fine_noed_simple_p1_none, field: v,
+          split: {train: [0, 900], val: [900, 1050], test: [1050, 1200]}}
+  batch_frames: 1
+  rollout: {horizon: 2, recurrent: true, weighting: uniform}
   operators:
-  - {op: plexus_model, role: predict, field: v, steps: 1, target: increment}
-  - {op: mse_loss, role: loss, norm: none}
-  - op: adamw
-    role: step
-    n_iter: 1500
-    groups:
-    - params: [kuramoto_known_ode.K]
-      lr: 0.002
-    - params: [kuramoto_known_ode.omega]
-      lr: 0.01
-    betas: [0.9, 0.95]
-    grad_clip: 32.0
-    scheduler: cosine_to_zero
-  schedule: [predict, loss, step]
+    - {op: mse_loss, norm: none}
+    - {op: adamw, n_iter: 1200, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
+       groups: [{params: [kuramoto_known_ode.K], lr: 0.02},
+              {params: [kuramoto_known_ode.omega], lr: 0.01}]}
+  schedule: [loss, step]
