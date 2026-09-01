@@ -53,7 +53,7 @@ import math
 
 import torch
 
-from plexus.models.base import Exchange, Operator
+from plexus.models.base import Exchange, FieldUpdate, Operator
 from plexus.models.registry import register_operator
 
 
@@ -65,7 +65,7 @@ def _as_list(v, default):
 
 
 @register_operator("advect_field", family="fields", set="field", kind="field", model="transport")
-class AdvectField(Operator):
+class AdvectField(FieldUpdate):
     """COARSE RULE: pure transport, first order in time AND in space.
 
         du/dt + c du/dx = 0
@@ -99,7 +99,6 @@ class AdvectField(Operator):
     coarse mesh becomes invisible in exactly the figure meant to show it. See `_initial`.
     """
 
-    EMIT = None
     INPUTS: list = []
     OUTPUTS: list = []
     READS: list = []
@@ -108,6 +107,7 @@ class AdvectField(Operator):
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS: list = []
+    REQUIRES_PARAMS = ["velocity"]
     MECHANISM_TAGS = ["advection", "transport", "external_drive"]
     PARAM_ROLES = {"velocity": "phase_velocity_domain_per_frame",
                    "wavevectors": "initial_profile_wavevectors_cycles_per_domain",
@@ -395,7 +395,7 @@ class GradientGain(Exchange):
 
 
 @register_operator("kuramoto_field", family="fields", set="field", kind="field", model="phase")
-class KuramotoField(Operator):
+class KuramotoField(FieldUpdate):
     """FINE RULE: locally coupled phase oscillators, inside a mask, at high resolution.
 
         dphi/dt = omega(x)  +  K * SUM_{4 neighbours} sin(phi_j - phi_i)
@@ -420,7 +420,6 @@ class KuramotoField(Operator):
     A node's own rate is invisible in a single frame and only legible against its neighbours.
     """
 
-    EMIT = None
     INPUTS: list = []
     OUTPUTS: list = []
     READS: list = []
@@ -429,6 +428,7 @@ class KuramotoField(Operator):
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS: list = []
+    REQUIRES_PARAMS = ["K", "omega_mean"]
     MECHANISM_TAGS = ["synchronisation", "phase_coupling", "local_fast_dynamics"]
     PARAM_ROLES = {"K": "coupling_strength", "omega_mean": "mean_natural_frequency",
                    "omega_spread": "frequency_heterogeneity", "discs": "active_region_mask",
@@ -527,7 +527,7 @@ class KuramotoField(Operator):
 
 
 @register_operator("observe_sum", family="fields", set="field", kind="field", model="sum")
-class ObserveSum(Operator):
+class ObserveSum(FieldUpdate):
     """THE OBSERVATION: write the sum of several fields into a field of its own.
 
     WHY THE SUM NEEDS AN OPERATOR AT ALL. Until now the sum existed only as an mp4 -- formed in the
@@ -547,7 +547,6 @@ class ObserveSum(Operator):
     sum would then contain fine-scale structure of two origins, one real and one interpolated.
     """
 
-    EMIT = None
     INPUTS: list = []
     OUTPUTS: list = []
     READS: list = []

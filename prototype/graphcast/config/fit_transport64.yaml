@@ -1,3 +1,9 @@
+# The SAME fit as fit_transport256 on the under-resolved grid. The only difference between the two
+# specs is `res` -- 64 against 256 -- which is the point of the pair.
+#
+# Derived from toy2d_coarse64.yaml the same way: advect_field -> transport_known_ode, its constant
+# becomes velocity_init plus `learn: [v]`, and a `fit:` section is appended.
+#
 # fit_transport64 -- the SAME fit on the under-resolved grid, and the only difference from
 # fit_transport256 is `res`. 86% of recorded pairs are bit-identical there, so du/dt is exactly
 # zero on most of them; the field jumps a whole cell 14% of the time and one cell is 9% of the
@@ -12,10 +18,10 @@ operators:
 schedule: [transport_known_ode]
 fit:
   data: {run: toy2d_coarse64_noed_simple_p1_none, field: u,
-          split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
+         split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
   batch_frames: 64
+  trainer: {n_iter: 8000, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
+            groups: [{params: [transport_known_ode.v], lr: 2.0e-5}]}
   operators:
     - {op: mse_loss, norm: none}
-    - {op: adamw, n_iter: 8000, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
-       groups: [{params: [transport_known_ode.v], lr: 2e-05}]}
-  schedule: [loss, step]
+  schedule: [mse_loss, step]

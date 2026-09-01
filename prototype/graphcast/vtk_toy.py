@@ -198,7 +198,7 @@ def pair_movie(a, b, out, labels=("ground truth", "inferred"), cmap=CMAP, fps=FP
             if per_step is not None and k == 1 and t < len(per_step):
                 r2, rr = per_step[t]
                 note = f"   R2 {r2:.3f}  r {rr:.3f}"
-            txts[k] = p.add_text(f"{lab}   step {t + 1}/{a.shape[0]}{note}",
+            txts[k] = p.add_text(f"{lab}   frame {t + 1}/{a.shape[0]}{note}",
                                  position="upper_left", font_size=10, color="white")
             if t == 0:
                 if vol:

@@ -58,7 +58,7 @@ import torch
 from torch import nn
 
 from ops_embedding import Ladder
-from plexus.models.base import Operator
+from plexus.models.base import FieldUpdate, Lateral
 from plexus.models.registry import register_operator
 
 
@@ -73,7 +73,7 @@ def _mlp(sizes, act=nn.GELU):
 
 @register_operator("gnn_field", family="signalling", set="field", kind="field",
                    model="message_passing")
-class GNNField(Operator):
+class GNNField(FieldUpdate):
     """dstate/dt from a learned message and a learned update over the lattice neighbourhood.
 
         m_ij  =  lin_edge( s_i, s_j, a_i, a_j )       one MLP, shared over edges
@@ -99,7 +99,6 @@ class GNNField(Operator):
     the boundary of every disc.
     """
 
-    EMIT = None
     INPUTS: list = []
     OUTPUTS: list = []
     READS: list = []
@@ -107,7 +106,7 @@ class GNNField(Operator):
     MAPS: list = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
-    REQUIRES_PARAMS: list = []
+    REQUIRES_PARAMS = ["embedding", "hidden_dim"]
     MECHANISM_TAGS = ["message_passing", "learned_interaction", "heterogeneity"]
     PARAM_ROLES = {"lin_edge": "message_function", "lin_phi": "update_function",
                    "a": "per_cell_embedding", "n_passes": "message_passing_depth"}
@@ -204,3 +203,104 @@ class GNNField(Operator):
             s = s + self.dt * ds * self._mask
         fld.grid = s
         return {}
+
+
+@register_operator("gnn_message", family="signalling", set="particle", kind="lateral",
+                   model="message_passing")
+class GNNMessage(Lateral):
+    """THE SAME RULE ON A SET, over whatever graph a `rewire` operator built. The canonical form.
+
+    `GNNField` above computes its neighbourhood with `torch.roll`, which bakes the 4/6-point
+    lattice stencil INTO THE CODE. That is fast, dimension-generic and wrong in one specific way:
+    the neighbourhood stops being a statement in the spec. It cannot be widened, it cannot be a
+    kNN, and it cannot move to an irregular point cloud -- so the operator that will eventually
+    read ZAPBench's 71,721 somata would have to be a different operator.
+
+    This is the same message and update over `lvl.edge_index`, which is the composition every
+    interaction model in the library uses (config/active_matter/vicsek_4t.yaml):
+
+        operators: [{op: radius_graph, at: pixel, radius: 0.006}, {op: gnn_message, at: pixel, ...}]
+        schedule:  [radius_graph, gnn_message]
+
+    Three consequences, and the first is the one that was hiding:
+
+      * THE NEIGHBOURHOOD IS A NUMBER IN THE FILE. Measured on a lattice, `radius: 1.5 cells`
+        gives EIGHT neighbours, not four -- it catches the diagonals at sqrt(2). The roll version
+        was silently choosing four, and no reader of the spec could have known.
+      * `EMIT = "velocity"` -- this returns a per-node dv/dt, and `plexus.engine._integrate` reads
+        EMIT to decide whether the delta is a rate (x += dt*delta) or an acceleration. A
+        `FieldUpdate` has no delta and inherits `EMIT = None`; a `Lateral` must declare one, and
+        omitting it is not a style lapse but a wrong integration.
+      * `REQUIRES_PARAMS` is checked by `plexus.schema` AT LOAD TIME, so a spec missing `radius`
+        or `hidden_dim` is rejected before anything builds, with the offending key named.
+
+    THE SCALE CEILING IS REAL AND IS RECORDED HERE. `radius_graph` is O(N^2) blockwise -- its own
+    docstring says 1e4-1e5 nodes. Measured on a lattice: 64^2 0.05 s / 0.2 GB, 256^2 1.02 s /
+    3.2 GB, 512^2 16.5 s / 12.9 GB, and 1024^2 would need ~206 GB. So this operator runs the toy
+    at 256^2 and the 1024^2 fine field stays with `GNNField`. Two operators for one rule is a cost;
+    pretending the graph version scales to a million nodes would be a bigger one.
+    """
+
+    EMIT = "velocity"                            # returns dv/dt: a RATE, not an acceleration
+    INPUTS: list = []
+    OUTPUTS: list = []
+    READS: list = []
+    WRITES: list = []
+    MAPS: list = []
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["embedding", "hidden_dim"]
+    MECHANISM_TAGS = ["message_passing", "learned_interaction", "heterogeneity"]
+    PARAM_ROLES = {"lin_edge": "message_function", "lin_phi": "update_function",
+                   "a": "per_node_embedding", "n_passes": "message_passing_depth",
+                   "block": "the state block the rule acts on"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at") or params.get("at", "particle")
+        self.block = str(params.get("block", "voltage"))
+        self.embedding = str(params.get("embedding", "free"))
+        if self.embedding not in ("none", "free", "ngp"):
+            raise ValueError(f"gnn_message embedding must be none|free|ngp, got {self.embedding!r}")
+        self.emb_dim = 0 if self.embedding == "none" else int(params.get("embedding_dim", 16))
+        self.hidden = int(params["hidden_dim"])
+        self.n_passes = int(params.get("n_passes", 1))
+        self.ngp = dict(params.get("ngp") or {})
+        self.seed = int(params.get("seed", 0))
+        self.device_ = device
+        self.lin_edge = self.lin_phi = self.a = self.ladder = None
+
+    def _build(self, C, N, pos):
+        torch.manual_seed(self.seed)
+        self.lin_edge = _mlp([2 * C + 2 * self.emb_dim, self.hidden, self.hidden]).to(self.device_)
+        self.lin_phi = _mlp([C + self.hidden + self.emb_dim, self.hidden, C]).to(self.device_)
+        if self.embedding == "free":
+            self.a = nn.Parameter(torch.ones(N, self.emb_dim, device=self.device_))
+        elif self.embedding == "ngp":
+            self.ladder = Ladder(self.emb_dim, pos.shape[-1],
+                                 int(self.ngp.get("n_levels", 8)), int(self.ngp.get("n_min", 4)),
+                                 int(self.ngp.get("n_max", 512)),
+                                 int(self.ngp.get("table_size", 2 ** 14)), self.seed, self.device_)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        x = lvl.get(self.block)
+        N, C = x.shape[0], x.shape[-1]
+        if self.lin_edge is None:
+            self._build(C, N, pos)
+        a = (None if self.embedding == "none"
+             else (self.a if self.embedding == "free" else self.ladder(pos)))
+        ei = lvl.edge_index                       # [2, E]: row 0 receiver i, row 1 neighbour j
+        if ei.numel() == 0:
+            return {self.at: torch.zeros_like(x)}
+        i, j = ei[0], ei[1]
+        s = x if a is None else torch.cat([x, a], -1)
+        for _ in range(self.n_passes):
+            m = self.lin_edge(torch.cat([s[i], s[j]], -1))          # [E, H]
+            agg = torch.zeros(N, self.hidden, device=x.device, dtype=x.dtype)
+            agg.index_add_(0, i, m * lvl.occ[j][:, None])           # SUM at the receiver
+            z = torch.cat([x, agg] + ([] if a is None else [a]), -1)
+            dx = self.lin_phi(z)
+            s = dx if a is None else torch.cat([dx, a], -1)
+        return {self.at: dx * lvl.occ[:, None]}

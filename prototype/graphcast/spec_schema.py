@@ -54,8 +54,16 @@ TARGET_KINDS = ("increment", "state")
 # The trainer's own vocabulary, kept apart from plexus.models.base.KINDS on purpose: KINDS say how
 # an operator moves data inside a hierarchy during a step, and a loss does not do that. Mirrored in
 # ops_trainer.ROLES, which is the registry that enforces it.
-# Mirrored in ops_trainer.ROLES. No `predict`: the spec's own schedule is the model.
-TRAINER_ROLES = ("loss", "regularize", "step")
+# Mirrored in ops_trainer.ROLES. No `predict`: the model operators of the spec's own
+# `operators:` are named directly in `fit.schedule:`, and running them IS the prediction.
+TRAINER_ROLES = ("loss", "regularize")
+STEP_TOKEN = "step"     # the last entry of fit.schedule; its params are `fit.trainer:`
+# `fit.schedule:` NAMES THE FITTING HALF ONLY -- the loss terms and `step`. The MODEL half is the
+# spec's own top-level `schedule:`, and naming it again here would be two lists that must agree:
+# a spec whose `schedule:` ran one operator while `fit.schedule:` claimed another would be silently
+# wrong in the direction that is hardest to see. The runtime prints the composed order instead, so
+# what a reader wants -- the whole iteration in one place -- is in the log rather than duplicated
+# in the file.
 TARGET_NORMS = ("none", "inverse_increment_variance")
 
 
@@ -321,8 +329,9 @@ class FitBlock:
         rollout    {recurrent, horizon, weighting, gamma}   one step, or unrolled
     """
     data: dict
-    operators: list
     schedule: list
+    trainer: dict = dc_field(default_factory=dict)
+    operators: list = dc_field(default_factory=list)
     rollout: dict = dc_field(default_factory=dict)
     batch_frames: int = 4
     record_stride: Optional[int] = None
@@ -340,19 +349,19 @@ class FitBlock:
     def parse(cls, raw: Optional[dict]) -> Optional["FitBlock"]:
         if not raw:
             return None
-        for key in ("data", "operators", "schedule"):
+        for key in ("data", "schedule", "trainer"):
             if key not in raw:
                 raise ValueError(f"fit: section is missing required key {key!r}")
         for key in ("run", "field"):
             if key not in raw["data"]:
                 raise ValueError(f"fit.data: is missing {key!r}; `run` names the recorded run "
                                  f"directory and `field` the field to score against")
-        bad = [r for r in raw["schedule"] if r not in TRAINER_ROLES]
-        if bad:
-            raise ValueError(f"fit.schedule has unknown role(s) {bad}; the roles are "
-                             f"{list(TRAINER_ROLES)}. There is no `predict` role: the spec's own "
-                             f"`schedule:` is the model, and running it is the prediction.")
-        return cls(data=raw["data"], operators=raw["operators"], schedule=raw["schedule"],
+        if raw["schedule"][-1] != STEP_TOKEN:
+            raise ValueError(f"fit.schedule must END with {STEP_TOKEN!r} -- the parameter update is "
+                             f"the last thing a training iteration does, and its params live in "
+                             f"`fit.trainer:`. Got {raw['schedule']}")
+        return cls(data=raw["data"], operators=raw.get("operators") or [],
+                   schedule=raw["schedule"], trainer=raw["trainer"],
                    rollout=raw.get("rollout") or {},
                    batch_frames=int(raw.get("batch_frames", 4)),
                    record_stride=(None if raw.get("record_stride") is None

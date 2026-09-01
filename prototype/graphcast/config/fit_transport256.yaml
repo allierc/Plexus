@@ -1,3 +1,15 @@
+# HOW THIS SPEC WAS MADE, and it is the whole workflow: START FROM THE SIMULATION SPEC
+# (toy2d_coarse256.yaml) and change four things.
+#
+#   1. operators:  advect_field  ->  transport_known_ode      the LEARNABLE TWIN of the same rule
+#                  velocity: [...]  ->  velocity_init: [0,0]  the constant becomes an unknown
+#                  + learn: [v]                               and the spec says WHICH unknown
+#   2. schedule:   the twin's name replaces the original's
+#   3. fit:        added -- the data to score against, the objective, the optimiser
+#   4. everything else is UNCHANGED: same general, same fields, same resolution
+#
+# That is why a fit spec and its simulation twin can be diffed, and why the diff is short.
+#
 # fit_transport256 -- recover the coarse rule's VELOCITY VECTOR from the recorded field.
 # The FITTING TWIN of toy2d_coarse256.yaml: same general, same field, same schedule shape. The one
 # difference is the operator -- `transport_known_ode` is `advect_field` with its constant made an
@@ -15,10 +27,10 @@ operators:
 schedule: [transport_known_ode]
 fit:
   data: {run: toy2d_coarse256_noed_simple_p1_none, field: u,
-          split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
+         split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
   batch_frames: 64
+  trainer: {n_iter: 8000, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
+            groups: [{params: [transport_known_ode.v], lr: 2.0e-5}]}
   operators:
     - {op: mse_loss, norm: none}
-    - {op: adamw, n_iter: 8000, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
-       groups: [{params: [transport_known_ode.v], lr: 2e-05}]}
-  schedule: [loss, step]
+  schedule: [mse_loss, step]

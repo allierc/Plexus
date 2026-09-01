@@ -54,7 +54,7 @@ import math
 
 import torch
 
-ROLES = ("loss", "regularize", "step")
+ROLES = ("loss", "regularize")
 
 _REGISTRY: dict[str, type] = {}
 
@@ -89,6 +89,11 @@ class TrainerOp:
     def describe(self) -> str:
         keys = [k for k in self.params if k != "op"]
         return f"{self.NAME}({self.ROLE}) " + " ".join(f"{k}={self.params[k]}" for k in keys)
+
+
+def build_trainer(params: dict):
+    """`fit.trainer:` -> the optimiser. One of them, not a list."""
+    return AdamW(params)
 
 
 # ------------------------------------------------------------------ loss ------------------------
@@ -155,8 +160,21 @@ class L2Reg(_Penalty):
 
 
 # ------------------------------------------------------------------ step ------------------------
-@register_trainer_op("adamw")
-class AdamWStep(TrainerOp):
+class AdamW:
+    NAME = "adamw"
+    ROLE = "step"
+
+    """Not a registered operator: `fit.trainer:` is a PARAMETER BLOCK.
+
+    An optimiser is not a term in the objective. `mse_loss` and `l1_reg` are -- they take
+    tensors and return a scalar that is summed with the others, so they belong in a list and
+    an ablation is deleting a line. AdamW takes the RESULT of that sum and mutates the
+    parameters; there is exactly one of it, it composes with nothing, and calling it an
+    operator put a singleton in a list to make it look like a composition. `fit.schedule`
+    still ends with the token `step`, because the update IS the last thing an iteration
+    does and the schedule should say so -- but its params are `fit.trainer:`.
+    """
+
     """ROLE step. AdamW with PARAMETER GROUPS, a schedule, and global gradient clipping.
 
     The groups are the point. Production configs carry three learning rates -- `lr_W 0.0009`,
@@ -168,10 +186,8 @@ class AdamWStep(TrainerOp):
     benchmark's one-checkpoint collapses of 0.2-0.5 in R^2_W are the symptom of never annealing.
     """
 
-    ROLE = "step"
-
-    def __init__(self, params, ctx):
-        super().__init__(params, ctx)
+    def __init__(self, params, ctx=None):
+        self.params = params
         self.n_iter = int(params.get("n_iter", 1000))
         self.grad_clip = float(params.get("grad_clip", 32.0))
         self.warmup = int(params.get("warmup_iters", 0))
@@ -182,6 +198,9 @@ class AdamWStep(TrainerOp):
         self.betas = (float(b[0]), float(b[1]))
         self.groups_spec = params.get("groups") or [{"params": ["*"], "lr": 1.0e-3}]
         self.opt = None
+
+    def describe(self) -> str:
+        return "adamw  " + " ".join(f"{k}={v}" for k, v in self.params.items())
 
     def bind(self, named):
         groups, claimed = [], set()

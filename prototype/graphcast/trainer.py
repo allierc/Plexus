@@ -227,28 +227,40 @@ def run(fit, out_root: str, device: str = "cuda", log_every: int = 50) -> dict:
 
     ctx = {"field": field, "dim": fit.dim, "device": device, "stride": stride, "model": model}
     ops = {r: [] for r in ops_trainer.ROLES}
+    by_name = {}
     for line in fb.operators:
         op = ops_trainer.build(line, ctx)
         ops[op.ROLE].append(op)
-    for role in fb.schedule:
-        if not ops.get(role):
-            raise ValueError(f"fit.schedule names role {role!r} but no operator declares it")
-    if len(ops["step"]) != 1:
-        raise ValueError(f"a fit needs exactly one `step` operator, got {len(ops['step'])}")
+        by_name[line["op"]] = op
+    # ONE SCHEDULE NAMES EVERYTHING, in order: the MODEL operators (from the spec's own
+    # `operators:`, which must stay a valid Plexus spec so plexus.schema validates it and
+    # plexus.engine builds it), then the objective's terms, then `step`. A name that is neither is
+    # a typo, and saying so here is cheaper than a silent no-op.
+    dup = [n for n in fb.schedule if n in model.names]
+    if dup:
+        raise ValueError(f"fit.schedule names the MODEL operator(s) {dup}. The model half is the "
+                         f"spec's own top-level `schedule:`; naming it twice makes two lists that "
+                         f"must agree. fit.schedule carries the loss terms and 'step'.")
+    unknown = [n for n in fb.schedule if n not in set(by_name) | {"step"}]
+    if unknown:
+        raise ValueError(f"fit.schedule names {unknown}, which are neither fit operators "
+                         f"{sorted(by_name)} nor 'step'")
     if not ops["loss"]:
-        raise ValueError("a fit needs at least one `loss` operator")
-
-    step = ops["step"][0]
+        raise ValueError("a fit needs at least one `loss` operator in fit.operators:")
+    step = ops_trainer.build_trainer(fb.trainer)
     named = model.named_parameters()
     step.bind(named)
 
     ro = fb.rollout or {}
     recurrent, horizon = bool(ro.get("recurrent", False)), int(ro.get("horizon", 1))
+    # THE COMPOSED ORDER, printed rather than duplicated in the file: the model's own schedule,
+    # then the fitting half. This is the whole training iteration in one line.
+    print(f"schedule  {' -> '.join(model.names)}  |  {' -> '.join(fb.schedule)}")
     print(f"model     {model.describe()}")
-    print(f"fit       {' -> '.join(fb.schedule)}")
-    for role in fb.schedule:
-        for op in ops[role]:
-            print(f"  {op.describe()}")
+    for name in fb.schedule:
+        if name in by_name:
+            print(f"  {by_name[name].describe()}")
+    print(f"  step  {step.describe()}")
     print(f"learn     {', '.join(f'{k}{tuple(v.shape)}' for k, v in named.items())}")
     print(f"data      {run_dir}  records [{a}, {b}) of {n_rec}, stride {stride} sim-frames")
     print(f"objective {'rollout, horizon %d, %s' % (horizon, ro.get('weighting', 'uniform')) if recurrent else 'one step (t+1)'}")
