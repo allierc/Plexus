@@ -15,7 +15,7 @@ operators:
 schedule: [transport_known_ode]
 fit:
   data: {run: toy2d_coarse256_noed_simple_p1_none, field: u,
-          split: {train: [0, 900], val: [900, 1050], test: [1050, 1200]}}
+          split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
   batch_frames: 64
   operators:
     - {op: mse_loss, norm: none}

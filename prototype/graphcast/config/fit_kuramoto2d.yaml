@@ -20,7 +20,7 @@ operators:
 schedule: [kuramoto_known_ode]
 fit:
   data: {run: toy2d_fine_noed_simple_p1_none, field: v,
-          split: {train: [0, 900], val: [900, 1050], test: [1050, 1200]}}
+          split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
   batch_frames: 1
   rollout: {horizon: 2, recurrent: true, weighting: uniform}
   operators:

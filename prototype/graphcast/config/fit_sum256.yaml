@@ -1,0 +1,39 @@
+# fit_sum256 -- THE SEPARATION PROBLEM: recover BOTH rules from the OBSERVATION they are
+# superposed into. The fitting twin of toy2d_sum256.yaml, and the only spec here whose model has
+# more than one mechanism in its schedule.
+#
+#   transport_known_ode   on u (256^2)   learns the velocity vector
+#   kuramoto_known_ode    on v (1024^2)  learns K and omega_i
+#   observe_sum           on s (1024^2)  s = u + v[0]   -- NOT learnable, it is the observation
+#
+# The loss is on `s` ALONE. Neither u nor v appears in it, so nothing tells the fit which part of
+# the signal belongs to which rule; that is the whole question. Thresholds for this case are
+# deliberately looser than for the two single-mechanism fits, because separation is strictly harder
+# than recovery and a gate that ignored the difference would be measuring the wrong thing.
+#
+# `init: [u, v]` gives the model the LATENT STATE at the first frame of each window and nothing
+# after. That separates two questions a single number would confound: can the PARAMETERS be
+# recovered through a superposition (this spec), and can the STATE be estimated from one (not yet).
+general: {name: fit_sum256, seed: 42, n_frames: 1200, dt: 1.0, dim: 2, world: 1.0, boundary: periodic, units: {length_um: 1024.0, time_s: 1.0}}
+sets: {}
+fields:
+  u: {frame: grid, res: 256, components: 1}
+  v: {frame: grid, res: 1024, components: 2}
+  s: {frame: grid, res: 1024, components: 1}
+operators:
+  - {op: transport_known_ode, at: u, dt: 1.0, velocity_init: [0.0, 0.0], learn: [v]}
+  - {op: kuramoto_known_ode, at: v, dt: 0.25, substeps: 12, K_init: 0.0, learn: [K, omega]}
+  - {op: observe_sum, at: s, model: sum, sources: [u, v], channels: [0, 0]}
+schedule: [transport_known_ode, kuramoto_known_ode, observe_sum]
+fit:
+  data: {run: toy2d_sum256_noed_simple_p1_none, field: s, init: [u, v],
+         split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
+  batch_frames: 1
+  rollout: {recurrent: true, horizon: 2, weighting: uniform}
+  operators:
+    - {op: mse_loss, norm: none}
+    - {op: adamw, n_iter: 1200, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
+       groups: [{params: [transport_known_ode.v], lr: 2.0e-5},
+                {params: [kuramoto_known_ode.K], lr: 0.02},
+                {params: [kuramoto_known_ode.omega], lr: 0.01}]}
+  schedule: [loss, step]

@@ -524,3 +524,59 @@ class KuramotoField(Operator):
             # operator and the GNN both fit. The phase itself is still never written out.
             fld.grid[self.channel + 1] = torch.cos(phi) * m
         return {}
+
+
+@register_operator("observe_sum", family="fields", set="field", kind="field", model="sum")
+class ObserveSum(Operator):
+    """THE OBSERVATION: write the sum of several fields into a field of its own.
+
+    WHY THE SUM NEEDS AN OPERATOR AT ALL. Until now the sum existed only as an mp4 -- formed in the
+    generator's Python and rendered -- on the argument that it is `interpolate(u) + v` exactly and a
+    third copy could only drift. That argument holds for a PICTURE and fails for a FIT: a model
+    fitted to the sum must be scored against an archived array, and "the thing the movie was made
+    from" is not an archived array. So the observation becomes what it always was in the model --
+    an operator with a name, in the schedule, writing a field a consumer can read.
+
+    It is also the honest statement of the inverse problem. The generator's two rules never meet;
+    they are superposed HERE, at the point of observation, and nowhere else. That is exactly the
+    situation the real datasets are in -- ZAPBench records one dF/F per neuron, whatever number of
+    mechanisms produced it -- and the model's task is to undo this one operator.
+
+    NEAREST-NEIGHBOUR UPSAMPLING, as the generator's own sum used. A coarse field IS a 256^2 object;
+    bilinear interpolation would invent sub-cell gradients the coarse rule never computed, and the
+    sum would then contain fine-scale structure of two origins, one real and one interpolated.
+    """
+
+    EMIT = None
+    INPUTS: list = []
+    OUTPUTS: list = []
+    READS: list = []
+    WRITES: list = []
+    MAPS: list = []
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["sources"]
+    MECHANISM_TAGS = ["observation", "superposition"]
+    PARAM_ROLES = {"sources": "fields summed into the observation",
+                   "channels": "which channel of each source is observed"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("_at") or params.get("to")
+        self.sources = list(params["sources"])
+        self.channels = [int(c) for c in params.get("channels", [0] * len(self.sources))]
+        if len(self.channels) != len(self.sources):
+            raise ValueError(f"observe_sum has {len(self.sources)} sources but "
+                             f"{len(self.channels)} channels")
+
+    def forward(self, H, mask=None):
+        fld = H.fields[self.field_name]
+        out = None
+        for name, ch in zip(self.sources, self.channels):
+            g = H.fields[name].grid[ch]
+            if g.shape != fld.grid.shape[1:]:
+                g = torch.nn.functional.interpolate(
+                    g[None, None], size=tuple(fld.grid.shape[1:]), mode="nearest")[0, 0]
+            out = g if out is None else out + g
+        fld.grid = out[None].contiguous()
+        return {}
