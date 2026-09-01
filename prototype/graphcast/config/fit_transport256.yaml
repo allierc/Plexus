@@ -1,53 +1,24 @@
-general:
-  name: fit_transport256
-  seed: 42
-  n_frames: 1200
-  dt: 1.0
-  dim: 2
-  world: 1.0
-  boundary: periodic
-  units: {length_um: 1024.0, time_s: 1.0}
-data:
-  source: zarr
-  path: log/toy2d_coarse256_noed_simple_p1_none/field.zarr
-  state: voltage
-  positions: positions
-  stimulus: u
-  graph: {kind: none, k: 0}
-  split:
-    train: [0, 900]
-    val: [900, 1050]
-    test: [1050, 1200]
-model: {encoder_decoder: false, message: simple, n_passes: 1, embedding: none, embedding_dim: 2,
-  latent_dim: 64, hidden_dim: 64, n_hidden_layers: 1, observation: identity}
-training: {n_iter: 1, batch_frames: 1, lr: 0.001, lr_scheduler: none, warmup_iters: 0,
-  grad_clip: 32.0, target: increment, target_norm: none, checkpoint_every: 1, seed: 42,
-  device: cpu}
-trainer:
-  field: u
+# fit_transport256 -- recover the coarse rule's VELOCITY VECTOR from the recorded field.
+# The FITTING TWIN of toy2d_coarse256.yaml: same general, same field, same schedule shape. The one
+# difference is the operator -- `transport_known_ode` is `advect_field` with its constant made an
+# nn.Parameter -- and the `fit:` block appended below.
+#
+# (C1)  du/dt = -(v . grad u).  One unknown: v, the phase velocity in DOMAIN WIDTHS PER FRAME,
+# true [0.000745356, 0.000372678]. Linear in v, so the least-squares answer exists in closed form
+# and the gate is really asking whether the training loop lands on a number it could have computed.
+general: {name: fit_transport256, seed: 42, n_frames: 1200, dt: 1.0, dim: 2, world: 1.0, boundary: periodic, units: {length_um: 1024.0, time_s: 1.0}}
+sets: {}
+fields:
+  u: {frame: grid, res: 256, components: 1}
+operators:
+  - {op: transport_known_ode, at: u, dt: 1.0, velocity_init: [0.0, 0.0], learn: [v]}
+schedule: [transport_known_ode]
+fit:
+  data: {run: toy2d_coarse256_noed_simple_p1_none, field: u,
+          split: {train: [0, 900], val: [900, 1050], test: [1050, 1200]}}
   batch_frames: 64
-  model:
-    fields:
-      u: {frame: grid, res: 256, components: 1}
-    operators:
-    - op: transport_known_ode
-      at: u
-      model: transport_fit
-      learn: [v]
-      velocity_init: [0.0, 0.0]
-      dt: 1.0
-    schedule:
-    - {op: transport_known_ode, every: 1}
   operators:
-  - {op: plexus_model, role: predict, field: u, steps: 1, target: increment}
-  - {op: mse_loss, role: loss, norm: none}
-  - op: adamw
-    role: step
-    n_iter: 8000
-    groups:
-    - params: [transport_known_ode.v]
-      lr: 2.0e-05
-    betas: [0.9, 0.95]
-    grad_clip: 32.0
-    scheduler: cosine_to_zero
-  schedule: [predict, loss, step]
+    - {op: mse_loss, norm: none}
+    - {op: adamw, n_iter: 8000, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
+       groups: [{params: [transport_known_ode.v], lr: 2e-05}]}
+  schedule: [loss, step]

@@ -28,6 +28,15 @@ for p in (_HERE, _PLEXUS_SRC):
 
 import numpy as np
 import gates as gates_mod
+# EVERY OPERATOR MODULE IS IMPORTED HERE, at the entry point, because `plexus.schema.load`
+# validates a spec's operators against the registry -- and an operator that has not been imported
+# is not in it. The failure is confusing rather than obvious: the spec is rejected as naming an
+# unknown operator, and the list of "available" ones is the library's, so it reads as though the
+# prototype's operators were never written.
+import ops_embedding  # noqa: F401  ngp_embedding
+import ops_gnn        # noqa: F401  gnn_field
+import ops_known_ode  # noqa: F401  transport_known_ode, kuramoto_known_ode
+import ops_toy        # noqa: F401  advect_field, kuramoto_field, wave_field, gradient_gain
 import spec_schema
 import toy as toy_mod
 import viz
@@ -418,8 +427,8 @@ def main(argv=None) -> int:
                     help="task (generate|train|test|plot|gates) followed by the config path")
     ap.add_argument("--out_root", default=None,
                     help="root for log/ output (default: the prototype's own log/)")
-    ap.add_argument("--data_dir", default=None,
-                    help="the recorded run directory a `-o train` fit reads its trajectory from")
+    ap.add_argument("--horizon", type=int, default=None,
+                    help="rollout length for `-o test` (default: the spec's fit.rollout.horizon)")
     ap.add_argument("--gate", nargs="+", default=None,
                     help="run only these gate ids, e.g. --gate G1 G2")
     args = ap.parse_args(argv)
@@ -445,18 +454,24 @@ def main(argv=None) -> int:
 
     if task == "gates":
         return run_gates(config, out_dir, args.gate)
-    if task == "train" and fit.trainer is not None:
+    if task == "train" and fit.fit is not None:
         # A SPEC CARRYING `trainer:` IS RUN BY THE TRAINER ENGINE, not by the scalar train loop.
         # Which one runs is a property of the FILE -- it declared a schedule or it declared a bag
         # of scalars -- rather than of a flag someone has to remember to pass.
+        # A SPEC CARRYING `fit:` IS RUN BY THE FIT ENGINE. Which one runs is a property of the
+        # FILE -- it declared a fit block or it did not -- rather than of a flag to remember. The
+        # run to fit is named IN the spec (`fit.data.run`), so there is no --data_dir either.
         import trainer as trainer_mod
-        src = args.data_dir or os.path.join(args.out_root or os.path.join(_HERE, "log"),
-                                            fit.trainer.model.get("data_run", ""))
-        if not os.path.isdir(src):
-            ap.error(f"-o train needs the recorded run to fit; {src!r} is not a directory. "
-                     f"Pass --data_dir <run>, or set trainer.model.data_run.")
-        out = trainer_mod.run(fit, src, device=fit.training.device)
-        print("learned:", {k: v for k, v in out["learned"].items()})
+        out = trainer_mod.run(fit, args.out_root or os.path.join(_HERE, "log"),
+                              device=fit.training.device)
+        print("learned:", out["learned"])
+        return 0
+    if task == "test" and fit.fit is not None:
+        # THE TESTER IS A SEPARATE ENGINE because a loss is not a result: it is measured on the
+        # training split at the objective's own horizon. `-o test` rolls out on HELD-OUT frames.
+        import tester as tester_mod
+        tester_mod.run(fit, args.out_root or os.path.join(_HERE, "log"),
+                       device=fit.training.device, horizon=args.horizon)
         return 0
     if task == "generate":
         summary = toy_mod.generate(fit, out_dir, device=fit.data.device)

@@ -31,6 +31,7 @@ import numpy as np
 
 from plexus.render_vtk import _grid, _plotter, _range, evolve_volume, open_movie
 
+SIZE_ = 448        # per panel; a pair movie is twice this wide
 CMAP = "viridis"    # the one colour map, matching viz.CMAP
 FPS = 24
 
@@ -135,3 +136,65 @@ def movie(a, out, label, **kw):
     if a.ndim == 4:
         return volume_movie(a, out, label, **kw)
     raise ValueError(f"expected [T, nx, ny] or [T, nx, ny, nz], got {a.shape}")
+
+
+def pair_movie(a, b, out, labels=("ground truth", "inferred"), cmap=CMAP, fps=FPS, clim=None):
+    """TWO PANELS, ONE FRAME, ONE COLOUR SCALE: what was recorded beside what the model produced.
+
+    THE CLIM IS SHARED AND FIXED FOR THE WHOLE CLIP, and that is the only thing that makes the
+    comparison honest. Per-panel normalisation would rescale a decaying rollout back to full
+    contrast every frame, so a model whose amplitude was collapsing would look identical to one
+    that was right; per-frame normalisation would do the same in time. Both panels are drawn
+    against the range of the GROUND TRUTH, so a prediction that leaves that range saturates -- which
+    is the correct rendering of a prediction that has left the data.
+
+    Dispatches on rank exactly as `movie` does, so a 2-D toy and a 3-D toy give the same figure at
+    different D.
+    """
+    import pyvista as pv
+
+    a, b = np.asarray(a, np.float32), np.asarray(b, np.float32)
+    if a.shape != b.shape:
+        raise ValueError(f"pair_movie shapes differ: {a.shape} vs {b.shape}")
+    lo, hi = clim if clim is not None else _range(a, 0.5, 99.5)
+    lim = max(abs(lo), abs(hi))
+    vol = a.ndim == 4
+    opacity = _opacity_for(a)[0] if vol else None
+
+    p = _plotter()
+    p.close()
+    p = pv.Plotter(off_screen=True, window_size=(2 * (SIZE_ or 448), SIZE_ or 448), shape=(1, 2))
+    p.set_background("black")
+    p.enable_anti_aliasing("msaa", multi_samples=8)
+    open_movie(p, out, fps)
+    actors = [None, None]
+    txts = [None, None]
+    for t in range(a.shape[0]):
+        for k, (arr, lab) in enumerate(zip((a, b), labels)):
+            p.subplot(0, k)
+            if actors[k] is not None:
+                p.remove_actor(actors[k])
+            if txts[k] is not None:
+                p.remove_actor(txts[k])
+            if vol:
+                actors[k] = p.add_volume(_grid(np.abs(arr[t])), scalars="a", cmap=cmap,
+                                         opacity=opacity, clim=[0.0, lim], show_scalar_bar=False)
+            else:
+                nx, ny = arr[t].shape
+                g = pv.ImageData(dimensions=(nx + 1, ny + 1, 2))
+                g.spacing = (1.0 / nx, 1.0 / ny, 1.0)
+                g.cell_data["a"] = np.ascontiguousarray(arr[t]).ravel(order="F")
+                actors[k] = p.add_mesh(g, scalars="a", cmap=cmap, clim=[-lim, lim],
+                                       lighting=False, show_scalar_bar=False)
+            txts[k] = p.add_text(f"{lab}   step {t + 1}/{a.shape[0]}", position="upper_left",
+                                 font_size=10, color="white")
+            if t == 0:
+                if vol:
+                    p.camera_position = "iso"
+                else:
+                    p.view_xy()
+                p.reset_camera()
+                p.camera.zoom(1.15)
+        p.write_frame()
+    p.close()
+    return f"{a.shape[0]} frames, {'x'.join(str(s) for s in a.shape[1:])}, clim +-{lim:.3f}"

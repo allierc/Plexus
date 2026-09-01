@@ -305,6 +305,7 @@ class KuramotoKnownODE(Operator):
         """
         fld = H.fields[self.field_name]
         v, w = fld.grid[0], fld.grid[1]
+        m = self._mask
         for _ in range(self.substeps):
             dv, dw = self.rhs(v, w)
             v, w = v + self.dt * dv, w + self.dt * dw
@@ -328,7 +329,21 @@ class KuramotoKnownODE(Operator):
             # the observables: the state is a phase, and a phase has unit modulus. It is
             # differentiable, it is exact on the constraint manifold, and it changes nothing about
             # what is learnable -- K and omega are untouched.
-            n = torch.sqrt(v * v + w * w).clamp_min(1e-12)
+            # THE MASK IS ADDED TO THE NORM, and this is the third version of one line.
+            #
+            # Outside the mask v and w are exactly zero, and d/dx sqrt(x) at x = 0 is infinite. So
+            # `sqrt(v^2+w^2).clamp_min(eps)` has a finite VALUE and an infinite GRADIENT: the
+            # forward pass looked right and the backward produced NaN for every parameter at once,
+            # which the tester caught and no forward check would have. Moving the epsilon inside
+            # the root, `sqrt(v^2+w^2+1e-12)`, makes it finite but 1e6 -- still ruinous, since
+            # 85% of the domain is outside the mask and would dominate every gradient.
+            #
+            # `(1 - m)` is exactly the right constant to add: the state is on the unit circle
+            # INSIDE the mask, so there v^2+w^2 = 1 and the term vanishes; OUTSIDE, v = w = 0 and
+            # the norm becomes exactly 1, so the projection is the identity on zero with gradient
+            # 1. No epsilon, no special case, and it says what it means -- there is nothing to
+            # normalise where there is no oscillator.
+            n = torch.sqrt(v * v + w * w + (1.0 - m))
             v, w = v / n, w / n
         # outside the mask the field is identically zero, and dividing 0/0 would have put NaN there
         fld.grid = torch.cat([torch.stack([v, w]) * self._mask, fld.grid[2:]], 0)
