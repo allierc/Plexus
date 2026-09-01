@@ -244,6 +244,20 @@ class KuramotoKnownODE(FieldUpdate):
         self.dt = self.tunable(params.get("dt"), 0.25)
         self.substeps = int(params.get("substeps", 12))
         self.K = nn.Parameter(torch.tensor(float(params.get("K_init", 0.0)), device=device))
+        # `omega_from:` NAMES A FIELD ANOTHER OPERATOR WROTE, and when it is set this operator owns
+        # no omega at all. That is the point of it: the heterogeneity stops being 1,048,576 free
+        # numbers hidden inside the rule and becomes a MECHANISM with its own operator, its own
+        # parameters and its own line in the schedule --
+        #
+        #     schedule: [hash_encoding, kuramoto_known_ode]
+        #
+        # so if the fit fails, "the encoding cannot represent the heterogeneity" and "the rule is
+        # wrong" are separable, which is the whole argument for operators over layers. It is also a
+        # REGULARISER with a measured ceiling: a hash encoding reaches R^2 0.8166 against this
+        # toy's true omega with 24k parameters, and a perfect SMOOTH fit scores 0.8155 -- the
+        # remaining 18.5% is spatially white per-pixel jitter that no smooth encoding can represent.
+        self.omega_from = params.get("omega_from")
+        self._omega_ext = None
         # REGISTERED AS `omega`, THE NAME `PARAM_ROLES` DECLARES, and registered as None here so
         # the name exists before the shape does. The first version assigned `self._omega =
         # nn.Parameter(...)` in `bind` and then re-registered it as "omega"; because
@@ -261,7 +275,7 @@ class KuramotoKnownODE(FieldUpdate):
         lazily. `bind` is idempotent so a trainer may call it before every epoch without resetting
         what has been learned.
         """
-        if self.omega is None:
+        if self.omega is None and self.omega_from is None:
             self.omega = nn.Parameter(torch.full(tuple(shape), float(omega_init),
                                                  device=self.device_))
         self._mask = mask.to(self.device_)
@@ -282,7 +296,8 @@ class KuramotoKnownODE(FieldUpdate):
 
     def rhs(self, v, w):
         """(dv/dt, dw/dt) from (F3)-(F5)."""
-        r = self.omega + self.K * self.coupling(v, w)
+        om = self.omega if self._omega_ext is None else self._omega_ext
+        r = om + self.K * self.coupling(v, w)
         m = self._mask
         return w * r * m, -v * r * m
 
@@ -302,6 +317,8 @@ class KuramotoKnownODE(FieldUpdate):
         also what plexus2.tex means by operators being pure transformations.
         """
         fld = H.fields[self.field_name]
+        if self.omega_from is not None:
+            self._omega_ext = H.fields[self.omega_from].grid[0]
         v, w = fld.grid[0], fld.grid[1]
         m = self._mask
         for _ in range(self.substeps):

@@ -1,0 +1,49 @@
+# fit_kuramoto_hash -- THE SAME FIT AS fit_kuramoto2d WITH omega HASH-ENCODED, and it exists to
+# test one hypothesis with a number attached.
+#
+# THE HYPOTHESIS. fit_kuramoto2d leaves K at 0.42 against a true 0.90 while its own loss falls.
+# The leading explanation is CAPACITY: r_i = omega_i + K*coupling_i with omega FREE PER PIXEL, so
+# omega can absorb K*coupling at any single instant and only its variation in time distinguishes
+# them. 1,048,576 free numbers against K's one.
+#
+# THE CHANGE, and it is one line of schedule. `omega` stops being a learnable of the Kuramoto
+# operator and becomes a FIELD that a `hash_encoding` operator writes:
+#
+#     schedule: [hash_encoding, kuramoto_known_ode]
+#     kuramoto_known_ode:  omega_from: om,  learn: [K]     <- K is now the ONLY thing it owns
+#
+# 1,048,576 free parameters -> ~90,000 correlated ones, and correlated is the operative word: the
+# encoding is smooth by construction, so it cannot represent a per-pixel value independent of its
+# neighbours', which is exactly the freedom that let omega absorb the coupling.
+#
+# WHAT THIS CANNOT DO, MEASURED BEFORE RUNNING IT so the result is not read as a shortfall. The
+# toy's true omega is a per-disc constant PLUS per-pixel uniform jitter of half-width 0.012. That
+# jitter is 18.5% of omega's variance inside the mask and is spatially WHITE, so no smooth encoding
+# can represent it. A perfect smooth fit scores R^2 0.8155 against the true field; the encoding at
+# 24k parameters reaches 0.8166 and at 364k reaches 0.8324, i.e. it is already AT the ceiling and
+# the rest is it starting to fit noise. So 0.82 IS the target here, not 1.0.
+#
+# THE PREDICTION, stated in advance: if the capacity diagnosis is right, K rises toward 0.90. If K
+# stays near 0.42 with omega's R^2 at its ceiling, the diagnosis was wrong and the obstruction is
+# something else -- which is worth as much as the confirmation.
+general: {name: fit_kuramoto_hash, seed: 42, n_frames: 1200, dt: 1.0, dim: 2, world: 1.0, boundary: periodic, units: {length_um: 1024.0, time_s: 1.0}}
+sets: {}
+fields:
+  v: {frame: grid, res: 1024, components: 2}   # (sin phi, cos phi)
+  om: {frame: grid, res: 1024, components: 1}  # omega, WRITTEN by the encoding, read by the rule
+operators:
+  - {op: hash_encoding, at: om, model: multires_hash, n_levels: 12, log2_hashmap_size: 14,
+     px_per_finest_cell: 8, use_time: false, scale: 0.05, activation: gelu, learn: ["*"]}
+  - {op: kuramoto_known_ode, at: v, dt: 0.25, substeps: 12, K_init: 0.0, omega_from: om, learn: [K]}
+schedule: [hash_encoding, kuramoto_known_ode]
+fit:
+  data: {run: toy2d_fine_noed_simple_p1_none, field: v,
+         split: {train: [0, 870], val: [870, 900], test: [900, 1200]}}
+  batch_frames: 1
+  rollout: {horizon: 2, recurrent: true, weighting: uniform}
+  trainer: {n_iter: 1200, betas: [0.9, 0.95], grad_clip: 32.0, scheduler: cosine_to_zero,
+            groups: [{params: [kuramoto_known_ode.K], lr: 0.02},
+                     {params: ["*"], lr: 0.005}]}
+  operators:
+    - {op: mse_loss, norm: none}
+  schedule: [mse_loss, step]

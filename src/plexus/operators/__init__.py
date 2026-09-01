@@ -15,6 +15,7 @@ other is how anyone can tell which one a spec is getting.
     contact_ops          where a triangulated surface meets a continuum, both directions
     mpm_ops              MLS-MPM: the grid, the four-step cycle, and the forces on it
     motion_ops           how a body moves with nothing acting on it: drag, glide, walls, gravity
+    encoding_ops         a learnable field written from its own coordinates
     interaction_ops      pairwise laws, and the relation they act over
     field_ops            a continuum bound to a set: deposit / diffuse / decay / sense
     agent_ops            agents in a material: the two-way coupling, population, scale maps
@@ -39,6 +40,8 @@ rejection that lives only in a markdown file is one the next reader re-promotes 
 from __future__ import annotations
 
 # --- the mechanism modules -------------------------------------------------------------------
+from . import encoding_ops          # noqa: F401  hash_encoding -- a learnable field from its
+                                   #               own coordinates (Instant-NGP)
 from . import interaction_ops       # noqa: F401  radius_graph, attraction_repulsion, squared_law,
 #                                                 cohesion, separation, velocity_align, stillinger_weber
 from . import motion_ops            # noqa: F401  drag, glide, velocity_cruise, sediment,
@@ -77,6 +80,6 @@ from . import observation           # noqa: F401  voxelize -- a REPRESENTATION, 
 # models.registry only, so there is no cycle back into this package.
 from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
-__all__ = ["interaction_ops", "motion_ops", "field_ops", "mpm_ops", "agent_ops",
+__all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops", "agent_ops",
            "mpm_triton", "mpm_warp", "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
            "contact_ops", "neural", "observation", "continuous_engine"]
