@@ -85,7 +85,13 @@ class ModelHierarchy:
             self.every.append(int(entry.get("every", 1)))
             self.names.append(line["op"])
             self.learn[line["op"]] = list(line.get("learn", []))
+            self._at = getattr(self, "_at", {})
+            self._at[line["op"]] = line.get("at", "")
         self.tick = 0
+
+    def at_of(self, op_name: str) -> str:
+        """Which field an operator acts on, so a caller can give it that field's mask."""
+        return self._at.get(op_name, "")
 
     def bind_shapes(self, masks: dict | None = None):
         """Let operators whose PARAMETER SHAPE is the field's allocate it, now that the field exists.

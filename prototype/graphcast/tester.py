@@ -46,37 +46,43 @@ def run(fit, out_root: str, device: str = "cuda", horizon: int | None = None,
     run_dir = fb.run if os.path.isdir(fb.run) else os.path.join(out_root, fb.run)
     if not os.path.isdir(run_dir):
         raise FileNotFoundError(f"fit.data.run is {fb.run!r}; no such run directory")
-    u = _load_field(run_dir, field, device).float()
+    init_names = list(fb.data.get("init") or [field])
+    fields = {n: _load_field(run_dir, n, device).float()
+              for n in dict.fromkeys(init_names + [field])}
+    u = fields[field]
     n_rec = u.shape[0]
     stride = fb.record_stride or max(1, round(fit.n_frames / max(1, n_rec - 1)))
 
     lo, hi = fb.split.get(split, [0, fit.n_frames])
     a, b = int(lo * n_rec / fit.n_frames), int(hi * n_rec / fit.n_frames)
-    held = u[a:b]
-    if held.shape[0] < 2:
-        raise ValueError(f"the {split!r} split holds {held.shape[0]} records; a rollout needs 2+")
+    held = {k: v[a:b] for k, v in fields.items()}
+    obs = held[field]
+    if obs.shape[0] < 2:
+        raise ValueError(f"the {split!r} split holds {obs.shape[0]} records; a rollout needs 2+")
     K = int(horizon or (fb.rollout or {}).get("horizon", 8))
-    K = min(K, held.shape[0] - 1)
+    K = min(K, obs.shape[0] - 1)
 
     model = ModelHierarchy(fit.path, device=device)
-    mask = (u.abs().amax(dim=0).amax(dim=0) > 1e-12).to(u.dtype)
-    model.bind_shapes({n: mask for n in model.names})
+    masks = {n: (v.abs().amax(dim=0).amax(dim=0) > 1e-12).to(v.dtype) for n, v in fields.items()}
+    mask = masks[field]
+    model.bind_shapes({op: masks.get(model.at_of(op), mask) for op in model.names})
     # THE LEARNED PARAMETERS, read back from the fit's own artifacts. A tester that re-fitted would
     # be reporting a different model from the one the trainer wrote.
     loaded = _load_learned(model, run_dir)
 
-    starts = np.linspace(0, held.shape[0] - K - 1, num=min(n_starts, held.shape[0] - K),
-                         dtype=int) if held.shape[0] > K else np.array([0])
+    starts = np.linspace(0, obs.shape[0] - K - 1, num=min(n_starts, obs.shape[0] - K),
+                         dtype=int) if obs.shape[0] > K else np.array([0])
     true_steps, pred_steps = [], []
     with torch.no_grad():
         for s0 in starts:
-            s = held[int(s0)].clone()
+            # THE LATENT FIELDS ARE GIVEN ONCE, at the window's first frame, and never again --
+            # after that the model carries its own state, which is what makes this a rollout.
+            for name, arr in held.items():
+                model.load(name, arr[int(s0)].clone())
             for k in range(K):
-                model.load(field, s)
                 model.step(stride)                       # ONE RECORD per rollout step
-                s = model.read(field)
-                pred_steps.append(s.detach().cpu().numpy())
-                true_steps.append(held[int(s0) + k + 1].cpu().numpy())
+                pred_steps.append(model.read(field).detach().cpu().numpy())
+                true_steps.append(obs[int(s0) + k + 1].cpu().numpy())
     # [n_starts*K, ...] -> [K, n_starts, ...] so a per-step statistic pools the starts
     P = np.stack(pred_steps).reshape(len(starts), K, *pred_steps[0].shape).transpose(1, 0, *range(2, 2 + pred_steps[0].ndim))
     T = np.stack(true_steps).reshape(len(starts), K, *true_steps[0].shape).transpose(1, 0, *range(2, 2 + true_steps[0].ndim))

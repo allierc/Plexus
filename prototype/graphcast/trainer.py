@@ -74,6 +74,12 @@ def _step_weights(weighting: str, n_steps: int, gamma: float) -> list[float]:
                      f"linear_decay or last)")
 
 
+def _load_all(model, batch, b):
+    """Put sample `b` of every INITIALISED field into the hierarchy."""
+    for name, arr in batch.items():
+        model.load(name, arr[b])
+
+
 def _predict_increment(model, field, x, n_ticks):
     """The model's INCREMENT over `n_ticks` of its own schedule, per tick. `x` is [B, C, *res].
 
@@ -81,19 +87,39 @@ def _predict_increment(model, field, x, n_ticks):
     so a batch is a loop rather than a leading tensor dimension. Slower, and honest: pretending a
     hierarchy is batched is how a model stops being the thing it claims to simulate.
     """
+    batch = x if isinstance(x, dict) else {field: x}
+    n = next(iter(batch.values())).shape[0]
     out = []
-    for b in range(x.shape[0]):
-        model.load(field, x[b])
+    for b in range(n):
+        _load_all(model, batch, b)
+        before = model.read(field)
         model.step(n_ticks)
-        out.append(model.read(field) - x[b])
+        out.append(model.read(field) - before)
     return torch.stack(out)
+
+
+def _predict_state_all(model, batch, n_ticks):
+    """Advance EVERY field the model carries, returning them all -- so a rollout keeps the latent
+    state (`u`, `v`) as well as the observed one (`s`). Re-loading only the observation each step
+    would silently re-anchor the latents to their initial values and make a K-step rollout a
+    sequence of one-step predictions."""
+    n = next(iter(batch.values())).shape[0]
+    outs = {k: [] for k in batch}
+    for b in range(n):
+        _load_all(model, batch, b)
+        model.step(n_ticks)
+        for k in batch:
+            outs[k].append(model.read(k))
+    return {k: torch.stack(v) for k, v in outs.items()}
 
 
 def _predict_state(model, field, x, n_ticks):
     """The model's STATE after `n_ticks`. The rollout path hands the model back its own output."""
+    batch = x if isinstance(x, dict) else {field: x}
+    n = next(iter(batch.values())).shape[0]
     out = []
-    for b in range(x.shape[0]):
-        model.load(field, x[b])
+    for b in range(n):
+        _load_all(model, batch, b)
         model.step(n_ticks)
         out.append(model.read(field))
     return torch.stack(out)
@@ -106,9 +132,10 @@ def _train_step_nominal(train, model, field, losses, stride, batch_frames, devic
     while the model's tick is one; the PREDICTION is not, because it already is a per-frame
     increment. Dividing both was a real bug here and scaled every recovered constant by the stride.
     """
-    j = torch.randint(0, train.shape[0] - 1, (batch_frames,), device=device)
-    x = train[j]
-    target = (train[j + 1] - x) / stride
+    obs = train[field]
+    j = torch.randint(0, obs.shape[0] - 1, (batch_frames,), device=device)
+    x = {k: v[j] for k, v in train.items()}
+    target = (obs[j + 1] - obs[j]) / stride
     pred = _predict_increment(model, field, x, 1)
     return sum(op.forward(pred, target) for op in losses)
 
@@ -138,20 +165,23 @@ def _train_step_recurrent(train, model, field, losses, stride, batch_frames, dev
     prediction against a record that is `stride` frames later would silently fit a velocity that is
     `stride` times too small.
     """
+    obs = train[field]
     K = int(horizon)
-    hi = train.shape[0] - K
+    hi = obs.shape[0] - K
     if hi <= 0:
         raise ValueError(f"rollout horizon {K} needs {K + 1} records; the split holds "
-                         f"{train.shape[0]}")
+                         f"{obs.shape[0]}")
     j = torch.randint(0, hi, (batch_frames,), device=device)
     w = _step_weights(weighting, K, gamma)
-    s = train[j]
+    # THE LATENT FIELDS ARE INITIALISED ONCE, at the start of the window, and then never again:
+    # after step 1 the model carries its OWN u and v forward, so only the first frame is given.
+    state = {k: v[j] for k, v in train.items()}
     total, wsum = 0.0, 0.0
     for k in range(K):
-        s = _predict_state(model, field, s, stride)   # the model's own state, never re-anchored
+        state = _predict_state_all(model, state, stride)
         if w[k] == 0.0:
             continue
-        total = total + w[k] * sum(op.forward(s, train[j + k + 1]) for op in losses)
+        total = total + w[k] * sum(op.forward(state[field], obs[j + k + 1]) for op in losses)
         wsum += w[k]
     return total / max(wsum, 1e-12)
 
@@ -164,7 +194,14 @@ def run(fit, out_root: str, device: str = "cuda", log_every: int = 50) -> dict:
     if not os.path.isdir(run_dir):
         raise FileNotFoundError(f"fit.data.run is {fb.run!r}; no such run directory "
                                 f"(looked in {out_root}). Generate it first.")
-    u = _load_field(run_dir, field, device).float()
+    # `init:` NAMES THE FIELDS THE MODEL IS STARTED FROM; `field:` names the one it is SCORED on.
+    # For a single-mechanism fit they are the same. For a fit on the SUM they are not: the model is
+    # given the latent u and v at the start of a window and scored on the observation s, which
+    # separates "can the parameters be recovered through a superposition" from "can the state be
+    # estimated from it" -- two questions that a single number would confound.
+    init_names = list(fb.data.get("init") or [field])
+    fields = {n: _load_field(run_dir, n, device).float() for n in dict.fromkeys(init_names + [field])}
+    u = fields[field]
     n_rec = u.shape[0]
 
     # THE RECORD STRIDE IS PART OF THE TARGET'S UNIT. Records are `stride` simulation frames apart,
@@ -174,15 +211,19 @@ def run(fit, out_root: str, device: str = "cuda", log_every: int = 50) -> dict:
     stride = fb.record_stride or max(1, round(fit.n_frames / max(1, n_rec - 1)))
     lo, hi = fb.split.get("train", [0, fit.n_frames])
     a, b = int(lo * n_rec / fit.n_frames), int(hi * n_rec / fit.n_frames)
-    train = u[a:b]
+    train = {k: v[a:b] for k, v in fields.items()}
 
     # THE MODEL IS THE SPEC. Loaded from the same file, by plexus.schema, as a Plexus spec.
     model = ModelHierarchy(fit.path, device=device)
     # THE SUPPORT, read off the data: a cell the field is never non-zero at is outside the mask.
     # Exact here because the generator multiplies by it, and it keeps the mask a property of the
     # OBSERVATION rather than a second copy of the generator's config that could drift from it.
-    mask = (u.abs().amax(dim=0).amax(dim=0) > 1e-12).to(u.dtype)
-    model.bind_shapes({n: mask for n in model.names})
+    # A MASK PER FIELD, and each operator gets the one belonging to the field it acts on. Using
+    # the observation's mask everywhere would hand the Kuramoto operator a mask covering the whole
+    # domain, since the sum is non-zero everywhere the coarse rule is.
+    masks = {n: (v.abs().amax(dim=0).amax(dim=0) > 1e-12).to(v.dtype) for n, v in fields.items()}
+    model.bind_shapes({op_name: masks.get(model.at_of(op_name), masks[field])
+                       for op_name in model.names})
 
     ctx = {"field": field, "dim": fit.dim, "device": device, "stride": stride, "model": model}
     ops = {r: [] for r in ops_trainer.ROLES}

@@ -1,7 +1,7 @@
 # toy2d_fine -- the fine rule alone: locally coupled phase oscillators inside four discs.
 # `observables: quadrature` records (sin phi, cos phi). sin alone is a many-to-one observation, so
 # no rule written in phi could be fitted to it; with cos the Kuramoto rule closes in the observables.
-general: {name: toy2d_fine, seed: 42, n_frames: 1200, dt: 1.0, dim: 2, world: 1.0, boundary: periodic, field_record_cap: 240, units: {length_um: 1024.0, time_s: 1.0}}
+general: {name: toy2d_fine, seed: 42, n_frames: 1200, dt: 1.0, dim: 2, world: 1.0, boundary: periodic, field_record_cap: 480, units: {length_um: 1024.0, time_s: 1.0}}
 sets: {probe: {n: 1, spawn: random}}
 fields:
   v: {frame: grid, res: 1024, components: 2}
