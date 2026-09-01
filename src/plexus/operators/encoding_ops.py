@@ -165,6 +165,22 @@ class HashEncoding(FieldUpdate):
         self._shape = tuple(shape)
         return self
 
+    @torch.no_grad()
+    def sample(self, shape=None, t: float = 0.0) -> torch.Tensor:
+        """Evaluate the encoding on an ARBITRARY grid, [C, *shape]. For figures, not for the fit.
+
+        The montage needs each level drawn at ITS OWN lattice -- a level with 12 cells across
+        cannot represent anything finer than 12 cells, and rendering it at 1024 only interpolates
+        that fact into a blur. So the resolution is an argument rather than the bound field's.
+        """
+        shape = tuple(shape or self._shape)
+        axes = torch.meshgrid(*[(torch.arange(n, device=self.device_, dtype=torch.float32) + 0.5)
+                                / n for n in shape], indexing="ij")
+        x = torch.stack([a.reshape(-1) for a in axes], -1)
+        if self.use_time:
+            x = torch.cat([x, torch.full((x.shape[0], 1), float(t), device=x.device)], -1)
+        return (self.head(self.grid(x)) * self.scale).T.reshape(self._out_dim, *shape)
+
     def set_level_window(self, alpha: float) -> None:
         """Coarse-to-fine: enable levels up to `alpha`. Forwarded to the grid; see hashgrid."""
         if self.grid is not None:
