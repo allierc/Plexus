@@ -112,9 +112,9 @@ def run(fit, out_root: str, device: str = "cuda", horizon: int | None = None,
         gt, pr = gt[:, 0], pr[:, 0]                       # drop the channel axis
     mp4 = os.path.join(out_dir, f"rollout_{split}.mp4")
     try:
-        vtk_toy.pair_movie(gt, pr, mp4, labels=(f"ground truth  [{split}]",
-                                                f"inferred  R2 {res['r2_mean']:.3f}  "
-                                                f"r {res['pearson_mean']:.3f}"))
+        vtk_toy.pair_movie(gt, pr, mp4,
+                           labels=(f"ground truth  [{split}]", "inferred"),
+                           per_step=list(zip(res["r2"], res["pearson"])))
         res["movie"] = mp4
         print(f"  movie: {mp4}")
     except Exception as e:                                # a missing renderer must not lose metrics
