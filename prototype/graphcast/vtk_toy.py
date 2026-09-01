@@ -138,7 +138,8 @@ def movie(a, out, label, **kw):
     raise ValueError(f"expected [T, nx, ny] or [T, nx, ny, nz], got {a.shape}")
 
 
-def pair_movie(a, b, out, labels=("ground truth", "inferred"), cmap=CMAP, fps=FPS, clim=None):
+def pair_movie(a, b, out, labels=("ground truth", "inferred"), cmap=CMAP, fps=FPS,
+               clim=None, per_step=None):
     """TWO PANELS, ONE FRAME, ONE COLOUR SCALE: what was recorded beside what the model produced.
 
     THE CLIM IS SHARED AND FIXED FOR THE WHOLE CLIP, and that is the only thing that makes the
@@ -147,6 +148,13 @@ def pair_movie(a, b, out, labels=("ground truth", "inferred"), cmap=CMAP, fps=FP
     that was right; per-frame normalisation would do the same in time. Both panels are drawn
     against the range of the GROUND TRUTH, so a prediction that leaves that range saturates -- which
     is the correct rendering of a prediction that has left the data.
+
+    `per_step` IS PER STEP, AND THAT IS THE POINT OF IT. The first version stamped the rollout's
+    MEAN R^2 on every frame, which is a summary of the whole clip printed over one moment of it --
+    so a frame at step 21 whose own agreement was R^2 0.513 carried the label "-0.123", the mean
+    dragged down by a tail decaying to -0.91 by step 100. The two panels looked alike and the
+    caption said they did not, and the caption was what was wrong. A rollout figure has to report
+    the frame it is showing.
 
     Dispatches on rank exactly as `movie` does, so a 2-D toy and a 3-D toy give the same figure at
     different D.
@@ -186,8 +194,12 @@ def pair_movie(a, b, out, labels=("ground truth", "inferred"), cmap=CMAP, fps=FP
                 g.cell_data["a"] = np.ascontiguousarray(arr[t]).ravel(order="F")
                 actors[k] = p.add_mesh(g, scalars="a", cmap=cmap, clim=[-lim, lim],
                                        lighting=False, show_scalar_bar=False)
-            txts[k] = p.add_text(f"{lab}   step {t + 1}/{a.shape[0]}", position="upper_left",
-                                 font_size=10, color="white")
+            note = ""
+            if per_step is not None and k == 1 and t < len(per_step):
+                r2, rr = per_step[t]
+                note = f"   R2 {r2:.3f}  r {rr:.3f}"
+            txts[k] = p.add_text(f"{lab}   step {t + 1}/{a.shape[0]}{note}",
+                                 position="upper_left", font_size=10, color="white")
             if t == 0:
                 if vol:
                     p.camera_position = "iso"
