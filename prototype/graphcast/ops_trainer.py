@@ -134,11 +134,10 @@ class PlexusModelPredict(TrainerOp):
         """
         out = []
         for b in range(x.shape[0]):
-            self.model.load(self.field, x[b])
-            before = x[b]
+            self.model.load(self.field, x[b])          # x[b] is [C, *res], every channel
             self.model.step(self.steps)
             after = self.model.read(self.field)
-            out.append(after - before if self.target == "increment" else after)
+            out.append(after - x[b] if self.target == "increment" else after)
         return torch.stack(out)
 
 

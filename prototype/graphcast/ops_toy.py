@@ -1,4 +1,21 @@
-"""Two prototype-local operators: a coarse rule and a fine rule, deliberately different.
+"""THE TOY'S GENERATING RULES. Not a model -- this is the world the models are fitted to.
+
+NAMED `ops_toy` AFTER A RENAME. This file was `ops_graphcast.py`, which was wrong in the way a
+filename can quietly be wrong for a long time: it contains no GraphCast operator and never did.
+The name came from the prototype's own name at a time when there was only one file. The four model
+families now each have their own, and the mapping is:
+
+    ops_toy.py         THIS FILE -- the generator. advect_field, kuramoto_field. No parameters.
+    ops_known_ode.py   the true equations with their constants learnable. The upper bound.
+    ops_gnn.py         a general message-passing rule, with `embedding: none | free | ngp`.
+    ops_graphcast.py   the GraphCast form -- edge latents, unshared layers, post-norm residuals.
+    ops_embedding.py   the Instant-NGP ladder-hashtable, shared by the two above.
+
+NOTHING HERE OWNS AN nn.Parameter, and that is the point of the separation. These operators are the
+ground truth; every constant in them is given by the spec and none of it is fitted. Each has a
+learnable twin in one of the files above, and a gate compares the two.
+
+Two prototype-local rules, a coarse one and a fine one, deliberately different.
 
 THE POINT OF THE PAIR. The previous toy failed as a test bed for a reason worth keeping: a single
 global clock drove every neuron, so connected neurons correlated at 0.52, the neighbour message was
@@ -430,9 +447,14 @@ class KuramotoField(Operator):
         self.discs = [[float(x) for x in d] for d in params.get("discs", [])]
         self.tubes = [[float(x) for x in d] for d in params.get("tubes", [])]
         self.seed = int(params.get("seed", 0))
-        self.emit = str(params.get("emit", "sin"))   # "sin" | "quadrature" (also writes cos)
-        if self.emit not in ("sin", "quadrature"):
-            raise ValueError(f"kuramoto_field emit must be 'sin' or 'quadrature', got {self.emit!r}")
+        # NOT CALLED `emit`. `emit:` is a RESERVED Plexus2 spec key whose vocabulary is
+        # base.EMITS = (velocity, acceleration, mpm_acceleration) -- it says what an operator's
+        # delta IS, and the schema rejects anything outside that list. This knob says which
+        # OBSERVABLES of the phase get written to the grid, which is a different question.
+        self.observables = str(params.get("observables", "sin"))
+        if self.observables not in ("sin", "quadrature"):
+            raise ValueError(f"kuramoto_field observables must be 'sin' or 'quadrature', "
+                             f"got {self.observables!r}")
         self._init = False
 
     def _build(self, g):
@@ -494,7 +516,7 @@ class KuramotoField(Operator):
             phi = phi + float(self.dt) * m * (self._omega + self.K * coup)
         self._phi = phi
         fld.grid[self.channel] = torch.sin(phi) * m      # the OBSERVABLE, not the phase
-        if self.emit == "quadrature":
+        if self.observables == "quadrature":
             # w = cos(phi), THE OTHER HALF OF AN OBSERVABLE PAIR AND NOT A LEAK OF THE ANSWER.
             # sin(phi) alone is a many-to-one observation -- it does not determine phi, so no rule
             # written in phi can be fitted to it. With w recorded, the Kuramoto rule closes in the
