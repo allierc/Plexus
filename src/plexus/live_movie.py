@@ -70,7 +70,7 @@ class LiveMovie:
     def __init__(self, out, world, n_frames, up=2, render_n=400_000, max_frames=300,
                  fps=20, px=1280, dot=None, fill=0.9, elev=18.0, azim=-58.0, name="", seed=0,
                  sim=None, style=None, stills=10, keep_stills=False,
-                 dt=None, time_s=None, real_time=True, length_um=None, centred=False):
+                 dt=None, time_s=None, real_time=True, length_um=None, centred=False, can_curve=False):
         # THE SPEC'S `plotting.fps` WAS DECORATIVE. `style` carries it, `fps` was a separate
         # keyword defaulting to 20, and nothing connected them -- so every movie was written at 20
         # regardless of what the spec asked for. It matters twice over now: `fps` sets the mp4's
@@ -292,7 +292,11 @@ class LiveMovie:
         # tissue on the frames where it has grown. Declaring `curve` adds a COLUMN to the right and
         # the camera is shifted left by the same amount below, so the panels sit beside the scene
         # rather than in front of it. A spec with no curves is unchanged, pixel for pixel.
-        _cv = (style or {}).get("curve")
+        # WIDEN ONLY IF THE PANELS WILL BE DRAWN. The curve's axes are fixed over the whole clip, so
+        # only the REPLAY can build them -- and the live path was still reserving the column, giving
+        # a frame a third wider than it needed with a band of black down the right. `can_curve` is
+        # the caller saying which path this is, not a guess from the style.
+        _cv = (style or {}).get("curve") if can_curve else None
         _ncv = 0 if not _cv else (1 if isinstance(_cv, dict) else len(_cv))
         # THE COLUMN IS THE PANEL PLUS A MARGIN, and the ASPECT is what makes the scene fit beside
         # it -- 1 + column is not enough. Parallel projection fits the box to the frame's HEIGHT, so
@@ -349,7 +353,13 @@ class LiveMovie:
         # origin whenever the spec said `free` fought its own caller and framed the corner of an
         # already-corrected scene. The live path passes `centred=True`; the replay does not, because
         # by the time it calls, the content is at [0, box] by construction.
+        # ...AND `centred` IS A HINT, NOT A FACT. `boundary: free` says nothing about WHERE the
+        # content is: a vesicle is built about the origin, an MPM block is seeded inside [0, world],
+        # and a spec with both has one of each. Framed on +-world/2 the gel drew outside the box it
+        # was supposedly in. The hint decides the DEFAULT; the first drawn frame corrects it from
+        # the content's own bounds, which is what `replay` has always done by shifting instead.
         self.free = bool(centred)
+        self._reframe = bool(centred)
         if self.free:
             self.lo, self.hi = -np.array(w) / 2.0, np.array(w) / 2.0
 
@@ -1376,8 +1386,18 @@ class LiveMovie:
             # sphere. Two pictures of one frame disagreeing about the geometry is the worst kind of
             # artefact: it reads exactly like a physics bug. The ranges are set to a common span
             # about the content's centre instead.
-            _ax0, _bx0 = float(np.nanmin(xs)), float(np.nanmin(ys))
-            _ax1, _bx1 = float(np.nanmax(xs)), float(np.nanmax(ys))
+            # CENTRED ON EVERYTHING IN THE PANEL. The range was taken from the PARTICLES alone, so
+            # a surface sitting above them -- the spheroid over the gel, which is the whole point of
+            # the section -- fell outside it and the content sat low and off-centre in its own box.
+            _mx = [xs]; _my = [ys]
+            for _nm, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+                MV = np.asarray(_pd.points)
+                _in = np.abs(MV[:, ax] - y0) < self.cs_cells * dx
+                if _in.any():
+                    _mx.append(MV[_in][:, a]); _my.append(MV[_in][:, b])
+            _cat_x = np.concatenate(_mx); _cat_y = np.concatenate(_my)
+            _ax0, _bx0 = float(np.nanmin(_cat_x)), float(np.nanmin(_cat_y))
+            _ax1, _bx1 = float(np.nanmax(_cat_x)), float(np.nanmax(_cat_y))
             _sp = max(_ax1 - _ax0, _bx1 - _bx0, 1e-9) * 1.06
             _cx, _cy = 0.5 * (_ax0 + _ax1), 0.5 * (_bx0 + _bx1)
             self.cs.x_range = [_cx - _sp / 2, _cx + _sp / 2]
@@ -1480,6 +1500,18 @@ class LiveMovie:
                              f"{', '.join(sorted(_FIELDS))}")
         import torch
         idx = self.idx
+        # A REPLAY HAS NO DEFORMATION GRADIENT. `trajectory.npz` stores positions, occupancy and the
+        # mesh; `F` and `C` are solver state and are not recorded (9 floats per particle per frame
+        # would be 1.8 GB on this run alone). Returning None here reads to the caller as "no colour
+        # was asked for", and the answer to that is the HEIGHT RAMP fixed at t=0 -- so `-o plot`
+        # quietly replaced a strain-coloured movie with a static gradient and said so in one line.
+        if want in ("deformation", "strain", "volume", "pressure", "vorticity") \
+                and getattr(lvl, "F", None) is None and getattr(lvl, "C", None) is None:
+            raise ValueError(
+                f"plotting.color_field: {want!r} needs the per-particle deformation gradient, which "
+                f"a trajectory does not store -- `-o plot` cannot draw it and must not overwrite a "
+                f"correct movie with a height ramp. Render from `-o generate`, or use `speed`, "
+                f"which is computed from the recorded velocities.")
         if want == "speed":
             v = lvl.get("vel")[idx]
             return v.norm(dim=1), "|v| (m/s)"
@@ -1856,6 +1888,7 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
     u = getattr(sim, "units", None)
     dec = bool(getattr(u, "declared", False))
     lm = LiveMovie(out=out, world=list(np.asarray(box, np.float64)), n_frames=T,
+                   can_curve=True,      # a replay holds every frame; the live path does not
                    up=int(style.get("up_axis", 2)), render_n=render_n, max_frames=max_frames,
                    name=name or getattr(sim, "name", ""), sim=sim, style=style,
                    stills=stills, keep_stills=keep_stills,

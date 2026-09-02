@@ -132,7 +132,15 @@ def data_generate(
                                   name=sim.name, sim=sim, style=(sim.plotting or {}),
                                   # A FREE BOUNDARY PUTS NOTHING AT [0, world]: this spec's box is a
                                   # camera hint, and the content is about the origin.
-                                  centred=(str(getattr(sim, "boundary", "") or "").lower() == "free"),
+                                  # `free` SAYS NOTHING ABOUT WHERE THE CONTENT IS. A vesicle is
+                                  # built about the ORIGIN and an MPM block is seeded inside
+                                  # [0, world]; a spec with both has one of each, and framing on
+                                  # +-world/2 then drew the gel outside the box it was in. When
+                                  # there are material points the box is [0, world] and is right.
+                                  centred=(str(getattr(sim, "boundary", "") or "").lower() == "free"
+                                           and not any(k in (sim.sets or {}) for k in
+                                                       ("mpm_particle", "cytosol", "nucleus"))),
+                                  can_curve=False,      # the live path has only the current frame
                                   render_n=_n, stills=(_cfg.get("stills", 10) if _n == _ns[0] else 0),
                                   **{k: v for k, v in _cfg.items() if k != "stills"}))
         hooks.extend(movs)
@@ -251,7 +259,17 @@ def data_generate(
     # the panels, and whichever of `-o generate` / `-o plot` ran LAST decided what `movie.mp4`
     # contains. Re-rendering here off the trajectory that was just written costs one replay and
     # makes the two entry points produce the same file again.
-    if save and (sim.plotting or {}).get("curve") and live_movie is not None:
+    # ...AND ONLY WHEN THE COLOUR SURVIVES THE TRIP. `deformation` and friends are computed from
+    # the per-particle deformation gradient, which the trajectory does not store, so re-rendering
+    # such a spec off disk would REPLACE a correctly coloured movie with one the replay can draw.
+    # The panels are worth less than the field.
+    _cf = str(((sim.plotting or {}).get("color_field", "") or "")).lower()
+    if _cf in ("deformation", "strain", "volume", "pressure", "vorticity"):
+        if (sim.plotting or {}).get("curve"):
+            print(f"[render] plotting.curve declared but `color_field: {_cf}` cannot be recomputed "
+                  f"from a trajectory -- keeping the movie this run just made, panels and all "
+                  f"omitted. Use `color_field: speed` if the panels matter more.", flush=True)
+    elif save and (sim.plotting or {}).get("curve") and live_movie is not None:
         try:
             from plexus import live_movie as _lm, render_vtk as _rv
             if _rv.available():
