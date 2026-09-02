@@ -103,6 +103,18 @@ def data_generate(
         hooks.append(_snap)
 
     movs = []
+    # A MESH SPEC GETS NO POINT MOVIE. `live_movie` draws the largest set that carries positions,
+    # and for a vertex-model run that is the VERTEX set -- a few hundred points scattered on a
+    # surface, in the corner of a world box sized for the grown tissue. The result is a mostly empty
+    # frame that is nonetheless called `movie.mp4`, so the run's headline artefact was the one
+    # picture of it that shows nothing. When the spec has declared `renderer: vtk_mesh` it has said
+    # which renderer it wants; `render_vtk` then writes `movie.mp4` itself.
+    _want = str(((sim.plotting or {}).get("renderer", "") or "")).strip().lower()
+    if live_movie is not None and _want == "vtk_mesh":
+        print("[live-movie] skipped: plotting.renderer is vtk_mesh, so the mesh renderer writes "
+              "movie.mp4 -- a point cloud of a mesh set's vertices is not this run's picture",
+              flush=True)
+        live_movie = None
     if live_movie is not None:
         from plexus.live_movie import LiveMovie
         # SEVERAL MOVIES FROM ONE SIMULATION. At 200 M particles the trajectory is not stored --
@@ -118,6 +130,9 @@ def data_generate(
                                   world=list(sim.world_size), n_frames=sim.n_frames,
                                   up=int((sim.plotting or {}).get("up_axis", 2)),
                                   name=sim.name, sim=sim, style=(sim.plotting or {}),
+                                  # A FREE BOUNDARY PUTS NOTHING AT [0, world]: this spec's box is a
+                                  # camera hint, and the content is about the origin.
+                                  centred=(str(getattr(sim, "boundary", "") or "").lower() == "free"),
                                   render_n=_n, stills=(_cfg.get("stills", 10) if _n == _ns[0] else 0),
                                   **{k: v for k, v in _cfg.items() if k != "stills"}))
         hooks.extend(movs)
@@ -225,4 +240,20 @@ def data_generate(
     # count the rows off a set that HAS them -- `occ` is recorded for every set, spatial or not
     nrec = next(iter(out["sets"].values()))["occ"].shape[0]
     print(f"[generate] done: {nrec} recorded frames -> {data_dir}", flush=True)
+
+    # AND THE MESH RENDERER RUNS HERE, so `-o generate` on a mesh spec still leaves a movie behind.
+    # The point movie was skipped above precisely because it is the wrong picture for this spec; a
+    # generation that therefore produced NO picture would have traded a misleading artefact for a
+    # missing one. It needs `trajectory.npz`, which is why it is after the save and not beside the
+    # skip. `-o plot` reaches the same two files by the same path.
+    if save and _want == "vtk_mesh" and live_movie is None:
+        try:
+            from plexus import render_vtk
+            if render_vtk.available():
+                render_vtk.still(data_dir, style="flat",
+                                 out=os.path.join(data_dir, "3d.png"), name=sim.name)
+                render_vtk.render_all(data_dir, seq=int((sim.plotting or {}).get("vtk_seq", 2)),
+                                      name=sim.name)
+        except Exception as e:                              # noqa: BLE001 -- never lose a finished run
+            print(f"[render] mesh movie unavailable ({type(e).__name__}: {e})", flush=True)
     return data_dir, out

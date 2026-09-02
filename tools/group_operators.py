@@ -73,7 +73,7 @@ flat table is the geometry.
         doc='''"""The 3D vertex model, as one module: seed, geometry, mechanics, growth, division, death, T1.
 
     seed_mesh (alias mesh_seed)  build the closed spherical half-edge surface, once, at frame 0
-    cell_mechanics               the AVM shape energy -- `default` (3D AVM) and `monolayer`
+    cell_mechanics               the vertex-model shape energy -- `default` (3D) and `monolayer`
     cell_divide                  a septum through a face -> two daughters   (default/doubler/timer)
     cell_die                     shrink to a triangle, then extrude
     edge_flip                    the T1 / reversible network reconnection
