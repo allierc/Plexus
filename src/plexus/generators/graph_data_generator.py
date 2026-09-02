@@ -49,7 +49,21 @@ def data_generate(
     folder = pre_folder.rstrip("/")
     data_dir = graphs_data_path(folder, sim.name)
     if erase and os.path.isdir(data_dir):
-        shutil.rmtree(data_dir)
+        # EMPTY THE DIRECTORY, DO NOT REMOVE IT -- because the data root is NFS. When a run is
+        # killed while writing its mp4, NFS keeps the still-open file alive under a silly-rename
+        # `.nfsXXXX` handle and refuses to unlink either it or its parent until the holder exits.
+        # `shutil.rmtree(data_dir)` then dies with `OSError: [Errno 16] Device or resource busy`
+        # and `--force` -- whose entire job is to clear the way -- becomes the thing that blocks
+        # the run. Deleting the CONTENTS and skipping the `.nfs*` handles leaves nothing stale
+        # behind (they vanish by themselves the moment the writer dies) and cannot fail on a
+        # directory that is merely in use.
+        for entry in os.scandir(data_dir):
+            if entry.name.startswith(".nfs"):
+                continue
+            try:
+                shutil.rmtree(entry.path) if entry.is_dir() else os.unlink(entry.path)
+            except OSError as e:
+                print(f"[generate] --force could not remove {entry.name}: {e}", flush=True)
     os.makedirs(data_dir, exist_ok=True)
 
     out_path = os.path.join(data_dir, "simulation.zarr") if save else None
