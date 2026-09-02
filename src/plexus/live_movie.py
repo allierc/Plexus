@@ -583,10 +583,19 @@ class LiveMovie:
             clk = f"\nt = {tick * float(self.dt) * float(self.time_s):.4g} s"
             if abs(getattr(self, "slow_motion", 1.0) - 1.0) > 1e-9:
                 clk += f"   {self.slow_motion:g}x slow"
+        # WHAT THE COLOURS MEAN, ON THE PICTURE. The closing print names the LUT, but a movie is
+        # read frame by frame and by someone who did not run it: a field colouring with no legend is
+        # a colourful picture of an unnamed quantity, and the range matters as much as the name
+        # since it is FIXED for the whole movie by design.
+        _lut = ""
+        if self.colour_by and self.colour_by != "?" and str(self.style.get("color_field", "") or ""):
+            # `colour_by` ALREADY CARRIES THE RANGE AND THE MAP -- `_rgb_field` builds it as
+            # "<label> <range> (<cmap>)" -- so appending them here printed each of them twice.
+            _lut = f"\ncolour = {self.colour_by}"
         self.p.add_text(f"{self.name}{self._box_label}\n"
                         f"{self.n:,} particles{sub}{self._grid_label}\n"
                         f"frame {tick}/{self.n_frames}   "
-                        f"{el / max(tick, 1) * 1000:.0f} ms/frame {self._rate_of}{clk}",
+                        f"{el / max(tick, 1) * 1000:.0f} ms/frame {self._rate_of}{clk}{_lut}",
                         position="upper_left", font_size=11, color="white", name="hdr")
         if self.cs is not None:
             self._update_cross_section(H)
@@ -835,10 +844,19 @@ class LiveMovie:
             if lvl is None:
                 from plexus.live_movie import _biggest_particle_set
                 lvl = H.level(_biggest_particle_set(H))
-            X = lvl.get("pos").detach()
+            # THE SECTION READS THE SAME PARTICLES THE 3D VIEW DRAWS. `_field` is computed over
+            # `self.idx` -- the drawn subset -- so a section built from every particle in the level
+            # could not be coloured by it: the two arrays are different lengths, and lining them up
+            # by slicing twice in different orders is how a colouring ends up on the wrong points.
+            # One index space, used for the positions and the values alike.
+            import torch as _t
+            I = self.idx if self.idx is not None else _t.arange(int(lvl.n),
+                                                                device=lvl.state.device)
+            X = lvl.get("pos").detach()[I]
             occ = getattr(lvl, "occ", None)
-            if occ is not None:
-                X = X[occ > 0]
+            live = (occ[I] > 0) if occ is not None else None
+            if live is not None:
+                X = X[live]
             if X.shape[0] == 0:
                 return
             ax, (a, b) = self.cs_axis, self._cs_lat
@@ -848,11 +866,10 @@ class LiveMovie:
                     dx = float(fc.dx)
                     break
             y0 = self.cs_at * float(self.world[ax])
-            sel = (X[:, ax] - y0).abs() < self.cs_cells * dx
-            P = X[sel]
-            if P.shape[0] > self.cs_max:            # a slab of a big jet is tens of thousands
-                step = P.shape[0] // self.cs_max + 1
-                P = P[::step]
+            keep = _t.nonzero((X[:, ax] - y0).abs() < self.cs_cells * dx).squeeze(1)
+            if keep.numel() > self.cs_max:          # a slab of a big jet is tens of thousands
+                keep = keep[:: keep.numel() // self.cs_max + 1]
+            P = X[keep]
             # THE SERIES IS REPLACED, NOT UPDATED. `update()` swaps the arrays and the rendered
             # panel keeps whatever it drew first: 81,583 particles spanning the full column were
             # handed over every frame while the picture still showed the inlet sheet from frame 0.
@@ -863,12 +880,42 @@ class LiveMovie:
             # compares PIXELS between frames rather than state.
             xs = P[:, a].cpu().numpy()
             ys = P[:, b].cpu().numpy()
-            try:
-                self.cs.remove_plot(self._cs_series)
-            except Exception:                            # noqa: BLE001
-                pass
-            self._cs_series = self.cs.scatter(xs, ys, size=self._cs_size, style="o",
-                                              color=self._cs_colour)
+            for _s in ([self._cs_series] if not isinstance(self._cs_series, list)
+                       else self._cs_series):
+                try:
+                    self.cs.remove_plot(_s)
+                except Exception:                        # noqa: BLE001
+                    pass
+            # THE SECTION CARRIES THE SAME FIELD AS THE 3D VIEW, IN BANDS. `Chart2D.scatter` takes
+            # ONE colour for a whole series, so a per-point colouring is not available -- and a
+            # section drawn in flat blue next to a 3D view drawn in `deformation` invites the reader
+            # to compare two pictures of different quantities. One series per band of the SAME fixed
+            # range is the same LUT, quantised: 12 steps is finer than the eye reads off a colour
+            # bar anyway, and it costs twelve chart plots a frame instead of one.
+            self._cs_series = []
+            fld = str(self.style.get("color_field", "") or "")
+            val = self._field(H, lvl)[0] if fld else None
+            if val is not None:
+                import matplotlib.pyplot as _plt
+                v = val.detach()
+                v = (v[live] if live is not None else v)[keep].float().cpu().numpy()
+                rng = getattr(self, "_frng", None) or self.style.get("color_range")
+                lo, hi = ((float(rng[0]), float(rng[1])) if rng and len(rng) == 2
+                          else (float(np.nanmin(v)), float(np.nanmax(v))))
+                nb = int(self.style.get("cross_section_bands", 12))
+                cm = _plt.get_cmap(self.style.get("field_cmap", "turbo"))
+                q = np.clip(((v - lo) / max(hi - lo, 1e-12) * nb).astype(int), 0, nb - 1)
+                for k in range(nb):
+                    m_ = q == k
+                    if not m_.any():
+                        continue
+                    c = cm((k + 0.5) / nb)
+                    self._cs_series.append(self.cs.scatter(
+                        xs[m_], ys[m_], size=self._cs_size, style="o",
+                        color=(int(c[0] * 255), int(c[1] * 255), int(c[2] * 255), 255)))
+            else:
+                self._cs_series.append(self.cs.scatter(xs, ys, size=self._cs_size, style="o",
+                                                       color=self._cs_colour))
             # AND THE SURFACE'S PROFILE THROUGH THE SAME SLAB. The section exists because a
             # compressed slab is an opaque silhouette from outside; leaving the indenter out of it
             # would show the dimple with nothing making it. Vertices inside the slab, ordered along
@@ -880,16 +927,34 @@ class LiveMovie:
                     pass
             self._cs_mesh_series = []
             _mc = (self.style or {}).get("mesh_color", "#e6dcc0")
+            # A TRUE PLANE SLICE OF THE SURFACE, NOT ITS VERTICES SORTED BY x.
+            #
+            # Taking the vertices inside the slab and joining them in order of one in-plane
+            # coordinate is right for a PLATE, whose slab-band is a single row, and wrong for
+            # anything closed: a sphere's band is a whole belt of vertices, so x-ordering zigzags
+            # back and forth across it and fills the disc in solid -- which is what a 400-face
+            # sphere drew. `slice` intersects the polygons with the plane and returns the curve
+            # itself; `strip` then joins the segments into ordered polylines, so one series per
+            # closed loop and no ordering to invent.
+            _nrm = [0.0, 0.0, 0.0]; _nrm[ax] = 1.0
+            _org = [0.0, 0.0, 0.0]; _org[ax] = y0
             for _nm, _nv, _pd in getattr(self, "_meshes", []) or []:
-                MV = H.level(_nm).get("pos")[:_nv].detach()
-                _in = (MV[:, ax] - y0).abs() < self.cs_cells * dx
-                if int(_in.sum()) < 2:
-                    continue
-                _mx = MV[_in][:, a].cpu().numpy()
-                _my = MV[_in][:, b].cpu().numpy()
-                _o = np.argsort(_mx)
-                self._cs_mesh_series.append(
-                    self.cs.line(_mx[_o], _my[_o], color=_mc, width=2.0))
+                try:
+                    _sl = _pd.slice(normal=_nrm, origin=_org)
+                    if _sl.n_points < 2:
+                        continue
+                    _pts, _ln = _sl.points, _sl.lines
+                    _st = _sl.strip(join=True) if _sl.n_lines else _sl
+                    _pts, _ln = _st.points, _st.lines
+                    i = 0
+                    while i < len(_ln):
+                        n_ = int(_ln[i]); ids = _ln[i + 1: i + 1 + n_]; i += n_ + 1
+                        if n_ < 2:
+                            continue
+                        self._cs_mesh_series.append(
+                            self.cs.line(_pts[ids, a], _pts[ids, b], color=_mc, width=2.0))
+                except Exception:                        # noqa: BLE001 -- the section is not the run
+                    pass
         except Exception as e:                       # noqa: BLE001 -- a panel must never kill a run
             if not getattr(self, "_cs_warned", False):
                 self._cs_warned = True
@@ -1124,7 +1189,15 @@ class LiveMovie:
         sub = f", {self.drawn:,} of them drawn" if self.drawn < self.n else ""
         print(f"[live-movie] {self.out}   {self.n:,} particles{sub}, {self.rendered} frames"
               f"{'' if self.stride == 1 else f' (every {self.stride}th)'}, "
-              f"coloured by {self.colour_by}, dot {self.px_used:.2f} px"
+              # `px_used` IS None WHENEVER THE DOTS WERE NOT DRAWN -- `render_3d: surface` never
+              # calls `_dot_px` -- and `{None:.2f}` raises. It raised in `close()`, i.e. AFTER every
+              # frame was written and before the writer was closed, so the run "succeeded", the
+              # summary never printed, and the mp4 was left unfinalised. A reporting line must not
+              # be able to cost the artefact it is reporting on.
+              f"coloured by {self.colour_by}"
+              + (f", dot {self.px_used:.2f} px" if self.px_used is not None
+                 else f", surface ({self._surf.n_faces_strict:,} faces)"
+                 if getattr(self, "_surf", None) is not None else "")
               + (f", {self.n_obstacles} obstacle(s)" if self.n_obstacles else "")
               + (f", {self.stills_written} stills + 3d.png" if self.stills_written
                  else (f", {getattr(self, '_removed_stills', 0)} stills removed, 3d.png kept"

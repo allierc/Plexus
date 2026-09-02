@@ -1,14 +1,19 @@
-# MESH-MPM 00 -- the FLAT PLATE: an open planar patch pressed into an elastic gel.
+# MESH-MPM 02 -- the INVERTED PYRAMID: a four-sided tip, apex down, driven into the same gel.
 #
-# THE BASE OF THE LADDER, and the awkward case for the contact rather than the easy one. An
-# open patch has no interior for the star-shape reference to sit in, so `centre_offset` puts it
-# 0.30 above the plate, in the body of the piston -- put it IN the plate's plane and the ray
-# cast is degenerate, put it below and the plate pushes upward. Neither crashes; both report
-# zero contacts, which reads as nothing happened.
+# THE NANOINDENTER'S GEOMETRY. `profile: pyramid` displaces the same lattice `seed_plate`
+# already builds -- apex at the declared `height`, four faces rising by `profile_depth` to the
+# rim -- so the shape mask (sheet/disc/hole/grid) and the out-of-plane profile stay orthogonal
+# and a conical tip is `disc` + `cone` from the same seeder.
 #
-# A FLAT PUNCH loads a fixed area from the moment it touches, and its pressure is singular at
-# the rim. That is the whole difference from the sphere: same material, same depth, a load
-# history that starts at full area instead of growing into it.
+# 0.12 OF RISE OVER 0.25 OF HALF-WIDTH is a half-angle of 64.4 deg from the axis -- between a
+# Vickers (68) and a sharper tip, quoted as an equivalent cone. It is declared as a RISE and
+# not as an angle because the angle also depends on `half_width`, and two numbers pinning one
+# geometry is one too many; the operator prints the angle it implies.
+#
+# WHY THIS IS THE HARD RUNG. A sharp tip concentrates the whole load on the few particles at
+# the apex, so it is where a penalty contact is most likely to be seen letting material
+# through -- and where `height` meaning THE TOOL'S LOWEST POINT matters, since the apex touches
+# 0.12 before the rim would.
 #
 # THE LADDER'S SHARED PART, IDENTICAL IN ALL THREE RUNGS. Same gel (E = 30 stress units = 200 Pa at
 # this calibration, a 1-3 mg/ml collagen I gel), same 500,000 material points, same warp solver,
@@ -34,7 +39,7 @@
 # contact's direction-bin grid from 90 rows to 150 for a geometry that never changed.
 
 general:
-  name: mesh_mpm_sheet_elastic
+  name: mesh_mpm_pyramid_elastic
   seed: 0
   n_frames: 400
   dt: 0.0032
@@ -106,6 +111,8 @@ operators:
   centre:
   - 0.5
   - 0.5
+  profile: pyramid
+  profile_depth: 0.12
   standoff: 0.3
 - op: surface_drive
   at: vertex

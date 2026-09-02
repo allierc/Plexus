@@ -1,14 +1,14 @@
-# MESH-MPM 00 -- the FLAT PLATE: an open planar patch pressed into an elastic gel.
+# MESH-MPM 01 -- the SPHERE: a closed vertex surface driven into the same elastic gel.
 #
-# THE BASE OF THE LADDER, and the awkward case for the contact rather than the easy one. An
-# open patch has no interior for the star-shape reference to sit in, so `centre_offset` puts it
-# 0.30 above the plate, in the body of the piston -- put it IN the plate's plane and the ray
-# cast is degenerate, put it below and the plate pushes upward. Neither crashes; both report
-# zero contacts, which reads as nothing happened.
+# THE CONTACT'S NATIVE CASE, WHICH MAKES IT THE CONTROL. For a closed star-shaped shell the
+# forbidden region IS the shell's interior, so `centre: centroid` needs no offset: there is no
+# standoff to choose and no degenerate ray to avoid. The plate and the pyramid are the awkward
+# cases; this is the one `mesh_contact` was written for, and all three now run one code path.
 #
-# A FLAT PUNCH loads a fixed area from the moment it touches, and its pressure is singular at
-# the rim. That is the whole difference from the sphere: same material, same depth, a load
-# history that starts at full area instead of growing into it.
+# A HERTZIAN CONTACT: the patch GROWS with indentation, so the gel is loaded through a
+# different history from the flat punch's at the same final depth. `seed_mesh` builds the shell
+# as a spherical Voronoi tessellation -- 400 faces -- which is the same seeder 461 okuda specs
+# use for an epithelium, here carrying no biology and only its geometry.
 #
 # THE LADDER'S SHARED PART, IDENTICAL IN ALL THREE RUNGS. Same gel (E = 30 stress units = 200 Pa at
 # this calibration, a 1-3 mg/ml collagen I gel), same 500,000 material points, same warp solver,
@@ -34,7 +34,7 @@
 # contact's direction-bin grid from 90 rows to 150 for a geometry that never changed.
 
 general:
-  name: mesh_mpm_sheet_elastic
+  name: mesh_mpm_sphere_elastic
   seed: 0
   n_frames: 400
   dt: 0.0032
@@ -74,9 +74,9 @@ sets:
   vertex:
     n: 4096
     mesh: half_edge
-    cell_set: plate_face
-  plate_face:
-    n: 2304
+    cell_set: sphere_face
+  sphere_face:
+    n: 512
   mpm_particle:
     n: 500000
     types:
@@ -96,17 +96,17 @@ fields:
     frame: mpm_grid
     n_grid: 64
 operators:
-- op: seed_plate
+- op: mesh_seed
   at: vertex
-  shape: sheet
-  nq: 48
-  half_width: 0.25
-  axis: 1
-  height: 0.46
+  n_cells: 400
+  radius: 0.15
   centre:
   - 0.5
+  - 0.61
   - 0.5
-  standoff: 0.3
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
 - op: surface_drive
   at: vertex
   axis: 1
@@ -121,10 +121,6 @@ operators:
   n_grid: 64
   a_max: 100000.0
   centre: centroid
-  centre_offset:
-  - 0.0
-  - 0.3
-  - 0.0
 - op: mpm_strain
   at: mpm_particle
   implementation: warp
@@ -148,7 +144,7 @@ operators:
   at: mpm_particle
   n_grid: 64
 schedule:
-- seed_plate
+- mesh_seed
 - surface_drive
 - substep_dt: 0.0004
   steps:
