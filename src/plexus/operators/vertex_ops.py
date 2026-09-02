@@ -558,7 +558,33 @@ class ShapeEnergy3D(Lateral):
                     deg = torch.zeros(Nv, device=x.device, dtype=x.dtype).index_add(0, es, ones).clamp(min=1)
                     xs = (1 - self.smooth_w) * x + self.smooth_w * (nbr / deg[:, None])
                     x = xs * (x.norm(dim=1, keepdim=True) / xs.norm(dim=1, keepdim=True).clamp(min=1e-9))  # keep on shell
-        v_full[:Nv] = (x - x0) / max(self.dt, 1e-9)
+        # DIVIDED BY THE ENGINE'S dt, NOT BY THIS OPERATOR'S, so the two cancel BY CONSTRUCTION.
+        #
+        # This is a UNIT CONVERSION and nothing else: the relaxation above solved a DISPLACEMENT
+        # (`x - x0`), using `eta`, `cap_frac` and `relax_iters`, none of which involve a timestep.
+        # `EMIT = "velocity"` means the engine will apply `pos += v * general.dt`, so the only
+        # divisor that returns the displacement actually solved is `general.dt`.
+        #
+        # IT USED TO DIVIDE BY `self.dt`, and the two cancelled in every spec ever written because
+        # both were 1.0. The moment a spec lowered `general.dt` to co-schedule an MPM continuum --
+        # 0.0032 -- and left this at 1.0, the tissue relaxed at 0.32% of the rate it had solved for:
+        # a vesicle that reaches 7,814 cells reached 270. NOTHING LOOKED WRONG. The shell stayed
+        # round, every shape diagnostic passed, the contact behaved; it read as a growth-rate
+        # problem and it was a unit-of-time problem, and it took a spec-for-spec ablation to find.
+        # A parameter that must always equal another parameter is not a parameter.
+        #
+        # BIT-IDENTICAL FOR THE CORPUS: 1,606 of the 1,610 operator lines that declare a `dt` in
+        # `config/` already set it to their spec's `general.dt`, so the ratio was already 1. The
+        # four that did not were the specs this was found in.
+        _dt = float(getattr(H, "dt", self.dt) or self.dt)
+        if "dt" in self.params and abs(float(self.params["dt"]) - _dt) > 1e-12 * max(_dt, 1.0) \
+                and not getattr(self, "_dt_warned", False):
+            self._dt_warned = True
+            from plexus.paths import warn
+            warn(f"[warn] cell_mechanics: `dt: {self.params['dt']}` is IGNORED -- the divisor is "
+                 f"general.dt ({_dt}) so that the engine's own multiplication cancels it. Remove "
+                 f"the parameter; leaving it in the spec suggests a knob that is not there.")
+        v_full[:Nv] = (x - x0) / max(_dt, 1e-9)
         if mask is not None:
             v_full = v_full * mask[:, None].float()
         return {self.at: v_full}

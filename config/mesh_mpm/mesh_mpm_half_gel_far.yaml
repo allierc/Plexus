@@ -1,0 +1,240 @@
+# MESH-MPM 08 -- THE GEL ADDED TO THE WORKING TISSUE, and placed OUT OF REACH.
+#
+# THE LADDER RUNS THIS WAY ROUND NOW, and the earlier direction was the mistake. Starting from a
+# working gel and adding tissue operators one at a time cannot work, because the tissue's stack is
+# not decomposable: `mesh_seed + cell_geometry + cell_grow + cell_mechanics + edge_flip +
+# cell_divide + junction_sync` is the minimal thing that stays a sphere, and any subset of it
+# degrades. Measured -- a shell driven by scaling with `cell_divide` and nothing else reaches a
+# radius spread of 0.267 of its mean, against 0.002 for the full stack.
+#
+# SO THE TISSUE IS `mesh_mpm_spheroid_half` UNCHANGED, and the gel is added around it. Two edits,
+# both declared and neither dynamical:
+#
+#   the tissue moves to [25, 25, 25]    MPM lives in [0, world] and the vesicle is built about the
+#                                       ORIGIN, so they cannot share a box until one moves.
+#   `cell_mechanics centre:` follows    `K_R` penalises (|pos| - R0)^2 from the WORLD ORIGIN, so a
+#                                       translated tissue is torn apart by the one term that is not
+#                                       translation-invariant. Every other term is, which is why
+#                                       evaluating the energy on `p - centre` changes only this one.
+#
+# WHETHER THAT IS REALLY "UNCHANGED" IS THE FIRST THING THIS RUN REPORTS: cell count and radius are
+# compared against `mesh_mpm_spheroid_half` frame for frame. If they differ, the translation is not
+# neutral and nothing downstream is worth reading.
+#
+# THE GEL IS OUT OF REACH ON PURPOSE. Its top is at z = 10 and the shell's lower pole reaches
+# 25 - 9.3 = 15.7, so `mesh_contact` is scheduled and never fires. That is the point: the contact
+# and the 300,000 material points are PRESENT, so this run tests that they are inert -- which a
+# separate experiment already showed (a no-gel and a no-MPM run came out bit-identical) and which
+# should now hold with the tissue that actually works.
+
+general:
+  name: mesh_mpm_half_gel_far
+  seed: 0
+  n_frames: 401
+  dt: 1.0
+  record_cap: 403
+  boundary: free
+  dim: 3
+  world:
+  - 50.0
+  - 50.0
+  - 50.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+    force_nN: 0.6666666666666666
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 60
+  mesh_color: '#cfd8e3'
+  real_time: false
+  slow_motion: 2
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    ticks: 4
+  render_3d: surface
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  mesh_flat: true
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+sets:
+  vertex:
+    n: 25584
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 12800
+    state:
+      area:
+        width: 1
+      cen:
+        width: 3
+      chem:
+        width: 2
+        integration: first_order
+  mpm_particle:
+    n: 300000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 10.0
+        - 10.0
+        - 2.0
+        - 40.0
+        - 40.0
+        - 10.0
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: mesh_seed
+  at: vertex
+  before_frame: 1
+  cell_set: cell
+  n_cells: 200
+  radius: 2.5
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+  centre: &id001
+  - 25.0
+  - 25.0
+  - 25.0
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  cell_set: cell
+  rate: 0.003457
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
+- op: junction_myosin
+  at: vertex
+  activity: 1.0
+  tau: 20.0
+  beta: 1.0
+  myo_new: 1.0
+  dt: 1.0
+  inherit: true
+  keyed_on: length
+  destabilising: true
+  k_perim: 1.0
+  lam: 0.0
+  gam: 0.0
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  centre: centroid
+  k_frac: 0.45
+  mu: 0.4
+  dt: 1.0
+  n_grid: 64
+  a_max: 100000.0
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 0.25
+  K_V: 8.0
+  K_R: 0.4
+  Lambda: 0.375
+  Gamma: 0.1
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  centre: *id001
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: cell_divide
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.12
+- op: junction_sync
+  at: vertex
+  myo_new: 1.0
+  inherit: true
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- mesh_seed
+- cell_geometry
+- cell_grow
+- junction_myosin
+- substep_dt: 0.05
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- cell_mechanics
+- edge_flip
+- cell_divide
+- junction_sync
+- topo_record
+- mesh_inside
