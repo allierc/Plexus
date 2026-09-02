@@ -1,0 +1,179 @@
+# MESH-MPM 03h -- THE SAME TISSUE AT HALF THE RADIUS, with cells four times smaller.
+#
+# `mesh_mpm_spheroid_nominal.yaml` WITH FIVE NUMBERS CHANGED, and they are not free choices: two are
+# the experiment and three are what the experiment costs.
+#
+#   radius   5.0  -> 2.5      the experiment
+#   n_cells  200  -> 200      unchanged, so at half the radius the CELL is 4x smaller
+#   K_P      1.0  -> 0.25     |
+#   Lambda   3.0  -> 0.375    |  the rescale, derived below
+#   Gamma    0.4  -> 0.1      |
+#   K_V      2.0  -> 8.0      |
+#
+# THE VERTEX ENERGY IS NOT INVARIANT UNDER A DILATION. Its terms carry different powers of length, so
+# shrinking the shell with the constants held fixed changes which of them wins -- at radius 0.15 with
+# 200 cells the line tension came to outweigh everything and the shell crumpled under no load at all
+# (Lambda/K_A reached 1.95e7 against 602 at radius 5). Per CELL, with area A and shell radius R:
+#
+#     K_A A^2      K_P A       K_V A^2 R^2       Lambda sqrt(A)      Gamma A
+#
+# so holding every ratio to K_A A^2 fixed under A -> A/4 and R -> R/2 gives K_P/4, Lambda/4^1.5,
+# Gamma/4 and K_V x4. MEASURED against the reference, and all four land within 1%:
+#
+#     spec                        cell area   K_P/K_A   K_V/K_A   Lambda/K_A   Gamma/K_A
+#     nominal   R5.0  N200            1.551     9.704      5.40        601.9       194.1
+#     this      R2.5  N200            0.388     9.665      5.399       599.3       193.3
+#     (this, unscaled)                0.388     38.66      5.399        4794       773.2
+#
+# WHY SMALLER CELLS AND NOT FEWER. Quartering the cell count with the radius keeps the cell fixed and
+# needs only K_V x4 -- simpler, and it was the first version of this file. But 50 faces is too coarse
+# for what comes next: `mesh_contact`'s direction-bin lookup rails at its 4-row floor on a 50-face
+# sphere and asks for gigabytes. A tessellation the contact can use is worth four derived constants.
+#
+# THE WORLD IS NOT CHANGED. The two runs share a scene, so the half-size shell renders half the size
+# instead of being re-framed to fill the same picture, and the comparison is one a reader can make by
+# looking.
+
+general:
+  name: mesh_mpm_spheroid_half
+  seed: 0
+  n_frames: 401
+  dt: 1.0
+  record_cap: 403
+  boundary: free
+  dim: 3
+  world:
+  - 50.0
+  - 50.0
+  - 50.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 60
+  mesh_color: '#cfd8e3'
+  real_time: false
+  slow_motion: 2
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    font_size: 9
+    ticks: 4
+    size:
+    - 0.3
+    - 0.26
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    font_size: 9
+    ticks: 4
+    size:
+    - 0.3
+    - 0.26
+sets:
+  vertex:
+    n: 25584
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 12800
+    state:
+      area:
+        width: 1
+      cen:
+        width: 3
+      chem:
+        width: 2
+        integration: first_order
+fields: {}
+operators:
+- op: mesh_seed
+  at: vertex
+  before_frame: 1
+  cell_set: cell
+  n_cells: 200
+  radius: 2.5
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  cell_set: cell
+  rate: 0.003457
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
+- op: junction_myosin
+  at: vertex
+  activity: 1.0
+  tau: 20.0
+  beta: 1.0
+  myo_new: 1.0
+  dt: 1.0
+  inherit: true
+  keyed_on: length
+  destabilising: true
+  k_perim: 1.0
+  lam: 0.0
+  gam: 0.0
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 0.25
+  K_V: 8.0
+  K_R: 0.4
+  Lambda: 0.375
+  Gamma: 0.1
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: cell_divide
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.12
+- op: junction_sync
+  at: vertex
+  myo_new: 1.0
+  inherit: true
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- mesh_seed
+- cell_geometry
+- cell_grow
+- junction_myosin
+- cell_mechanics
+- edge_flip
+- cell_divide
+- junction_sync
+- topo_record
