@@ -1702,6 +1702,20 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         for _j, (nm, ob, sel, (after_frame, before_frame, every)) in enumerate(inst):
             if nm != token or _j not in _want:
                 continue
+            # ROW 0 IS THE INITIAL CONDITION, NOT THE STATE AFTER A PASS. The loop runs the schedule,
+            # integrates, and THEN records, so tick 0's row was the seeded state plus one full update
+            # -- and nothing in a trajectory showed what the run actually started from. Measured on
+            # myosin_mesh_x20: at row 0 the cell areas are still identical between the two halves
+            # (ratio 0.998, so the seeding is even), but the myosin already reads 1.037 and 1.827
+            # against the 1.0 every junction is born with. The first frame of every movie was
+            # therefore a frame of physics presented as the initial condition.
+            #
+            # At tick 0 only `seed` and `aggregate` kinds run: the first builds the body, the second
+            # derives the geometry (area, centroid) that makes the recorded row meaningful without
+            # advancing anything. Every kind that CHANGES state -- structural, lateral, rewire --
+            # starts at tick 1.
+            if tick == 0 and _ic and getattr(type(ob), "KIND", None) not in ("seed", "aggregate"):
+                continue
             if not (after_frame <= tick < before_frame):
                 continue                                 # engine-level frame gate (skip = no delta, no RNG drawn)
             if every > 1 and tick % every != 0:
@@ -1722,6 +1736,12 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             f"integrates it); only structural / derived-readout operators "
                             f"(MAY_MUTATE_INTEGRATED_STATE) may write state. (integration invariant)")
 
+    # `general.record_ic: false` restores the old off-by-one for a run that has to reproduce a
+    # trajectory recorded before this was fixed.
+    _ic = bool(getattr(sim, "record_ic", True))
+    if _ic:
+        print("[engine] frame 0 is the INITIAL CONDITION: only seed/aggregate operators run on "
+              "tick 0, so the first recorded row is what the run started from", flush=True)
     ticks = range(sim.n_frames + 1)
     if progress:                                     # live progress bar over the simulated frames
         try:

@@ -14,11 +14,10 @@ general:
     length_um: 10.0
     time_s: 600.0
 plotting:
-  renderer: vtk_mesh
+  renderer: vtk_points
   background: black
   edge_color: type
   edge_width: 3.0
-  show_division: false
   colors:
     soft:
     - 0.35
@@ -29,18 +28,17 @@ plotting:
     - 0.35
     - 0.25
   curve:
-    xlabel: frame
-    ylabel: myosin
+  - quantity: myosin
     ymin: 0.0
-    ymax: 5.0
-    font_size: 9
+    ymax: 6.0
     ticks: 4
-    size:
-    - 0.3
-    - 0.26
-    loc:
-    - 0.66
-    - 0.71
+  - quantity: cells
+    ymin: 0.0
+    ymax: 1000.0
+    ticks: 4
+  real_time: false
+  fps: 20
+  movie_max_frames: 200
 sets:
   vertex:
     n: 25584
