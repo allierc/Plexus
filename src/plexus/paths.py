@@ -117,6 +117,20 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("promotion",   ()),
     ("gates",       ()),
     ("atlas",       ()),
+    # THE MESH-MPM INTERACTION LADDER. A prescribed vertex surface pressed into an MPM continuum
+    # through `mesh_contact` -- the one coupling in the promoted vocabulary that neither the gates
+    # nor the corpus exercise on anything but a growing sphere. No trigger substrings, for the same
+    # reason the three above have none: `mesh` and `mpm` both appear in names all over the corpus,
+    # and inferring this folder from either would sweep vertex and material specs into a directory
+    # nobody chose. Named by folder: `mesh_mpm/<name>` -- or by the ANCHORED trigger below.
+    #
+    # `^mesh_mpm` IS SAFE WHERE A BARE `mesh` OR `mpm` WOULD NOT BE. An anchored trigger matches
+    # only at position 0, so it claims exactly the names this folder's specs already carry and
+    # nothing else; the hazard the paragraph above describes is SUBSTRING matching, which this is
+    # not. Without it `mesh_mpm_sheet_elastic` matched `mpm` at position 5 and resolved to
+    # `config/mpm/`, a folder that does not exist on disk -- so the bare name could not be run at
+    # all, and the error named a missing directory rather than the rule that sent it there.
+    ("mesh_mpm",    ("^mesh_mpm",)),
     # THE COMPOSED-CELL LADDER. A cell built from heterogeneous substrates -- a nucleus, a cytosol
     # of two protein species, a membrane -- each its own contained set (`config/cell/`, appendix
     # "Making a cell in Plexus"). No trigger substrings, for the same reason the three above have
