@@ -1,0 +1,235 @@
+# MESH-MPM 11 -- IN CONTACT, and the gel drawn as the MATERIAL POINTS it is.
+#
+# `mesh_mpm_half_gel_twin.yaml` with the slab enlarged and raised into the spheroid's path. The twin
+# stopped at z = 0.30 against a mapped shell whose lower pole ends at 0.350, so the two never met and
+# `mesh_contact` reported zero all run -- which is what made it a twin. Here the slab is
+# [0.05, 0.05, 0.05] to [0.95, 0.95, 0.44] with 500,000 points, so the pole crosses the surface at a
+# shell radius of 0.06 and indents it by 0.44 - 0.350 = 0.09 by the end.
+#
+# THE TISSUE IS STILL UNTOUCHED. It lives at the ORIGIN in its own units and `mesh_contact` maps it
+# in at the point of use (`scale: 0.0161`, `centre: [0.5, 0.5, 0.5]`), which is gate 04's own device
+# and what keeps `cell_mechanics`'s origin-referenced radial term correct. The twin established that
+# this arrangement reproduces `mesh_mpm_spheroid_half` frame for frame with the gel present and the
+# contact silent, so anything that differs from here is the contact and nothing else.
+#
+# `render_3d: dots`, NOT `surface`, BECAUSE THE SUBJECT IS THE DEFORMATION. The skinned isosurface
+# is built ONCE at rest and thereafter ridden by the particles, which is the right picture for a
+# SHAPE -- a dimple, a bulge -- and the wrong one for a FIELD: it shows the deformation only where
+# the boundary moved, and a strain bulb under an indenter is interior. Dots carry the per-particle
+# `deformation` colour everywhere the material is, and the section cuts through the bulb.
+
+general:
+  name: mesh_mpm_half_gel_contact
+  seed: 0
+  n_frames: 401
+  dt: 0.0032
+  record_cap: 403
+  boundary: free
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1172.3329425556858
+    force_nN: 9162.430188008488
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.4
+  fps: 60
+  mesh_color: '#cfd8e3'
+  real_time: false
+  slow_motion: 2
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    ticks: 4
+  - quantity: radius
+    xlabel: frame
+    ylabel: shell radius
+    ticks: 4
+  render_3d: dots
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  mesh_flat: true
+  surface_opacity: 1.0
+  surface_color: '#cfd8e3'
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    max_points: 8000
+sets:
+  vertex:
+    n: 25584
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 12800
+    state:
+      area:
+        width: 1
+      cen:
+        width: 3
+      chem:
+        width: 2
+        integration: first_order
+  mpm_particle:
+    n: 500000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 15.0
+        density: 1.0
+        block:
+        - 0.05
+        - 0.05
+        - 0.05
+        - 0.95
+        - 0.95
+        - 0.44
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: mesh_seed
+  at: vertex
+  before_frame: 1
+  cell_set: cell
+  n_cells: 200
+  radius: 2.5
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  cell_set: cell
+  rate: 0.003457
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
+- op: junction_myosin
+  at: vertex
+  activity: 1.0
+  tau: 20.0
+  beta: 1.0
+  myo_new: 1.0
+  dt: 1.0
+  inherit: true
+  keyed_on: length
+  destabilising: true
+  k_perim: 1.0
+  lam: 0.0
+  gam: 0.0
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  scale: 0.0161
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 8.0
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1000000000.0
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 0.25
+  K_V: 8.0
+  K_R: 0.4
+  Lambda: 0.375
+  Gamma: 0.1
+  p0: 3.5
+  mu: 1.0
+  dt: 0.0032
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: cell_divide
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.12
+- op: junction_sync
+  at: vertex
+  myo_new: 1.0
+  inherit: true
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- mesh_seed
+- cell_geometry
+- cell_grow
+- junction_myosin
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- cell_mechanics
+- edge_flip
+- cell_divide
+- junction_sync
+- topo_record
+- mesh_inside
