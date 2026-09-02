@@ -1,48 +1,34 @@
-# MESH-MPM 08 -- THE GEL ADDED TO THE WORKING TISSUE, and placed OUT OF REACH.
+# MESH-MPM 12 -- THE FULL-SIZE SPHEROID IN THE GEL, drawn as surfaces.
 #
-# THE LADDER RUNS THIS WAY ROUND NOW, and the earlier direction was the mistake. Starting from a
-# working gel and adding tissue operators one at a time cannot work, because the tissue's stack is
-# not decomposable: `mesh_seed + cell_geometry + cell_grow + cell_mechanics + edge_flip +
-# cell_divide + junction_sync` is the minimal thing that stays a sphere, and any subset of it
-# degrades. Measured -- a shell driven by scaling with `cell_divide` and nothing else reaches a
-# radius spread of 0.267 of its mean, against 0.002 for the full stack.
+# `mesh_mpm_spheroid_nominal` -- which is `promo_G_gates_gate_00_spheroid_B` verbatim -- pressed into
+# the gel of rung 11. The tissue is UNTOUCHED and at the ORIGIN in its own units (radius 4.65 growing
+# to 17.95); `mesh_contact` maps it into the box at the point of use with `scale: 0.00836`, so it
+# ends at 0.150 -- gate 04's own final radius, and 0.00836 is within 2% of gate 04's own 0.00853.
+# The only edits to the tissue are its clock and its box, and neither is dynamical: every tissue
+# operator here is per-FRAME, and `cell_mechanics` now divides by `general.dt` so the engine's own
+# multiplication cancels it whatever the timestep.
 #
-# SO THE TISSUE IS `mesh_mpm_spheroid_half` UNCHANGED, and the gel is added around it. Two edits,
-# both declared and neither dynamical:
-#
-#   the tissue moves to [25, 25, 25]    MPM lives in [0, world] and the vesicle is built about the
-#                                       ORIGIN, so they cannot share a box until one moves.
-#   `cell_mechanics centre:` follows    `K_R` penalises (|pos| - R0)^2 from the WORLD ORIGIN, so a
-#                                       translated tissue is torn apart by the one term that is not
-#                                       translation-invariant. Every other term is, which is why
-#                                       evaluating the energy on `p - centre` changes only this one.
-#
-# WHETHER THAT IS REALLY "UNCHANGED" IS THE FIRST THING THIS RUN REPORTS: cell count and radius are
-# compared against `mesh_mpm_spheroid_half` frame for frame. If they differ, the translation is not
-# neutral and nothing downstream is worth reading.
-#
-# THE GEL IS OUT OF REACH ON PURPOSE. Its top is at z = 10 and the shell's lower pole reaches
-# 25 - 9.3 = 15.7, so `mesh_contact` is scheduled and never fires. That is the point: the contact
-# and the 300,000 material points are PRESENT, so this run tests that they are inert -- which a
-# separate experiment already showed (a no-gel and a no-MPM run came out bit-identical) and which
-# should now hold with the tissue that actually works.
+# `render_3d: surface` RATHER THAN `dots`, because the question here is the SHAPE. Rung 11 draws the
+# gel as points coloured by strain, which is the right picture for a FIELD -- a bulb under an
+# indenter is interior and a boundary cannot show it. This one shows what the two bodies look like:
+# the skinned isosurface of the gel, built once at rest and ridden by the particles, with the
+# epithelium over it flat and cell-edged. The section still carries the field.
 
 general:
-  name: mesh_mpm_half_gel_far
+  name: mesh_mpm_nominal_gel_contact
   seed: 0
   n_frames: 401
-  dt: 1.0
+  dt: 0.0032
   record_cap: 403
   boundary: free
   dim: 3
   world:
-  - 50.0
-  - 50.0
-  - 50.0
+  - 1.0
+  - 1.0
+  - 1.0
   units:
-    length_um: 10.0
-    time_s: 600.0
-    force_nN: 0.6666666666666666
+    length_um: 1172.3329425556858
+    force_nN: 9162.430188008488
 plotting:
   renderer: vtk_points
   background: black
@@ -51,7 +37,6 @@ plotting:
   camera_elev: 1.18
   camera_turns: 0.0
   camera_zoom: 0.0
-  dot_size: 1.6
   fps: 60
   mesh_color: '#cfd8e3'
   real_time: false
@@ -65,6 +50,10 @@ plotting:
     xlabel: frame
     ylabel: cell area
     ticks: 4
+  - quantity: radius
+    xlabel: frame
+    ylabel: shell radius
+    ticks: 4
   render_3d: surface
   color_field: deformation
   color_range:
@@ -74,11 +63,13 @@ plotting:
   mesh_edges: true
   mesh_opacity: 1.0
   mesh_flat: true
+  surface_opacity: 1.0
+  surface_color: '#cfd8e3'
   cross_section:
     axis: y
     at: 0.5
     thickness: 6
-    max_points: 6000
+    max_points: 8000
 sets:
   vertex:
     n: 25584
@@ -95,19 +86,19 @@ sets:
         width: 2
         integration: first_order
   mpm_particle:
-    n: 300000
+    n: 500000
     types:
       gel:
         fraction: 1.0
-        youngs: 30.0
+        youngs: 15.0
         density: 1.0
         block:
-        - 10.0
-        - 10.0
-        - 2.0
-        - 40.0
-        - 40.0
-        - 10.0
+        - 0.05
+        - 0.05
+        - 0.05
+        - 0.95
+        - 0.95
+        - 0.44
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -118,15 +109,11 @@ operators:
   before_frame: 1
   cell_set: cell
   n_cells: 200
-  radius: 2.5
+  radius: 5.0
   jitter: 0.18
   p0: 3.5
   seed: 0
   vseed_cv: 0.15
-  centre: &id001
-  - 25.0
-  - 25.0
-  - 25.0
 - op: cell_geometry
   at: cell
 - op: cell_grow
@@ -153,10 +140,14 @@ operators:
 - op: mesh_contact
   at: mpm_particle
   surface: vertex
-  centre: centroid
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  scale: 0.00836
   k_frac: 0.45
   mu: 0.4
-  dt: 1.0
+  dt: 0.0032
   n_grid: 64
   a_max: 100000.0
 - op: mpm_strain
@@ -165,7 +156,7 @@ operators:
 - op: mpm_scatter
   at: mpm_particle
   to: mpm_grid
-  drag: 0.5
+  drag: 8.0
   a_max: 100000.0
   implementation: warp
 - op: mpm_grid_update
@@ -176,7 +167,7 @@ operators:
   from: mpm_grid
   wall_damp: 0.7
   wall_contact: 0.04
-  vmax: 1.0e9
+  vmax: 1000000000.0
   implementation: warp
 - op: mesh_inside
   at: mpm_particle
@@ -184,18 +175,17 @@ operators:
 - op: cell_mechanics
   at: vertex
   K_A: 1.0
-  K_P: 0.25
-  K_V: 8.0
+  K_P: 1.0
+  K_V: 2.0
   K_R: 0.4
-  Lambda: 0.375
-  Gamma: 0.1
+  Lambda: 3.0
+  Gamma: 0.4
   p0: 3.5
   mu: 1.0
-  dt: 1.0
+  dt: 0.0032
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
-  centre: *id001
 - op: edge_flip
   at: vertex
   every: 4
@@ -225,7 +215,7 @@ schedule:
 - cell_geometry
 - cell_grow
 - junction_myosin
-- substep_dt: 0.05
+- substep_dt: 0.0004
   steps:
   - mesh_contact
   - mpm_strain

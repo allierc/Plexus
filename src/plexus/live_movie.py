@@ -492,7 +492,13 @@ class LiveMovie:
         if self.cs is None and getattr(self, "cs_cfg", None) is not None and not self.cs_only:
             ax = self.cs_axis
             lat = [k for k in range(3) if k != ax][:2]
-            ch = pv.Chart2D(size=(0.26, 0.26), loc=(0.015, 0.645))
+            # SQUARE ON SCREEN, WHICH IS A CONSTRAINT ON THE SIZE AND NOT ON THE RANGE. `size` is in
+            # WINDOW fractions and the window need not be square (a curve column widens it), so
+            # (0.26, 0.26) is 0.26*W by 0.26*H -- and equal DATA ranges then still render stretched:
+            # a spherical shell sliced through its middle came out as a tall ellipse beside a 3D
+            # view showing a sphere. A panel `h` of the height must be h/aspect of the width.
+            _csh = float((style or {}).get("cross_section_height", 0.26))
+            ch = pv.Chart2D(size=(_csh / self.aspect, _csh), loc=(0.015, 0.645))
             ch.background_color = (0, 0, 0, 0.55)
             ch.border_color = "#9a9a9a"
             names = "xyz"
@@ -1400,8 +1406,20 @@ class LiveMovie:
             _ax1, _bx1 = float(np.nanmax(_cat_x)), float(np.nanmax(_cat_y))
             _sp = max(_ax1 - _ax0, _bx1 - _bx0, 1e-9) * 1.06
             _cx, _cy = 0.5 * (_ax0 + _ax1), 0.5 * (_bx0 + _bx1)
-            self.cs.x_range = [_cx - _sp / 2, _cx + _sp / 2]
-            self.cs.y_range = [_cy - _sp / 2, _cy + _sp / 2]
+            # SET ON THE AXES, NOT ON THE CHART. `Chart2D.x_range` is a convenience that the chart
+            # re-derives from its plots whenever one is added or removed -- and this panel removes
+            # and re-adds every series on every frame -- so the range was being overwritten the
+            # moment it was set, and the content sat wherever autoscaling put it: low and left, with
+            # the panel's top-right empty. `x_axis.range` is the property the curve panels already
+            # use and it sticks.
+            self._cs_rng = ([_cx - _sp / 2, _cx + _sp / 2], [_cy - _sp / 2, _cy + _sp / 2])
+            # "fixed" IS A STRING HERE, not an enum -- pyvista validates against {"auto","fixed"}
+            # and the enum I reached for raised, which the panel's own guard turned into
+            # "cross section unavailable" and no section at all for the whole run. `behavior` is
+            # what stops the chart re-deriving the range when a series is removed and re-added,
+            # which this panel does on every frame.
+            for _a in (self.cs.x_axis, self.cs.y_axis):
+                _a.behavior = "fixed"
             self._cs_series = []
             fld = str(self.style.get("color_field", "") or "")
             val = self._field(H, lvl)[0] if fld else None
@@ -1451,20 +1469,38 @@ class LiveMovie:
             for _nm, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
                 try:
                     _sl = _pd.slice(normal=_nrm, origin=_org)
-                    if _sl.n_points < 2:
+                    if _sl.n_points < 3:
                         continue
-                    _pts, _ln = _sl.points, _sl.lines
-                    _st = _sl.strip(join=True) if _sl.n_lines else _sl
-                    _pts, _ln = _st.points, _st.lines
-                    i = 0
-                    while i < len(_ln):
-                        n_ = int(_ln[i]); ids = _ln[i + 1: i + 1 + n_]; i += n_ + 1
-                        if n_ < 2:
-                            continue
-                        self._cs_mesh_series.append(
-                            self.cs.line(_pts[ids, a], _pts[ids, b], color=_mc, width=2.0))
+                    # ONE CLOSED CURVE, ORDERED BY ANGLE. `slice` returns the intersection as
+                    # hundreds of unordered SEGMENTS -- 7,000 faces cut by a plane -- and `strip`
+                    # joins only those that already share endpoints, so a shell came out as dozens
+                    # of polylines drawn as dozens of series: a scribble where the outline should
+                    # be, and dozens of chart plots a frame. A section of a star-shaped shell is a
+                    # closed curve about its own centre, so sorting the points by angle recovers it
+                    # exactly, in one series, and closes it by repeating the first point.
+                    _P = np.asarray(_sl.points)
+                    _u, _v = _P[:, a], _P[:, b]
+                    _th = np.arctan2(_v - _v.mean(), _u - _u.mean())
+                    _o = np.argsort(_th)
+                    _o = np.append(_o, _o[0])
+                    self._cs_mesh_series.append(
+                        self.cs.line(_u[_o], _v[_o], color=_mc, width=2.0))
                 except Exception:                        # noqa: BLE001 -- the section is not the run
                     pass
+            # LAST, AFTER EVERY SERIES IS BACK. Adding a plot re-derives the chart's range from its
+            # data, so a range set before the series were added was overwritten by the last `line`
+            # call and the panel autoscaled to the data's own extent -- wider than tall, which drew
+            # a spherical shell as an ellipse next to a 3D view showing a sphere.
+            #
+            # AND THE AXES ARE OFF. Their labels and ticks take space on the left and bottom, so the
+            # PLOT AREA is not square even when the panel is, and equal ranges still render
+            # stretched. A section is a picture of a shape; the numbers on it are box coordinates
+            # nobody reads.
+            for _a, _r in ((self.cs.x_axis, self._cs_rng[0]), (self.cs.y_axis, self._cs_rng[1])):
+                _a.label_visible = _a.ticks_visible = _a.tick_labels_visible = False
+                _a.grid = False
+                _a.range = _r
+                _a.behavior = "fixed"
         except Exception as e:                       # noqa: BLE001 -- a panel must never kill a run
             if not getattr(self, "_cs_warned", False):
                 self._cs_warned = True
