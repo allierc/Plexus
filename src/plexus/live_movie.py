@@ -70,7 +70,7 @@ class LiveMovie:
     def __init__(self, out, world, n_frames, up=2, render_n=400_000, max_frames=300,
                  fps=20, px=1280, dot=None, fill=0.9, elev=18.0, azim=-58.0, name="", seed=0,
                  sim=None, style=None, stills=10, keep_stills=False,
-                 dt=None, time_s=None, real_time=True, length_um=None):
+                 dt=None, time_s=None, real_time=True, length_um=None, centred=False):
         # THE SPEC'S `plotting.fps` WAS DECORATIVE. `style` carries it, `fps` was a separate
         # keyword defaulting to 20, and nothing connected them -- so every movie was written at 20
         # regardless of what the spec asked for. It matters twice over now: `fps` sets the mp4's
@@ -256,6 +256,7 @@ class LiveMovie:
         # so a run still finished, still wrote its trajectory, and silently had no movie.
         self._skin = self._surf = self._skin_sub = None
         self._meshes = []
+        self._mesh_is_subject = False
         self.drawn = self.n = self.rendered = 0
         self.t0 = None
         self.failed = None
@@ -287,6 +288,20 @@ class LiveMovie:
             w.append(0.0)
         self.lo, self.hi = np.zeros(3), np.array(w)
         span = np.array([x if x > 0 else 1.0 for x in w])
+        # WHERE THE CONTENT IS, AND IT IS THE CALLER THAT KNOWS. This renderer frames on [0, world],
+        # which is right for a walled run and wrong for a `boundary: free` one: the okuda vesicle is
+        # built about the ORIGIN and grows outward, so in a [0, 50] world it renders in a corner and
+        # eventually half outside it.
+        #
+        # KEYED ON A KWARG, NOT ON `sim.boundary`, and that distinction cost a wrong picture.
+        # `replay` ALREADY solves this its own way -- it shifts the recorded positions so the cloud
+        # sits inside a box built from the data bounds -- so a renderer that ALSO re-centred on the
+        # origin whenever the spec said `free` fought its own caller and framed the corner of an
+        # already-corrected scene. The live path passes `centred=True`; the replay does not, because
+        # by the time it calls, the content is at [0, box] by construction.
+        self.free = bool(centred)
+        if self.free:
+            self.lo, self.hi = -np.array(w) / 2.0, np.array(w) / 2.0
 
         if self.is2d:
             # A RECTANGLE, NOT A BOX, and seen square-on. A wireframe cube around a plane of
@@ -300,8 +315,9 @@ class LiveMovie:
             self.p.camera.parallel_projection = True
             self.p.camera.parallel_scale = float(max(span[0], span[1])) * 0.55
         else:
-            self.p.add_mesh(pv.Box((0, span[0], 0, span[1], 0, span[2])).extract_all_edges(),
-                            color="#4a4a4a", line_width=1.0, lighting=False)
+            if not self.free:
+                self.p.add_mesh(pv.Box((0, span[0], 0, span[1], 0, span[2])).extract_all_edges(),
+                                color="#4a4a4a", line_width=1.0, lighting=False)
             # A SCALE BAR, AND ONLY WHERE THERE IS A SCALE. Without `general.units` the box is
             # a number of nothing and a bar labelled "20" would be a lie. The length is the largest
             # round number (1, 2 or 5 times a power of ten) fitting in a third of the box, so it
@@ -324,14 +340,18 @@ class LiveMovie:
                 _len = _len_m / _m                            # back to box units for the geometry
                 _other = [i for i in range(3) if i not in (self.up, _ax0)][0]
                 _a = np.zeros(3); _b = np.zeros(3)
-                _a[_ax0] = 0.0; _b[_ax0] = _len
-                _a[_other] = _b[_other] = -0.04 * float(span[_other])
+                # PLACED AGAINST THE SCENE'S OWN CORNER for the same reason the camera is: with a
+                # free boundary the box's origin is in the middle of the tissue, and the bar was
+                # drawn straight through it.
+                _a[_ax0] = float(self.lo[_ax0]); _b[_ax0] = float(self.lo[_ax0]) + _len
+                _a[_other] = _b[_other] = float(self.lo[_other]) - 0.04 * float(span[_other])
+                _a[self.up] = _b[self.up] = float(self.lo[self.up])
                 self.p.add_mesh(pv.Line(_a, _b), color="white", line_width=4.0, lighting=False)
                 _v = _len_m
                 _lab = (f"{_v * 1e6:g} um" if _v < 1e-4 else f"{_v * 1e3:g} mm" if _v < 0.01
                         else f"{_v * 100:g} cm" if _v < 1.0
                         else f"{_v:g} m" if _v < 1000.0 else f"{_v / 1000:g} km")
-                _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.05 * float(span[self.up])
+                _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.05 * float(span[self.up])  # noqa
                 # TWICE THE HEADER'S NUMBER TO GET THE SAME HEIGHT. `add_text` and
                 # `add_point_labels` do not interpret `font_size` the same way -- both set to 11 and
                 # the label renders about half the cap height of the top-left print. 22 matches it,
@@ -340,7 +360,15 @@ class LiveMovie:
                 self.p.add_point_labels([_mid], [_lab], font_size=22, text_color="white",
                                         shape=None, show_points=False, always_visible=True,
                                         justification_horizontal="center")
-            centre, radius = 0.5 * span, float(span.max()) * 0.55
+            # AIMED AT THE SCENE, NOT AT [0, world]. `0.5 * span` is the middle of the world box,
+            # which is where the content is only when a wall puts it there. With `boundary: free`
+            # nothing does: the okuda vesicle is built about the ORIGIN, so the camera looked at
+            # [25, 25, 25] while the tissue sat at [0, 0, 0] and the frame was empty but for a
+            # corner of it, seen from inside. `lo`/`hi` already carry the framing decision made
+            # above -- [0, world] for a walled run, +-world/2 for a free one -- so the camera reads
+            # them instead of re-deriving a box.
+            centre = 0.5 * (np.asarray(self.lo) + np.asarray(self.hi))
+            radius = float(np.max(np.asarray(self.hi) - np.asarray(self.lo))) * 0.55
             e, az = np.radians(elev), np.radians(azim)
             ax_h = [i for i in range(3) if i != self.up]
             d = np.zeros(3)
@@ -558,9 +586,15 @@ class LiveMovie:
             _flat = dict(FLAT)
             if self.cs is not None:
                 _flat["render_points_as_spheres"] = False
-            # `render_3d: surface` REPLACES the dots rather than sitting on top of them: a solid
-            # with a speckled cloud inside it reads as neither.
-            if str((self.style or {}).get("render_3d", "dots")).lower() != "surface" \
+            # WHEN THE SUBJECT IS A MESH, THE DOTS ARE ITS OWN VERTICES and drawing them is drawing
+            # the corners of the thing rather than the thing. One renderer covers both cases: a
+            # material run draws its cloud (or a skinned surface of it) with any mesh set over the
+            # top, and a mesh-only run draws the mesh. Nothing about the spec has to say which.
+            _m = getattr(lvl, "mesh", None)
+            self._mesh_is_subject = bool(_m is not None and int(_m.get("nF", 0) or 0))
+            if self._mesh_is_subject:
+                pass
+            elif str((self.style or {}).get("render_3d", "dots")).lower() != "surface" \
                     or not self._skin_build(H, lvl, pos):
                 self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                 point_size=self._dot_px(pos))
@@ -775,7 +809,11 @@ class LiveMovie:
         hide = set((self.style or {}).get("hide_sets", []) or [])
         out = []
         for name, lvl in H.levels.items():
-            if name in hide or name == getattr(self, "_sname", None):
+            # THE DRAWN SET IS EXCLUDED ONLY WHEN ITS DOTS ARE ACTUALLY ON SCREEN. For a spec whose
+            # ONLY positional set is a vertex mesh -- a vertex-model run with no material -- that set
+            # is both `_sname` and the surface, so this skipped the one thing there was to draw and
+            # the movie was a few hundred dots in a corner of the world box.
+            if name in hide or (name == getattr(self, "_sname", None) and not self._mesh_is_subject):
                 continue
             m = getattr(lvl, "mesh", None)
             if m is None or not int(m.get("nF", 0) or 0):
@@ -810,20 +848,79 @@ class LiveMovie:
             st = self.style or {}
             colr = st.get("mesh_color", "#e6dcc0")
             lw = float(st.get("mesh_line_width", 0.8))
-            style = str(st.get("mesh_style", "wireframe"))
+            # A WIREFRAME OVER A CLOUD, A LIT SOLID WHEN IT IS THE PICTURE. Over 500,000 dots a solid
+            # surface hides the material it is acting on, which is half of what a contact run is
+            # about; with nothing behind it a wireframe is a tangle of edges with no shape.
+            style = str(st.get("mesh_style", "surface" if self._mesh_is_subject else "wireframe"))
             opac = float(st.get("mesh_opacity", 1.0 if style == "wireframe" else 0.55))
             for name, lvl, m in self._mesh_levels(H):
                 nv = int(m["Nv"])
                 pd = self.pv.PolyData(lvl.get("pos")[:nv].detach().cpu().numpy().astype(np.float32),
                                       self._mesh_faces(m))
-                self.p.add_mesh(pd, color=colr, style=style, line_width=lw, opacity=opac,
-                                lighting=(style != "wireframe"), render_lines_as_tubes=False)
+                # THE CELL BOUNDARIES ARE THE SUBJECT WHEN THE MESH IS. A shaded surface with no
+                # edges renders a 6,000-cell epithelium as a smooth grey ball -- the tessellation,
+                # which is the entire reason the model has faces, is invisible. `render_vtk` draws
+                # one polygon per cell with its outline, and this matches it. Off by default when
+                # the mesh is an OVERLAY: 2,304 plate quads of edge over a cloud is a moire.
+                _edges = bool(st.get("mesh_edges", self._mesh_is_subject and style == "surface"))
+                # FLAT WHEN THE MESH IS THE SUBJECT, which is `render_vtk`'s own default style for
+                # this picture and is not a preference. A lit shaded ball reads its own curvature
+                # as brightness, so the darkening toward the limb competes with the per-cell colour
+                # the marks are carrying; unlit, a cell's colour means only what it was set to.
+                _flat_m = (self._mesh_is_subject and style == "surface"
+                           and bool(st.get("mesh_flat", True)))
+                _rgb = self._mesh_face_rgb(m, pd) if self._mesh_is_subject else None
+                self.p.add_mesh(pd, color=(None if _rgb is not None else colr),
+                                scalars=("rgb" if _rgb is not None else None), rgb=(_rgb is not None),
+                                style=style, line_width=lw, opacity=opac,
+                                lighting=(style != "wireframe" and not _flat_m),
+                                ambient=(1.0 if _flat_m else 0.3),
+                                diffuse=(0.0 if _flat_m else 0.7), specular=0.0,
+                                render_lines_as_tubes=False,
+                                show_edges=_edges, edge_color=st.get("mesh_edge_color", "#2b2b2b"),
+                                edge_opacity=float(st.get("mesh_edge_opacity", 1.0)))
                 self._meshes.append((name, nv, pd))
                 print(f"[live-movie] surface {name!r}: {int(m['nF']):,} faces, {nv:,} vertices, "
                       f"drawn as {style}", flush=True)
         except Exception as e:                       # noqa: BLE001 -- never kill a run for a picture
             self._meshes = []
             print(f"[live-movie] mesh overlay unavailable ({type(e).__name__}: {e})", flush=True)
+
+    def _mesh_face_rgb(self, m, pd):
+        """One colour per cell: the base, with the division pair marked -- `render_vtk`'s own rule.
+
+        REUSED, NOT REIMPLEMENTED. `render_vtk._marks` is where the mother/daughter split lives, and
+        it is subtle enough to be worth importing rather than restating: the two masks are on
+        DIFFERENT CLOCKS (`age <= DIVIDED` counts division CALLS, "appended since" counts rows), so
+        a naive "compare with the previous frame" draws mothers on every frame and daughters on
+        almost none. It takes a face count from far enough back to cover the same window.
+        """
+        if not bool((self.style or {}).get("mesh_mark_division", True)):
+            return None
+        try:
+            from plexus.render_vtk import _marks
+            import matplotlib.colors as _mc
+            nF = int(m["nF"])
+            self._nF_hist = (getattr(self, "_nF_hist", []) + [nF])[-8:]
+            prev = self._nF_hist[0] if len(self._nF_hist) > 1 else None
+            mother, daughter, kills, _sup = _marks(m, np.arange(nF), nF, prev_nF=prev)
+            st = self.style or {}
+            rgb = np.tile((np.asarray(_mc.to_rgb(st.get("mesh_color", "#e6dcc0"))) * 255)
+                          .astype(np.uint8), (nF, 1))
+            for msk, key, dflt in ((mother, "mesh_mother_color", "#4a86c8"),
+                                   (daughter, "mesh_daughter_color", "#d9534f"),
+                                   (kills, "mesh_apop_color", "#e8c33a")):
+                if msk is not None and np.any(msk):
+                    rgb[np.asarray(msk, bool)] = (np.asarray(_mc.to_rgb(st.get(key, dflt))) * 255
+                                                  ).astype(np.uint8)
+            pd.cell_data["rgb"] = rgb
+            return rgb
+        except Exception as e:                       # noqa: BLE001 -- a colouring is not the run
+            if not getattr(self, "_mark_warned", False):
+                self._mark_warned = True
+                print(f"[live-movie] division marks unavailable ({type(e).__name__}: {e})",
+                      flush=True)
+            return None
 
     def _update_meshes(self, H):
         """POINTS ONLY. The topology is rebound only if the face count changed -- a plate never
@@ -841,6 +938,8 @@ class LiveMovie:
                     pd.faces = self._mesh_faces(m)
                 else:
                     pd.points = lvl.get("pos")[:nv].detach().cpu().numpy().astype(np.float32)
+                if self._mesh_is_subject:
+                    self._mesh_face_rgb(m, pd)
             except Exception:                        # noqa: BLE001
                 pass
 
@@ -1246,6 +1345,45 @@ class _ReplayLevel:
         pn = z[f"{name}__parent_name"] if f"{name}__parent_name" in z.files else None
         self.parent_name = None if pn is None else str(pn)
         self.C = self.F = None                        # not stored in a trajectory -- see above
+        # THE HALF-EDGE TABLE IS IN THE TRAJECTORY AND WAS NOT BEING READ, so a replay of a
+        # vertex-model run drew the mesh's VERTICES as dots while the same renderer, driven live
+        # from the engine, drew the surface. One renderer that produces two different pictures of
+        # one run depending on which entry point called it is two renderers wearing one name.
+        #
+        # RAGGED, HENCE THE OFFSETS. `nF` changes every frame under division, so the recorder
+        # concatenates the per-frame half-edge arrays and stores `mesh_offsets` to cut them apart
+        # again; `mesh_face_offsets` does the same for the per-face columns and is a DIFFERENT
+        # array -- reading E_face with the face offsets gives one entry per face and a mesh that
+        # renders as confetti.
+        self._mo = np.asarray(z[f"{name}__mesh_offsets"]) if f"{name}__mesh_offsets" in z.files \
+            else None
+        if self._mo is not None:
+            self._mesh_cols = {k: np.asarray(z[f"{name}__mesh_{k}"])
+                               for k in ("E_srce", "E_trgt", "E_face")}
+            self._mesh_nF = np.asarray(z[f"{name}__mesh_nF"])
+            self._mesh_Nv = np.asarray(z[f"{name}__mesh_Nv"])
+            # PER-FACE COLUMNS ON THEIR OWN OFFSETS. `age` and `ndiv` are what the division marks
+            # are computed from, and they are cut by `mesh_face_offsets`, not by `mesh_offsets`:
+            # one is a per-face array and the other per-half-edge, and reading either with the
+            # other's offsets gives a mask that is the right dtype and the wrong length.
+            self._fo = np.asarray(z[f"{name}__mesh_face_offsets"])
+            self._face_cols = {k: np.asarray(z[f"{name}__mesh_{k}"])
+                               for k in ("age", "ndiv", "apop", "inhib")
+                               if f"{name}__mesh_{k}" in z.files}
+
+    @property
+    def mesh(self):
+        """The frame's half-edge table, in the shape `_mesh_live` and `_mesh_faces` expect."""
+        if self._mo is None:
+            return None
+        import torch
+        a, b = int(self._mo[self.t]), int(self._mo[self.t + 1])
+        d = {k: torch.as_tensor(v[a:b].astype(np.int64)) for k, v in self._mesh_cols.items()}
+        d["nF"] = int(self._mesh_nF[self.t]); d["Nv"] = int(self._mesh_Nv[self.t])
+        fa, fb = int(self._fo[self.t]), int(self._fo[self.t + 1])
+        for k, v in self._face_cols.items():
+            d[k] = v[fa:fb]
+        return d
 
     def get(self, key):
         if key == "pos":
@@ -1315,7 +1453,9 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
             lvl._pos = P - torch.as_tensor((0.5 * (lo + hi) - 0.5 * box), dtype=P.dtype)
         else:
             box = ws
-    out = out or os.path.join(data_dir, f"movie_{sname}.mp4")
+    # `movie.mp4`, NOT `movie_<set>.mp4`. Every other path in this codebase writes `movie.mp4`, so a
+    # re-render under `-o plot` left the folder holding both and neither obviously the current one.
+    out = out or os.path.join(data_dir, "movie.mp4")
     # UNITS ONLY WHEN THEY WERE DECLARED. `Units` defaults to length_um 1.0 / time_s 1.0 with
     # `declared: False`, and handing those to the renderer would put a scale bar and a wall clock on
     # a run that has neither -- a bar reading "2 m" across a galaxy 12 dimensionless units wide.

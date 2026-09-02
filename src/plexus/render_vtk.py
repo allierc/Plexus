@@ -1041,7 +1041,16 @@ def render_all(run_dir, seq=LOOP_SEQ, size=None, quiet=False, fill=1.0, name=Non
     nm = name or os.path.basename(run_dir.rstrip("/"))
     took = {}
     for kind, st in SEQUENCES[int(seq)]:
-        out = os.path.join(run_dir, f"vtk_{kind}_{st}.mp4")
+        # THE DEFAULT PAIR IS `movie.mp4` + `movie_kburns.mp4`, the same names the point renderer
+        # writes, because a reader opening a run directory should not have to know which renderer
+        # made it. They were `vtk_evolve_mesh.mp4` / `vtk_kburns_mesh.mp4`, so a mesh run's folder
+        # looked nothing like every other run's and its `movie.mp4` was whatever the point renderer
+        # had managed to draw of a mesh set -- which is a few hundred vertices in the corner of the
+        # world box. The style suffix survives only where it distinguishes something: sequence 3
+        # writes both the `mesh` and `nomesh` cuts and those must not collide.
+        out = os.path.join(run_dir, {("evolve", "mesh"): "movie.mp4",
+                                     ("kburns", "mesh"): "movie_kburns.mp4"}
+                           .get((kind, st), f"movie_{kind}_{st}.mp4"))
         t0 = time.perf_counter()
         msg = (kburns if kind == "kburns" else evolve)(run_dir, st, out, fill=fill, label=nm)
         dt = time.perf_counter() - t0
