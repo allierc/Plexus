@@ -77,6 +77,13 @@ class LiveMovie:
         # but so heavily aliased that it reads as several times too fast. At 60 it is stride 20 and
         # 90 frames, the same 1.5 s, smooth.
         fps = float((style or {}).get("fps", fps))
+        # THE CANVAS, BECAUSE A DOT CANNOT BE SMALLER THAN A PIXEL. `dot_size` below ~1.0 buys
+        # nothing -- VTK draws a point at one pixel minimum, so 0.2 and 0.7 are the same picture.
+        # What makes a dot smaller RELATIVE TO THE SCENE is more pixels to put it in: at 100 M
+        # particles in a 1280 frame there are 61 particles per pixel and the galaxy is a white
+        # blob, while the same run at 2560 has 15 and the arms separate. This is the knob that
+        # matters at high N, and it was not reachable from a spec.
+        px = int((style or {}).get("render_px", px))
         from plexus.render_vtk import offscreen
         offscreen()                                   # kill the Xlib chatter before VTK loads
         import pyvista as pv
