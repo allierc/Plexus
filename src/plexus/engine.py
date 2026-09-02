@@ -173,6 +173,20 @@ def _spawn_pair3d(n: int, box, radius: float, rng, device: str, thickness: float
     rot [2,3,3]) -- `rot` is each group's plane rotation, which the velocity IC needs to put the
     orbits in the disc's own plane rather than in xy.
     """
+    # RADIUS AND THICKNESS MAY BE A PAIR. `spawn_radius: [3.6, 4.8]` gives the two galaxies
+    # DIFFERENT SIZES -- an unequal-mass-ratio encounter, which is the common case in nature and
+    # the interesting one to watch: at equal mass the two discs destroy each other symmetrically,
+    # while a compact companion punches through an extended primary and survives it. A scalar
+    # still means both, so every existing spec is unchanged.
+    def _pair(v, what):
+        if isinstance(v, (list, tuple)):
+            if len(v) != 2:
+                raise ValueError(f"spawn_{what}: give one value for both discs or two, got {len(v)}")
+            return [float(v[0]), float(v[1])]
+        return [float(v), float(v)]
+
+    radius = _pair(radius, "radius")
+    thickness = _pair(thickness, "thickness")
     box = torch.as_tensor(box, dtype=torch.float32, device=device)
     c = box * 0.5
     ct, st = math.cos(tilt), math.sin(tilt)
@@ -184,9 +198,10 @@ def _spawn_pair3d(n: int, box, radius: float, rng, device: str, thickness: float
         c + torch.tensor([+0.5 * separation, +0.5 * offset, 0.0], device=device)])
     pos, gid = [], []
     for g, k in enumerate(counts):
-        r = torch.sqrt(torch.rand(k, generator=rng, device=device)) * radius   # uniform-area disc
+        r = torch.sqrt(torch.rand(k, generator=rng, device=device)) * radius[g]  # uniform-area disc
         th = torch.rand(k, generator=rng, device=device) * 2 * math.pi
-        z = thickness * torch.randn(k, generator=rng, device=device) if thickness > 0 else torch.zeros(k, device=device)
+        z = (thickness[g] * torch.randn(k, generator=rng, device=device)
+             if thickness[g] > 0 else torch.zeros(k, device=device))
         local = torch.stack([r * torch.cos(th), r * torch.sin(th), z], 1)
         pos.append(local @ rot[g].T + centres[g])                             # tilt, then translate
         gid.append(torch.full((k,), g, dtype=torch.long, device=device))
@@ -785,8 +800,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
                     # a PAIR of discs in one set: two galaxies that feel each other through the
                     # same all-pairs law that holds each of them together.
                     pos, head, gid, grot = _spawn_pair3d(
-                        n, H.world_size, float(s.get("spawn_radius", 0.3)), H.rng, device,
-                        thickness=float(s.get("spawn_thickness", 0.0)),
+                        n, H.world_size, s.get("spawn_radius", 0.3), H.rng, device,
+                        thickness=s.get("spawn_thickness", 0.0),
                         separation=float(s.get("spawn_separation", 0.0)),
                         offset=float(s.get("spawn_offset", 0.0)),
                         tilt=float(s.get("spawn_tilt", 0.0)))
