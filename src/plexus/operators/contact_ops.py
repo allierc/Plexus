@@ -1135,8 +1135,25 @@ class SurfaceDrive(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
         self.axis = int(params.get("axis", 1))
-        if ("target" in params) == ("by" in params):
-            raise ValueError("surface_drive: declare exactly one of `by:` (a signed displacement "
+        # GROWTH AS A PRESCRIPTION, which is the third way a tool can move and the one a spheroid
+        # needs. `by`/`target` translate the surface; `grow` SCALES it about its own centroid by a
+        # declared factor over `over` frames, so a shell can indent a gel by inflating instead of by
+        # descending -- and it stays a kinematic tool while doing it.
+        #
+        # WHY NOT `cell_grow` + `cell_mechanics`. Those solve a tissue, and a solved tissue in the
+        # same schedule as an MPM continuum is a different experiment: `log/okuda_ECM/04_spheroid_ecm`
+        # -- the run this reproduces -- has NO vertex set at all and replays 200 cached meshes, so
+        # its coupling is one-way because the surface cannot answer. Prescribing the growth keeps
+        # that property without the cache: the gel feels the shell and the shell feels nothing.
+        self.grow = params.get("grow", None)
+        self.grow = None if self.grow is None else float(self.grow)
+        if self.grow is not None:
+            if "target" in params or "by" in params:
+                raise ValueError("surface_drive: `grow` scales the surface and `by`/`target` "
+                                 "translate it -- declare one motion, not two")
+        elif ("target" in params) == ("by" in params):
+            raise ValueError("surface_drive: declare exactly one of `grow:` (a scale factor "
+                             "about the centroid), `by:` (a signed displacement "
                              "along the axis, the same for every tool shape) or `target:` (an "
                              "absolute coordinate of the surface's centroid)")
         self.target = float(params["target"]) if "target" in params else None
@@ -1149,6 +1166,7 @@ class SurfaceDrive(Structural):
         self._from = None
         self._v0 = None
         self._y_prev = None
+        self._f_prev = 1.0
         self._said = False
 
     def forward(self, H, mask=None):
@@ -1163,6 +1181,12 @@ class SurfaceDrive(Structural):
             self._v0 = (torch.as_tensor(v0[:Nv, self.axis], device=pos.device, dtype=pos.dtype)
                         if v0 is not None else pos[:Nv, self.axis].clone())
             self._from = float(self._v0.mean())      # the surface's own centroid on that axis
+            _p0 = m.get("verts0", None)
+            self._p0 = (torch.as_tensor(np.asarray(_p0)[:Nv], device=pos.device, dtype=pos.dtype)
+                        if _p0 is not None else pos[:Nv].clone())
+            self._c0 = self._p0.mean(0, keepdim=True)
+            if self.grow is not None:
+                self.target = self._from
             if self.target is None:
                 self.target = self._from + self.by
             self._y_prev = self._from
@@ -1170,10 +1194,41 @@ class SurfaceDrive(Structural):
         f = int(getattr(H, "frame", 0) or 0)
         u = min(1.0, max(0.0, (f - self.hold) / float(self.over)))
         y = self._from + u * (self.target - self._from)
+        # ZERO BEFORE AND AFTER THE TRAVEL. Hoisted above the branches because BOTH need it and the
+        # growth branch returns before the translation branch's copy was ever reached.
+        moving = (self.hold <= f < self.hold + self.over)
         # A TRANSLATION OF THE SEEDED SHAPE, NOT AN ASSIGNMENT. `pos[:Nv, axis] = y` is the same
         # thing for a plate, whose vertices all share one coordinate on that axis -- and it FLATTENS
         # a sphere into a disc on the first frame. The offset is measured from the seeded positions,
         # so the shape is exact at every frame rather than drifting with whatever the last one did.
+        if self.grow is not None:
+            # ABOUT THE SEEDED CENTROID, from the SEEDED positions -- exact at every frame rather
+            # than a product of 400 incremental multiplications.
+            f = 1.0 + u * (self.grow - 1.0)
+            if self.rigid:
+                # FROM THE SEEDED SHAPE: exact at every frame, and right for a tool.
+                pos[:Nv] = self._c0 + (self._p0 - self._c0) * f
+            else:
+                # INCREMENTAL, ABOUT THE LIVE CENTROID, so whatever else shaped the surface this
+                # frame survives. Resetting from the seed is what a rigid tool wants and what
+                # DESTROYS a solved one: `cell_mechanics` would run every frame and be discarded,
+                # and the shell would read as rigid while a schedule full of operators said
+                # otherwise. The ratio is per-frame, so 400 of them compose to `grow`.
+                _c = pos[:Nv].mean(0, keepdim=True)
+                _r = f / max(self._f_prev, 1e-12)
+                pos[:Nv] = _c + (pos[:Nv] - _c) * _r
+            self._f_prev = f
+            v = ((self.grow - 1.0) / (self.over * float(getattr(H, "dt", 1.0)))) if moving else 0.0
+            vv = m.get("Vv", None)
+            if vv is None or vv.shape[0] < Nv:
+                vv = torch.zeros(pos.shape[0], 3, device=pos.device, dtype=pos.dtype)
+                m["Vv"] = vv
+            # THE SURFACE VELOCITY OF AN INFLATING SHELL IS RADIAL and proportional to the radius,
+            # which is what the friction law needs and what a single axis-aligned number cannot say.
+            vv[:Nv] = (self._p0 - self._c0) * v
+            self._y_prev = y
+            self._say(v)
+            return {}
         if self.rigid:
             pos[:Nv, self.axis] = self._v0 + (y - self._from)
         else:
@@ -1184,10 +1239,9 @@ class SurfaceDrive(Structural):
             # a schedule full of operators said otherwise.
             pos[:Nv, self.axis] = pos[:Nv, self.axis] + (y - self._y_prev)
         self._y_prev = y
-        # ZERO BEFORE AND AFTER THE TRAVEL, not the mean rate: a friction law told the plate is
-        # still sliding while it is parked would shear the material it is resting on for the whole
+        # `moving` IS HOISTED ABOVE: not the mean rate, because a friction law told the tool is
+        # still moving while it is parked would shear the material it is resting on for the whole
         # hold, and the hold exists precisely to show the material at rest under a static load.
-        moving = (self.hold <= f < self.hold + self.over)
         v = (self.target - self._from) / (self.over * float(getattr(H, "dt", 1.0))) if moving else 0.0
         # THE VELOCITY BUFFER IS THIS OPERATOR'S, NOT THE SEED'S. `seed_plate` allocated it and
         # `seed_mesh` -- which predates all of this and serves 461 specs -- does not, so a surface
@@ -1200,8 +1254,17 @@ class SurfaceDrive(Structural):
         vv[:Nv] = 0.0
         vv[:Nv, self.axis] = v
         m["plate_height"] = y
+        self._say(v)
+        return {}
+
+    def _say(self, v):
         if not self._said:
-            print(f"[plate_drive] {self.at}: axis {self.axis}, {self._from:.4g} -> {self.target:.4g} "
+            if self.grow is not None:
+                print(f"[surface_drive] {self.at}: scaling x{self.grow:g} about its centroid over "
+                      f"{self.over} frames after a {self.hold}-frame hold", flush=True)
+                self._said = True
+                return
+            print(f"[surface_drive] {self.at}: axis {self.axis}, {self._from:.4g} -> {self.target:.4g} "
                   f"over {self.over} frames after a {self.hold}-frame hold; "
                   f"speed {abs(v):.5g} box units per unit time", flush=True)
             self._said = True
