@@ -254,6 +254,11 @@ class SeedMesh3D(Structural):
         self.n = int(params.get("n_cells", 150)); self.R = float(params.get("radius", 5.0))
         self.jitter = float(params.get("jitter", 0.15)); self.p0 = float(params.get("p0", 3.9))
         self.seed = int(params.get("seed", 0))
+        # WHERE THE SPHERE GOES. `build_sphere_mesh` returns it about the ORIGIN, and until now
+        # nothing could move it: every spec that used this ran in a `free` world centred on 0, so a
+        # unit box put the vesicle in a corner. Default [0,0,0], so the 461 specs that never asked
+        # are byte-identical.
+        self.centre = [float(v) for v in params.get("centre", [0.0, 0.0, 0.0])]
         self.vseed_cv = float(params.get("vseed_cv", 0.0))       # STOCHASTIC VOLUME SEED: per-cell random cell-cycle
         #   phase at t=0 (spread of the initial division threshold) -> desynchronises the FIRST division wave
 
@@ -263,6 +268,7 @@ class SeedMesh3D(Structural):
         Nv = verts.shape[0]; Nbuf = lvl.state.shape[0]
         if Nv > Nbuf:
             raise ValueError(f"sphere mesh has {Nv} vertices but buffer n={Nbuf}")
+        verts = verts + np.asarray(self.centre, verts.dtype)
         pos = torch.zeros(Nbuf, 3, dtype=dt, device=dev)
         pos[:Nv] = torch.as_tensor(verts, dtype=dt, device=dev)
         px0, px1 = lvl.state_schema["pos"]
@@ -301,7 +307,8 @@ class SeedMesh3D(Structural):
                          V0=float(vf.sum()),
                          v_ref=float(vf.median()),              # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
                          #   morphogen growth caps v_eq at (4/3)v_ref, cells cycle in [2/3,4/3]v_ref centred on v_ref
-                         R0=float(np.linalg.norm(verts, axis=1).mean()), verts0=verts,
+                         R0=float(np.linalg.norm(verts - np.asarray(self.centre, verts.dtype),
+                                                axis=1).mean()), verts0=verts,
                          # RESERVOIR fixed sizes for the compiled mechanics (verts<=Nbuf; faces~V/2; half-edges~3V)
                          Nv_max=Nbuf, nF_max=Nbuf // 2 + 64, Ebuf=4 * Nbuf)
         m = getattr(lvl, "_mesh", None)

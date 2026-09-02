@@ -124,7 +124,24 @@ class MeshContact(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "mpm_particle")
-        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        # THE STAR-SHAPE REFERENCE, AND IT MAY MOVE WITH THE SURFACE.
+        #
+        #   centre: [x, y, z]   a fixed point in the box, as before.
+        #   centre: centroid    the LIVE surface's own centroid, re-read every frame.
+        #
+        # A fixed point is right for a surface that stays put and wrong for one that travels: the
+        # forbidden region is the side of the surface the reference sits on, so a sphere driven
+        # 0.15 of a box downward leaves its own reference behind and the ray cast starts pointing
+        # at the wrong face. `centroid` also removes the drift the plate had -- its declared
+        # standoff of 0.30 grew to 0.50 over the descent, which is a 90 -> 150 walk in the contact's
+        # bin rows for a geometry that never changed.
+        #
+        # `centre_offset` is added to whichever, so a plate says `centre: centroid` with an offset
+        # into the piston body and the standoff is then constant by construction.
+        _c = params.get("centre", [0.5, 0.5, 0.5])
+        self.centre_track = isinstance(_c, str) and str(_c).lower() in ("centroid", "surface")
+        self.centre = [0.0, 0.0, 0.0] if self.centre_track else [float(v) for v in _c]
+        self.centre_offset = [float(v) for v in params.get("centre_offset", [0.0, 0.0, 0.0])]
         self.scale = float(params.get("scale", 1.0))
         # THE PENALTY AS A FRACTION OF THE EXPLICIT CEILING. In acceleration form the contact is
         # a = k*d, integrated at the substep, so it is stable only while dt_sub*sqrt(k) < 1, i.e.
@@ -189,6 +206,9 @@ class MeshContact(Lateral):
         if m is None or not int(m.get("Nv", 0)):
             return None
         nv = int(m["Nv"])
+        if self.centre_track:
+            self.centre = (lvl.get("pos")[:nv].mean(0).detach().to("cpu").tolist())
+            self.centre = [a + b for a, b in zip(self.centre, self.centre_offset)]
         c = torch.tensor(self.centre, device=dev, dtype=dt_)
         V = lvl.get("pos")[:nv].to(dt_) - c
         vv = m.get("Vv", None)
@@ -958,6 +978,22 @@ class SeedPlate(Structural):
         self.axis = int(params.get("axis", 1))
         self.height = float(params.get("height", 0.55))
         self.centre = [float(v) for v in params.get("centre", [0.5, 0.5])]   # the two IN-PLANE axes
+        # THE PROFILE IS ORTHOGONAL TO THE SHAPE, and keeping them apart is the point. `shape`
+        # decides which quads of the lattice survive (sheet / disc / disc with a hole / grid) and
+        # `profile` displaces the survivors along the normal -- so `disc` + `cone` is a conical
+        # indenter and `sheet` + `pyramid` a Vickers-like one, from one seeder and one lattice.
+        # Fold them into a single `shape:` list and every new tip costs a new mask.
+        #
+        #   flat     the plane, and the default: 461 specs' worth of nothing changes.
+        #   pyramid  apex DOWN at the centre, four faces rising to the rim -- Chebyshev distance.
+        #   cone     the same with a radial distance, i.e. the axisymmetric tip.
+        #
+        # `profile_depth` is the APEX-TO-RIM rise. It is declared rather than an angle because the
+        # angle also depends on `half_width`, and two numbers that pin one geometry is one too many;
+        # the half-angle it implies is printed instead, since that is what an indenter is specified
+        # by (Berkovich 70.3 deg, Vickers 68 deg, both as equivalent cones).
+        self.profile = str(params.get("profile", "flat"))
+        self.profile_depth = float(params.get("profile_depth", 0.0))
         self.hole_frac = float(params.get("hole_frac", 0.35))
         self.bars = int(params.get("bars", 4))
         self.bar_frac = float(params.get("bar_frac", 0.5))
@@ -981,6 +1017,20 @@ class SeedPlate(Structural):
         pos[:Nv, ip[0]] = torch.as_tensor(xy[:, 0] + self.centre[0], dtype=dt_, device=dev)
         pos[:Nv, ip[1]] = torch.as_tensor(xy[:, 1] + self.centre[1], dtype=dt_, device=dev)
         pos[:Nv, self.axis] = self.height
+        if self.profile != "flat":
+            if self.profile == "pyramid":
+                d = np.maximum(np.abs(xy[:, 0]), np.abs(xy[:, 1]))       # square, apex-down
+            elif self.profile == "cone":
+                d = np.hypot(xy[:, 0], xy[:, 1])                         # axisymmetric
+            else:
+                raise ValueError(f"seed_plate: profile must be flat|pyramid|cone, "
+                                 f"got {self.profile!r}")
+            # THE APEX SITS AT `height` AND THE RIM RISES ABOVE IT, so `height` keeps meaning "the
+            # lowest point of the tool" across the whole ladder -- the number a descent is measured
+            # against. Defining it at the rim instead would make the flat plate and the pyramid
+            # start their contact at different depths for the same declared height.
+            pos[:Nv, self.axis] += torch.as_tensor(
+                self.profile_depth * d / max(self.half_width, 1e-12), dtype=dt_, device=dev)
         p0, p1 = lvl.state_schema["pos"]
         st = lvl.state.clone(); st[:, p0:p1] = pos; lvl.state = st
         if getattr(lvl, "occ", None) is not None:
@@ -1006,15 +1056,25 @@ class SeedPlate(Structural):
             f"; standoff {self.standoff:.4g} from the declared contact centre -> a face subtends "
             f"~{edge / self.standoff:.4f} rad, i.e. ~{int(math.pi / max(edge / self.standoff, 1e-3))} "
             f"bin rows (the contact caps at 200 and floors at 4)")
+        pr = ""
+        if self.profile != "flat":
+            pr = (f", {self.profile} apex-down: rim {self.profile_depth:.4g} above the apex, "
+                  f"half-angle {math.degrees(math.atan2(self.half_width, max(self.profile_depth, 1e-12))):.1f} "
+                  f"deg from the axis (Berkovich 70.3, Vickers 68 as equivalent cones)")
         print(f"[seed_plate] {self.shape}: {nF} quads ({4 * nF} sub-triangles), {Nv} vertices, "
               f"edge {edge:.4f}, half-width {self.half_width} at axis-{self.axis} = "
-              f"{self.height}{so}", flush=True)
+              f"{self.height}{pr}{so}", flush=True)
         return {}
 
 
-@register_operator("plate_drive", family="mechanics", set="vertex", kind="structural")
-class PlateDrive(Structural):
-    """Move a seeded plate along its normal at a prescribed rate, and publish its velocity.
+@register_operator("surface_drive", "plate_drive", family="mechanics", set="vertex",
+                   kind="structural")
+class SurfaceDrive(Structural):
+    """Move a seeded SURFACE along one axis at a prescribed rate, and publish its velocity.
+
+    `plate_drive` IS AN ALIAS AND NOT THE NAME. The operator translates whatever surface the set
+    holds -- a plate, a sphere, a cap -- so naming it for one of them made the sphere rung read as
+    a mistake. Canonical name first, on the `seed_mesh`/`mesh_seed` precedent.
 
     KINEMATIC, NOT DYNAMIC, AND THAT IS THE MODELLING DECISION. The plate is a rigid indenter whose
     position is imposed; it does not accelerate under the reaction it collects. `mesh_contact` still
@@ -1033,11 +1093,18 @@ class PlateDrive(Structural):
     # `target`, NOT `to`: the schema reserves `to`/`from` for FIELD references (`mpm_scatter`'s
     # `to: mpm_grid`), so a scalar there is resolved as a field name and the spec dies with
     # "references unknown field 0.35".
-    REQUIRES_PARAMS = ["target"]
+    # `by` OR `target`, AND `by` IS THE ONE A LADDER WANTS. `target` is an absolute coordinate of
+    # the surface's CENTROID, which is the tool's low point for a flat plate, its centre for a
+    # sphere, and neither for a pyramid -- so three rungs meant to differ only in the tool would
+    # have had to declare three different numbers to travel the same distance. `by` is that
+    # distance, signed along the axis, and it means the same thing for every shape.
+    REQUIRES_PARAMS = []
     DIFFERENTIABLE = False
     MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["prescribed_kinematics", "rigid_indenter", "moving_boundary"]
-    PARAM_ROLES = {"target": "final_position_on_axis", "over": "frames_of_travel",
+    PARAM_ROLES = {"by": "signed_displacement_along_axis",
+                   "target": "final_centroid_position_on_axis", "over": "frames_of_travel",
+                   "rigid": "reset_from_seed_or_translate_live",
                    "axis": "motion_axis", "hold": "frames_held_before_moving"}
     REFERENCE = "Plexus (this work); the loading protocol of a displacement-controlled indentation."
 
@@ -1045,10 +1112,20 @@ class PlateDrive(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
         self.axis = int(params.get("axis", 1))
-        self.target = float(params["target"])
+        if ("target" in params) == ("by" in params):
+            raise ValueError("surface_drive: declare exactly one of `by:` (a signed displacement "
+                             "along the axis, the same for every tool shape) or `target:` (an "
+                             "absolute coordinate of the surface's centroid)")
+        self.target = float(params["target"]) if "target" in params else None
+        self.by = float(params["by"]) if "by" in params else None
         self.over = int(params.get("over", 0))          # 0 -> the whole run, resolved at frame 0
         self.hold = int(params.get("hold", 0))
+        # RIGID BY DEFAULT: a tool's shape is its own, and resetting from the seeded positions is
+        # exact at every frame instead of accumulating one increment's rounding per step.
+        self.rigid = bool(params.get("rigid", True))
         self._from = None
+        self._v0 = None
+        self._y_prev = None
         self._said = False
 
     def forward(self, H, mask=None):
@@ -1059,19 +1136,46 @@ class PlateDrive(Structural):
         Nv = int(m["Nv"])
         pos = lvl.get("pos")
         if self._from is None:
-            self._from = float(pos[0, self.axis])
+            v0 = m.get("verts0", None)
+            self._v0 = (torch.as_tensor(v0[:Nv, self.axis], device=pos.device, dtype=pos.dtype)
+                        if v0 is not None else pos[:Nv, self.axis].clone())
+            self._from = float(self._v0.mean())      # the surface's own centroid on that axis
+            if self.target is None:
+                self.target = self._from + self.by
+            self._y_prev = self._from
             self.over = self.over or max(1, int(getattr(H, "n_frames", 0) or 1) - self.hold)
         f = int(getattr(H, "frame", 0) or 0)
         u = min(1.0, max(0.0, (f - self.hold) / float(self.over)))
         y = self._from + u * (self.target - self._from)
-        pos[:Nv, self.axis] = y
+        # A TRANSLATION OF THE SEEDED SHAPE, NOT AN ASSIGNMENT. `pos[:Nv, axis] = y` is the same
+        # thing for a plate, whose vertices all share one coordinate on that axis -- and it FLATTENS
+        # a sphere into a disc on the first frame. The offset is measured from the seeded positions,
+        # so the shape is exact at every frame rather than drifting with whatever the last one did.
+        if self.rigid:
+            pos[:Nv, self.axis] = self._v0 + (y - self._from)
+        else:
+            # INCREMENTAL, so whatever else moved the surface this frame SURVIVES. Resetting from
+            # the seeded positions is exact for a rigid tool and destroys a solved one: a spheroid
+            # under `cell_mechanics` would have its shape overwritten on the drive axis every frame,
+            # so the mechanics would run and be discarded and the surface would read as rigid while
+            # a schedule full of operators said otherwise.
+            pos[:Nv, self.axis] = pos[:Nv, self.axis] + (y - self._y_prev)
+        self._y_prev = y
         # ZERO BEFORE AND AFTER THE TRAVEL, not the mean rate: a friction law told the plate is
         # still sliding while it is parked would shear the material it is resting on for the whole
         # hold, and the hold exists precisely to show the material at rest under a static load.
         moving = (self.hold <= f < self.hold + self.over)
         v = (self.target - self._from) / (self.over * float(getattr(H, "dt", 1.0))) if moving else 0.0
-        m["Vv"][:Nv] = 0.0
-        m["Vv"][:Nv, self.axis] = v
+        # THE VELOCITY BUFFER IS THIS OPERATOR'S, NOT THE SEED'S. `seed_plate` allocated it and
+        # `seed_mesh` -- which predates all of this and serves 461 specs -- does not, so a surface
+        # built by the second and driven by this died on `KeyError: 'Vv'`. The operator that
+        # publishes a quantity is the one that should create the place to put it.
+        vv = m.get("Vv", None)
+        if vv is None or vv.shape[0] < Nv:
+            vv = torch.zeros(pos.shape[0], 3, device=pos.device, dtype=pos.dtype)
+            m["Vv"] = vv
+        vv[:Nv] = 0.0
+        vv[:Nv, self.axis] = v
         m["plate_height"] = y
         if not self._said:
             print(f"[plate_drive] {self.at}: axis {self.axis}, {self._from:.4g} -> {self.target:.4g} "

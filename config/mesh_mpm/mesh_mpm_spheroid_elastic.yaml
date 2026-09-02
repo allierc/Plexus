@@ -1,40 +1,41 @@
-# MESH-MPM 00 -- the FLAT PLATE: an open planar patch pressed into an elastic gel.
+# MESH-MPM 03 -- the CELL SPHEROID: an epithelium, not a shell, driven into the same gel.
 #
-# THE BASE OF THE LADDER, and the awkward case for the contact rather than the easy one. An
-# open patch has no interior for the star-shape reference to sit in, so `centre_offset` puts it
-# 0.30 above the plate, in the body of the piston -- put it IN the plate's plane and the ray
-# cast is degenerate, put it below and the plate pushes upward. Neither crashes; both report
-# zero contacts, which reads as nothing happened.
+# WHAT MAKES IT A SPHEROID AND NOT RUNG 01's SPHERE. `config/promotion/promo_G_gates_gate_00_spheroid_B.yaml`
+# builds the okuda vesicle: 200 cells as a spherical Voronoi tessellation with `vseed_cv: 0.15` and
+# `jitter: 0.18`, a `cell` SET carrying per-cell area and centroid, and `cell_mechanics` -- the AVM
+# shape energy K_A(A-A0)^2 + K_P(P-P0)^2 + K_V(v-v_eq)^2 + Lambda*l. So the surface here is
+# cell-scale FACETED and ELASTIC, where rung 01's is a smooth rigid shell, and the contact meets a
+# tessellation whose faces are the size of the features it is resolving.
 #
-# A FLAT PUNCH loads a fixed area from the moment it touches, and its pressure is singular at
-# the rim. That is the whole difference from the sphere: same material, same depth, a load
-# history that starts at full area instead of growing into it.
+# THE TISSUE GROWS, AND THE CLOCK DOES NOT STOP IT. `cell_grow`'s rate is PER CALL, not per unit
+# time -- it raises each cell's targets (A0, P0, v_eq) by `rate` every frame it runs, and
+# `cell_mechanics` then inflates the cell by force balance -- so 400 frames here buy exactly what
+# 400 of the gate's buy, whatever `dt` says. At the gate's own 0.003457 that is a target volume
+# 1.003457^400 = 4.0x, i.e. a radius 1.58x, so the spheroid arrives at the gel already swelling.
+# (The earlier version of this file claimed the opposite and left growth out. The 10^5 clock ratio
+# is real and it is why gate 04 was a replay, but it bites only what reads `H.dt`; a per-frame rate
+# is not that.)
 #
-# THE LADDER'S SHARED PART, IDENTICAL IN ALL THREE RUNGS. Same gel (E = 30 stress units = 200 Pa at
-# this calibration, a 1-3 mg/ml collagen I gel), same 500,000 material points, same warp solver,
-# same penalty (`k_frac: 0.45`, 20% of the explicit ceiling), same descent. Only the TOOL differs,
-# so anything that differs between the movies is the shape of the indenter.
+# `cell_divide` AND `edge_flip` ARE STILL OUT, and for a different reason: both change the FACE
+# COUNT, and `mesh_contact` rebuilds its direction-bin table from the surface every frame while the
+# renderer's skinned overlay binds the face array once. Topology that changes under a contact is
+# its own rung, with its own question -- does a T1 under load do anything the contact can see --
+# and putting it in this one would confound growth with reconnection.
 #
-# THE TOOL STARTS 0.01 ABOVE THE GEL -- 10 um, two thirds of a grid cell -- and travels `by: -0.11`
-# over 320 of the 400 frames, then holds for 80. The approach used to be 0.10 of the box, i.e. half
-# the run spent watching a tool fall through empty space; contact now begins around frame 30 and the
-# rest of the movie is the thing the run is about. The hold is not padding either: it is the only
-# stretch in which the surface is at REST under load, where the friction law's regularised branch
-# and the penalty's steady overlap can be read without a sliding term.
+# `rigid: false` ON THE DRIVE, WHICH IS THE POINT OF THE RUNG. The other three tools reset their
+# vertices from the seeded shape every frame -- exact, and right for a rigid indenter. Doing that
+# here would overwrite `cell_mechanics` on the drive axis every frame, so the mechanics would run
+# and be discarded and the surface would read as rigid while a schedule full of operators said
+# otherwise. Incremental, the tissue keeps whatever shape it solved.
 #
-# `by:` AND NOT `target:`, because `target` is an absolute coordinate of the surface's CENTROID --
-# the low point of a flat plate, the centre of a sphere, and neither for a pyramid. Three rungs
-# meant to travel the same distance would have had to declare three different numbers.
-#
-# `centre: centroid` RIDES THE TOOL. `mesh_contact` is star-shaped: it rays from `centre` and pushes
-# anything between `centre` and the surface outward, so `centre` names the region the gel may not
-# enter. Re-read every frame it is the tool's own middle, and `centre_offset` lifts it into the body
-# of an OPEN tool (a plate or a pyramid has no interior to sit in). Declared fixed, the standoff
-# drifts as the tool descends -- 0.30 to 0.50 on the first version of the sheet, which walked the
-# contact's direction-bin grid from 90 rows to 150 for a geometry that never changed.
+# THE COUPLING IS STILL ONE-WAY, AND THAT IS STATED RATHER THAN IMPLIED. `mesh_contact` computes the
+# reaction and accumulates it per vertex in `VERTEX_FORCE`, but no operator in this schedule applies
+# it, so the gel does not yet push back on the tissue -- the epithelium deforms under its own energy
+# and under the drive, not under the load. `ecm_load` is the registered operator for that half and
+# it appears in no spec; making it work is the next rung, not this one.
 
 general:
-  name: mesh_mpm_sheet_elastic
+  name: mesh_mpm_spheroid_elastic
   seed: 0
   n_frames: 400
   dt: 0.0032
@@ -72,11 +73,19 @@ plotting:
     max_points: 6000
 sets:
   vertex:
-    n: 4096
+    n: 8192
     mesh: half_edge
-    cell_set: plate_face
-  plate_face:
-    n: 2304
+    cell_set: cell
+  cell:
+    n: 1024
+    state:
+      area:
+        width: 1
+      cen:
+        width: 3
+      chem:
+        width: 2
+        integration: first_order
   mpm_particle:
     n: 500000
     types:
@@ -96,22 +105,35 @@ fields:
     frame: mpm_grid
     n_grid: 64
 operators:
-- op: seed_plate
+- op: mesh_seed
   at: vertex
-  shape: sheet
-  nq: 48
-  half_width: 0.25
-  axis: 1
-  height: 0.46
+  cell_set: cell
+  n_cells: 200
+  radius: 0.15
   centre:
   - 0.5
+  - 0.61
   - 0.5
-  standoff: 0.3
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  cell_set: cell
+  rate: 0.003457
+  rho: 1.0
+  a_sw: 0.0
+  hill: 4.0
+  vth_frac: 2.5
 - op: surface_drive
   at: vertex
   axis: 1
   by: -0.11
   over: 320
+  rigid: false
 - op: mesh_contact
   at: mpm_particle
   surface: vertex
@@ -121,10 +143,24 @@ operators:
   n_grid: 64
   a_max: 100000.0
   centre: centroid
-  centre_offset:
-  - 0.0
-  - 0.3
-  - 0.0
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 2.0
+  K_R: 0.4
+  Lambda: 3.0
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: topo_record
+  at: vertex
+  every: 4
+  engine_clock: true
 - op: mpm_strain
   at: mpm_particle
   implementation: warp
@@ -148,7 +184,9 @@ operators:
   at: mpm_particle
   n_grid: 64
 schedule:
-- seed_plate
+- mesh_seed
+- cell_geometry
+- cell_grow
 - surface_drive
 - substep_dt: 0.0004
   steps:
@@ -157,6 +195,8 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+- cell_mechanics
+- topo_record
 - mesh_inside
 descriptions:
   movie:
