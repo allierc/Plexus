@@ -1,5 +1,5 @@
 general:
-  name: myosin_mesh_type
+  name: myosin_mesh_x1p5
   seed: 0
   n_frames: 401
   dt: 1.0
@@ -17,7 +17,6 @@ plotting:
   renderer: vtk_mesh
   background: black
   edge_color: type
-  edge_lut: viridis
   edge_width: 3.0
   show_division: false
   colors:
@@ -32,6 +31,8 @@ plotting:
   curve:
     xlabel: frame
     ylabel: myosin
+    ymin: 0.0
+    ymax: 5.0
     font_size: 9
     ticks: 4
     size:
@@ -61,7 +62,7 @@ sets:
         myo_drive: 1.0
       tense:
         fraction: 0.5
-        myo_drive: 3.0
+        myo_drive: 1.5
 fields: {}
 operators:
 - op: mesh_seed
