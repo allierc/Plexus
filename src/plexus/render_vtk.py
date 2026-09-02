@@ -680,7 +680,6 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
     # exactly wrong while the picture is about myosin: two unrelated quantities on one surface, and
     # the reader cannot tell which is which. Declared, so a spec says what its picture is about.
     _div = bool(_pl.get("show_division", True))
-    _ntype = _cell_types(run_dir)
     if not fr:
         return "no trajectory"
     L0 = box_of(run_dir, fr)
@@ -702,137 +701,6 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
     return f"{n} frames"
 
 
-def _cell_types(run_dir):
-    """The cell set's `node_type`, for colouring a junction by the cells that own it."""
-    try:
-        z = _traj(run_dir)
-        k = [c for c in z.files if c.endswith("__node_type")]
-        return np.asarray(z[k[0]]) if k else None
-    except Exception:
-        return None
-
-
-def _curve_setup(p, pl, fr, ntype, erng):
-    """`plotting.curve` -- mean +- SD of a per-junction quantity, PER TYPE, as an inset.
-
-    Declared the way `cross_section` is, and for the same reason: the 3D view answers "what shape is
-    it" and cannot answer "by how much, and is the difference bigger than the spread". A mean alone
-    would be the more misleading of the two -- two populations whose means separate by less than
-    their scatter look identical on a surface and different on a line plot, so the band is not
-    decoration, it is the part that says whether to believe the lines.
-
-    THE AXES ARE FIXED, both of them. An autoscaled y renormalises every frame, so a belt whose
-    myosin doubles looks exactly like one that does not move; an autoscaled x redraws the whole
-    history at a new scale on every frame. Ranges come from the WHOLE clip, computed once here.
-    """
-    cfg = pl.get("curve")
-    if not cfg or ntype is None:
-        return None
-    import pyvista as pv
-    cfg = {} if cfg is True else dict(cfg)
-    ntype = np.asarray(ntype)
-    nt = int(ntype.max()) + 1 if ntype.size else 0
-    if nt < 1:
-        return None
-    series = []                                            # [type][frame] -> (mean, sd)
-    for _pos, m_, _a, _c in fr:
-        v = m_.get("e_myo")
-        nF = int(m_["nF"])
-        ef = np.asarray(m_["E_face"])
-        live = ef < nF
-        row = []
-        for k in range(nt):
-            if v is None or not live.any():
-                row.append((np.nan, 0.0)); continue
-            vv = np.asarray(v, float)[live]
-            kk = ntype[np.clip(ef[live].astype(int), 0, len(ntype) - 1)] == k
-            row.append((float(np.nanmean(vv[kk])), float(np.nanstd(vv[kk]))) if kk.any()
-                       else (np.nan, 0.0))
-        series.append(row)
-    S = np.asarray(series, float)                          # [T, ntype, 2]
-    lo = float(np.nanmin(S[..., 0] - S[..., 1])) if np.isfinite(S[..., 0]).any() else 0.0
-    hi = float(np.nanmax(S[..., 0] + S[..., 1])) if np.isfinite(S[..., 0]).any() else 1.0
-    pad = 0.08 * max(hi - lo, 1e-6)
-    ch = pv.Chart2D(size=tuple(cfg.get("size", (0.30, 0.26))),
-                    loc=tuple(cfg.get("loc", (0.66, 0.71))))
-    ch.background_color = (0, 0, 0, 0.0)
-    # NO BOX. The border is a rectangle around the whole inset and it competes with the two axes for
-    # the same job; with the axes drawn and labelled the box says nothing the axes do not.
-    ch.border_style = None
-    # NO TITLE BY DEFAULT. The panel sits over the render and a caption there costs a line of the
-    # plot area to say what the axis label already says; `title:` puts one back if a spec wants it.
-    ch.title = str(cfg.get("title", ""))
-    ch.x_axis.range = [0.0, float(len(fr) - 1)]
-    ch.y_axis.range = [float(cfg.get("ymin", lo - pad)), float(cfg.get("ymax", hi + pad))]
-    ch.x_axis.label = str(cfg.get("xlabel", "frame"))
-    ch.y_axis.label = str(cfg.get("ylabel", "myosin"))
-    # SMALL, AND WHITE, AND SET THROUGH VTK. pyvista exposes the SIZES (`label_size`,
-    # `tick_label_size`) but not the text COLOUR, which defaults to black -- so on a black background
-    # the labels rendered correctly and were invisible, which reads exactly like "the axes did not
-    # turn on". `GetLabelProperties()` / `GetTitleProperties()` are the vtkAxis accessors underneath;
-    # `axis_visible` and the other snake_case VTK names are blocked by pyvista's guard, these are not.
-    _fs = int(cfg.get("font_size", 9))
-    for _a in (ch.x_axis, ch.y_axis):
-        _a.label_visible = True
-        _a.ticks_visible = True
-        _a.tick_labels_visible = True
-        _a.grid = False
-        _a.label_size = _fs
-        _a.tick_label_size = max(6, _fs - 2)
-        _a.tick_count = int(cfg.get("ticks", 4))
-        # THREE SIGNIFICANT FIGURES, NOT SIX. VTK's default prints a tick at 19.6667 and 6.1569 --
-        # digits that are an artefact of dividing the range by the tick count, not a measurement.
-        # `label_format` alone does nothing: the format string is only consulted in PRINTF_NOTATION,
-        # so the mode has to be set first, which is why the first attempt changed nothing at all.
-        try:
-            _a.SetNotation(_a.PRINTF_NOTATION)
-            _fmt = str(cfg.get("tick_format", "%.1f"))
-            _a.SetLabelFormat(_fmt)
-            # THE FIRST AND LAST TICK ARE NOT TICKS. VTK draws the two ends of the range with a
-            # SEPARATE format (`RangeLabelFormat`), so setting the tick format alone left 6.22863 and
-            # -0.754096 at the extremes among 1.6 and 3.9 in between -- which looks like the format
-            # was ignored rather than like there being two of them.
-            _a.SetRangeLabelFormat(_fmt)
-        except Exception:
-            pass
-        try:
-            _a.pen.color = "white"
-            _a.GetLabelProperties().SetColor(1.0, 1.0, 1.0)
-            _a.GetTitleProperties().SetColor(1.0, 1.0, 1.0)
-        except Exception:
-            pass
-    try:
-        _t = ch.GetTitleProperties()
-        _t.SetColor(1.0, 1.0, 1.0); _t.SetFontSize(_fs + 1)
-    except Exception:
-        pass
-    ch.legend_visible = False
-    pal = [tuple(c) for c in (list((pl.get("colors") or {}).values()) or
-                              [(0.35, 0.60, 1.00), (1.00, 0.35, 0.25),
-                               (0.45, 0.95, 0.55), (1.00, 0.85, 0.30)])]
-    bands, lines = [], []
-    for k in range(nt):
-        c = pal[k % len(pal)]
-        bands.append(ch.area([0.0, 0.0], [0.0, 0.0], [0.0, 0.0], color=(*c, 0.28)))
-        lines.append(ch.line([0.0, 0.0], [0.0, 0.0], color=(*c, 1.0), width=2.0))
-    p.add_chart(ch)
-    return {"chart": ch, "S": S, "bands": bands, "lines": lines, "nt": nt}
-
-
-def _curve_update(cv, t):
-    """Reveal the series up to the current frame -- the band is mean-SD .. mean+SD."""
-    S, x = cv["S"], np.arange(t + 1, dtype=float)
-    if t < 1:
-        return
-    for k in range(cv["nt"]):
-        mu, sd = S[: t + 1, k, 0], S[: t + 1, k, 1]
-        ok = np.isfinite(mu)
-        if ok.sum() < 2:
-            continue
-        cv["bands"][k].update(x[ok], (mu - sd)[ok], (mu + sd)[ok])
-        cv["lines"][k].update(x[ok], mu[ok])
-
-
 def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     """The run through time, camera nailed down."""
     fr = frames_of(run_dir)
@@ -844,7 +712,6 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     # exactly wrong while the picture is about myosin: two unrelated quantities on one surface, and
     # the reader cannot tell which is which. Declared, so a spec says what its picture is about.
     _div = bool(_pl.get("show_division", True))
-    _ntype = _cell_types(run_dir)
     if not fr:
         return "no trajectory"
     ticks_all = _frames_ticks.value
@@ -880,7 +747,6 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
         if _vals:
             _erng = (float(min(np.nanmin(v) for v in _vals)),
                      float(max(np.nanmax(v) for v in _vals)))
-    _curve = _curve_setup(p, _pl, fr, _ntype, _erng)
     for t, (pos, mt, act, _chem) in enumerate(fr):
         back = _pair_reference(t, nFs, ticks, PAIR_TICKS)
         m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh" and _div), prev_nF=back,
@@ -895,14 +761,12 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
             p.remove_actor(eactor)
         actor = add(p, m, style)
         if _ec:
-            em = edges_of(pos, mt, _ec, ntype=_ntype, rng=_erng,
+            em = edges_of(pos, mt, _ec, ntype=None, rng=_erng,
                           colors=list((_pl.get("colors") or {}).values()) or None,
                           lut=str(_pl.get("edge_lut", "inferno")))
             eactor = None if em is None else p.add_mesh(
                 em, scalars="rgb", rgb=True, line_width=_pl.get("edge_width", 3.0),
                 lighting=False, render_lines_as_tubes=True)
-        if _curve is not None:
-            _curve_update(_curve, t)
         txt = p.add_text(f"{name}  {style}   frame {t + 1}/{len(fr)}   {int(mt['nF'])} cells",
                          position="upper_left", font_size=11, color="white")
         aim(p, L, fill=fill)

@@ -280,6 +280,7 @@ class LiveMovie:
         self._meshes = []
         self._mesh_is_subject = False
         self._curves = []
+        self._cs_rng = None
         self.drawn = self.n = self.rendered = 0
         self.t0 = None
         self.failed = None
@@ -691,6 +692,9 @@ class LiveMovie:
                 self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                 point_size=self._dot_px(pos))
             self._add_meshes(H)
+            for _n, _l, _m in self._mesh_levels(H):
+                self._edge_actor(H, _l, _m, first=True)
+                break
             self._curves_setup(H, lvl)
             self.t0 = time.perf_counter()
             return
@@ -760,7 +764,10 @@ class LiveMovie:
     # is that a ray from `centre` meets the surface once, so a rising sd is the surface going
     # off-sphere -- which is what collapses the direction-bin grid, and it does so long before the
     # picture looks wrong.
-    _CURVE_Q = ("cells", "area", "radius")
+    #     quantity: myosin    mean +- SD of the junctional myosin, per type -- the only one of
+    #                         these that lives on an EDGE rather than on a face, so it is grouped by
+    #                         the type of the cell each half-edge belongs to.
+    _CURVE_Q = ("cells", "area", "radius", "myosin")
 
     def _curve_series(self, H, lvl, q, ntype):
         """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
@@ -786,6 +793,18 @@ class LiveMovie:
                 for j in range(nt):
                     out[t, j] = (float((k == j).sum()), 0.0)
                 continue
+            if q == "myosin":
+                v = m.get("e_myo")
+                if v is None:
+                    continue
+                ef = np.asarray(m["E_face"]); live = ef < nF
+                vv = np.asarray(v, float)[live]
+                ke = k[np.clip(ef[live].astype(int), 0, nF - 1)]
+                for j in range(nt):
+                    sel = ke == j
+                    if sel.any():
+                        out[t, j] = (float(np.nanmean(vv[sel])), float(np.nanstd(vv[sel])))
+                continue
             import torch
             if q == "radius":
                 nv = int(m["Nv"])
@@ -808,6 +827,11 @@ class LiveMovie:
 
     def _curve_types(self, H, lvl):
         """The per-cell type ids, or None. `mesh_cell_set` names which set a face belongs to."""
+        _nts = getattr(H, "node_types", None) or {}
+        for nm in (getattr(lvl, "mesh_cell_set", None), "cell"):
+            v = _nts.get(nm)
+            if v is not None and int(np.max(v)) > 0:
+                return np.asarray(v).astype(int)
         for nm in (getattr(lvl, "mesh_cell_set", None), "cell"):
             if not nm:
                 continue
@@ -879,7 +903,7 @@ class LiveMovie:
                 e = 10.0 ** np.floor(np.log10(abs(v)))
                 f = np.ceil(abs(v) / e) if (v > 0) == up else np.floor(abs(v) / e)
                 return float(np.sign(v) * max(f, 1.0) * e)
-            lo = 0.0 if (lo >= 0 or q in ("cells", "area")) else _r1(lo, False)
+            lo = 0.0 if (lo >= 0 or q in ("cells", "area", "myosin")) else _r1(lo, False)
             # A ROUND STEP, NOT A ROUND TOP. Snapping only the top to one significant figure still
             # left the ticks between the ends to be whatever the count divided into: 0..8000 over
             # `ticks: 4` printed 0, 2667, 5333, 8000, and the two in the middle are the artefact of
@@ -1310,6 +1334,40 @@ class LiveMovie:
                       flush=True)
             return None
 
+    def _edge_actor(self, H, lvl, m, first):
+        """`plotting.edge_color: myosin | type` -- the junctions as their own coloured line mesh.
+
+        REUSED, NOT RESTATED. `render_vtk.edges_of` builds it, the same way `_marks` is imported
+        rather than copied: a face colour can only say something about a cell, and myosin lives on
+        the junction, so the edges have to be drawn as edges. The range is taken ONCE, on the first
+        frame, for the reason every other range here is fixed -- a per-frame one would renormalise
+        and a belt that is tightening would look constant.
+        """
+        mode = str((self.style or {}).get("edge_color", "") or "").lower()
+        if not mode:
+            return
+        from plexus.render_vtk import edges_of
+        nt = self._curve_types(H, lvl)
+        if first and mode == "myosin":
+            v = m.get("e_myo")
+            if v is not None:
+                ef = np.asarray(m["E_face"]); live = ef < int(m["nF"])
+                vv = np.asarray(v, float)[live]
+                self._erng = (float(np.nanmin(vv)), float(np.nanmax(vv)))
+        pos = np.asarray(lvl.get("pos")[: int(m["Nv"])], np.float32)
+        em = edges_of(pos, {k: np.asarray(m[k]) for k in ("E_srce", "E_trgt", "E_face")}
+                      | {"nF": int(m["nF"]), "e_myo": m.get("e_myo")},
+                      mode, ntype=nt, rng=getattr(self, "_erng", None),
+                      colors=list((self.style or {}).get("colors", {}).values()) or None,
+                      lut=str((self.style or {}).get("edge_lut", "inferno")))
+        if em is None:
+            return
+        if getattr(self, "_eactor", None) is not None:
+            self.p.remove_actor(self._eactor)
+        self._eactor = self.p.add_mesh(em, scalars="rgb", rgb=True, lighting=False,
+                                       line_width=float((self.style or {}).get("edge_width", 3.0)),
+                                       render_lines_as_tubes=True)
+
     def _update_meshes(self, H):
         """POINTS ONLY. The topology is rebound only if the face count changed -- a plate never
         divides, but an epithelium does, and swapping the face array every frame on a 12,000-cell
@@ -1326,6 +1384,7 @@ class LiveMovie:
                     pd.faces = self._mesh_faces(m)
                 else:
                     pd.points = self._mesh_xyz(lvl, nv, sc, ct)
+                self._edge_actor(H, lvl, m, first=False)
                 if self._mesh_is_subject:
                     self._mesh_face_rgb(m, pd)
             except Exception:                        # noqa: BLE001
@@ -1395,24 +1454,28 @@ class LiveMovie:
             # CENTRED ON EVERYTHING IN THE PANEL. The range was taken from the PARTICLES alone, so
             # a surface sitting above them -- the spheroid over the gel, which is the whole point of
             # the section -- fell outside it and the content sat low and off-centre in its own box.
-            _mx = [xs]; _my = [ys]
-            for _nm, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
-                MV = np.asarray(_pd.points)
-                _in = np.abs(MV[:, ax] - y0) < self.cs_cells * dx
-                if _in.any():
-                    _mx.append(MV[_in][:, a]); _my.append(MV[_in][:, b])
-            _cat_x = np.concatenate(_mx); _cat_y = np.concatenate(_my)
-            _ax0, _bx0 = float(np.nanmin(_cat_x)), float(np.nanmin(_cat_y))
-            _ax1, _bx1 = float(np.nanmax(_cat_x)), float(np.nanmax(_cat_y))
-            _sp = max(_ax1 - _ax0, _bx1 - _bx0, 1e-9) * 1.06
-            _cx, _cy = 0.5 * (_ax0 + _ax1), 0.5 * (_bx0 + _bx1)
-            # SET ON THE AXES, NOT ON THE CHART. `Chart2D.x_range` is a convenience that the chart
-            # re-derives from its plots whenever one is added or removed -- and this panel removes
-            # and re-adds every series on every frame -- so the range was being overwritten the
-            # moment it was set, and the content sat wherever autoscaling put it: low and left, with
-            # the panel's top-right empty. `x_axis.range` is the property the curve panels already
-            # use and it sticks.
-            self._cs_rng = ([_cx - _sp / 2, _cx + _sp / 2], [_cy - _sp / 2, _cy + _sp / 2])
+            # THE RANGE IS COMPUTED ONCE AND HELD, and getting this wrong is the same mistake the
+            # curve panels carry a paragraph about. Taken from the CURRENT frame's content it grows
+            # with the spheroid -- 0.039 to 0.150 of the box over the run -- so the panel rescales
+            # every frame and a gel that never moves appears to shrink and drift across it. Nothing
+            # in a section should move except what is actually moving.
+            #
+            # THE BOX IS THE FIXED CHOICE, not the first frame's content: it is the same coordinates
+            # for every frame by construction, needs no guess about how far the run will get, and is
+            # what the 3D view beside it is already drawn in. Equal span on both axes, so a circle
+            # renders as a circle.
+            #
+            # SET ON `x_axis.range`, NOT ON `Chart2D.x_range`: the latter is a convenience the chart
+            # RE-DERIVES from its plots whenever one is added, and this panel removes and re-adds
+            # every series every frame, so it was overwritten the moment it was set.
+            if getattr(self, "_cs_rng", None) is None:
+                _l, _h = np.asarray(self.lo, float), np.asarray(self.hi, float)
+                _sp = float(max(_h[a] - _l[a], _h[b] - _l[b], 1e-9))
+                _cx, _cy = 0.5 * (_l[a] + _h[a]), 0.5 * (_l[b] + _h[b])
+                self._cs_rng = ([_cx - _sp / 2, _cx + _sp / 2], [_cy - _sp / 2, _cy + _sp / 2])
+                print(f"[live-movie] cross section: axes fixed to the box, "
+                      f"{'xyz'[a]} {self._cs_rng[0][0]:.3g}..{self._cs_rng[0][1]:.3g}  "
+                      f"{'xyz'[b]} {self._cs_rng[1][0]:.3g}..{self._cs_rng[1][1]:.3g}", flush=True)
             # "fixed" IS A STRING HERE, not an enum -- pyvista validates against {"auto","fixed"}
             # and the enum I reached for raised, which the panel's own guard turned into
             # "cross section unavailable" and no section at all for the whole run. `behavior` is
@@ -1822,6 +1885,11 @@ class _ReplayLevel:
             self._face_cols = {k: np.asarray(z[f"{name}__mesh_{k}"])
                                for k in ("age", "ndiv", "apop", "inhib")
                                if f"{name}__mesh_{k}" in z.files}
+            # AND THE PER-HALF-EDGE COLUMNS, on `mesh_offsets` like E_srce/E_trgt/E_face. `e_myo` is
+            # the only quantity in this model that lives on a JUNCTION, so without it neither the
+            # myosin curve nor a myosin edge colour can be drawn from a trajectory at all.
+            self._edge_cols = {k[len(name) + len("__mesh_"):]: np.asarray(z[k]) for k in z.files
+                               if k.startswith(f"{name}__mesh_e_") and not k.endswith("_offsets")}
 
     @property
     def mesh(self):
@@ -1835,6 +1903,8 @@ class _ReplayLevel:
         fa, fb = int(self._fo[self.t]), int(self._fo[self.t + 1])
         for k, v in self._face_cols.items():
             d[k] = v[fa:fb]
+        for k, v in getattr(self, "_edge_cols", {}).items():
+            d[k] = v[a:b]                                # half-edge offsets, not face offsets
         return d
 
     def get(self, key):
@@ -1849,6 +1919,12 @@ class _ReplayState:
     """The `H` the renderer expects: a name -> level mapping and nothing else."""
 
     def __init__(self, z, dev):
+        # EVERY SET'S TYPES, not only the sets that carry positions. A vertex model's `cell` set has
+        # `cen`/`area`/`node_type` and NO `pos`, so it never becomes a level here -- and the curve's
+        # per-type split, which indexes faces by the cell set's node_type, silently collapsed to one
+        # series. The types are in the file either way.
+        self.node_types = {k[: -len("__node_type")]: np.asarray(z[k])
+                           for k in z.files if k.endswith("__node_type")}
         names = sorted({k[: -len("__pos")] for k in z.files if k.endswith("__pos")})
         self.levels = {n: _ReplayLevel(z, n, dev) for n in names}
         self.fields = {}
