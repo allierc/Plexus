@@ -124,5 +124,6 @@ schedule:
   - voxelize
 
 plotting:
+  renderer: vtk_points
   background: black
   point_size: 4.0

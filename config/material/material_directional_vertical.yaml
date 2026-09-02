@@ -118,5 +118,6 @@ descriptions:
       Each individual particle is very small relative to the overall dimensions of
       the frame.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

@@ -85,6 +85,7 @@ descriptions:
       disc-like arrangement. The particles are contained within a large, transparent
       wireframe cube that defines the spatial boundaries.
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

@@ -118,4 +118,5 @@ descriptions:
       a singular, connected structure near the bottom center. This central object
       is dark and elongated, contrasting with the surrounding bright blue field.
 plotting:
+  renderer: mpl2d
   dot_size: 1.2

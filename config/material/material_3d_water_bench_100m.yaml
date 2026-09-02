@@ -454,6 +454,7 @@ sets:
     radius: 0.05
     vel_init: 2.5
 plotting:
+  renderer: vtk_points
   background: black
   box_frame: true
   camera_elev: 1.18

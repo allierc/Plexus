@@ -453,6 +453,7 @@ descriptions:
       objects form a complex, multi-colored field of interconnected filaments and
       pools of varying sizes.
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

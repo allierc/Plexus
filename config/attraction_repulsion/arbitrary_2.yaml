@@ -24,6 +24,7 @@ operators:
 schedule: [radius_graph, attraction_repulsion]
 
 plotting:
+  renderer: mpl2d
   background: black
   colormap: tab10
   point_size: 4.0

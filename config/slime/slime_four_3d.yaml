@@ -78,6 +78,7 @@ schedule:
 - bounce
 - glide
 plotting:
+  renderer: vtk_points
   colors:
     a:
     - 0.2

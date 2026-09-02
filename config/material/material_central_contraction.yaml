@@ -117,4 +117,5 @@ descriptions:
       do not form any specific geometric shapes or clusters, maintaining a sparse
       and even spatial occupancy.
 plotting:
+  renderer: mpl2d
   dot_size: 1.2

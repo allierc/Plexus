@@ -188,7 +188,5 @@ _two_species:
   death_after_frame: 180
   max_mark_frac: 0.25
   shrink_rate: 0.15
-  why: species A (chem 0,1) and species B (chem 2,3) are independent RD systems in
-    one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species
-    run cannot put growth and death in different places, because every operator reads
-    the same field.
+  why: species A (chem 0,1) and species B (chem 2,3) are independent RD systems in one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species run cannot put growth and death in different places, because every operator reads the same field.
+plotting: {renderer: vtk_mesh}

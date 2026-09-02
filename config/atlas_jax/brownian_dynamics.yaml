@@ -37,5 +37,6 @@ operators:
 schedule: [agitate]
 
 plotting:
+  renderer: mpl2d
   background: black
   point_size: 3.0

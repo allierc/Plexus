@@ -98,6 +98,7 @@ schedule:
 - mpm_gather
 - mpm_gather
 plotting:
+  renderer: panels
   background: black
   cutaway:
   - x

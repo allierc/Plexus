@@ -25,6 +25,7 @@ operators:
 schedule: [radius_graph, attraction_repulsion]
 
 plotting:                      # render STYLE (read by plexus.plot; engine ignores it)
+  renderer: mpl2d
   background: black
   colormap: tab10
   point_size: 2.0

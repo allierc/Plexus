@@ -125,5 +125,6 @@ descriptions:
       background is a plain white field that provides high contrast for the blue and
       gray elements.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

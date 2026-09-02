@@ -118,5 +118,6 @@ descriptions:
       A central void emerges as a negative space, characterized by the absence of
       particles in the middle of the field.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

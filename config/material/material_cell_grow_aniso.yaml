@@ -63,6 +63,7 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 plotting:
+  renderer: mpl2d
   background: black
   colors:
     body:

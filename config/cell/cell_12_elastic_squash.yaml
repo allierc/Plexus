@@ -194,6 +194,7 @@ schedule:
   capture: true
   compile: true
 plotting:
+  renderer: panels
   background: black
   colors:
     light:

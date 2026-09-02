@@ -106,6 +106,7 @@ descriptions:
       is contained within a large, transparent white wireframe cube. The background
       is solid black, providing high contrast for the blue particles and white outlines.
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

@@ -128,5 +128,6 @@ descriptions:
       to one another, forming a point-cloud topology rather than a continuous field
       or network.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

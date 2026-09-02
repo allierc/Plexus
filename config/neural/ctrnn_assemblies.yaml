@@ -349,5 +349,6 @@ schedule:
   - aggregate
 
 plotting:
+  renderer: mpl2d
   background: black
   point_size: 6.0

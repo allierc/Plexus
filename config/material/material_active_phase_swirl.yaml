@@ -114,5 +114,6 @@ descriptions:
       a consistent blue hue. The particles are bounded within a square area, creating
       a dense, speckled texture.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

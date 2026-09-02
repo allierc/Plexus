@@ -74,6 +74,7 @@ descriptions:
       boundary for the simulation. The particles are densely packed to form a cohesive,
       roughly spherical mass.
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

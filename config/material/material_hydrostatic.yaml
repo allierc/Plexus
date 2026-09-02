@@ -88,5 +88,6 @@ descriptions:
       medium-blue color. The overall mass of particles forms a continuous, granular
       field that occupies the lower portion of the white background.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

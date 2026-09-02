@@ -19,6 +19,7 @@ operators:
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
 plotting:
+  renderer: mpl2d
   colors: {a: [0.45, 0.75, 1.0]}
   background: black
   gamma: 0.7

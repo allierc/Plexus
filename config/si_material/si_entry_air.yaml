@@ -532,6 +532,7 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

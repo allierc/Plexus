@@ -22,6 +22,7 @@ operators:
 - {op: attractor_flow, at: cloud, system: dadras, a: 3.0, b: 2.7, c: 1.7, d: 2.0, e: 9.0, clamp: 5000.0}
 schedule: [attractor_flow]
 plotting:
+  renderer: vtk_points
   background: black
   colors:
     c: [1.0, 0.35, 0.72]

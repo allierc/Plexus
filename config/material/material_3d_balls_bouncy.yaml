@@ -86,6 +86,7 @@ descriptions:
       separated from each other. The particles move independently until the red and
       green ones merge into a single overlapping cluster.
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

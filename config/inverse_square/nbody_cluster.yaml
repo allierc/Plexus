@@ -17,7 +17,7 @@ fields: {}
 operators:
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.1, all_pairs: true, compile: true}
 schedule: [squared_law]
-plotting: {background: black, point_size: 2, colors: {s: [0.7, 0.7, 1.0]}, movie_max_frames: 480}
+plotting: {renderer: mpl2d, background: black, point_size: 2, colors: {s: [0.7, 0.7, 1.0]}, movie_max_frames: 480}
 # 480 movie frames, not the default 120: over 16,000 frames a 120-frame movie is a slideshow of
 # four stills per collapse, and the two clumps merge between two of them.
 

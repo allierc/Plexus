@@ -41,6 +41,7 @@ operators:
   - {op: separation,   at: particle}
 schedule: [radius_graph, cohesion, velocity_align, separation]
 plotting:
+  renderer: vtk_points
   background: black
   colormap: tab20
   point_size: 6

@@ -31,6 +31,7 @@ operators:
 - {op: glide,   at: cell, noise: 0.012}
 schedule: [deposit, diffuse, decay, sense, glide]
 plotting:
+  renderer: mpl2d
   colors:
     a: [0.2, 0.95, 0.65]
     b: [1.0, 0.35, 0.45]

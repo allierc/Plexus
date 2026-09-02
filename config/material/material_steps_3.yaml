@@ -103,5 +103,6 @@ descriptions:
       the simulation. The grey steps are solid, geometric shapes that provide a static
       foundation for the moving particles.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

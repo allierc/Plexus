@@ -90,6 +90,7 @@ descriptions:
       are approximately equal in size and density. The clusters are initially arranged
       in a triangle and transition into a linear horizontal arrangement.
 plotting:
+  renderer: mpl2d
   background: black
   colormap: tab10
   dot_size: 1.2

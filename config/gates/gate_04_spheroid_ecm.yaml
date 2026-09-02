@@ -53,6 +53,7 @@ general:
     force_nN: 9162.430188008488
 
 plotting:
+  renderer: vtk_points
   background: black
   box_frame: true
 

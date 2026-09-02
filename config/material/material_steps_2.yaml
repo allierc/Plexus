@@ -113,5 +113,6 @@ descriptions:
       base. The grey steps are large and uniform in color, providing a stable surface
       for the blue particles to interact with.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

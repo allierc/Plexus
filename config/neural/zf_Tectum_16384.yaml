@@ -42,4 +42,4 @@ operators:
   - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
       sigma: 6.0, normalize: none}
 schedule: [neuron_update, neuron_signal, aggregate, voxelize]
-plotting: {background: black, point_size: 4.0}
+plotting: {renderer: vtk_points, background: black, point_size: 4.0}

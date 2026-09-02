@@ -90,5 +90,6 @@ descriptions:
       geometric structure. In the final state, the particles form a continuous, horizontal
       band of varying thickness along the bottom edge.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

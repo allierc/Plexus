@@ -89,5 +89,6 @@ descriptions:
       vertically in the center-right of the frame. The background is a plain white
       surface that provides a high-contrast environment for the moving particles.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

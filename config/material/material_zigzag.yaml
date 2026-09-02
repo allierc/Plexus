@@ -98,5 +98,6 @@ descriptions:
       at the highest elevation. The middle and bottom platforms are shorter and shifted
       to the right, creating a stepped structure for the particles to fall onto.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

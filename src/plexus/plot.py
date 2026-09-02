@@ -50,6 +50,49 @@ def _composite(frame, colors, gamma=0.7):
     return np.clip(rgb, 0, 1) ** gamma                # gamma lifts faint trails
 
 
+# ==========================================================================================================
+#  WHICH RENDERER, AND WHY -- one key, resolved in one place, printed on every run
+# ==========================================================================================================
+# THE CHOICE USED TO BE INVISIBLE. Four renderers were reachable from here and nothing in a spec
+# named any of them: `plotting.panels` picked one, the PRESENCE OF A MESH SET picked another, the
+# dimension picked between the last two, and a fifth (`live_movie`, the VTK point renderer every MPM
+# movie is made with) was not reachable from `-o plot` at all -- it only ran during generation. So a
+# 3D point set was drawn one way while it was being computed and a different way afterwards, and the
+# only way to find out which was to read this file.
+#
+# `plotting.renderer` names it. Unset, the default is derived from what the data contains and both
+# the choice and the reason are printed, so an unset spec is still legible from its output.
+RENDERERS = {
+    "vtk_points": "VTK point cloud (plexus.live_movie) -- real dots, obstacles, box, scale bar",
+    "vtk_mesh":   "VTK surface mesh (plexus.render_vtk) -- depth-buffered, lit",
+    "mpl2d":      "matplotlib scatter movie -- planar runs",
+    "splat3d":    "numpy gaussian splat -- soft blobs, no obstacles (legacy)",
+    "panels":     "two-panel composition (tools/cell_panels) -- domain + cross-sectioned body",
+    "none":       "no figures",
+}
+
+
+def _resolve_renderer(sim, d) -> tuple[str, str]:
+    """(renderer, why). `plotting.renderer` if declared, else the default the data implies."""
+    style = sim.plotting or {}
+    want = str(style.get("renderer", "") or "").strip().lower()
+    if want:
+        if want not in RENDERERS:
+            raise ValueError(
+                f"plotting.renderer: {want!r} is not one of {', '.join(sorted(RENDERERS))}")
+        return want, "declared in plotting.renderer"
+    if style.get("panels"):
+        return "panels", "plotting.panels is set"
+    if any(k.endswith("__mesh_nF") for k in d.files):
+        return "vtk_mesh", "a mesh set is present"
+    dims = {int(d[k].shape[2]) for k in d.files if k.endswith("__pos") and d[k].ndim == 3}
+    if dims == {2}:
+        return "mpl2d", "every set is planar"
+    if 3 in dims:
+        return "vtk_points", "a 3D point set (default)"
+    return "mpl2d", "no 3D point set"
+
+
 def _render_meta(sname: str) -> dict:
     """Render hints for a set, from the entity registry (how to color/draw it)."""
     try:
@@ -145,7 +188,30 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
     # each draws a single compartment alone while the entire claim is how they relate. The two
     # panels are the domain (where the cell is, in its box) and the cell zoomed with a cross
     # section (what it is made of) -- a filled body tells you nothing from outside.
-    if (sim.plotting or {}).get("panels"):
+    which, why = _resolve_renderer(sim, d)
+    print(f"[plot] renderer: {which} -- {RENDERERS[which]}  ({why})", flush=True)
+    if which == "none":
+        return data_dir
+
+    # THE VTK POINT RENDERER, which is the one every MPM movie is already made with. Reached here by
+    # replaying the trajectory through the SAME class the live hook uses, so there is one point
+    # renderer in the codebase rather than two that drift apart. It falls back to the splat rather
+    # than taking a plot down: a headless node with no GL is a real configuration.
+    if which == "vtk_points":
+        from plexus import render_vtk
+        if render_vtk.available():
+            from plexus import live_movie
+            st = sim.plotting or {}
+            live_movie.replay(data_dir, sim,
+                              max_frames=int(st.get("movie_max_frames", 300)),
+                              render_n=int(st.get("render_n", 500_000_000)),
+                              stills=int(st.get("stills", 0)), name=sim.name)
+            return data_dir
+        print("[plot] renderer vtk_points asked for but pyvista did not import -- falling back to "
+              "splat3d, which has no obstacles and no depth buffer", flush=True)
+        which = "splat3d"
+
+    if which == "panels":
         import sys as _sys
         _t = os.path.join(get_repo_root(), "tools")
         if _t not in _sys.path:
@@ -179,8 +245,7 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
     # ONLY FOR A MESH SET, and only when pyvista imports: a 2D spec has nothing to z-buffer, and a
     # headless node with no GL is a real configuration that must not take a generation down. Both
     # fall through to the matplotlib path below, unchanged.
-    mesh_sets = sorted(k[:-len("__mesh_nF")] for k in d.files if k.endswith("__mesh_nF"))
-    if mesh_sets:
+    if which == "vtk_mesh":
         from plexus import render_vtk
         if render_vtk.available():
             render_vtk.still(data_dir, style="flat",
@@ -215,7 +280,9 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         pal, sf = _typed_palette(sim, sname, style)
         size_scale = (sf[nt % len(sf)] if (sf is not None and nt is not None) else None)
         # --- 3D set: render with the orbiting 3D gaussian splat, then move on --- #
-        if D == 3:
+        # `renderer: mpl2d` on a 3D run is not an error, it is a request for the xy PROJECTION --
+        # which is the right picture for a run whose third axis is thin (a disc, a monolayer).
+        if D == 3 and which != "mpl2d":
             box = (np.asarray(world_size, np.float32) if world_size is not None
                    and len(world_size) == 3 else np.array([W, 1.0, 1.0], np.float32))
             # up-axis: the splat camera takes world axis 2 (z) as screen-vertical. A scene

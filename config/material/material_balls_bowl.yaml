@@ -107,5 +107,6 @@ descriptions:
       This green region is similar in size and texture to the individual components
       of the first cluster.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

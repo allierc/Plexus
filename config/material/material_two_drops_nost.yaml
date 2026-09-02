@@ -88,5 +88,6 @@ descriptions:
       are approximately the same size and are positioned side-by-side. The particles
       within each cluster are densely packed to form a roughly spherical shape.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

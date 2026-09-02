@@ -117,4 +117,5 @@ descriptions:
       particles collectively form a high-density, homogeneous field within a square
       boundary.
 plotting:
+  renderer: mpl2d
   dot_size: 1.2

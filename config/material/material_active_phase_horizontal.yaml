@@ -115,5 +115,6 @@ descriptions:
       blue hue. The particles do not form clusters or chains, appearing as a homogeneous
       point cloud.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

@@ -123,5 +123,6 @@ descriptions:
       dot is roughly the same size and maintains a uniform color. The particles are
       not connected to one another, forming a discrete point cloud.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

@@ -102,5 +102,6 @@ sets:
     parent: cell
     per_parent: 2500
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

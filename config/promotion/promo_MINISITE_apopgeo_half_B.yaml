@@ -88,5 +88,5 @@ _apopgeo:
     mode: band
     band_deg: 45.0
     n_bands: 1
-  why: death is the only mechanism in this composition, so the cell count can only
-    fall and n_apop must equal 400 - cells_final exactly
+  why: death is the only mechanism in this composition, so the cell count can only fall and n_apop must equal 400 - cells_final exactly
+plotting: {renderer: vtk_mesh}

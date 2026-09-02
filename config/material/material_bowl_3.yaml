@@ -118,5 +118,6 @@ descriptions:
       final state shows the particles organized into a narrow, vertical column at
       the bottom center.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

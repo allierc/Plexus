@@ -48,6 +48,7 @@ general:
 # TOP LEVEL, not under `general:`. `schema.load` reads `raw.get("plotting", {})` directly, so a
 # `plotting:` nested under `general:` is parsed, ignored and silently lost.
 plotting:
+  renderer: vtk_mesh
   background: black
 
 sets:

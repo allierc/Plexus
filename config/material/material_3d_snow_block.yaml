@@ -86,6 +86,7 @@ descriptions:
       The particles are much smaller than the cube, which serves as the primary reference
       for scale.
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

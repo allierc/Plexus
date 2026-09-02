@@ -161,6 +161,7 @@ schedule:
 - cell_divide
 - topo_record
 plotting:
+  renderer: vtk_mesh
   background: black
   cutaway:
   - x

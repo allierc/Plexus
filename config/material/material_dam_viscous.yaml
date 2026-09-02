@@ -90,5 +90,6 @@ descriptions:
       layer. The final arrangement consists of a continuous but irregular band of
       blue dots along the bottom edge.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

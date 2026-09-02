@@ -138,6 +138,7 @@ operators:
 schedule: [radius_graph, cohesion, velocity_align, separation]
 
 plotting:
+  renderer: mpl2d
   background: black
   colormap: tab20
   point_size: 6.0

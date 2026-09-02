@@ -374,6 +374,7 @@ sets:
     per_parent: 7407407
     vel_init: 0.0
 plotting:
+  renderer: vtk_points
   background: black
   box_frame: true
   camera_elev: 1.18

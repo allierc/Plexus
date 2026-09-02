@@ -89,5 +89,6 @@ descriptions:
       are arranged in a dynamic, evolving shape that moves from a low horizontal position
       to a high vertical peak.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

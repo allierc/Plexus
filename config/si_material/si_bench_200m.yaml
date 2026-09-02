@@ -45,6 +45,7 @@ operators:
   wall_contact: 0.04
   wall_damp: 1.0
 plotting:
+  renderer: vtk_points
   background: black
   box_frame: true
   camera_elev: 1.18

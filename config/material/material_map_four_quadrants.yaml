@@ -127,5 +127,6 @@ descriptions:
       are not connected to one another, forming a discrete point cloud rather than
       a continuous field.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

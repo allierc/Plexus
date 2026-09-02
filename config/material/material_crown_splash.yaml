@@ -106,5 +106,6 @@ descriptions:
       to the sphere as it moves into the blue field. The orange sphere remains a consistent
       size and color throughout the entire sequence.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

@@ -105,5 +105,6 @@ descriptions:
       bottom of the frame. The grey blocks are solid, opaque, and significantly larger
       than the individual blue particles.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

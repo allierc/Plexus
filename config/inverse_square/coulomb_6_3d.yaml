@@ -19,6 +19,7 @@ operators:
   - {op: squared_law,  at: particle, law: coulomb, clamp: 1000000.0}
 schedule: [radius_graph, squared_law]
 plotting:
+  renderer: vtk_points
   background: black
   size_by: charge          # point size ~ |charge|
   colors:                  # ParticleGraph PDE_E colour code (by type index)

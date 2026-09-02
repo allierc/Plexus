@@ -122,5 +122,6 @@ descriptions:
       The blue particles vary in density, appearing as a concentrated mass at the
       start and a dispersed layer at the end.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

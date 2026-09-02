@@ -91,4 +91,5 @@ descriptions:
       a roughly spherical boundary. As the simulation progresses, the two sets of
       particles merge into a single, larger, and more irregular composite shape.
 plotting:
+  renderer: mpl2d
   dot_size: 1.2

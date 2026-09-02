@@ -43,5 +43,6 @@ operators:
 schedule: [adhere]
 
 plotting:
+  renderer: mpl2d
   background: black
   point_size: 8.0

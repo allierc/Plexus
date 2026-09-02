@@ -126,5 +126,6 @@ descriptions:
       at the bottom. The background consists of a white upper region and a gray, stepped
       lower region.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

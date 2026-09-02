@@ -118,5 +118,6 @@ descriptions:
       a single pixel or a small cluster of pixels. There are no visible connections
       or topological structures between the individual particles.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

@@ -17,6 +17,7 @@ operators:
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
 schedule: [radius_graph, attraction_repulsion]
 plotting:
+  renderer: vtk_points
   background: black
   colormap: tab10
   splat_size: 1.7

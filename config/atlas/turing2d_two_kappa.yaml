@@ -96,5 +96,6 @@ schedule:
 - cell_chem_react
 - cell_chem_react
 plotting:
+  renderer: mpl2d
   background: black
   dot_fill: 0.9

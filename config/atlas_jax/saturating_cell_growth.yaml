@@ -42,5 +42,6 @@ operators:
 schedule: [seed_state, grow_radius]
 
 plotting:
+  renderer: mpl2d
   background: black
   point_size: 6.0
