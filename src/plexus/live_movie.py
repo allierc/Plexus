@@ -36,6 +36,9 @@ import torch
 
 FLAT = dict(render_points_as_spheres=True, lighting=False, ambient=1.0, diffuse=0.0, specular=0.0)
 _CS_AXIS = {"x": 0, "y": 1, "z": 2}
+# EVERY `plotting.color_field` THE RENDERER KNOWS. Named in one place so the check that
+# refuses an unknown one can quote the list, the way `plotting.renderer` already does.
+_FIELDS = ("vorticity", "speed", "pressure", "deformation", "strain", "volume")
 
 
 def _biggest_particle_set(H):
@@ -187,8 +190,12 @@ class LiveMovie:
         if length_um and time_s is not None:
             _m = float(length_um) / 1.0e6
             _w = [float(x) * _m for x in world]
-            _f = (lambda v: f"{v * 1e3:g} mm" if v < 0.01 else f"{v * 100:g} cm"
-                  if v < 1.0 else f"{v:g} m" if v < 1000.0 else f"{v / 1000:g} km")
+            # THREE SIGNIFICANT FIGURES. `:g` on a measured box printed "1.17233 mm cube" -- six
+            # digits of a number the reader is being given for scale, where the point is the order
+            # of magnitude and the leading figure. (The scale BAR is a chosen round number and is
+            # exact; this is a measurement and is rounded.)
+            _f = (lambda v: f"{v * 1e3:.3g} mm" if v < 0.01 else f"{v * 100:.3g} cm"
+                  if v < 1.0 else f"{v:.3g} m" if v < 1000.0 else f"{v / 1000:.3g} km")
             self._box_label = ("   box " + " x ".join(_f(v) for v in _w)
                                if len(set(_w)) > 1 else f"   box {_f(_w[0])} cube")
         self.speed = None
@@ -298,16 +305,24 @@ class LiveMovie:
             if self.time_s is not None and getattr(self, "length_um", None):
                 _m = float(self.length_um) / 1.0e6            # metres per simulation length unit
                 _ax0 = [i for i in range(3) if i != self.up][0]
-                _tgt = float(span[_ax0]) / 3.0
-                _p10 = 10.0 ** np.floor(np.log10(max(_tgt, 1e-30)))
-                _len = max([f * _p10 for f in (1.0, 2.0, 5.0) if f * _p10 <= _tgt] or [_p10])
+                # THE ROUND NUMBER IS CHOSEN IN THE PHYSICAL UNIT, NOT IN BOX UNITS. It used to
+                # be the other way round -- 1/2/5 times a power of ten of `span/3` in SIMULATION
+                # units -- and the label then quoted whatever that happened to convert to: a tidy
+                # 0.2 of the box printed as "0.234467 mm". A scale bar's whole job is to be a number
+                # a reader can carry, so the number is picked first and the bar is drawn to fit it.
+                _tgt_m = float(span[_ax0]) / 3.0 * _m
+                _p10 = 10.0 ** np.floor(np.log10(max(_tgt_m, 1e-30)))
+                _len_m = max([f * _p10 for f in (1.0, 2.0, 2.5, 5.0) if f * _p10 <= _tgt_m]
+                             or [_p10])
+                _len = _len_m / _m                            # back to box units for the geometry
                 _other = [i for i in range(3) if i not in (self.up, _ax0)][0]
                 _a = np.zeros(3); _b = np.zeros(3)
                 _a[_ax0] = 0.0; _b[_ax0] = _len
                 _a[_other] = _b[_other] = -0.04 * float(span[_other])
                 self.p.add_mesh(pv.Line(_a, _b), color="white", line_width=4.0, lighting=False)
-                _v = _len * _m
-                _lab = (f"{_v * 1e3:g} mm" if _v < 0.01 else f"{_v * 100:g} cm" if _v < 1.0
+                _v = _len_m
+                _lab = (f"{_v * 1e6:g} um" if _v < 1e-4 else f"{_v * 1e3:g} mm" if _v < 0.01
+                        else f"{_v * 100:g} cm" if _v < 1.0
                         else f"{_v:g} m" if _v < 1000.0 else f"{_v / 1000:g} km")
                 _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.05 * float(span[self.up])
                 # TWICE THE HEADER'S NUMBER TO GET THE SAME HEIGHT. `add_text` and
@@ -536,13 +551,20 @@ class LiveMovie:
             _flat = dict(FLAT)
             if self.cs is not None:
                 _flat["render_points_as_spheres"] = False
-            self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
-                            point_size=self._dot_px(pos))
+            # `render_3d: surface` REPLACES the dots rather than sitting on top of them: a solid
+            # with a speckled cloud inside it reads as neither.
+            if str((self.style or {}).get("render_3d", "dots")).lower() != "surface" \
+                    or not self._skin_build(H, lvl, pos):
+                self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
+                                point_size=self._dot_px(pos))
+            self._add_meshes(H)
             self.t0 = time.perf_counter()
             return
         if tick % self.stride:
             return
         self.cloud.points = self._xyz(lvl)
+        self._skin_update(H, lvl, self.cloud.points)
+        self._update_meshes(H)
         # A FIELD COLOUR IS A PROPERTY OF NOW, so unlike the body hue it is recomputed each frame.
         if str(self.style.get("color_field", "") or ""):
             _c = self._rgb_field(H, lvl)
@@ -572,6 +594,239 @@ class LiveMovie:
         self.rendered += 1
         if tick in self.still_ticks:
             self._still(tick)
+
+    # ---- the cloud AS a surface -----------------------------------------------------------
+    #
+    # THE METHOD IS `prototype/eye/render_surface_vtk.py`'s, and its docstring is the argument for
+    # it: "render_orbit_vtk draws the material points themselves, which is honest and unreadable:
+    # 45 000 dots make a speckled ball, and the six straps lose the shape the model gave them."
+    #
+    # WHAT COULD NOT BE IMPORTED, AND WHY IT IS REBUILT RATHER THAN CALLED. The eye binds an
+    # AUTHORED Blender mesh -- a globe and six muscle straps an artist drew -- to the particles
+    # seeded inside it. A slab of gel has no such mesh, and `render_surface_vtk` also imports
+    # `eye_anatomy`, `blend_mpm_ops` and `render_eye` at module scope, so calling it would drag the
+    # prototype into `src/plexus/`. `Skin` below is that class, kept line for line.
+    #
+    # THE REST SURFACE IS RECONSTRUCTED INSTEAD OF AUTHORED -- VTK's SurfaceReconstructionFilter
+    # over a subsample of the frame-0 cloud -- and that is the ONLY substitution. Everything after
+    # is the eye's: the mesh is built ONCE, at rest, and thereafter RIDDEN by the particles,
+    #
+    #     x_v(t) = sum_i w_i x_i(t),   sum_i w_i = 1,   w_i ~ 1/d_i^2 to the k nearest at rest,
+    #
+    # rather than re-extracted every frame. Re-extracting is what loses the crispness (the eye's
+    # own stated reason for rejecting marching cubes), and skinning inherits the simulation's
+    # rotations and stretches for free because the particles carry them. What it cannot show is
+    # deformation FINER than the particle spacing -- the same limit the simulation has.
+    #
+    # The colour scalar rides the SAME weights, so a `color_field` appears ON the surface.
+    class Skin:
+        """A mesh bound to a set of moving particles: `deform(X)` returns its vertices."""
+
+        def __init__(self, verts, rest_pts, k=8):
+            from scipy.spatial import cKDTree
+            k = int(min(k, len(rest_pts)))
+            d, idx = cKDTree(rest_pts).query(np.asarray(verts, float), k=k)
+            d = np.atleast_2d(d.T).T if k > 1 else d[:, None]
+            idx = np.atleast_2d(idx.T).T if k > 1 else idx[:, None]
+            w = 1.0 / np.maximum(d, 1e-9) ** 2
+            self.w = (w / w.sum(axis=1, keepdims=True)).astype(np.float64)
+            self.idx = idx.astype(np.int64)
+            # the bind pose is where the particles put the vertex, so t = 0 renders the surface
+            # exactly as it was reconstructed and every later frame is a pure displacement
+            self.offset = np.asarray(verts, float) - self.deform(rest_pts)
+
+        def deform(self, X):
+            return np.einsum("vk,vkj->vj", self.w, np.asarray(X, float)[self.idx])
+
+        def __call__(self, X):
+            return self.deform(X) + self.offset
+
+        def scalar(self, values):
+            """Per-vertex interpolation of a per-particle scalar, same inverse-square weights."""
+            return np.einsum("vk,vk->v", self.w, np.asarray(values, float)[self.idx])
+
+    def _skin_build(self, H, lvl, pos):
+        """Reconstruct the rest surface and bind it. Returns True when the surface is live."""
+        self._skin = self._surf = self._skin_sub = None
+        try:
+            st = self.style or {}
+            X = np.asarray(pos, dtype=np.float64)
+            # A SUBSAMPLE FOR THE RECONSTRUCTION, THE FULL CLOUD FOR THE SKIN. The filter is
+            # O(N log N) with a large constant and 500,000 points is minutes; 60,000 resolves a
+            # feature the grid can resolve anyway, since `sample_spacing` defaults to the grid's
+            # own dx and the simulation cannot represent anything finer.
+            nsub = int(st.get("surface_sample", 60_000))
+            step = max(1, X.shape[0] // max(nsub, 1))
+            sub = np.arange(0, X.shape[0], step)
+            self._skin_sub = sub
+            # THE REST SURFACE IS AN ISOSURFACE OF THE PARTICLE DENSITY, and this is the one
+            # place the eye's recipe had to be replaced rather than copied.
+            #
+            # `reconstruct_surface` (VTK's SurfaceReconstructionFilter) fits an implicit function
+            # from LOCAL TANGENT PLANES, which is what a laser scan of a SURFACE gives it. An MPM
+            # cloud is a SOLID: 500,000 points fill the interior, where there is no tangent plane
+            # and the signed distance it estimates is noise. Measured on this slab it returned a
+            # lace of spikes and holes at every spacing tried -- 110,981 faces of foam around a box.
+            #
+            # Counting the particles into cells and contouring at half the bulk density is the
+            # standard answer for a filled cloud, and the eye's objection to marching cubes does not
+            # reach it: that objection is to RE-EXTRACTING every frame, which loses crispness and
+            # temporal coherence. This runs ONCE, at rest, and the skinning below carries it -- so
+            # the surface is still ridden by the particles, not rebuilt from them.
+            #
+            # AT THE SIMULATION'S OWN RESOLUTION. The cell is the MPM grid's dx, so the surface can
+            # show exactly what the solver can represent and no more -- and at ~10 particles per
+            # occupied cell the count is a density rather than a speckle.
+            from scipy.ndimage import gaussian_filter
+            h = float(st.get("surface_spacing", 0.0)) or self._cs_dx
+            lo = X.min(0) - 3.0 * h
+            dim = np.maximum(np.ceil((X.max(0) + 3.0 * h - lo) / h).astype(int) + 1, 2)
+            ijk = np.clip(((X - lo) / h).astype(np.int64), 0, dim - 1)
+            D = np.zeros(tuple(dim), np.float32)
+            np.add.at(D, (ijk[:, 0], ijk[:, 1], ijk[:, 2]), 1.0)
+            D = gaussian_filter(D, sigma=float(st.get("surface_blur", 1.0)))
+            occ = D[D > 0]
+            iso = float(st.get("surface_iso", 0.0)) or 0.5 * float(np.median(occ))
+            g = self.pv.ImageData(dimensions=tuple(int(v) for v in dim),
+                                  spacing=(h, h, h), origin=tuple(float(v) for v in lo))
+            g.point_data["d"] = D.ravel(order="F")
+            surf = g.contour([iso], scalars="d")
+            # TAUBIN, NOT LAPLACIAN. Laplacian smoothing shrinks a closed surface toward its
+            # centroid, and the thickness of this slab is the measurement. Taubin alternates a
+            # shrink and an expand and holds the volume.
+            surf = surf.extract_largest().smooth_taubin(
+                n_iter=int(st.get("surface_smooth", 30)), pass_band=0.08)
+            self._skin = self.Skin(surf.points, X[sub], k=int(st.get("surface_k", 8)))
+            self._surf = surf
+            # THE SCALAR MUST EXIST BEFORE `add_mesh`, not after the first update: pyvista
+            # resolves `scalars=` at add time and raises "Data array (f) not present in this
+            # dataset". The whole surface then fell back to dots -- with the reason printed, which
+            # is the only thing that made it a five-minute bug instead of a silent one.
+            fld = str(st.get("color_field", "") or "")
+            clim = None
+            if fld:
+                val = self._field(H, lvl)[0]
+                if val is not None:
+                    v = val.detach().cpu().numpy().astype(np.float64)[sub]
+                    surf["f"] = self._skin.scalar(v)
+                    rng = st.get("color_range")
+                    clim = ([float(rng[0]), float(rng[1])] if rng and len(rng) == 2
+                            else [float(np.percentile(v, 2)), float(np.percentile(v, 98))])
+                else:
+                    fld = ""
+            self.p.add_mesh(surf, scalars=("f" if fld else None), clim=clim,
+                            cmap=st.get("field_cmap", "turbo"),
+                            color=(None if fld else st.get("surface_color", "#cfd8e3")),
+                            opacity=float(st.get("surface_opacity", 1.0)),
+                            smooth_shading=True, specular=0.25, specular_power=18,
+                            ambient=0.25, diffuse=0.75, show_scalar_bar=False)
+            print(f"[live-movie] surface: density isosurface of {X.shape[0]:,} points at cell "
+                  f"{h:.4g} ({'x'.join(str(int(v)) for v in dim)}), iso {iso:.3g} of a bulk "
+                  f"{float(np.median(occ)):.3g} -> {surf.n_points:,} vertices, "
+                  f"{surf.n_faces_strict:,} faces, skinned to {self._skin.idx.shape[1]} "
+                  f"particles each over a {len(sub):,}-point bind set", flush=True)
+            return True
+        except Exception as e:                       # noqa: BLE001 -- fall back to dots, never die
+            self._skin = self._surf = None
+            print(f"[live-movie] surface reconstruction failed ({type(e).__name__}: {e}); "
+                  f"drawing the point cloud instead", flush=True)
+            return False
+
+    def _skin_update(self, H, lvl, pos):
+        if self._skin is None or self._surf is None:
+            return
+        X = np.asarray(pos, dtype=np.float64)[self._skin_sub]
+        self._surf.points = self._skin(X).astype(np.float32)
+        if str((self.style or {}).get("color_field", "") or ""):
+            val = self._field(H, lvl)[0]
+            if val is not None:
+                v = val.detach().cpu().numpy().astype(np.float64)[self._skin_sub]
+                self._surf["f"] = self._skin.scalar(v)
+
+    # ---- the surface, drawn over the cloud ------------------------------------------------
+    #
+    # A MESH SET IN THE SAME SCENE, NOT A SECOND RENDERER. This renderer drew exactly one thing --
+    # the largest Level carrying positions -- so a spec that couples a triangulated surface to a
+    # continuum rendered the continuum and left the surface out, and the one picture nobody could
+    # get was the picture of the coupling. `discovery_okuda/ops/test_03_mesh_contact.py` solved it
+    # with a matplotlib wireframe over a scatter; that is the right IMAGE and the wrong renderer
+    # (mpl has no depth buffer, so the far half of a surface is drawn over the near half whenever
+    # the painter's-algorithm tie goes the wrong way). Here the surface is a second VTK actor,
+    # z-buffered against the dots by construction, and it costs nothing per frame but a point
+    # array swap.
+    def _mesh_levels(self, H):
+        """Every Level carrying a non-empty half-edge table, minus `plotting.hide_sets`."""
+        hide = set((self.style or {}).get("hide_sets", []) or [])
+        out = []
+        for name, lvl in H.levels.items():
+            if name in hide or name == getattr(self, "_sname", None):
+                continue
+            m = getattr(lvl, "mesh", None)
+            if m is None or not int(m.get("nF", 0) or 0):
+                continue
+            out.append((name, lvl, m))
+        return out
+
+    @staticmethod
+    def _mesh_faces(m):
+        """The half-edge table as VTK's flat face array: [n, i0..i(n-1), n, i0.., ...].
+
+        THE RING ORDER IS ALREADY THERE. `E_face` is grouped by face and `E_srce` walks each face's
+        vertices in order, so the polygon is read straight off the table -- no triangulation, which
+        means a quad plate and a polygonal epithelium go through the same three lines.
+        """
+        ef = m["E_face"].detach().cpu().numpy()
+        es = m["E_srce"].detach().cpu().numpy()
+        nF = int(m["nF"])
+        cnt = np.bincount(ef, minlength=nF)
+        offs = np.concatenate([[0], np.cumsum(cnt)])
+        faces = np.empty(len(es) + nF, np.int64)
+        faces[offs[:-1] + np.arange(nF)] = cnt
+        faces[np.arange(len(es)) + np.repeat(np.arange(nF), cnt) + 1] = es
+        return faces
+
+    def _add_meshes(self, H):
+        """One actor per mesh set, built once. Wireframe by default: a filled surface over a point
+        cloud hides the material the surface is acting on, which is the half of the picture the
+        contact is about."""
+        self._meshes = []
+        try:
+            st = self.style or {}
+            colr = st.get("mesh_color", "#e6dcc0")
+            lw = float(st.get("mesh_line_width", 0.8))
+            style = str(st.get("mesh_style", "wireframe"))
+            opac = float(st.get("mesh_opacity", 1.0 if style == "wireframe" else 0.55))
+            for name, lvl, m in self._mesh_levels(H):
+                nv = int(m["Nv"])
+                pd = self.pv.PolyData(lvl.get("pos")[:nv].detach().cpu().numpy().astype(np.float32),
+                                      self._mesh_faces(m))
+                self.p.add_mesh(pd, color=colr, style=style, line_width=lw, opacity=opac,
+                                lighting=(style != "wireframe"), render_lines_as_tubes=False)
+                self._meshes.append((name, nv, pd))
+                print(f"[live-movie] surface {name!r}: {int(m['nF']):,} faces, {nv:,} vertices, "
+                      f"drawn as {style}", flush=True)
+        except Exception as e:                       # noqa: BLE001 -- never kill a run for a picture
+            self._meshes = []
+            print(f"[live-movie] mesh overlay unavailable ({type(e).__name__}: {e})", flush=True)
+
+    def _update_meshes(self, H):
+        """POINTS ONLY. The topology is rebound only if the face count changed -- a plate never
+        divides, but an epithelium does, and swapping the face array every frame on a 12,000-cell
+        surface would cost more than the rest of the frame."""
+        for name, nv, pd in getattr(self, "_meshes", []) or []:
+            try:
+                lvl = H.level(name)
+                m = getattr(lvl, "mesh", None)
+                if m is None:
+                    continue
+                n_now = int(m["Nv"])
+                if n_now != nv or pd.n_faces_strict != int(m["nF"]):
+                    pd.points = lvl.get("pos")[:n_now].detach().cpu().numpy().astype(np.float32)
+                    pd.faces = self._mesh_faces(m)
+                else:
+                    pd.points = lvl.get("pos")[:nv].detach().cpu().numpy().astype(np.float32)
+            except Exception:                        # noqa: BLE001
+                pass
 
     def _update_cross_section(self, H):
         """Scatter whatever is inside the slab, in the plane of the other two axes."""
@@ -614,6 +869,27 @@ class LiveMovie:
                 pass
             self._cs_series = self.cs.scatter(xs, ys, size=self._cs_size, style="o",
                                               color=self._cs_colour)
+            # AND THE SURFACE'S PROFILE THROUGH THE SAME SLAB. The section exists because a
+            # compressed slab is an opaque silhouette from outside; leaving the indenter out of it
+            # would show the dimple with nothing making it. Vertices inside the slab, ordered along
+            # the in-plane axis -- for a plate that is its own cross-section, exactly.
+            for _s in getattr(self, "_cs_mesh_series", []) or []:
+                try:
+                    self.cs.remove_plot(_s)
+                except Exception:                        # noqa: BLE001
+                    pass
+            self._cs_mesh_series = []
+            _mc = (self.style or {}).get("mesh_color", "#e6dcc0")
+            for _nm, _nv, _pd in getattr(self, "_meshes", []) or []:
+                MV = H.level(_nm).get("pos")[:_nv].detach()
+                _in = (MV[:, ax] - y0).abs() < self.cs_cells * dx
+                if int(_in.sum()) < 2:
+                    continue
+                _mx = MV[_in][:, a].cpu().numpy()
+                _my = MV[_in][:, b].cpu().numpy()
+                _o = np.argsort(_mx)
+                self._cs_mesh_series.append(
+                    self.cs.line(_mx[_o], _my[_o], color=_mc, width=2.0))
         except Exception as e:                       # noqa: BLE001 -- a panel must never kill a run
             if not getattr(self, "_cs_warned", False):
                 self._cs_warned = True
@@ -635,8 +911,18 @@ class LiveMovie:
         field calming down, and the movie cannot tell you which. `plotting.color_range: [lo, hi]`.
         """
         want = str(self.style.get("color_field", "") or "").lower()
-        if want not in ("vorticity", "speed", "pressure"):
+        if not want:
             return None, ""
+        # AN UNKNOWN NAME RAISES. It used to return None, which is the same answer as "no
+        # `color_field` was asked for" -- so `color_field: deformation` was accepted, ignored, and
+        # the cloud fell back to `_rgb`'s HEIGHT RAMP, which is fixed at t = 0 and carried with the
+        # particle. The movie then showed a smooth red-to-blue gradient that never changed and
+        # looked exactly like a field, on a run whose whole subject is a deformation. A colour that
+        # looks like data and is not is worse than no colour, and this is the one line that decides
+        # which of the two a typo produces.
+        if want not in _FIELDS:
+            raise ValueError(f"plotting.color_field: {want!r} is not one of "
+                             f"{', '.join(sorted(_FIELDS))}")
         import torch
         idx = self.idx
         if want == "speed":
@@ -648,7 +934,27 @@ class LiveMovie:
                              C[:, 0, 2] - C[:, 2, 0],
                              C[:, 1, 0] - C[:, 0, 1]], 1)    # curl(v) = 2 * antisym(C)
             return w.norm(dim=1), "|curl v| (1/s)"
-        J = torch.linalg.det(lvl.F[idx].float())             # volume ratio
+        F = lvl.F[idx].float()
+        J = torch.linalg.det(F)                              # volume ratio
+        if want in ("deformation", "strain"):
+            # THE SAME SCALAR `ecm_stress[measure: dev]` BANDS, and deliberately the same lines:
+            # the volume-normalised left Cauchy-Green tensor's deviator, i.e. SHAPE change with the
+            # volume change divided out. Two readings of one F that disagreed would be worse than
+            # one, and this is what a colour called "deformation" has to mean if the run is also
+            # allowed to quote `ecm_stress`.
+            #
+            # WHY NOT |J-1| UNDER THIS NAME. A fixed-corotated MPM solid resists volume change
+            # stiffly, so an indented gel is SHEARED far more than it is compressed: |J-1| stays
+            # near zero while the material is visibly flowing around the plate. That reading is
+            # available as `volume`, named for what it is.
+            B = F @ F.transpose(-1, -2)
+            Bb = B / J.abs().clamp_min(1e-9).pow(2.0 / 3.0)[:, None, None]
+            tr = Bb.diagonal(dim1=-2, dim2=-1).sum(-1)
+            eye = torch.eye(Bb.shape[-1], device=Bb.device, dtype=Bb.dtype)
+            dev = Bb - (tr / 3.0)[:, None, None] * eye
+            return torch.sqrt((1.5 * (dev * dev).sum((-1, -2))).clamp_min(0.0)), "equiv. dev. strain"
+        if want == "volume":
+            return (J - 1.0).abs(), "|J - 1|"
         K = float(self.style.get("pressure_K", 3.0e6))
         return K * (1.0 - J), "p = K(1-J) (Pa)"
 

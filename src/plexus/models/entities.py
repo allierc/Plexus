@@ -98,11 +98,49 @@ class MPMParticle:
         -> radial material bands (liquid / snow / elastic); optional stiffer `core`;
         optional per-type `block` rectangle that the type FILLS (a pool/cube) instead
         of a disc. Mirrors the validated prototype build."""
-        types = getattr(parent, "types_raw", None) or {}
-        type_list = list(types.values())
-        ntp = parent.node_type                                   # [Nc] per-cell type id
+        # A PARENT IS OPTIONAL, AND WITHOUT ONE THE SET DECLARES ITSELF.
+        #
+        # The container above an MPM cloud earns its place when it is a BODY -- a cell with a
+        # nucleus, a jelly block next to a water pool -- because then `youngs`, `density`, `layers`
+        # and `core` describe that body and the particles inherit them. It earns nothing when
+        # there is exactly one of it and no operator touches it: a slab of gel indented by a plate
+        # then declares a set of one element whose only job is to hold `types`, and the spec has to
+        # name a body that is not in the model. `mpm_particle` may therefore carry its own `n` and
+        # its own `types` and stand alone.
+        #
+        # WHAT THE SHIM DOES: every line below indexes per-parent arrays as `x[pidx]`. With no
+        # parent each particle IS its own body, so `pidx` is the identity and the per-parent arrays
+        # are per-particle. Nothing downstream changes, and the parented path is untouched.
         Np = lvl.n
-        pidx = lvl.parent                                        # [Np] parent cell per particle
+        if parent is None:
+            types = s.get("types") or {}
+            type_list = list(types.values())
+            ntp = getattr(lvl, "node_type", None)
+            if ntp is None:
+                ntp = torch.zeros(Np, dtype=torch.long, device=device)
+            pidx = torch.arange(Np, device=device)
+            n_par = Np
+            # RADIAL BANDS NEED A CENTRE, AND THERE IS NONE. `layers` and `core` are concentric
+            # shells measured from the parent's position; with no parent every particle sits at
+            # r = 0 from itself, so `core` would swallow the whole cloud and `layers` would collapse
+            # to their innermost shell -- silently, and looking like a uniform material.
+            for _t in type_list:
+                if _t.get("layers") or _t.get("core"):
+                    raise ValueError(
+                        f"{lvl.name}: `layers`/`core` are radial bands about a parent body's "
+                        f"centre, and this set has no parent. Give it a `parent:` or declare the "
+                        f"materials as separate types with their own `block:`.")
+                if _t.get("block") is None:
+                    raise ValueError(
+                        f"{lvl.name}: a parentless MPM set is placed by its types' `block:` -- "
+                        f"there is no parent centre to scatter a disc around. Add a `block: "
+                        f"[x0,y0,z0,x1,y1,z1]` to every type, or give the set a `parent:`.")
+        else:
+            types = getattr(parent, "types_raw", None) or {}
+            type_list = list(types.values())
+            ntp = parent.node_type                               # [Nc] per-cell type id
+            pidx = lvl.parent                                    # [Np] parent cell per particle
+            n_par = parent.n
         rho = float(s.get("density", 1.0)); rad = float(s.get("radius", 0.02))
         # DENSITY MAY VARY BY TYPE, and it has to for buoyancy to mean anything. It was a single
         # set-level scalar, so two species of different density needed two SETS -- two particle
@@ -129,16 +167,18 @@ class MPMParticle:
         if _ct and _nt is not None and len(_ct) > 1 and any("density" in t for t in _ct):
             rho_p = torch.as_tensor([float(t.get("density", rho)) for t in _ct],
                                     device=device, dtype=torch.float32)[_nt]
-        ppc = int(s["per_parent"])
+        ppc = int(s["per_parent"]) if parent is not None else Np
         px0, px1 = lvl.state_schema["pos"]
         D = H.dim                                                # particle dimension (2D or 3D; the global dim contract)
         pos = lvl.state[:, px0:px1].clone()
-        cpos = parent.get("pos")[pidx]                           # each particle's parent center
+        # WITH NO PARENT A PARTICLE IS ITS OWN CENTRE, so `r` is 0 everywhere -- which is why
+        # `layers`/`core` are refused above rather than allowed to read it.
+        cpos = parent.get("pos")[pidx] if parent is not None else pos
         r = (pos - cpos).norm(dim=1)                             # radial distance (for layer bands)
 
         # per-cell youngs / core / layers, broadcast to particles
-        youngs_c = torch.full((parent.n,), 100.0, device=device)
-        core_y = torch.zeros(parent.n, device=device); core_f = torch.zeros(parent.n, device=device)
+        youngs_c = torch.full((n_par,), 100.0, device=device)
+        core_y = torch.zeros(n_par, device=device); core_f = torch.zeros(n_par, device=device)
         type_layers = {}
         type_mat = {}
         for tid, t in enumerate(type_list):
@@ -316,7 +356,7 @@ class MPMParticle:
         # chances to disagree. Absent -> every existing spec is byte-identical.
         _bk = [t for t in type_list if t.get("bulk_modulus") is not None]
         if _bk:
-            k_c = torch.full((parent.n,), float("nan"), device=device)
+            k_c = torch.full((n_par,), float("nan"), device=device)
             for tid, t in enumerate(type_list):
                 K = t.get("bulk_modulus")
                 if K is None:

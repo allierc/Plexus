@@ -1,0 +1,182 @@
+# MESH-MPM 00 -- the nominal: a flat plate, seeded and driven, pressed into an elastic slab.
+
+general:
+  name: mesh_mpm_sheet_elastic
+  seed: 0
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  # THE THREE BASE SCALES, EACH FROM A CHOICE THIS SPEC MAKES -- not inherited. The first version
+  # copied gate 02/04's `length_um: 1172.33` / `force_nN: 9162.43`, and those numbers are the OKUDA
+  # SPHEROID's: `log/okuda_ECM/0u_units/units.json` fixes one TISSUE unit at 10 um from measured
+  # junction lengths, and gate 04's `scale: 0.00853` then makes the box 10/0.00853 = 1172.33 um.
+  # There is no tissue here, no `scale`, and no spheroid, so that chain does not exist and the
+  # number would have been six digits of precision about somebody else's experiment.
+  #
+  #   length_um 1000  -- THE BOX IS 1 mm. That is the choice, and it makes the rest of the geometry
+  #                     say something: a 0.5 mm indenter on a 0.4 mm slab, at 7.4 um between
+  #                     particles and a 15.6 um grid cell.
+  #   force_nN  6666.667 -- FIXED BY WANTING E = 30 TO BE 200 Pa, a 1-3 mg/ml collagen I gel.
+  #                     `stress_Pa = 1e3 * force_nN / length_um^2` (plexus/units.py), so
+  #                     6666.667 nN gives 6.667 Pa per stress unit and 30 x 6.667 = 200 Pa.
+  #                     With a dimensionless solver two of {length, force, stiffness} may be chosen
+  #                     and the third follows; these are the two, stated.
+  #   time_s    1.0  -- DEFAULTED, i.e. dt IS seconds, and that is a claim: the plate descends
+  #                     0.20 box in 320 x 3.2 ms = 1.024 s, i.e. 195 um/s. Fast for a
+  #                     microindenter (1-100 um/s) and quasi-static against the material's own
+  #                     5.5 mm/s wave speed -- Mach 0.035 -- which is the ratio that matters here.
+  units:
+    length_um: 1000.0
+    force_nN: 6666.6666666666667
+
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: surface
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 8
+  color_field: deformation
+  color_range: [0.0, 0.35]
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+
+sets:
+  # THE PLATE. `mesh: half_edge` so the engine allocates the table and `seed_plate` fills it in
+  # place; n is the vertex reservoir, and the sheet at nq = 48 needs 2,401 of it. The headroom is
+  # for the ladder's other shapes, which are the same lattice under a different mask.
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: plate_face
+  # THE FACE SET THE PAIRING IS DECLARED AGAINST. `mesh: half_edge` requires one, and the
+  # requirement is right: a face of a mesh is an element of something, and leaving it undeclared is
+  # what let `edge_flip` renumber a set it never said it needed. For an epithelium that something is
+  # a CELL; for a plate it is a QUAD OF THE PLATE and nothing more, so it is named for what it is
+  # rather than borrowed from the MPM parent, which would make `cell` mean two things in one spec.
+  # No operator here crosses between the two sets; the declaration exists so that a crossing cannot
+  # be introduced later without saying so.
+  plate_face:
+    n: 2304
+  # THE MATERIAL, DECLARING ITSELF -- no container above it. An MPM cloud has a parent when the
+  # parent is a BODY: a cell with a nucleus, a jelly block beside a water pool, where `youngs`,
+  # `layers` and `core` describe that body and the particles inherit them. Here there is one
+  # homogeneous slab and no operator that touches a body, so a parent would be a set of one element
+  # existing only to hold `types:` -- and the spec would have to name a cell that is not in the
+  # model. `mpm_particle` carries its own `n` and its own `types`; `MPMParticle.provision` treats
+  # each particle as its own body, which is what `parent: null` means for a material.
+  #
+  # `block` IS REQUIRED WITHOUT A PARENT, and `layers`/`core` are refused: both are radial shells
+  # about a parent's centre, and with no centre every particle sits at r = 0 from itself, so `core`
+  # would swallow the cloud and `layers` collapse to their innermost shell -- silently, and looking
+  # like a uniform material.
+  mpm_particle:
+    n: 500000
+    # E = 30 stress units = 200 Pa at this spec's calibration -- a 1-3 mg/ml collagen I gel.
+    types:
+      gel: { fraction: 1.0, youngs: 30.0, density: 1.0,
+             block: [0.15, 0.05, 0.15, 0.85, 0.45, 0.85] }
+
+fields:
+  mpm_grid: { frame: mpm_grid, n_grid: 64 }
+
+operators:
+  # THE PLATE, AND ITS STANDOFF DECLARED SO THE BIN SIZING IS PRINTED BEFORE THE RUN RATHER THAN
+  # DISCOVERED IN IT. `standoff` is reported only; the geometry it describes is `centre` below.
+  - {
+      op: seed_plate,
+      at: vertex,
+      shape: sheet,
+      nq: 48,
+      half_width: 0.25,
+      axis: 1,
+      height: 0.55,
+      centre: [0.5, 0.5],
+      standoff: 0.30,
+    }
+  # 0.55 -> 0.35 over 320 of the 400 frames, then held. The hold is not padding: it is the only part
+  # of the run in which the surface is at REST under load, which is where the friction law's
+  # regularised branch and the penalty's steady overlap can be read without a sliding term.
+  - { op: plate_drive, at: vertex, axis: 1, target: 0.35, over: 320 }
+  - {
+      op: mesh_contact,
+      at: mpm_particle,
+      surface: vertex,
+      centre: [0.5, 0.85, 0.5],
+      k_frac: 0.45,
+      mu: 0.4,
+      dt: 0.0032,
+      n_grid: 64,
+      a_max: 100000.0,
+    }
+  - { op: mpm_strain, at: mpm_particle, implementation: warp }
+  - {
+      op: mpm_scatter,
+      at: mpm_particle,
+      to: mpm_grid,
+      drag: 0.5,
+      a_max: 100000.0,
+      implementation: warp,
+    }
+  - { op: mpm_grid_update, at: mpm_grid, wall_damp: 0.7 }
+  - {
+      op: mpm_gather,
+      at: mpm_particle,
+      from: mpm_grid,
+      wall_damp: 0.7,
+      wall_contact: 0.04,
+      vmax: 1.0e9,
+      implementation: warp,
+    }
+  - { op: mesh_inside, at: mpm_particle, n_grid: 64 }
+
+# `mesh_contact` IS INSIDE THE SUBSTEP BLOCK, and that is stability and not preference: the penalty
+# is integrated at the substep, so it is stable while dt_sub*sqrt(k) < 1. At the frame level the
+# ceiling would be (dt/dt_sub)^2 = 64x lower. The surface itself is moved once per frame, before the
+# block, because its position is a frame-level fact.
+schedule:
+  - seed_plate
+  - plate_drive
+  - {
+      substep_dt: 4.0e-4,
+      steps:
+        [mesh_contact, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather],
+    }
+  - mesh_inside
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A large purple cube is subjected to a compressive force from a thin, grey mesh sheet
+      on its top surface. As time progresses, the cube undergoes significant deformation, flattening and
+      expanding outward under the pressure. The internal stress distribution becomes visible as a heat
+      map, transitioning from dark purple to bright yellow and red. By the final frame, the cube has been
+      compressed into a much thinner, wider shape with high-intensity stress concentrated at the bottom
+      and center.
+    objects: The primary object is a large, roughly cubic volume of particles that starts as a dark purple
+      mass. A thin, grey rectangular mesh sheet sits on top of the cube, acting as the source of external
+      pressure. A smaller, blue rectangular inset in the top-left corner provides a zoomed-in view of
+      the surface deformation. A white wireframe box defines the 1 mm³ simulation domain, with a 0.25
+      mm scale bar provided for spatial reference.
+  movie_mpm_particle:
+    description: A large cube of particles undergoes a deformation process over time. The particles shift
+      from a uniform blue state to a gradient of red and purple. The overall shape of the particle mass
+      compresses and tilts slightly as the simulation progresses. The movement appears smooth and continuous,
+      representing an elastic deformation of a 1 mm cube.
+    objects: The primary object is a large, dense collection of particles forming a roughly cubic shape.
+      These particles transition from a solid blue color to a gradient of red at the bottom and purple
+      at the top. A smaller, static blue cube is shown in an inset box in the upper left corner for reference.
+      The entire simulation is contained within a wireframe bounding box with a scale bar indicating 0.25
+      mm.
