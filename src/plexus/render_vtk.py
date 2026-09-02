@@ -255,12 +255,23 @@ def style_of(run_dir):
     return None, None, None
 
 
+_PLOT_OVERRIDE: dict | None = None
+
+
 def plot_style(run_dir) -> dict:
-    """The run's own `plotting:` block, for the render flags that are not colour tables.
+    """The `plotting:` block for the render flags that are not colour tables.
+
+    THE LIVE CONFIG WINS OVER THE RUN'S FROZEN COPY. `spec.yaml` in the data directory is written at
+    GENERATE time, so reading it here meant that editing a render flag and re-running `-o plot`
+    silently used the old value -- change `edge_lut` to viridis, re-plot, get inferno, and nothing
+    says why. `plot_dataset` has the freshly loaded spec and now hands it down; the run's copy stays
+    the fallback for anything calling this directly (tools, comparisons) with no spec in hand.
 
     `style_of` returns the three keys the colourmap needs and predates the rest; this returns the
     block so a new flag does not mean a new element on a tuple every caller has to unpack.
     """
+    if _PLOT_OVERRIDE is not None:
+        return dict(_PLOT_OVERRIDE)
     for nm in ("spec.yaml", "spec_run.yaml"):
         f = os.path.join(run_dir, nm)
         if os.path.exists(f):
@@ -272,7 +283,7 @@ def plot_style(run_dir) -> dict:
     return {}
 
 
-def edges_of(pos, mt, mode, ntype=None, rng=None, colors=None):
+def edges_of(pos, mt, mode, ntype=None, rng=None, colors=None, lut="inferno"):
     """The junctions as a line mesh with per-edge RGB -- `plotting.edge_color`.
 
     WHY A SECOND ACTOR AND NOT A FACE COLOUR. Myosin lives on the JUNCTION, and a face colour can
@@ -281,7 +292,9 @@ def edges_of(pos, mt, mode, ntype=None, rng=None, colors=None):
     one cell. Drawing the edges themselves is the only honest picture of a per-junction quantity.
 
       `myosin`  the value `junction_myosin` wrote, through a fixed range so a frame's colour means
-                the same number as every other frame's
+                the same number as every other frame's. `plotting.edge_lut` names the colour table
+                (any matplotlib colormap); the default is `inferno`, dark-to-bright, which reads as
+                "how much" on a black background where a diverging or cyclic map would not.
       `type`    the owning cell's node_type, as flat categorical colours
     """
     import pyvista as pv
@@ -307,7 +320,7 @@ def edges_of(pos, mt, mode, ntype=None, rng=None, colors=None):
         v = np.asarray(v, float)[live]
         lo, hi = (rng if rng else (float(np.nanmin(v)), float(np.nanmax(v))))
         x = np.clip((v - lo) / max(hi - lo, 1e-9), 0, 1)
-        rgb = (np.asarray(colormaps["inferno"](x))[:, :3] * 255).astype(np.uint8)
+        rgb = (np.asarray(colormaps[lut](x))[:, :3] * 255).astype(np.uint8)
     lines = np.empty((len(i), 3), np.int64)
     lines[:, 0] = 2; lines[:, 1] = i; lines[:, 2] = j
     m = pv.PolyData(np.asarray(pos, float), lines=lines.ravel())
@@ -742,27 +755,57 @@ def _curve_setup(p, pl, fr, ntype, erng):
     pad = 0.08 * max(hi - lo, 1e-6)
     ch = pv.Chart2D(size=tuple(cfg.get("size", (0.30, 0.26))),
                     loc=tuple(cfg.get("loc", (0.66, 0.71))))
-    ch.background_color = (0, 0, 0, 0.55)
-    ch.border_color = "#9a9a9a"
-    ch.title = str(cfg.get("title", "junction myosin, mean +- SD"))
+    ch.background_color = (0, 0, 0, 0.0)
+    # NO BOX. The border is a rectangle around the whole inset and it competes with the two axes for
+    # the same job; with the axes drawn and labelled the box says nothing the axes do not.
+    ch.border_style = None
+    # NO TITLE BY DEFAULT. The panel sits over the render and a caption there costs a line of the
+    # plot area to say what the axis label already says; `title:` puts one back if a spec wants it.
+    ch.title = str(cfg.get("title", ""))
     ch.x_axis.range = [0.0, float(len(fr) - 1)]
     ch.y_axis.range = [float(cfg.get("ymin", lo - pad)), float(cfg.get("ymax", hi + pad))]
     ch.x_axis.label = str(cfg.get("xlabel", "frame"))
     ch.y_axis.label = str(cfg.get("ylabel", "myosin"))
+    # SMALL, AND WHITE, AND SET THROUGH VTK. pyvista exposes the SIZES (`label_size`,
+    # `tick_label_size`) but not the text COLOUR, which defaults to black -- so on a black background
+    # the labels rendered correctly and were invisible, which reads exactly like "the axes did not
+    # turn on". `GetLabelProperties()` / `GetTitleProperties()` are the vtkAxis accessors underneath;
+    # `axis_visible` and the other snake_case VTK names are blocked by pyvista's guard, these are not.
+    _fs = int(cfg.get("font_size", 9))
     for _a in (ch.x_axis, ch.y_axis):
-        _a.label_visible = True; _a.ticks_visible = True
-        _a.tick_labels_visible = True; _a.grid = False
-        # WHITE, BECAUSE THE BACKGROUND IS BLACK. VTK draws chart text in black by default, so the
-        # labels and tick numbers were being rendered correctly and were simply invisible -- which
-        # reads exactly like "the axes did not turn on" and would have been chased in the wrong place.
-        # The property names differ across pyvista versions; set what exists and skip what does not,
-        # because a chart that is merely unlabelled is worth far less than a render that crashes.
-        for _attr, _val in (("label_color", "white"), ("tick_label_color", "white"),
-                            ("color", "#9a9a9a")):
-            try:
-                setattr(_a, _attr, _val)
-            except Exception:
-                pass
+        _a.label_visible = True
+        _a.ticks_visible = True
+        _a.tick_labels_visible = True
+        _a.grid = False
+        _a.label_size = _fs
+        _a.tick_label_size = max(6, _fs - 2)
+        _a.tick_count = int(cfg.get("ticks", 4))
+        # THREE SIGNIFICANT FIGURES, NOT SIX. VTK's default prints a tick at 19.6667 and 6.1569 --
+        # digits that are an artefact of dividing the range by the tick count, not a measurement.
+        # `label_format` alone does nothing: the format string is only consulted in PRINTF_NOTATION,
+        # so the mode has to be set first, which is why the first attempt changed nothing at all.
+        try:
+            _a.SetNotation(_a.PRINTF_NOTATION)
+            _fmt = str(cfg.get("tick_format", "%.1f"))
+            _a.SetLabelFormat(_fmt)
+            # THE FIRST AND LAST TICK ARE NOT TICKS. VTK draws the two ends of the range with a
+            # SEPARATE format (`RangeLabelFormat`), so setting the tick format alone left 6.22863 and
+            # -0.754096 at the extremes among 1.6 and 3.9 in between -- which looks like the format
+            # was ignored rather than like there being two of them.
+            _a.SetRangeLabelFormat(_fmt)
+        except Exception:
+            pass
+        try:
+            _a.pen.color = "white"
+            _a.GetLabelProperties().SetColor(1.0, 1.0, 1.0)
+            _a.GetTitleProperties().SetColor(1.0, 1.0, 1.0)
+        except Exception:
+            pass
+    try:
+        _t = ch.GetTitleProperties()
+        _t.SetColor(1.0, 1.0, 1.0); _t.SetFontSize(_fs + 1)
+    except Exception:
+        pass
     ch.legend_visible = False
     pal = [tuple(c) for c in (list((pl.get("colors") or {}).values()) or
                               [(0.35, 0.60, 1.00), (1.00, 0.35, 0.25),
@@ -853,7 +896,8 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
         actor = add(p, m, style)
         if _ec:
             em = edges_of(pos, mt, _ec, ntype=_ntype, rng=_erng,
-                          colors=list((_pl.get("colors") or {}).values()) or None)
+                          colors=list((_pl.get("colors") or {}).values()) or None,
+                          lut=str(_pl.get("edge_lut", "inferno")))
             eactor = None if em is None else p.add_mesh(
                 em, scalars="rgb", rgb=True, line_width=_pl.get("edge_width", 3.0),
                 lighting=False, render_lines_as_tubes=True)
@@ -1024,6 +1068,12 @@ def compare_still(dir_a, dir_b, out, style="flat", fill=1.0, labels=("A", "B"), 
     p.screenshot(out)
     p.close()
     return "ok"
+
+
+def use_plotting(pl: dict | None) -> None:
+    """Install the live spec's `plotting:` block for this process -- see `plot_style`."""
+    global _PLOT_OVERRIDE
+    _PLOT_OVERRIDE = None if pl is None else dict(pl)
 
 
 def render_all(run_dir, seq=LOOP_SEQ, size=None, quiet=False, fill=1.0, name=None):
