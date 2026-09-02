@@ -246,6 +246,25 @@ def data_generate(
     # generation that therefore produced NO picture would have traded a misleading artefact for a
     # missing one. It needs `trajectory.npz`, which is why it is after the save and not beside the
     # skip. `-o plot` reaches the same two files by the same path.
+    # A CURVE PANEL NEEDS THE WHOLE CLIP, so a live generate cannot draw one -- its axes are fixed
+    # over the run and the run is not over. The movie it wrote is therefore the right picture minus
+    # the panels, and whichever of `-o generate` / `-o plot` ran LAST decided what `movie.mp4`
+    # contains. Re-rendering here off the trajectory that was just written costs one replay and
+    # makes the two entry points produce the same file again.
+    if save and (sim.plotting or {}).get("curve") and live_movie is not None:
+        try:
+            from plexus import live_movie as _lm, render_vtk as _rv
+            if _rv.available():
+                print("[render] plotting.curve declared -- re-rendering the movie off the "
+                      "trajectory, which is the first point the panel's axes can be fixed",
+                      flush=True)
+                # `stills=10` so `3d.png` is rewritten from the SAME render as the movie.
+                # Left at the default 0 the re-render replaced `movie.mp4` and kept the
+                # live path's still -- so the folder held a movie with the curve panels and
+                # a 3d.png without them, which is the file a browser previews.
+                _lm.replay(data_dir, sim, name=sim.name, stills=10)
+        except Exception as e:                              # noqa: BLE001
+            print(f"[render] curve re-render unavailable ({type(e).__name__}: {e})", flush=True)
     if save and _want == "vtk_mesh" and live_movie is None:
         try:
             from plexus import render_vtk

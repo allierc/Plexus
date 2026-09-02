@@ -287,7 +287,34 @@ class LiveMovie:
         self.n_obstacles = 0
 
         px = int(px) // 16 * 16                       # ffmpeg's macro_block_size; see cell_panels
-        self.p = pv.Plotter(off_screen=True, window_size=(px, px), border=False)
+        # WIDER ONLY WHEN THERE IS SOMETHING TO PUT THERE. The frame is square because a scene is,
+        # and a curve panel then has nowhere to go but on top of it -- over the box, and over the
+        # tissue on the frames where it has grown. Declaring `curve` adds a COLUMN to the right and
+        # the camera is shifted left by the same amount below, so the panels sit beside the scene
+        # rather than in front of it. A spec with no curves is unchanged, pixel for pixel.
+        _cv = (style or {}).get("curve")
+        _ncv = 0 if not _cv else (1 if isinstance(_cv, dict) else len(_cv))
+        # THE COLUMN IS THE PANEL PLUS A MARGIN, and the ASPECT is what makes the scene fit beside
+        # it -- 1 + column is not enough. Parallel projection fits the box to the frame's HEIGHT, so
+        # the box is half-width 0.5/aspect of the width; to sit inside a scene column of (1 - c) it
+        # needs 0.5/aspect <= (1 - c)/2, i.e. aspect >= 1/(1 - c). At c = 0.32 that is 1.47, and
+        # 1 + c = 1.32 left the box hanging off the left edge with the scale bar cut in half.
+        # A SQUARE PANEL, WHICH IS A CONSTRAINT ON THE ASPECT AND NOT ON THE PANEL. `size` is in
+        # WINDOW fractions and the window is not square, so (0.30, 0.26) drew a panel 614 x 333 px.
+        # Squareness ties the two: a panel `h` of the height is h*px tall, so it must be h*px wide,
+        # which is h/aspect of the width. The aspect then has to leave room for the box beside it --
+        # 0.5/aspect <= (1 - c)/2 with c = h/aspect + margin -- which solves to
+        # aspect >= (1 + h)/(1 - margin), plus 9% so the box is not flush against the edge.
+        _ch = float((style or {}).get("curve_height", 0.26))
+        _mg = float((style or {}).get("curve_margin", 0.03))
+        _asp = float((style or {}).get("movie_aspect",
+                                       1.0 if not _ncv else
+                                       round((1.0 + _ch) / max(1.0 - _mg, 0.2) * 1.09, 3)))
+        self._curve_size = (_ch / _asp, _ch)
+        self._curve_col = 0.0 if not _ncv else self._curve_size[0] + _mg
+        pxw = max(16, int(px * _asp) // 16 * 16)
+        self.aspect = pxw / float(px)
+        self.p = pv.Plotter(off_screen=True, window_size=(pxw, px), border=False)
         self.p.set_background("black")
         self.p.enable_anti_aliasing("msaa", multi_samples=8)
 
@@ -411,6 +438,24 @@ class LiveMovie:
             self.p.camera.up = tuple(u)
             self.p.camera.parallel_projection = True
             self.p.camera.parallel_scale = radius * 1.45
+            # AND SHIFTED OUT FROM UNDER THE PANELS. Widening the frame alone does not clear the
+            # scene: parallel projection fits the VERTICAL extent, so the extra width is slack on
+            # BOTH sides and the box still reaches into the right-hand column. Translating the
+            # camera along its own horizontal screen axis moves the scene left by exactly the
+            # column's width -- `parallel_scale` is the half-height in world units, so the window is
+            # 2*scale*aspect wide and a column of `f` of it is f*2*scale*aspect.
+            if self._curve_col > 0:
+                # `d` POINTS FROM THE SCENE TO THE CAMERA, so the view direction is -d and
+                # screen-right is cross(-d, u), not cross(d, u). With the sign the other way
+                # the camera moved left and the scene slid RIGHT, straight under the panels
+                # the shift exists to clear.
+                _h = np.cross(-d, u)
+                _n = float(np.linalg.norm(_h))
+                if _n > 1e-12:
+                    _sh = (_h / _n) * (0.5 * self._curve_col * 2.0
+                                       * self.p.camera.parallel_scale * self.aspect)
+                    self.p.camera.position = tuple(np.asarray(self.p.camera.position) + _sh)
+                    self.p.camera.focal_point = tuple(np.asarray(self.p.camera.focal_point) + _sh)
 
         self._draw_obstacles(span)
         # A FRAGMENTED MP4, SO THE FILE IS READABLE WHILE IT IS STILL BEING WRITTEN.
@@ -806,10 +851,18 @@ class LiveMovie:
             hi = lo + _step * max(_n, 1)
             cfg["ticks"] = max(_n, 1) + 1
             pad = 0.0
-            _sz = tuple(cfg.get("size", (0.30, 0.26)))
+            # THE PANEL'S WIDTH IS A FRACTION OF THE WINDOW, USED AS GIVEN. Dividing it by the
+            # aspect kept its SHAPE constant and left the column it was supposed to fill only
+            # two thirds occupied -- a band of blank down the right edge. The column was sized from
+            # this number in the first place, so the two agree by construction.
+            _sz = tuple(cfg.get("size", self._curve_size))
+            # DOWN THE RIGHT. The left is where the header prints -- the name, the box, the frame
+            # counter, the LUT -- so a panel there sits under four lines of text on the first row
+            # and the stack has to start below them.
             ch = self.pv.Chart2D(size=_sz,
-                                 loc=tuple(cfg.get("loc",
-                                                   (0.03, 0.71 - _i * (_sz[1] + 0.05)))))
+                                 loc=tuple(cfg.get(
+                                     "loc", (1.0 - self._curve_col + 0.005,
+                                             0.71 - _i * (_sz[1] + 0.05)))))
             ch.background_color = (0, 0, 0, 0.0)
             ch.border_style = None
             ch.title = str(cfg.get("title", ""))
@@ -817,12 +870,22 @@ class LiveMovie:
             ch.y_axis.range = [float(cfg.get("ymin", lo - pad)), float(cfg.get("ymax", hi + pad))]
             ch.x_axis.label = str(cfg.get("xlabel", "frame"))
             ch.y_axis.label = str(cfg.get("ylabel", q))
-            _fs = int(cfg.get("font_size", 9))
+            # TWO SIZES, NOT ONE MINUS TWO. The axis TITLE ("cells", "frame") and the TICK NUMBERS
+            # are read at different distances -- the title once, the ticks repeatedly while
+            # following a line -- so they get their own keys instead of one being derived from the
+            # other. Both default larger than they were: at 9 and 7 on a 1280 px frame the ticks
+            # were about eight pixels tall.
+            # SIZED FOR THE FRAME THE PANEL ENDS UP IN. These are absolute point sizes, and the
+            # frame grew from 1280 square to 2048x1280 when the curve column was added -- so a size
+            # that was small at 1280 is smaller still as a fraction of the wider frame. 18/15 on a
+            # panel ~600 px across is readable at the size these clips are actually watched.
+            _fs = int(cfg.get("font_size", 18))
+            _tfs = int(cfg.get("tick_font_size", max(6, _fs - 3)))
             for _a in (ch.x_axis, ch.y_axis):
                 _a.label_visible = _a.ticks_visible = _a.tick_labels_visible = True
                 _a.grid = False
                 _a.label_size = _fs
-                _a.tick_label_size = max(6, _fs - 2)
+                _a.tick_label_size = _tfs
                 _a.tick_count = int(cfg.get("ticks", 4))
                 try:
                     # ONE DIGIT ON EVERY TICK, derived from the axis's own top rather than
@@ -836,8 +899,16 @@ class LiveMovie:
                     pass
                 try:
                     _a.pen.color = "white"
-                    _a.GetLabelProperties().SetColor(1.0, 1.0, 1.0)
-                    _a.GetTitleProperties().SetColor(1.0, 1.0, 1.0)
+                    # NOT BOLD. vtkAxis renders both its title and its tick labels bold by default,
+                    # which at this size reads as emphasis the panel is not making -- and bold white
+                    # on black blooms, so the strokes close up and a 3 becomes an 8. `SetColor` was
+                    # already being reached through these accessors; the weight is on the same
+                    # objects and was simply never set.
+                    for _tp in (_a.GetLabelProperties(), _a.GetTitleProperties()):
+                        _tp.SetColor(1.0, 1.0, 1.0)
+                        _tp.SetBold(0)
+                    _a.GetTitleProperties().SetFontSize(_fs)
+                    _a.GetLabelProperties().SetFontSize(_tfs)
                 except Exception:                        # noqa: BLE001
                     pass
             ch.legend_visible = False

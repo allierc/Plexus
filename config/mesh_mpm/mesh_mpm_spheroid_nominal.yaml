@@ -52,19 +52,11 @@ plotting:
   - quantity: cells
     xlabel: frame
     ylabel: cells
-    font_size: 9
     ticks: 4
-    size:
-    - 0.3
-    - 0.26
   - quantity: area
     xlabel: frame
     ylabel: cell area
-    font_size: 9
     ticks: 4
-    size:
-    - 0.3
-    - 0.26
 sets:
   vertex:
     n: 25584

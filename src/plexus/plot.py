@@ -205,7 +205,10 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
             live_movie.replay(data_dir, sim,
                               max_frames=int(st.get("movie_max_frames", 300)),
                               render_n=int(st.get("render_n", 500_000_000)),
-                              stills=int(st.get("stills", 0)), name=sim.name)
+                              # 10, NOT 0: `-o plot` rewrites `movie.mp4` and used to leave
+                              # `3d.png` as whatever the generation wrote, so the two disagreed
+                              # about the same run.
+                              stills=int(st.get("stills", 10)), name=sim.name)
             return data_dir
         print("[plot] renderer vtk_points asked for but pyvista did not import -- falling back to "
               "splat3d, which has no obstacles and no depth buffer", flush=True)
