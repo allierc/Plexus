@@ -1,0 +1,127 @@
+# MESH-MPM 07a -- THE SPHEROID ALONE: `surface_drive grow` + `cell_divide`, and nothing else.
+#
+# The gel is GONE -- no `mpm_particle` set, no MLS-MPM cycle, no `mesh_contact`, no `mesh_inside`.
+# What is left is a prescribed shell that inflates x2.4 and a division operator. If the shell is
+# still ill here then neither the contact nor the presence of the MPM tensors is the channel, and
+# the fault is in the two operators themselves or in their interaction.
+#
+# THE LADDER SO FAR, each step removing one thing:
+#   gel_divide          contact + MPM + divide      dies at ~frame 184, shell off-sphere
+#   divide_nogel        MPM present, out of reach   completes, shell still ill
+#   divide_alone (this) no MPM at all               <- the remaining question
+#
+# The reference for a healthy dividing tissue is `mesh_mpm_spheroid_half`, whose shell stays round
+# to 7,805 cells -- but it drives its growth with `cell_grow` + `cell_mechanics`, not by scaling.
+# That difference is now the prime suspect: scaling multiplies every wedge volume by the SAME
+# factor, so every cell crosses the x2 threshold at once, and `cell_divide` fires on a whole
+# tessellation in the same tick rather than on the few cells a growth rate ripens.
+
+general:
+  name: mesh_mpm_spheroid_divide_alone
+  seed: 0
+  n_frames: 160
+  dt: 0.0032
+  record_cap: 42
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 4
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  mesh_flat: true
+  mesh_color: '#cfd8e3'
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    ticks: 4
+  - quantity: radius
+    xlabel: frame
+    ylabel: shell radius
+    ticks: 4
+sets:
+  vertex:
+    n: 32768
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 16384
+fields: {}
+operators:
+- op: mesh_seed
+  at: vertex
+  n_cells: 400
+  radius: 0.08
+  centre:
+  - 0.5
+  - 0.53
+  - 0.5
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  cell_set: cell
+- op: surface_drive
+  at: vertex
+  grow: 2.4
+  over: 128
+  rigid: false
+- op: cell_divide
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.12
+schedule:
+- mesh_seed
+- surface_drive
+- cell_divide
+descriptions:
+  movie:
+    description: A large purple cube is subjected to a compressive force from a thin, grey mesh sheet
+      on its top surface. As time progresses, the cube undergoes significant deformation, flattening and
+      expanding outward under the pressure. The internal stress distribution becomes visible as a heat
+      map, transitioning from dark purple to bright yellow and red. By the final frame, the cube has been
+      compressed into a much thinner, wider shape with high-intensity stress concentrated at the bottom
+      and center.
+    objects: "The primary object is a large, roughly cubic volume of particles that starts as a dark purple\
+      \ mass. A thin, grey rectangular mesh sheet sits on top of the cube, acting as the source of external\
+      \ pressure. A smaller, blue rectangular inset in the top-left corner provides a zoomed-in view of\
+      \ the surface deformation. A white wireframe box defines the 1 mm\xB3 simulation domain, with a\
+      \ 0.25 mm scale bar provided for spatial reference."
+  movie_mpm_particle:
+    description: A large cube of particles undergoes a deformation process over time. The particles shift
+      from a uniform blue state to a gradient of red and purple. The overall shape of the particle mass
+      compresses and tilts slightly as the simulation progresses. The movement appears smooth and continuous,
+      representing an elastic deformation of a 1 mm cube.
+    objects: The primary object is a large, dense collection of particles forming a roughly cubic shape.
+      These particles transition from a solid blue color to a gradient of red at the bottom and purple
+      at the top. A smaller, static blue cube is shown in an inset box in the upper left corner for reference.
+      The entire simulation is contained within a wireframe bounding box with a scale bar indicating 0.25
+      mm.

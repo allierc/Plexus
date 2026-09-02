@@ -739,7 +739,12 @@ class LiveMovie:
     # population that doubles looks exactly like one that does not move. Fixing it needs the whole
     # series up front, so the panel is built on the REPLAY path, which has the trajectory; a live
     # generate has only the frame it is on and says so rather than drawing a rescaling plot.
-    _CURVE_Q = ("cells", "area")
+    # `radius` IS THE ONE THAT SPEAKS TO A CONTACT. A shell's mean radius says how big it is; the
+    # SPREAD says whether it is still a shell. `mesh_contact` is star-shaped and its whole premise
+    # is that a ray from `centre` meets the surface once, so a rising sd is the surface going
+    # off-sphere -- which is what collapses the direction-bin grid, and it does so long before the
+    # picture looks wrong.
+    _CURVE_Q = ("cells", "area", "radius")
 
     def _curve_series(self, H, lvl, q, ntype):
         """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
@@ -766,6 +771,13 @@ class LiveMovie:
                     out[t, j] = (float((k == j).sum()), 0.0)
                 continue
             import torch
+            if q == "radius":
+                nv = int(m["Nv"])
+                P = np.asarray(lvl.get("pos")[:nv])
+                r = np.linalg.norm(P - P.mean(0), axis=1)
+                for j in range(nt):                   # per VERTEX, so the type split is by face
+                    out[t, j] = (float(np.mean(r)), float(np.std(r)))
+                continue
             from plexus.operators.vertex_ops import face_geometry_3d
             nv = int(m["Nv"])
             pos = torch.as_tensor(lvl.get("pos")[:nv], dtype=torch.float64)
@@ -809,6 +821,21 @@ class LiveMovie:
         if len(cfgs) > 3:
             raise ValueError(f"plotting.curve: {len(cfgs)} panels asked for, at most 3 fit "
                              f"legibly -- each is 26% of the frame's height")
+        # THE CURVE READS THE SET THAT CARRIES THE MESH, not the set being drawn. `cells`, `area`
+        # and `radius` are properties of a SURFACE, and the drawn set is whichever positional set is
+        # largest -- which in a coupled run is the 200,000 material points, not the 25,000-vertex
+        # vesicle. Pointed at the particles they came back all-NaN and the panels were skipped
+        # without a word, so a spec that asked for three curves silently got none.
+        lq = lvl
+        for _nm, _lv in H.levels.items():
+            _m = getattr(_lv, "mesh", None)
+            if _m is not None and int(_m.get("nF", 0) or 0) and hasattr(_lv, "_pos"):
+                lq = _lv
+                if _nm != getattr(self, "_sname", None):
+                    print(f"[live-movie] curves read set {_nm!r} (it carries the mesh), not "
+                          f"{getattr(self, '_sname', '?')!r}", flush=True)
+                break
+        lvl = lq
         ntype = self._curve_types(H, lvl)
         if not hasattr(lvl, "_pos"):
             print("[live-movie] plotting.curve needs the whole clip to fix its axes and a live "
@@ -1109,6 +1136,30 @@ class LiveMovie:
     # the painter's-algorithm tie goes the wrong way). Here the surface is a second VTK actor,
     # z-buffered against the dots by construction, and it costs nothing per frame but a point
     # array swap.
+    def _mesh_map(self, name):
+        """(scale, centre) for a mesh set, read off the `mesh_contact` that consumes it.
+
+        A SURFACE NEED NOT BE IN BOX COORDINATES. `mesh_contact` maps it at the point of USE --
+        `scale` and `centre`, gate 04's own device -- so a vesicle can live at the ORIGIN in its own
+        units, which is where `cell_mechanics`'s radial term requires it. The renderer drew it where
+        it truly is: radius 2.3 -> 9.3 about the origin, entirely outside a [0, 1] box, so the movie
+        showed the gel and an empty space where the experiment was.
+        READ OFF THE OPERATOR, NOT DECLARED AGAIN. A second copy of `scale` in `plotting` is a
+        second chance to disagree, and a picture drawn at a different scale from the physics is
+        worse than no picture.
+        """
+        for o in (getattr(self.sim, "operators", None) or []):
+            pr = getattr(o, "params", None) or {}
+            if getattr(o, "op", "") == "mesh_contact" and pr.get("surface") == name:
+                c = pr.get("centre", [0.0, 0.0, 0.0])
+                c = [0.0, 0.0, 0.0] if isinstance(c, str) else [float(v) for v in c]
+                return float(pr.get("scale", 1.0)), np.asarray(c, np.float32)
+        return 1.0, None
+
+    def _mesh_xyz(self, lvl, nv, sc, ct):
+        P = lvl.get("pos")[:nv].detach().cpu().numpy().astype(np.float32)
+        return P if (sc == 1.0 or ct is None) else (P - P.mean(0)) * sc + ct
+
     def _mesh_levels(self, H):
         """Every Level carrying a non-empty half-edge table, minus `plotting.hide_sets`."""
         hide = set((self.style or {}).get("hide_sets", []) or [])
@@ -1165,8 +1216,11 @@ class LiveMovie:
                                 1.0 if (style == "wireframe" or self._mesh_is_subject) else 0.55))
             for name, lvl, m in self._mesh_levels(H):
                 nv = int(m["Nv"])
-                pd = self.pv.PolyData(lvl.get("pos")[:nv].detach().cpu().numpy().astype(np.float32),
-                                      self._mesh_faces(m))
+                sc, ct = self._mesh_map(name)
+                pd = self.pv.PolyData(self._mesh_xyz(lvl, nv, sc, ct), self._mesh_faces(m))
+                if sc != 1.0:
+                    print(f"[live-movie] surface {name!r} drawn through mesh_contact's own mapping: "
+                          f"x{sc:g} about its centroid, placed at {list(np.round(ct, 4))}", flush=True)
                 # THE CELL BOUNDARIES ARE THE SUBJECT WHEN THE MESH IS. A shaded surface with no
                 # edges renders a 6,000-cell epithelium as a smooth grey ball -- the tessellation,
                 # which is the entire reason the model has faces, is invisible. `render_vtk` draws
@@ -1189,7 +1243,7 @@ class LiveMovie:
                                 render_lines_as_tubes=False,
                                 show_edges=_edges, edge_color=st.get("mesh_edge_color", "#2b2b2b"),
                                 edge_opacity=float(st.get("mesh_edge_opacity", 1.0)))
-                self._meshes.append((name, nv, pd))
+                self._meshes.append((name, nv, pd, sc, ct))
                 print(f"[live-movie] surface {name!r}: {int(m['nF']):,} faces, {nv:,} vertices, "
                       f"drawn as {style}", flush=True)
         except Exception as e:                       # noqa: BLE001 -- never kill a run for a picture
@@ -1244,7 +1298,7 @@ class LiveMovie:
         """POINTS ONLY. The topology is rebound only if the face count changed -- a plate never
         divides, but an epithelium does, and swapping the face array every frame on a 12,000-cell
         surface would cost more than the rest of the frame."""
-        for name, nv, pd in getattr(self, "_meshes", []) or []:
+        for name, nv, pd, sc, ct in getattr(self, "_meshes", []) or []:
             try:
                 lvl = H.level(name)
                 m = getattr(lvl, "mesh", None)
@@ -1252,10 +1306,10 @@ class LiveMovie:
                     continue
                 n_now = int(m["Nv"])
                 if n_now != nv or pd.n_faces_strict != int(m["nF"]):
-                    pd.points = lvl.get("pos")[:n_now].detach().cpu().numpy().astype(np.float32)
+                    pd.points = self._mesh_xyz(lvl, n_now, sc, ct)
                     pd.faces = self._mesh_faces(m)
                 else:
-                    pd.points = lvl.get("pos")[:nv].detach().cpu().numpy().astype(np.float32)
+                    pd.points = self._mesh_xyz(lvl, nv, sc, ct)
                 if self._mesh_is_subject:
                     self._mesh_face_rgb(m, pd)
             except Exception:                        # noqa: BLE001
@@ -1316,6 +1370,18 @@ class LiveMovie:
             # to compare two pictures of different quantities. One series per band of the SAME fixed
             # range is the same LUT, quantised: 12 steps is finer than the eye reads off a colour
             # bar anyway, and it costs twelve chart plots a frame instead of one.
+            # EQUAL ASPECT, OR THE SECTION LIES ABOUT SHAPE. `Chart2D` scales its two axes
+            # independently to the data, and the slab is 0.70 wide by 0.40 tall -- so a ROUND shell
+            # sliced through its middle drew as a flat ellipse while the 3D view beside it showed a
+            # sphere. Two pictures of one frame disagreeing about the geometry is the worst kind of
+            # artefact: it reads exactly like a physics bug. The ranges are set to a common span
+            # about the content's centre instead.
+            _ax0, _bx0 = float(np.nanmin(xs)), float(np.nanmin(ys))
+            _ax1, _bx1 = float(np.nanmax(xs)), float(np.nanmax(ys))
+            _sp = max(_ax1 - _ax0, _bx1 - _bx0, 1e-9) * 1.06
+            _cx, _cy = 0.5 * (_ax0 + _ax1), 0.5 * (_bx0 + _bx1)
+            self.cs.x_range = [_cx - _sp / 2, _cx + _sp / 2]
+            self.cs.y_range = [_cy - _sp / 2, _cy + _sp / 2]
             self._cs_series = []
             fld = str(self.style.get("color_field", "") or "")
             val = self._field(H, lvl)[0] if fld else None
@@ -1362,7 +1428,7 @@ class LiveMovie:
             # closed loop and no ordering to invent.
             _nrm = [0.0, 0.0, 0.0]; _nrm[ax] = 1.0
             _org = [0.0, 0.0, 0.0]; _org[ax] = y0
-            for _nm, _nv, _pd in getattr(self, "_meshes", []) or []:
+            for _nm, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
                 try:
                     _sl = _pd.slice(normal=_nrm, origin=_org)
                     if _sl.n_points < 2:

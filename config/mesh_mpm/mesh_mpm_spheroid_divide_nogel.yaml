@@ -1,0 +1,194 @@
+# MESH-MPM 07n -- THE SANITY CHECK: the same schedule, with the gel out of reach.
+#
+# `mesh_mpm_spheroid_gel_divide.yaml` WITH ONE NUMBER CHANGED -- the gel's top drops from 0.45 to
+# 0.20 -- so the shell, whose lower pole goes 0.45 -> 0.338 as it grows, NEVER TOUCHES IT. Every
+# operator, every constant and every schedule entry is otherwise identical: same `mesh_contact`,
+# same 500,000 material points, same MLS-MPM cycle, same `cell_divide`.
+#
+# WHAT IT SEPARATES. The dividing shell in the contact run goes off-sphere and grows a patch of
+# small cells on the side facing the gel, and there is no operator in the schedule that should let
+# that happen: `mesh_contact` emits an acceleration for the MPM particles and nothing applies its
+# reaction to the vertices. Two explanations remain -- an operator acting on the spheroid from
+# outside it, or a leak from the MPM tensors into the mesh tensors -- and both predict the SAME
+# failure here, where the contact never fires, only if the channel is not the contact itself.
+#
+#   shell still degrades  ->  the channel is not contact; look at the schedule and at aliasing
+#   shell grows cleanly   ->  the channel IS the contact, and `mesh_contact` is not read-only
+#
+# The reference for "grows cleanly" is `mesh_mpm_spheroid_half`, which runs the tissue alone.
+
+general:
+  name: mesh_mpm_spheroid_divide_nogel
+  seed: 0
+  n_frames: 160
+  dt: 0.0032
+  record_cap: 42
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: surface
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  mesh_flat: true
+  mesh_color: '#cfd8e3'
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    ticks: 4
+  - quantity: radius
+    xlabel: frame
+    ylabel: shell radius
+    ticks: 4
+sets:
+  vertex:
+    n: 32768
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 16384
+  mpm_particle:
+    n: 500000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.2
+        - 0.85
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: mesh_seed
+  at: vertex
+  n_cells: 400
+  radius: 0.08
+  centre:
+  - 0.5
+  - 0.53
+  - 0.5
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  cell_set: cell
+- op: surface_drive
+  at: vertex
+  grow: 2.4
+  over: 128
+  rigid: false
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+- op: cell_divide
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.12
+schedule:
+- mesh_seed
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- mesh_inside
+- cell_divide
+descriptions:
+  movie:
+    description: A large purple cube is subjected to a compressive force from a thin, grey mesh sheet
+      on its top surface. As time progresses, the cube undergoes significant deformation, flattening and
+      expanding outward under the pressure. The internal stress distribution becomes visible as a heat
+      map, transitioning from dark purple to bright yellow and red. By the final frame, the cube has been
+      compressed into a much thinner, wider shape with high-intensity stress concentrated at the bottom
+      and center.
+    objects: "The primary object is a large, roughly cubic volume of particles that starts as a dark purple\
+      \ mass. A thin, grey rectangular mesh sheet sits on top of the cube, acting as the source of external\
+      \ pressure. A smaller, blue rectangular inset in the top-left corner provides a zoomed-in view of\
+      \ the surface deformation. A white wireframe box defines the 1 mm\xB3 simulation domain, with a\
+      \ 0.25 mm scale bar provided for spatial reference."
+  movie_mpm_particle:
+    description: A large cube of particles undergoes a deformation process over time. The particles shift
+      from a uniform blue state to a gradient of red and purple. The overall shape of the particle mass
+      compresses and tilts slightly as the simulation progresses. The movement appears smooth and continuous,
+      representing an elastic deformation of a 1 mm cube.
+    objects: The primary object is a large, dense collection of particles forming a roughly cubic shape.
+      These particles transition from a solid blue color to a gradient of red at the bottom and purple
+      at the top. A smaller, static blue cube is shown in an inset box in the upper left corner for reference.
+      The entire simulation is contained within a wireframe bounding box with a scale bar indicating 0.25
+      mm.

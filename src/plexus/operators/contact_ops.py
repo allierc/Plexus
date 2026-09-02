@@ -170,14 +170,17 @@ class MeshContact(Lateral):
             raise ValueError("mesh_contact: `mesh_stride:` counted pass-2 frames per KEPT mesh in "
                              "the archive. A live surface has one mesh per frame and no cadence to "
                              "reconcile, so the parameter has no meaning; remove it")
-        if self.scale != 1.0:
-            # A LIVE SET IS ALREADY IN BOX COORDINATES. `scale` existed because the archive held the
-            # tissue in its own units about its own centroid. Applied to a set the engine is already
-            # integrating in box units it would move the surface away from the particles it is
-            # meant to touch, and the run would report no contacts -- which reads as "nothing
-            # happened" rather than as an error.
-            raise ValueError(f"mesh_contact: `scale: {self.scale}` -- a live surface is already in "
-                             f"box units, so the only meaningful scale is 1.0")
+        # `scale` IS HOW THE TWO SUBSYSTEMS KEEP THEIR OWN COORDINATES, and forbidding it on the
+        # live path was wrong. The archive path held the tissue about its own centroid in its own
+        # units (`export_tissue` writes `p - c`) and mapped it in here -- gate 04's epithelium was
+        # radius 17.58 TISSUE units and 0.15 of the box because 0.15/17.58 = 0.00853. That is what
+        # let the vesicle live in a 50-unit world about the ORIGIN, which is where `cell_mechanics`
+        # requires it: `K_R` penalises (|pos| - R0)^2 from the world origin, so translating the
+        # tissue into the matrix's box destroys it (measured: radius spread 0.006 -> 0.407 of the
+        # mean on the first recorded frame, before a single division).
+        #
+        # SO THE LIVE PATH DOES THE SAME MAPPING, at the point of use and on a COPY: the surface is
+        # centred on its own centroid, scaled, and placed at `centre`. Nothing moves the tissue.
         self._frame = -2
         self._built = None
         self._dom = None
@@ -206,13 +209,24 @@ class MeshContact(Lateral):
         if m is None or not int(m.get("Nv", 0)):
             return None
         nv = int(m["Nv"])
+        P = lvl.get("pos")[:nv].to(dt_)
         if self.centre_track:
-            self.centre = (lvl.get("pos")[:nv].mean(0).detach().to("cpu").tolist())
-            self.centre = [a + b for a, b in zip(self.centre, self.centre_offset)]
-        c = torch.tensor(self.centre, device=dev, dtype=dt_)
-        V = lvl.get("pos")[:nv].to(dt_) - c
+            self.centre = [a + b for a, b in zip(P.mean(0).detach().to("cpu").tolist(),
+                                                 self.centre_offset)]
+        # THE SURFACE'S OWN FRAME, SCALED. `V` is what everything below works in: the surface about
+        # the ray origin. With `scale: 1` and a set already in box units this is the old behaviour
+        # exactly (`P - centre`); with a scale it is the archive's mapping done live -- centre on
+        # the surface's OWN centroid, scale, and let `centre` place that origin in the box.
+        if self.scale != 1.0:
+            V = (P - P.mean(0)) * self.scale
+        else:
+            V = P - torch.tensor(self.centre, device=dev, dtype=dt_)
         vv = m.get("Vv", None)
-        Vv = torch.zeros_like(V) if vv is None else vv[:nv].to(device=dev, dtype=dt_)
+        # A COPY, AND SCALED WITH THE GEOMETRY. `.to()` with a matching dtype returns THE SAME
+        # TENSOR, so this aliased the live mesh table's velocity buffer -- harmless while the
+        # contact only read it, and a trap waiting for the first line that does not.
+        Vv = (torch.zeros_like(V) if vv is None
+              else vv[:nv].to(device=dev, dtype=dt_).clone() * self.scale)
         return V, m["E_srce"].to(dev), m["E_trgt"].to(dev), m["E_face"].to(dev), Vv
 
     def _build(self, dev, dt_, H):
@@ -325,7 +339,12 @@ class MeshContact(Lateral):
         # own. It fires only on a surface that is BOTH angularly coarse and near a lot of material,
         # which is the case that ran a run out of memory at frame 230 of 400 with an error naming an
         # allocation and not a cause.
-        _cap = float(os.environ.get("PLEXUS_CONTACT_MAX_ENTRIES", "4.0e8"))
+        # 5e7 ENTRIES, NOT 4e8. The first number came from costing an entry at 72 bytes -- six
+        # [n, 9K, 3] tensors -- but each is float32, so an entry is 12 bytes in ONE of them and the
+        # peak is a handful of those plus the intermediates. A single [n, 9K, 3] of 2.75e8 entries
+        # is 3.3 GB, which is what the run actually asked for and the guard waved through. At 5e7
+        # the largest single allocation is ~600 MB and the peak a few GB.
+        _cap = float(os.environ.get("PLEXUS_CONTACT_MAX_ENTRIES", "5.0e7"))
         _need = float(x.shape[0]) * 9.0 * float(M["K"])
         if _need > _cap:
             raise ValueError(
@@ -1225,7 +1244,13 @@ class SurfaceDrive(Structural):
                 m["Vv"] = vv
             # THE SURFACE VELOCITY OF AN INFLATING SHELL IS RADIAL and proportional to the radius,
             # which is what the friction law needs and what a single axis-aligned number cannot say.
-            vv[:Nv] = (self._p0 - self._c0) * v
+            #
+            # FROM THE LIVE POSITIONS, NOT THE SEEDED ONES. `_p0` is the frame-0 vertex array, and
+            # `cell_divide` APPENDS vertices -- so the moment a cell split this was 796 rows being
+            # written into 1,160 and the run died on a shape mismatch. The live array is the right
+            # one anyway: after a division the new vertices have a radius too, and it is theirs.
+            _cv = pos[:Nv].mean(0, keepdim=True)
+            vv[:Nv] = (pos[:Nv] - _cv) * v
             self._y_prev = y
             self._say(v)
             return {}
