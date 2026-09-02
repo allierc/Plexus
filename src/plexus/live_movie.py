@@ -165,7 +165,14 @@ class LiveMovie:
         # This replaces a `playback` speed knob, which was a way of asking for slow motion and is
         # not what a movie with units should do: it should show the world at the rate the world
         # ran, and if that is too fast to watch, the answer is a longer run, not a slower film.
-        self.dt, self.time_s, self.real_time = dt, time_s, bool(real_time)
+        # THE SPEC MAY OVERRIDE THE REAL-TIME CLOCK, and some must. `real_time` picks the framerate
+        # so the movie runs at the world's own pace, which is what a 1.28 s MPM run wants and is
+        # nonsense for a tissue at 600 s a frame: 402 frames of that is 2.8 DAYS, so honest playback
+        # asks for 0.0002 fps, every player clamps it, and the file then lies about its duration.
+        # It was reachable only as a CLI flag (`--no-real-time`), i.e. not from the artefact that
+        # describes the run.
+        self.dt, self.time_s = dt, time_s
+        self.real_time = bool((self.style or {}).get("real_time", real_time))
         self.length_um = length_um
         # THE GRID, BESIDE THE PARTICLE COUNT. The two together are what actually determines
         # whether a run resolves anything: 100M particles on a 96^3 grid is 8,176 per cell and a
@@ -852,7 +859,12 @@ class LiveMovie:
             # surface hides the material it is acting on, which is half of what a contact run is
             # about; with nothing behind it a wireframe is a tangle of edges with no shape.
             style = str(st.get("mesh_style", "surface" if self._mesh_is_subject else "wireframe"))
-            opac = float(st.get("mesh_opacity", 1.0 if style == "wireframe" else 0.55))
+            # TRANSLUCENT ONLY AS AN OVERLAY. 0.55 is right for a surface sitting ON a point cloud --
+            # it is there so the material underneath is not hidden by the thing acting on it -- and
+            # wrong when the surface is the whole picture: a 6,000-cell epithelium at 0.55 shows its
+            # own far side through its near side, so every cell is read through another cell.
+            opac = float(st.get("mesh_opacity",
+                                1.0 if (style == "wireframe" or self._mesh_is_subject) else 0.55))
             for name, lvl, m in self._mesh_levels(H):
                 nv = int(m["Nv"])
                 pd = self.pv.PolyData(lvl.get("pos")[:nv].detach().cpu().numpy().astype(np.float32),

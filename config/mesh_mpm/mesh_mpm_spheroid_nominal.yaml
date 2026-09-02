@@ -45,8 +45,8 @@ plotting:
   camera_zoom: 0.0
   dot_size: 1.6
   fps: 60
-  slow_motion: 4
   mesh_color: '#cfd8e3'
+  real_time: false
 sets:
   vertex:
     n: 25584
