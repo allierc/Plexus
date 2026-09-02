@@ -1,7 +1,7 @@
 """The 3D vertex model, as one module: seed, geometry, mechanics, growth, division, death, T1.
 
     seed_mesh (alias mesh_seed)  build the closed spherical half-edge surface, once, at frame 0
-    cell_mechanics               the AVM shape energy -- `default` (3D AVM) and `monolayer`
+    cell_mechanics               the vertex-model shape energy -- `default` (3D) and `monolayer`
     cell_divide                  a septum through a face -> two daughters   (default/doubler/timer)
     cell_die                     shrink to a triangle, then extrude
     edge_flip                    the T1 / reversible network reconnection
@@ -134,7 +134,7 @@ def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
 
 def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R, Lam, Gam,
                        eocc, vocc, K_bend=0.0, twin_face=None, K_lumen=0.0, myo_e=None):
-    """Explicit-arg AVM shape energy on a FIXED-size RESERVOIR (torch.compile-friendly: shapes never
+    """Explicit-arg vertex-model shape energy on a FIXED-size RESERVOIR (torch.compile-friendly: shapes never
     change, so it compiles once even under division). Dead slots are masked out: `alive` (faces),
     `eocc` (half-edges), `vocc` (vertices, for the radial term). R0 is a tensor (changes each frame);
     the K_* / Lam / Gam coefficients are compile-time constants."""
@@ -144,7 +144,7 @@ def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_
     # PER-JUNCTION MYOSIN, when a junction operator has supplied it. `Lam` alone is one number for the
     # whole tissue, so no junction can be weaker than its neighbours and myosin cannot be recruited where
     # tension is high. `myo_e` is a per-half-edge multiplier on exactly that term -- which is where
-    # actomyosin enters an AVM -- and defaults to None, in which case this reduces to `Lam * line.sum()`
+    # actomyosin enters a vertex model -- and defaults to None, in which case this reduces to `Lam * line.sum()`
     # exactly and every existing run is bit-identical.
     E = E.sum() + (Lam * line.sum() if myo_e is None else Lam * (myo_e * line).sum())
     E = E + K_V * ((vf - V0f) ** 2 * alive).sum()
@@ -259,6 +259,14 @@ class SeedMesh3D(Structural):
         # unit box put the vesicle in a corner. Default [0,0,0], so the 461 specs that never asked
         # are byte-identical.
         self.centre = [float(v) for v in params.get("centre", [0.0, 0.0, 0.0])]
+        # PARTITION THE TYPES BY POSITION, NOT AT RANDOM. `type_layout` on a SET is applied at build
+        # (engine.py), over that set's own coordinates -- which a mesh cell does not have yet: the
+        # cells do not exist until this operator runs, so the build-time split assigns every one of
+        # them to type 0 and a two-type spheroid comes out uniform. Declaring it here instead cuts
+        # the shell at the equator of the axis named, tiling the declared `fraction`s along it, at
+        # the moment the faces first have centroids.
+        self.type_layout = str(params.get("type_layout", "random")).lower()
+        self.cell_set = params.get("cell_set", "cell")
         self.vseed_cv = float(params.get("vseed_cv", 0.0))       # STOCHASTIC VOLUME SEED: per-cell random cell-cycle
         #   phase at t=0 (spread of the initial division threshold) -> desynchronises the FIRST division wave
 
@@ -297,6 +305,28 @@ class SeedMesh3D(Structural):
         # recorder, a probe, the salvage) would keep writing into an orphan. So the seed writes
         # THROUGH the existing table when there is one, and only creates one for a spec that has
         # not declared it yet (456 of the 458 okuda specs, at the time of writing).
+        if self.type_layout.startswith("split_"):
+            from plexus.engine import retype
+            _ax = "xyz".index(self.type_layout[-1])
+            _cl = H.level(self.cell_set) if self.cell_set in H.levels else None
+            _fr = getattr(_cl, "_type_fracs", None) if _cl is not None else None
+            if _cl is None or _fr is None or int(_fr.numel()) < 2:
+                print(f"[mesh_seed] type_layout={self.type_layout} ignored: set "
+                      f"{self.cell_set!r} declares fewer than two types", flush=True)
+            else:
+                order = torch.argsort(cen[:, _ax])              # faces, sorted along the axis
+                nt = torch.zeros(int(_cl.n), dtype=torch.long, device=dev)
+                cuts = (torch.cumsum(_fr / _fr.sum(), 0) * nF).round().long().tolist()
+                lo = 0
+                for tid, hi in enumerate(cuts):
+                    nt[order[lo:min(int(hi), nF)]] = tid
+                    lo = int(hi)
+                retype(_cl, nt)
+                _names = list(getattr(_cl, "type_names", []) or [])
+                _tally = "  ".join(f"{(_names[t] if t < len(_names) else t)}={int((nt[:nF] == t).sum())}"
+                                   for t in range(int(_fr.numel())))
+                print(f"[mesh_seed] type_layout={self.type_layout}: {nF} cells cut at the "
+                      f"{'xyz'[_ax]} equator -> {_tally}", flush=True)
         seeded = dict(E_srce=est, E_trgt=ett, E_face=eft, nF=nF, Nv=Nv,
                          A0=torch.full((nF,), A0, dtype=dt, device=dev),
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
@@ -321,8 +351,18 @@ class SeedMesh3D(Structural):
 
 @register_operator("cell_mechanics", set="vertex", kind="lateral", family="mechanics")
 class ShapeEnergy3D(Lateral):
-    """3D AVM shape-energy force on the vesicle vertices:
+    """3D vertex-model shape-energy force on the vesicle vertices:
         E = sum_f [ K_A(A_f-A0)^2 + K_P(P_f-P0)^2 + K_V(v_f - v_eq_f)^2 ] + Lambda*sum_e l_e .
+    NOT AN "AVM", WHICH IS WHAT THIS SAID AND IS A DIFFERENT MODEL. `AVM` is the Active Vertex
+    Model of Barton, D. L., Henkes, S., Weijer, C. J. & Sknepnek, R. (2017), PLoS Comput. Biol.
+    13(6):e1005569, and it differs from this in both of its defining ingredients: it is ACTIVE (the
+    cells are self-propelled, active-matter dynamics on top of the vertex energy) and it is
+    CENTRE-BASED (contacts are generated dynamically from cell CENTRE positions, a Voronoi
+    construction). This operator is passive -- force = -grad E, overdamped, no active term -- and
+    the degrees of freedom ARE the vertices of a half-edge mesh, which is the true-vertex lineage
+    (DamCB/tyssue, Okuda) and is exactly the contrast `ops_2d.py` draws. Borrowing the name imports
+    a claim of self-propulsion the code does not make.
+
     K_V is a PER-CELL volume elasticity on each cell's wedge volume v_f (Turing_vertex Eq.3 / tyssue
     ClosedMonolayer), not a single global lumen term: it keeps every cell inflated and resists local
     buckling, so growth (ramping v_eq per cell) inflates the shell smoothly. Force = -grad E by one 3D
@@ -333,7 +373,17 @@ class ShapeEnergy3D(Lateral):
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["vertex_model", "shape_energy", "cell_volume_elasticity", "vesicle", "force_balance"]
-    REFERENCE = "Farhadifar, R. et al. (2007). Curr. Biol. 17:2095-2104 (vertex-model shape energy); Okuda, S. et al. (2015). Biomech. Model. Mechanobiol. 14:413-421 (3D volume/surface)."
+    # THE SECOND CITATION WAS THE WRONG OKUDA 2015, AND THE PAGES WERE WRONG TOO. It read
+    # "Biomech. Model. Mechanobiol. 14:413-421 (3D volume/surface)": that paper is 413-425,
+    # and it is the VISCOSITY paper -- local velocity fields to make vertex dynamics Galilean
+    # invariant -- which this operator does not implement. The 3D volume/surface energy is the
+    # other Okuda 2015, in Biophysics and Physicobiology.
+    REFERENCE = ("Farhadifar, R., Roper, J.-C., Aigouy, B., Eaton, S. & Julicher, F. (2007). "
+                 "Curr. Biol. 17(24):2095-2104, doi:10.1016/j.cub.2007.11.049 -- the vertex-model "
+                 "shape energy (area, perimeter, line tension) this generalises; "
+                 "Okuda, S., Inoue, Y. & Adachi, T. (2015). Three-dimensional vertex model for "
+                 "simulating multicellular morphogenesis. Biophys. Physicobiol. 12:13-20 -- the "
+                 "3D volume/surface form. NOT an Active Vertex Model: see the class docstring.")
     PARAM_ROLES = {"p0": "target_shape_index", "K_A": "area_stiffness", "K_P": "perimeter_stiffness",
                    "Lambda": "surface_tension", "K_V": "cell_volume_elasticity", "cap_frac": "stability_cap"}
 
@@ -360,7 +410,7 @@ class ShapeEnergy3D(Lateral):
         # a move that only makes an already-inverted face WORSE is blocked, a recovering move is allowed.
         # Straight-through (scale detached) so the rollout stays differentiable. 0 = off (default).
         self.antiinv = float(params.get("antiinv", 0.0))
-        # Lloyd-like tangential regularization (AVM analog of Turing's surface_lloyd): rounds cells
+        # Lloyd-like tangential regularization (vertex-model analog of Turing's surface_lloyd): rounds cells
         self.smooth_iters = int(params.get("smooth_iters", 0)); self.smooth_w = float(params.get("smooth_w", 0.0))
         # torch.compile the (autograd-differentiated) energy: ~2.4x on a FIXED mesh, but DIVISION changes
         # nF every other frame -> torch.compile recompiles each time -> 20x SLOWER. So default OFF; only
@@ -813,6 +863,21 @@ class Divide3D(Structural):
                 clvl.state = cst
                 if getattr(clvl, "occ", None) is not None:
                     cocc = torch.zeros(clvl.state.shape[0], device=clvl.state.device); cocc[:nF2] = 1.0; clvl.occ = cocc
+            # AND ITS TYPE, which is not part of `state` and was therefore not inherited. `node_type`
+            # is its own buffer, so a daughter kept whatever type its BUFFER SLOT was assigned at
+            # build -- which for the usual contiguous fraction split is type 0 for every low index.
+            # Measured on a 200-cell spheroid seeded 100 soft / 100 tense: by frame 401 it was 4,104
+            # soft and 100 tense, every one of the 4,004 daughters born soft, and the type predicted
+            # which hemisphere a cell was in 53.8% of the time -- chance. Any per-type property
+            # (myosin drive, adhesion, a clone label) silently washed out of a growing tissue, and
+            # the run still looked plausible because the SHAPE change it produced early on persisted.
+            nt = getattr(clvl, "node_type", None) if clvl is not None else None
+            if nt is not None and int(nt.numel()) >= nF2:
+                from plexus.engine import retype
+                nt = nt.clone()
+                for i, mother in enumerate(daughter_mothers):
+                    nt[nF + i] = nt[mother]
+                retype(clvl, nt)                                 # and put the derived buffers back
         return {}
 
 

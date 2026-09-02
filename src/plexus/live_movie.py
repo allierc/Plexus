@@ -249,6 +249,13 @@ class LiveMovie:
         self.keep_stills = bool(keep_stills)
         self._still_paths = []
         self.cloud = self.idx = None
+        # INITIALISED HERE, NOT ONLY IN `_skin_build`. That builder runs only for
+        # `render_3d: surface`, so every OTHER spec reached `_skin_update` with the attribute
+        # never created and died on `AttributeError: 'LiveMovie' object has no attribute
+        # '_skin'` at frame 2 -- which the class swallows and turns into "movie DISABLED",
+        # so a run still finished, still wrote its trajectory, and silently had no movie.
+        self._skin = self._surf = self._skin_sub = None
+        self._meshes = []
         self.drawn = self.n = self.rendered = 0
         self.t0 = None
         self.failed = None

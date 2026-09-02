@@ -186,7 +186,7 @@ class JunctionMyosin(Structural):
         myo_ss = activity * (l_e / l_ref)          setpoint rises with junction length, i.e. with tension
         d myo  = (myo_ss - myo) * dt / tau         first-order relaxation toward it
 
-    so a stretched junction recruits myosin and pulls harder, which is the feedback the AVM's constant
+    so a stretched junction recruits myosin and pulls harder, which is the feedback the vertex model's constant
     `Lambda` cannot express. `activity` is the myosin-inhibition knob -- the in-silico blebbistatin --
     and it multiplies the setpoint rather than the tension directly, so inhibition takes effect over
     `tau` the way a drug does rather than instantly.
@@ -204,7 +204,8 @@ class JunctionMyosin(Structural):
     MECHANISM_TAGS = ["actomyosin_contraction", "mechanosensitive_recruitment",
                       "junction_state", "topology_persistent"]
     PARAM_ROLES = {"activity": "global_myosin_activity", "tau": "recruitment_timescale",
-                   "myo_new": "myosin_of_a_newborn_junction", "beta": "tension_sensitivity"}
+                   "myo_new": "myosin_of_a_newborn_junction", "beta": "tension_sensitivity",
+                   "activity_from": "per-type cell property giving each junction its drive"}
     REFERENCE = ("Rauzi, M. et al. (2008) Nat. Cell Biol. 10:1401 (myosin on shrinking junctions); "
                  "Fernandez-Gonzalez, R. et al. (2009) Dev. Cell 17:736 (tension-dependent recruitment).")
 
@@ -219,6 +220,20 @@ class JunctionMyosin(Structural):
         # the literature supports. `destabilising` flips the sign so high drive -> more myosin -> higher
         # drive, which is the positive feedback that produces T1s rather than suppressing them.
         self.keyed_on = str(params.get("keyed_on", "length")).lower()
+        # HETEROGENEITY, THROUGH THE TYPES. `activity` is one scalar over the whole tissue, so nothing
+        # in a spec could say "these cells contract harder" -- and two operator instances cannot say it
+        # either, because each rewrites the WHOLE keyed store every frame (`m["myo_keys"] = key`), so
+        # the second would erase the first. `mask` does not help: the selector is per NODE of `at:`,
+        # i.e. per vertex, while myosin lives per junction.
+        #
+        # `activity_from: <prop>` names a PER-TYPE property of the cell set, which is how every other
+        # heterogeneous spec in this corpus says the same thing (`types: {t0: {fraction, p}, ...}`).
+        # Each half-edge takes the value of the cell that owns it, and the junction takes the MEAN of
+        # its two -- a junctional belt is fed from the cortices on both sides, and averaging is the
+        # only choice symmetric in them, which matters because the store keeps ONE value per
+        # undirected edge and would otherwise depend on which half-edge was written last.
+        self.act_prop = params.get("activity_from")
+        self.cell_set = params.get("cell_set", "cell")
         self.destabilising = bool(params.get("destabilising", True))
         self._prev_len = None
         self.lam = float(params.get("lam", 1.0))          # Lambda, for the tension expression
@@ -309,7 +324,22 @@ class JunctionMyosin(Structural):
         # So the destabilising choice is +1, not -1. I had it as -1 on the first pass, which would have
         # made every "tension" run a stabiliser and the whole 84-91 comparison vacuous.
         sgn = 1.0 if self.destabilising else -1.0
-        ss = self.activity * (1.0 + sgn * self.beta * (drive / d_ref - 1.0)).clamp_min(0.0)
+        act = self.activity
+        if self.act_prop:
+            cl = H.level(self.cell_set)
+            a_cell = getattr(cl, self.act_prop, None)
+            if a_cell is None:
+                raise ValueError(
+                    f"junction_myosin activity_from={self.act_prop!r}: set {self.cell_set!r} has no "
+                    f"per-node buffer of that name -- declare it as a per-type scalar under "
+                    f"`sets.{self.cell_set}.types`.")
+            a_he = a_cell[ef[live].long()].to(dt_)          # per half-edge, from the cell that owns it
+            uk, inv = torch.unique(key, return_inverse=True)
+            tot = torch.zeros(int(uk.numel()), device=dev, dtype=dt_).index_add_(0, inv, a_he)
+            cnt = torch.zeros(int(uk.numel()), device=dev, dtype=dt_).index_add_(
+                0, inv, torch.ones_like(a_he))
+            act = self.activity * (tot / cnt.clamp_min(1.0))[inv]
+        ss = act * (1.0 + sgn * self.beta * (drive / d_ref - 1.0)).clamp_min(0.0)
         myo = myo + (ss - myo) * (self.dt / max(self.tau, 1e-9))
         myo = myo.clamp(0.0, 5.0)
 
@@ -326,6 +356,13 @@ class JunctionMyosin(Structural):
         MYOSIN_TRACE.append((int(live.sum()), float(myo.mean()), float(myo.min()),
                              float(myo.max()), n_new))
         if not self._said:
+            if self.act_prop:
+                _u = torch.unique(act)
+                print(f"[junction_myosin] activity_from={self.act_prop!r} on set {self.cell_set!r}: "
+                      f"{int(_u.numel())} distinct drives across {int(live.sum()):,} junctions, "
+                      f"{[round(float(v), 3) for v in _u[:6]]}"
+                      f"{' ...' if _u.numel() > 6 else ''} (a boundary junction gets the mean of its "
+                      f"two cells)", flush=True)
             print(f"[junction_myosin] {int(live.sum())} live junctions, activity={self.activity}, "
                   f"tau={self.tau}, myo_new={self.myo_new}; keyed by vertex pair so T1 / division / "
                   f"death need no edits", flush=True)

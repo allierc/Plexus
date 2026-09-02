@@ -294,6 +294,25 @@ class MeshContact(Lateral):
         # is never tested. This is what keeps the query over ~1% of the matrix instead of all of it.
         # Taken through the table rather than by a scatter-max, which has no deterministic
         # implementation and would make a re-run non-reproducible for a number that is a maximum.
+        # A COARSE SURFACE RAILS THIS GRID, AND IT USED TO DO IT SILENTLY. `nrow` is floored at 4,
+        # so a surface whose faces are angularly large -- a 50-cell sphere, or any mesh with one
+        # sliver whose `rmed` is small -- gets ~20 bins for the whole sphere and hundreds of
+        # triangles per bucket. `_query` then allocates [n_candidates, 9*K] and builds six such
+        # tensors from it, so K = 278 with 500,000 particles near the surface asked CUDA for 3.4 GB
+        # and the run died at frame 230 of 400 with an OOM that names an allocation and not a cause.
+        #
+        # THE BUDGET IS CHECKED, NOT THE SYMPTOM. `nrow` at its floor is not itself an error -- a
+        # small closed surface can be legitimately coarse -- but a bucket depth that turns the query
+        # into gigabytes is, and it is knowable here, before anything is allocated.
+        if K > int(os.environ.get("PLEXUS_CONTACT_MAX_K", "96")):
+            raise ValueError(
+                f"mesh_contact: the direction-bin grid is degenerate -- {nrow} rows (floor is 4), "
+                f"{nb} bins for {A.shape[0]} sub-triangles, up to {K} per bucket. `_query` "
+                f"allocates [n_candidates, 9*{K}] and would need gigabytes. The surface is too "
+                f"COARSE for the lookup: its faces are angularly large seen from `centre`, so the "
+                f"premise that a triangle spans at most one bin does not hold. Give the surface "
+                f"more faces, or move `centre` further from it. (Raise PLEXUS_CONTACT_MAX_K to "
+                f"override, and expect the memory.)")
         rtri = torch.maximum(torch.maximum(rA, rB), rC)
         rmax = torch.where(table >= 0, rtri[table.clamp_min(0)],
                            torch.zeros_like(rtri[0]).expand(nb, K)).max(dim=1).values
