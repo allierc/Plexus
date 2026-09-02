@@ -131,6 +131,12 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # `config/mpm/`, a folder that does not exist on disk -- so the bare name could not be run at
     # all, and the error named a missing directory rather than the rule that sent it there.
     ("mesh_mpm",    ("^mesh_mpm",)),
+    # THE MYOSIN HETEROGENEITY LADDER. A spheroid whose two halves are given different myosin drive
+    # (`junction_myosin.activity_split`), to see what a contractility boundary does to a closed
+    # epithelium. ANCHORED, like `^mesh_mpm` and for a sharper reason: three specs already carry
+    # `myosin` in their names (`gate_01_nomyosin`, and two promotion twins of it), and a substring
+    # trigger would pull all three out of the folders they belong to.
+    ("myosin_mesh", ("^myosin_mesh",)),
     # THE COMPOSED-CELL LADDER. A cell built from heterogeneous substrates -- a nucleus, a cytosol
     # of two protein species, a membrane -- each its own contained set (`config/cell/`, appendix
     # "Making a cell in Plexus"). No trigger substrings, for the same reason the three above have

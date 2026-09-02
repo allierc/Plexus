@@ -3,7 +3,7 @@
 TEN MODULES, GROUPED BY MECHANISM, where there were fifty-five files holding one operator each.
 That directory was unreadable in a specific way rather than merely long: to find out what acts on an
 MPM particle you opened eight files, and the eight could not be compared because they were never on
-the screen together. The two implementations of `cell_mechanics` -- the 3D AVM and the monolayer --
+the screen together. The two implementations of `cell_mechanics` -- the 3D vertex model and the monolayer --
 are the case that settles it: they are one contract with two bodies, and reading them one after the
 other is how anyone can tell which one a spec is getting.
 

@@ -206,6 +206,12 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
                  and k.split("__mesh_")[1] not in ("E_srce", "E_trgt", "E_face", "nF", "Nv",
                                                    "offsets", "face_offsets")
                  and not k.split("__mesh_")[1].startswith(("scalar_", "e_"))}
+    # THE PER-HALF-EDGE COLUMNS, sliced by the HALF-EDGE offsets. `e_myo` is recorded every frame and
+    # was dropped here, so nothing downstream could colour a junction by the myosin on it -- the one
+    # quantity `junction_myosin` exists to produce. It is excluded from `face_cols` for a good reason
+    # (its rows are half-edges, not faces, and `foff` would slice the wrong ones); it needs `off`.
+    edge_cols = {k.split("__mesh_")[1]: z[k] for k in z.files
+                 if k.startswith(set_name + "__mesh_e_") and not k.endswith("_offsets")}
     chem = z[f"{cell_set}__chem"] if cell_set and f"{cell_set}__chem" in z.files else None
     out = []
     for t in range(len(nF)):
@@ -215,6 +221,8 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
               "nF": int(nF[t]), "Nv": int(Nv[t])}
         for c, arr in face_cols.items():
             mt[c] = arr[fa:fb]
+        for c, arr in edge_cols.items():
+            mt[c] = arr[a:b]
         act = None if chem is None else np.asarray(chem[t][:int(nF[t]), chan], float)
         # THE WHOLE CHEM ROW TRAVELS WITH THE FRAME, not only the column `chan` names. A
         # three-species run (May-Leonard u,v,w) has no single activator: colouring it from one
@@ -245,6 +253,66 @@ def style_of(run_dir):
         lut = pl.get("species")
         return (list(lut) if lut else None), pl.get("blend"), pl.get("cutaway")
     return None, None, None
+
+
+def plot_style(run_dir) -> dict:
+    """The run's own `plotting:` block, for the render flags that are not colour tables.
+
+    `style_of` returns the three keys the colourmap needs and predates the rest; this returns the
+    block so a new flag does not mean a new element on a tuple every caller has to unpack.
+    """
+    for nm in ("spec.yaml", "spec_run.yaml"):
+        f = os.path.join(run_dir, nm)
+        if os.path.exists(f):
+            try:
+                import yaml
+                return dict((yaml.safe_load(open(f)) or {}).get("plotting") or {})
+            except Exception:
+                return {}
+    return {}
+
+
+def edges_of(pos, mt, mode, ntype=None, rng=None, colors=None):
+    """The junctions as a line mesh with per-edge RGB -- `plotting.edge_color`.
+
+    WHY A SECOND ACTOR AND NOT A FACE COLOUR. Myosin lives on the JUNCTION, and a face colour can
+    only say something about a cell; painting a cell by the mean of its edges is a different claim
+    and it hides exactly what a contractile belt does, which is to differ from edge to edge around
+    one cell. Drawing the edges themselves is the only honest picture of a per-junction quantity.
+
+      `myosin`  the value `junction_myosin` wrote, through a fixed range so a frame's colour means
+                the same number as every other frame's
+      `type`    the owning cell's node_type, as flat categorical colours
+    """
+    import pyvista as pv
+    from matplotlib import colormaps
+    nF = int(mt["nF"])
+    es, et, ef = (np.asarray(mt[k]) for k in ("E_srce", "E_trgt", "E_face"))
+    live = ef < nF
+    if not live.any():
+        return None
+    i, j, f = es[live].astype(int), et[live].astype(int), ef[live].astype(int)
+    if mode == "type":
+        if ntype is None:
+            return None
+        k = np.asarray(ntype)[np.clip(f, 0, len(ntype) - 1)].astype(int)
+        pal = np.asarray(colors if colors is not None else
+                         [(0.35, 0.60, 1.00), (1.00, 0.35, 0.25), (0.45, 0.95, 0.55),
+                          (1.00, 0.85, 0.30)], float)
+        rgb = (np.clip(pal[k % len(pal)], 0, 1) * 255).astype(np.uint8)
+    else:
+        v = mt.get("e_myo")
+        if v is None:
+            return None
+        v = np.asarray(v, float)[live]
+        lo, hi = (rng if rng else (float(np.nanmin(v)), float(np.nanmax(v))))
+        x = np.clip((v - lo) / max(hi - lo, 1e-9), 0, 1)
+        rgb = (np.asarray(colormaps["inferno"](x))[:, :3] * 255).astype(np.uint8)
+    lines = np.empty((len(i), 3), np.int64)
+    lines[:, 0] = 2; lines[:, 1] = i; lines[:, 2] = j
+    m = pv.PolyData(np.asarray(pos, float), lines=lines.ravel())
+    m["rgb"] = rgb
+    return m
 
 
 def frames_of(run_dir, traj=None):
@@ -592,6 +660,14 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
     """The finished specimen, turned once and zoomed in. Geometry fixed, camera moving."""
     fr = frames_of(run_dir)
     _lut, _blend, _cut = style_of(run_dir)
+    _pl = plot_style(run_dir)
+    _ec = str(_pl.get("edge_color", "") or "").lower()          # myosin | type | ""
+    # DIVISION MARKS OFF WHEN SOMETHING ELSE IS BEING SHOWN. `show_div` paints mothers and daughters
+    # red/blue over the face colour, which is the right default for watching a tissue grow and
+    # exactly wrong while the picture is about myosin: two unrelated quantities on one surface, and
+    # the reader cannot tell which is which. Declared, so a spec says what its picture is about.
+    _div = bool(_pl.get("show_division", True))
+    _ntype = _cell_types(run_dir)
     if not fr:
         return "no trajectory"
     L0 = box_of(run_dir, fr)
@@ -613,10 +689,119 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
     return f"{n} frames"
 
 
+def _cell_types(run_dir):
+    """The cell set's `node_type`, for colouring a junction by the cells that own it."""
+    try:
+        z = _traj(run_dir)
+        k = [c for c in z.files if c.endswith("__node_type")]
+        return np.asarray(z[k[0]]) if k else None
+    except Exception:
+        return None
+
+
+def _curve_setup(p, pl, fr, ntype, erng):
+    """`plotting.curve` -- mean +- SD of a per-junction quantity, PER TYPE, as an inset.
+
+    Declared the way `cross_section` is, and for the same reason: the 3D view answers "what shape is
+    it" and cannot answer "by how much, and is the difference bigger than the spread". A mean alone
+    would be the more misleading of the two -- two populations whose means separate by less than
+    their scatter look identical on a surface and different on a line plot, so the band is not
+    decoration, it is the part that says whether to believe the lines.
+
+    THE AXES ARE FIXED, both of them. An autoscaled y renormalises every frame, so a belt whose
+    myosin doubles looks exactly like one that does not move; an autoscaled x redraws the whole
+    history at a new scale on every frame. Ranges come from the WHOLE clip, computed once here.
+    """
+    cfg = pl.get("curve")
+    if not cfg or ntype is None:
+        return None
+    import pyvista as pv
+    cfg = {} if cfg is True else dict(cfg)
+    ntype = np.asarray(ntype)
+    nt = int(ntype.max()) + 1 if ntype.size else 0
+    if nt < 1:
+        return None
+    series = []                                            # [type][frame] -> (mean, sd)
+    for _pos, m_, _a, _c in fr:
+        v = m_.get("e_myo")
+        nF = int(m_["nF"])
+        ef = np.asarray(m_["E_face"])
+        live = ef < nF
+        row = []
+        for k in range(nt):
+            if v is None or not live.any():
+                row.append((np.nan, 0.0)); continue
+            vv = np.asarray(v, float)[live]
+            kk = ntype[np.clip(ef[live].astype(int), 0, len(ntype) - 1)] == k
+            row.append((float(np.nanmean(vv[kk])), float(np.nanstd(vv[kk]))) if kk.any()
+                       else (np.nan, 0.0))
+        series.append(row)
+    S = np.asarray(series, float)                          # [T, ntype, 2]
+    lo = float(np.nanmin(S[..., 0] - S[..., 1])) if np.isfinite(S[..., 0]).any() else 0.0
+    hi = float(np.nanmax(S[..., 0] + S[..., 1])) if np.isfinite(S[..., 0]).any() else 1.0
+    pad = 0.08 * max(hi - lo, 1e-6)
+    ch = pv.Chart2D(size=tuple(cfg.get("size", (0.30, 0.26))),
+                    loc=tuple(cfg.get("loc", (0.66, 0.71))))
+    ch.background_color = (0, 0, 0, 0.55)
+    ch.border_color = "#9a9a9a"
+    ch.title = str(cfg.get("title", "junction myosin, mean +- SD"))
+    ch.x_axis.range = [0.0, float(len(fr) - 1)]
+    ch.y_axis.range = [float(cfg.get("ymin", lo - pad)), float(cfg.get("ymax", hi + pad))]
+    ch.x_axis.label = str(cfg.get("xlabel", "frame"))
+    ch.y_axis.label = str(cfg.get("ylabel", "myosin"))
+    for _a in (ch.x_axis, ch.y_axis):
+        _a.label_visible = True; _a.ticks_visible = True
+        _a.tick_labels_visible = True; _a.grid = False
+        # WHITE, BECAUSE THE BACKGROUND IS BLACK. VTK draws chart text in black by default, so the
+        # labels and tick numbers were being rendered correctly and were simply invisible -- which
+        # reads exactly like "the axes did not turn on" and would have been chased in the wrong place.
+        # The property names differ across pyvista versions; set what exists and skip what does not,
+        # because a chart that is merely unlabelled is worth far less than a render that crashes.
+        for _attr, _val in (("label_color", "white"), ("tick_label_color", "white"),
+                            ("color", "#9a9a9a")):
+            try:
+                setattr(_a, _attr, _val)
+            except Exception:
+                pass
+    ch.legend_visible = False
+    pal = [tuple(c) for c in (list((pl.get("colors") or {}).values()) or
+                              [(0.35, 0.60, 1.00), (1.00, 0.35, 0.25),
+                               (0.45, 0.95, 0.55), (1.00, 0.85, 0.30)])]
+    bands, lines = [], []
+    for k in range(nt):
+        c = pal[k % len(pal)]
+        bands.append(ch.area([0.0, 0.0], [0.0, 0.0], [0.0, 0.0], color=(*c, 0.28)))
+        lines.append(ch.line([0.0, 0.0], [0.0, 0.0], color=(*c, 1.0), width=2.0))
+    p.add_chart(ch)
+    return {"chart": ch, "S": S, "bands": bands, "lines": lines, "nt": nt}
+
+
+def _curve_update(cv, t):
+    """Reveal the series up to the current frame -- the band is mean-SD .. mean+SD."""
+    S, x = cv["S"], np.arange(t + 1, dtype=float)
+    if t < 1:
+        return
+    for k in range(cv["nt"]):
+        mu, sd = S[: t + 1, k, 0], S[: t + 1, k, 1]
+        ok = np.isfinite(mu)
+        if ok.sum() < 2:
+            continue
+        cv["bands"][k].update(x[ok], (mu - sd)[ok], (mu + sd)[ok])
+        cv["lines"][k].update(x[ok], mu[ok])
+
+
 def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     """The run through time, camera nailed down."""
     fr = frames_of(run_dir)
     _lut, _blend, _cut = style_of(run_dir)
+    _pl = plot_style(run_dir)
+    _ec = str(_pl.get("edge_color", "") or "").lower()          # myosin | type | ""
+    # DIVISION MARKS OFF WHEN SOMETHING ELSE IS BEING SHOWN. `show_div` paints mothers and daughters
+    # red/blue over the face colour, which is the right default for watching a tissue grow and
+    # exactly wrong while the picture is about myosin: two unrelated quantities on one surface, and
+    # the reader cannot tell which is which. Declared, so a spec says what its picture is about.
+    _div = bool(_pl.get("show_division", True))
+    _ntype = _cell_types(run_dir)
     if not fr:
         return "no trajectory"
     ticks_all = _frames_ticks.value
@@ -642,10 +827,20 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     # hundreds of mothers and no daughters at all.
     ticks = getattr(_frames_ticks, "value", None)
     nFs = [int(m_["nF"]) for _p, m_, _a, _c in fr]
-    actor = txt = None
+    actor = txt = eactor = None
+    # ONE RANGE FOR THE WHOLE CLIP, as for the activator: a per-frame myosin range would renormalise
+    # every frame and a belt that is tightening would look constant.
+    _erng = None
+    if _ec == "myosin":
+        _vals = [np.asarray(m_["e_myo"], float)[np.asarray(m_["E_face"]) < int(m_["nF"])]
+                 for _p, m_, _a, _c in fr if m_.get("e_myo") is not None]
+        if _vals:
+            _erng = (float(min(np.nanmin(v) for v in _vals)),
+                     float(max(np.nanmax(v) for v in _vals)))
+    _curve = _curve_setup(p, _pl, fr, _ntype, _erng)
     for t, (pos, mt, act, _chem) in enumerate(fr):
         back = _pair_reference(t, nFs, ticks, PAIR_TICKS)
-        m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"), prev_nF=back,
+        m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh" and _div), prev_nF=back,
                     chem=_chem, lut=_lut, blend=_blend, cutaway=_cut)
         if m is None:
             continue
@@ -653,7 +848,17 @@ def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
             p.remove_actor(actor)                  # NOT p.clear(): that removes the lights too
         if txt is not None:
             p.remove_actor(txt)
+        if eactor is not None:
+            p.remove_actor(eactor)
         actor = add(p, m, style)
+        if _ec:
+            em = edges_of(pos, mt, _ec, ntype=_ntype, rng=_erng,
+                          colors=list((_pl.get("colors") or {}).values()) or None)
+            eactor = None if em is None else p.add_mesh(
+                em, scalars="rgb", rgb=True, line_width=_pl.get("edge_width", 3.0),
+                lighting=False, render_lines_as_tubes=True)
+        if _curve is not None:
+            _curve_update(_curve, t)
         txt = p.add_text(f"{name}  {style}   frame {t + 1}/{len(fr)}   {int(mt['nF'])} cells",
                          position="upper_left", font_size=11, color="white")
         aim(p, L, fill=fill)

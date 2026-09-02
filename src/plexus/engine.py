@@ -665,11 +665,30 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
     # SpeciesSettings -- so operators read `lvl.move_speed` without indexing types.
     scalar_keys = {k for t in types.values() for k, v in t.items()
                    if k not in ("fraction", "p", "core", "layers", "color") and isinstance(v, (int, float))}
+    # KEEP THE PER-TYPE TABLE, not just the broadcast. Until now the type -> value mapping was
+    # consumed here and thrown away, so an operator that RE-TYPES a node later (mesh_seed splitting a
+    # spheroid at its equator) could rewrite `node_type` and leave every derived buffer holding the
+    # value of the type the node used to be. The table plus `retype` below make the derived buffers
+    # recoverable from the types at any point in a run, which is what makes re-typing legal at all.
+    lvl._type_scalars = {}
     for k in sorted(scalar_keys):
-        buf = torch.zeros(lvl.n, device=device)
-        for tid, t in enumerate(type_list):
-            buf[node_type == tid] = float(t.get(k, 0.0))
-        lvl.register_buffer(k, buf)
+        tab = torch.tensor([float(t.get(k, 0.0)) for t in type_list], device=device)
+        lvl.register_buffer(k, tab[node_type.clamp(min=0, max=tab.numel() - 1)])
+        lvl._type_scalars[k] = tab
+    lvl._type_fracs = torch.tensor([float(t.get("fraction", 1.0 / max(len(type_list), 1)))
+                                    for t in type_list], device=device)
+
+
+def retype(lvl, node_type) -> None:
+    """Rewrite a set's `node_type` and refresh every per-node buffer DERIVED from it.
+
+    The derived buffers (`_type_scalars`) are broadcast once at build; anything that changes a node's
+    type afterwards has to put them back or the node keeps its old type's properties while reporting
+    the new type -- a disagreement nothing would catch, because both halves look valid on their own.
+    """
+    lvl.node_type = node_type
+    for k, tab in (getattr(lvl, "_type_scalars", None) or {}).items():
+        getattr(lvl, k)[:] = tab[node_type.clamp(min=0, max=tab.numel() - 1)]
 
 
 
