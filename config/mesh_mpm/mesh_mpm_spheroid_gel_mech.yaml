@@ -1,33 +1,37 @@
-# MESH-MPM 05 -- THE SPHEROID INDENTS THE GEL BY GROWING. Nothing is translated.
+# MESH-MPM 06 -- ONE OPERATOR TOWARD A GROWING SPHEROID: `cell_mechanics`.
 #
-# `mesh_mpm_sphere_elastic.yaml` WITH ONE OPERATOR LINE CHANGED: `surface_drive` scales the shell
-# about its own centroid instead of pushing it down. Same gel, same 500,000 material points, same
-# solver, same penalty -- so what differs from rung 01 is that the tool inflates rather than
-# descends, and the contact patch grows for a reason a real spheroid has.
+# `mesh_mpm_spheroid_gel.yaml` PLUS EXACTLY ONE OPERATOR, which is the whole method. The working
+# point is a PRESCRIBED shell -- scaled about its centroid, rigid, feeling nothing -- and the
+# destination is a solved epithelium that grows because its cells do. Going there in one step is
+# what produced a tissue dividing ten times too fast with no way to say which of six added operators
+# did it. This rung adds the first: the shell stops being rigid and holds its shape by force balance,
+# while `surface_drive` still supplies the growth.
 #
-# THE SURFACE IS PRESCRIBED, AND THAT IS THE WHOLE DESIGN. There is no `cell_grow`, no
-# `cell_mechanics`, no `cell_divide`, no `edge_flip` -- the shell is a kinematic tool, exactly as
-# the plate, the sphere and the pyramid are. The gel feels the shell; the shell feels nothing.
+# `rigid: false` ON THE DRIVE, WITHOUT WHICH THE OPERATOR IS INERT. Growth resets the vertices from
+# the SEEDED shape every frame, which is exact and right for a tool; here it would discard whatever
+# `cell_mechanics` had just solved, so the shell would read as rigid while the schedule said
+# otherwise. Incremental, the scaling composes with the mechanics instead of overwriting it.
 #
-# WHY NOT A SOLVED EPITHELIUM, having tried it. `log/okuda_ECM/04_spheroid_ecm` is the run this
-# reproduces and it has NO vertex set at all: its only sets are the MPM parent and the material
-# points, and its surface is 200 cached meshes replayed out of
-# `_tissue/cellfix_B_new_f401_x4_c4a5698982.npz`. It worked precisely BECAUSE there was no tissue in
-# it -- a replayed surface cannot answer, so the coupling is one-way by construction. Putting a live
-# okuda vesicle in the same schedule is a different experiment, and the first attempt showed why:
-# the tissue divided about ten times too fast (2,022 faces at frame 100 against 201 for the same
-# tissue alone), which a spec-for-spec probe pinned on the presence of the MPM set and the contact
-# rather than on the boundary, the radial term's origin or the timestep. That is an influence FROM
-# the gel TO the spheroid, and it is unresolved. This rung does not depend on it.
+# THE CONSTANTS ARE DERIVED, NOT COPIED, AND THAT IS NOT OPTIONAL. The vertex energy is not
+# invariant under a dilation, and this shell is radius 0.08 with cells of area 2.0e-4 against the
+# reference's radius 5.0 and area 1.551 -- a factor of 7,800 in cell area. Holding each per-cell
+# ratio to K_A A^2 fixed (K_P ~ A, K_V ~ 1/R^2, Lambda ~ A^1.5, Gamma ~ A, K_R ~ A^2/R^2) and then
+# correcting each against its MEASURED ratio gives the numbers below. Verified:
 #
-# THE GEOMETRY, so the comparison with rung 01 is exact. Seeded at radius 0.08 with its lower pole
-# at 0.45 -- the gel's top -- and grown x2.4 over 320 of the 400 frames, the pole travels
-# 0.192 - 0.08 = 0.112 into the gel, against the 0.11 rung 01's sphere is driven. The shell's
-# TESSELLATION is unchanged by scaling, so the contact's direction-bin grid stays at ~17 rows for
-# the whole run instead of railing at its floor the way a dividing tissue's did.
+#     spec                    cell area   K_P/K_A   K_V/K_A   Lambda/K_A   Gamma/K_A   K_R/K_A
+#     reference R5.0 N200         1.551     9.704      5.40        601.9       194.1     8.216
+#     this      R0.08 N400      1.993e-4     8.977     5.424        511.4       179.5     6.757
+#
+# `centre: [0.5, 0.53, 0.5]` because `K_R` penalises (|pos| - R0)^2 from the WORLD ORIGIN, and this
+# shell is not there. Every other term is translation-invariant already.
+#
+# WHAT THIS RUNG IS ASKED. Does adding a solved tissue operator to a schedule that also runs MPM
+# keep the run clean -- the bin grid off its floor, the penetration steady, the momentum residual at
+# 1e-8 -- or does it reproduce the tenfold divergence? `cell_grow`, `cell_divide` and `edge_flip`
+# come after, one at a time, and only if this one holds.
 
 general:
-  name: mesh_mpm_spheroid_gel
+  name: mesh_mpm_spheroid_gel_mech
   seed: 0
   n_frames: 400
   dt: 0.0032
@@ -109,6 +113,7 @@ operators:
   at: vertex
   grow: 2.4
   over: 320
+  rigid: false
 - op: mesh_contact
   at: mpm_particle
   surface: vertex
@@ -140,6 +145,24 @@ operators:
 - op: mesh_inside
   at: mpm_particle
   n_grid: 64
+- op: cell_mechanics
+  at: vertex
+  centre:
+  - 0.5
+  - 0.53
+  - 0.5
+  K_A: 1.0
+  K_P: 0.0001401
+  K_V: 7778.0
+  K_R: 3.193e-05
+  Lambda: 5.212e-06
+  Gamma: 5.607e-05
+  p0: 3.5
+  mu: 7800.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
 schedule:
 - mesh_seed
 - surface_drive
@@ -151,6 +174,7 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside
+- cell_mechanics
 descriptions:
   movie:
     description: A large purple cube is subjected to a compressive force from a thin, grey mesh sheet
