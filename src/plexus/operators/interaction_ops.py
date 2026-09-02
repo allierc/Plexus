@@ -103,6 +103,15 @@ def _inv_square_sum(pos, src, soft2):
 _inv_square_sum_compiled = None
 
 
+def _reject_compile(params, op):
+    """`compile` was an operator parameter; it is an IMPLEMENTATION. Fail loudly, not silently."""
+    if "compile" in params:
+        raise ValueError(
+            f"{op}: `compile` is no longer an operator parameter -- which kernel runs is a backend "
+            f"choice and belongs on the same key as every other one. Write "
+            f"`implementation: compile` on the operator instead of `compile: true`.")
+
+
 def _get_inv_square_sum(compile):
     """Return the (optionally torch.compiled) all-pairs inverse-square-sum kernel, compiling once."""
     global _inv_square_sum_compiled
@@ -126,8 +135,13 @@ class SquaredLaw(Lateral):
                    "coupling": "per-type source property (charge|mass)",
                    "softening": "Plummer softening length eps (0 = pure 1/r^3)",
                    "all_pairs": "sum over ALL pairs (O(N^2), long-range) vs the neighbour graph",
-                   "compile": "torch.compile the all-pairs kernel (big N)",
                    "clamp": "max |acceleration| (0 = unbounded)"}
+    # WHICH KERNEL IS NOT A PARAMETER OF THE LAW. `compile: true` used to sit in the operator's
+    # params next to `k` and `softening`, which put a backend switch in the same list as the
+    # physics -- and gave the spec TWO ways to choose a kernel, since `implementation:` was already
+    # the dispatch key. It is now `implementation: compile`, and a spec still passing the old
+    # parameter is refused rather than silently losing the speedup it asked for.
+    COMPILE = False
     REFERENCE = "Newton, I. (1687). Principia (inverse-square law); Coulomb, C.-A. (1785)."
 
     def __init__(self, params, device="cpu"):
@@ -141,7 +155,8 @@ class SquaredLaw(Lateral):
                                        "charge" if self.law == "coulomb" else "mass"))
         self.soft = float(params.get("softening", 0.0))           # Plummer eps (0 = pure 1/r^3)
         self.all_pairs = bool(params.get("all_pairs", False))     # O(N^2) long-range vs neighbour graph
-        self.compile = bool(params.get("compile", False))         # torch.compile the all-pairs kernel
+        _reject_compile(params, "squared_law")
+        self.compile = self.COMPILE
         self.clamp = float(params.get("clamp", 0.0))              # optional cap on |a| (0 = off)
         # physical conventions bundled by `law`: (sign) like-repel vs attract; (receiver) whether the
         # receiver's own coupling charge scales its acceleration (Coulomb) or cancels (gravity).
@@ -424,8 +439,8 @@ class RadiusGraph(Rewire):
     SUPPORTED_DIMS = [2, 3]                      # pairwise distances are dimension-generic
     REQUIRES_PARAMS = ["radius"]
     MECHANISM_TAGS = ["radius_graph", "neighbor_search", "rewire"]
-    PARAM_ROLES = {"min_radius": "inner_cutoff_radius", "block": "block_size",
-                   "compile": "torch.compile the O(N^2) block distance+mask kernel"}
+    PARAM_ROLES = {"min_radius": "inner_cutoff_radius", "block": "block_size"}
+    COMPILE = False                              # `implementation: compile` -- see SquaredLaw.COMPILE
     REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
@@ -433,7 +448,8 @@ class RadiusGraph(Rewire):
         self.r_max = float(params["radius"])
         self.r_min = float(params.get("min_radius", 0.0))
         self.block = int(params.get("block", 2048))
-        self.compile = bool(params.get("compile", False))    # torch.compile the O(N^2) distance kernel
+        _reject_compile(params, "radius_graph")
+        self.compile = self.COMPILE
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
@@ -445,3 +461,27 @@ class RadiusGraph(Rewire):
             block=self.block, compile=self.compile,
         )
         return {}
+
+
+# ==========================================================================================================
+#  `implementation: compile` -- the torch.compile variants, as implementations rather than parameters
+# ==========================================================================================================
+# THREE OPERATORS TOOK A `compile` PARAMETER and each meant the same thing by it: run this operator's
+# hot kernel through torch.compile. That is a backend choice, so it belongs on `implementation:`, the
+# key the schema already resolves and the key `mpm_scatter[warp]` and `mpm_gather[torch_loop27]`
+# already use. Keeping it as a parameter meant a spec had two unrelated ways to pick a kernel and the
+# physics list contained something that is not physics.
+@register_operator("squared_law", implementation="compile", family="interaction",
+                   set="particle", kind="lateral")
+class SquaredLawCompiled(SquaredLaw):
+    """The all-pairs kernel through torch.compile. Fuses the reduction; the [N, N] intermediates
+    still exist in the eager fallback and the memory ceiling is unchanged -- see nbody_warp for the
+    variant that removes them."""
+    COMPILE = True
+
+
+@register_operator("radius_graph", implementation="compile", family="topology",
+                   set="particle", kind="rewire")
+class RadiusGraphCompiled(RadiusGraph):
+    """The O(N^2) block distance+mask kernel through torch.compile."""
+    COMPILE = True

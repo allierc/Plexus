@@ -6,7 +6,7 @@
 # collapse into a bound, orbiting cluster read gradually rather than flashing past. Run for
 # 16,000 frames (4x the first pass) because at 4,000 the cluster had only just formed: what it
 # DOES once bound -- whether it stays a cluster, spins up a bar, or evaporates -- is after that.
-# all-pairs O(N^2) force is fused with torch.compile (`compile: true`) so N=10000 is cheap.
+# all-pairs O(N^2) force is fused with torch.compile (`implementation: compile`) so N=10000 is cheap.
 general: {name: nbody_cluster, seed: 17, n_frames: 16000, dt: 0.0006, boundary: free, world: [4.0, 4.0]}
 sets:
   star:
@@ -15,7 +15,7 @@ sets:
     types: {s: {fraction: 1.0, mass: 0.002}}         # ~20 total mass / 10000 stars
 fields: {}
 operators:
-  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.1, all_pairs: true, compile: true}
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.1, all_pairs: true}
 schedule: [squared_law]
 plotting: {renderer: mpl2d, background: black, point_size: 2, colors: {s: [0.7, 0.7, 1.0]}, movie_max_frames: 480}
 # 480 movie frames, not the default 120: over 16,000 frames a 120-frame movie is a slideshow of
