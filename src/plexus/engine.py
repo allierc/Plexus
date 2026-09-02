@@ -685,9 +685,27 @@ def _resolve_default_impl(sim, device: str, grad: bool = False) -> list[str]:
         if str(o.impl or "").lower() == "default":
             o.impl = None
             _forced.add(id(o))
-    if int(getattr(sim, "dim", 2)) != 3 or not str(device).startswith("cuda"):
+    _cuda = str(device).startswith("cuda")
+    _bad = grad or str(getattr(sim, "boundary", "wall")).lower() == "periodic"
+    # SQUARED_LAW IS RESOLVED BEFORE THE 3D GATE, because unlike the MPM kernels its warp variant is
+    # 2D AND 3D -- an all-pairs sum has no grid and no stencil, so nothing about it is dimensional.
+    #
+    # AND IT IS A BIGGER DEFAULT THAN THE MPM ONE. `_inv_square_sum` materialises the [N, N]
+    # separation matrices, ~12 N^2 bytes, so it is bound by writing down numbers it uses once: 9.35
+    # GB and 147.3 ms a step at 25,000 particles on an A6000, against 0.04 GB and 4.9 ms for the
+    # warp kernel -- 30x faster on 1/230th of the memory, and the memory is what decides whether a
+    # run is possible at all (120 GB of intermediates at 100,000 particles, 12 TB at a million).
+    # Only `all_pairs` is covered: the neighbour-graph branch is O(E) and materialises nothing, so
+    # there is nothing there to win.
+    if _cuda and not _bad:
+        for o in sim.operators:
+            if (o.op == "squared_law" and o.impl is None and id(o) not in _forced
+                    and bool(o.params.get("all_pairs", False))):
+                o.impl = "warp"
+                picked.append(o.op)
+    if int(getattr(sim, "dim", 2)) != 3 or not _cuda:
         return picked
-    if grad or str(getattr(sim, "boundary", "wall")).lower() == "periodic":
+    if _bad:
         return picked
     for o in sim.operators:
         if o.op not in MPM_WARP_DEFAULT or o.impl is not None or id(o) in _forced:

@@ -320,6 +320,7 @@ class ShapeEnergy3D(Lateral):
     ClosedMonolayer), not a single global lumen term: it keeps every cell inflated and resists local
     buckling, so growth (ramping v_eq per cell) inflates the shell smoothly. Force = -grad E by one 3D
     autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity."""
+    COMPILE = False                  # `implementation: compile` -- see SquaredLaw.COMPILE
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["p0"]
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
@@ -362,7 +363,9 @@ class ShapeEnergy3D(Lateral):
         # -> no padding); for growing/dividing meshes the padding computes over the oversized buffer and
         # the one-time compile cost only amortizes over very long runs, so it is net SLOWER. Hence
         # OPT-IN (compile=True) -- use it for the static RD; the default is the fast live-only path.
-        self.use_compile = bool(params.get("compile", False))
+        from plexus.operators.interaction_ops import _reject_compile
+        _reject_compile(params, "cell_mechanics")
+        self.use_compile = self.COMPILE
         self._efn = torch.compile(_shape_energy_core, dynamic=False) if self.use_compile else _shape_energy_core
 
     def _antiinv_scale(self, x, step, es, et, ef, nF, eocc, vf_ref, floor):
@@ -2211,3 +2214,12 @@ class MonolayerShapeEnergy3D(Lateral):
         if mask is not None:
             v_full = v_full * mask[:, None].float()
         return {self.at: v_full}
+
+
+@register_operator("cell_mechanics", implementation="compile", set="vertex", kind="lateral",
+                   family="mechanics")
+class ShapeEnergy3DCompiled(ShapeEnergy3D):
+    """The shape energy through torch.compile over a fixed-size reservoir. A clear ~2.4x win ONLY
+    for fixed-topology runs; with division the padding computes over the oversized buffer and it is
+    net slower, which is why it is opt-in rather than the default."""
+    COMPILE = True

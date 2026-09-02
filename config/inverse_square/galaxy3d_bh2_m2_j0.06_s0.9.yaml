@@ -18,7 +18,7 @@ sets:
     types: {s: {fraction: 1.0, mass: 0.00008}}      # disk mass ~2.0 (m2)
 fields: {}
 operators:
-  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true}
 schedule: [squared_law]
 plotting: {renderer: vtk_points, background: black, colors: {s: [1.0, 1.0, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
            # camera pitch SWEEP over the movie: 0.0 = top-down/face-on -> 1.35 rad (~77 deg) = almost side/edge-on.
