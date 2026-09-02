@@ -1,27 +1,23 @@
 general:
-  name: galaxy_1m
+  name: graze3_1m
   seed: 2
   n_frames: 50000
-  dt: 0.02
+  dt: 0.004
   boundary: free
   dim: 3
   world:
-  - 26.0
-  - 26.0
-  - 26.0
+  - 14.0
+  - 14.0
+  - 14.0
   record_cap: 2
   save_data: false
 sets:
   star:
     n: 1000000
     spawn: two_disks
-    spawn_radius:
-    - 3.6
-    - 4.8
-    spawn_thickness:
-    - 0.18
-    - 0.24
-    spawn_separation: 21.0
+    spawn_radius: 1.2
+    spawn_thickness: 0.06
+    spawn_separation: 6.0
     spawn_offset: 0.0
     spawn_tilt: 0.6
     type_layout: split_x
@@ -32,8 +28,8 @@ sets:
       softening: 0.15
       central_mass: 0.75
       jitter: 0.06
-      approach: 0.0962
-      swirl: 0.139
+      approach: 0.18
+      swirl: 0.26
     types:
       red:
         fraction: 0.5
@@ -58,8 +54,8 @@ plotting:
   background: black
   up_axis: 2
   dot_size: 1.0
+  render_px: 1920
   box_frame: false
-  frame_percentile: 94
   movie_max_frames: 500
   slow_motion: 1
   colors:
@@ -71,4 +67,3 @@ plotting:
     - 0.3
     - 0.55
     - 1.0
-  render_px: 1920
