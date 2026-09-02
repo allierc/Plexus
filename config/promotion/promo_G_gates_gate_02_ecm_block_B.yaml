@@ -13,6 +13,7 @@ general:
   units:
     length_um: 1172.3329425556858
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   box_frame: true

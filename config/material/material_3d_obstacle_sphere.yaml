@@ -87,6 +87,7 @@ descriptions:
       are contained within a large, transparent white wireframe cube. The blue particles
       are significantly more numerous and larger in total volume than the grey particles.
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

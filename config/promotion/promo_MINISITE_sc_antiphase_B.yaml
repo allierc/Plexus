@@ -162,6 +162,6 @@ _sculpt:
     a_sw: 0.45
   after_frame: 600
   two_species: false
-  k_purse: null
-  asks: 'the finger hypothesis: grow at the spots, remove the flanks, and a bulge
-    should sharpen'
+  k_purse:
+  asks: 'the finger hypothesis: grow at the spots, remove the flanks, and a bulge should sharpen'
+plotting: {renderer: vtk_mesh}

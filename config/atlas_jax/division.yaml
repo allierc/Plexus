@@ -54,5 +54,6 @@ operators:
 schedule: [seed_state, relax, grow_radius, cell_divide]
 
 plotting:
+  renderer: mpl2d
   background: black
   point_size: 6.0

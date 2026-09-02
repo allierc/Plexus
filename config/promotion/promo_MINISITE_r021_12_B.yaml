@@ -138,6 +138,5 @@ _basis:
   drive: lo
   rho_gated: 0.1
   grid: 4 chemistry x 2 material x 2 mechanics, + a death twin of each Route A base
-  why: chemistry=gs, material=gated, mechanics=plain -- one cell of the basis grid
-    written by make_basis.py; every value not on an axis is shared with the other
-    fifteen.
+  why: chemistry=gs, material=gated, mechanics=plain -- one cell of the basis grid written by make_basis.py; every value not on an axis is shared with the other fifteen.
+plotting: {renderer: vtk_mesh}

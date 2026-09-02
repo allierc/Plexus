@@ -118,6 +118,7 @@ descriptions:
 
       The bars are smaller in size compared to the grey circle.'
 plotting:
+  renderer: mpl2d
   colors:
     star_v:
     - 0.9

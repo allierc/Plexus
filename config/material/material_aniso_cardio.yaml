@@ -136,4 +136,5 @@ descriptions:
       be of a uniform size. There are no visible connections or topological structures
       between the individual particles.
 plotting:
+  renderer: mpl2d
   dot_size: 1.2

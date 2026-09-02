@@ -54,4 +54,4 @@ operators:
 # leaving the Gray-Scott columns at exactly zero for all 6,000 frames.
 schedule: [cell_chem_seed, cell_chem_seed, radius_graph,
            cell_chem_diffuse, cell_chem_diffuse, cell_chem_react, cell_chem_react]
-plotting: {background: black, dot_fill: 0.9}
+plotting: {renderer: mpl2d, background: black, dot_fill: 0.9}

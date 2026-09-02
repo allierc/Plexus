@@ -88,6 +88,7 @@ schedule:
   - mpm_gather
   capture: true
 plotting:
+  renderer: panels
   background: black
   colors:
     light:

@@ -101,5 +101,6 @@ descriptions:
       The side chamber is located at the bottom right and is partially filled by the
       flowing particles.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

@@ -91,5 +91,6 @@ descriptions:
       as they move. The grey bar is uniform in width and maintains a constant position
       and color throughout the video.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

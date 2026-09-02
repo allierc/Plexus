@@ -92,5 +92,6 @@ descriptions:
       size of the cluster remains relatively constant, but its spatial distribution
       changes from a vertical orientation to a horizontal one.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

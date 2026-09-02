@@ -89,5 +89,6 @@ descriptions:
       thick grey vertical bar is positioned in the center-right of the frame. The
       background is a plain white space that serves as the container for the simulation.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

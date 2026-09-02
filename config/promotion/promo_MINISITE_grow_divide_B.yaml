@@ -101,3 +101,4 @@ schedule:
 - cell_grow
 - cell_divide
 - topo_record
+plotting: {renderer: vtk_mesh}

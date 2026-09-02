@@ -12,6 +12,7 @@ operators:
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
 schedule: [radius_graph, attraction_repulsion]
 plotting:
+  renderer: mpl2d
   background: black
   colormap: tab10
   point_size: 2.0

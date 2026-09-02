@@ -118,5 +118,6 @@ descriptions:
       concentrated mass to a thin, elongated column as they move through the white
       conduit.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

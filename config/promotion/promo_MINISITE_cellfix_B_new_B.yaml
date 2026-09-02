@@ -1,7 +1,6 @@
 _discovery:
   comp_hash: MINI_mini_grow_divide_bigger
-  region: same, vth_frac 1.4 -> 2.5 so cells can actually double before dividing [reference
-    buffers 3552/1800]
+  region: same, vth_frac 1.4 -> 2.5 so cells can actually double before dividing [reference buffers 3552/1800]
 fields: {}
 general:
   boundary: free
@@ -91,3 +90,4 @@ sets:
         width: 2
   vertex:
     n: 6396
+plotting: {renderer: vtk_mesh}

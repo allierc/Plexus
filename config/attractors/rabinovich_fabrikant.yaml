@@ -22,6 +22,7 @@ operators:
 - {op: attractor_flow, at: cloud, system: rabinovich_fabrikant, alpha: 1.1, gamma: 0.87, clamp: 25.0}
 schedule: [attractor_flow]
 plotting:
+  renderer: vtk_points
   background: black
   colors:
     c: [1.0, 0.6, 0.85]

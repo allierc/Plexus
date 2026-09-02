@@ -116,5 +116,6 @@ descriptions:
       size and color. There are no visible connections or topological structures between
       the individual particles.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

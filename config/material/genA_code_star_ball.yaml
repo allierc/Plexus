@@ -106,6 +106,7 @@ descriptions:
       The grey circle is a large, solid-colored sphere located at the bottom of the
       frame.
 plotting:
+  renderer: mpl2d
   colors:
     bar_v:
     - 0.9

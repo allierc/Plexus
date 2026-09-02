@@ -165,3 +165,4 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride
+plotting: {renderer: vtk_mesh}

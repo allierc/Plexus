@@ -114,5 +114,6 @@ descriptions:
       The grey bars are solid, rectangular, and significantly larger in height than
       the individual blue particles.'
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

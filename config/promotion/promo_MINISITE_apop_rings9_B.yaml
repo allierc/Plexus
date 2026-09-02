@@ -88,6 +88,5 @@ _basis:
   mat: static
   mech: plain
   grid: 4 chemistry x 2 material x 2 mechanics
-  why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
-    written by make_basis.py; every value not on an axis is shared with the other
-    fifteen.
+  why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid written by make_basis.py; every value not on an axis is shared with the other fifteen.
+plotting: {renderer: vtk_mesh}

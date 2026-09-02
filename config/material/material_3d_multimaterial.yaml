@@ -115,6 +115,7 @@ descriptions:
       sphere in the center but transforms into a large, flat, two-dimensional sheet
       that covers the bottom of the cube.'
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

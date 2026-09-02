@@ -151,5 +151,6 @@ schedule:
 - cell_divide
 - topo_record
 plotting:
+  renderer: vtk_mesh
   background: black
   dot_fill: 0.9

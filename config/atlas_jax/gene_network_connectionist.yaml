@@ -120,5 +120,6 @@ schedule:
 - seed_state
 - regulate
 plotting:
+  renderer: mpl2d
   background: black
   point_size: 8.0

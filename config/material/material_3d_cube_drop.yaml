@@ -81,6 +81,7 @@ descriptions:
       the spatial boundaries. The particles are uniform in color and size, creating
       a textured, volumetric appearance.
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

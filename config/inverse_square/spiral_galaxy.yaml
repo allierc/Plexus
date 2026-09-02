@@ -18,7 +18,7 @@ fields: {}
 operators:
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
 schedule: [squared_law]
-plotting: {background: black, point_size: 1, colors: {s: [0.86, 0.9, 1.0]}, movie_max_frames: 1000, fps: 25}
+plotting: {renderer: mpl2d, background: black, point_size: 1, colors: {s: [0.86, 0.9, 1.0]}, movie_max_frames: 1000, fps: 25}
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:

@@ -126,5 +126,6 @@ descriptions:
       are bounded within a square region, creating a dense, speckled texture against
       the white background.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

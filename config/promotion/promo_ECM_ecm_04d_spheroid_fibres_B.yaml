@@ -126,6 +126,7 @@ schedule:
 - ecm_stress
 - mesh_inside
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   box_frame: true

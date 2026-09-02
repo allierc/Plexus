@@ -109,5 +109,6 @@ descriptions:
       guide the falling particles. The blue particles are small, individual points
       that aggregate into larger, distinct shapes as they move.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

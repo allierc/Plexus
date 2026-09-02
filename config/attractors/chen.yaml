@@ -22,6 +22,7 @@ operators:
 - {op: attractor_flow, at: cloud, system: chen, a: 35.0, b: 3.0, c: 28.0}
 schedule: [attractor_flow]
 plotting:
+  renderer: vtk_points
   background: black
   colors:
     c: [0.2, 0.92, 0.78]

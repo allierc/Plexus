@@ -38,4 +38,4 @@ schedule:
   - mpm_turgor
   - substep_dt: 0.0001
     steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
-plotting: {background: black, fps: 30, up_axis: 2, render_3d: dots}
+plotting: {renderer: vtk_points, background: black, fps: 30, up_axis: 2, render_3d: dots}

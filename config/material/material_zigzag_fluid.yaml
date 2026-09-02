@@ -94,5 +94,6 @@ descriptions:
       and supports the initial blue sphere. The lower platforms are smaller and serve
       as landing surfaces for the flowing material.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

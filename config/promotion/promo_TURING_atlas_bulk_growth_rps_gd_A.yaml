@@ -142,6 +142,7 @@ schedule:
 - topo_record
 - cell_die
 plotting:
+  renderer: vtk_mesh
   background: black
   cutaway:
   - x

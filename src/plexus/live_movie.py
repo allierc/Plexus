@@ -126,6 +126,7 @@ class LiveMovie:
             self.cs_only = bool(_cs.get("only", False))
             self.cs_cfg = _cs
         self.px_used = None
+        self._rate_of = "compute"       # `replay` sets "render": see below
         self.up = int(up)
         # (reset to 1 for 2D below, once the world tells us the run is planar)
         self.stride = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
@@ -491,6 +492,7 @@ class LiveMovie:
         if sname is None:
             self.failed = "no set carries positions"
             return
+        self._sname = sname                           # `_rgb` needs it to look up the type palette
         lvl = H.level(sname)
         if self.cloud is None:
             self.n = int(lvl.n)
@@ -555,7 +557,7 @@ class LiveMovie:
         self.p.add_text(f"{self.name}{self._box_label}\n"
                         f"{self.n:,} particles{sub}{self._grid_label}\n"
                         f"frame {tick}/{self.n_frames}   "
-                        f"{el / max(tick, 1) * 1000:.0f} ms/frame compute{clk}",
+                        f"{el / max(tick, 1) * 1000:.0f} ms/frame {self._rate_of}{clk}",
                         position="upper_left", font_size=11, color="white", name="hdr")
         if self.cs is not None:
             self._update_cross_section(H)
@@ -694,6 +696,19 @@ class LiveMovie:
         n = pos.shape[0]
         try:
             from plexus.plot import _typed_palette
+            # THE SET'S OWN TYPE FIRST, when it has one. This branch did not exist: colour came from
+            # the PARENT body or from height, which is right for MPM (particles inherit their cell's
+            # material) and wrong for every set that is typed directly. A galaxy's stars carry
+            # `node_type` 0/1 for the two discs and no parent at all, so `plotting.colors:
+            # {red: ..., blue: ...}` -- the whole point of the picture, since the colours ARE the two
+            # galaxies -- fell through to the height ramp and the merger rendered as one gradient.
+            own = getattr(lvl, "node_type", None)
+            if own is not None and getattr(self, "_sname", None):
+                pal, _ = _typed_palette(self.sim, self._sname, self.style)
+                if pal is not None:
+                    tid = own[self.idx].detach().cpu().numpy() % len(pal)
+                    self.colour_by = f"own node_type ({len(pal)} hues from plotting.colors)"
+                    return (np.clip(pal[tid], 0, 1) * 255).astype(np.uint8)
             pname = getattr(lvl, "parent_name", None)
             par = getattr(lvl, "parent", None)
             if pname and par is not None:
@@ -803,3 +818,131 @@ class LiveMovie:
                        if getattr(self, "_removed_stills", 0) else "")),
               flush=True)
         return self.out
+
+
+# ==========================================================================================================
+#  REPLAY -- the same renderer, driven from a saved trajectory instead of a running engine
+# ==========================================================================================================
+# WHY THIS EXISTS RATHER THAN A SECOND POINT RENDERER. `plexus.plot` had its own 3D path -- a numpy
+# gaussian splat -- so a 3D point set was drawn one way DURING generation (this class, VTK, real
+# dots, obstacles, a box, a scale bar) and a different way afterwards (`-o plot`, soft blobs, no
+# obstacles, its own camera keys). Two renderers for one kind of data is two sets of bugs and two
+# looks, and nothing in the spec said which one a run would get.
+#
+# The engine hands this class an `H`: a state object it reads six things from. Replaying a saved run
+# only needs those six to come from an npz instead, so the renderer itself is untouched -- which is
+# the point. Anything fixed for the live path is fixed for the replay for free.
+#
+# WHAT REPLAY CANNOT DO, and says so: `color_field` (vorticity / pressure) needs `C` and `F`, the
+# per-particle affine and deformation tensors, and a trajectory stores neither. Those colours are a
+# live-only feature; the replay falls back to the type palette and prints that it did.
+class _ReplayLevel:
+    """One set of a trajectory.npz, shaped like the Level the renderer reads off the engine."""
+
+    def __init__(self, z, name, dev):
+        import torch
+        self._pos = torch.as_tensor(np.asarray(z[f"{name}__pos"], np.float32), device=dev)
+        _occ = z[f"{name}__occ"] if f"{name}__occ" in z.files else None
+        self._occ = None if _occ is None else torch.as_tensor(np.asarray(_occ), device=dev)
+        self.n = int(self._pos.shape[1])
+        self.state = self._pos[0]                     # only `.state.device` is ever read
+        self.t = 0
+        for k in ("node_type", "parent"):
+            v = z[f"{name}__{k}"] if f"{name}__{k}" in z.files else None
+            setattr(self, k, None if v is None else torch.as_tensor(np.asarray(v), device=dev))
+        pn = z[f"{name}__parent_name"] if f"{name}__parent_name" in z.files else None
+        self.parent_name = None if pn is None else str(pn)
+        self.C = self.F = None                        # not stored in a trajectory -- see above
+
+    def get(self, key):
+        if key == "pos":
+            return self._pos[self.t]
+        if key == "occ" and self._occ is not None:
+            return self._occ[self.t]
+        return None
+
+
+class _ReplayState:
+    """The `H` the renderer expects: a name -> level mapping and nothing else."""
+
+    def __init__(self, z, dev):
+        names = sorted({k[: -len("__pos")] for k in z.files if k.endswith("__pos")})
+        self.levels = {n: _ReplayLevel(z, n, dev) for n in names}
+        self.fields = {}
+        self.dim = int(next(iter(self.levels.values()))._pos.shape[2]) if self.levels else 3
+
+    def level(self, name):
+        return self.levels[name]
+
+    def seek(self, t):
+        for lvl in self.levels.values():
+            lvl.t = t
+
+
+def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, stills=0,
+           keep_stills=False, name=None, fps=None, traj=None):
+    """Render `data_dir/trajectory.npz` with the live VTK point renderer. Returns the mp4 path.
+
+    THE BOX IS TAKEN FROM THE DATA WHEN THE RUN LEFT ITS OWN. This renderer draws a wireframe box
+    at [0, world] and frames the camera on it, which is right for a walled run and useless for a
+    `boundary: free` one -- a galaxy encounter throws stars to several times the world size, so a
+    12-unit box would be a small cube in the middle of a cloud that had left it. `frame_percentile`
+    (the key `plot.py` already reads) frames on the central p% instead, so the ~20% of stars thrown
+    out by a passage cannot set the scale for the 80% worth looking at.
+    """
+    import torch
+    z = traj if traj is not None else np.load(os.path.join(data_dir, "trajectory.npz"))
+    style = dict((sim.plotting or {}) if sim is not None else {})
+    dev = torch.device("cpu")
+    H = _ReplayState(z, dev)
+    if not H.levels:
+        raise ValueError(f"{data_dir}: no set carries positions, nothing to render")
+    sname = _biggest_particle_set(H)
+    lvl = H.levels[sname]
+    P = lvl._pos                                       # [T, N, D]
+    T, D = int(P.shape[0]), int(P.shape[2])
+
+    # --- the box, and the shift that puts the cloud inside it ---
+    ws = np.asarray(z["world_size"], np.float64) if "world_size" in z.files else None
+    if ws is None or len(ws) != D:
+        w = float(z["world"]) if "world" in z.files else float(getattr(sim, "world", 1.0))
+        ws = np.full(D, w, np.float64)
+    flat = P.reshape(-1, D).numpy()
+    fp = style.get("frame_percentile")
+    if fp is not None:
+        q = 0.5 * (100.0 - float(fp))
+        lo = np.percentile(flat, q, axis=0)
+        hi = np.percentile(flat, 100.0 - q, axis=0)
+        box = (hi - lo) * 1.06
+        lvl._pos = P - torch.as_tensor((0.5 * (lo + hi) - 0.5 * box), dtype=P.dtype)
+    else:
+        lo, hi = flat.min(0), flat.max(0)
+        if bool(((hi - lo) > ws * 1.02).any()) or bool((lo < -1e-6 * ws.max()).any()):
+            box = (hi - lo) * 1.06
+            lvl._pos = P - torch.as_tensor((0.5 * (lo + hi) - 0.5 * box), dtype=P.dtype)
+        else:
+            box = ws
+    out = out or os.path.join(data_dir, f"movie_{sname}.mp4")
+    # UNITS ONLY WHEN THEY WERE DECLARED. `Units` defaults to length_um 1.0 / time_s 1.0 with
+    # `declared: False`, and handing those to the renderer would put a scale bar and a wall clock on
+    # a run that has neither -- a bar reading "2 m" across a galaxy 12 dimensionless units wide.
+    u = getattr(sim, "units", None)
+    dec = bool(getattr(u, "declared", False))
+    lm = LiveMovie(out=out, world=list(np.asarray(box, np.float64)), n_frames=T,
+                   up=int(style.get("up_axis", 2)), render_n=render_n, max_frames=max_frames,
+                   name=name or getattr(sim, "name", ""), sim=sim, style=style,
+                   stills=stills, keep_stills=keep_stills,
+                   dt=getattr(sim, "dt", None),
+                   time_s=(float(u.time_s) if dec else None),
+                   length_um=(float(u.length_um) if dec else None),
+                   **({"fps": float(fps)} if fps else {}))
+    lm._rate_of = "render"
+    if style.get("color_field"):
+        print("[replay] plotting.color_field needs the per-particle C/F tensors, which a trajectory "
+              "does not store -- colouring by type instead. Use the live renderer for a field.",
+              flush=True)
+        lm.style.pop("color_field", None)
+    for t in range(T):
+        H.seek(t)
+        lm(H, t)
+    return lm.close()

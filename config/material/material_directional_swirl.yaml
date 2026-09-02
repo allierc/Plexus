@@ -115,5 +115,6 @@ descriptions:
       in size and color, creating a speckled texture. The particles are not connected
       but are packed closely together to form a coherent field.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

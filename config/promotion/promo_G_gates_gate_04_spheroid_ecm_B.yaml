@@ -14,6 +14,7 @@ general:
     length_um: 1172.3329425556858
     force_nN: 9162.430188008488
 plotting:
+  renderer: vtk_points
   background: black
   box_frame: true
 sets:

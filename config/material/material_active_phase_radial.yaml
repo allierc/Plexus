@@ -113,5 +113,6 @@ descriptions:
       appearance. The particles are not connected to one another, forming a discrete
       set of independent entities.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

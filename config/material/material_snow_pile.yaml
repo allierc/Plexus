@@ -85,5 +85,6 @@ descriptions:
       bottom. The particles are uniformly blue in color and vary in density, ranging
       from sparse individual dots to thick, opaque clusters.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

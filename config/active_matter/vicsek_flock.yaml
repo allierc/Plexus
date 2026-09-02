@@ -13,6 +13,7 @@ operators:
   - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.001, chirality: 0.0}
 schedule: [radius_graph, velocity_align, velocity_cruise]
 plotting:
+  renderer: mpl2d
   background: black
   marker: triangle
   triangle_size: 0.01

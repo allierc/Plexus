@@ -54,5 +54,6 @@ operators:
 schedule: [reorient, glide]
 
 plotting:
+  renderer: mpl2d
   background: black
   point_size: 3.0

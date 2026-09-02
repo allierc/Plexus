@@ -26,6 +26,7 @@ operators:
   - {op: chemotax,           at: particle, from: bison, gain: 0.00012}
 schedule: [playback, radius_graph, attraction_repulsion, chemotax]
 plotting:
+  renderer: mpl2d
   background: black
   colormap: tab10
   point_size: 4.0

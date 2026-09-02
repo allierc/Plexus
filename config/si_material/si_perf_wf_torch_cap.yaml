@@ -101,6 +101,7 @@ schedule:
   - mpm_gather
   capture: true
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
   camera_elev: 1.18

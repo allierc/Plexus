@@ -39,7 +39,7 @@ operators:
   # core-core force finite; halving dt to 0.002 reproduces the same trajectory to three digits.
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.15, all_pairs: true, compile: true}
 schedule: [squared_law]
-plotting: {background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55, 1.0]},
+plotting: {renderer: vtk_points, background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55, 1.0]},
            splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
            # frame to the central 90% of the stars: the ~20% thrown out by the passage reach
            # several times the size of what is worth watching, and framing on the full extent

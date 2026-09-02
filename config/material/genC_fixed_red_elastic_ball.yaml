@@ -70,6 +70,7 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 plotting:
+  renderer: mpl2d
   colormap: Set1
   background: black
   dot_size: 1.2

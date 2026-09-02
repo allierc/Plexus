@@ -124,5 +124,6 @@ descriptions:
       cluster in the center. The particles maintain a consistent size and color throughout
       the entire duration of the video.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

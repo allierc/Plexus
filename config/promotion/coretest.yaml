@@ -137,17 +137,11 @@ _basis:
   drive: lo
   rho_gated: 0.1
   grid: 4 chemistry x 2 material x 2 mechanics, + a death twin of each Route A base
-  why: chemistry=gs, material=gated, mechanics=plain -- one cell of the basis grid
-    written by make_basis.py; every value not on an axis is shared with the other
-    fifteen.
+  why: chemistry=gs, material=gated, mechanics=plain -- one cell of the basis grid written by make_basis.py; every value not on an axis is shared with the other fifteen.
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_vertex:
-    description: A single blue sphere moves from the center of the frame toward the bottom right corner.
-      The sphere maintains a constant size and color throughout its trajectory. The background remains
-      completely black and static during the entire sequence. The motion is smooth and linear across the
-      field of view.
-    objects: The scene contains one small blue sphere. It is a solid, circular object with a uniform blue
-      hue. The sphere is isolated in the center of a large, black void. It does not interact with or connect
-      to any other objects.
+    description: A single blue sphere moves from the center of the frame toward the bottom right corner. The sphere maintains a constant size and color throughout its trajectory. The background remains completely black and static during the entire sequence. The motion is smooth and linear across the field of view.
+    objects: The scene contains one small blue sphere. It is a solid, circular object with a uniform blue hue. The sphere is isolated in the center of a large, black void. It does not interact with or connect to any other objects.
+plotting: {renderer: vtk_mesh}

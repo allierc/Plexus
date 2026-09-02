@@ -222,6 +222,7 @@ schedule:
 - plate_confine
 - plate_confine
 plotting:
+  renderer: panels
   background: black
   colors:
     light:

@@ -128,5 +128,6 @@ descriptions:
       state shows a dense, interconnected cluster in the center and a sparse, scattered
       arrangement at the periphery.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

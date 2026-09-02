@@ -102,5 +102,6 @@ descriptions:
       transformation from a rectangle to a rounded shape. Both clusters are roughly
       equal in size and maintain a side-by-side arrangement throughout the simulation.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

@@ -90,5 +90,6 @@ descriptions:
       densely packed in some areas and sparse in others, while the grey bar remains
       a constant, uniform size.
 plotting:
+  renderer: mpl2d
   background: black
   dot_size: 1.2

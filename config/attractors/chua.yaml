@@ -22,6 +22,7 @@ operators:
 - {op: attractor_flow, at: cloud, system: chua, alpha: 15.6, beta: 28.58, m0: -1.1428571, m1: -0.7142857}
 schedule: [attractor_flow]
 plotting:
+  renderer: vtk_points
   background: black
   colors:
     c: [0.38, 0.62, 1.0]

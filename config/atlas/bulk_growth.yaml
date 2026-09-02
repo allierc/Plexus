@@ -64,6 +64,7 @@ operators:
 - {op: agent_divide, at: cell, rate: 0.004, offset: 0.004, max_occ: 0.95}
 schedule: [radius_graph, attraction_repulsion, agent_divide]
 plotting:
+  renderer: vtk_points
   background: black
   cutaway: [x, y]
   dot_fill: 0.9
