@@ -41,6 +41,10 @@ sets:
       blue:
         fraction: 0.5
         mass: 1.5e-05
+    spawn_arms:
+      m: 2
+      amplitude: 0.3
+      pitch: 20.0
 fields: {}
 operators:
 - op: squared_law

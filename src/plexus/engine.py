@@ -157,7 +157,8 @@ def _spawn3d(mode: str, n: int, box, radius: float, rng, device: str, thickness:
 
 
 def _spawn_pair3d(n: int, box, radius: float, rng, device: str, thickness: float = 0.0,
-                  separation: float = 0.0, offset: float = 0.0, tilt: float = 0.0):
+                  separation: float = 0.0, offset: float = 0.0, tilt: float = 0.0,
+                  arms: dict | None = None):
     """TWO flat discs, placed for an ENCOUNTER -- the `two_disks` 3D spawn mode.
 
     Group 0 is centred at `(cx - separation/2, cy - offset/2, cz)` and group 1 at
@@ -200,6 +201,24 @@ def _spawn_pair3d(n: int, box, radius: float, rng, device: str, thickness: float
     for g, k in enumerate(counts):
         r = torch.sqrt(torch.rand(k, generator=rng, device=device)) * radius[g]  # uniform-area disc
         th = torch.rand(k, generator=rng, device=device) * 2 * math.pi
+        # A SPIRAL THAT DOES NOT FADE WITH N. Left alone, the arms in a disc like this are seeded by
+        # SHOT NOISE and grown by swing amplification, so their amplitude starts at 1/sqrt(N): 0.63%
+        # at 25,000 particles and 0.10% at a million. The amplifier has a finite gain, so six times
+        # less seed is six times less arm -- which is why raising the particle count made the spiral
+        # DISAPPEAR rather than sharpen. It is the classic result (Sellwood & Carlberg 1984) and it
+        # is a property of the initial condition, not of the solver.
+        #
+        # `spawn_arms` plants the pattern instead of waiting for noise to. Displacing each star in
+        # azimuth by (A/m) sin(m*phi) crowds them towards m equally spaced ridges: dphi'/dphi =
+        # 1 + A cos(m*phi), so the surface density is modulated by A, whatever N is. Winding the
+        # phase with ln(r) makes those ridges a LOGARITHMIC SPIRAL of pitch angle `pitch` degrees --
+        # a real trailing two-armed pattern for the amplifier to work on, not a bar.
+        if arms and float(arms.get("amplitude", 0.0)) > 0.0:
+            A = float(arms["amplitude"])
+            mm = float(arms.get("m", 2))
+            pitch = math.radians(float(arms.get("pitch", 20.0)))
+            phase = th - torch.log(r.clamp(min=1e-6) / radius[g]) / math.tan(pitch)
+            th = th + (A / mm) * torch.sin(mm * phase)
         z = (thickness[g] * torch.randn(k, generator=rng, device=device)
              if thickness[g] > 0 else torch.zeros(k, device=device))
         local = torch.stack([r * torch.cos(th), r * torch.sin(th), z], 1)
@@ -804,7 +823,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
                         thickness=s.get("spawn_thickness", 0.0),
                         separation=float(s.get("spawn_separation", 0.0)),
                         offset=float(s.get("spawn_offset", 0.0)),
-                        tilt=float(s.get("spawn_tilt", 0.0)))
+                        tilt=float(s.get("spawn_tilt", 0.0)),
+                        arms=s.get("spawn_arms"))
                 elif D == 3:                           # 3D agent: vector heading; ball / thin `disk` spawn
                     pos, head = _spawn3d(s["spawn"], n, H.world_size,
                                          float(s.get("spawn_radius", 0.3)), H.rng, device,
