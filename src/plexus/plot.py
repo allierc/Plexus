@@ -248,6 +248,7 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
     if which == "vtk_mesh":
         from plexus import render_vtk
         if render_vtk.available():
+            render_vtk.use_plotting(sim.plotting or {})   # the live config, not the run's frozen copy
             render_vtk.still(data_dir, style="flat",
                              out=os.path.join(data_dir, "3d.png"), name=sim.name)
             if movie:

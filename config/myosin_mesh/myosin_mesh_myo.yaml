@@ -17,6 +17,7 @@ plotting:
   renderer: vtk_mesh
   background: black
   edge_color: myosin
+  edge_lut: viridis
   edge_width: 3.0
   show_division: false
   colors:
@@ -29,9 +30,10 @@ plotting:
     - 0.35
     - 0.25
   curve:
-    title: junction myosin, mean +- SD per type
     xlabel: frame
     ylabel: myosin
+    font_size: 9
+    ticks: 4
     size:
     - 0.3
     - 0.26

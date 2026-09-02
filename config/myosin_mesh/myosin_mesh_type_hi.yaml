@@ -1,5 +1,5 @@
 general:
-  name: myosin_mesh_type
+  name: myosin_mesh_type_hi
   seed: 0
   n_frames: 401
   dt: 1.0
@@ -61,7 +61,7 @@ sets:
         myo_drive: 1.0
       tense:
         fraction: 0.5
-        myo_drive: 3.0
+        myo_drive: 12.0
 fields: {}
 operators:
 - op: mesh_seed
