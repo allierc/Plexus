@@ -863,6 +863,20 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             lvl.spawn_group_rot = grot
         _assign_types(lvl, s, H, device)
         lvl.types_raw = s.get("types")          # raw per-type config (layers/material/block) for child provisioning
+        # AN ENTITY MAY PROVISION A ROOT SET TOO, and until now only a CONTAINED one could. That
+        # asymmetry made a parent MANDATORY for anything whose buffers come from `provision` --
+        # `mpm_particle` gets F, C, mass, mu, la and p_vol there -- so a homogeneous slab of one
+        # material had to declare a container of ONE element that no operator ever touched, purely
+        # so the engine would take the branch that allocates the solver's state. Without it the run
+        # built cleanly and died at the first `mpm_strain` with `'Level' object has no attribute
+        # 'F'`, which names the symptom and not the cause.
+        #
+        # `parent=None` IS PASSED EXPLICITLY, so an entity that needs one says so itself rather
+        # than being handed a stand-in. The contained path below is unchanged.
+        _ent_r = _entity_class(sname)
+        _prov_r = getattr(_ent_r, "provision", None) if _ent_r is not None else None
+        if _prov_r is not None:
+            _prov_r(lvl, None, s, H, device)
         if isinstance(vinit, dict) and "vel" in schema:
             vx0, vx1 = schema["vel"]
             vel = _init_velocity(vinit, lvl, H.world_size, H.rng, device)
@@ -1083,6 +1097,18 @@ def _capture_refusals(sim: Spec, H, step: dict, inst: list) -> list[str]:
     if getattr(H, "emit_order", None):
         why.append(f"engine-integrated sets {list(H.emit_order)} -- `_integrate` rebinds lvl.state "
                    f"every tick, so a captured graph would read a stale buffer")
+    # `mesh_contact` READS A SURFACE ON THE HOST EVERY FRAME. It rebuilds its direction-bin table
+    # from the live vertex set -- `torch.tensor` from a python list, `int(ef.max())`,
+    # `float(torch.quantile(...))` to size the grid, and `bool(near.any())` to skip an empty frame --
+    # so the block contains host->device copies and syncs by construction, not by accident.
+    # MEASURED: capture aborts at the first `torch.tensor(self.centre, ...)` with
+    # `cudaErrorStreamCaptureUnsupported`, then invalidates the whole capture. There is no version
+    # of this operator that captures while the surface can move, because the bin table is a
+    # different SHAPE from frame to frame -- a captured graph is a fixed list of kernels.
+    if {"mesh_contact"} & toks:
+        why.append("mesh_contact rebuilds its direction-bin table from the live surface every "
+                   "frame (host tensor construction, a quantile sync, a variable bucket depth), "
+                   "so the block is uncapturable while the surface moves")
     # NO STATIC CHECK FOR "STRUCTURAL" OPERATORS. `kind` is the wrong proxy: what invalidates a
     # graph is a buffer being REALLOCATED, and `kind="structural"` means "may change the entity
     # set", which is neither necessary nor sufficient. `plate_confine` is tagged structural and

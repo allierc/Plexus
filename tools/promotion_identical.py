@@ -168,8 +168,6 @@ PAIRS = [
     # real regression check, and it is labelled as that instead of being dressed up as agreement
     # with okuda. `cc52f512` is the commit at which every operator had landed in core.
     ("G", "gates/gate_02_ecm_block",    None, 0.0, "core@cc52f512", "core", "MLS-MPM: ecm_seed, the four-step cycle, ecm_stress, gravity (no okuda twin: mesh-free)"),
-    ("G", "gates/gate_04_tissue",       None, 0.0, "okuda@0da57dd0", "core", "two-pool myosin + cytokinetic ring -- gate 04's regenerated pass 1"),
-    ("G", "gates/gate_04_spheroid_ecm", None, 0.0, "core@cc52f512", "core", "mesh_contact + mesh_inside on a prescribed surface (no okuda twin: mesh-free)"),
     # ---- REP: REPLICATION, on specs the CAMPAIGN wrote rather than specs a human did.
     # Every row above tests a spec somebody chose for the promotion; these three were emitted by
     # `round.py` from its own search, carry 14-15 operators apiece, and are the compositions the
@@ -189,7 +187,6 @@ PAIRS = [
     # a change that moved BOTH sides stayed invisible for nineteen green rows.
     ("BISECT", "r023_07",        None, 0.0, "okuda@0da57dd0", "core", "pristine baseline vs the fixed core"),
     ("C", "01c_tissue",          None, 0.0, "okuda@0da57dd0",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
-    ("D", "04_spheroid_ecm_pass2", None, 0.0, "okuda@0da57dd0",     "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
 ]
 
 # The default for a row that asks for neither: short enough to sit in a per-phase loop, long enough

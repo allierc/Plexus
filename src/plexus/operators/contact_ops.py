@@ -1,5 +1,7 @@
 """Where a triangulated surface meets a continuum, and what each tells the other.
 
+    seed_plate        an open planar half-edge patch -- sheet, disc, disc with a hole, or grid
+    plate_drive       and its prescribed rigid descent, so the surface is a piston
     mesh_contact      the vertex mesh pushes MPM particles out of itself, and feels the reaction
     mesh_inside       which particles are inside the closed surface -- the test the contact needs
     surface_track     the surface's own moving frame, kept across division and death
@@ -79,15 +81,34 @@ def _neighbours(it, ph, G):
 
 @register_operator("mesh_contact", family="boundary", set="particle", kind="lateral")
 class MeshContact(Lateral):
-    """Particle-to-surface contact against a replayed triangulated tissue.
+    """Particle-to-surface contact against a LIVE triangulated surface.
 
     Penalty in the face normal, regularised Coulomb friction against the face's own velocity, and
     the reaction distributed to the face's vertices by the barycentric weights that built it.
+
+    NO REPLAY. The surface is a vertex set in this hierarchy, read at the frame it is in --
+    `surface: <set>`. The archive path (`tissue: <npz>`, a cache of 200 meshes with a `mesh_stride`
+    and a linear interpolation between kept frames) IS DELETED, along with the interpolation, the
+    stride arithmetic and the finite-differenced vertex velocity that went with it.
+
+    WHY, AND WHAT IT COST TO LEARN. A replayed input is a claim about a FILE, not about a model.
+    Gate 04 read a 32.7 MB npz built in August from a spec that no longer resolved -- its parent had
+    drifted to `rate: 0.03` against the `0.003457` that made the cache -- so the gate was green
+    against an artefact nobody could rebuild, and `tools/export_tissue.py` existed only to paper
+    over that. The surface now comes from a `seed` operator like every other initial condition
+    (`seed_plate`, `seed_mesh`), which means it is declared, regenerated on every run, and cannot
+    silently disagree with the spec that names it.
+
+    WHAT THIS RULES OUT, STATED RATHER THAN HIDDEN: two subsystems whose clocks differ by ~10^5 --
+    an epithelium at 600 s a frame against a matrix at 3.2 ms -- cannot share a schedule, and the
+    replay was how that was dodged. A surface on this path must therefore be PRESCRIBED (kinematics
+    written by an operator, e.g. `plate_drive`) or solved on the matrix's own clock. That is a
+    modelling constraint, not a regression.
     """
 
     EMIT = "mpm_acceleration"          # consumed by `mpm_scatter` as a_ext, like `ecm_from_cell`
     SUPPORTED_DIMS = [3]
-    REQUIRES_PARAMS = ["tissue"]
+    REQUIRES_PARAMS = ["surface"]      # a live vertex set; there is no archive path any more
     MECHANISM_TAGS = ["cell_matrix_contact", "particle_to_surface", "friction", "moving_boundary"]
     PARAM_ROLES = {"k_frac": "penalty_fraction_of_ceiling", "mu": "friction_coefficient",
                    "scale": "tissue_to_box_scale", "eps_v": "slip_regularisation_velocity"}
@@ -120,21 +141,27 @@ class MeshContact(Lateral):
         self.cap_rows = int(params.get("cap_rows", 2))
         self.map_theta = int(params.get("map_theta", 32))        # the pressure map's own resolution
         self.map_phi = int(params.get("map_phi", 64))
-        # PASS-2 FRAMES PER KEPT MESH. The tissue cache keeps 200 meshes out of 402 tissue frames,
-        # so a pass-2 run of 400 frames advances one mesh every two frames; `stride` is that number,
-        # and the mesh in between is interpolated rather than held. Held, the surface would stand
-        # still for a frame and then jump, and a jump into a penalty contact is a shock the material
-        # has to absorb -- the interpolation is also exactly what the friction law's vertex velocity
-        # already assumes, so holding would have made the two disagree.
-        self.stride = max(1, int(params.get("mesh_stride", 1)))
         self.verbose = bool(params.get("verbose", True))
 
-        z = np.load(str(params["tissue"]))
-        self.n_mesh = int(len(z["mesh_frames"]))
-        self._z = {k: z[k] for k in z.files if k.startswith("m")}
-        self._nmesh_keys = z["mesh_frames"]
+        # THE SURFACE IS A SET, NOT A FILE. See the class docstring for why the archive path is gone.
+        self.surface = str(params["surface"])
+        if "tissue" in params:
+            raise ValueError("mesh_contact: `tissue:` (the replayed mesh archive) is deleted. Seed "
+                             "the surface as a vertex set -- `seed_plate` or `seed_mesh` -- and "
+                             f"name it with `surface: <set>` instead of {params['tissue']!r}")
+        if "mesh_stride" in params:
+            raise ValueError("mesh_contact: `mesh_stride:` counted pass-2 frames per KEPT mesh in "
+                             "the archive. A live surface has one mesh per frame and no cadence to "
+                             "reconcile, so the parameter has no meaning; remove it")
+        if self.scale != 1.0:
+            # A LIVE SET IS ALREADY IN BOX COORDINATES. `scale` existed because the archive held the
+            # tissue in its own units about its own centroid. Applied to a set the engine is already
+            # integrating in box units it would move the surface away from the particles it is
+            # meant to touch, and the run would report no contacts -- which reads as "nothing
+            # happened" rather than as an error.
+            raise ValueError(f"mesh_contact: `scale: {self.scale}` -- a live surface is already in "
+                             f"box units, so the only meaningful scale is 1.0")
         self._frame = -2
-        self._j = -1
         self._built = None
         self._dom = None
         self._newframe = False
@@ -144,32 +171,41 @@ class MeshContact(Lateral):
         _LIVE["contact"] = self
 
     # ---- the mesh of one frame ------------------------------------------------------------
-    def _mesh(self, j, dev, dt_):
-        """Vertices, half-edges and face sizes of kept mesh `j`, in BOX units and centred."""
-        p = torch.as_tensor(self._z[f"m{j}_pos"], device=dev, dtype=dt_) * self.scale
-        es = torch.as_tensor(self._z[f"m{j}_E_srce"].astype(np.int64), device=dev)
-        et = torch.as_tensor(self._z[f"m{j}_E_trgt"].astype(np.int64), device=dev)
-        ef = torch.as_tensor(self._z[f"m{j}_E_face"].astype(np.int64), device=dev)
-        return p, es, et, ef
+    def _mesh_live(self, H, dev, dt_):
+        """Vertices, half-edges and the surface's own velocity, read off the live vertex set.
 
-    def _build(self, j, dev, dt_, alpha=0.0):
-        """Everything about the surface that changes once per frame: triangles, their bins, and the
-        vertex velocity the friction law needs.
+        IN THE STAR FRAME, WHICH IS THE ONE CONVERSION THIS OWES. Everything below assumes the
+        surface is given about the ray origin, and a live set is in box coordinates -- so `centre`
+        is subtracted here and added back in `forward` when the hit point is reconstructed. Getting
+        this wrong does not crash: it reports zero contacts, which reads as "the surface never
+        touched anything".
 
-        `alpha` in [0,1) is how far this frame sits between kept mesh `j` and `j+1`. The TOPOLOGY is
-        always mesh `j`'s -- a vertex that does not exist yet cannot be interpolated toward -- and
-        the positions of the vertices the two meshes share are blended. `cell_divide` appends vertices
-        and never renumbers them (checked: Nv is monotone and a vertex's position is continuous
-        across a kept-frame pair), so the shared set is the common prefix.
+        `Vv` comes off the mesh table because the surface KNOWS its velocity -- `plate_drive` writes
+        it. The archive path had to recover it by differencing two cached meshes and dividing by a
+        stride, which is one place a cadence could disagree with the positions it was handed.
         """
-        V, es, et, ef = self._mesh(j, dev, dt_)
-        Vn = None
-        if j + 1 < self.n_mesh:
-            Vn, _, _, _ = self._mesh(j + 1, dev, dt_)
-            if alpha > 0:
-                m = min(V.shape[0], Vn.shape[0])
-                V = V.clone()
-                V[:m] = (1.0 - alpha) * V[:m] + alpha * Vn[:m]
+        lvl = H.level(self.surface)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or not int(m.get("Nv", 0)):
+            return None
+        nv = int(m["Nv"])
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        V = lvl.get("pos")[:nv].to(dt_) - c
+        vv = m.get("Vv", None)
+        Vv = torch.zeros_like(V) if vv is None else vv[:nv].to(device=dev, dtype=dt_)
+        return V, m["E_srce"].to(dev), m["E_trgt"].to(dev), m["E_face"].to(dev), Vv
+
+    def _build(self, dev, dt_, H):
+        """Everything about the surface that changes once per frame: triangles, their bins, and the
+        vertex velocity the friction law needs. Rebuilt every frame, because a live surface has
+        moved by definition.
+        """
+        got = self._mesh_live(H, dev, dt_)
+        return None if got is None else self._build_from(*got, dev=dev, dt_=dt_)
+
+    def _build_from(self, V, es, et, ef, Vv, dev, dt_):
+        """The geometry, given the four arrays -- split out so `selftest` can certify the lookup on
+        a surface it builds in memory instead of one a run has to produce first."""
         nv, nF = V.shape[0], int(ef.max()) + 1
         # FACE CENTROIDS. Every face contributes each of its vertices exactly once as a half-edge
         # source, so a scatter-mean over `E_srce` is the polygon's centroid with no ring ordering
@@ -242,18 +278,8 @@ class MeshContact(Lateral):
         rmax = torch.where(table >= 0, rtri[table.clamp_min(0)],
                            torch.zeros_like(rtri[0]).expand(nb, K)).max(dim=1).values
 
-        # VERTEX VELOCITY, from the next kept mesh. `cell_divide` appends vertices and never renumbers
-        # them (checked: Nv is monotone and a vertex's position is continuous across a kept-frame
-        # pair), so the common prefix is the same vertex on both sides; a vertex that does not yet
-        # exist in the next mesh gets zero.
-        Vv = torch.zeros_like(V)
-        if Vn is not None:
-            # PER PASS-2 FRAME, so the divisor is the time between kept meshes and not the frame's.
-            # With `stride` frames to a mesh the surface covers that displacement in `stride` frames,
-            # and a velocity computed as if it took one would make the friction law read a surface
-            # sliding `stride` times faster than the positions it is handed.
-            m = min(V.shape[0], Vn.shape[0])
-            Vv[:m] = (Vn[:m] - V[:m]) / (self.stride * self.dt_frame)
+        # VERTEX VELOCITY comes off the surface itself (`_mesh_live`), because the operator that
+        # moves it knows it exactly. Nothing is differenced here.
         return dict(V=V, Vv=Vv, es=es, et=et, ef=ef, cnt=cnt, A=A, B=B, C=C, nrm=nrm,
                     table=table, rmax=rmax, G=G, nv=nv, nF=nF, K=K, n_tri=int(A.shape[0]))
 
@@ -304,20 +330,28 @@ class MeshContact(Lateral):
         # that opens the history, so the aggregation below would index an empty list.
         f = getattr(H, "frame", None)
         f = -1 if f is None else int(f)
-        j = min(self.n_mesh - 1, max(0, f // self.stride))
-        alpha = (f - j * self.stride) / self.stride if self.stride > 1 else 0.0
+        # REBUILT ONCE PER FRAME AND NOT PER SUBSTEP. The surface's position is a frame-level fact --
+        # `plate_drive` writes it once, before the substep block -- so rebuilding inside the block
+        # would cost eight bin tables to describe one geometry. The build is a few milliseconds
+        # against a frame's eight substeps.
         if f != self._frame:
             self._frame, self._newframe = f, True
-            # REBUILT EVERY FRAME WHEN THE MESH IS INTERPOLATED, because the geometry now changes
-            # between kept meshes as well as at them. At stride 1 this is the same rebuild-on-change
-            # it always was; the build is a few milliseconds against a frame's eight substeps.
-            if j != self._j or alpha > 0:
-                self._j = j
-                self._built = self._build(j, dev, dt_, alpha)
+            self._built = self._build(dev, dt_, H)
         elif self._built is None:
-            self._j = j
-            self._built = self._build(j, dev, dt_, alpha)
+            # the seed ran between this frame's substeps; pick the surface up without opening a
+            # second history row for a frame that already has one
+            self._built = self._build(dev, dt_, H)
         M = self._built
+        if M is None:
+            # THE SEED HAS NOT RUN. `seed` operators are confined to the opening frames and the
+            # contact may be scheduled inside a substep block that runs on the same frame, so an
+            # empty surface is an ordering fact and not an error -- but a silent zero would make a
+            # mis-ordered schedule look like a run in which nothing ever touched.
+            if not getattr(self, "_said_empty", False):
+                print(f"[mesh_contact] surface `{self.surface}` is empty at frame {f}; no contact "
+                      f"until its seed has run", flush=True)
+                self._said_empty = True
+            return {self.at: torch.zeros_like(pos)}
         dt_sub = float(getattr(H, "sub_dt", None) or self.dt_frame)
         k = (self.k_frac / dt_sub) ** 2
         dx = 1.0 / self.n_grid
@@ -531,71 +565,101 @@ def reset():
 
 
 # --------------------------------------------------------------------------- the self-test
-def selftest(tissue, scale=0.00853, dev="cuda:0", n=40000, n_brute=400, meshes=(0, 100, 199)):
+def selftest(surface="sphere", dev="cuda:0", n=40000, n_brute=400, **kw):
     """THE LOOKUP IS THE ONE THING HERE THAT FAILS SILENTLY, so it is certified against brute force
     before any run is trusted to it.
 
-    A miss is not an error and not a NaN: the particle simply feels no contact, ends up inside the
-    tissue, and the movie shows matrix in the lumen -- which is exactly the artefact
-    `cell_exclude` was written to sweep up rather than to explain. Two questions, both of which
-    can come back wrong:
+    A miss is not an error and not a NaN: the particle simply feels no contact, ends up behind the
+    surface, and the movie shows matrix where the solid is -- which is exactly the artefact
+    `cell_exclude` was written to sweep up rather than to explain. Two questions, both of which can
+    come back wrong:
 
-      COVERAGE  a ray from the centroid of a CLOSED star-shaped surface must hit it. The fraction of
-                random directions that find a face is therefore 1, and anything less is the bin
-                structure losing faces -- which is what a plain (theta, phi) lattice does near the
-                poles.
+      COVERAGE  a ray from inside a CLOSED star-shaped surface must hit it, so the fraction of
+                random directions that find a face is 1 and anything less is the bin structure
+                losing faces -- which is what a plain (theta, phi) lattice does near the poles. An
+                OPEN surface (a plate) covers only its own solid angle, so the number is reported
+                and not asserted; there the agreement test is the whole check.
       AGREEMENT for a subsample, the face and the radius the bins return must be the ones a test
                 against EVERY triangle returns. Coverage alone would pass on a lookup that
                 confidently returns the wrong face.
+
+    THE SURFACE IS BUILT HERE, NOT LOADED. It used to take a path to a 32.7 MB mesh archive, so the
+    one check that certifies the lookup could not run without an artefact somebody had generated --
+    and the check would then be certifying the lookup against whatever that file happened to hold.
+
+    RUN IT AS AN IMPORT, NOT AS `python -m`: this module registers its operators at import, and
+    `-m` executes it a SECOND time under the name `__main__`, so the decorators raise
+    "operator 'mesh_contact' already has variant 'default'" before the check starts.
+
+        python -c "import plexus.operators as _; from plexus.operators.contact_ops import selftest;\
+                   raise SystemExit(0 if selftest('sphere') else 1)"
+        python -c "import plexus.operators as _; from plexus.operators.contact_ops import selftest;\
+                   raise SystemExit(0 if selftest('plate', shape='disc_hole') else 1)"
     """
-    z = np.load(tissue)
-    op = MeshContact({"tissue": tissue, "scale": scale, "verbose": False}, device=dev)
+    if surface == "sphere":
+        from plexus.operators.vertex_ops import build_sphere_mesh
+        verts, es, et, ef, _nF = build_sphere_mesh(int(kw.get("n_cells", 400)),
+                                                   float(kw.get("radius", 5.0)),
+                                                   float(kw.get("jitter", 0.15)), 0)
+        V = np.asarray(verts, np.float64)
+        closed = True
+    elif surface == "plate":
+        # THE PLATE IN ITS STAR FRAME: the patch sits `standoff` below the ray origin, which is
+        # where `seed_plate` + a `centre` above it put it. Open, so coverage is a fraction.
+        xy, quads = _plate_lattice(int(kw.get("nq", 48)), float(kw.get("half_width", 0.25)),
+                                   str(kw.get("shape", "sheet")))
+        es, et, ef = _plate_half_edges(quads)
+        h = float(kw.get("standoff", 0.30))
+        V = np.stack([xy[:, 0], np.full(len(xy), -h), xy[:, 1]], -1)
+        closed = False
+    else:
+        raise ValueError(f"selftest: surface must be 'sphere' or 'plate', got {surface!r}")
+
+    dv = torch.device(dev)
+    op = MeshContact({"surface": "vertex", "verbose": False}, device=dev)
+    Vt = torch.as_tensor(V, device=dv, dtype=torch.float32)
+    M = op._build_from(Vt, torch.as_tensor(np.asarray(es, np.int64), device=dv),
+                       torch.as_tensor(np.asarray(et, np.int64), device=dv),
+                       torch.as_tensor(np.asarray(ef, np.int64), device=dv),
+                       torch.zeros_like(Vt), dev=dv, dt_=torch.float32)
     g = torch.Generator(device="cpu").manual_seed(0)
-    ok_all = True
-    for j in meshes:
-        j = min(j, op.n_mesh - 1)
-        M = op._build(j, torch.device(dev), torch.float32)
-        u = torch.randn(n, 3, generator=g).to(dev)
-        u = u / u.norm(dim=1, keepdim=True)
-        r = torch.full((n,), 1e-6, device=dev)
-        x = u * r[:, None]
-        hit, tri, t, w = op._query(M, x, u, r)
-        cov = float(hit.float().mean())
-        # brute force: every triangle, for a subsample
-        s = torch.randperm(n, generator=g)[:n_brute].to(dev)
+    u = torch.randn(n, 3, generator=g).to(dv)
+    u = u / u.norm(dim=1, keepdim=True)
+    r = torch.full((n,), 1e-6, device=dv)
+    hit, tri, t, w = op._query(M, u * r[:, None], u, r)
+    cov = float(hit.float().mean())
+
+    # BRUTE FORCE OVER EVERY TRIANGLE, for a subsample, and only where the lookup found one: on an
+    # open surface most rays legitimately hit nothing, and comparing those would measure the
+    # geometry rather than the bins.
+    pool = torch.nonzero(hit).squeeze(1)
+    s_ = pool[torch.randperm(pool.numel(), generator=g).to(dv)[:n_brute]] if pool.numel() else pool
+    nb = int(s_.numel())
+    bad, dmax = 0, 0.0
+    if nb:
         A, B, C = M["A"], M["B"], M["C"]
         e1, e2 = B - A, C - A
-        us = u[s][:, None, :]
-        p = torch.cross(us.expand(-1, A.shape[0], -1), e2[None], dim=2)
-        det = (e1[None] * p).sum(2)
+        us = u[s_][:, None, :]
+        pp = torch.cross(us.expand(-1, A.shape[0], -1), e2[None], dim=2)
+        det = (e1[None] * pp).sum(2)
         inv = 1.0 / torch.where(det.abs() < 1e-20, torch.full_like(det, 1e-20), det)
         sv = -A[None]
-        w1 = (sv * p).sum(2) * inv
-        q = torch.cross(sv.expand(n_brute, -1, -1), e1[None].expand(n_brute, -1, -1), dim=2)
+        w1 = (sv * pp).sum(2) * inv
+        q = torch.cross(sv.expand(nb, -1, -1), e1[None].expand(nb, -1, -1), dim=2)
         w2 = (us * q).sum(2) * inv
         tb = (e2[None] * q).sum(2) * inv
         good = (det.abs() > 1e-20) & (w1 >= -1e-6) & (w2 >= -1e-6) & (w1 + w2 <= 1 + 1e-6) & (tb > 0)
         tb = torch.where(good, tb, torch.full_like(tb, -1.0))
         t_ref = tb.max(dim=1).values
-        d = (t[s] - t_ref).abs() / t_ref.clamp_min(1e-9)
-        bad = int((d > 1e-4).sum())
-        print(f"[selftest] mesh {j:3d}: {M['n_tri']:6d} triangles, {M['G']['nbin']:6d} bins in "
-              f"{M['G']['nrow']:3d} rows, max {M['K']:3d} per bucket | coverage {cov:.5f} | "
-              f"brute-force disagreement {bad}/{n_brute} (max relative {float(d.max()):.2e})",
-              flush=True)
-        ok_all = ok_all and cov > 0.9999 and bad == 0
-    print(f"[selftest] {'PASS' if ok_all else 'FAIL'}", flush=True)
-    return ok_all
-
-
-if __name__ == "__main__":
-    import sys as _sys
-    _t = (_sys.argv[_sys.argv.index("--tissue") + 1] if "--tissue" in _sys.argv else
-          os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-              os.path.abspath(__file__)))), "log", "okuda_ECM", "_tissue",
-              "cellfix_B_new_f401_x4_c4a5698982.npz"))
-    _d = _sys.argv[_sys.argv.index("--device") + 1] if "--device" in _sys.argv else "cuda:0"
-    raise SystemExit(0 if selftest(_t, dev=_d) else 1)
+        d = (t[s_] - t_ref).abs() / t_ref.clamp_min(1e-9)
+        bad, dmax = int((d > 1e-4).sum()), float(d.max())
+    ok = (bad == 0) and (cov > 0.9999 if closed else cov > 0.0)
+    print(f"[selftest] {surface}: {M['n_tri']:6d} triangles, {M['G']['nbin']:6d} bins in "
+          f"{M['G']['nrow']:3d} rows, max {M['K']:3d} per bucket | coverage {cov:.5f}"
+          f"{' (closed: must be 1)' if closed else ' (open: reported, not asserted)'} | "
+          f"brute-force disagreement {bad}/{nb} (max relative {dmax:.2e})", flush=True)
+    print(f"[selftest] {'PASS' if ok else 'FAIL'}", flush=True)
+    return ok
 
 
 # ==========================================================================================================
@@ -780,6 +844,241 @@ def block_fraction(gap_half, half_extent):
     """
     free = min(1.0, max(0.0, gap_half / half_extent))
     return 1.0 - free
+
+
+# ==========================================================================================================
+# THE PISTON: a surface this repository can SEED, so the interaction has a second geometry.
+#
+# `mesh_contact` has only ever met one surface -- a growing sphere, replayed from a cache -- and every
+# gate row about it is a row about that sphere. What the operator claims is more general than that:
+# a triangulated surface, of any shape, pushing a continuum. A claim exercised on one geometry is a
+# claim about that geometry.
+#
+# SO THE SURFACE BECOMES A SEED OPERATOR RATHER THAN A FILE. `seed_plate` builds the patch at frame 0
+# the way `seed_mesh` builds the vesicle, and `plate_drive` prescribes its motion, so a spec declares
+# the piston instead of pointing at an npz somebody generated. The four shapes are one lattice under
+# four masks, which is what makes them comparable: same resolution, same edge length, same bin count
+# per unit area -- geometry is the only thing that differs across the ladder.
+# ==========================================================================================================
+def _plate_lattice(nq, half_width, shape, hole_frac=0.35, bars=4, bar_frac=0.5):
+    """One `nq` x `nq` quad lattice minus whatever `shape` removes: (xy of kept vertices, quads).
+
+    THE MASK IS ON THE QUAD CENTRES, not on the vertices, so a removed quad takes no vertex its
+    neighbours still need and the kept set is exactly the boundary of what survives.
+    """
+    g = np.linspace(-half_width, half_width, nq + 1)
+    X, Y = np.meshgrid(g, g, indexing="ij")
+    vid = np.arange((nq + 1) ** 2).reshape(nq + 1, nq + 1)
+    i, j = np.meshgrid(np.arange(nq), np.arange(nq), indexing="ij")
+    quads = np.stack([vid[i, j], vid[i + 1, j], vid[i + 1, j + 1], vid[i, j + 1]], -1).reshape(-1, 4)
+    cx = 0.5 * (g[:-1] + g[1:])
+    CX, CZ = (a.reshape(-1) for a in np.meshgrid(cx, cx, indexing="ij"))
+    r = np.hypot(CX, CZ)
+    if shape == "sheet":
+        keep = np.ones(len(quads), bool)
+    elif shape == "disc":
+        keep = r <= half_width
+    elif shape == "disc_hole":
+        keep = (r <= half_width) & (r >= hole_frac * half_width)
+    elif shape == "grid":
+        # A LATTICE OF BARS: solid strips with square windows between them, so the material is
+        # loaded in patches and can extrude through the gaps. `bar_frac` is the fraction of each
+        # period the strip occupies, so 1.0 recovers `sheet` and the shape is a continuum.
+        per = 2 * half_width / bars
+        u = ((CX + half_width) % per) / per
+        v = ((CZ + half_width) % per) / per
+        w = 0.5 * bar_frac
+        keep = (np.minimum(u, 1 - u) < w) | (np.minimum(v, 1 - v) < w)
+    else:
+        raise ValueError(f"seed_plate: shape must be sheet|disc|disc_hole|grid, got {shape!r}")
+    quads = quads[keep]
+    if not len(quads):
+        raise ValueError(f"seed_plate: shape {shape!r} kept no quads at nq={nq}")
+    used = np.unique(quads)
+    remap = np.full(vid.size, -1, np.int64)
+    remap[used] = np.arange(len(used))
+    return np.stack([X.reshape(-1)[used], Y.reshape(-1)[used]], -1), remap[quads]
+
+
+def _plate_half_edges(quads):
+    """(E_srce, E_trgt, E_face) -- four half-edges per quad, in ring order, grouped by face.
+
+    QUADS AND NOT TRIANGLES because `mesh_contact` fans every face from its own centroid, one
+    sub-triangle per half-edge, and needs no ring ordering to do it. A quad therefore costs four
+    sub-triangles and buys a lattice that can have holes punched in it by dropping whole faces.
+    """
+    nf = len(quads)
+    es = np.concatenate([quads[:, k] for k in (0, 1, 2, 3)])
+    et = np.concatenate([quads[:, k] for k in (1, 2, 3, 0)])
+    ef = np.tile(np.arange(nf), 4)
+    o = np.argsort(ef, kind="stable")
+    return es[o], et[o], ef[o]
+
+
+@register_operator("seed_plate", family="seed", set="vertex", kind="seed")
+class SeedPlate(Structural):
+    """Frame-0: an open planar half-edge patch normal to `axis`, and its half-edge table.
+
+    WHERE THE PATCH SITS RELATIVE TO `mesh_contact`'s `centre:` IS THE WHOLE DESIGN, and it is the
+    one thing a spec can get wrong silently. The contact is star-shaped: it casts a ray from
+    `centre` along each particle's own direction, calls the outward normal the one pointing AWAY
+    from `centre`, and pushes anything it finds BETWEEN `centre` and the surface further out. So
+    `centre` names the region the material is forbidden to enter -- the tissue's interior for the
+    spheroid, and for a piston the BODY OF THE PISTON, i.e. a point on the far side of the plate
+    from the material. Declare `centre` in the plate's plane and the ray cast is degenerate; declare
+    it on the material's side and the plate pushes the wrong way.
+
+    `standoff` REPORTS THE CONSEQUENCE AT FRAME 0 rather than leaving it to be discovered: the
+    distance from the declared `centre` to the plate, which is what sizes the contact's direction
+    bins. Too small and a rim face is seen edge-on and the bin grid collapses to its floor of four
+    rows; too large and the angular size of a face falls under the 200-row cap and a face spans more
+    than one bin, which is the assumption the 3x3 lookup rests on.
+    """
+
+    EMIT = None                        # writes positions and the mesh table; no integrable delta
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["planar_patch", "half_edge_mesh", "rigid_indenter", "initial_condition"]
+    PARAM_ROLES = {"shape": "patch_topology", "nq": "quads_across", "half_width": "patch_half_extent",
+                   "height": "position_on_axis", "axis": "patch_normal_axis",
+                   "hole_frac": "inner_over_outer_radius", "bars": "strips_per_side",
+                   "bar_frac": "strip_width_over_period"}
+    REFERENCE = ("Plexus (this work). The indenter geometry of a nanoindentation / parallel-plate "
+                 "compression assay; the half-edge layout is Okuda, S. et al. (2013) "
+                 "Biomech. Model. Mechanobiol. 12:627-644, as used by `seed_mesh`.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.shape = str(params.get("shape", "sheet"))
+        self.nq = int(params.get("nq", 48))
+        self.half_width = float(params.get("half_width", 0.25))
+        self.axis = int(params.get("axis", 1))
+        self.height = float(params.get("height", 0.55))
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5])]   # the two IN-PLANE axes
+        self.hole_frac = float(params.get("hole_frac", 0.35))
+        self.bars = int(params.get("bars", 4))
+        self.bar_frac = float(params.get("bar_frac", 0.5))
+        self.standoff = params.get("standoff", None)
+        self.standoff = None if self.standoff is None else float(self.standoff)
+
+    def forward(self, H, mask=None):
+        from plexus.models.mesh import MeshTable
+        lvl = H.level(self.at)
+        dev, dt_ = lvl.state.device, lvl.state.dtype
+        xy, quads = _plate_lattice(self.nq, self.half_width, self.shape,
+                                   self.hole_frac, self.bars, self.bar_frac)
+        es, et, ef = _plate_half_edges(quads)
+        Nv, nF = len(xy), len(quads)
+        Nbuf = lvl.state.shape[0]
+        if Nv > Nbuf:
+            raise ValueError(f"seed_plate: the {self.shape} patch has {Nv} vertices but the "
+                             f"`{self.at}` set declares n={Nbuf}")
+        ip = [a for a in (0, 1, 2) if a != self.axis]              # the two in-plane axes
+        pos = torch.zeros(Nbuf, 3, dtype=dt_, device=dev)
+        pos[:Nv, ip[0]] = torch.as_tensor(xy[:, 0] + self.centre[0], dtype=dt_, device=dev)
+        pos[:Nv, ip[1]] = torch.as_tensor(xy[:, 1] + self.centre[1], dtype=dt_, device=dev)
+        pos[:Nv, self.axis] = self.height
+        p0, p1 = lvl.state_schema["pos"]
+        st = lvl.state.clone(); st[:, p0:p1] = pos; lvl.state = st
+        if getattr(lvl, "occ", None) is not None:
+            occ = torch.zeros(Nbuf, device=dev); occ[:Nv] = 1.0; lvl.occ = occ
+        seeded = dict(E_srce=torch.as_tensor(es, device=dev),
+                      E_trgt=torch.as_tensor(et, device=dev),
+                      E_face=torch.as_tensor(ef, device=dev), nF=nF, Nv=Nv,
+                      # THE SURFACE VELOCITY LIVES ON THE TABLE, not in a `vel` state block, because
+                      # it is a property of the SURFACE and `mesh_contact` reads it as one -- the
+                      # replay path derives exactly this by differencing consecutive cached meshes.
+                      # A vertex set that declared `vel` would also have the engine integrate it,
+                      # and a prescribed piston must not be integrated.
+                      Vv=torch.zeros(Nv, 3, dtype=dt_, device=dev),
+                      plate_axis=self.axis, plate_height=self.height,
+                      verts0=pos[:Nv].detach().to("cpu").numpy())
+        m = getattr(lvl, "_mesh", None)
+        if isinstance(m, MeshTable):
+            m.clear(); m.update(seeded)
+        else:
+            lvl._mesh = MeshTable(**seeded)
+        edge = 2.0 * self.half_width / self.nq
+        so = "" if self.standoff is None else (
+            f"; standoff {self.standoff:.4g} from the declared contact centre -> a face subtends "
+            f"~{edge / self.standoff:.4f} rad, i.e. ~{int(math.pi / max(edge / self.standoff, 1e-3))} "
+            f"bin rows (the contact caps at 200 and floors at 4)")
+        print(f"[seed_plate] {self.shape}: {nF} quads ({4 * nF} sub-triangles), {Nv} vertices, "
+              f"edge {edge:.4f}, half-width {self.half_width} at axis-{self.axis} = "
+              f"{self.height}{so}", flush=True)
+        return {}
+
+
+@register_operator("plate_drive", family="mechanics", set="vertex", kind="structural")
+class PlateDrive(Structural):
+    """Move a seeded plate along its normal at a prescribed rate, and publish its velocity.
+
+    KINEMATIC, NOT DYNAMIC, AND THAT IS THE MODELLING DECISION. The plate is a rigid indenter whose
+    position is imposed; it does not accelerate under the reaction it collects. `mesh_contact` still
+    computes that reaction and still accumulates it per vertex (`VERTEX_FORCE`), so the load the
+    material puts back is MEASURED here even though it is not integrated -- which is the difference
+    between a one-way coupling that reports its own residual and one that hides it.
+
+    THE VELOCITY IS PUBLISHED, NOT INFERRED. The contact's friction law needs the surface's velocity
+    at the contact point, and on the replay path it gets it by differencing consecutive cached
+    meshes. A prescribed plate KNOWS its velocity exactly, so it writes it, and the friction is then
+    reading the motion that is happening rather than a finite difference of it.
+    """
+
+    EMIT = None                        # moves positions in place; no integrable delta
+    SUPPORTED_DIMS = [3]
+    # `target`, NOT `to`: the schema reserves `to`/`from` for FIELD references (`mpm_scatter`'s
+    # `to: mpm_grid`), so a scalar there is resolved as a field name and the spec dies with
+    # "references unknown field 0.35".
+    REQUIRES_PARAMS = ["target"]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["prescribed_kinematics", "rigid_indenter", "moving_boundary"]
+    PARAM_ROLES = {"target": "final_position_on_axis", "over": "frames_of_travel",
+                   "axis": "motion_axis", "hold": "frames_held_before_moving"}
+    REFERENCE = "Plexus (this work); the loading protocol of a displacement-controlled indentation."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.axis = int(params.get("axis", 1))
+        self.target = float(params["target"])
+        self.over = int(params.get("over", 0))          # 0 -> the whole run, resolved at frame 0
+        self.hold = int(params.get("hold", 0))
+        self._from = None
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or not int(m.get("Nv", 0)):
+            return {}                                   # the seed has not run yet
+        Nv = int(m["Nv"])
+        pos = lvl.get("pos")
+        if self._from is None:
+            self._from = float(pos[0, self.axis])
+            self.over = self.over or max(1, int(getattr(H, "n_frames", 0) or 1) - self.hold)
+        f = int(getattr(H, "frame", 0) or 0)
+        u = min(1.0, max(0.0, (f - self.hold) / float(self.over)))
+        y = self._from + u * (self.target - self._from)
+        pos[:Nv, self.axis] = y
+        # ZERO BEFORE AND AFTER THE TRAVEL, not the mean rate: a friction law told the plate is
+        # still sliding while it is parked would shear the material it is resting on for the whole
+        # hold, and the hold exists precisely to show the material at rest under a static load.
+        moving = (self.hold <= f < self.hold + self.over)
+        v = (self.target - self._from) / (self.over * float(getattr(H, "dt", 1.0))) if moving else 0.0
+        m["Vv"][:Nv] = 0.0
+        m["Vv"][:Nv, self.axis] = v
+        m["plate_height"] = y
+        if not self._said:
+            print(f"[plate_drive] {self.at}: axis {self.axis}, {self._from:.4g} -> {self.target:.4g} "
+                  f"over {self.over} frames after a {self.hold}-frame hold; "
+                  f"speed {abs(v):.5g} box units per unit time", flush=True)
+            self._said = True
+        return {}
 
 
 # ==========================================================================================================
