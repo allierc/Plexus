@@ -47,6 +47,24 @@ plotting:
   fps: 60
   mesh_color: '#cfd8e3'
   real_time: false
+  slow_motion: 2
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    font_size: 9
+    ticks: 4
+    size:
+    - 0.3
+    - 0.26
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    font_size: 9
+    ticks: 4
+    size:
+    - 0.3
+    - 0.26
 sets:
   vertex:
     n: 25584

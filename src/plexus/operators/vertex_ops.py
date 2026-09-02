@@ -385,7 +385,8 @@ class ShapeEnergy3D(Lateral):
                  "simulating multicellular morphogenesis. Biophys. Physicobiol. 12:13-20 -- the "
                  "3D volume/surface form. NOT an Active Vertex Model: see the class docstring.")
     PARAM_ROLES = {"p0": "target_shape_index", "K_A": "area_stiffness", "K_P": "perimeter_stiffness",
-                   "Lambda": "surface_tension", "K_V": "cell_volume_elasticity", "cap_frac": "stability_cap"}
+                   "Lambda": "surface_tension", "K_V": "cell_volume_elasticity", "cap_frac": "stability_cap",
+                   "centre": "origin_of_the_K_R_radial_term"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -393,6 +394,8 @@ class ShapeEnergy3D(Lateral):
         self.K_A = float(params.get("K_A", 1.0)); self.K_P = float(params.get("K_P", 1.0))
         self.p0 = float(params.get("p0", 3.9)); self.Lambda = float(params.get("Lambda", 0.1))
         self.K_V = float(params.get("K_V", 0.5)); self.K_R = float(params.get("K_R", 0.0))
+        _c = params.get("centre", None)
+        self._centre = None if _c is None else torch.tensor([float(v) for v in _c])
         # DIHEDRAL bending (Wardetzky): penalises adjacent-cell normal deviation -> smooths the local folds
         # the hollow metric flags (division-injected cap tilts). High-frequency: unlike the radial K_R it
         # does NOT flatten gentle whole-shell/tube curvature. 0 = off (default). See _shape_energy_core.
@@ -444,7 +447,20 @@ class ShapeEnergy3D(Lateral):
               myo_e=None):
         with torch.enable_grad():
             p = p.detach().requires_grad_(True)
-            E = self._efn(p, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
+            # THE RADIAL TERM'S ORIGIN, AND WHY IT HAS TO BE DECLARABLE. `K_R` penalises
+            # (|pos| - R0)^2 with |pos| measured from the WORLD ORIGIN, so an energy that reads as
+            # translation-invariant is not: place the tissue at [25,25,25] of a 50-unit box and every
+            # vertex sits 43 units out against an R0 of 4.65, and the term tears the shell apart --
+            # 685 cells instead of 6,786, measured. Every other term (areas, perimeters, volumes,
+            # edge lengths) IS translation-invariant, so evaluating the whole energy on `p - centre`
+            # changes only this one and leaves the gradient of the rest identical.
+            #
+            # DEFAULT [0, 0, 0], so the 461 specs that never asked are bit-identical.
+            if self._centre is not None:
+                p_e = p - self._centre.to(p.device, p.dtype)
+            else:
+                p_e = p
+            E = self._efn(p_e, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
                           self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc, self.K_bend,
                           twin_face, self.K_lumen, myo_e)
             g = torch.autograd.grad(E, p)[0]

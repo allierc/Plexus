@@ -206,6 +206,21 @@ class LiveMovie:
             self._box_label = ("   box " + " x ".join(_f(v) for v in _w)
                                if len(set(_w)) > 1 else f"   box {_f(_w[0])} cube")
         self.speed = None
+        self.fps = float(fps)          # the declared rate; both branches below refine it
+        # SLOW MOTION APPLIES EITHER WAY. It lived entirely inside the real-time branch, so a spec
+        # that turned the clock off -- which a tissue at 600 s a frame must -- silently lost the one
+        # knob that says how fast to play the result. "Play it twice as slowly" is a statement about
+        # the FILE, and it is true whether the base framerate came from the world clock or from
+        # `plotting.fps`. Off the clock it simply halves the declared rate; nothing is dropped or
+        # resampled, the same frames take longer.
+        self.slow_motion = float((self.style or {}).get("slow_motion", 1.0))
+        if self.slow_motion <= 0:
+            raise ValueError(f"plotting.slow_motion must be > 0, got {self.slow_motion}")
+        if not self.real_time:
+            self.fps = fps = float(fps) / self.slow_motion
+            if abs(self.slow_motion - 1.0) > 1e-9:
+                print(f"[live-movie] {fps * self.slow_motion:g} fps declared / "
+                      f"{self.slow_motion:g}x slow = {fps:g} fps", flush=True)
         if self.real_time and dt and time_s:
             frame_s = float(dt) * float(time_s)
             self.duration_s = self.n_frames * frame_s
@@ -264,6 +279,7 @@ class LiveMovie:
         self._skin = self._surf = self._skin_sub = None
         self._meshes = []
         self._mesh_is_subject = False
+        self._curves = []
         self.drawn = self.n = self.rendered = 0
         self.t0 = None
         self.failed = None
@@ -322,9 +338,17 @@ class LiveMovie:
             self.p.camera.parallel_projection = True
             self.p.camera.parallel_scale = float(max(span[0], span[1])) * 0.55
         else:
-            if not self.free:
-                self.p.add_mesh(pv.Box((0, span[0], 0, span[1], 0, span[2])).extract_all_edges(),
-                                color="#4a4a4a", line_width=1.0, lighting=False)
+            # THE BOX IS A SCENE REFERENCE, NOT A CLAIM ABOUT A WALL. I dropped it for a free
+            # boundary on the argument that drawing one asserts a wall the model does not have --
+            # but the spec asks for it with `box_frame`, the replay path draws it, and without it a
+            # sphere alone on black has no scale, no orientation and no sense of where the camera
+            # is. Dropping it also made the two entry points disagree AGAIN, which is the whole
+            # thing this renderer was unified to stop. Drawn at `lo..hi`, which is [0, world] for a
+            # walled run and centred on the origin for a free one.
+            _b = np.asarray(self.lo), np.asarray(self.hi)
+            self.p.add_mesh(pv.Box((_b[0][0], _b[1][0], _b[0][1], _b[1][1],
+                                    _b[0][2], _b[1][2])).extract_all_edges(),
+                            color="#4a4a4a", line_width=1.0, lighting=False)
             # A SCALE BAR, AND ONLY WHERE THERE IS A SCALE. Without `general.units` the box is
             # a number of nothing and a bar labelled "20" would be a lie. The length is the largest
             # round number (1, 2 or 5 times a power of ten) fitting in a third of the box, so it
@@ -606,6 +630,7 @@ class LiveMovie:
                 self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                 point_size=self._dot_px(pos))
             self._add_meshes(H)
+            self._curves_setup(H, lvl)
             self.t0 = time.perf_counter()
             return
         if tick % self.stride:
@@ -613,6 +638,7 @@ class LiveMovie:
         self.cloud.points = self._xyz(lvl)
         self._skin_update(H, lvl, self.cloud.points)
         self._update_meshes(H)
+        self._curves_update(tick)
         # A FIELD COLOUR IS A PROPERTY OF NOW, so unlike the body hue it is recomputed each frame.
         if str(self.style.get("color_field", "") or ""):
             _c = self._rgb_field(H, lvl)
@@ -651,6 +677,207 @@ class LiveMovie:
         self.rendered += 1
         if tick in self.still_ticks:
             self._still(tick)
+
+    # ---- the inset curves ------------------------------------------------------------------
+    #
+    # `plotting.curve` PORTED FROM `render_vtk._curve_setup`, and generalised in two ways it needed:
+    # it names a QUANTITY rather than being wired to `e_myo`, and it may be a LIST, because "how many
+    # cells" and "how big are they" are two questions and answering them in one panel would need two
+    # y axes. The chart styling -- no box, no title, white axis text through the VTK accessors,
+    # 3-significant-figure ticks -- is that function's, decision for decision; see it for the why.
+    #
+    #     quantity: cells      the live face count, one line, no band
+    #     quantity: area       mean +- SD of the live faces' areas
+    #
+    # THE AXES ARE FIXED OVER THE WHOLE CLIP, which is the part that makes the panel readable and the
+    # part that constrains where this can run. An autoscaled y renormalises every frame, so a
+    # population that doubles looks exactly like one that does not move. Fixing it needs the whole
+    # series up front, so the panel is built on the REPLAY path, which has the trajectory; a live
+    # generate has only the frame it is on and says so rather than drawing a rescaling plot.
+    _CURVE_Q = ("cells", "area")
+
+    def _curve_series(self, H, lvl, q, ntype):
+        """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
+
+        PARTITIONED BY TYPE WHEN THERE IS ONE. A face of the mesh IS a cell, so the cell set's
+        `node_type` indexes the faces directly and a per-type split costs one mask. With no types
+        declared it is a single series -- which is the honest picture and not a degenerate case of
+        the other, because "the mean over one population" and "the mean over each of several" are
+        different claims.
+        """
+        T = int(getattr(lvl, "_pos").shape[0])
+        nt = 1 if ntype is None else int(np.max(ntype)) + 1
+        out = np.full((T, nt, 2), np.nan)
+        for t in range(T):
+            lvl.t = t
+            m = getattr(lvl, "mesh", None)
+            if m is None or not int(m.get("nF", 0) or 0):
+                continue
+            nF = int(m["nF"])
+            k = (np.zeros(nF, int) if ntype is None
+                 else np.asarray(ntype)[np.clip(np.arange(nF), 0, len(ntype) - 1)].astype(int))
+            if q == "cells":
+                for j in range(nt):
+                    out[t, j] = (float((k == j).sum()), 0.0)
+                continue
+            import torch
+            from plexus.operators.vertex_ops import face_geometry_3d
+            nv = int(m["Nv"])
+            pos = torch.as_tensor(lvl.get("pos")[:nv], dtype=torch.float64)
+            a, _p, _c, _v = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], nF)
+            a = a.numpy()
+            for j in range(nt):
+                sel = k == j
+                if sel.any():
+                    out[t, j] = (float(np.nanmean(a[sel])), float(np.nanstd(a[sel])))
+        lvl.t = 0
+        return out
+
+    def _curve_types(self, H, lvl):
+        """The per-cell type ids, or None. `mesh_cell_set` names which set a face belongs to."""
+        for nm in (getattr(lvl, "mesh_cell_set", None), "cell"):
+            if not nm:
+                continue
+            try:
+                v = getattr(H.level(nm), "node_type", None)
+            except Exception:                            # noqa: BLE001
+                continue
+            if v is None:
+                continue
+            v = v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
+            if v.ndim > 1:
+                v = v[0]
+            if int(np.max(v)) > 0:                       # one type is no partition at all
+                return v.astype(int)
+        return None
+
+    def _curves_setup(self, H, lvl):
+        self._curves = []
+        cfgs = (self.style or {}).get("curve")
+        if not cfgs:
+            return
+        cfgs = [cfgs] if isinstance(cfgs, dict) else list(cfgs)
+        # THREE PANELS, STACKED. More than that and each is a hundred pixels tall on a 1280 frame --
+        # too short to read a spread off, which is the whole reason the band is drawn. `loc` still
+        # wins where a spec gives one; without it they stack down the left, which is the arrangement
+        # "one on top of another" means and saves every spec from computing three offsets.
+        if len(cfgs) > 3:
+            raise ValueError(f"plotting.curve: {len(cfgs)} panels asked for, at most 3 fit "
+                             f"legibly -- each is 26% of the frame's height")
+        ntype = self._curve_types(H, lvl)
+        if not hasattr(lvl, "_pos"):
+            print("[live-movie] plotting.curve needs the whole clip to fix its axes and a live "
+                  "generate has only the current frame -- re-render with `-o plot`", flush=True)
+            return
+        for _i, cfg in enumerate(cfgs):
+            cfg = dict(cfg)
+            q = str(cfg.get("quantity", "cells")).lower()
+            if q not in self._CURVE_Q:
+                raise ValueError(f"plotting.curve.quantity: {q!r} is not one of "
+                                 f"{', '.join(self._CURVE_Q)}")
+            S = self._curve_series(H, lvl, q, ntype)
+            if not np.isfinite(S[..., 0]).any():
+                continue
+            lo = float(np.nanmin(S[..., 0] - S[..., 1])); hi = float(np.nanmax(S[..., 0] + S[..., 1]))
+            # THE ENDS ARE ROUND NUMBERS, AND THE FLOOR IS ZERO WHERE ZERO IS THE FLOOR. An 8% pad
+            # below the minimum put the `cells` axis at -317, i.e. a tick labelled with a negative
+            # count of cells, and left the top at 7181 -- five digits of a bound that is a padding
+            # artefact, not a measurement. Both ends are snapped to ONE significant figure (7181 ->
+            # 8000, 0.6494 -> 0.7) so the first and last ticks are numbers a reader can hold, and a
+            # quantity that cannot be negative starts at 0. `ymin`/`ymax` still override.
+            def _r1(v, up):
+                if v == 0 or not np.isfinite(v):
+                    return 0.0
+                e = 10.0 ** np.floor(np.log10(abs(v)))
+                f = np.ceil(abs(v) / e) if (v > 0) == up else np.floor(abs(v) / e)
+                return float(np.sign(v) * max(f, 1.0) * e)
+            lo = 0.0 if (lo >= 0 or q in ("cells", "area")) else _r1(lo, False)
+            # A ROUND STEP, NOT A ROUND TOP. Snapping only the top to one significant figure still
+            # left the ticks between the ends to be whatever the count divided into: 0..8000 over
+            # `ticks: 4` printed 0, 2667, 5333, 8000, and the two in the middle are the artefact of
+            # a division, not numbers anyone chose. The STEP is snapped instead -- to the largest of
+            # {1, 2, 2.5, 5} x 10^k that is no bigger than range/(ticks-1) -- and the top is then the
+            # first multiple of it above the data. Every tick is round by construction, and the tick
+            # COUNT follows from the step rather than forcing it.
+            _raw = max(hi * 1.02 - lo, 1e-12) / max(int(cfg.get("ticks", 4)) - 1, 1)
+            _e = 10.0 ** np.floor(np.log10(_raw))
+            _step = max([f * _e for f in (1.0, 2.0, 2.5, 5.0) if f * _e <= _raw] or [_e])
+            _n = int(np.ceil((hi * 1.02 - lo) / _step))
+            hi = lo + _step * max(_n, 1)
+            cfg["ticks"] = max(_n, 1) + 1
+            pad = 0.0
+            _sz = tuple(cfg.get("size", (0.30, 0.26)))
+            ch = self.pv.Chart2D(size=_sz,
+                                 loc=tuple(cfg.get("loc",
+                                                   (0.03, 0.71 - _i * (_sz[1] + 0.05)))))
+            ch.background_color = (0, 0, 0, 0.0)
+            ch.border_style = None
+            ch.title = str(cfg.get("title", ""))
+            ch.x_axis.range = [0.0, float(S.shape[0] - 1)]
+            ch.y_axis.range = [float(cfg.get("ymin", lo - pad)), float(cfg.get("ymax", hi + pad))]
+            ch.x_axis.label = str(cfg.get("xlabel", "frame"))
+            ch.y_axis.label = str(cfg.get("ylabel", q))
+            _fs = int(cfg.get("font_size", 9))
+            for _a in (ch.x_axis, ch.y_axis):
+                _a.label_visible = _a.ticks_visible = _a.tick_labels_visible = True
+                _a.grid = False
+                _a.label_size = _fs
+                _a.tick_label_size = max(6, _fs - 2)
+                _a.tick_count = int(cfg.get("ticks", 4))
+                try:
+                    # ONE DIGIT ON EVERY TICK, derived from the axis's own top rather than
+                    # declared per quantity: a range ending at 8000 needs no decimals and one
+                    # ending at 0.7 needs one, and hard-coding "%.2f" printed 0.20, 0.40, 0.60.
+                    _top = float(ch.y_axis.range[1]) if _a is ch.y_axis else float(len(S) - 1)
+                    _dec = 0 if _top >= 10 else int(max(0, -np.floor(np.log10(max(_top, 1e-12)))))
+                    _a.SetNotation(_a.PRINTF_NOTATION)
+                    _a.SetLabelFormat(str(cfg.get("tick_format", f"%.{_dec}f")))
+                except Exception:                        # noqa: BLE001
+                    pass
+                try:
+                    _a.pen.color = "white"
+                    _a.GetLabelProperties().SetColor(1.0, 1.0, 1.0)
+                    _a.GetTitleProperties().SetColor(1.0, 1.0, 1.0)
+                except Exception:                        # noqa: BLE001
+                    pass
+            ch.legend_visible = False
+            # COLOURED BY TYPE WHERE THERE ARE TYPES, WHITE WHERE THERE ARE NOT. A single population
+            # drawn in the first slot of a categorical palette invites the reader to ask what the
+            # other colours would have been; white says there is one thing being measured.
+            nt = S.shape[1]
+            _pal = [tuple(v) for v in ((self.style or {}).get("colors") or {}).values()]
+            _pal = _pal or [(0.35, 0.60, 1.00), (1.00, 0.35, 0.25),
+                            (0.45, 0.95, 0.55), (1.00, 0.85, 0.30)]
+            cols = ([tuple(cfg["color"])] if "color" in cfg and nt == 1
+                    else [(1.0, 1.0, 1.0)] if nt == 1 else [_pal[j % len(_pal)] for j in range(nt)])
+            bands, lines = [], []
+            for j in range(nt):
+                c = cols[j]
+                bands.append(ch.area([0.0, 0.0], [0.0, 0.0], [0.0, 0.0], color=(*c, 0.28)))
+                lines.append(ch.line([0.0, 0.0], [0.0, 0.0], color=(*c, 1.0), width=2.0))
+            self.p.add_chart(ch)
+            self._curves.append({"S": S, "bands": bands, "lines": lines, "nt": nt,
+                                 "sd": bool(cfg.get("sd", q != "cells"))})
+            print(f"[live-movie] curve {q}: {S.shape[0]} frames, {nt} "
+                  f"{'series by type' if nt > 1 else 'series'}, "
+                  f"y [{ch.y_axis.range[0]:.4g}, {ch.y_axis.range[1]:.4g}]", flush=True)
+
+    def _curves_update(self, tick):
+        """Reveal each series up to the current RECORDED row -- the band is mean-SD .. mean+SD."""
+        for cv in getattr(self, "_curves", []) or []:
+            S = cv["S"]
+            t = min(int(tick), S.shape[0] - 1)
+            if t < 1:
+                continue
+            x = np.arange(t + 1, dtype=float)
+            for j in range(cv["nt"]):
+                mu, sd = S[: t + 1, j, 0], S[: t + 1, j, 1]
+                ok = np.isfinite(mu)
+                if ok.sum() < 2:
+                    continue
+                if cv["sd"]:
+                    cv["bands"][j].update(x[ok], (mu - sd)[ok], (mu + sd)[ok])
+                cv["lines"][j].update(x[ok], mu[ok])
 
     # ---- the cloud AS a surface -----------------------------------------------------------
     #
@@ -915,7 +1142,15 @@ class LiveMovie:
             nF = int(m["nF"])
             self._nF_hist = (getattr(self, "_nF_hist", []) + [nF])[-8:]
             prev = self._nF_hist[0] if len(self._nF_hist) > 1 else None
-            mother, daughter, kills, _sup = _marks(m, np.arange(nF), nF, prev_nF=prev)
+            # NUMPY, BECAUSE `_marks` IS NUMPY. On the REPLAY path the columns come out of an npz
+            # and already are; live from the engine they are CUDA tensors, so the call raised
+            # "can't convert cuda:0 device type tensor to numpy" -- and the guard below turned that
+            # into a one-line warning and a uniformly grey tissue. The two paths were drawing
+            # different pictures again, which is the thing this renderer was unified to stop.
+            mt = {k: (v.detach().cpu().numpy() if hasattr(v, "detach") else v)
+                  for k, v in m.items() if k in ("age", "ndiv", "apop", "inhib")}
+            mt["nF"] = nF
+            mother, daughter, kills, _sup = _marks(mt, np.arange(nF), nF, prev_nF=prev)
             st = self.style or {}
             rgb = np.tile((np.asarray(_mc.to_rgb(st.get("mesh_color", "#e6dcc0"))) * 255)
                           .astype(np.uint8), (nF, 1))
@@ -1460,11 +1695,21 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
         lvl._pos = P - torch.as_tensor((0.5 * (lo + hi) - 0.5 * box), dtype=P.dtype)
     else:
         lo, hi = flat.min(0), flat.max(0)
-        if bool(((hi - lo) > ws * 1.02).any()) or bool((lo < -1e-6 * ws.max()).any()):
+        # A CENTRED RUN STILL HAS A DECLARED BOX, and falling back to the data bounds threw it away.
+        # The test was "does the content sit in [0, world]" -- true for a walled run and false for
+        # every `boundary: free` one, whose content is about the ORIGIN -- so a free run was always
+        # framed on its own extent. Two runs of one model at different sizes then filled the frame
+        # identically and the size difference, which is the entire experiment, was invisible. If the
+        # content fits in [-world/2, +world/2] the declared box is used and the cloud is shifted into
+        # it; only content that fits NEITHER convention falls back to its own bounds.
+        if not bool(((hi - lo) > ws * 1.02).any()) and not bool((lo < -1e-6 * ws.max()).any()):
+            box = ws                                            # already in [0, world]
+        elif not bool(((hi - lo) > ws * 1.02).any()):
+            box = ws                                            # fits [-world/2, world/2]
+            lvl._pos = P + torch.as_tensor(0.5 * box, dtype=P.dtype)
+        else:
             box = (hi - lo) * 1.06
             lvl._pos = P - torch.as_tensor((0.5 * (lo + hi) - 0.5 * box), dtype=P.dtype)
-        else:
-            box = ws
     # `movie.mp4`, NOT `movie_<set>.mp4`. Every other path in this codebase writes `movie.mp4`, so a
     # re-render under `-o plot` left the folder holding both and neither obviously the current one.
     out = out or os.path.join(data_dir, "movie.mp4")
