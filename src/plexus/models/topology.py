@@ -52,6 +52,30 @@ def _edge_face_map(rings):
     return m
 
 
+def _emap_drop(emap, f, ring):
+    """Remove `ring`'s directed edges from `emap`, but only the entries still owned by face `f`.
+
+    The ownership test matters: a division inserts a midpoint into a NEIGHBOUR's ring, so by the time
+    that neighbour is refreshed some of its old keys may already have been re-registered to another
+    face. Deleting blindly would drop a live entry."""
+    if not ring or len(ring) < 3:
+        return
+    k = len(ring)
+    for i in range(k):
+        key = (ring[i], ring[(i + 1) % k])
+        if emap.get(key) == f:
+            del emap[key]
+
+
+def _emap_add(emap, f, ring):
+    """Register face `f`'s directed edges in `emap`."""
+    if not ring or len(ring) < 3:
+        return
+    k = len(ring)
+    for i in range(k):
+        emap[(ring[i], ring[(i + 1) % k])] = f
+
+
 def _insert_after(ring, u, v, w):
     """Insert vertex w between consecutive u,v in ring (in place). Returns True on success."""
     k = len(ring)
@@ -62,12 +86,25 @@ def _insert_after(ring, u, v, w):
     return False
 
 
-def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None):
+def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None, emap=None):
     """Divide face f by an edge-midpoint septum across edges `ea` and `eb` (pass the two edges the
     cell's SHORT axis crosses -> the septum runs perpendicular to the long axis, Hertwig's rule ->
     compact daughters). Defaults to roughly-opposite edges. Mutates `rings` (f -> two daughters,
     neighbours gain the midpoint vertices) and appends the two new vertex positions to `pos`.
-    Returns (idx_daughterB, m1, m2) -- daughter A stays at index f, B is appended. None if it can't."""
+    Returns (idx_daughterB, m1, m2) -- daughter A stays at index f, B is appended. None if it can't.
+
+    `emap` -- THE EDGE->FACE MAP, PASSED IN AND MAINTAINED, RATHER THAN REBUILT PER DIVISION.
+    This function needs exactly TWO lookups from it, and it used to pay a full O(E) dict rebuild for
+    them. `cell_divide` calls this once per dividing cell, and both the edge count and the number of
+    cells ripening per frame grow with the tissue, so the cost was QUADRATIC in the thing the run is
+    trying to grow. Measured on `mesh_mpm_spheroid_nominal` at frame 380: `_edge_face_map` was
+    19.4 s of `cell_divide`'s 24.2 s -- 80% of the operator, and 5,480 rebuilds across 96 frames.
+    That is the term behind 246 ms/frame at frame 50 becoming 85 s/frame at frame 700.
+
+    Passed a dict, this updates it in place for the four faces a division touches (the mother, the
+    new daughter, and the two neighbours that gain a midpoint) and leaves the rest alone -- the same
+    map a rebuild would produce, since `_edge_face_map` is a pure function of `rings` and no other
+    ring changed. Passed None it rebuilds, so every other caller is unaffected."""
     r = rings[f]
     k = len(r)
     if k < 4:                                   # need >=4 edges to split two non-adjacent ones cleanly
@@ -79,7 +116,9 @@ def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None):
         i0, i1 = 0, k // 2
     a0, a1 = r[i0], r[(i0 + 1) % k]
     b0, b1 = r[i1], r[(i1 + 1) % k]
-    emap = _edge_face_map(rings)
+    own_map = emap is None
+    if own_map:
+        emap = _edge_face_map(rings)
     nbrA = emap.get((a1, a0)); nbrB = emap.get((b1, b0))
     if nbrA is None or nbrB is None or nbrA == f or nbrB == f or nbrA == nbrB:
         return None                             # both split edges must have distinct interior neighbours
@@ -94,10 +133,19 @@ def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None):
         p_b = p_b * (rb / max(np.linalg.norm(p_b), 1e-9))
     pos.append(p_a); pos.append(p_b)
 
+    # THE OLD RINGS OF THE TWO NEIGHBOURS, taken BEFORE `_insert_after` mutates them in place --
+    # `_emap_drop` needs the keys as they were, and after the insert they are gone.
+    old_A = list(rings[nbrA]); old_B = list(rings[nbrB])
+
     # split the two shared edges inside the neighbouring faces (keeps every edge shared by two faces)
     if not _insert_after(rings[nbrA], a1, a0, m1):
         return None
     if not _insert_after(rings[nbrB], b1, b0, m2):
+        # nbrA HAS ALREADY BEEN MUTATED on this path, so a maintained map would be left describing a
+        # ring that no longer exists. Harmless when the map is rebuilt per call (the old behaviour);
+        # a silent corruption when it is carried, so it is repaired here rather than at the caller.
+        if not own_map:
+            _emap_drop(emap, nbrA, old_A); _emap_add(emap, nbrA, rings[nbrA])
         return None
 
     # daughter A: m1 -> (r[i0+1 .. i1]) -> m2, closed by the septum m2->m1
@@ -106,6 +154,17 @@ def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None):
     seg_B = [m2] + [r[j % k] for j in range(i1 + 1, i0 + 1 + k)] + [m1]
     rings[f] = seg_A
     rings.append(seg_B)
+    if not own_map:
+        # FOUR FACES CHANGED AND NOTHING ELSE DID: the mother (now daughter A), the appended
+        # daughter B, and the two neighbours that gained a midpoint. Drop first, then add, so an
+        # edge that moves between two of these four ends up owned by the face that has it now.
+        _emap_drop(emap, f, r)
+        _emap_drop(emap, nbrA, old_A)
+        _emap_drop(emap, nbrB, old_B)
+        _emap_add(emap, f, seg_A)
+        _emap_add(emap, len(rings) - 1, seg_B)
+        _emap_add(emap, nbrA, rings[nbrA])
+        _emap_add(emap, nbrB, rings[nbrB])
     return len(rings) - 1, m1, m2
 
 
