@@ -103,10 +103,24 @@ def test_contracts_and_signatures():
 
 
 def test_neuron_schema_comes_from_the_registry():
-    """No `state:` block in the spec -- the layout is the entity's, and it is dimension-aware."""
+    """No `state:` block in the spec -- the layout is the entity's, and it is dimension-aware.
+
+    THE EXPECTATION IS READ FROM THE REGISTRY, not written out here. This test used to assert
+    `list(sch) == ["pos", "voltage", "omega"]`, which is the entity's layout restated as a literal
+    -- so it went red the moment the entity gained `neurite_dir` and `soma_radius`, reporting a
+    schema change as a failure when the schema changing is the thing the entity is allowed to do.
+    Asking the registry for the layout tests the claim the name makes (the level's schema is the
+    ENTITY's, not the spec's) and cannot rot when a block is added.
+    """
+    from plexus.models.entities import neuron_schema
+
     _sim, H = _circuit([[0, 1]], [1.0], n=2)
-    sch = H.level("neuron").state_schema
-    assert list(sch) == ["pos", "voltage", "omega"]
+    lvl = H.level("neuron")
+    sch = lvl.state_schema
+    assert list(sch) == list(neuron_schema(H.dim)), "the level's layout is not the entity's"
+    # The three blocks the REST of this test reasons about, named explicitly so that a rename shows
+    # up here rather than as an AttributeError four lines down.
+    assert {"pos", "voltage", "omega"} <= set(sch)
     assert sch.block("pos").integration == "none"           # a neuron does not move
     assert sch.block("voltage").integration == "first_order"
     # VOLTAGE IS THE COORDINATE, not pos: that is what sizes the delta accumulator to 1 column
