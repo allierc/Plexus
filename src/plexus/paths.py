@@ -137,10 +137,11 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # `myosin` in their names (`gate_01_nomyosin`, and two promotion twins of it), and a substring
     # trigger would pull all three out of the folders they belong to.
     ("myosin_mesh", ("^myosin_mesh",)),
-    # THE MARINARI WORK FUNCTION. `cell_mechanics[model: marinari]` -- the per-junction elastic
-    # spring of Nature 484:542 -- against the default Farhadifar perimeter form. ANCHORED, like the
-    # two above: `marinari` could otherwise appear in any spec named after the paper it cites.
-    ("marinari",    ("^marinari",)),
+    # THE VERTEX-MODEL ENERGY COMPARISON, named for the QUESTION and not for one of its answers.
+    # It was `marinari`, which forced every spec to carry that prefix -- so the Farhadifar runs were
+    # named after the other paper (`marinari_perim_c100` WAS the Farhadifar one) and the folder
+    # asserted a conclusion the comparison exists to test. ANCHORED, like the three above.
+    ("vertex_energy", ("^vertex_energy",)),
     # THE COMPOSED-CELL LADDER. A cell built from heterogeneous substrates -- a nucleus, a cytosol
     # of two protein species, a membrane -- each its own contained set (`config/cell/`, appendix
     # "Making a cell in Plexus"). No trigger substrings, for the same reason the three above have

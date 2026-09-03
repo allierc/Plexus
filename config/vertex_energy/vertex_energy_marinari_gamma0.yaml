@@ -1,5 +1,5 @@
 general:
-  name: marinari_junction_c100
+  name: vertex_energy_marinari_gamma0
   seed: 0
   n_frames: 200
   dt: 1.0
@@ -56,19 +56,19 @@ operators:
   at: cell
 - op: cell_mechanics
   at: vertex
+  model: marinari
+  K: 160.0
+  Lambda: 56.8
+  Gamma: 0.0
+  crowding: 1.0
+  K_V: 2.0
+  K_R: 0.0
   p0: 3.5
   mu: 1.0
   dt: 1.0
   relax_iters: 30
   eta: 0.02
   cap_frac: 0.05
-  K_V: 2.0
-  K_R: 0.0
-  model: marinari
-  K: 160.0
-  Lambda: 56.8
-  Gamma: 49.9
-  crowding: 1.0
 - op: edge_flip
   at: vertex
   every: 4

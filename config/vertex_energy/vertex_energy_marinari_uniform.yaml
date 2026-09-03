@@ -1,9 +1,9 @@
 general:
-  name: marinari_perim_c50
+  name: vertex_energy_marinari_uniform
   seed: 0
-  n_frames: 200
+  n_frames: 400
   dt: 1.0
-  record_cap: 202
+  record_cap: 402
   boundary: free
   dim: 3
   world:
@@ -48,7 +48,7 @@ operators:
   cell_set: cell
   n_cells: 200
   radius: 4.55
-  jitter: 0.8
+  jitter: 0.18
   p0: 3.5
   seed: 0
   vseed_cv: 0.0
@@ -56,18 +56,19 @@ operators:
   at: cell
 - op: cell_mechanics
   at: vertex
+  model: marinari
+  K: 160.0
+  Lambda: 56.8
+  Gamma: 49.9
+  crowding: 1.0
+  K_V: 2.0
+  K_R: 0.0
   p0: 3.5
   mu: 1.0
   dt: 1.0
   relax_iters: 30
   eta: 0.02
   cap_frac: 0.05
-  K_V: 2.0
-  K_R: 0.0
-  K_A: 80.0
-  K_P: 0.0
-  Lambda: 28.4
-  Gamma: 4.158333333333333
 - op: edge_flip
   at: vertex
   every: 4

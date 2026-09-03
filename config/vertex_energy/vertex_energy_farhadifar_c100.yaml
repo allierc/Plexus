@@ -1,5 +1,5 @@
 general:
-  name: marinari_junction_c25
+  name: vertex_energy_farhadifar_c100
   seed: 0
   n_frames: 200
   dt: 1.0
@@ -64,11 +64,10 @@ operators:
   cap_frac: 0.05
   K_V: 2.0
   K_R: 0.0
-  model: marinari
-  K: 160.0
-  Lambda: 56.8
-  Gamma: 12.475
-  crowding: 1.0
+  K_A: 80.0
+  K_P: 0.0
+  Lambda: 28.4
+  Gamma: 8.316666666666666
 - op: edge_flip
   at: vertex
   every: 4
