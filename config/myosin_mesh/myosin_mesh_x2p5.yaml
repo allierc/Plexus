@@ -1,9 +1,9 @@
 general:
   name: myosin_mesh_x2p5
   seed: 0
-  n_frames: 401
+  n_frames: 802
   dt: 1.0
-  record_cap: 403
+  record_cap: 804
   boundary: free
   dim: 3
   world:
@@ -39,6 +39,7 @@ plotting:
   real_time: false
   fps: 20
   movie_max_frames: 200
+  zoom: 2
 sets:
   vertex:
     n: 25584
