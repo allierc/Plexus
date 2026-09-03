@@ -160,6 +160,14 @@ PAIRS = [
     ("G", "gates/gate_00_spheroid",     None, 0.0, "okuda@0da57dd0", "core", "the growth line: seed, geometry, grow, belt, mechanics, T1, divide, sync"),
     ("G", "gates/gate_01_nosync",       None, 0.0, "okuda@0da57dd0", "core", "gate 01's own arm: the belt WITHOUT the re-keying operator"),
     ("G", "gates/gate_01_nomyosin",     None, 0.0, "okuda@0da57dd0", "core", "gate 01's contrast arm: the same tissue with no belt"),
+    # 01b RECONSTRUCTED, not replayed. `log/okuda_ECM/01b_myosin_pools/spec.yaml` is one of the
+    # 43 PROSE records -- `what` and `operators_exercised`, no `sets`, no `schedule` -- so
+    # `suite_ecm` cannot see it and there is nothing to load. The two operators it exercises that
+    # gate 00 does not are `medioapical_myosin` and `junction_myosin[two_pool]`, and this row is
+    # gate 00 with exactly those two changes: the medial pool added before the belt, and the belt
+    # switched to the two-pool model. Everything else is gate 00 verbatim, so a DIFFER here names
+    # one of those two operators rather than the tissue.
+    ("G", "gates/gate_01b_myosin_pools", None, 0.0, "okuda@0da57dd0", "core", "the two myosin pools: a medial pool exporting onto a two-pool belt"),
     # ---- THE TWO MPM GATES HAVE NO OKUDA TWIN, and that is a fact about okuda's runner rather
     # than a gap in the promotion. `run_one.py` reads `H.level("vertex")` in three places -- the
     # heartbeat, the live snapshot and the cell ceiling -- so a spec with no mesh set dies with

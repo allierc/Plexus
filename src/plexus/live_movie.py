@@ -1475,6 +1475,63 @@ class LiveMovie:
             except Exception:                        # noqa: BLE001
                 pass
 
+    def _drawn_centre(self, H):
+        """The centroid of what this frame actually draws, or None if that cannot be read.
+
+        Used to place the cross-section window. Prefers a mesh set, because on a spec that has both
+        a tissue and a gel the section is there for the tissue; falls back to the drawn particles.
+        """
+        try:
+            for _nm, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+                q = np.asarray(_pd.points)
+                if len(q):
+                    return q.mean(0)
+            lvl = H.level(self.set_name) if getattr(self, "set_name", None) else None
+            if lvl is not None:
+                q = np.asarray(lvl.get("pos").detach().cpu().numpy())
+                occ = getattr(lvl, "occ", None)
+                if occ is not None:
+                    q = q[np.asarray(occ.detach().cpu().numpy()) > 0]
+                if len(q):
+                    return q.mean(0)
+        except Exception:                                # noqa: BLE001
+            pass
+        return None
+
+    def _mono_shell_points(self, H, name, sc, ct):
+        """The apical and basal vertex positions of a monolayer mesh, in RENDER coordinates.
+
+        Empty for every other model, which is the whole gate: a mesh carries `mono_h` only if
+        `cell_mechanics[model: monolayer]` published it, so a mid-surface run draws exactly what it
+        drew before and pays one dict lookup for the privilege. `mono_h` is per-FACE, so it rides
+        `mesh_face_offsets` into the trajectory alongside `A0` and the replay has it too.
+        """
+        try:
+            lvl = H.level(name)
+            m = getattr(lvl, "mesh", None) or getattr(lvl, "_mesh", None)
+            if m is None or "mono_h" not in m:
+                return []
+            import torch as _t
+            from plexus.operators.vertex_ops import monolayer_shells
+            nv, nF = int(m["Nv"]), int(m["nF"])
+            _as = lambda v, d=_t.long: _t.as_tensor(np.asarray(v), dtype=d)   # noqa: E731
+            pos = _t.as_tensor(np.asarray(self._mesh_xyz(lvl, nv, 1.0, (0.0, 0.0, 0.0))),
+                               dtype=_t.float32)
+            h = _as(m["mono_h"], _t.float32)[:nF]
+            ap, ba, _, _ = monolayer_shells(pos, _as(m["E_srce"]), _as(m["E_trgt"]),
+                                            _as(m["E_face"]), nF, h)
+            out = []
+            for lbl, arr, col in (("apical", ap, "#d9534f"), ("basal", ba, "#4a86c8")):
+                q = arr.numpy()
+                # THE SAME MAPPING THE MID-SURFACE GOT. `_mesh_xyz` applies `scale` about the
+                # centroid and then the placement offset; taking the shells in raw coordinates and
+                # forgetting it drew them at the origin while the tissue sat elsewhere.
+                q = (q - q.mean(0)) * sc if sc != 1.0 else q - np.asarray(ct, float)
+                out.append((lbl, q.astype(np.float32), col))
+            return out
+        except Exception:                                # noqa: BLE001 -- a shell is not the run
+            return []
+
     def _update_cross_section(self, H):
         """Scatter whatever is inside the slab, in the plane of the other two axes."""
         try:
@@ -1556,9 +1613,36 @@ class LiveMovie:
             if getattr(self, "_cs_rng", None) is None:
                 _l, _h = np.asarray(self.lo, float), np.asarray(self.hi, float)
                 _sp = float(max(_h[a] - _l[a], _h[b] - _l[b], 1e-9))
+                # `cross_section.span` -- THE WINDOW IN WORLD UNITS, when the box is the wrong size.
+                # The box is the right default for a walled run, whose material fills it. It is the
+                # wrong one for a `free` run: a vesicle of radius 11 in a 50-unit box is a fifth of
+                # the panel, and the section -- the whole point of which is to show a thickness of
+                # about 1 -- becomes unreadable. Framing on the CONTENT instead cannot be done live
+                # (the tissue grows, and a window that tracks it makes the scale jump every frame),
+                # so the spec declares the window once and it is fixed for the clip like the rest.
+                _decl = (self.style or {}).get("cross_section", {}).get("span")
+                if _decl:
+                    _sp = float(_decl)
                 _cx, _cy = 0.5 * (_l[a] + _h[a]), 0.5 * (_l[b] + _h[b])
+                # CENTRED ON THE CONTENT, NOT ON THE BOX, and measured ONCE so the window is still
+                # fixed for the clip. The box centre is right for a walled run whose material fills
+                # it, and wrong for a `free` one: this renderer draws the box at [0, w] on the
+                # replay path and a vesicle is built about the ORIGIN, so the section framed
+                # x 11..39 around a tissue living at x -11..11 -- a slice of empty space beside the
+                # cells. Reading the centre off what is actually drawn fixes it for both paths and,
+                # unlike moving the drawing box, leaves the 3D camera alone.
+                _ctr = self._drawn_centre(H)
+                if _ctr is None:
+                    # NOT CACHED YET. The window is computed ONCE and kept, so computing it on a
+                    # frame where the mesh actor does not exist yet would pin the box centre for the
+                    # whole clip -- which is what happened on the replay path: the live pass framed
+                    # x -14..14 and the replay, which writes the movie that is kept, framed x 11..39
+                    # around a tissue living at x -11..11. Leaving `_cs_rng` unset retries next frame.
+                    return
+                _cx, _cy = float(_ctr[a]), float(_ctr[b])
                 self._cs_rng = ([_cx - _sp / 2, _cx + _sp / 2], [_cy - _sp / 2, _cy + _sp / 2])
-                print(f"[live-movie] cross section: axes fixed to the box, "
+                print(f"[live-movie] cross section: axes fixed to "
+                      f"{'the declared span' if _decl else 'the box'}, "
                       f"{'xyz'[a]} {self._cs_rng[0][0]:.3g}..{self._cs_rng[0][1]:.3g}  "
                       f"{'xyz'[b]} {self._cs_rng[1][0]:.3g}..{self._cs_rng[1][1]:.3g}", flush=True)
             # "fixed" IS A STRING HERE, not an enum -- pyvista validates against {"auto","fixed"}
@@ -1635,6 +1719,30 @@ class LiveMovie:
                         self.cs.line(_u[_o], _v[_o], color=_mc, width=2.0))
                 except Exception:                        # noqa: BLE001 -- the section is not the run
                     pass
+            # THE THICKNESS, WHERE THE THICKNESS IS THE POINT.
+            #
+            # `cell_mechanics[model: monolayer]` gives every cell a 3D volume with apical, basal and
+            # lateral surfaces, but the mesh it stores and the renderer draws is the MID-surface --
+            # so a monolayer run and a mid-surface run produce the SAME picture, and the one thing
+            # the thick model adds is the one thing that cannot be seen. The shells are rebuilt here
+            # through `monolayer_shells`, the function the energy itself is written on, so the
+            # drawing cannot drift from the model, and sliced by the same plane as the mid-surface.
+            # Red outside, blue inside: two distinct surfaces, not a measurement against a truth.
+            for _nm, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+                for _lbl, _pts, _col in self._mono_shell_points(H, _nm, _sc, _ct):
+                    try:
+                        _sh = self.pv.PolyData(_pts, _pd.faces)
+                        _sl = _sh.slice(normal=_nrm, origin=_org)
+                        if _sl.n_points < 3:
+                            continue
+                        _P = np.asarray(_sl.points)
+                        _u, _v = _P[:, a], _P[:, b]
+                        _th = np.arctan2(_v - _v.mean(), _u - _u.mean())
+                        _o = np.append(np.argsort(_th), np.argsort(_th)[0])
+                        self._cs_mesh_series.append(
+                            self.cs.line(_u[_o], _v[_o], color=_col, width=2.0))
+                    except Exception:                    # noqa: BLE001
+                        pass
             # LAST, AFTER EVERY SERIES IS BACK. Adding a plot re-derives the chart's range from its
             # data, so a range set before the series were added was overwritten by the last `line`
             # call and the panel autoscaled to the data's own extent -- wider than tall, which drew

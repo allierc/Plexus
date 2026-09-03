@@ -2220,9 +2220,19 @@ def apical_basal_shells(pos, es, et, ef, nF, h_cell):
     return pos + 0.5 * hv[:, None] * n, pos - 0.5 * hv[:, None] * n
 
 
-def monolayer_geometry_3d(pos, es, et, ef, nF, h_cell, eocc=None):
-    """Per-cell prism volume v_f and surface s_f (apical+basal+lateral), plus the apical/basal cap areas.
-    All differentiable in `pos`. h_cell is per-cell thickness [nF]. eocc masks dead half-edges (or None)."""
+def monolayer_shells(pos, es, et, ef, nF, h_cell, eocc=None):
+    """The apical and basal surfaces of a monolayer, from its MID-surface and a per-cell thickness.
+
+    ONE DEFINITION, TWO CALLERS. `monolayer_geometry_3d` needs these to build the prism the energy
+    is written on, and the renderer needs them to draw the epithelium as something with a thickness
+    rather than as the mid-surface it stores. Two copies of "offset along the vertex normal by h/2"
+    would agree until one of them changed, and the picture would then stop being a picture of the
+    model -- so the formula lives here and both call it.
+
+    The normal at a vertex is the normalised sum of the area vectors of its incident faces, and the
+    thickness at a vertex is the mean over its incident cells; the shell straddles the mid-surface
+    symmetrically, apical OUTWARD. Returns (apical, basal, vertex_normal, vertex_thickness).
+    """
     dev, dt = pos.device, pos.dtype
     Nv = pos.shape[0]
     s, t = pos[es], pos[et]
@@ -2235,8 +2245,17 @@ def monolayer_geometry_3d(pos, es, et, ef, nF, h_cell, eocc=None):
     # thickness at a vertex = mean thickness of incident cells
     cnt_v = torch.zeros(Nv, device=dev, dtype=dt).index_add(0, es, ones_e)
     hv = torch.zeros(Nv, device=dev, dtype=dt).index_add(0, es, h_cell[ef] * ones_e) / cnt_v.clamp(min=1e-9)
-    a = pos + 0.5 * hv[:, None] * n                                # apical (outer) shell
-    b = pos - 0.5 * hv[:, None] * n                                # basal (inner) shell
+    return pos + 0.5 * hv[:, None] * n, pos - 0.5 * hv[:, None] * n, n, hv
+
+
+def monolayer_geometry_3d(pos, es, et, ef, nF, h_cell, eocc=None):
+    """Per-cell prism volume v_f and surface s_f (apical+basal+lateral), plus the apical/basal cap areas.
+    All differentiable in `pos`. h_cell is per-cell thickness [nF]. eocc masks dead half-edges (or None)."""
+    dev, dt = pos.device, pos.dtype
+    ones_e = torch.ones(es.shape[0], device=dev, dtype=dt) if eocc is None else eocc
+    crossm = torch.cross(pos[es], pos[et], dim=-1) * ones_e[:, None]
+    Nf = 0.5 * torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, crossm)
+    a, b, _, _ = monolayer_shells(pos, es, et, ef, nF, h_cell, eocc)
     a_s, a_t, b_s, b_t = a[es], a[et], b[es], b[et]
     # cell VOLUME = mid-surface area x thickness (v_j = A_mid*h_j). Exact for a flat cell, first-order in
     # curvature (the O((h/R)^2) prism correction ~0.3% is dropped); ALWAYS positive & differentiable, and
@@ -2389,6 +2408,13 @@ class MonolayerShapeEnergy3D(Lateral):
         eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
         R0t = torch.as_tensor(float(m["R0"]), dtype=dt, device=dev)
         h_cell = torch.full((nF,), self.h0, dtype=dt, device=dev)   # v1: uniform fixed thickness
+        # PUBLISHED FOR THE RENDERER. The mesh this operator works on is the MID-surface, so a
+        # picture of it is a picture of a sheet with no thickness -- which is the one thing the
+        # monolayer model adds. Recording the per-cell thickness (a per-face column, so it rides
+        # `mesh_face_offsets` into the trajectory like `A0` does) lets the cross section rebuild
+        # the apical and basal shells through `monolayer_shells`, the same function the energy
+        # below is written on.
+        m["mono_h"] = h_cell
         # target monolayer volume: calibrate ONCE so V_eq matches the rest prism volume, then track the
         # growth op's scaling of the wedge target V0f (cell_grow scales V0f per cell) -> reuse it.
         v_rest, _, _, _ = monolayer_geometry_3d(x0, es, et, ef, nF, h_cell, eocc)

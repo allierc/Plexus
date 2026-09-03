@@ -243,3 +243,15 @@ schedule:
 - junction_sync
 - topo_record
 - mesh_inside
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A small cluster of blue particles initially appears in the upper-left corner of a large
+      3D bounding box. Over time, these particles expand outward from their origin point to form a spherical
+      shell. The number of particles increases rapidly as the shell grows in diameter. By the final frame,
+      the particles have formed a large, hollow sphere that occupies a significant portion of the volume.
+    objects: The scene contains a set of small blue particles that are initially clustered together. These
+      particles are arranged in a spherical topology, moving from a dense point to a hollow shell. The
+      particles are very small in size relative to the large, white-lined 3D bounding box. The bounding
+      box serves as a fixed spatial reference with a 2 cm scale bar provided at the bottom.
