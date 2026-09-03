@@ -282,6 +282,21 @@ class SeedMesh3D(Structural):
         # the moment the faces first have centroids.
         self.type_layout = str(params.get("type_layout", "random")).lower()
         self.cell_set = params.get("cell_set", "cell")
+        # THE PREFERRED AREA, SET APART FROM THE GEOMETRY. `A0` was always `mean(area)` of the mesh
+        # just built, so every run started exactly at its target and the ONLY direction it could go
+        # was down, under whatever line tension the mechanics carried: a sweep of six specs that all
+        # ended between A/A0 0.44 and 0.72 and never once tested expansion.
+        #
+        # It is also the missing half of the Marinari crowding transform. `cell_mechanics
+        # [model: marinari]` rescales K, Lambda and Gamma by g^-2, g^-1/2 and g^-1, which leaves W
+        # invariant ONLY together with A0' = g A0 -- and that line is the seeder's, so `crowding: 4`
+        # weakened the area term 16x against a line term weakened 2x and collapsed the shell to
+        # radius 1.4 with CV(junction length) 1.9. With this, `a0_scale: g` completes the transform,
+        # and the paper's own words become the gate: a tissue "free to expand so that its total area
+        # was larger by a factor g" must settle at A = g x its seeded area.
+        self.a0_scale = float(params.get("a0_scale", 1.0))
+        if self.a0_scale <= 0:
+            raise ValueError(f"mesh_seed: a0_scale must be > 0, got {self.a0_scale}")
         self.vseed_cv = float(params.get("vseed_cv", 0.0))       # STOCHASTIC VOLUME SEED: per-cell random cell-cycle
         #   phase at t=0 (spread of the initial division threshold) -> desynchronises the FIRST division wave
 
@@ -301,7 +316,13 @@ class SeedMesh3D(Structural):
         est = torch.as_tensor(es, device=dev); ett = torch.as_tensor(et, device=dev)
         eft = torch.as_tensor(ef, device=dev)
         area, perim, cen, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
-        A0 = float(area.mean()); P0 = self.p0 * (A0 ** 0.5)
+        A_seed = float(area.mean())
+        A0 = A_seed * self.a0_scale; P0 = self.p0 * (A0 ** 0.5)
+        if self.a0_scale != 1.0:
+            print(f"[mesh_seed] preferred area A0 = {self.a0_scale:g} x the seeded mean area "
+                  f"{A_seed:.4f} = {A0:.4f}: every cell starts at {1.0 / self.a0_scale:.3f} of its "
+                  f"target, so the shell is under-inflated and must EXPAND "
+                  f"(radius x {self.a0_scale ** 0.5:.3f} if the area term wins outright)", flush=True)
         if self.vseed_cv > 0:                                    # random initial cell-cycle phase per cell
             dj = np.clip(1.0 + self.vseed_cv * np.random.default_rng(self.seed + 101).standard_normal(nF), 0.4, 1.8)
         else:
@@ -347,13 +368,21 @@ class SeedMesh3D(Structural):
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
                          divjit=torch.as_tensor(dj, dtype=dt, device=dev),   # per-cell division-threshold multiplier
-                         V0f=vf.detach().clone(),               # PER-CELL target wedge volume (v_eq per cell)
-                         Vbirth=vf.detach().clone(),            # volume at birth -> cell divides when it doubles
-                         V0=float(vf.sum()),
-                         v_ref=float(vf.median()),              # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
+                         # THE VOLUME AND RADIUS TARGETS FOLLOW `a0_scale`, on the isotropic rescale
+                         # it implies: a preferred AREA g times larger is a preferred LENGTH sqrt(g)
+                         # larger, hence a volume g^1.5 larger. Leaving V0f at the seeded value would
+                         # set `K_V` against the very expansion `a0_scale` asks for, so the shell
+                         # would stall short of its area target and the gate would fail on a
+                         # constraint the paper's 2D model does not even have. `Vbirth` follows V0f
+                         # for the same reason: a cell must still divide at twice its OWN target,
+                         # not at twice a volume it was never meant to hold.
+                         V0f=vf.detach().clone() * self.a0_scale ** 1.5,   # PER-CELL target wedge volume (v_eq per cell)
+                         Vbirth=vf.detach().clone() * self.a0_scale ** 1.5,   # volume at birth -> cell divides when it doubles
+                         V0=float(vf.sum()) * self.a0_scale ** 1.5,
+                         v_ref=float(vf.median()) * self.a0_scale ** 1.5,   # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
                          #   morphogen growth caps v_eq at (4/3)v_ref, cells cycle in [2/3,4/3]v_ref centred on v_ref
                          R0=float(np.linalg.norm(verts - np.asarray(self.centre, verts.dtype),
-                                                axis=1).mean()), verts0=verts,
+                                                axis=1).mean()) * self.a0_scale ** 0.5, verts0=verts,
                          # RESERVOIR fixed sizes for the compiled mechanics (verts<=Nbuf; faces~V/2; half-edges~3V)
                          Nv_max=Nbuf, nF_max=Nbuf // 2 + 64, Ebuf=4 * Nbuf)
         m = getattr(lvl, "_mesh", None)
@@ -807,6 +836,15 @@ class Divide3D(Structural):
                     if nba > 1e-6:
                         bud_axis = ba / nba
         blocked = 0                     # divisions the RESERVOIR refused, not the biology
+        # THE EDGE->FACE MAP IS BUILT ONCE FOR THE FRAME, not once per dividing cell.
+        #
+        # `divide_face_3d` needs two lookups out of it and used to rebuild the whole O(E) dict for
+        # them. That made the operator quadratic in the tissue: both the edge count and the number
+        # of cells ripening on a tick grow together, so the rebuild cost grew with the product.
+        # Profiled on `mesh_mpm_spheroid_nominal` at frame 380 it was 19.4 s of `cell_divide`'s
+        # 24.2 s, over 5,480 rebuilds in 96 frames -- 57 rebuilds a frame, one per division.
+        # Built here and maintained inside `divide_face_3d`, it is one build a frame.
+        emap = _edge_face_map(rings)
         for f in cand:
             if len(pos) + 2 > buf:
                 # THE VERTEX BUFFER IS FULL. Counted and reported, never silent.
@@ -844,7 +882,7 @@ class Divide3D(Structural):
                 ea, eb = int(np.argmax(proj)), int(np.argmin(proj))
             except Exception:
                 ea, eb = 0, len(r) // 2
-            res = divide_face_3d(rings, pos, f, ea=ea, eb=eb)
+            res = divide_face_3d(rings, pos, f, ea=ea, eb=eb, emap=emap)
             if res is None:
                 continue
             half = vf[f] * 0.5                                    # each daughter is born at half the actual volume

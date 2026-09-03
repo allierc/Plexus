@@ -1,5 +1,5 @@
 general:
-  name: vertex_energy_marinari_g4
+  name: vertex_energy_farhadifar_expand_a2
   seed: 0
   n_frames: 300
   dt: 1.0
@@ -7,9 +7,9 @@ general:
   boundary: free
   dim: 3
   world:
-  - 28.0
-  - 28.0
-  - 28.0
+  - 20.0
+  - 20.0
+  - 20.0
   units:
     length_um: 10.0
     time_s: 600.0
@@ -52,7 +52,7 @@ operators:
   p0: 3.5
   seed: 0
   vseed_cv: 0.0
-  a0_scale: 4.0
+  a0_scale: 2.0
 - op: cell_geometry
   at: cell
 - op: cell_mechanics
@@ -64,11 +64,10 @@ operators:
   cap_frac: 0.015
   K_V: 2.0
   K_R: 0.0
-  model: marinari
-  K: 160.0
-  Lambda: 56.8
-  Gamma: 49.9
-  crowding: 4.0
+  K_A: 80.0
+  K_P: 0.0
+  Lambda: 28.4
+  Gamma: 8.316666666666666
 - op: edge_flip
   at: vertex
   every: 4

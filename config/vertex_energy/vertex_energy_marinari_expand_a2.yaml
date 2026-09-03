@@ -1,15 +1,15 @@
 general:
-  name: vertex_energy_marinari_uniform
+  name: vertex_energy_marinari_expand_a2
   seed: 0
-  n_frames: 400
+  n_frames: 300
   dt: 1.0
-  record_cap: 402
+  record_cap: 302
   boundary: free
   dim: 3
   world:
-  - 14.0
-  - 14.0
-  - 14.0
+  - 20.0
+  - 20.0
+  - 20.0
   units:
     length_um: 10.0
     time_s: 600.0
@@ -18,12 +18,12 @@ plotting:
   background: black
   real_time: false
   fps: 20
-  movie_max_frames: 200
+  movie_max_frames: 300
   mesh_edges: true
   curve:
   - quantity: area
     ticks: 4
-  - quantity: cells
+  - quantity: radius
     ticks: 4
 sets:
   vertex:
@@ -48,27 +48,27 @@ operators:
   cell_set: cell
   n_cells: 200
   radius: 4.55
-  jitter: 0.18
+  jitter: 0.8
   p0: 3.5
   seed: 0
   vseed_cv: 0.0
+  a0_scale: 2.0
 - op: cell_geometry
   at: cell
 - op: cell_mechanics
   at: vertex
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 1
+  eta: 0.02
+  cap_frac: 0.015
+  K_V: 2.0
+  K_R: 0.0
   model: marinari
   K: 160.0
   Lambda: 56.8
   Gamma: 49.9
   crowding: 1.0
-  K_V: 2.0
-  K_R: 0.0
-  p0: 3.5
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.02
-  cap_frac: 0.05
 - op: edge_flip
   at: vertex
   every: 4
