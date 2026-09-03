@@ -1,9 +1,9 @@
 general:
   name: vertex_energy_marinari_c100
   seed: 0
-  n_frames: 200
+  n_frames: 300
   dt: 1.0
-  record_cap: 202
+  record_cap: 302
   boundary: free
   dim: 3
   world:
@@ -18,12 +18,12 @@ plotting:
   background: black
   real_time: false
   fps: 20
-  movie_max_frames: 200
+  movie_max_frames: 300
   mesh_edges: true
   curve:
   - quantity: area
     ticks: 4
-  - quantity: cells
+  - quantity: radius
     ticks: 4
 sets:
   vertex:
@@ -58,10 +58,9 @@ operators:
   at: vertex
   p0: 3.5
   mu: 1.0
-  dt: 1.0
-  relax_iters: 30
+  relax_iters: 1
   eta: 0.02
-  cap_frac: 0.05
+  cap_frac: 0.015
   K_V: 2.0
   K_R: 0.0
   model: marinari
