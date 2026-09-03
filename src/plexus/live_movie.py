@@ -363,6 +363,24 @@ class LiveMovie:
         self._reframe = bool(centred)
         if self.free:
             self.lo, self.hi = -np.array(w) / 2.0, np.array(w) / 2.0
+        # `plotting.zoom` -- FRAME A SUB-BOX, AND DRAW THAT BOX. `camera_zoom` has been in specs for
+        # a long time and this renderer never read it, so asking for a closer view did nothing.
+        #
+        # ZOOMING IS NOT MOVING THE CAMERA IN. Everything downstream -- the wireframe box, the
+        # camera's parallel scale, the scale bar, the cross-section's fixed range -- is derived from
+        # `lo`/`hi`, so shrinking THOSE about the scene's centre zooms all of them together and the
+        # box still frames the picture instead of falling outside it. `zoom: 2` frames the central
+        # half of each axis; the scale bar re-picks its round number for the new extent, so it stays
+        # honest rather than becoming a bar that no longer fits.
+        self.zoom = float((style or {}).get("zoom", 1.0) or 1.0)
+        if self.zoom <= 0:
+            raise ValueError(f"plotting.zoom must be > 0, got {self.zoom}")
+        if abs(self.zoom - 1.0) > 1e-9:
+            _c = 0.5 * (np.asarray(self.lo, float) + np.asarray(self.hi, float))
+            _hf = 0.5 * (np.asarray(self.hi, float) - np.asarray(self.lo, float)) / self.zoom
+            self.lo, self.hi = _c - _hf, _c + _hf
+            print(f"[live-movie] zoom x{self.zoom:g}: framing "
+                  f"{np.round(self.lo, 4).tolist()}..{np.round(self.hi, 4).tolist()}", flush=True)
 
         if self.is2d:
             # A RECTANGLE, NOT A BOX, and seen square-on. A wireframe cube around a plane of
@@ -402,7 +420,8 @@ class LiveMovie:
                 # units -- and the label then quoted whatever that happened to convert to: a tidy
                 # 0.2 of the box printed as "0.234467 mm". A scale bar's whole job is to be a number
                 # a reader can carry, so the number is picked first and the bar is drawn to fit it.
-                _tgt_m = float(span[_ax0]) / 3.0 * _m
+                # THE FRAMED EXTENT, so a zoomed view gets a bar that fits it.
+                _tgt_m = float((np.asarray(self.hi) - np.asarray(self.lo))[_ax0]) / 3.0 * _m
                 _p10 = 10.0 ** np.floor(np.log10(max(_tgt_m, 1e-30)))
                 _len_m = max([f * _p10 for f in (1.0, 2.0, 2.5, 5.0) if f * _p10 <= _tgt_m]
                              or [_p10])
@@ -1888,8 +1907,21 @@ class _ReplayLevel:
             # AND THE PER-HALF-EDGE COLUMNS, on `mesh_offsets` like E_srce/E_trgt/E_face. `e_myo` is
             # the only quantity in this model that lives on a JUNCTION, so without it neither the
             # myosin curve nor a myosin edge colour can be drawn from a trajectory at all.
-            self._edge_cols = {k[len(name) + len("__mesh_"):]: np.asarray(z[k]) for k in z.files
-                               if k.startswith(f"{name}__mesh_e_") and not k.endswith("_offsets")}
+            # A THIRD OFFSETS ARRAY, and it is per COLUMN. `e_myo` is written only on the ticks its
+            # operator ran, so it is NOT in step with `mesh_offsets` even though both are indexed by
+            # half-edge: with frame 0 now the initial condition, junction_myosin has not run and
+            # `e_myo_offsets` reads [0, 0, 1188, ...] -- an EMPTY row 0 -- while `mesh_offsets` reads
+            # [0, 1188, 2376, ...]. Cutting one with the other shifts every frame by one and makes
+            # the initial condition look like a frame of physics, which is exactly the symptom this
+            # was chased for. Each column carries its own offsets; use them.
+            self._edge_cols = {}
+            for k in z.files:
+                if not k.startswith(f"{name}__mesh_e_") or k.endswith("_offsets"):
+                    continue
+                c = k[len(name) + len("__mesh_"):]
+                o = f"{k}_offsets"
+                self._edge_cols[c] = (np.asarray(z[k]),
+                                      np.asarray(z[o]) if o in z.files else self._mo)
 
     @property
     def mesh(self):
@@ -1903,8 +1935,10 @@ class _ReplayLevel:
         fa, fb = int(self._fo[self.t]), int(self._fo[self.t + 1])
         for k, v in self._face_cols.items():
             d[k] = v[fa:fb]
-        for k, v in getattr(self, "_edge_cols", {}).items():
-            d[k] = v[a:b]                                # half-edge offsets, not face offsets
+        for k, (v, o) in getattr(self, "_edge_cols", {}).items():
+            ea, eb = int(o[self.t]), int(o[self.t + 1])  # this COLUMN's offsets, not the mesh's
+            if eb > ea:
+                d[k] = v[ea:eb]
         return d
 
     def get(self, key):

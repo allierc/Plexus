@@ -210,7 +210,8 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
     # was dropped here, so nothing downstream could colour a junction by the myosin on it -- the one
     # quantity `junction_myosin` exists to produce. It is excluded from `face_cols` for a good reason
     # (its rows are half-edges, not faces, and `foff` would slice the wrong ones); it needs `off`.
-    edge_cols = {k.split("__mesh_")[1]: z[k] for k in z.files
+    edge_cols = {k.split("__mesh_")[1]: (z[k], z[f"{k}_offsets"] if f"{k}_offsets" in z.files else off)
+                 for k in z.files
                  if k.startswith(set_name + "__mesh_e_") and not k.endswith("_offsets")}
     chem = z[f"{cell_set}__chem"] if cell_set and f"{cell_set}__chem" in z.files else None
     out = []
@@ -221,8 +222,10 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
               "nF": int(nF[t]), "Nv": int(Nv[t])}
         for c, arr in face_cols.items():
             mt[c] = arr[fa:fb]
-        for c, arr in edge_cols.items():
-            mt[c] = arr[a:b]
+        for c, (arr, eoff) in edge_cols.items():       # each column's OWN offsets -- see live_movie
+            ea, eb = int(eoff[t]), int(eoff[t + 1])
+            if eb > ea:
+                mt[c] = arr[ea:eb]
         act = None if chem is None else np.asarray(chem[t][:int(nF[t]), chan], float)
         # THE WHOLE CHEM ROW TRAVELS WITH THE FRAME, not only the column `chan` names. A
         # three-species run (May-Leonard u,v,w) has no single activator: colouring it from one

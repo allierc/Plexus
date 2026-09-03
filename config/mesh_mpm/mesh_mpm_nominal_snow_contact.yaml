@@ -1,29 +1,36 @@
-# MESH-MPM 11 -- IN CONTACT, and the gel drawn as the MATERIAL POINTS it is.
+# MESH-MPM 13 -- THE SAME SPHEROID INTO SNOW, so the material is the only thing that differs.
 #
-# `mesh_mpm_half_gel_twin.yaml` with the slab enlarged and raised into the spheroid's path. The twin
-# stopped at z = 0.30 against a mapped shell whose lower pole ends at 0.350, so the two never met and
-# `mesh_contact` reported zero all run -- which is what made it a twin. Here the slab is
-# [0.05, 0.05, 0.05] to [0.95, 0.95, 0.44] with 500,000 points, so the pole crosses the surface at a
-# shell radius of 0.06 and indents it by 0.44 - 0.350 = 0.09 by the end.
+# `mesh_mpm_nominal_gel_contact.yaml` WITH ONE TYPE CHANGED: `material: snow`, E = 90, density 0.35,
+# against the gel's elastic E = 15 at density 1.0. Same tissue, same mapping, same contact, same
+# 500,000 points, same 800 frames -- so what differs between the two movies is the constitutive law
+# and nothing else.
 #
-# THE TISSUE IS STILL UNTOUCHED. It lives at the ORIGIN in its own units and `mesh_contact` maps it
-# in at the point of use (`scale: 0.0161`, `centre: [0.5, 0.5, 0.5]`), which is gate 04's own device
-# and what keeps `cell_mechanics`'s origin-referenced radial term correct. The twin established that
-# this arrangement reproduces `mesh_mpm_spheroid_half` frame for frame with the gel present and the
-# contact silent, so anything that differs from here is the contact and nothing else.
+# WHY SNOW IS THE INTERESTING SECOND MATERIAL. The gel is elastic: it stores what the spheroid does
+# to it and springs back, so its strain field is a picture of the CURRENT load. Snow is elasto-
+# plastic with hardening -- it yields, compacts and KEEPS the deformation -- so the same indenter
+# leaves a permanent cavity and the strain field is a picture of the run's HISTORY. A spheroid
+# growing into a matrix that does not spring back is closer to what a tumour meets than an elastic
+# gel is, and it is the case where "the matrix was pushed out of the way" and "the matrix is under
+# load" stop being the same statement.
 #
-# `render_3d: dots`, NOT `surface`, BECAUSE THE SUBJECT IS THE DEFORMATION. The skinned isosurface
-# is built ONCE at rest and thereafter ridden by the particles, which is the right picture for a
-# SHAPE -- a dimple, a bulge -- and the wrong one for a FIELD: it shows the deformation only where
-# the boundary moved, and a strain bulb under an indenter is interior. Dots carry the per-particle
-# `deformation` colour everywhere the material is, and the section cuts through the bulb.
+# `implementation: warp` ON `mpm_strain` IS LOAD-BEARING HERE, not a speed choice: the default
+# strain reaches snow's plastic branch through `torch.linalg.svd` and boolean-mask indexing, neither
+# of which can be captured, and the warp kernel does the same maths with `wp.svd3` and per-thread
+# branches (`CAPTURABLE_MATERIAL_BRANCHES`). The spec already asks for it.
+#
+# 500 AND NOT 800, AND THE LIMIT IS THE TISSUE, not the solver. Growth here compounds: the mesh is
+# 38,000 half-edges at frame 400, 178,000 at 550 and 263,000 at 600 -- roughly 1.5x per fifty
+# frames -- so 800 lands near a million half-edges and ~170,000 cells, past the reservoir this spec
+# declares and far past the point where rebuilding the contact's direction-bin table once a frame is
+# affordable. The 800-frame attempt sat at frame 604 after twenty minutes with the GPU idle. 500
+# still multiplies the 400-frame run's mesh by three, which is the range this ladder can report on.
 
 general:
-  name: mesh_mpm_half_gel_contact
+  name: mesh_mpm_nominal_snow_contact
   seed: 0
-  n_frames: 401
+  n_frames: 500
   dt: 0.0032
-  record_cap: 403
+  record_cap: 127
   boundary: free
   dim: 3
   world:
@@ -33,6 +40,7 @@ general:
   units:
     length_um: 1172.3329425556858
     force_nN: 9162.430188008488
+  record_every: 4
 plotting:
   renderer: vtk_points
   background: black
@@ -41,7 +49,6 @@ plotting:
   camera_elev: 1.18
   camera_turns: 0.0
   camera_zoom: 0.0
-  dot_size: 1.4
   fps: 60
   mesh_color: '#cfd8e3'
   real_time: false
@@ -59,7 +66,7 @@ plotting:
     xlabel: frame
     ylabel: shell radius
     ticks: 4
-  render_3d: dots
+  render_3d: surface
   color_field: deformation
   color_range:
   - 0.0
@@ -77,11 +84,11 @@ plotting:
     max_points: 8000
 sets:
   vertex:
-    n: 25584
+    n: 262144
     mesh: half_edge
     cell_set: cell
   cell:
-    n: 12800
+    n: 131072
     state:
       area:
         width: 1
@@ -93,17 +100,18 @@ sets:
   mpm_particle:
     n: 500000
     types:
-      gel:
+      snow:
         fraction: 1.0
-        youngs: 15.0
-        density: 1.0
+        youngs: 90.0
+        density: 0.35
+        material: snow
         block:
         - 0.05
         - 0.05
         - 0.05
         - 0.95
         - 0.95
-        - 0.44
+        - 0.472
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -114,7 +122,7 @@ operators:
   before_frame: 1
   cell_set: cell
   n_cells: 200
-  radius: 2.5
+  radius: 5.0
   jitter: 0.18
   p0: 3.5
   seed: 0
@@ -149,7 +157,7 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  scale: 0.0161
+  scale: 0.00449
   k_frac: 0.45
   mu: 0.4
   dt: 0.0032
@@ -180,11 +188,11 @@ operators:
 - op: cell_mechanics
   at: vertex
   K_A: 1.0
-  K_P: 0.25
-  K_V: 8.0
+  K_P: 1.0
+  K_V: 2.0
   K_R: 0.4
-  Lambda: 0.375
-  Gamma: 0.1
+  Lambda: 3.0
+  Gamma: 0.4
   p0: 3.5
   mu: 1.0
   dt: 0.0032
@@ -220,7 +228,7 @@ schedule:
 - cell_geometry
 - cell_grow
 - junction_myosin
-- substep_dt: 0.0004
+- substep_dt: 0.0003555556
   steps:
   - mesh_contact
   - mpm_strain
