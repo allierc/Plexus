@@ -53,9 +53,19 @@ def _biggest_particle_set(H):
             pos = lvl.get("pos")
         except Exception:
             continue
-        if pos is None or pos.ndim != 2 or int(lvl.n) <= bn:
+        if pos is None or pos.ndim != 2:
             continue
-        best, bn = name, int(lvl.n)
+        # BY LIVE COUNT, NOT BY BUFFER SIZE. `lvl.n` is the RESERVOIR, and a vertex set's reservoir
+        # is sized for the tissue it will grow into: raising it to 524,288 for a long run made it
+        # "bigger" than 500,000 material points while holding 396 live vertices, so the renderer
+        # picked the mesh as the particle cloud, found no deformation gradient on it, and disabled
+        # the movie for the whole run. A reservoir is a promise about the future; `occ` is the
+        # present, and the present is what is being drawn.
+        occ = getattr(lvl, "occ", None)
+        k = int(occ.sum()) if occ is not None else int(lvl.n)
+        if k <= bn:
+            continue
+        best, bn = name, k
     return best
 
 
