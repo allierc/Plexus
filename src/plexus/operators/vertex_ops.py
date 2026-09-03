@@ -2414,7 +2414,7 @@ class MonolayerShapeEnergy3D(Lateral):
         # `mesh_face_offsets` into the trajectory like `A0` does) lets the cross section rebuild
         # the apical and basal shells through `monolayer_shells`, the same function the energy
         # below is written on.
-        m["mono_h"] = h_cell
+        m["mono_h"] = float(self.h0)
         # target monolayer volume: calibrate ONCE so V_eq matches the rest prism volume, then track the
         # growth op's scaling of the wedge target V0f (cell_grow scales V0f per cell) -> reuse it.
         v_rest, _, _, _ = monolayer_geometry_3d(x0, es, et, ef, nF, h_cell, eocc)

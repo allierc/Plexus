@@ -1517,7 +1517,9 @@ class LiveMovie:
             _as = lambda v, d=_t.long: _t.as_tensor(np.asarray(v), dtype=d)   # noqa: E731
             pos = _t.as_tensor(np.asarray(self._mesh_xyz(lvl, nv, 1.0, (0.0, 0.0, 0.0))),
                                dtype=_t.float32)
-            h = _as(m["mono_h"], _t.float32)[:nF]
+            # A SCALAR ON THE TABLE, BROADCAST BACK. v1 is a uniform thickness; see the note on
+            # `Mesh.SCALAR_RECORD` for why it is not carried per face.
+            h = _t.full((nF,), float(np.asarray(m["mono_h"]).ravel()[0]), dtype=_t.float32)
             ap, ba, _, _ = monolayer_shells(pos, _as(m["E_srce"]), _as(m["E_trgt"]),
                                             _as(m["E_face"]), nF, h)
             out = []

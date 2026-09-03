@@ -164,7 +164,13 @@ class MeshTable(dict):
     #   div_blocked  divisions refused for want of buffer    (cell_divide)
     #   apop_spill   material a death could not bequeath     (cell_die) -- must stay ~0
     #   renumber_failed  a renumber that did not act -- MUST be 0; see Hierarchy.renumber_set
-    SCALAR_RECORD = ("n_t1", "n_apop", "div_blocked", "apop_spill", "renumber_failed")
+    # `mono_h` IS A SCALAR AND NOT A FACE COLUMN, and that is the difference between a recorded
+    # thickness and a zero. v1 of the monolayer is a UNIFORM thickness, so one number says all of
+    # it -- and a per-face array here goes stale: `cell_mechanics` publishes it sized to the nF it
+    # saw, `cell_divide` runs AFTER it and grows nF, and `snapshot` drops a short array rather
+    # than padding it. Recorded per-face, the thickness came back 0.000 on every frame where a
+    # division had fired and 1.200 only on the frames where none had -- a thickness that blinks.
+    SCALAR_RECORD = ("n_t1", "n_apop", "div_blocked", "apop_spill", "renumber_failed", "mono_h")
 
     # PER-HALF-EDGE STATE, and it is a THIRD ragged length. `myo` has one entry per half-edge, not
     # per face and not per row, so it cannot ride in `FACE_RECORD` (which drops anything shorter
