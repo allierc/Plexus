@@ -18,7 +18,7 @@
 # silently downgrade it. Recording one scalar per particle per frame (~200 MB here) would turn every
 # camera variant into a re-render; it is the obvious next economy and is not done.
 #
-# 500 AND NOT 800, AND THE LIMIT IS THE TISSUE, not the solver. Growth here compounds: the mesh is
+# 800 FRAMES, AND THE LIMIT IS REAL. Not the solver: Growth here compounds: the mesh is
 # 38,000 half-edges at frame 400, 178,000 at 550 and 263,000 at 600 -- roughly 1.5x per fifty
 # frames -- so 800 lands near a million half-edges and ~170,000 cells, past the reservoir this spec
 # declares and far past the point where rebuilding the contact's direction-bin table once a frame is
@@ -28,9 +28,9 @@
 general:
   name: mesh_mpm_nominal_gel_contact_zoom2
   seed: 0
-  n_frames: 500
+  n_frames: 800
   dt: 0.0032
-  record_cap: 127
+  record_cap: 202
   boundary: free
   dim: 3
   world:
@@ -85,11 +85,11 @@ plotting:
   zoom: 2
 sets:
   vertex:
-    n: 262144
+    n: 524288
     mesh: half_edge
     cell_set: cell
   cell:
-    n: 131072
+    n: 262144
     state:
       area:
         width: 1
@@ -158,7 +158,7 @@ operators:
   - 0.5
   - 0.5
   scale: 0.00449
-  k_frac: 0.45
+  k_frac: 0.9
   mu: 0.4
   dt: 0.0032
   n_grid: 64
