@@ -394,6 +394,12 @@ class LiveMovie:
             self.p.camera.parallel_projection = True
             self.p.camera.parallel_scale = float(max(span[0], span[1])) * 0.55
         else:
+            # AND A ZOOMED VIEW HAS NO BOX. The frame is a sub-box of the world, so its edges are
+            # not walls and not the domain -- drawing them puts a rectangle around an arbitrary crop
+            # and invites it to be read as the boundary. The SCALE BAR stays, because that is the
+            # thing a crop still needs: it re-picks its round number for the framed extent, so it
+            # says 0.25 mm, 0.1 mm or 50 um as the view closes in.
+            #
             # THE BOX IS A SCENE REFERENCE, NOT A CLAIM ABOUT A WALL. I dropped it for a free
             # boundary on the argument that drawing one asserts a wall the model does not have --
             # but the spec asks for it with `box_frame`, the replay path draws it, and without it a
@@ -402,9 +408,10 @@ class LiveMovie:
             # thing this renderer was unified to stop. Drawn at `lo..hi`, which is [0, world] for a
             # walled run and centred on the origin for a free one.
             _b = np.asarray(self.lo), np.asarray(self.hi)
-            self.p.add_mesh(pv.Box((_b[0][0], _b[1][0], _b[0][1], _b[1][1],
-                                    _b[0][2], _b[1][2])).extract_all_edges(),
-                            color="#4a4a4a", line_width=1.0, lighting=False)
+            if abs(self.zoom - 1.0) < 1e-9:
+                self.p.add_mesh(pv.Box((_b[0][0], _b[1][0], _b[0][1], _b[1][1],
+                                        _b[0][2], _b[1][2])).extract_all_edges(),
+                                color="#4a4a4a", line_width=1.0, lighting=False)
             # A SCALE BAR, AND ONLY WHERE THERE IS A SCALE. Without `general.units` the box is
             # a number of nothing and a bar labelled "20" would be a lie. The length is the largest
             # round number (1, 2 or 5 times a power of ten) fitting in a third of the box, so it
