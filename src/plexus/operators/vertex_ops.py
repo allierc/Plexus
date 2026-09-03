@@ -133,7 +133,7 @@ def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
 
 
 def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R, Lam, Gam,
-                       eocc, vocc, K_bend=0.0, twin_face=None, K_lumen=0.0, myo_e=None):
+                       eocc, vocc, K_bend=0.0, twin_face=None, K_lumen=0.0, myo_e=None, Gam_l=0.0):
     """Explicit-arg vertex-model shape energy on a FIXED-size RESERVOIR (torch.compile-friendly: shapes never
     change, so it compiles once even under division). Dead slots are masked out: `alive` (faces),
     `eocc` (half-edges), `vocc` (vertices, for the radial term). R0 is a tensor (changes each frame);
@@ -147,6 +147,21 @@ def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_
     # actomyosin enters a vertex model -- and defaults to None, in which case this reduces to `Lam * line.sum()`
     # exactly and every existing run is bit-identical.
     E = E.sum() + (Lam * line.sum() if myo_e is None else Lam * (myo_e * line).sum())
+    # A PER-JUNCTION QUADRATIC, WHICH IS NOT THE SAME TERM AS `Gam`. `Gam` above is Farhadifar's
+    # cortical contractility, (Gamma/2) * PERIMETER^2, one number per CELL. `Gam_l` is Marinari's
+    # (Nature 484:542, Supplementary p.1), (Gamma/2) * l^2 per JUNCTION -- they state the substitution
+    # explicitly, "proportional to the square of the junction length, instead of the square of
+    # perimeter length, and thus we model individual junctions as elastic springs with equilibrium
+    # length l0 = -Lambda/Gamma". The two are rival hypotheses about one force, not additive
+    # contributions, which is why `cell_mechanics[model: marinari]` sets one and zeroes the other
+    # rather than the spec being free to set both.
+    #
+    # THE SUM IS OVER HALF-EDGES AND THEIR SUM IS OVER JUNCTIONS. A closed half-edge mesh carries two
+    # half-edges per junction, so `line.sum()` is 2x a junction sum. The factor is NOT applied here --
+    # `Lam` has always meant "per half-edge" and changing that would move every existing run -- it is
+    # applied by the marinari variant when it maps the paper's parameters in. See ShapeEnergy3DMarinari.
+    if Gam_l:
+        E = E + 0.5 * Gam_l * ((line ** 2) * eocc).sum()
     E = E + K_V * ((vf - V0f) ** 2 * alive).sum()
     E = E + K_R * (((pos.norm(dim=1) - R0) ** 2) * vocc).sum()   # radial over live vertices only
     if K_bend > 0 and twin_face is not None:
@@ -404,6 +419,7 @@ class ShapeEnergy3D(Lateral):
         # the current area -> distinguishes sphere from a per-cell-volume-preserving buckle. 0=off. Coral only.
         self.K_lumen = float(params.get("K_lumen", 0.0))
         self.Gamma = float(params.get("Gamma", 0.0))             # cortical contractility (1/2)Gamma*P^2 -> rounds cells
+        self.Gam_l = 0.0                # per-JUNCTION (1/2)Gamma*l^2; set by model=marinari, not by a spec
         self.mu = float(params.get("mu", 1.0))
         self.dt = float(params.get("dt", 1.0)); self.relax_iters = int(params.get("relax_iters", 6))
         self.eta = float(params.get("eta", 0.08)); self.cap_frac = float(params.get("cap_frac", 0.12))
@@ -462,7 +478,7 @@ class ShapeEnergy3D(Lateral):
                 p_e = p
             E = self._efn(p_e, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
                           self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc, self.K_bend,
-                          twin_face, self.K_lumen, myo_e)
+                          twin_face, self.K_lumen, myo_e, self.Gam_l)
             g = torch.autograd.grad(E, p)[0]
         return torch.nan_to_num(g)
 
@@ -2197,8 +2213,10 @@ class MonolayerShapeEnergy3D(Lateral):
     default implementation is a mid-surface model with a lumen-wedge volume; this one gives every cell
     its OWN 3D volume + surface (apical+basal+lateral, Okuda Eq. 3): per-cell 3D volume elasticity +
     linear surface tension. Force = -grad U by one autograd pass; bounded overdamped Euler (displacement
-    capped at cap_frac x mean edge). EMIT=velocity. Selected by {op: cell_mechanics, implementation:
-    monolayer}. Emergent bending (thin undulate / thick straight) falls out of the vertex-normal offset;
+    capped at cap_frac x mean edge). EMIT=velocity. Selected by {op: cell_mechanics, model:
+    monolayer} -- `model:`, because giving every cell its own 3D volume is a different HYPOTHESIS
+    about the tissue, not the same one computed differently; `implementation: monolayer` is refused
+    by the schema, and this docstring said it for months. Emergent bending (thin undulate / thick straight) falls out of the vertex-normal offset;
     no explicit K_bend. See monolayer_design.md."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
@@ -2324,7 +2342,20 @@ class MonolayerShapeEnergy3D(Lateral):
             step = -(self.eta * self.mu) * self._grad(x, es, et, ef, nF, h_cell, V_eq, m["alive"], R0t, eocc, vocc)
             step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
             x = x + step
-        v_full[:Nv] = (x - x0) / max(self.dt, 1e-9)
+        # THE DIVISOR IS `general.dt`, NOT A DECLARED ONE -- the same by-construction fix as the
+        # default implementation (see the long note at ShapeEnergy3D). This operator emits a
+        # VELOCITY that the engine immediately multiplies by `general.dt`, so the two must cancel;
+        # a declared `dt` that differs from the harness's silently rescales the relaxation rate and
+        # nothing looks wrong. Both implementations of the same contract now read the harness.
+        _dt = float(getattr(H, "dt", self.dt) or self.dt)
+        if "dt" in self.params and abs(float(self.params["dt"]) - _dt) > 1e-12 * max(_dt, 1.0) \
+                and not getattr(self, "_dt_warned", False):
+            self._dt_warned = True
+            from plexus.paths import warn
+            warn(f"[warn] cell_mechanics[monolayer]: `dt: {self.params['dt']}` is IGNORED -- the "
+                 f"divisor is general.dt ({_dt}) so that the engine's own multiplication cancels "
+                 f"it. Remove the parameter; leaving it in the spec suggests a knob that is not there.")
+        v_full[:Nv] = (x - x0) / max(_dt, 1e-9)
         if mask is not None:
             v_full = v_full * mask[:, None].float()
         return {self.at: v_full}
@@ -2337,3 +2368,89 @@ class ShapeEnergy3DCompiled(ShapeEnergy3D):
     for fixed-topology runs; with division the padding computes over the oversized buffer and it is
     net slower, which is why it is opt-in rather than the default."""
     COMPILE = True
+
+
+@register_operator("cell_mechanics", model="marinari", set="vertex", kind="lateral",
+                   family="mechanics")
+class ShapeEnergy3DMarinari(ShapeEnergy3D):
+    """The work function of Marinari et al., Nature 484:542 (2012), Supplementary p.1:
+
+        W = SUM_cells (K/2)(A - A0)^2  +  SUM_junctions [ Lambda * l  +  (Gamma/2) * l^2 ]
+
+    A DIFFERENT MODEL, NOT A DIFFERENT IMPLEMENTATION, which is why it is on the `model=` axis and
+    not `implementation=`. The default body is Farhadifar's: its contractility is (Gamma/2) * P^2,
+    one number per CELL. This one puts the quadratic on each JUNCTION instead, so every junction is
+    an elastic spring of equilibrium length l0 = -Lambda/Gamma -- and with the paper's own values,
+    Lambda = 56.8 and Gamma = 49.9, that length is NEGATIVE (-1.14). No junction has a rest length it
+    can reach; each is under tension all the way down to zero, resisted only by the area term. That
+    is the whole engine of the paper: junctions shrink, T1s fire, cells lose neighbours, and the ones
+    that reach three junctions and a quarter of their target area are extruded. The two forms are
+    rival hypotheses about one force, so a spec must not be able to set both -- this variant zeroes
+    the perimeter terms rather than adding to them.
+
+    THE PAPER'S PARAMETERS ARE THE SPEC'S PARAMETERS, and the factor-of-two bookkeeping happens here
+    rather than in anyone's yaml:
+
+      K       -> K_A = K/2         the core writes K_A*(A-A0)^2, the paper writes (K/2)(A-A0)^2
+      Lambda  -> Lam  = Lambda/2   the core sums over HALF-EDGES, the paper over JUNCTIONS, and a
+      Gamma   -> Gam_l = Gamma/2   closed half-edge mesh has two half-edges per junction, so a
+                                   half-edge sum is exactly twice a junction sum. `Gam_l` is then
+                                   halved again inside the core (it writes 0.5*Gam_l*l^2), giving
+                                   (Gamma/4)*SUM_halfedges l^2 = (Gamma/2)*SUM_junctions l^2.
+
+    Getting this wrong is silent: it does not crash, it runs the tissue at twice the tension the spec
+    asked for, and the delamination rate -- the paper's entire observable -- is a steep function of
+    exactly that.
+
+    WHAT THIS CLASS DOES NOT GIVE YOU, because they are not the energy: their dynamics are Metropolis
+    Monte Carlo on vertex positions (accept if dW<0, else with probability exp(-dW)), their T1 is a
+    Metropolis-accepted move rather than a threshold flip, their boundary is a periodic box of FIXED
+    area, and their T2 removes a cell at exactly 3 junctions and area < A0/4. This operator is the
+    force law alone; on the inherited overdamped-descent mover it will relax to a minimum of W rather
+    than fluctuate through it, so it reproduces their ENERGY and not yet their PHENOMENON.
+    """
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        K = float(params.get("K", 160.0))                     # Table S1, uncrowded
+        Lambda = float(params.get("Lambda", 56.8))
+        Gamma = float(params.get("Gamma", 49.9))
+        # CROWDING, AS THE PAPER APPLIES IT: not by shrinking the box but by rescaling the parameters
+        # together, "values [that] correspond to a tissue that would have the same value of the work
+        # function ... were it free to expand so that its total area was larger by a factor g".
+        # A0' = g A0 is the seeder's business; the three coefficients are this operator's.
+        g = float(params.get("crowding", 1.0))
+        if g <= 0:
+            raise ValueError(f"cell_mechanics[marinari]: crowding must be > 0, got {g}")
+        K = K * g ** -2.0
+        Lambda = Lambda * g ** -0.5
+        Gamma = Gamma / g
+        self.K_A = 0.5 * K
+        self.Lambda = 0.5 * Lambda
+        self.Gam_l = 0.5 * Gamma
+        # THE RIVAL TERM IS OFF, not merely defaulted off. `Gamma` is NOT rejected here even though
+        # the default model has a parameter of that name: in THIS model `Gamma` is the per-junction
+        # spring constant, read above, and rejecting it would refuse the paper's own notation. It is
+        # the PERIMETER terms that must not also be live -- `K_P` unambiguously names one, and the
+        # default's perimeter `Gamma` is zeroed below after its value has been consumed as the
+        # junction spring. (The first version of this guard rejected `Gamma` and so refused every
+        # spec written in the paper's own symbols.)
+        if params.get("K_P") is not None:
+            raise ValueError(
+                "cell_mechanics[model: marinari]: 'K_P' is the perimeter elasticity of the default "
+                "(Farhadifar) model, which this model replaces with a per-junction spring. Running "
+                "both would be neither model. Drop 'K_P', or use the default model if you want it.")
+        self.K_P = 0.0
+        self.Gamma = 0.0
+        self._said_marinari = False
+
+    def forward(self, H, mask=None):
+        if not self._said_marinari:
+            self._said_marinari = True
+            _l0 = (-2.0 * self.Lambda) / (2.0 * self.Gam_l) if self.Gam_l else float("nan")
+            print(f"[cell_mechanics/marinari] W = (K/2)(A-A0)^2 + sum_junctions[Lambda*l + "
+                  f"(Gamma/2)l^2]  ->  K_A {self.K_A:g}, Lam {self.Lambda:g} (per half-edge), "
+                  f"Gam_l {self.Gam_l:g}; junction rest length l0 = -Lambda/Gamma = {_l0:.3f}"
+                  f"{'  (NEGATIVE: every junction is under tension to zero length)' if _l0 < 0 else ''}",
+                  flush=True)
+        return super().forward(H, mask)
