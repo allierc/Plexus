@@ -991,13 +991,28 @@ class LiveMovie:
                 _a.tick_label_size = _tfs
                 _a.tick_count = int(cfg.get("ticks", 4))
                 try:
-                    # ONE DIGIT ON EVERY TICK, derived from the axis's own top rather than
-                    # declared per quantity: a range ending at 8000 needs no decimals and one
+                    # ENOUGH DIGITS THAT ADJACENT TICKS DIFFER, derived from the tick SPACING and
+                    # not from the axis's top: a range ending at 8000 needs no decimals and one
                     # ending at 0.7 needs one, and hard-coding "%.2f" printed 0.20, 0.40, 0.60.
-                    _top = float(ch.y_axis.range[1]) if _a is ch.y_axis else float(len(S) - 1)
-                    _dec = 0 if _top >= 10 else int(max(0, -np.floor(np.log10(max(_top, 1e-12)))))
+                    #
+                    # KEYING ON THE TOP WAS WRONG FOR EVERY AXIS BETWEEN 1 AND 10, which is most of
+                    # them: an area axis running 0 to 2 has log10(2) = 0.3, floor 0, so it asked for
+                    # zero decimals and printed its five ticks as "0, 0, 1, 2, 2" -- two pairs of
+                    # duplicate labels and no way to read the middle. The spacing (2/4 = 0.5) is
+                    # what has to be resolvable, and it asks for the one digit the comment claimed.
+                    _lo, _hi = ((float(ch.y_axis.range[0]), float(ch.y_axis.range[1]))
+                                if _a is ch.y_axis else (0.0, float(len(S) - 1)))
+                    _n = max(1, int(cfg.get("ticks", 4)))
+                    _sp = abs(_hi - _lo) / _n
+                    _dec = int(min(3, max(0, -np.floor(np.log10(max(_sp, 1e-12))))))
                     _a.SetNotation(_a.PRINTF_NOTATION)
-                    _a.SetLabelFormat(str(cfg.get("tick_format", f"%.{_dec}f")))
+                    _fmt = str(cfg.get("tick_format", f"%.{_dec}f"))
+                    _a.SetLabelFormat(_fmt)
+                    # AND THE FIRST AND LAST TICK, which vtkAxis formats through a SEPARATE
+                    # `RangeLabelFormat`. Leaving it default is why an axis whose middle ticks read
+                    # 0.5, 1.0, 1.5 still capped itself with a bare "0" and "2".
+                    if hasattr(_a, "SetRangeLabelFormat"):
+                        _a.SetRangeLabelFormat(_fmt)
                 except Exception:                        # noqa: BLE001
                     pass
                 try:
@@ -1404,10 +1419,40 @@ class LiveMovie:
                                        line_width=float((self.style or {}).get("edge_width", 3.0)),
                                        render_lines_as_tubes=True)
 
+    @staticmethod
+    def _conn_sig(m):
+        """Order-sensitive signature of a half-edge table: changes on any rewiring, not only on a
+        change of counts. Torch on the live path, numpy on replay -- both index the same way."""
+        es = m["E_srce"]
+        if hasattr(es, "detach"):
+            import torch
+            es = es.detach().to(torch.int64)
+            w = torch.arange(1, es.numel() + 1, device=es.device, dtype=torch.int64)
+            return int((es * w).sum())
+        es = np.asarray(es, np.int64)
+        return int((es * np.arange(1, es.size + 1, dtype=np.int64)).sum())
+
     def _update_meshes(self, H):
-        """POINTS ONLY. The topology is rebound only if the face count changed -- a plate never
-        divides, but an epithelium does, and swapping the face array every frame on a 12,000-cell
-        surface would cost more than the rest of the frame."""
+        """POINTS ONLY, unless the CONNECTIVITY moved. Swapping the face array every frame on a
+        12,000-cell surface would cost more than the rest of the frame, so it is rebound only on
+        the events that actually change what a cell's ring contains.
+
+        COUNTING FACES IS NOT ENOUGH, and the operator this misses is the one it most needed to
+        catch. `edge_flip` (`ReconnectT1_3D`) is documented as keeping V, E and F fixed -- a T1
+        only REWIRES, so `nF` and `Nv` are both unchanged and the old guard passed. The renderer
+        then kept frame 0's rings and drew them on the current positions, so every rewired cell
+        came out as a self-intersecting star: the zigzag spikes across the face of a spheroid that
+        the geometry itself never had (planarity 0.998, zero folded faces, measured on the same
+        run). On a 200-cell spheroid a single sweep rewired 916 of 1,188 half-edge slots, so most
+        of the tissue was drawn with the wrong polygon.
+
+        So the guard is an ORDER-SENSITIVE CHECKSUM of `E_srce` rather than a per-operator counter:
+        `edge_flip` does maintain `n_t1`, but the replay level rebuilds its table from the npz and
+        carries no counter at all, so keying on one would have left `-o plot` broken while the live
+        path was fixed -- the two-renderers-in-one-name failure again. The weights make it sensitive
+        to a permutation, which a plain sum is not, and 72k half-edges of a 12,000-cell mesh peak
+        near 1.3e14, well inside int64. One reduction per frame against ~50 ms of VTK.
+        """
         for name, nv, pd, sc, ct in getattr(self, "_meshes", []) or []:
             try:
                 lvl = H.level(name)
@@ -1415,7 +1460,11 @@ class LiveMovie:
                 if m is None:
                     continue
                 n_now = int(m["Nv"])
-                if n_now != nv or pd.n_faces_strict != int(m["nF"]):
+                sig = self._conn_sig(m)
+                seen = getattr(self, "_mesh_conn", {})
+                if n_now != nv or pd.n_faces_strict != int(m["nF"]) or seen.get(name) != sig:
+                    seen[name] = sig
+                    self._mesh_conn = seen
                     pd.points = self._mesh_xyz(lvl, n_now, sc, ct)
                     pd.faces = self._mesh_faces(m)
                 else:
