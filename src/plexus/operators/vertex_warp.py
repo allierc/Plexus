@@ -242,7 +242,22 @@ def try_shape_energy_grad(op, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, 
     find, and one that is printed per frame is noise in a 500-frame log.
     """
     why = None
-    if not HAVE_WARP:
+    from plexus.engine import STRICT_DETERMINISM
+    if STRICT_DETERMINISM:
+        # STRICT MEANS STRICT, AND THESE KERNELS CANNOT HONOUR IT. `PLEXUS_STRICT_DETERMINISM` sets
+        # `torch.use_deterministic_algorithms(True, warn_only=False)` precisely so that a kernel
+        # with no deterministic implementation FAILS rather than quietly running the
+        # nondeterministic path -- see the note at engine.py:58. `wp.atomic_add` is outside torch's
+        # machinery altogether, so it would not fail and would not be deterministic either: the run
+        # would claim reproducibility it does not have. That is the one outcome the flag exists to
+        # prevent, so the warp path steps aside whenever it is set.
+        #
+        # This is also what makes the promotion comparisons work. `tools/promotion_identical.py`
+        # exports the flag on BOTH sides, and side A is an okuda commit that predates this file, so
+        # without this the whole G/BASE/MINISITE corpus would compare a warp gradient against an
+        # autograd one and no row could be bit-identical again.
+        why = "PLEXUS_STRICT_DETERMINISM is set, and wp.atomic_add is outside torch's guarantee"
+    elif not HAVE_WARP:
         why = "warp is not installed"
     elif p.device.type != "cuda":
         why = f"the run is on {p.device.type}, and these kernels are CUDA-only"

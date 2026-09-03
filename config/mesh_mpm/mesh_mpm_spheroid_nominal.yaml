@@ -48,6 +48,11 @@ plotting:
   mesh_color: '#cfd8e3'
   real_time: false
   slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    span: 28.0
   curve:
   - quantity: cells
     xlabel: frame
