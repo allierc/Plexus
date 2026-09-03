@@ -31,7 +31,7 @@
 general:
   name: mesh_mpm_nominal_gel_contact
   seed: 0
-  n_frames: 800
+  n_frames: 500
   dt: 0.0032
   record_cap: 202
   boundary: free
