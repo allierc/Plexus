@@ -1,5 +1,5 @@
 general:
-  name: vertex_energy_marinari_g4
+  name: vertex_energy_marinari_expand_a4
   seed: 0
   n_frames: 300
   dt: 1.0
@@ -68,7 +68,7 @@ operators:
   K: 160.0
   Lambda: 56.8
   Gamma: 49.9
-  crowding: 4.0
+  crowding: 1.0
 - op: edge_flip
   at: vertex
   every: 4
