@@ -1,0 +1,86 @@
+general:
+  name: marinari_energy_test
+  seed: 0
+  n_frames: 400
+  dt: 1.0
+  record_cap: 402
+  boundary: free
+  dim: 3
+  world:
+  - 14.0
+  - 14.0
+  - 14.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+plotting:
+  renderer: vtk_points
+  background: black
+  real_time: false
+  fps: 20
+  movie_max_frames: 200
+  mesh_edges: true
+  curve:
+  - quantity: area
+    ticks: 4
+  - quantity: cells
+    ticks: 4
+sets:
+  vertex:
+    n: 25584
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 12800
+    state:
+      area:
+        width: 1
+      cen:
+        width: 3
+      chem:
+        width: 2
+        integration: first_order
+fields: {}
+operators:
+- op: mesh_seed
+  at: vertex
+  before_frame: 1
+  cell_set: cell
+  n_cells: 200
+  radius: 4.55
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.0
+- op: cell_geometry
+  at: cell
+- op: cell_mechanics
+  at: vertex
+  model: marinari
+  K: 160.0
+  Lambda: 56.8
+  Gamma: 49.9
+  crowding: 1.0
+  K_V: 2.0
+  K_R: 0.0
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.02
+  cap_frac: 0.05
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- mesh_seed
+- cell_geometry
+- cell_mechanics
+- edge_flip
+- topo_record

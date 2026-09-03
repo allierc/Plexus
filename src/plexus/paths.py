@@ -137,6 +137,10 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # `myosin` in their names (`gate_01_nomyosin`, and two promotion twins of it), and a substring
     # trigger would pull all three out of the folders they belong to.
     ("myosin_mesh", ("^myosin_mesh",)),
+    # THE MARINARI WORK FUNCTION. `cell_mechanics[model: marinari]` -- the per-junction elastic
+    # spring of Nature 484:542 -- against the default Farhadifar perimeter form. ANCHORED, like the
+    # two above: `marinari` could otherwise appear in any spec named after the paper it cites.
+    ("marinari",    ("^marinari",)),
     # THE COMPOSED-CELL LADDER. A cell built from heterogeneous substrates -- a nucleus, a cytosol
     # of two protein species, a membrane -- each its own contained set (`config/cell/`, appendix
     # "Making a cell in Plexus"). No trigger substrings, for the same reason the three above have
