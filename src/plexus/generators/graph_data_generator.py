@@ -293,4 +293,32 @@ def data_generate(
                                       name=sim.name)
         except Exception as e:                              # noqa: BLE001 -- never lose a finished run
             print(f"[render] mesh movie unavailable ({type(e).__name__}: {e})", flush=True)
+
+    # THE STILLS ARE SWEPT AGAINST THE DATASET, NOT AGAINST A RENDERER'S LIFETIME.
+    #
+    # `LiveMovie.close()` already deletes the numbered `still_NN_fNNNNN.png` it wrote, and for a run
+    # that reaches close() that is enough. The runs that leave stills behind are precisely the ones
+    # that do NOT reach it: `mesh_mpm_nominal_gel_contact` was killed by the LSF wall clock at frame
+    # 736 of 801 (TERM_RUNLIMIT, exit 140), so its seven stills and an unfinalised mp4 stayed in the
+    # folder. Ctrl-C and an OOM kill leave the same debris. Cleanup that lives in one object's
+    # teardown cannot survive the object being killed, and long runs are the ones that get killed.
+    #
+    # THERE IS ALSO MORE THAN ONE WRITER. The live path writes stills, and so does the curve
+    # re-render (`_lm.replay(..., stills=10)`) a few lines above; each removes its own list. A sweep
+    # of the DIRECTORY is indifferent to how many passes ran and in what order, which is the property
+    # the caller actually wants: once the dataset is on disk, the strip is gone.
+    #
+    # `3d.png` IS NOT A STILL and is deliberately not swept -- it is the run's poster frame, the file
+    # a browser previews, and it is rewritten by whichever pass rendered last.
+    if save and not (live_movie or {}).get("keep_stills", False):
+        import glob as _glob
+        _left = _glob.glob(os.path.join(data_dir, "still_*.png"))
+        for _p in _left:
+            try:
+                os.remove(_p)
+            except OSError:
+                pass
+        if _left:
+            print(f"[generate] removed {len(_left)} leftover still(s); pass --keep-stills to keep "
+                  f"the strip", flush=True)
     return data_dir, out
