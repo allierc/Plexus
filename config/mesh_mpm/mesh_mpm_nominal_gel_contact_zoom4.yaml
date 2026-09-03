@@ -1,28 +1,36 @@
-# MESH-MPM 09t -- THE TWIN: the working tissue and a gel slab that it never touches.
+# MESH-MPM 12z4 -- THE SAME RUN, FRAMED 4x CLOSER. One plotting key differs.
 #
-# `mesh_mpm_spheroid_half` UNCHANGED, with a gel SLAB added below it and `mesh_contact` scheduled.
-# The tissue stays at the ORIGIN in its own units -- radius 2.343 growing to 9.32 -- and the contact
-# maps it into the box at the point of use (`scale: 0.0161`, `centre: [0.5, 0.5, 0.5]`), which is
-# exactly what gate 04 did with `scale: 0.00853` and what lets `cell_mechanics`'s origin-referenced
-# radial term stay correct. Translating the tissue instead destroys it on frame 0.
+# `mesh_mpm_nominal_gel_contact.yaml` with `zoom: 4` and nothing else -- same tissue, same gel,
+# same contact, same seed, so the two are the SAME SIMULATION seen at a different distance.
 #
-# A SLAB, NOT A SHELL, and that is a rendering decision as much as a modelling one. The matrix shell
-# of rung 09 surrounds the spheroid, and since the isosurface is built from the LARGEST positional
-# set -- 200,000 fibre points against ~25,000 vertices -- the movie was an opaque grey ball with the
-# experiment sealed inside it. A slab underneath occludes nothing.
+# WHAT `zoom` DOES, and it is not moving the camera in. Everything the renderer frames with -- the
+# wireframe box, the camera's parallel scale, the scale bar, the cross-section's fixed range -- is
+# derived from one pair of bounds, so `zoom` shrinks THOSE about the scene's centre and all of them
+# follow together. The box therefore still frames the picture instead of falling outside it, and
+# the scale bar re-picks its round number for the new extent rather than becoming a bar that no
+# longer fits. `camera_zoom` had been sitting in specs unread for a long time; this is the key that
+# does something.
 #
-# THEY NEVER TOUCH: the mapped tissue ends at 0.5 - 0.150 = 0.350 and the slab's top is 0.30. So
-# `mesh_contact` is present, the 200,000 points are present, and the contact must report zero all
-# run -- which is what makes this the TWIN of `mesh_mpm_spheroid_half` rather than a new experiment.
-# The comparison is cell count and roundness, frame for frame; rung 09 already passed it
-# (200/386/1054/2862 at frames 0/100/200/300, roundness equal to four decimals).
+# IT IS A RE-SIMULATION AND IT SHOULD NOT HAVE TO BE. Zoom is a camera property and these three runs
+# differ in nothing else, so they ought to be three renders of one trajectory. They are not, because
+# `color_field: deformation` is computed from the per-particle deformation gradient and the
+# trajectory does not store it -- so `-o plot` cannot draw this colouring and re-rendering would
+# silently downgrade it. Recording one scalar per particle per frame (~200 MB here) would turn every
+# camera variant into a re-render; it is the obvious next economy and is not done.
+#
+# 500 AND NOT 800, AND THE LIMIT IS THE TISSUE, not the solver. Growth here compounds: the mesh is
+# 38,000 half-edges at frame 400, 178,000 at 550 and 263,000 at 600 -- roughly 1.5x per fifty
+# frames -- so 800 lands near a million half-edges and ~170,000 cells, past the reservoir this spec
+# declares and far past the point where rebuilding the contact's direction-bin table once a frame is
+# affordable. The 800-frame attempt sat at frame 604 after twenty minutes with the GPU idle. 500
+# still multiplies the 400-frame run's mesh by three, which is the range this ladder can report on.
 
 general:
-  name: mesh_mpm_half_gel_twin
+  name: mesh_mpm_nominal_gel_contact_zoom4
   seed: 0
-  n_frames: 401
+  n_frames: 500
   dt: 0.0032
-  record_cap: 403
+  record_cap: 127
   boundary: free
   dim: 3
   world:
@@ -32,6 +40,7 @@ general:
   units:
     length_um: 1172.3329425556858
     force_nN: 9162.430188008488
+  record_every: 4
 plotting:
   renderer: vtk_points
   background: black
@@ -40,7 +49,6 @@ plotting:
   camera_elev: 1.18
   camera_turns: 0.0
   camera_zoom: 0.0
-  dot_size: 1.6
   fps: 60
   mesh_color: '#cfd8e3'
   real_time: false
@@ -69,13 +77,19 @@ plotting:
   mesh_flat: true
   surface_opacity: 1.0
   surface_color: '#cfd8e3'
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    max_points: 8000
+  zoom: 4
 sets:
   vertex:
-    n: 25584
+    n: 262144
     mesh: half_edge
     cell_set: cell
   cell:
-    n: 12800
+    n: 131072
     state:
       area:
         width: 1
@@ -85,19 +99,19 @@ sets:
         width: 2
         integration: first_order
   mpm_particle:
-    n: 200000
+    n: 500000
     types:
       gel:
         fraction: 1.0
         youngs: 15.0
         density: 1.0
         block:
-        - 0.15
-        - 0.15
         - 0.05
-        - 0.85
-        - 0.85
-        - 0.3
+        - 0.05
+        - 0.05
+        - 0.95
+        - 0.95
+        - 0.472
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -108,7 +122,7 @@ operators:
   before_frame: 1
   cell_set: cell
   n_cells: 200
-  radius: 2.5
+  radius: 5.0
   jitter: 0.18
   p0: 3.5
   seed: 0
@@ -143,7 +157,7 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  scale: 0.0161
+  scale: 0.00449
   k_frac: 0.45
   mu: 0.4
   dt: 0.0032
@@ -174,11 +188,11 @@ operators:
 - op: cell_mechanics
   at: vertex
   K_A: 1.0
-  K_P: 0.25
-  K_V: 8.0
+  K_P: 1.0
+  K_V: 2.0
   K_R: 0.4
-  Lambda: 0.375
-  Gamma: 0.1
+  Lambda: 3.0
+  Gamma: 0.4
   p0: 3.5
   mu: 1.0
   dt: 0.0032

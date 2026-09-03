@@ -1,25 +1,22 @@
-# MESH-MPM 12 -- THE FULL-SIZE SPHEROID IN THE GEL, drawn as surfaces.
+# MESH-MPM 12z2 -- THE SAME RUN, FRAMED 2x CLOSER. One plotting key differs.
 #
-# `mesh_mpm_spheroid_nominal` -- which is `promo_G_gates_gate_00_spheroid_B` verbatim -- pressed into
-# the gel of rung 11. The tissue is UNTOUCHED and at the ORIGIN in its own units (radius 4.65 growing
-# to 17.95); `mesh_contact` maps it into the box at the point of use with `scale: 0.00836`, so it
-# ends at 0.150 -- gate 04's own final radius, and 0.00836 is within 2% of gate 04's own 0.00853.
-# The only edits to the tissue are its clock and its box, and neither is dynamical: every tissue
-# operator here is per-FRAME, and `cell_mechanics` now divides by `general.dt` so the engine's own
-# multiplication cancels it whatever the timestep.
+# `mesh_mpm_nominal_gel_contact.yaml` with `zoom: 2` and nothing else -- same tissue, same gel,
+# same contact, same seed, so the two are the SAME SIMULATION seen at a different distance.
 #
-# `render_3d: surface` RATHER THAN `dots`, because the question here is the SHAPE. Rung 11 draws the
-# gel as points coloured by strain, which is the right picture for a FIELD -- a bulb under an
-# indenter is interior and a boundary cannot show it. This one shows what the two bodies look like:
-# the skinned isosurface of the gel, built once at rest and ridden by the particles, with the
-# epithelium over it flat and cell-edged. The section still carries the field.
+# WHAT `zoom` DOES, and it is not moving the camera in. Everything the renderer frames with -- the
+# wireframe box, the camera's parallel scale, the scale bar, the cross-section's fixed range -- is
+# derived from one pair of bounds, so `zoom` shrinks THOSE about the scene's centre and all of them
+# follow together. The box therefore still frames the picture instead of falling outside it, and
+# the scale bar re-picks its round number for the new extent rather than becoming a bar that no
+# longer fits. `camera_zoom` had been sitting in specs unread for a long time; this is the key that
+# does something.
 #
-# 500 FRAMES AND A NEARER START. At 400 the spheroid spent a third of the run in the air and the
-# contact was the last act; the gel's top is now 0.472 against a mapped lower pole of 0.4791, so
-# they meet in the first few frames. `scale` drops 0.00836 -> 0.00449 because the tissue keeps
-# growing: at 800 frames the shell is several times the radius it reaches at 400, and the old scale
-# would put it through the wall of its own box. The reservoirs are raised with it -- a vesicle that
-# runs out of its own vertex array stops rather than reports.
+# IT IS A RE-SIMULATION AND IT SHOULD NOT HAVE TO BE. Zoom is a camera property and these three runs
+# differ in nothing else, so they ought to be three renders of one trajectory. They are not, because
+# `color_field: deformation` is computed from the per-particle deformation gradient and the
+# trajectory does not store it -- so `-o plot` cannot draw this colouring and re-rendering would
+# silently downgrade it. Recording one scalar per particle per frame (~200 MB here) would turn every
+# camera variant into a re-render; it is the obvious next economy and is not done.
 #
 # 500 AND NOT 800, AND THE LIMIT IS THE TISSUE, not the solver. Growth here compounds: the mesh is
 # 38,000 half-edges at frame 400, 178,000 at 550 and 263,000 at 600 -- roughly 1.5x per fifty
@@ -29,7 +26,7 @@
 # still multiplies the 400-frame run's mesh by three, which is the range this ladder can report on.
 
 general:
-  name: mesh_mpm_nominal_gel_contact
+  name: mesh_mpm_nominal_gel_contact_zoom2
   seed: 0
   n_frames: 500
   dt: 0.0032
@@ -85,6 +82,7 @@ plotting:
     at: 0.5
     thickness: 6
     max_points: 8000
+  zoom: 2
 sets:
   vertex:
     n: 262144
