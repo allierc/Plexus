@@ -488,8 +488,36 @@ class ShapeEnergy3D(Lateral):
             scale = torch.where((badv > 0)[:, None], scale * 0.5, scale)
         return scale.detach()
 
+    GRAD_BACKEND = "warp"          # DISPATCH TAG, not a tunable: `implementation: autograd` flips it
+
     def _grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, vocc, twin_face=None,
               myo_e=None):
+        """dE/d(pos), through the hand-written warp kernels when they apply, autograd otherwise.
+
+        WARP IS THE DEFAULT. The energy is unchanged -- `vertex_warp` implements the derivative OF
+        `_shape_energy_core`, checked term by term against `torch.autograd.grad` in
+        `tests/test_vertex_warp.py` at a relative error of ~3.5e-07, which is float32 round-off.
+        What changes is the cost: the autograd backward was the single largest entry in the frame's
+        profile (25.6 s of 85.8 s on `mesh_mpm_spheroid_nominal` at frame 380), and it is
+        LAUNCH-bound rather than arithmetic-bound -- 3.27 ms per call whether the mesh has 1,188
+        half-edges or 71,988. The warp path is 0.40 ms at every one of those sizes: 8.1x on the
+        gradient, 3.5x on the whole frame (120.5 -> 34.1 ms/frame end to end).
+
+        IT FALLS BACK RATHER THAN REFUSING, and says so once: on CPU, in float64, without warp
+        installed, or when `K_bend` / `K_lumen` is on -- those two terms are not ported, and a term
+        silently dropped from a gradient is a different model, not a faster one. `implementation:
+        autograd` forces the old path outright, which is what `implementation: compile` wants.
+
+        NOT BIT-IDENTICAL, and neither is the thing it replaces. Both accumulate per-face sums with
+        float32 atomics whose order is not fixed -- warp's `atomic_add` and torch's `index_add` --
+        so two runs of the UNMODIFIED default already differ from each other.
+        """
+        if self.GRAD_BACKEND == "warp":
+            from plexus.operators.vertex_warp import try_shape_energy_grad
+            g = try_shape_energy_grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t,
+                                      eocc, vocc, twin_face, myo_e)
+            if g is not None:
+                return g
         with torch.enable_grad():
             p = p.detach().requires_grad_(True)
             # THE RADIAL TERM'S ORIGIN, AND WHY IT HAS TO BE DECLARABLE. `K_R` penalises
@@ -2404,8 +2432,13 @@ class MonolayerShapeEnergy3D(Lateral):
 class ShapeEnergy3DCompiled(ShapeEnergy3D):
     """The shape energy through torch.compile over a fixed-size reservoir. A clear ~2.4x win ONLY
     for fixed-topology runs; with division the padding computes over the oversized buffer and it is
-    net slower, which is why it is opt-in rather than the default."""
+    net slower, which is why it is opt-in rather than the default.
+
+    AUTOGRAD, NECESSARILY. This variant exists to compile the ENERGY and let autograd differentiate
+    the compiled graph; routing its gradient through the warp kernels would leave `torch.compile`
+    compiling something nothing calls."""
     COMPILE = True
+    GRAD_BACKEND = "autograd"
 
 
 @register_operator("cell_mechanics", model="marinari", set="vertex", kind="lateral",
