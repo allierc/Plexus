@@ -127,7 +127,7 @@ def _probe_spec(tmpdir, dt=1.0, n_frames=3):
     `sep` AS ITS COORDINATE -- and then `add_delta(..., "sep")` hits the `block == coord_name` guard
     and lands in the coordinate accumulator, exactly where the untagged delta went. Both deltas sum,
     the block appears to integrate, and the test passes whether or not the tick loop routes anything.
-    Written the wrong way first, this probe read 9.0 (= (1+2) x 3 ticks) instead of 6.0.
+    Written the wrong way first, this probe read 12.0 (= (1+2) x 4 ticks) instead of 8.0.
     """
     import os
     import yaml
@@ -153,6 +153,13 @@ def test_tick_loop_routes_a_tuple_key(tmp_path):
     have taken the operator's single `INTEGRAND` (None), so BOTH would have landed on `pos`: `sep`
     would have stayed at zero and `pos` would have moved by 3 per frame instead of 1. Those are the
     two numbers this asserts.
+
+    THE EXPECTED VALUE ENCODES THE TICK-0 CONVENTION, so it is written out rather than computed.
+    `ticks = range(n_frames + 1)`, and a `lateral` operator runs on ALL of them: 4 ticks x dt 1.0 x
+    delta 2.0 = 8.0. It read 6.0 for one day, between `d58728c8` (which skipped every kind but
+    seed/aggregate on tick 0, making row 0 the initial condition) and that change being reverted on
+    2026-09-04 -- the revert is why this line moved, and if it moves again the IC convention moved
+    with it. See the comment at the tick-0 site in `engine._run`.
     """
     import torch as _t
     from plexus.engine import run
@@ -178,8 +185,8 @@ def test_tick_loop_routes_a_tuple_key(tmp_path):
     c0, c1 = lvl.state_schema.slice("sep")
     sep = lvl.state[:, c0:c1]
 
-    assert _t.allclose(sep, _t.full_like(sep, 6.0)), (
-        f"`sep` should have integrated 3 ticks x dt 1.0 x delta 2.0 = 6.0, got {sep[0].tolist()}. "
+    assert _t.allclose(sep, _t.full_like(sep, 8.0)), (
+        f"`sep` should have integrated 4 ticks x dt 1.0 x delta 2.0 = 8.0, got {sep[0].tolist()}. "
         "Zero here means the tuple key was dropped and both deltas went to the coordinate block -- "
         "the pre-change behaviour, and the one that would have frozen a second surface silently.")
     assert not _t.allclose(sep, _t.zeros_like(sep)), "the second block never moved"
