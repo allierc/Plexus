@@ -29,8 +29,19 @@ against a file there proves the file has not changed, which is not the question.
 submits `N` pairs at a time and waits for a slot, so eighty jobs do not queue behind each other with
 the first failure invisible until the last one lands.
 
-Each pair lands in `log/promotion/<phase>_<spec>/` with `A/`, `B/`, `compare.png` and `compare.mp4`
-— the two sides side by side, stepped together, verdict in the footer.
+Each pair lands as **two sibling directories** — `log/promotion/<phase>_<spec>_A` and `..._B` —
+beside `<phase>_<spec>_compare.png` and `_compare.mp4`, the two sides stepped together with the
+verdict in the footer.
+
+**Flat, since 4 September, and the old shape is worth knowing because it was actively misleading.**
+There used to be a pair directory above the two sides, and inside it each run was kept TWICE: once
+where the runner natively wrote it — `<pair>/graphs_data/promotion/<name>/` for the core,
+`<worktree>/log/okuda/<name>/` for okuda — and once in the `A/`/`B/` mirror the comparison read.
+Measured on one pair, that was the same 7,507,620,532-byte `trajectory.npz` at two inodes. The disk
+was the smaller problem: kill a run and the mirror holds one attempt while the native tree holds
+another, with nothing in either name to say which. Now the poll copies only the small artefacts so a
+run can be watched, and `promote_side` **moves** the rest into the side directory when it lands, so
+the trajectory exists once and the directory a name points at is the only copy of it.
 
 ## 2a. The operator is missing, or needs changing
 
