@@ -1032,19 +1032,35 @@ def promote_side(side, run_name, side_dir):
     is a rename and the trajectory is stored ONCE. The old `collect` copied, which is how one pair
     came to hold the same 7.5 GB npz at two inodes."""
     src = os.path.dirname(_out_path(side, run_name, side_dir))
-    if not os.path.isdir(src) or os.path.abspath(src) == os.path.abspath(side_dir):
-        return
+    if os.path.isdir(src) and os.path.abspath(src) != os.path.abspath(side_dir):
+        _move_up(src, side_dir)
+    _sweep_shells(side_dir)
+
+
+def _move_up(src, side_dir):
     for f in os.listdir(src):
         sp, dp = os.path.join(src, f), os.path.join(side_dir, f)
         if os.path.exists(dp):
             shutil.rmtree(dp, ignore_errors=True) if os.path.isdir(dp) else os.remove(dp)
         shutil.move(sp, dp)
     shutil.rmtree(src, ignore_errors=True)
-    # and the empty scaffolding the runner insisted on: `<side>/graphs_data/promotion/`
-    for up in (os.path.dirname(src), os.path.dirname(os.path.dirname(src))):
-        if os.path.abspath(up).startswith(os.path.abspath(side_dir)) and os.path.isdir(up) \
-                and not os.listdir(up):
-            os.rmdir(up)
+
+
+def _sweep_shells(side_dir):
+    """THE SCAFFOLDING GOES TOO, and there are two trees of it, not one. `--output_root X` makes
+    `Plexus_Main` create BOTH `X/graphs_data/<campaign>/<name>/` (the run) and `X/log/<campaign>/
+    <name>/` (its `_complete` / `_completed_generate` markers). Promoting only the first leaves a
+    `log/` beside the trajectory holding four marker files, which is exactly the kind of directory
+    that gets read later as evidence of something.
+
+    SEPARATE FROM THE MOVE, and unconditional, because a side that has ALREADY been promoted still
+    has to be swept: the first version returned early when the source was gone and therefore never
+    reached this.
+    """
+    for shell in ("graphs_data", "log"):
+        top = os.path.join(side_dir, shell)
+        if os.path.isdir(top):
+            shutil.rmtree(top, ignore_errors=True)
 
 
 def collect(spec, names, dirs):
@@ -1143,6 +1159,14 @@ def main():
         # protocol: the two sides must not be separated by an hour of drift in the tree they read.
         if a.batch and not a.compare_only:
             while _running() >= 2 * a.batch:
+                # MIRROR WHILE WE WAIT FOR A SLOT, not only in the wait loop below. `_collect_live`
+                # used to run only after EVERY pair had been submitted -- and with `--batch 8` the
+                # submission itself blocks on free slots, so it takes as long as the whole suite.
+                # A pair that finished in 138 seconds therefore had an EMPTY directory bearing its
+                # name for the next two hours, with its output still in the runner's native tree,
+                # which reads as a run that produced nothing.
+                for _j in jobs:
+                    _collect_live(_j[6], _j[7])
                 time.sleep(45)
             # SETTLE BEFORE THE NEXT POLL. `bsub` returns as soon as the scheduler accepts the job,
             # and `bjobs` does not list it for a few seconds -- so a tight loop reads a stale count
