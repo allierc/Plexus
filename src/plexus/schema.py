@@ -389,7 +389,9 @@ def load(path: str) -> Spec:
     # (seed in schedule:) would reject if that operator is ALSO scheduled.
     if _legacy_seed_ops:
         warn(f"[warn] deprecated: {sorted(_legacy_seed_ops)} declared in operators: with "
-              f"kind=\"seed\" -- move to the seed: section (see SEED_MIGRATION.md). Still "
+              f"kind=\"seed\" -- move to the seed: section, or run "
+              f"`tools/migrate_seed_section.py` (see SEED_MIGRATION.md, which records that a "
+              f"`before_frame` wider than 1 CANNOT be migrated: `seed:` has no window). Still "
               f"accepted for now via the legacy engine seed-window path.")
 
     # --- warn about per-type properties no operator reads (typo guard) ------ #

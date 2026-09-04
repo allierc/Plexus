@@ -1,7 +1,6 @@
 _discovery:
   comp_hash: MINI_mini_grow_divide_bigger
-  region: same, vth_frac 1.4 -> 2.5 so cells can actually double before dividing [reference
-    buffers 3552/1800]
+  region: same, vth_frac 1.4 -> 2.5 so cells can actually double before dividing [reference buffers 3552/1800]
 fields: {}
 general:
   boundary: free
@@ -12,72 +11,71 @@ general:
   record_cap: 403
   seed: 0
   world:
-  - 50.0
-  - 50.0
-  - 50.0
+    - 50.0
+    - 50.0
+    - 50.0
+seed:
+  - at: vertex
+    cell_set: cell
+    jitter: 0.18
+    n_cells: 200
+    op: mesh_seed
+    p0: 3.5
+    radius: 5.0
+    seed: 0
+    vseed_cv: 0.15
 operators:
-- at: vertex
-  before_frame: 1
-  cell_set: cell
-  jitter: 0.18
-  n_cells: 200
-  op: mesh_seed
-  p0: 3.5
-  radius: 5.0
-  seed: 0
-  vseed_cv: 0.15
-- at: cell
-  op: cell_geometry
-- a_sw: 50.0
-  at: vertex
-  cell_set: cell
-  hill: 4.0
-  op: cell_grow
-  rate: 0.003457
-  rho: 0.0
-  vth_frac: 2.5
-- Gamma: 0.4
-  K_A: 1.0
-  K_P: 1.0
-  K_R: 0.4
-  K_V: 2.0
-  Lambda: 3.0
-  at: vertex
-  cap_frac: 0.12
-  dt: 1.0
-  eta: 0.08
-  mu: 1.0
-  op: cell_mechanics
-  p0: 3.5
-  relax_iters: 30
-- at: vertex
-  engine_clock: true
-  every: 4
-  l_th_frac: 0.35
-  max_flips: 30
-  op: edge_flip
-- at: vertex
-  cell_set: cell
-  cycle_cv: 0.15
-  engine_clock: true
-  every: 4
-  factor: 2.0
-  max_cycle: 1000000000
-  min_cycle: 4
-  op: cell_divide
-  p0: 3.5
-  reset_noise: 0.12
-- at: vertex
-  every: 1
-  op: topo_record
+  - at: cell
+    op: cell_geometry
+  - a_sw: 50.0
+    at: vertex
+    cell_set: cell
+    hill: 4.0
+    op: cell_grow
+    rate: 0.003457
+    rho: 0.0
+    vth_frac: 2.5
+  - Gamma: 0.4
+    K_A: 1.0
+    K_P: 1.0
+    K_R: 0.4
+    K_V: 2.0
+    Lambda: 3.0
+    at: vertex
+    cap_frac: 0.12
+    dt: 1.0
+    eta: 0.08
+    mu: 1.0
+    op: cell_mechanics
+    p0: 3.5
+    relax_iters: 30
+  - at: vertex
+    engine_clock: true
+    every: 4
+    l_th_frac: 0.35
+    max_flips: 30
+    op: edge_flip
+  - at: vertex
+    cell_set: cell
+    cycle_cv: 0.15
+    engine_clock: true
+    every: 4
+    factor: 2.0
+    max_cycle: 1000000000
+    min_cycle: 4
+    op: cell_divide
+    p0: 3.5
+    reset_noise: 0.12
+  - at: vertex
+    every: 1
+    op: topo_record
 schedule:
-- mesh_seed
-- cell_geometry
-- cell_grow
-- cell_mechanics
-- edge_flip
-- cell_divide
-- topo_record
+  - cell_geometry
+  - cell_grow
+  - cell_mechanics
+  - edge_flip
+  - cell_divide
+  - topo_record
 sets:
   cell:
     n: 130004

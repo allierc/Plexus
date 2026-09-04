@@ -69,7 +69,7 @@ sets:
     n: 12800                      # 3200 x 4
     state:
       area: {width: 1}
-      cen:  {width: 3}
+      cen: {width: 3}
       # INERT HERE and kept for layout fidelity with the reference: no chemistry operator is in this
       # schedule, so `chem` stays identically zero. `cell_grow` does not need it -- it has an explicit
       # no-chemistry branch, because no chemistry means UNIFORM growth, not no growth.
@@ -77,17 +77,16 @@ sets:
 
 fields: {}                        # required key; the loader raises without it
 
+seed:
+  - {op: mesh_seed, at: vertex, cell_set: cell, n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15}
 operators:
   # `kind: seed` declared under `operators:` is the DEPRECATED spelling and the loader says so. It
   # stays here rather than moving to a `seed:` section because migrating it is a behaviour change
   # that has to be twin-tested against this gate's own reference first -- which is what this gate is
   # for. `before_frame: 1` is redundant today (the window defaults to 1) and is a real guard: the
   # window is the MAX over every declared seed, so a future co-seed would widen this one's.
-  - {op: mesh_seed, at: vertex, before_frame: 1, cell_set: cell,
-     n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15}
   - {op: cell_geometry, at: cell}
-  - {op: cell_grow, at: vertex, cell_set: cell, rate: 0.003457, rho: 1.0,
-     a_sw: 50.0, hill: 4.0, vth_frac: 2.5}
+  - {op: cell_grow, at: vertex, cell_set: cell, rate: 0.003457, rho: 1.0, a_sw: 50.0, hill: 4.0, vth_frac: 2.5}
   # BEFORE `cell_mechanics`, because the energy reads `m["myo"]` in the frame it is written. After it,
   # the relaxation would use the previous frame's myosin -- on a 20-frame timescale, a lag nobody
   # would notice and everybody would inherit.
@@ -97,19 +96,13 @@ operators:
   # defaults 0.0 win and the archived tissue was built with them. Latent today because
   # `keyed_on: length` never evaluates the tension branch -- written out explicitly so the first
   # person to set `keyed_on: tension` sees a zero instead of inheriting a tissue no run ever had.
-  - {op: junction_myosin, at: vertex, activity: 1.0, tau: 20.0, beta: 1.0, myo_new: 1.0,
-     dt: 1.0, inherit: true, keyed_on: length, destabilising: true,
-     k_perim: 1.0, lam: 0.0, gam: 0.0}
-  - {op: cell_mechanics, at: vertex, K_A: 1.0, K_P: 1.0, K_V: 2.0, K_R: 0.4,
-     Lambda: 3.0, Gamma: 0.4, p0: 3.5, mu: 1.0, dt: 1.0,
-     relax_iters: 30, eta: 0.08, cap_frac: 0.12}
+  - {op: junction_myosin, at: vertex, activity: 1.0, tau: 20.0, beta: 1.0, myo_new: 1.0, dt: 1.0, inherit: true, keyed_on: length, destabilising: true, k_perim: 1.0, lam: 0.0, gam: 0.0}
+  - {op: cell_mechanics, at: vertex, K_A: 1.0, K_P: 1.0, K_V: 2.0, K_R: 0.4, Lambda: 3.0, Gamma: 0.4, p0: 3.5, mu: 1.0, dt: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.12}
   # `max_flips: 30` IS A RAIL, not a headroom: 32 of the 101 calls sit on it and deliver about two
   # thirds of the run's flips. Gated explicitly by `t1_rail_fraction` below rather than left for a
   # reader to discover, because a T1 rate measured against a cap is a property of the cap.
   - {op: edge_flip, at: vertex, every: 4, engine_clock: true, l_th_frac: 0.35, max_flips: 30}
-  - {op: cell_divide, at: vertex, cell_set: cell, every: 4, engine_clock: true,
-     factor: 2.0, cycle_cv: 0.15, min_cycle: 4, max_cycle: 1000000000, p0: 3.5,
-     reset_noise: 0.12}
+  - {op: cell_divide, at: vertex, cell_set: cell, every: 4, engine_clock: true, factor: 2.0, cycle_cv: 0.15, min_cycle: 4, max_cycle: 1000000000, p0: 3.5, reset_noise: 0.12}
   # AFTER the topology operators. `edge_flip` rewires the half-edge arrays and `cell_divide` lengthens
   # them, both after `junction_myosin` wrote `m["myo"]` for the arrays as they were -- so without this
   # the record holds this frame's edges beside last writing's myosin. Measured on the 401-frame
@@ -118,8 +111,7 @@ operators:
   - {op: junction_sync, at: vertex, myo_new: 1.0, inherit: true}
   - {op: topo_record, at: vertex, every: 1}
 
-schedule: [mesh_seed, cell_geometry, cell_grow, junction_myosin, cell_mechanics,
-           edge_flip, cell_divide, junction_sync, topo_record]
+schedule: [cell_geometry, cell_grow, junction_myosin, cell_mechanics, edge_flip, cell_divide, junction_sync, topo_record]
 
 # =====================================================================================
 #  THE GATE. Read by `tools/run_gates.py`; inert to the loader, which has no unknown-key
@@ -144,8 +136,7 @@ _gate:
   question: >
     Does an epithelium of 200 cells grow, divide and intercalate on a closed surface for 401 frames
     without tearing, losing a cell, or running out of its own array?
-  operators_exercised: [mesh_seed, cell_geometry, cell_grow, junction_myosin, cell_mechanics,
-                        edge_flip, cell_divide, junction_sync, topo_record]
+  operators_exercised: [mesh_seed, cell_geometry, cell_grow, junction_myosin, cell_mechanics, edge_flip, cell_divide, junction_sync, topo_record]
   cross_check:
     # NOT `log/okuda_ECM/00_spheroid/metrics.json`. That file reports 6,076 cells / fold 3.5577 /
     # aspect 1.0213 / 1,384 T1s, which belongs to the `_PRESYNC` sibling cache, not to the cache the

@@ -8,9 +8,9 @@ general:
   boundary: free
   dim: 3
   world:
-  - 80.0
-  - 80.0
-  - 80.0
+    - 80.0
+    - 80.0
+    - 80.0
 _run:
   target_cells: 4000
   seed_cells: 400
@@ -30,65 +30,62 @@ sets:
       area:
         width: 1
 fields: {}
+seed:
+  - op: mesh_seed
+    at: vertex
+    cell_set: cell
+    n_cells: 400
+    seed: 0
+    vseed_cv: 0.15
+    radius: 5.0
+    jitter: 0.15
+    p0: 3.5
 operators:
-- op: mesh_seed
-  at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 400
-  seed: 0
-  vseed_cv: 0.15
-  radius: 5.0
-  jitter: 0.15
-  p0: 3.5
-- op: cell_geometry
-  at: cell
-- op: cell_die
-  at: vertex
-  cell_set: cell
-  p0: 3.5
-  mode: list
-  cells:
-  - 137
-  shrink_rate: 0.1
-  critical_frac: 0.15
-  min_age: 0
-  after_frame: 50
-- op: cell_mechanics
-  at: vertex
-  K_A: 1.0
-  K_P: 1.0
-  K_V: 20.0
-  K_R: 0.0
-  Lambda: 0.5
-  Gamma: 0.4
-  p0: 3.5
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: edge_flip
-  at: vertex
-  l_th_frac: 0.28
-  every: 1
-  max_flips: 300
-- op: topo_record
-  at: vertex
-  every: 1
+  - op: cell_geometry
+    at: cell
+  - op: cell_die
+    at: vertex
+    cell_set: cell
+    p0: 3.5
+    mode: list
+    cells:
+      - 137
+    shrink_rate: 0.1
+    critical_frac: 0.15
+    min_age: 0
+    after_frame: 50
+  - op: cell_mechanics
+    at: vertex
+    K_A: 1.0
+    K_P: 1.0
+    K_V: 20.0
+    K_R: 0.0
+    Lambda: 0.5
+    Gamma: 0.4
+    p0: 3.5
+    mu: 1.0
+    dt: 1.0
+    relax_iters: 30
+    eta: 0.08
+    cap_frac: 0.12
+  - op: edge_flip
+    at: vertex
+    l_th_frac: 0.28
+    every: 1
+    max_flips: 300
+  - op: topo_record
+    at: vertex
+    every: 1
 schedule:
-- mesh_seed
-- cell_geometry
-- cell_die
-- cell_mechanics
-- edge_flip
-- topo_record
+  - cell_geometry
+  - cell_die
+  - cell_mechanics
+  - edge_flip
+  - topo_record
 _gate:
   gate: G13
   shrink_rate: 0.1
   critical_frac: 0.15
   predicted_clearing_ticks: 18.0
   predicted_death_frame: 68.0
-  why: 'one cell, marked once, on a tissue where nothing else changes: the frame it
-    vanishes minus 50 is the clearing time, and the ratio between rungs is ln(1-s1)/ln(1-s2)
-    with the T1 shedding overhead cancelled out'
+  why: 'one cell, marked once, on a tissue where nothing else changes: the frame it vanishes minus 50 is the clearing time, and the ratio between rungs is ln(1-s1)/ln(1-s2) with the T1 shedding overhead cancelled out'
