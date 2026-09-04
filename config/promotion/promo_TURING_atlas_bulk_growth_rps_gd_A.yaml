@@ -45,12 +45,12 @@ operators:
     at: cell
   - op: cell_chem_seed
     at: cell
-    mode: simplex
     n_spots: 1
     cone_deg: 8.0
     seed: 819657
     before_frame: 3
     n_species: 3
+    model: simplex
   - op: cell_neighbours
     at: cell
   - op: cell_chem_diffuse

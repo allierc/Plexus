@@ -42,7 +42,6 @@ operators:
     at: cell
   - op: cell_chem_seed
     at: cell
-    mode: scatter
     n_spots: 1
     cone_deg: 8.0
     seed: 1003

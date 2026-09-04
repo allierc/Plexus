@@ -7,8 +7,8 @@ general:
   dim: 2
   boundary: free
   world:
-  - 49.4
-  - 49.4
+    - 49.4
+    - 49.4
 sets:
   cell:
     n: 4000
@@ -25,32 +25,31 @@ sets:
         boundary: free
 fields: {}
 operators:
-- op: cell_chem_seed
-  at: cell
-  seed: 0
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.12
-- op: radius_graph
-  at: cell
-  radius: 0.95
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.08
-  d_h: 0.16
-  chi: 0.5
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.03
-  kk: 0.055
-  rate: 1.0
+  - op: cell_chem_seed
+    at: cell
+    seed: 0
+    before_frame: 3
+    seed_frac: 0.12
+  - op: radius_graph
+    at: cell
+    radius: 0.95
+  - op: cell_chem_diffuse
+    at: cell
+    implementation: graph_laplacian
+    d_a: 0.08
+    d_h: 0.16
+    chi: 0.5
+  - op: cell_chem_react
+    at: cell
+    model: gray_scott
+    F: 0.03
+    kk: 0.055
+    rate: 1.0
 schedule:
-- cell_chem_seed
-- radius_graph
-- cell_chem_diffuse
-- cell_chem_react
+  - cell_chem_seed
+  - radius_graph
+  - cell_chem_diffuse
+  - cell_chem_react
 plotting:
   renderer: mpl2d
   background: black

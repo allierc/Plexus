@@ -7,8 +7,8 @@ general:
   dim: 2
   boundary: free
   world:
-  - 49.4
-  - 49.4
+    - 49.4
+    - 49.4
 sets:
   cell:
     n: 4000
@@ -25,59 +25,57 @@ sets:
         boundary: free
 fields: {}
 operators:
-- op: cell_chem_seed
-  at: cell
-  seed: 0
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.12
-  chan: 0
-- op: cell_chem_seed
-  at: cell
-  seed: 2
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.12
-  chan: 2
-- op: radius_graph
-  at: cell
-  radius: 0.95
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
-  chan: 0
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
-  chan: 2
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.046
-  kk: 0.062
-  rate: 1.0
-  chan: 0
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.034
-  kk: 0.063
-  rate: 1.0
-  chan: 2
+  - op: cell_chem_seed
+    at: cell
+    seed: 0
+    before_frame: 3
+    seed_frac: 0.12
+    chan: 0
+  - op: cell_chem_seed
+    at: cell
+    seed: 2
+    before_frame: 3
+    seed_frac: 0.12
+    chan: 2
+  - op: radius_graph
+    at: cell
+    radius: 0.95
+  - op: cell_chem_diffuse
+    at: cell
+    implementation: graph_laplacian
+    d_a: 0.08
+    d_h: 0.16
+    chi: 1.3
+    chan: 0
+  - op: cell_chem_diffuse
+    at: cell
+    implementation: graph_laplacian
+    d_a: 0.08
+    d_h: 0.16
+    chi: 1.3
+    chan: 2
+  - op: cell_chem_react
+    at: cell
+    model: gray_scott
+    F: 0.046
+    kk: 0.062
+    rate: 1.0
+    chan: 0
+  - op: cell_chem_react
+    at: cell
+    model: gray_scott
+    F: 0.034
+    kk: 0.063
+    rate: 1.0
+    chan: 2
 schedule:
-- cell_chem_seed
-- cell_chem_seed
-- radius_graph
-- cell_chem_diffuse
-- cell_chem_diffuse
-- cell_chem_react
-- cell_chem_react
+  - cell_chem_seed
+  - cell_chem_seed
+  - radius_graph
+  - cell_chem_diffuse
+  - cell_chem_diffuse
+  - cell_chem_react
+  - cell_chem_react
 plotting:
   renderer: mpl2d
   background: black

@@ -45,7 +45,6 @@ operators:
   - op: cell_chem_seed
     at: cell
     seed: 0
-    mode: scatter
     seed_frac: 0.12
   - op: cell_neighbours
     at: cell
