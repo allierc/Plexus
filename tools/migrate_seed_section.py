@@ -55,6 +55,33 @@ def seed_kind_names():
     return {n for n, c in REG.items() if getattr(c, "KIND", None) == "seed"}
 
 
+def drop_window(doc, seeds):
+    """Remove `before_frame` from every seed operator. Returns the names touched.
+
+    A SEED THAT RUNS FOR THREE FRAMES IS NOT AN INITIAL CONDITION -- it re-applies x_0 on ticks 0, 1
+    and 2, and `seed_cell_chem`'s own docstring records what that costs: re-applying it "overwrites
+    BOTH chemistry channels, so no operator that writes to `chem` can accumulate anything". The
+    value is a template, not a decision: across 1,482 chemistry seeds, 1,478 say 3, three say 1 and
+    one says 906.
+
+    IT IS A BEHAVIOUR CHANGE AND NOT A CLEANUP, measured on `config/okuda/apop_loop_small.yaml` at
+    12 frames under PLEXUS_STRICT_DETERMINISM (noise floor 0.000e+00 on both arrays): dropping the
+    window leaves vertex positions BYTE-IDENTICAL and moves the chemistry by 1.468e-01 from row 1,
+    on an activator scale of ~0.5. Positions are untouched only because 12 frames is too short for
+    chem -> cell_grow -> geometry to close; on the spec's real 900 they would not be.
+
+    So this is opt-in per glob, and `config/okuda/` is deliberately NOT swept: those 1,256 are
+    ARCHIVED campaign specs, and a spec that no longer reproduces the run it recorded is worse than
+    a spec with an odd window.
+    """
+    touched = []
+    for o in (doc.get("operators") or []):
+        if isinstance(o, dict) and o.get("op") in seeds and "before_frame" in o:
+            touched.append(f"{o['op']}[before_frame={o['before_frame']}]")
+            del o["before_frame"]
+    return touched
+
+
 def plan(doc, seeds):
     """(moves, refusal). `moves` is the list of operator entries to relocate, in schedule order."""
     ops = doc.get("operators") or []
@@ -80,7 +107,7 @@ def plan(doc, seeds):
     return [ops[i] for i in sorted(idx, key=lambda i: sched.index(ops[i]["op"]))], None
 
 
-def migrate(path, seeds, apply=False):
+def migrate(path, seeds, apply=False, drop_win=False):
     """Returns (status, detail). status in {'moved', 'already', 'none', 'refused', 'unreadable'}."""
     from ruamel.yaml import YAML
     y = YAML()
@@ -100,10 +127,20 @@ def migrate(path, seeds, apply=False):
         return "none", ""
     if "seed" in doc:
         return "already", ""
+    dropped = drop_window(doc, seeds) if drop_win else []
     moves, refusal = plan(doc, seeds)
     if refusal:
+        if dropped and apply:                    # the window went even if the move cannot
+            with open(path, "w") as f:
+                y.dump(doc, f)
+            return "window", ", ".join(dropped)
         return "refused", refusal
     if not moves:
+        if dropped:
+            if apply:
+                with open(path, "w") as f:
+                    y.dump(doc, f)
+            return "window", ", ".join(dropped)
         return "none", ""
 
     names = [o["op"] for o in moves]
@@ -135,6 +172,9 @@ def main():
     ap.add_argument("--apply", action="store_true", help="write the files (default is a dry run)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--quiet", action="store_true", help="only the roll-up and the refusals")
+    ap.add_argument("--drop-window", action="store_true",
+                    help="also delete `before_frame` from every seed operator -- A BEHAVIOUR "
+                         "CHANGE (see drop_window's docstring), opt-in per --glob")
     a = ap.parse_args()
 
     seeds = seed_kind_names()
@@ -145,14 +185,15 @@ def main():
     counts = {}
     refused = []
     for p in paths:
-        st, detail = migrate(p, seeds, apply=a.apply and not a.dry_run)
+        st, detail = migrate(p, seeds, apply=a.apply and not a.dry_run, drop_win=a.drop_window)
         counts[st] = counts.get(st, 0) + 1
         rel = os.path.relpath(p, ROOT)
         if st == "refused":
             refused.append((rel, detail))
-        elif st == "moved" and not a.quiet:
+        elif st in ("moved", "window") and not a.quiet:
             print(f"  {'moved ' if a.apply and not a.dry_run else 'would move'}  {rel}   [{detail}]")
-    print(f"\n  {counts.get('moved', 0)} to migrate | {counts.get('already', 0)} already on seed: "
+    print(f"\n  {counts.get('moved', 0)} to migrate | {counts.get('window', 0)} window dropped only "
+          f"| {counts.get('already', 0)} already on seed: "
           f"| {counts.get('none', 0)} no seed op | {len(refused)} REFUSED "
           f"| {counts.get('unreadable', 0)} unreadable")
     for rel, why in refused:

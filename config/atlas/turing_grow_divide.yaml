@@ -19,9 +19,9 @@ general:
   boundary: free
   dim: 3
   world:
-  - 50.0
-  - 50.0
-  - 50.0
+    - 50.0
+    - 50.0
+    - 50.0
   units:
     length_um: 10.0
     time_s: 600.0
@@ -45,109 +45,107 @@ sets:
         integration: first_order
 fields: {}
 operators:
-- op: mesh_seed
-  at: vertex
-  before_frame: 1
-  cell_set: cell
-  n_cells: 2000
-  radius: 5.0
-  jitter: 0.18
-  p0: 3.5
-  seed: 0
-  vseed_cv: 0.15
-- op: cell_chem_seed
-  at: cell
-  seed: 0
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.06
-- op: cell_neighbours
-  at: cell
-  vertex_set: vertex
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.046
-  kk: 0.062
-  rate: 1.0
-- op: cell_chem_from_shape
-  at: cell
-  model: curvature
-  vertex_set: vertex
-  beta: 0.5
-  F0: 0.046
-  rate: 1.0
-- op: cell_geometry
-  at: cell
-- op: cell_grow
-  at: vertex
-  cell_set: cell
-  rate: 0.000866
-  rho: 0.1
-  a_sw: 0.35
-  hill: 4.0
-  vth_frac: 2.5
-  after_frame: 100
-  conserve_amount: false
-- op: cell_mechanics
-  at: vertex
-  K_A: 1.0
-  K_P: 1.0
-  K_V: 2.0
-  K_R: 0.4
-  Lambda: 3.0
-  Gamma: 0.4
-  p0: 3.5
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: edge_flip
-  at: vertex
-  every: 4
-  engine_clock: true
-  l_th_frac: 0.35
-  max_flips: 30
-- op: cell_divide
-  at: vertex
-  cell_set: cell
-  every: 4
-  engine_clock: true
-  factor: 2.0
-  cycle_cv: 0.15
-  min_cycle: 4
-  max_cycle: 1000000000
-  p0: 3.5
-  reset_noise: 0.12
-- op: topo_record
-  at: vertex
+  - op: mesh_seed
+    at: vertex
+    cell_set: cell
+    n_cells: 2000
+    radius: 5.0
+    jitter: 0.18
+    p0: 3.5
+    seed: 0
+    vseed_cv: 0.15
+  - op: cell_chem_seed
+    at: cell
+    seed: 0
+    mode: scatter
+    seed_frac: 0.06
+  - op: cell_neighbours
+    at: cell
+    vertex_set: vertex
+  - op: cell_chem_diffuse
+    at: cell
+    implementation: graph_laplacian
+    d_a: 0.08
+    d_h: 0.16
+    chi: 1.3
+  - op: cell_chem_react
+    at: cell
+    model: gray_scott
+    F: 0.046
+    kk: 0.062
+    rate: 1.0
+  - op: cell_chem_from_shape
+    at: cell
+    model: curvature
+    vertex_set: vertex
+    beta: 0.5
+    F0: 0.046
+    rate: 1.0
+  - op: cell_geometry
+    at: cell
+  - op: cell_grow
+    at: vertex
+    cell_set: cell
+    rate: 0.000866
+    rho: 0.1
+    a_sw: 0.35
+    hill: 4.0
+    vth_frac: 2.5
+    after_frame: 100
+    conserve_amount: false
+  - op: cell_mechanics
+    at: vertex
+    K_A: 1.0
+    K_P: 1.0
+    K_V: 2.0
+    K_R: 0.4
+    Lambda: 3.0
+    Gamma: 0.4
+    p0: 3.5
+    mu: 1.0
+    dt: 1.0
+    relax_iters: 30
+    eta: 0.08
+    cap_frac: 0.12
+  - op: edge_flip
+    at: vertex
+    every: 4
+    engine_clock: true
+    l_th_frac: 0.35
+    max_flips: 30
+  - op: cell_divide
+    at: vertex
+    cell_set: cell
+    every: 4
+    engine_clock: true
+    factor: 2.0
+    cycle_cv: 0.15
+    min_cycle: 4
+    max_cycle: 1000000000
+    p0: 3.5
+    reset_noise: 0.12
+  - op: topo_record
+    at: vertex
   # SAME CLOCK AS THE POSITIONS -- see the note in `turing_coral.yaml`. `record_cap: 602` against
   # 1800 frames records positions every 3rd tick (601 rows) while `every: 1` recorded 1801 topology
   # rows, and D3 refuses the pair. 3 = 1800 / (602 - 1).
-  every: 3
+    every: 3
   # `engine_clock: true` IS NOT OPTIONAL HERE. `_engine_owns_clock` returns 1 for any
   # operator that does not declare it, so `every: 3` alone was silently discarded and the
   # topology went on recording every tick -- the D3 misalignment survived the fix that was
   # supposed to remove it. The flag asserts the period is written for the engine-owned
   # clock rather than for the old operator-side one, which meant every*every.
-  engine_clock: true
+    engine_clock: true
 schedule:
-- mesh_seed
-- cell_geometry
-- cell_grow
-- cell_chem_seed
-- cell_neighbours
-- cell_chem_diffuse
-- cell_chem_react
-- cell_chem_from_shape
-- cell_mechanics
-- edge_flip
-- cell_divide
-- topo_record
+  - mesh_seed
+  - cell_geometry
+  - cell_grow
+  - cell_chem_seed
+  - cell_neighbours
+  - cell_chem_diffuse
+  - cell_chem_react
+  - cell_chem_from_shape
+  - cell_mechanics
+  - edge_flip
+  - cell_divide
+  - topo_record

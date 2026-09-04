@@ -21,37 +21,31 @@
 # Geometry is the promotion runs' (config-identical sunflower disc of 4,000 cells, radius 19 in a
 # 49.4 box, radius_graph 0.95), so this run can be read directly against
 # TURING_atlas_turing2d_gs_kappa and _two_beta.
-general: {name: rps_gs_mix, seed: 0, n_frames: 6000, record_cap: 602, dt: 1.0, dim: 2,
-          boundary: free, world: [49.4, 49.4]}
+general: {name: rps_gs_mix, seed: 0, n_frames: 6000, record_cap: 602, dt: 1.0, dim: 2, boundary: free, world: [49.4, 49.4]}
 sets:
   cell:
     n: 4000
     spawn: sunflower                     # even disc coverage (Vogel spiral), as in the atlas runs
     spawn_radius: 19.0
     state:
-      pos:  {width: 2, integration: none, boundary: free}
+      pos: {width: 2, integration: none, boundary: free}
       chem: {width: 6, integration: first_order, boundary: free}   # [a, h | -- | u, v, w]
 fields: {}
+seed:
+  - {op: cell_chem_seed, at: cell, chan: 3, n_species: 3, mode: simplex, p0: 1.0, noise: 0.04, seed: 0}
+  - {op: cell_chem_seed, at: cell, chan: 0, mode: scatter, seed_frac: 0.12, seed: 0}
 operators:
   # --- rock-paper-scissors: three species on columns 3,4,5 ---------------------
   # `simplex` seeds them onto the May-Leonard simplex u+v+w = p0, which is the state that model
   # expects; `scatter` is the Gray-Scott initial condition and would start RPS off its own manifold.
-  - {op: cell_chem_seed, at: cell, chan: 3, n_species: 3, mode: simplex, p0: 1.0,
-     noise: 0.04, seed: 0, before_frame: 3}
   - {op: radius_graph, at: cell, radius: 0.95}
-  - {op: cell_chem_diffuse, at: cell, implementation: graph_laplacian, chan: 3,
-     d: [1.0, 1.0, 1.0], chi: 0.35}      # all three species diffuse alike (Reichenbach et al. 2007)
+  - {op: cell_chem_diffuse, at: cell, implementation: graph_laplacian, chan: 3, d: [1.0, 1.0, 1.0], chi: 0.35} # all three species diffuse alike (Reichenbach et al. 2007)
   - {op: cell_chem_react, at: cell, model: rock_paper_scissor, chan: 3, a: 0.6, rate: 0.35}
-  # --- Gray-Scott: activator + substrate on columns 0,1 ------------------------
-  - {op: cell_chem_seed, at: cell, chan: 0, mode: scatter, seed_frac: 0.12, seed: 0,
-     before_frame: 3}
-  - {op: cell_chem_diffuse, at: cell, implementation: graph_laplacian, chan: 0,
-     d_a: 0.08, d_h: 0.16, chi: 4.0}
+  - {op: cell_chem_diffuse, at: cell, implementation: graph_laplacian, chan: 0, d_a: 0.08, d_h: 0.16, chi: 4.0}
   - {op: cell_chem_react, at: cell, model: gray_scott, chan: 0, F: 0.05, kk: 0.063, rate: 1.0}
 # EVERY INSTANCE NEEDS ITS OWN TOKEN. The k-th occurrence of a name in the schedule runs the k-th
 # instance of that operator, so naming `cell_chem_react` once with two instances declared runs only
 # the first: the first pass of this spec listed each token once and silently ran the RPS half alone,
 # leaving the Gray-Scott columns at exactly zero for all 6,000 frames.
-schedule: [cell_chem_seed, cell_chem_seed, radius_graph,
-           cell_chem_diffuse, cell_chem_diffuse, cell_chem_react, cell_chem_react]
+schedule: [radius_graph, cell_chem_diffuse, cell_chem_diffuse, cell_chem_react, cell_chem_react]
 plotting: {renderer: mpl2d, background: black, dot_fill: 0.9}
