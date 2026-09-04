@@ -2449,6 +2449,12 @@ class MonolayerShapeEnergy3D(Lateral):
         # REST STATE. "force_balance" makes the seeded vesicle an equilibrium; "volume_only" is the
         # original behaviour, kept so the collapse can be reproduced deliberately. See _rest_offset.
         self.rest_calibration = str(params.get("rest_calibration", "force_balance"))
+        # THE SAME PLANAR CONSTRAINT THE DEFAULT IMPLEMENTATION TAKES. This class does not derive
+        # from `ShapeEnergy3D` -- it is a different energy on the same contract -- so it parses
+        # and applies `plane_axis` itself. Without this the key is accepted, ignored, and a flat
+        # monolayer buckles for a reason that has nothing to do with its thickness.
+        _pa = params.get("plane_axis", None)
+        self.plane_axis = None if _pa is None else int(_pa)
 
     def _rest_offset(self, x0, es, et, ef, nF, h, V_eq0, alive, R0t, eocc, vocc):
         """The constant to add to every cell's target volume so the SEEDED SHELL IS AT REST.
@@ -2555,10 +2561,17 @@ class MonolayerShapeEnergy3D(Lateral):
             V_eq = (V_eq + m["mono_delta"]).clamp(min=1e-9)
         with torch.no_grad():
             cap = self.cap_frac * (x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-6)
+        # STASHED FOR THE TOPOLOGY OPERATORS, exactly as the default implementation does it:
+        # `edge_flip` reads the plane off `m["mech"]`, so a monolayer sheet keeps its T1s in plane.
+        m["mech"] = dict(K_A=0.0, K_P=0.0, K_V=self.k_v, K_R=self.K_R, Lambda=self.Lambda,
+                         Gamma=self.gamma, eta=self.eta, cap_frac=self.cap_frac,
+                         plane_axis=self.plane_axis)
         x = x0.clone()
         for _ in range(max(1, self.relax_iters)):
             step = -(self.eta * self.mu) * self._grad(x, es, et, ef, nF, h_cell, V_eq, m["alive"], R0t, eocc, vocc)
             step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+            if self.plane_axis is not None:
+                step[:, self.plane_axis] = 0.0
             x = x + step
         # THE DIVISOR IS `general.dt`, NOT A DECLARED ONE -- the same by-construction fix as the
         # default implementation (see the long note at ShapeEnergy3D). This operator emits a
