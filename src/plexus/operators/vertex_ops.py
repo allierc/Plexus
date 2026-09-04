@@ -110,6 +110,67 @@ def build_sphere_mesh(n, r=1.0, jitter=0.0, seed=0):
             np.array(ef, np.int64), len(faces))
 
 
+def build_disc_mesh(n, r=1.0, jitter=0.0, seed=0):
+    """A FLAT Voronoi patch as an open half-edge mesh: vertices [Nv,3] (z=0), E_srce/E_trgt/E_face, nF.
+
+    The planar twin of `build_sphere_mesh`, and it exists for one reason: a sheet is where the
+    monolayer's apical/basal offset can be judged with no curvature in the picture. On a closed
+    shell a normal offset that is going unstable and a shell that is merely bumpy look alike; on a
+    flat patch the mid-surface should stay in its plane, and any departure IS the instability.
+
+    OPEN, AND DELIBERATELY SO. Only the Voronoi regions that are BOUNDED and lie wholly inside the
+    disc are kept, so the patch has a rim: rim edges belong to one face, not two. Euler is not 2 and
+    `_check_closed` will say so -- which is correct, this is not a closed surface. The operators that
+    care refuse a rim face rather than crashing (`divide_face_3d` returns None when a split edge has
+    no neighbour), so the interior grows and the rim does not.
+
+    CCW AS SEEN FROM +z, so the Newell area vector points along +z and every wedge volume taken about
+    an origin BELOW the patch is positive -- which is what makes `cell_grow` and `cell_divide` work
+    on a sheet without changing them: at height h the wedge volume is (h/3)A, exactly proportional to
+    the cell's area.
+    """
+    from scipy.spatial import Voronoi
+    g = np.random.default_rng(seed)
+    # a jittered hex-ish lattice covering the disc, which gives rounder cells than pure Poisson
+    m = int(np.ceil(np.sqrt(n / 0.7854)))                    # disc packs pi/4 of its bounding square
+    step = 2.0 * r / max(m, 1)
+    xs, ys = np.meshgrid(np.arange(m + 1) * step - r, np.arange(m + 1) * step - r)
+    xs = xs + (np.arange(m + 1)[:, None] % 2) * 0.5 * step   # offset alternate rows -> hexagonal
+    pts = np.stack([xs.ravel(), ys.ravel()], 1)
+    if jitter > 0:
+        pts = pts + jitter * step * (g.random(pts.shape) - 0.5)
+    pts = pts[np.linalg.norm(pts, axis=1) <= r * 1.35]       # a collar OUTSIDE the disc, so the
+    #                                                          cells we keep have bounded regions
+    vor = Voronoi(pts)
+    keep_r = r                                               # cells whose vertices all sit inside
+    faces, V = [], vor.vertices
+    for ip, ir in enumerate(vor.point_region):
+        reg = vor.regions[ir]
+        if not reg or -1 in reg:                             # unbounded region: outside the collar
+            continue
+        P = V[reg]
+        if np.linalg.norm(P, axis=1).max() > keep_r:
+            continue
+        faces.append(np.asarray(reg, np.int64))
+    if not faces:
+        raise ValueError(f"build_disc_mesh: no bounded cell inside r={r} for n={n}")
+    used = np.unique(np.concatenate(faces))                  # drop the collar's vertices
+    remap = -np.ones(len(V), np.int64); remap[used] = np.arange(len(used))
+    verts = np.zeros((len(used), 3), np.float64); verts[:, :2] = V[used]
+    es, et, ef = [], [], []
+    for f, reg in enumerate(faces):
+        rr = remap[reg]
+        P = verts[rr, :2]
+        c = P.mean(0)
+        if np.cross(P[0] - c, P[1] - c) < 0:                 # CCW seen from +z
+            rr = rr[::-1]
+        k = len(rr)
+        for i in range(k):
+            es.append(int(rr[i])); et.append(int(rr[(i + 1) % k])); ef.append(f)
+    return (verts, np.array(es, np.int64), np.array(et, np.int64),
+            np.array(ef, np.int64), len(faces))
+
+
 def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
     """Per-face 3D area (Newell area-vector magnitude), perimeter, centroid, and the PER-CELL wedge
     volume v_f = (1/3)(cen_f . N_f) -- the volume of the pyramid from the sphere centre to the face.
@@ -207,6 +268,8 @@ def _relax_subset(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, mech, move_mask, 
             g = torch.nan_to_num(torch.autograd.grad(E, xg)[0])
         step = -mech["eta"] * g
         step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+        if mech.get("plane_axis") is not None:                    # 2D vertex model: see ShapeEnergy3D
+            step[:, int(mech["plane_axis"])] = 0.0
         x = x + step * mm                                        # only the fresh region moves
     return x.detach()
 
@@ -274,6 +337,19 @@ class SeedMesh3D(Structural):
         # unit box put the vesicle in a corner. Default [0,0,0], so the 461 specs that never asked
         # are byte-identical.
         self.centre = [float(v) for v in params.get("centre", [0.0, 0.0, 0.0])]
+        # `shape: sphere | disc` -- THE GEOMETRY OF THE INITIAL CONDITION, and it is a value on this
+        # operator rather than a `model:` because a flat patch and a closed shell are the same
+        # hypothesis about the tissue seeded into two different geometries. `seed_plate` already
+        # spells its geometry this way.
+        #
+        # A DISC IS AN OPEN MESH, which the rest of the vertex stack has never seen: `divide_face_3d`
+        # refuses a face whose split edges lack two distinct interior neighbours, and every rim face
+        # is one. That is the point of seeding it -- a flat sheet is where the monolayer's normal
+        # offset can be tuned with no curvature in the picture -- but it means the rim does not
+        # divide, and the run has to be read knowing that.
+        self.shape = str(params.get("shape", "sphere")).lower()
+        if self.shape not in ("sphere", "disc"):
+            raise ValueError(f"mesh_seed: shape must be 'sphere' or 'disc', got {self.shape!r}")
         # PARTITION THE TYPES BY POSITION, NOT AT RANDOM. `type_layout` on a SET is applied at build
         # (engine.py), over that set's own coordinates -- which a mesh cell does not have yet: the
         # cells do not exist until this operator runs, so the build-time split assigns every one of
@@ -302,7 +378,8 @@ class SeedMesh3D(Structural):
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device; dt = lvl.state.dtype
-        verts, es, et, ef, nF = build_sphere_mesh(self.n, self.R, self.jitter, self.seed)
+        _build = build_sphere_mesh if self.shape == "sphere" else build_disc_mesh
+        verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
         Nv = verts.shape[0]; Nbuf = lvl.state.shape[0]
         if Nv > Nbuf:
             raise ValueError(f"sphere mesh has {Nv} vertices but buffer n={Nbuf}")
@@ -457,6 +534,19 @@ class ShapeEnergy3D(Lateral):
         # back the move of any vertex whose incident face would drop v_f below `antiinv` x median(v_f) --
         # a move that only makes an already-inverted face WORSE is blocked, a recovering move is allowed.
         # Straight-through (scale detached) so the rollout stays differentiable. 0 = off (default).
+        # `plane_axis` -- CONSTRAIN THE SOLVER TO A PLANE, which is what makes this a 2D vertex
+        # model. The ENERGY is unchanged; only the descent is projected, so a flat sheet stays in
+        # its plane by construction rather than by a restoring force fighting it.
+        #
+        # A PENALTY CANNOT DO THIS JOB, measured: `plate_confine` at `gap_half: 0.02` left the sheet
+        # undulating with sd(z) = 0.20 -- ten times the declared gap and 43% of an edge length --
+        # because this loop takes `relax_iters` (30) free 3D steps and the penalty corrects once per
+        # frame afterwards. Raising its stiffness does not help; the run goes NaN at 6.0 and 30.0,
+        # since an explicit penalty is stability-limited exactly where it would start to bite.
+        #
+        # None (the default) leaves every existing run untouched.
+        _pa = params.get("plane_axis", None)
+        self.plane_axis = None if _pa is None else int(_pa)
         self.antiinv = float(params.get("antiinv", 0.0))
         # Lloyd-like tangential regularization (vertex-model analog of Turing's surface_lloyd): rounds cells
         self.smooth_iters = int(params.get("smooth_iters", 0)); self.smooth_w = float(params.get("smooth_w", 0.0))
@@ -580,8 +670,14 @@ class ShapeEnergy3D(Lateral):
             return {self.at: v_full}
         Nv = int(m["Nv"]); nF = int(m["nF"]); es = m["E_srce"]; et = m["E_trgt"]; ef = m["E_face"]
         E = es.shape[0]; dev = pos_full.device; dt = pos_full.dtype
+        # `plane_axis` TRAVELS WITH THE REST. `cell_divide` heals the two fresh daughters and
+        # their one-ring with `_relax_subset`, a SECOND descent loop reading these numbers -- and
+        # a constraint the main loop honours and that one does not is a constraint the run does
+        # not have. Measured: with the main relax projected into the plane and this omitted, the
+        # sheet still drifted to sd(z) = 5.5% of an edge, and the drift tracked division activity.
         m["mech"] = dict(K_A=self.K_A, K_P=self.K_P, K_V=self.K_V, K_R=self.K_R, Lambda=self.Lambda,
-                         Gamma=self.Gamma, eta=self.eta, cap_frac=self.cap_frac)   # for cell_divide local relax
+                         Gamma=self.Gamma, eta=self.eta, cap_frac=self.cap_frac,
+                         plane_axis=self.plane_axis)   # for cell_divide local relax
         x0 = pos_full[:Nv].detach().clone()
         R0t = torch.as_tensor(float(m["R0"]), dtype=dt, device=dev)
         with torch.no_grad():
@@ -621,6 +717,8 @@ class ShapeEnergy3D(Lateral):
                 if floor is not None:                            # block any substep that drives a face toward inversion
                     _, _, _, vf_cur = face_geometry_3d(x, es, et, ef, nF, eocc)
                     step = step * self._antiinv_scale(x, step, es, et, ef, nF, eocc, vf_cur, floor)
+                if self.plane_axis is not None:                   # 2D vertex model: no motion off the sheet
+                    step[:, self.plane_axis] = 0.0
                 x = x + step
         if self.smooth_iters and self.smooth_w > 0:      # Lloyd-like tangential regularization -> rounder cells
             es, et = m["E_srce"], m["E_trgt"]
@@ -733,6 +831,14 @@ class Divide3D(Structural):
         # rather than widening it. orient_asw = activator threshold that flags an interface/red cell. 0 = off.
         self.orient_iface = bool(params.get("orient_iface", False))
         self.orient_asw = float(params.get("orient_asw", 1.0))
+        # `project` -- PUSH THE TWO NEW MIDPOINTS BACK OUT TO THE LOCAL SHELL RADIUS. True is
+        # right for a closed vesicle, where a septum midpoint left at the chord would dimple the
+        # surface inward at every division. It is a SPHERE assumption, and on a flat sheet it is
+        # simply wrong: |p| is measured from the world origin, so it lifts the midpoints off the
+        # plane. Measured on `mesh_mpm_step1_sheet_flat`, it was the entire residual
+        # out-of-plane drift once the solver itself was constrained -- sd(z) growing to 5.4% of
+        # an edge purely from division, on a sheet whose mechanics could no longer leave the plane.
+        self.project = bool(params.get("project", True))
 
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
         """Has this cell earned a division? THE ONLY THING A `model=` VARIANT OF cell_divide CHANGES.
@@ -910,7 +1016,7 @@ class Divide3D(Structural):
                 ea, eb = int(np.argmax(proj)), int(np.argmin(proj))
             except Exception:
                 ea, eb = 0, len(r) // 2
-            res = divide_face_3d(rings, pos, f, ea=ea, eb=eb, emap=emap)
+            res = divide_face_3d(rings, pos, f, ea=ea, eb=eb, emap=emap, project=self.project)
             if res is None:
                 continue
             half = vf[f] * 0.5                                    # each daughter is born at half the actual volume
@@ -1935,7 +2041,7 @@ def _face_ok_3d(ring, getp):
 T1_TRACE: list = []
 
 
-def t1_flip_3d(rings, pos, e_uv, new_len=None, emap=None, vf=None):
+def t1_flip_3d(rings, pos, e_uv, new_len=None, emap=None, vf=None, plane_axis=None):
     """One surface T1 on interior edge e_uv=(u,v): rewire the four rings A,B,C,D and move u,v apart
     along the tangent-plane perpendicular (projected onto the shell). Mutates `rings` and pos[u],pos[v]
     in place and returns (u,v) on success; returns None (no-op) if the flip is impossible or would break
@@ -1968,9 +2074,19 @@ def t1_flip_3d(rings, pos, e_uv, new_len=None, emap=None, vf=None):
     pu = np.asarray(pos[u], float); pv = np.asarray(pos[v], float)
     mid = 0.5 * (pu + pv); rmid = np.linalg.norm(mid)
     d = pv - pu; L = np.linalg.norm(d)
-    if L < 1e-12 or rmid < 1e-9:
+    if L < 1e-12 or (plane_axis is None and rmid < 1e-9):
         return None
-    n = mid / rmid                                           # outward radial (shell normal)
+    # THE SHELL NORMAL, AND ON A SHEET IT IS NOT THE RADIAL. For a closed vesicle the outward
+    # radial from the world origin is the surface normal, which is what this assumed. On a FLAT
+    # patch it is not: a sheet at height 5 has a radial that tilts away from +z everywhere except
+    # the axis, so reopening the junction perpendicular to it, and then re-projecting both new
+    # vertices onto a sphere below, lifts them off the plane at every flip. Ablation measured it
+    # exactly: with `edge_flip` removed the sheet stayed at sd(z) = 0.00e+00, with it 4.23% of an
+    # edge -- the whole residual, and none of it from division or from the relaxation.
+    if plane_axis is None:
+        n = mid / rmid                                       # outward radial (shell normal)
+    else:
+        n = np.zeros(3); n[int(plane_axis)] = 1.0            # the sheet's own normal
     perp = np.cross(n, d / L); pn = np.linalg.norm(perp)
     if pn < 1e-9:                                            # edge is radial -> perpendicular undefined
         return None
@@ -1991,8 +2107,12 @@ def t1_flip_3d(rings, pos, e_uv, new_len=None, emap=None, vf=None):
             continue                                         # would break the closed surface
         for sign in (+1.0, -1.0):
             nu = mid - sign * perp * half; nv = mid + sign * perp * half
-            nu = nu * (rm / (np.linalg.norm(nu) + 1e-12))    # back onto the shell
-            nv = nv * (rm / (np.linalg.norm(nv) + 1e-12))
+            if plane_axis is None:
+                nu = nu * (rm / (np.linalg.norm(nu) + 1e-12))  # back onto the shell
+                nv = nv * (rm / (np.linalg.norm(nv) + 1e-12))
+            else:                                              # back onto the SHEET
+                nu[int(plane_axis)] = mid[int(plane_axis)]
+                nv[int(plane_axis)] = mid[int(plane_axis)]
             getp = lambda i: (nu if i == u else nv if i == v else pos[i])
             if all(_face_ok_3d(r, getp) for r in (nA, nB, nC, nD)):
                 for fid, ro, rn in ((A, rA, nA), (B, rB, nB), (C, rC, nC), (D, rD, nD)):
@@ -2048,6 +2168,11 @@ class ReconnectT1_3D(Rewire):
         es = m["E_srce"].detach().cpu().numpy(); et = m["E_trgt"].detach().cpu().numpy()
         ef = m["E_face"].detach().cpu().numpy(); nF = int(m["nF"])
         rings = rings_from_flat_3d(es, et, ef, nF)
+        # READ OFF `mech`, NOT DECLARED AGAIN HERE. `cell_mechanics` stashes the constraint it is
+        # solving under, so a spec says `plane_axis` once and every topology operator that moves a
+        # vertex honours the same plane. Repeating it per operator is how three of them end up
+        # disagreeing about which surface the tissue lives on.
+        _plane = (m.get("mech") or {}).get("plane_axis")
         emap = _edge_face_map(rings); vf = _vertex_faces(rings)   # build the adjacency maps ONCE; t1_flip_3d
         #   updates them incrementally on each successful flip (was rebuilt O(F) per candidate = the hot spot)
         pos = [p.copy() for p in pos_np]
@@ -2062,7 +2187,8 @@ class ReconnectT1_3D(Rewire):
             if key in seen or a in used or b in used:
                 continue
             seen.add(key)
-            if t1_flip_3d(rings, pos, (a, b), new_len=thr, emap=emap, vf=vf) is not None:
+            if t1_flip_3d(rings, pos, (a, b), new_len=thr, emap=emap, vf=vf,
+                          plane_axis=_plane) is not None:
                 used.add(a); used.add(b); ndone += 1
         # TRACED PER FRAME, because the RATE is the observable that separates a length-keyed myosin
         # feedback from a tension-keyed one. A length feedback homogenises junction lengths and should
