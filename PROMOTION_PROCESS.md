@@ -160,3 +160,35 @@ Byte-identity is the criterion because the platform delivers it: two runs of one
 1,800 frames, 2,000 → 12,272 cells with division and T1 in the loop, give `max |delta| = 0.0`
 exactly. Re-measure with `--phase R` if the queue, the driver or the GPU model changes. A tolerance
 would have to be justified by a floor above zero; there is not one.
+
+## A retired instrument: `tools/mpm_identity_gate.py`, 4 September
+
+`config/cell/` — the composed-cell ladder, a nucleus and a cytosol of two protein species and a
+membrane, each its own contained set — was **deleted as a dead end**, with `log/cell` and 11 GB of
+`graphs_data/cell`. Three of its specs were not science, though; they were **instruments**, and the
+gate they served is retired with them rather than left broken.
+
+`mpm_identity_gate.py` answered a question this file's harness deliberately does not: *"I rewrote
+the inside of an MPM operator for speed — did any bit move?"* — a reference captured before the edit
+and re-checked after, in one command, with no cluster. Its five fixtures were chosen so that the MPM
+branches could not hide behind one another, and its own docstring says why three of them had to be
+the cell ladder:
+
+    cell_02_nucleus_bounce    3D, ONE particle set     the plain scatter/gather path
+    cell_03_nucleus_cytosol   3D, TWO sets             the shared-grid ACCUMULATE path, and CSF
+    cell_05_membrane          3D, THREE sets           what makes "who zeroes the grid" a question
+                                                       rather than a tautology
+
+    "A change that is identical on cell_02 and wrong on cell_05 is the exact shape of the
+     shared-grid bug: one set scattering is a special case in which overwriting and accumulating
+     agree."
+
+**So what is now unguarded is precisely that.** The two surviving fixtures — `material_3d_multimaterial`
+and `material_two_drops_st` — cover multi-TYPE and 2D, not multi-SET, so the accumulate path has no
+byte-identity gate at all. `mpm_warp.py` and `mpm_triton.py` are gated by a TOLERANCE against the
+default (atomics are order-dependent and cannot be bit-identical), which is the right gate for them
+and the wrong one for a refactor of the default itself.
+
+Rebuilding it means authoring one-, two- and three-set MPM specs under `config/material/` and
+showing the gate returns the same verdicts on them. That is real work and it is not on the
+apico-basal ladder, so it is recorded here as a gap rather than quietly carried.

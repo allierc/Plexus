@@ -434,7 +434,7 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
             # A FLAT MPM SCHEDULE STILL GETS ITS REPORT, and is told that nothing bounds its step.
             # Returning here meant a spec that runs the MPM cycle at the FRAME timestep -- no
             # substep block, so no `substep_dt` to correct -- got no CFL check and no [similarity]
-            # line at all. One spec is in that state (config/cell/cell_one.yaml) and it was the
+            # line at all. One spec was in that state (config/cell/cell_one.yaml, deleted 2026-09-04) and it was the
             # single hole in "the report prints for every MPM spec". There is no key to rewrite, so
             # this warns rather than corrects.
             _ops = {o.get("op") for o in (spec.get("operators") or []) if isinstance(o, dict)}

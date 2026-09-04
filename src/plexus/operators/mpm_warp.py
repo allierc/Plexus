@@ -22,7 +22,8 @@ error is.
 
 DETERMINISM. Atomic float addition is order-dependent, so this is not bit-identical to the default
 and cannot be a promotion twin -- hence the `implementation` axis, and a tolerance gate rather than
-`tools/mpm_identity_gate.py`.
+a byte-identity one. (It used to name `tools/mpm_identity_gate.py`, RETIRED 2026-09-04 with the
+`config/cell/` ladder that supplied three of its five fixtures.)
 """
 from __future__ import annotations
 

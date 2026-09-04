@@ -142,11 +142,13 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # named after the other paper (`marinari_perim_c100` WAS the Farhadifar one) and the folder
     # asserted a conclusion the comparison exists to test. ANCHORED, like the three above.
     ("vertex_energy", ("^vertex_energy",)),
-    # THE COMPOSED-CELL LADDER. A cell built from heterogeneous substrates -- a nucleus, a cytosol
-    # of two protein species, a membrane -- each its own contained set (`config/cell/`, appendix
-    # "Making a cell in Plexus"). No trigger substrings, for the same reason the three above have
-    # none: `cell` appears in the name of half the corpus, and inferring this folder from it would
-    # sweep every vertex-model spec into a directory nobody chose.
+    # THE COMPOSED-CELL LADDER -- a cell built from heterogeneous substrates, a nucleus, a cytosol
+    # of two protein species, a membrane, each its own contained set (appendix "Making a cell in
+    # Plexus"). DELETED 2026-09-04: it was a dead end, and its 11 GB of output went with it. The
+    # rule stays because it costs nothing and a spec named `cell_...` still has to land somewhere
+    # rather than in the default folder; no trigger SUBSTRING was ever used here, because `cell`
+    # appears in half the corpus and would sweep every vertex-model spec into a directory nobody
+    # chose.
     ("cell",        ("^cell_",)),
     # THE NEURAL FOLDER. Recurrent circuits: a `neuron` set, a `synapse` edge-set carrying the
     # connectivity matrix, and the assemblies that contain them (`operators/neural.py`). Trigger
