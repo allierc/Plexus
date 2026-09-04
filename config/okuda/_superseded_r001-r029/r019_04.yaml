@@ -8,9 +8,9 @@ general:
   boundary: free
   dim: 3
   world:
-  - 80.0
-  - 80.0
-  - 80.0
+    - 80.0
+    - 80.0
+    - 80.0
 _run:
   target_cells: 50000
   seed_cells: 2000
@@ -29,146 +29,144 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
-  at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 2000
-  radius: 5.0
-  jitter: 0.15
-  seed: 0
-  vseed_cv: 0.15
-  p0: 3.5
-- op: cell_geometry
-  at: cell
-- op: cell_chem_seed
-  at: cell
-  mode: scatter
-  n_spots: 1
-  cone_deg: 8.0
-  seed: 0
-  before_frame: 3
-  seed_frac: 0.06
-- op: cell_neighbours
-  at: cell
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.16
-  d_h: 0.16
-  chi: 1.3
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  rate: 2.0
-  F: 0.046
-  kk: 0.062
-- op: cell_chem_from_shape
-  at: cell
-  model: curvature
-  vertex_set: vertex
-  beta: 1.0
-  F0: 0.046
-  rate: 1.0
-- op: cell_grow
-  at: vertex
-  cell_set: cell
-  rate: 0.000866
-  a_sw: 0.35
-  hill: 4.0
-  rho: 0.1
-  vth_frac: 2.5
-  after_frame: 100
-  conserve_amount: false
-- op: cell_mechanics
-  at: vertex
-  p0: 1.75
-  K_A: 1.0
-  K_P: 1.0
-  Gamma: 0.4
-  Lambda: 0.5
-  K_V: 80.0
-  K_R: 0.0
-  K_bend: 0.02
-  K_lumen: 0.5
-  antiinv: 0.0
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: edge_flip
-  at: vertex
-  l_th_frac: 0.28
-  every: 1
-  max_flips: 300
-- op: cell_divide
-  at: vertex
-  factor: 2.0
-  reset_noise: 0.12
-  cycle_cv: 0.15
-  p0: 3.5
-  every: 4
-  cell_set: cell
-  min_cycle: 4
-  max_cycle: 1000000000
-  after_frame: 100
-  orient_iface: false
-  orient_asw: 0.6
-  g1_ramp: false
-  engine_clock: true
-- op: topo_record
-  at: vertex
-  every: 1
+  - op: mesh_seed
+    at: vertex
+    cell_set: cell
+    n_cells: 2000
+    radius: 5.0
+    jitter: 0.15
+    seed: 0
+    vseed_cv: 0.15
+    p0: 3.5
+  - op: cell_geometry
+    at: cell
+  - op: cell_chem_seed
+    at: cell
+    mode: scatter
+    n_spots: 1
+    cone_deg: 8.0
+    seed: 0
+    seed_frac: 0.06
+  - op: cell_neighbours
+    at: cell
+  - op: cell_chem_diffuse
+    at: cell
+    implementation: graph_laplacian
+    d_a: 0.16
+    d_h: 0.16
+    chi: 1.3
+  - op: cell_chem_react
+    at: cell
+    model: gray_scott
+    rate: 2.0
+    F: 0.046
+    kk: 0.062
+  - op: cell_chem_from_shape
+    at: cell
+    model: curvature
+    vertex_set: vertex
+    beta: 1.0
+    F0: 0.046
+    rate: 1.0
+  - op: cell_grow
+    at: vertex
+    cell_set: cell
+    rate: 0.000866
+    a_sw: 0.35
+    hill: 4.0
+    rho: 0.1
+    vth_frac: 2.5
+    after_frame: 100
+    conserve_amount: false
+  - op: cell_mechanics
+    at: vertex
+    p0: 1.75
+    K_A: 1.0
+    K_P: 1.0
+    Gamma: 0.4
+    Lambda: 0.5
+    K_V: 80.0
+    K_R: 0.0
+    K_bend: 0.02
+    K_lumen: 0.5
+    antiinv: 0.0
+    mu: 1.0
+    dt: 1.0
+    relax_iters: 30
+    eta: 0.08
+    cap_frac: 0.12
+  - op: edge_flip
+    at: vertex
+    l_th_frac: 0.28
+    every: 1
+    max_flips: 300
+  - op: cell_divide
+    at: vertex
+    factor: 2.0
+    reset_noise: 0.12
+    cycle_cv: 0.15
+    p0: 3.5
+    every: 4
+    cell_set: cell
+    min_cycle: 4
+    max_cycle: 1000000000
+    after_frame: 100
+    orient_iface: false
+    orient_asw: 0.6
+    g1_ramp: false
+    engine_clock: true
+  - op: topo_record
+    at: vertex
+    every: 1
 schedule:
-- mesh_seed
-- cell_geometry
-- cell_chem_seed
-- cell_neighbours
-- cell_chem_diffuse
-- cell_chem_react
-- cell_chem_from_shape
-- cell_grow
-- cell_mechanics
-- edge_flip
-- cell_divide
-- topo_record
+  - mesh_seed
+  - cell_geometry
+  - cell_chem_seed
+  - cell_neighbours
+  - cell_chem_diffuse
+  - cell_chem_react
+  - cell_chem_from_shape
+  - cell_grow
+  - cell_mechanics
+  - edge_flip
+  - cell_divide
+  - topo_record
 _discovery:
   comp_hash: Cf1e55e7d05f
   structure:
     operators:
-    - id: cell_adjacency0
-      op: cell_neighbours
-    - id: cell_diffuse0
-      op: cell_chem_diffuse
-      impl: graph_laplacian
-    - id: cell_geometry_3d0
-      op: cell_geometry
-    - id: cell_react0
-      op: cell_chem_react
-      impl: gray_scott
-    - id: divide_3d0
-      op: cell_divide
-      impl: hertwig
-    - id: grow_3d0
-      op: cell_grow
-      impl: hill_conserve_amount
-    - id: reconnect_t1_3d0
-      op: edge_flip
-    - id: seed_cell_rd0
-      op: cell_chem_seed
-      impl: cone
-    - id: seed_mesh_3d0
-      op: mesh_seed
-    - id: shape_energy_3d0
-      op: cell_mechanics
-      impl: default
-    - id: shape_to_chem0
-      op: cell_chem_from_shape
-      impl: curvature
+      - id: cell_adjacency0
+        op: cell_neighbours
+      - id: cell_diffuse0
+        op: cell_chem_diffuse
+        impl: graph_laplacian
+      - id: cell_geometry_3d0
+        op: cell_geometry
+      - id: cell_react0
+        op: cell_chem_react
+        impl: gray_scott
+      - id: divide_3d0
+        op: cell_divide
+        impl: hertwig
+      - id: grow_3d0
+        op: cell_grow
+        impl: hill_conserve_amount
+      - id: reconnect_t1_3d0
+        op: edge_flip
+      - id: seed_cell_rd0
+        op: cell_chem_seed
+        impl: cone
+      - id: seed_mesh_3d0
+        op: mesh_seed
+      - id: shape_energy_3d0
+        op: cell_mechanics
+        impl: default
+      - id: shape_to_chem0
+        op: cell_chem_from_shape
+        impl: curvature
     connections: []
   region: uniform growth (ungated, rho baseline only)
   defect_fixes:
-  - D1 engine owns the clock (every=1)
-  - D2 one global dt=1.0
-  - D3 topo_snapshot every=1 == position stride
+    - D1 engine owns the clock (every=1)
+    - D2 one global dt=1.0
+    - D3 topo_snapshot every=1 == position stride

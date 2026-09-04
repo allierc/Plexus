@@ -160,3 +160,51 @@ the archive reproduces its own evidence, and new work does not inherit a templat
 30% of that run the chemistry is overwritten every frame and, by the operator's own docstring,
 "no operator that writes to `chem` can accumulate anything". The spec is NAMED `_reseed`, so it may
 be deliberate. It is archived, so it was left alone with the rest of `config/okuda/`.
+
+---
+
+## Re-scoped the same day: `config/okuda/` swept after all
+
+The section above says the archive was deliberately left on `before_frame: 3` so each spec would
+still reproduce the run it recorded. **That was reversed a few hours later**, and the reversal is
+the better call for three reasons that can be checked rather than asserted:
+
+* **The archived runs largely are not there.** `log/promotion` was deleted twice that day, along
+  with `graphs_data/cell` and `log/atlas`. Protecting a spec's ability to reproduce output that no
+  longer exists is a thin thing to protect.
+* **They already did not reproduce them.** `run_one.py`'s D3 guard, the `record_ic` revert, `warp`
+  becoming the MPM default and the `renumber_set` fix all landed after those runs were recorded.
+* **The window was never a modelling choice.** 1,478 of 1,482 chemistry seeds carried the same
+  value; nobody chose it 1,478 times.
+
+`--drop-window` over `config/okuda/**`: **1,231 windows dropped**, 1 spec migrated, 147 already on
+`seed:`, 1 refused.
+
+### And the window was not what was blocking the migration
+
+With the window gone, **1,232 of the archive still refuse — on ORDERING**. Their schedules read
+
+    [mesh_seed, cell_geometry, cell_neighbours, cell_chem_seed, cell_chem_diffuse, ...]
+
+so the chemistry seed genuinely runs AFTER geometry, and `seed:` would run it before.
+
+**For 98.8% of them that refusal is over-cautious**, and the operator says so itself: *"`scatter` and
+`noise` use no geometry whatever, and `patch`/`cones` already guard on `"cen" in state_schema`"*.
+The modes across `config/okuda` are **1,242 `scatter`, 15 `cones`, 2 `tip`** (a mode deleted in
+August; those two specs raise at construction). Only the 15 `cones` specs read `cen`, and only they
+would change if the seed moved ahead of `cell_geometry`.
+
+Making the tool act on that means deciding, per spec, whether a seed's declared MODE reads geometry
+— which is operator-specific knowledge in a generic tool, and a smell. **The clean fix is upstream**:
+`scatter` / `noise` / `patch` / `cones` / `simplex` are five different initial-condition hypotheses
+carried by a `mode:` PARAMETER, which is exactly what the `model:` axis exists for. On the `model:`
+axis each would carry its own typed signature — `scatter` reading nothing, `cones` reading `cen` —
+and the ordering question would answer itself from the registry. That is the same defect the
+registry's own comment records about `cell_chem_from_shape`: *"four distinct biological hypotheses
+wearing one label"*. Not done here; recorded as the next step.
+
+### `config/promotion/` self-corrects
+
+165 chemistry seeds there still carry `before_frame: 3`. They are not edited, because `_spec_copy`
+regenerates them from their sources on every submission — and the sources are now clean, so the
+window disappears from them at the next twin run without anyone touching a file.
