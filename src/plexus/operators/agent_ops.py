@@ -107,7 +107,16 @@ class CellGrow(Structural):
         self.child = params.get("child", "mpm_particle")      # the MPM discretisation of this cell
         self.rate = float(params.get("rate", 0.0))            # specific growth rate (per unit time)
         self.target = float(params.get("target", 4.0))        # logistic ceiling on grow_V (size inhibition)
-        self.mode = str(params.get("mode", "isotropic"))      # isotropic | anisotropic | tip
+        # `mode: isotropic | anisotropic | tip` BECAME THE `model:` AXIS, 4 September. Three claims
+        # about HOW a cell grows -- outward in every direction, preferentially along an axis, or only
+        # at the leading edge -- are three hypotheses, not three settings, and `cell_grow`'s sibling
+        # triggers are already carried on `model:`. Nothing in `config/` selected it (0 specs), so
+        # this rename cost nothing. See AXES.md.
+        if "mode" in params:
+            raise ValueError(
+                "agent_grow: `mode` is gone -- write `model: isotropic | anisotropic | tip`. "
+                "How a cell grows is a hypothesis, not a setting. See AXES.md.")
+        self.mode = getattr(type(self), "GROWTH", "isotropic")
         self.aniso = float(params.get("aniso", 0.0))          # 0 round .. 1 fully along `axis`
         self.tip = float(params.get("tip", 0.0))              # 0 uniform .. large = seed only the leading edge
         self.offset = float(params.get("offset", 0.01))       # placement distance from the seed (world units)
@@ -218,6 +227,30 @@ class CellGrow(Structural):
 # ==========================================================================================================
 # FROM `discovery_okuda/ops/agent_scatter.py` -- agent_scatter (was agent_to_mpm) (agent set -> mpm_grid): the agents deform the material.
 # ==========================================================================================================
+@register_operator("agent_grow", family="population", set="cell", kind="structural",
+                   model="anisotropic")
+class CellGrowAnisotropic(CellGrow):
+    """`anisotropic` MODEL of agent_grow -- new material is placed preferentially ALONG `axis:`.
+
+    A claim about the cell, not a setting on it: `aniso` blends the axis with a random direction, so
+    the default (`isotropic`) is the aniso=0 end of the same blend -- but WHICH claim is being made
+    is the thing a reader needs from the spec, and a float buried in the parameters does not say it.
+    """
+    GROWTH = "anisotropic"
+
+
+@register_operator("agent_grow", family="population", set="cell", kind="structural", model="tip")
+class CellGrowTip(CellGrow):
+    """`tip` MODEL of agent_grow -- new material is seeded only at the LEADING EDGE along `axis:`.
+
+    Distinct from `anisotropic` in WHERE the parent is chosen, not in which direction the daughter
+    is placed: the seed is drawn from a softmax over the projection onto the axis, so growth extends
+    a front rather than thickening a body. That is the difference between a tube and an ellipsoid,
+    which is a morphological claim.
+    """
+    GROWTH = "tip"
+
+
 @register_operator("agent_scatter", "agent_to_mpm", family="coupling", set="cell", kind="exchange")
 class AgentScatter(Exchange):              # (alias `agent_to_mpm`, one migration cycle)
     EMIT = None                               # writes the grid; consumed by the MPM substep
@@ -459,33 +492,35 @@ class ActiveForce(Exchange):                     # (alias `pulse_to_contraction`
         self.field_name = params.get("from")
         self.amplitude = float(params.get("amplitude", 50.0))
         self.channel = int(params.get("channel", 0))
-        self.mode = str(params.get("mode", "inward"))
-        # gradient modes (inward/outward): direction = +/- grad(activation). directional:
-        # direction = a unit-vector field, magnitude = the (uniform) activation value.
-        self.sign = {"inward": 1.0, "outward": -1.0}.get(self.mode, 1.0)
-        self.direction_from = params.get("direction_from")
-        if self.mode == "directional" and self.direction_from is None:
-            raise ValueError("active_force mode: directional needs `direction_from:` "
-                             "(a vector_grid field giving the contraction direction)")
+        # `mode:` SPLIT ONTO ITS TWO REAL AXES, 4 September. It carried three words doing two
+        # different jobs: `inward`/`outward` chose a SIGN on one rule, `directional` chose a
+        # DIFFERENT RULE. One key, two axes, and nothing in the registry could tell them apart.
+        # `along:` is the value; `model: directional` is the hypothesis. See AXES.md.
+        if "mode" in params:
+            raise ValueError(
+                "active_force: `mode` is gone. `inward`/`outward` are now `along:` (a value on this "
+                "model -- the sign of the gradient), and `directional` is now "
+                "`model: directional` (a different rule: a prescribed direction field). See AXES.md.")
+        self.along = str(params.get("along", "inward"))
+        if self.along not in ("inward", "outward"):
+            raise ValueError(f"active_force: along must be inward|outward, got {self.along!r}")
+        self.sign = 1.0 if self.along == "inward" else -1.0
         self.at = params.get("_at", "particle")
+
+    def _accel(self, H, lvl, pos, fld):
+        """THE HYPOTHESIS, and the only thing a `model=` variant of active_force changes.
+
+        Default: the contraction follows the ACTIVATION GRADIENT -- direction = +/- grad(a), with
+        `along:` choosing the sign. `inward` pulls up the gradient, toward higher activation.
+        """
+        grad = fld.grad_at(pos, self.channel, periodic=getattr(H, "periodic", False))   # [N, 2]
+        return self.sign * self.amplitude * grad                          # inward for sign>0
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         pos = lvl.get("pos")
         fld = H.fields[self.field_name]
-
-        if self.mode == "directional":
-            # F_i = amplitude * a(x_i) * d(x_i): uniform activation sets WHEN/how much,
-            # the vector field sets WHERE to push (the active-stress orientation map).
-            a = fld.sample(pos, self.channel)                             # [N] activation
-            d = H.fields[self.direction_from].sample(pos)                 # [N, 2] direction
-            d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
-            acc = self.amplitude * a[:, None] * d
-        else:
-            # gradient mode: direction = +/- grad(activation), sampled at each particle.
-            grad = fld.grad_at(pos, self.channel, periodic=getattr(H, "periodic", False))  # [N, 2]
-            acc = self.sign * self.amplitude * grad                       # inward for sign>0
-
+        acc = self._accel(H, lvl, pos, fld)
         acc = acc * lvl.occ[:, None]
         if mask is not None:
             acc = acc * mask[:, None].float()
@@ -493,6 +528,36 @@ class ActiveForce(Exchange):                     # (alias `pulse_to_contraction`
         # H.delta(mpm_particle), which p2g consumes as the MPM body force. EMIT=None,
         # so the engine never integrates the particle set (g2p owns advection).
         return {self.at: acc}
+
+
+@register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle",
+                   kind="exchange", model="directional")
+class ActiveForceDirectional(ActiveForce):
+    """`directional` MODEL of active_force -- the contraction follows a PRESCRIBED DIRECTION FIELD.
+
+    A DIFFERENT HYPOTHESIS, NOT A DIFFERENT SIGN, which is why it is a `model:` and the old
+    `mode: inward|outward|directional` could not say so. The default reads the activation's GRADIENT
+    and lets the field decide where to push; this one reads the activation only for HOW MUCH and
+    takes WHERE from a separate unit-vector field -- the active-stress orientation map. On a uniform
+    activation the default produces no force at all and this one produces its full magnitude, so
+    they are not two ways of computing one thing.
+
+        F_i = amplitude * a(x_i) * d(x_i)
+
+    It also READS A SECOND FIELD, which the typed signature now records per variant (R1(c)).
+    """
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.direction_from = params.get("direction_from")
+        if self.direction_from is None:
+            raise ValueError("active_force[model: directional] needs `direction_from:` "
+                             "(a vector_grid field giving the contraction direction)")
+
+    def _accel(self, H, lvl, pos, fld):
+        a = fld.sample(pos, self.channel)                                 # [N] activation: HOW MUCH
+        d = H.fields[self.direction_from].sample(pos)                     # [N, 2] direction: WHERE
+        d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
+        return self.amplitude * a[:, None] * d
 
 
 # ==========================================================================================================

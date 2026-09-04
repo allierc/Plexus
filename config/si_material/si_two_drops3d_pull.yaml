@@ -76,7 +76,7 @@ operators:
 - op: mpm_anchor
   at: mpm_particle
   k: 2000.0
-  mode: substrate
+  applies_to: substrate
   anchor_frame: 0
   after_frame: 400
 schedule:

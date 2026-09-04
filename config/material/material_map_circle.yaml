@@ -15,76 +15,76 @@ general:
   name: material_map_circle
   seed: 0
 operators:
-- op: apply_material_map
-  at: mpm_particle
-  from: stiffness_map
-  target: youngs
-  min: 20
-  max: 200
-- at: activation
-  duration: 30
-  name: beat
-  op: pacemaker
-  period: 150
-  phase: 0
-- at: activation
-  center:
-  - 0.5
-  - 0.5
-  clock: beat
-  op: activation_pulse
-  radius: 0.12
-- amplitude: 20.0
-  at: mpm_particle
-  from: activation
-  mode: inward
-  op: active_force
-- at: mpm_particle
-  k: 30.0
-  op: drag
-  emit: mpm_acceleration
-- at: mpm_particle
-  op: mpm_strain
-- a_max: 200
-  at: mpm_particle
-  drag: 0.0
-  op: mpm_scatter
-  to: mpm_grid
-- at: mpm_grid
-  op: mpm_grid_update
-  wall_contact: 0.06
-  wall_damp: 0.5
-  implementation: nosync
-- at: mpm_particle
-  from: mpm_grid
-  op: mpm_gather
-  wall_contact: 0.06
-  wall_damp: 0.5
+  - op: apply_material_map
+    at: mpm_particle
+    from: stiffness_map
+    target: youngs
+    min: 20
+    max: 200
+  - at: activation
+    duration: 30
+    name: beat
+    op: pacemaker
+    period: 150
+    phase: 0
+  - at: activation
+    center:
+      - 0.5
+      - 0.5
+    clock: beat
+    op: activation_pulse
+    radius: 0.12
+  - amplitude: 20.0
+    at: mpm_particle
+    from: activation
+    op: active_force
+    along: inward
+  - at: mpm_particle
+    k: 30.0
+    op: drag
+    emit: mpm_acceleration
+  - at: mpm_particle
+    op: mpm_strain
+  - a_max: 200
+    at: mpm_particle
+    drag: 0.0
+    op: mpm_scatter
+    to: mpm_grid
+  - at: mpm_grid
+    op: mpm_grid_update
+    wall_contact: 0.06
+    wall_damp: 0.5
+    implementation: nosync
+  - at: mpm_particle
+    from: mpm_grid
+    op: mpm_gather
+    wall_contact: 0.06
+    wall_damp: 0.5
 schedule:
-- apply_material_map
-- pacemaker
-- activation_pulse
-- active_force
-- drag
-- substep_dt: 0.0002
-  steps:
-  - mpm_strain
-  - mpm_scatter
-  - mpm_grid_update
-  - mpm_gather
+  - apply_material_map
+  - pacemaker
+  - activation_pulse
+  - active_force
+  - drag
+  - substep_dt: 0.0002
+    steps:
+      - mpm_strain
+      - mpm_scatter
+      - mpm_grid_update
+      - mpm_gather
 sets:
   cell:
     n: 1
     start:
-    - - 0.5
-      - 0.5
+      -   - 0.5
+          - 0.5
     types:
       sheet:
         block:
-        - 0.15
-        - 0.15
-        - 0.85
-        - 0.85
+          - 0.15
+          - 0.15
+          - 0.85
+          - 0.85
         fraction: 1.0
         youngs: 80
   mpm_particle:
@@ -93,35 +93,14 @@ sets:
     per_parent: 144500
 descriptions:
   movie_activation:
-    description: A single greyish-white circular blob appears in the center of a black
-      background. The blob remains stationary and maintains its shape throughout the
-      duration of the video. There is no movement, expansion, or contraction of the
-      object over time. The scene remains static with no changes in lighting or environment.
-    objects: The scene contains a single circular object located in the center of
-      the frame. The object is a soft-edged, greyish-white sphere or disk. It is relatively
-      small compared to the overall black background. The object is isolated and does
-      not interact with any other elements.
+    description: A single greyish-white circular blob appears in the center of a black background. The blob remains stationary and maintains its shape throughout the duration of the video. There is no movement, expansion, or contraction of the object over time. The scene remains static with no changes in lighting or environment.
+    objects: The scene contains a single circular object located in the center of the frame. The object is a soft-edged, greyish-white sphere or disk. It is relatively small compared to the overall black background. The object is isolated and does not interact with any other elements.
   movie_cell:
-    description: The simulation shows a dense collection of blue particles contained
-      within a square boundary. Over the course of the video, the particles undergo
-      rapid, stochastic fluctuations in position. The overall density and distribution
-      of the blue field remain constant throughout the sequence. There is no discernible
-      macroscopic motion or structural evolution in the aggregate.
-    objects: The scene contains a large number of small, individual blue particles.
-      These particles are arranged in a high-density, disordered distribution that
-      fills a square area. Each particle is roughly uniform in size and maintains
-      a consistent blue color. The particles are not connected to one another, forming
-      a granular, fluid-like field.
+    description: The simulation shows a dense collection of blue particles contained within a square boundary. Over the course of the video, the particles undergo rapid, stochastic fluctuations in position. The overall density and distribution of the blue field remain constant throughout the sequence. There is no discernible macroscopic motion or structural evolution in the aggregate.
+    objects: The scene contains a large number of small, individual blue particles. These particles are arranged in a high-density, disordered distribution that fills a square area. Each particle is roughly uniform in size and maintains a consistent blue color. The particles are not connected to one another, forming a granular, fluid-like field.
   movie_mpm_particle:
-    description: The simulation shows a large collection of blue particles distributed
-      within a square boundary. Over time, the particles undergo a subtle transformation
-      in their spatial distribution. The overall density of the points remains relatively
-      constant throughout the sequence. The movement appears to be a stochastic fluctuation
-      or a very slow diffusion process.
-    objects: The scene contains thousands of small, individual blue dots. These particles
-      are arranged in a dense, random distribution across a white background. Each
-      dot is roughly the same size and maintains a uniform color. The particles are
-      not connected to one another, forming a discrete point cloud.
+    description: The simulation shows a large collection of blue particles distributed within a square boundary. Over time, the particles undergo a subtle transformation in their spatial distribution. The overall density of the points remains relatively constant throughout the sequence. The movement appears to be a stochastic fluctuation or a very slow diffusion process.
+    objects: The scene contains thousands of small, individual blue dots. These particles are arranged in a dense, random distribution across a white background. Each dot is roughly the same size and maintains a uniform color. The particles are not connected to one another, forming a discrete point cloud.
 plotting:
   renderer: mpl2d
   background: black
