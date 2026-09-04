@@ -87,13 +87,14 @@ operators:
     at: vertex
     cell_set: cell
     p0: 3.5
-    mode: field_high
     field: elong
     field_frac: 3.0
     max_mark_frac: 0.005
     min_age: 4
     shrink_rate: 0.05
     critical_frac: 0.15
+    model: field
+    compare: high
   - op: cell_mechanics
     at: vertex
     K_A: 1.0

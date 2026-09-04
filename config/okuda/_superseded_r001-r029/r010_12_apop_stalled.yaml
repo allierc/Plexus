@@ -96,10 +96,10 @@ operators:
     at: vertex
     cell_set: cell
     p0: 3.5
-    mode: stalled
     min_age: 4
     shrink_rate: 0.05
     critical_frac: 0.15
+    model: stalled
   - op: interface_tension
     at: vertex
     cell_set: cell

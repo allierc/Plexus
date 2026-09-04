@@ -47,13 +47,14 @@ operators:
     at: vertex
     cell_set: cell
     p0: 3.5
-    mode: list
     cells:
       - 137
     shrink_rate: 0.2
     critical_frac: 0.15
     min_age: 0
     after_frame: 50
+    model: prescribed
+    region: list
   - op: cell_mechanics
     at: vertex
     K_A: 1.0

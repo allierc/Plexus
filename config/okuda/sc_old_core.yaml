@@ -88,9 +88,9 @@ operators:
     shrink_rate: 0.15
     critical_frac: 0.15
     min_age: 4
-    mode: older
     stall_frac: 0.6
     after_frame: 600
+    model: older
   - op: cell_mechanics
     at: vertex
     p0: 3.5

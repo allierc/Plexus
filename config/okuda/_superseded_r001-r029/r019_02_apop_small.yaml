@@ -101,8 +101,8 @@ operators:
     p0: 3.5
     shrink_rate: 0.05
     critical_frac: 0.15
-    mode: small
     small_frac: 0.35
+    model: small
   - op: edge_flip
     at: vertex
     l_th_frac: 0.28

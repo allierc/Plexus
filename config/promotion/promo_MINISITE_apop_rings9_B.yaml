@@ -63,11 +63,12 @@ operators:
     at: vertex
     cell_set: cell
     p0: 3.5
-    mode: band
     band_deg: 4.0
     shrink_rate: 0.05
     critical_frac: 0.15
     n_bands: 9
+    model: prescribed
+    region: band
   - op: edge_flip
     at: vertex
     l_th_frac: 0.28

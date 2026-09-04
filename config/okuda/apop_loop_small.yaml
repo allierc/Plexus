@@ -98,10 +98,10 @@ operators:
     at: vertex
     cell_set: cell
     p0: 3.5
-    mode: small
     small_frac: 0.35
     shrink_rate: 0.05
     critical_frac: 0.15
+    model: small
   - op: cell_divide
     at: vertex
     cell_set: cell

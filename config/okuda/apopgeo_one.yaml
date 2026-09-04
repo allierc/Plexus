@@ -50,9 +50,10 @@ operators:
     shrink_rate: 0.05
     critical_frac: 0.15
     min_age: 0
-    mode: list
     cells: &id001
       - 137
+    model: prescribed
+    region: list
   - op: cell_mechanics
     at: vertex
     K_A: 1.0

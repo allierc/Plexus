@@ -1180,7 +1180,35 @@ class Apoptosis3D(Structural):
         # it is live on the b_none bases too), is the canonical cell-competition hypothesis, and
         # measured 69 deaths on r020_03 with protr 1.549 vs the parent's 1.596 and no premise
         # broken. Every existing spec sets `mode` explicitly, so nothing else moves.
-        self.mode = str(params.get("mode", "competition"))
+        # `mode:` BECAME THE `model:` AXIS, 4 September. Choosing what makes a cell die is the same
+        # kind of choice as choosing what makes it divide, and `cell_divide._trigger`'s docstring
+        # already says of its own: "THE ONLY THING A `model=` VARIANT OF cell_divide CHANGES". Two
+        # mechanisms for one question, in adjacent classes in this file. See AXES.md.
+        #
+        # TWO OF THE THIRTEEN COLLAPSED INTO VALUES rather than becoming models, because they were
+        # never distinct hypotheses:
+        #   `list`/`band`/`cone` -> `model: prescribed` with `region:` -- three GEOMETRIES of one
+        #     claim ("the experimenter ablates this patch"), the `mesh_seed.shape` case.
+        #   `field_high`/`field_low` -> `model: field` with `compare:` -- the docstring below already
+        #     says these "carry no criterion of their own", so the direction is a value on one model.
+        if "mode" in params:
+            raise ValueError(
+                "cell_die: `mode` is gone -- write `model:`. What makes a cell die is a hypothesis, "
+                "the same kind `cell_divide` carries on `model:`. `list`/`band`/`cone` are now "
+                "`model: prescribed` with `region:`, and `field_high`/`field_low` are "
+                "`model: field` with `compare: high|low`. See AXES.md.")
+        _death = getattr(type(self), "DEATH", "competition")
+        if _death == "prescribed":
+            _death = str(params.get("region", "list"))
+            if _death not in ("list", "band", "cone"):
+                raise ValueError(f"cell_die[prescribed]: region must be list|band|cone, "
+                                 f"got {_death!r}")
+        elif _death == "field":
+            _cmp = str(params.get("compare", "high"))
+            if _cmp not in ("high", "low"):
+                raise ValueError(f"cell_die[field]: compare must be high|low, got {_cmp!r}")
+            _death = "field_" + _cmp
+        self.mode = _death
         #   list|band|cone|small|stalled|chem_low
         #   LOCAL (vs neighbours): competition|smaller|dimmer|older|crowded|lonely
         #   PUBLISHED FIELD: field_high|field_low -- see `_marked`. These two carry no criterion of
@@ -1814,6 +1842,138 @@ class Apoptosis3D(Structural):
         print(f"[cell_die] tick {self._k}: extruded {gone} cell(s), {nF} -> {nF2} faces "
               f"(marked {len(marked)}, total {m['n_apop']})", flush=True)
         return {}
+
+
+@register_operator("cell_die", model="competition", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DCompetition(Apoptosis3D):
+    """`competition` MODEL of cell_die -- grows slower than its neighbours -- the Myc-style loser.
+
+    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
+    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    """
+    DEATH = "competition"
+
+
+@register_operator("cell_die", model="smaller", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DSmaller(Apoptosis3D):
+    """`smaller` MODEL of cell_die -- smaller than its neighbours: squeezed out by a fitter crowd.
+
+    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
+    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    """
+    DEATH = "smaller"
+
+
+@register_operator("cell_die", model="dimmer", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DDimmer(Apoptosis3D):
+    """`dimmer` MODEL of cell_die -- less activator than its neighbours -- the LOCAL chemical loser.
+
+    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
+    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    """
+    DEATH = "dimmer"
+
+
+@register_operator("cell_die", model="older", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DOlder(Apoptosis3D):
+    """`older` MODEL of cell_die -- has gone longer without dividing than its neighbours.
+
+    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
+    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    """
+    DEATH = "older"
+
+
+@register_operator("cell_die", model="crowded", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DCrowded(Apoptosis3D):
+    """`crowded` MODEL of cell_die -- has more neighbours than its neighbours do -- density-driven extrusion.
+
+    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
+    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    """
+    DEATH = "crowded"
+
+
+@register_operator("cell_die", model="lonely", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DLonely(Apoptosis3D):
+    """`lonely` MODEL of cell_die -- has fewer -- the tissue closes over a gap.
+
+    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
+    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    """
+    DEATH = "lonely"
+
+
+@register_operator("cell_die", model="small", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DSmall(Apoptosis3D):
+    """`small` MODEL of cell_die -- below an ABSOLUTE volume threshold, not a relative one.
+
+    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
+    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    """
+    DEATH = "small"
+
+
+@register_operator("cell_die", model="stalled", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DStalled(Apoptosis3D):
+    """`stalled` MODEL of cell_die -- below an absolute GROWTH-RATE threshold.
+
+    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
+    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    """
+    DEATH = "stalled"
+
+
+@register_operator("cell_die", model="chem_low", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DChemLow(Apoptosis3D):
+    """`chem_low` MODEL of cell_die -- below an absolute activator threshold -- dies BETWEEN the spots.
+
+    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
+    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    """
+    DEATH = "chem_low"
+
+
+@register_operator("cell_die", model="prescribed", set="vertex", kind="structural",
+                   family="population")
+class Apoptosis3DPrescribed(Apoptosis3D):
+    """`prescribed` MODEL of cell_die -- the EXPERIMENTER ablates a patch; the tissue did not choose.
+
+    ONE MODEL, THREE GEOMETRIES, and the geometry is a VALUE. `region: list | band | cone` names a
+    set of cells (explicit indices), a set of latitude rings, or one contiguous cap. All three make
+    the same claim -- "these cells are removed from outside" -- applied to different shapes, which is
+    the `mesh_seed.shape: sphere | disc` case: "the same hypothesis about the tissue seeded into two
+    different geometries". Splitting them into three models would have claimed three hypotheses where
+    there is one.
+
+    IT IS NOT A MECHANISM AND SHOULD NOT BE READ AS ONE. Every other model of this operator answers
+    "what makes a cell die"; this one answers "which cells did we kill", which is a protocol.
+    """
+    DEATH = "prescribed"
+
+
+@register_operator("cell_die", model="field", set="vertex", kind="structural", family="population")
+class Apoptosis3DField(Apoptosis3D):
+    """`field` MODEL of cell_die -- death keyed to a per-cell quantity SOME OTHER OPERATOR published.
+
+    The generic one, and the base class already says why it exists: these "carry no criterion of
+    their own; `field` names a per-cell quantity some other operator measured and published on the
+    mesh, and `field_frac` is the multiple of its live MEDIAN that counts as qualifying. Death stops
+    needing a new branch for every new measurement."
+
+    `compare: high | low` is a VALUE, not two models: which tail of one distribution qualifies is a
+    threshold direction, not a different claim about the tissue.
+    """
+    DEATH = "field"
 
 
 @register_operator("cell_divide", model="doubler", set="vertex", kind="structural", family="population")

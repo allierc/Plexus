@@ -50,9 +50,10 @@ operators:
     shrink_rate: 0.05
     critical_frac: 0.15
     min_age: 0
-    mode: band
     band_deg: 4.0
     n_bands: 9
+    model: prescribed
+    region: band
   - op: cell_mechanics
     at: vertex
     K_A: 1.0

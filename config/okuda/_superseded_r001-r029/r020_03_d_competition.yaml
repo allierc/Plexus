@@ -86,7 +86,7 @@ operators:
     shrink_rate: 0.05
     critical_frac: 0.15
     max_mark_frac: 0.005
-    mode: competition
+    model: competition
   - op: cell_mechanics
     at: vertex
     p0: 3.5
