@@ -30,7 +30,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 28.0
+    span: 46.0
   curve:
   - quantity: cells
     xlabel: frame
