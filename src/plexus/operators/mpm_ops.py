@@ -1103,7 +1103,7 @@ class MPMGridUpdate(FieldUpdate):
                     # `gy = -g, gz = 0` in 3D as well as in 2D. This line used to read -z in 3D, so
                     # on every 3D spec buoyancy pushed at RIGHT ANGLES to the weight it is supposed
                     # to oppose -- a bubble drifting sideways rather than rising. One shipped spec
-                    # is affected (config/cell/cell_one.yaml, buoyancy 4.0, no explicit direction),
+                    # is affected (config/cell/cell_one.yaml, buoyancy 4.0, no explicit direction; deleted 2026-09-04),
                     # and it was wrong before this change, not after. `buoyancy_dir` overrides.
                     _v[1] = -1.0
                 self._dir_cache = torch.tensor(_v, device=dev, dtype=gv.dtype)

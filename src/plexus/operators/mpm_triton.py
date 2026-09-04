@@ -34,7 +34,8 @@ measurement that says whether they are worth it.
 DETERMINISM. Atomic float addition is order-dependent, so this implementation is NOT bit-identical
 to the default and cannot be a promotion twin. It is registered on the `implementation` axis for
 exactly that reason -- same biology, different numerics -- and its gate is a tolerance against the
-default, not `tools/mpm_identity_gate.py`.
+default, not a byte-identity one. (It used to name `tools/mpm_identity_gate.py`, RETIRED
+2026-09-04 with the `config/cell/` ladder that supplied three of its five fixtures.)
 """
 from __future__ import annotations
 
