@@ -115,6 +115,53 @@ class MeshTable(dict):
             a = a if torch.is_tensor(a) else torch.as_tensor(np.asarray(a), dtype=dt, device=dev)
             self[nm] = a.to(dev)[idx.clamp(max=max(a.shape[0] - 1, 0))].to(dt)
 
+    def carry_vertices(self, births, dt=None, dev=None, names=None):
+        """Give every vertex BORN this tick a value, by averaging its parents'.
+
+        THE PER-VERTEX HALF OF `reindex_faces`, and it did not exist. Faces are permuted by a
+        topology edit and every per-face array is carried through `keep`; vertices are APPENDED by
+        `divide_face_3d` and MERGED by `face_collapse_3d`, and nothing carried anything. That is
+        invisible while `pos` is the only per-vertex quantity, because both functions write `pos`
+        themselves -- the midpoint, the centroid. It stops being invisible the moment a second one
+        exists: a monolayer's apico-basal separation would be 0 at a vertex born on a septum, which
+        is a cell of zero height along the seam it just grew, and would keep `r[0]`'s value at an
+        extrusion, which makes the site jump.
+
+        `births` is `[(new_vertex, (parent, ...)), ...]`, exactly what `divide_face_3d` and
+        `face_collapse_3d` now append to. A division reports two parents (the endpoints of the split
+        edge); a collapse reports three (the survivor and the two it absorbed).
+
+        THE BLEND IS A MEAN, WHICH MAKES THIS AN INTENSIVE-ONLY CARRY, the same restriction
+        `reindex_faces` documents: a density, a thickness, a concentration. An extensive quantity
+        averaged over two parents is halved at every division rather than conserved, and the failure
+        is silent. Anything extensive needs its own operator, not this.
+
+        ORDER MATTERS AND IS THE CALLER'S. `births` is applied in sequence, so a vertex that is
+        itself a parent of a later birth contributes its NEW value -- which is what a collapse
+        following a division in the same tick should see.
+        """
+        if torch is None:
+            raise RuntimeError("carry_vertices needs torch")
+        want = sorted(set(names or ()) | set(self.get("vertex_carry") or ()))
+        if not want or not births:
+            return
+        for nm in want:
+            a = self.get(nm)
+            if a is None:
+                continue
+            a = a if torch.is_tensor(a) else torch.as_tensor(np.asarray(a), dtype=dt, device=dev)
+            a = a.to(dev) if dev is not None else a
+            for new_i, parents in births:
+                ps = [int(q) for q in parents if 0 <= int(q) < a.shape[0]]
+                if not ps or int(new_i) >= a.shape[0]:
+                    # A VERTEX PAST THE END IS NOT AN ERROR HERE. `reindex_faces` clamps rather than
+                    # raises on a short array and this keeps that contract: the reservoir is sized
+                    # by the spec, and an operator that has not grown its own array yet must not
+                    # take the run down.
+                    continue
+                a[int(new_i)] = a[ps].mean(dim=0)
+            self[nm] = a.to(dt) if dt is not None else a
+
     # ---------------------------------------------------------------- recording
     # THE PER-FACE NAMES A PICTURE NEEDS, and this list is why `snapshot` is not topology-only.
     #
@@ -279,6 +326,17 @@ def mesh_row_columns(ms):
         return np.zeros(int(m["nF"]), np.float32)
 
     return scal, edge, face, fill
+
+
+def declare_vertex_carry(m, name):
+    """Ask the topology operators to give this per-vertex array a value at every new vertex.
+
+    The per-vertex twin of `junction_ops._face_carry`, and open for the same reason: the set of
+    names a topology operator carries was a literal tuple, so a state added by a new operator was
+    silently dropped. An operator declares its own array once and `cell_divide` / `cell_die` still
+    know nothing about what is in it.
+    """
+    m.setdefault("vertex_carry", set()).add(name)
 
 
 def is_mesh(obj) -> bool:
