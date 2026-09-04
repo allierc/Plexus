@@ -1762,6 +1762,26 @@ class LiveMovie:
                 # attempt a scribble.
                 try:
                     _sh = self._mono_shell_frame(H, _nm, _pd, _sc)
+                    # `cross_section.inner` -- THE REFERENCE'S COSMETIC BAND, declared as cosmetic.
+                    # `_cross_screen` draws its inner surface as `X * inner` with `inner = 0.82`, so
+                    # the wall in every okuda_ECM section is 18% of the radius whatever the model
+                    # says, and a MID-SURFACE run -- which has no thickness at all -- produces the
+                    # thick banded ring. Offered here so those figures can be reproduced, and named
+                    # so nobody reads the band as a measurement: a spec that sets `inner` is asking
+                    # for a drawing, and one that runs a monolayer gets the model's own h instead.
+                    _inner = (self.style or {}).get("cross_section", {}).get("inner")
+                    if _sh is None and _inner and getattr(self, "_meshes", None):
+                        _P = np.asarray(_pd.points, np.float64)
+                        _mm = getattr(H.level(_nm), "mesh", None) or getattr(H.level(_nm), "_mesh", None)
+                        if _mm is not None:
+                            _np_ = lambda v: (v.detach().cpu().numpy() if hasattr(v, "detach")
+                                              else np.asarray(v))
+                            _e0, _e1 = _np_(_mm["E_srce"]).astype(np.int64), _np_(_mm["E_trgt"]).astype(np.int64)
+                            _c0 = _P.mean(0)
+                            _rad = _P - _c0
+                            _hv = (1.0 - float(_inner)) * np.linalg.norm(_rad, axis=1)
+                            _nn = _rad / (np.linalg.norm(_rad, axis=1, keepdims=True) + 1e-12)
+                            _sh = (_P, _nn, _hv, _e0, _e1)
                     if _sh is not None:
                         _P, _nrmv, _hv, _es0, _es1 = _sh
                         _pr = _P[:, ax] - y0
@@ -1779,10 +1799,16 @@ class LiveMovie:
                                                        _X[:, a] - _X[:, a].mean()))
                             _ap, _ba = _ap[_o], _ba[_o]
                             _cl = np.append(np.arange(len(_o)), 0)
+                            # RED/BLUE ONLY WHEN THEY ARE TWO REAL SURFACES. Apical and basal are
+                            # two distinct sources and get the two-source colours; a cosmetic
+                            # `inner` band is ONE surface drawn twice, so colouring it as two would
+                            # claim a measurement the run does not have.
+                            _ca, _cb = ("#d9534f", "#4a86c8") if not _inner else (
+                                (self.style or {}).get("mesh_color", "#e6dcc0"),) * 2
                             self._cs_mesh_series.append(self.cs.line(
-                                _ap[_cl, a], _ap[_cl, b], color="#d9534f", width=2.0))
+                                _ap[_cl, a], _ap[_cl, b], color=_ca, width=2.0))
                             self._cs_mesh_series.append(self.cs.line(
-                                _ba[_cl, a], _ba[_cl, b], color="#4a86c8", width=2.0))
+                                _ba[_cl, a], _ba[_cl, b], color=_cb, width=2.0))
                             _n = int((self.style or {}).get("cross_section", {}).get("walls", 0))
                             if _n > 0:
                                 _wc = (self.style or {}).get("mesh_color", "#e6dcc0")

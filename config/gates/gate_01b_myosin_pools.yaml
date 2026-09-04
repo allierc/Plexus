@@ -23,7 +23,9 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 40.0
+    span: 46.0
+    inner: 0.82
+    walls: 200
   curve:
   - quantity: cells
     xlabel: frame
