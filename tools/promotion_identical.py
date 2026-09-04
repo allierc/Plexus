@@ -95,7 +95,29 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OKUDA = os.path.join(ROOT, "discovery_okuda")
 CFG_OKUDA = os.path.join(ROOT, "config", "okuda")
 LOG_OKUDA = os.path.join(ROOT, "log", "okuda")
-OUT = os.path.join(ROOT, "log", "promotion")
+# TWIN OUTPUT IS GENERATED DATA, so it lives with the generated data. `graphs_data/` is the symlink
+# onto the GraphData filer that every other run in this repo writes through; `log/` is for the
+# harness's own bookkeeping. Moved here on 4 September -- a twin run is two full simulations, which
+# is the same kind of object as anything under `graphs_data/<campaign>/`, and putting it under
+# `log/` was what made a 393 GB tree look like a log directory and invite a `rm -rf`.
+#
+#
+# `_worktrees/` DOES NOT MOVE WITH IT, and that separation is the whole lesson of 4 September. The
+# worktrees are CODE -- side A executes `run_one.py` from inside one -- and they used to sit in the
+# output tree. Deleting the output therefore deleted the code out from under fifteen running jobs,
+# every okuda side lost its `cd` target mid-flight, and the wrapper then died on
+# `git worktree add ... exit 128` because git still held the registration for a directory that was
+# gone. Output is deletable at any time by design; the thing a job is running must not be inside it.
+OUT = os.path.join(ROOT, "graphs_data", "promotion")
+WORKTREES = os.path.join(ROOT, "log", "_worktrees")
+
+# UNSET `DISPLAY` BEFORE ANYTHING CAN LOOK AT IT. A VS Code remote session exports a DISPLAY whose
+# X server this container cannot authenticate to, and VTK does not fall back quietly from that: one
+# path aborts the PROCESS with `BadValue ... X_GLXCreateContext`, which killed this wrapper after it
+# had submitted and was waiting on jobs. `render_vtk.offscreen()` does exactly this, but only once a
+# render function is called, which is too late. With no DISPLAY, VTK goes to EGL/OSMesa directly,
+# and nothing here ever wants an on-screen window.
+os.environ.pop("DISPLAY", None)
 sys.path.insert(0, OKUDA)
 
 # =============================================================================================
@@ -210,8 +232,11 @@ def _worktree(ref):
     stale reference this file exists to refuse. A worktree costs a checkout of the tracked files
     (`log/` is gitignored, so none of the 15 GB comes with it) and gives a real, runnable okuda at
     the old commit, which can then be submitted beside the new one.
+
+    IT LIVES IN `log/_worktrees/`, NOT IN THE OUTPUT TREE. See the note on `OUT`: a worktree is the
+    code a running job is executing, and the output tree is meant to be deletable at any moment.
     """
-    d = os.path.join(OUT, "_worktrees", ref.replace("/", "_"))
+    d = os.path.join(WORKTREES, ref.replace("/", "_"))
     if os.path.isdir(os.path.join(d, ".git")) or os.path.isfile(os.path.join(d, ".git")):
         return d
     os.makedirs(os.path.dirname(d), exist_ok=True)
