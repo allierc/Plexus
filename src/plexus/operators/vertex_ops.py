@@ -835,9 +835,11 @@ class Divide3D(Structural):
         # right for a closed vesicle, where a septum midpoint left at the chord would dimple the
         # surface inward at every division. It is a SPHERE assumption, and on a flat sheet it is
         # simply wrong: |p| is measured from the world origin, so it lifts the midpoints off the
-        # plane. Measured on `mesh_mpm_step1_sheet_flat`, it was the entire residual
-        # out-of-plane drift once the solver itself was constrained -- sd(z) growing to 5.4% of
-        # an edge purely from division, on a sheet whose mechanics could no longer leave the plane.
+        # plane. Measured on a flat-disc sheet spec (`mesh_mpm_step1_sheet_flat`, DELETED with the
+        # rest of the sheet ladder on 2026-09-04 -- the number is kept here because the spec is not),
+        # it was the entire residual out-of-plane drift once the solver itself was constrained --
+        # sd(z) growing to 5.4% of an edge purely from division, on a sheet whose mechanics could
+        # no longer leave the plane.
         self.project = bool(params.get("project", True))
 
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
@@ -872,6 +874,10 @@ class Divide3D(Structural):
 
     def forward(self, H, mask=None):
         from plexus.models.topology import rings_from_flat_3d, flat_from_rings_3d, divide_face_3d
+        # THE VERTEX PARENTAGE, collected here and spent below. Empty `vertex_carry` -> a no-op, so
+        # every existing spec is byte-identical; the list is built regardless because it costs two
+        # tuples per division and a conditional would be one more thing to get wrong.
+        births: list = []
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
         if m is None:
             return {}
@@ -1016,7 +1022,8 @@ class Divide3D(Structural):
                 ea, eb = int(np.argmax(proj)), int(np.argmin(proj))
             except Exception:
                 ea, eb = 0, len(r) // 2
-            res = divide_face_3d(rings, pos, f, ea=ea, eb=eb, emap=emap, project=self.project)
+            res = divide_face_3d(rings, pos, f, ea=ea, eb=eb, emap=emap, project=self.project,
+                                 births=births)
             if res is None:
                 continue
             half = vf[f] * 0.5                                    # each daughter is born at half the actual volume
@@ -1045,6 +1052,13 @@ class Divide3D(Structural):
                   f"buffer ({len(pos)}/{buf}). This run is capped by its array, not by its "
                   f"biology -- every later measurement describes the reservoir.", flush=True)
             return {}
+        # THE PER-VERTEX CARRY, spent here for the same reason `reindex_faces` is spent beside the
+        # per-face one: a topology edit that changes who a row IS must be followed by every array
+        # that is indexed by that row, in the same place, or the fourth operator does not get the
+        # memo. With no `vertex_carry` declared this walks an empty name list and returns, so every
+        # existing spec is byte-identical -- which is the claim R1 has to make and the twin measures.
+        if hasattr(m, "carry_vertices") and births:
+            m.carry_vertices(births, dt=dt, dev=dev)
         es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
         A0a = np.array([A0[i] for i in keep], np.float64)
         V0fa = np.array([V0f[i] for i in keep], np.float64)
@@ -1562,6 +1576,7 @@ class Apoptosis3D(Structural):
         # module-level import here is circular.
         from plexus.models.topology import (rings_from_flat_3d, flat_from_rings_3d,
                                            face_collapse_3d)
+        births: list = []                        # see Divide3D: the per-vertex carry's parentage
         self._k += 1
         dev = m["V0f"].device; dt = m["V0f"].dtype
         nF = int(m["nF"]); Nv = int(m["Nv"])
@@ -1653,7 +1668,7 @@ class Apoptosis3D(Structural):
             if V0f[f] > crit:
                 continue
             nbrs = [int(g) for g in self._ring_neighbours(rings, f) if g < nF]
-            if face_collapse_3d(rings, pos_t, f):
+            if face_collapse_3d(rings, pos_t, f, births=births):
                 gone += 1
                 if _has_chem and nbrs:
                     h0, h1 = clvl_c.state_schema["chem"]
@@ -1725,6 +1740,13 @@ class Apoptosis3D(Structural):
             clvl_c.state = cs
         # 3. REBUILD, exactly as cell_divide does: `keep` maps new face -> old face and carries every
         #    per-face array across, so nothing can fall out of step with the mesh.
+        # THE PER-VERTEX CARRY, spent here for the same reason `reindex_faces` is spent beside the
+        # per-face one: a topology edit that changes who a row IS must be followed by every array
+        # that is indexed by that row, in the same place, or the fourth operator does not get the
+        # memo. With no `vertex_carry` declared this walks an empty name list and returns, so every
+        # existing spec is byte-identical -- which is the claim R1 has to make and the twin measures.
+        if hasattr(m, "carry_vertices") and births:
+            m.carry_vertices(births, dt=dt, dev=dev)
         es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
         def _car(name, arr=None):
             a = (arr if arr is not None else m[name].detach().cpu().numpy().astype(np.float64))

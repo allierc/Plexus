@@ -291,4 +291,6 @@ if __name__ == "__main__":
 #      -o generate material_3d_water_bench_100mL --device cuda:0 \
 #      --render-n 100000008 --render-max-frames 500 --no-describe"
 
+# bsub -n 2 -gpu "num=1" -q gpu_a100 -W 24:00 -Is "python Plexus_Main.py -o generate si_waterfall --no-viz"   28 ms / frame
+
 

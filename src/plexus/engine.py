@@ -1169,9 +1169,16 @@ def seed(H: Hierarchy, sim: Spec, device: str = "cpu") -> None:
                 f"\"seed\" -- refusing to run a dynamics operator as a seed.")
         op = cls({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device)
         deltas = op(H, _selector_mask(H, o.on))
-        block = getattr(op, "INTEGRAND", None)
-        for lvlname, d in deltas.items():
-            H.add_delta(lvlname, d, block)
+        # THE SAME `(set, block)` KEY AS THE TICK LOOP, and it is here for the reason the two paths
+        # are ever allowed to differ: they are not. A seed that establishes a second dynamical block
+        # -- a monolayer's apico-basal separation seeded alongside its mid-surface positions -- would
+        # otherwise have its two deltas collapsed onto one `INTEGRAND` here while the tick loop
+        # routed them apart, so the same operator would mean two things depending on which entry
+        # point called it.
+        default_block = getattr(op, "INTEGRAND", None)
+        for key, d in deltas.items():
+            lvlname, blk = key if isinstance(key, tuple) else (key, default_block)
+            H.add_delta(lvlname, d, blk)
     if any(torch.count_nonzero(d) for d in H._delta.values()):
         _integrate(H, sim.dt)
 
@@ -1702,20 +1709,21 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         for _j, (nm, ob, sel, (after_frame, before_frame, every)) in enumerate(inst):
             if nm != token or _j not in _want:
                 continue
-            # ROW 0 IS THE INITIAL CONDITION, NOT THE STATE AFTER A PASS. The loop runs the schedule,
-            # integrates, and THEN records, so tick 0's row was the seeded state plus one full update
-            # -- and nothing in a trajectory showed what the run actually started from. Measured on
-            # myosin_mesh_x20: at row 0 the cell areas are still identical between the two halves
-            # (ratio 0.998, so the seeding is even), but the myosin already reads 1.037 and 1.827
-            # against the 1.0 every junction is born with. The first frame of every movie was
-            # therefore a frame of physics presented as the initial condition.
-            #
-            # At tick 0 only `seed` and `aggregate` kinds run: the first builds the body, the second
-            # derives the geometry (area, centroid) that makes the recorded row meaningful without
-            # advancing anything. Every kind that CHANGES state -- structural, lateral, rewire --
-            # starts at tick 1.
-            if tick == 0 and _ic and getattr(type(ob), "KIND", None) not in ("seed", "aggregate"):
-                continue
+            # ROW 0 IS THE STATE AFTER ONE PASS, and it is that way again on purpose. `d58728c8`
+            # made tick 0 the INITIAL CONDITION by skipping every kind but `seed`/`aggregate` on it,
+            # so the first recorded row showed what the run started from rather than the seeded state
+            # plus one update. REVERTED 2026-09-04, because it desynchronised the two recorded series:
+            # positions are written on every tick including 0, while `topo_record` is `KIND:
+            # structural` and was therefore skipped on tick 0 -- 601 position rows against 600
+            # topology rows. `run_one.py`'s D3 guard caught it on 9 sides of the twin suite with
+            # "positions=601 frames but topology=600", and D3 exists because the clamp it replaced
+            # (`hist[min(t, len(hist)-1)]`) once pairs one frame's coordinates with another frame's
+            # connectivity and produced a phantom "97% hollow / global buckling" result believed for
+            # days. THE INITIAL-CONDITION ROW IS STILL WANTED -- the observation that made the case
+            # for it stands (on myosin_mesh_x20, row 0's myosin already read 1.037 and 1.827 against
+            # the 1.0 every junction is born with, so the first frame of every movie was a frame of
+            # physics presented as the initial condition). It has to come back with the recorders
+            # included on tick 0, not excluded, so that both series start together.
             if not (after_frame <= tick < before_frame):
                 continue                                 # engine-level frame gate (skip = no delta, no RNG drawn)
             if every > 1 and tick % every != 0:
@@ -1723,9 +1731,33 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             snap = ({n: l.state.clone() for n, l in H.levels.items()}
                     if tick == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
             deltas = ob(H, _selector_mask(H, sel))   # call the operator: forward() runs, returns {set: delta} (or {})
-            block = getattr(ob, "INTEGRAND", None)   # which state block the delta integrates into (None = coordinate)
-            for lvlname, d in deltas.items():        # break here to inspect `deltas`; empty for EMIT=None ops
-                H.add_delta(lvlname, d, block)       # record each returned delta for end-of-tick integration
+            # `INTEGRAND` IS THE OPERATOR'S DEFAULT BLOCK, NOT ITS ONLY ONE. It is a class attribute,
+            # so before this it was applied to EVERY delta the operator returned: one operator could
+            # write `pos` OR `chem`, never both. That is a limit on the ENGINE and not on any
+            # mechanism, and it is what a cell with two independent surfaces runs into -- an
+            # apico-basal `cell_mechanics` has one energy whose gradient falls on two blocks of the
+            # same set (the mid-surface `pos` and the apico-basal separation), and splitting it into
+            # two operators would mean differentiating the same energy twice and calling the halves
+            # separate mechanisms.
+            #
+            # So a returned KEY may now be `(set, block)` as well as a bare `set`. Nothing else
+            # moves: `Hierarchy.add_delta` has always taken a per-delta `block` and routes a
+            # non-coordinate one into `_delta_blocks`, which `_integrate` walks for every set
+            # unconditionally. An operator that returns bare set keys is byte-identical, because
+            # the bare branch is the old line verbatim.
+            #
+            # NOT A `wall` SET, and the difference is not cosmetic. `_integrate` iterates
+            # `H.emit_order`, built by `_resolve_emit` from each operator's DECLARED set, so a delta
+            # returned for a set no operator is declared `at:` is never integrated -- it sits in
+            # `H._delta` and is wiped by the next `zero_delta`. A second surface put on its own set
+            # would therefore have been FROZEN while every gate row measured it.
+            default_block = getattr(ob, "INTEGRAND", None)   # None = the set's coordinate block
+            for key, d in deltas.items():            # break here to inspect `deltas`; empty for EMIT=None ops
+                if isinstance(key, tuple):
+                    lvlname, blk = key               # explicit per-delta block
+                else:
+                    lvlname, blk = key, default_block
+                H.add_delta(lvlname, d, blk)         # record each returned delta for end-of-tick integration
 
             if snap is not None:
                 for n, before in snap.items():
@@ -1736,12 +1768,6 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             f"integrates it); only structural / derived-readout operators "
                             f"(MAY_MUTATE_INTEGRATED_STATE) may write state. (integration invariant)")
 
-    # `general.record_ic: false` restores the old off-by-one for a run that has to reproduce a
-    # trajectory recorded before this was fixed.
-    _ic = bool(getattr(sim, "record_ic", True))
-    if _ic:
-        print("[engine] frame 0 is the INITIAL CONDITION: only seed/aggregate operators run on "
-              "tick 0, so the first recorded row is what the run started from", flush=True)
     ticks = range(sim.n_frames + 1)
     if progress:                                     # live progress bar over the simulated frames
         try:

@@ -2203,6 +2203,19 @@ class _ReplayLevel:
             d[k] = v[self.t]                             # one number a frame; no offsets to cut
         return d
 
+    @property
+    def occ(self):
+        """Occupancy AS AN ATTRIBUTE, because that is how every consumer asks for it.
+
+        `getattr(lvl, "occ", None)` is the idiom throughout the renderer, and on this class it
+        returned None -- the value was reachable only through `get("occ")`. So on the REPLAY path,
+        the pass that writes the movie that is kept, nothing masked the reservoir: a 25,584-slot
+        vertex set with 5,052 live cells drew all 20,532 dead slots too. They are zero-initialised,
+        so they sit at exactly (0,0,0) and land on top of each other -- one stray dot at the origin
+        in the cross section of every mesh run, which reads as a particle and is an artefact.
+        """
+        return None if self._occ is None else self._occ[self.t]
+
     def get(self, key):
         if key == "pos":
             return self._pos[self.t]
