@@ -33,12 +33,18 @@ def main():
     if not R.available():
         print("  pyvista did not import -- nothing rendered")
         return 3
+    # A GLOB NOW MATCHES SIDES, NOT PAIRS. `promotion_identical` used to write
+    # `log/promotion/<pair>/{A,B}/`; since the flat rewrite it writes two sibling directories,
+    # `log/promotion/<pair>_A` and `<pair>_B`. So `--glob 'log/promotion/G_*'` returns the side
+    # directories themselves. The old `<match>/A` join is kept for anything still on disk in the
+    # nested shape, because a glob that silently matched nothing was the failure mode here.
     dirs = list(a.dir or [])
-    for pair in sorted(glob.glob(a.glob or "")):
-        for tag in ("A", "B"):
-            d = os.path.join(pair, tag)
-            if os.path.isdir(d):
-                dirs.append(d)
+    for hit in sorted(glob.glob(a.glob or "")):
+        nested = [os.path.join(hit, t) for t in ("A", "B") if os.path.isdir(os.path.join(hit, t))]
+        if nested:
+            dirs.extend(nested)
+        elif os.path.isdir(hit):
+            dirs.append(hit)
     if not dirs:
         print("  no directories matched")
         return 2
