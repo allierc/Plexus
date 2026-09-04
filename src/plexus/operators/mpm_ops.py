@@ -1463,10 +1463,15 @@ class MPMTurgor(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.pressure = float(params["pressure"])           # excess of interior over exterior pressure
-        self.mode = str(params.get("mode", "constant"))
         self.at = params.get("_at", "mpm_particle")
-        if self.mode != "constant":
-            raise ValueError(f"mpm_turgor: unknown mode {self.mode!r} (only 'constant' is built)")
+        # `mode: constant` WAS DELETED, 4 September. A vocabulary with one member is not an axis: it
+        # read the key, compared it to the only value it accepts, and raised. Nothing selected
+        # anything, and no spec set it. If a second turgor law is ever written it goes on the
+        # `model:` axis, where the registry can see it -- see AXES.md.
+        if "mode" in params:
+            raise ValueError(
+                "mpm_turgor: `mode` is gone -- it only ever accepted 'constant'. A second turgor "
+                "law would be `model:`, not a mode. See AXES.md.")
 
     def forward(self, H, mask=None):
         p = H.level(self.at)
@@ -1602,7 +1607,16 @@ class MPMAnchor(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.k = float(params["k"])
-        self.mode = str(params.get("mode", "boundary"))       # "boundary" ring | "substrate" all
+        # WHERE THE ANCHOR ACTS -- a VALUE, not a mode, and renamed to say so. `boundary` holds a
+        # ring of particles, `substrate` holds all of them; the spring, the rest state and the
+        # hypothesis are identical either way. That is the `mesh_seed.shape: sphere | disc` case --
+        # "the same hypothesis about the tissue seeded into two different geometries" -- and the one
+        # `mode:` in this audit that was NOT a hypothesis in disguise. See AXES.md.
+        if "mode" in params:
+            raise ValueError(
+                "mpm_anchor: `mode` is now `applies_to` (boundary | substrate). It is a value, not "
+                "a model -- the spring and the rest state are the same either way. See AXES.md.")
+        self.applies_to = str(params.get("applies_to", "boundary"))
         self.ring = params.get("ring", None)                  # None -> derived (a length)
         # WHICH CONFIGURATION IS "REST"? Until now it was whenever the operator first ran, which is
         # frame 0 for an ungated operator and therefore looked like a choice. It is not: gate this
@@ -1632,7 +1646,7 @@ class MPMAnchor(Lateral):
                           else _CONST_DIMS["ring"][0])
         else:
             self._ring = float(self.ring)
-        if self.mode == "substrate":
+        if self.applies_to == "substrate":
             self._sel = torch.ones(self._rest.shape[0], dtype=torch.bool, device=self._rest.device)
         else:                                                 # outer ring of the tissue's rest extent
             lo = self._rest.min(0).values

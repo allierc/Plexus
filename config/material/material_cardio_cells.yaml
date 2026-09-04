@@ -39,8 +39,8 @@ operators:
   - amplitude: 20.0
     at: mpm_particle
     from: activation
-    mode: inward
     op: active_force
+    along: inward
   - at: mpm_particle
     k: 30.0
     op: drag
