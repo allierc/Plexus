@@ -8,9 +8,9 @@ general:
   boundary: free
   dim: 3
   world:
-  - 80.0
-  - 80.0
-  - 80.0
+    - 80.0
+    - 80.0
+    - 80.0
 _run:
   target_cells: 4000
   seed_cells: 400
@@ -31,70 +31,68 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
-  at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 400
-  seed: 0
-  vseed_cv: 0.15
-  radius: 5.0
-  jitter: 0.15
-  p0: 3.5
-- op: cell_geometry
-  at: cell
-- op: cell_chem_seed
-  at: cell
-  seed: 0
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.12
-- op: cell_neighbours
-  at: cell
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.046
-  kk: 0.062
-  rate: 1.0
-- op: cell_mechanics
-  at: vertex
-  K_A: 1.0
-  K_P: 1.0
-  K_V: 20.0
-  K_R: 0.0
-  Lambda: 0.5
-  Gamma: 0.4
-  p0: 3.5
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: edge_flip
-  at: vertex
-  l_th_frac: 0.28
-  every: 1
-  max_flips: 300
-- op: topo_record
-  at: vertex
-  every: 1
+  - op: mesh_seed
+    at: vertex
+    cell_set: cell
+    n_cells: 400
+    seed: 0
+    vseed_cv: 0.15
+    radius: 5.0
+    jitter: 0.15
+    p0: 3.5
+  - op: cell_geometry
+    at: cell
+  - op: cell_chem_seed
+    at: cell
+    seed: 0
+    mode: scatter
+    seed_frac: 0.12
+  - op: cell_neighbours
+    at: cell
+  - op: cell_chem_diffuse
+    at: cell
+    implementation: graph_laplacian
+    d_a: 0.08
+    d_h: 0.16
+    chi: 1.3
+  - op: cell_chem_react
+    at: cell
+    model: gray_scott
+    F: 0.046
+    kk: 0.062
+    rate: 1.0
+  - op: cell_mechanics
+    at: vertex
+    K_A: 1.0
+    K_P: 1.0
+    K_V: 20.0
+    K_R: 0.0
+    Lambda: 0.5
+    Gamma: 0.4
+    p0: 3.5
+    mu: 1.0
+    dt: 1.0
+    relax_iters: 30
+    eta: 0.08
+    cap_frac: 0.12
+  - op: edge_flip
+    at: vertex
+    l_th_frac: 0.28
+    every: 1
+    max_flips: 300
+  - op: topo_record
+    at: vertex
+    every: 1
 schedule:
-- mesh_seed
-- cell_geometry
-- cell_chem_seed
-- cell_neighbours
-- cell_chem_diffuse
-- cell_chem_react
-- cell_mechanics
-- edge_flip
-- topo_record
+  - mesh_seed
+  - cell_geometry
+  - cell_chem_seed
+  - cell_neighbours
+  - cell_chem_diffuse
+  - cell_chem_react
+  - cell_mechanics
+  - edge_flip
+  - topo_record
 _gate:
   gate: G16
   species: species_a
@@ -104,5 +102,4 @@ _gate:
   d_a: 0.08
   d_h: 0.16
   chi: 1.3
-  why: a static sphere, so n_spots is a property of the chemistry and not of the mesh.
-    The design asserts B is COARSER; the gate is n_spots(B) < n_spots(A)
+  why: a static sphere, so n_spots is a property of the chemistry and not of the mesh. The design asserts B is COARSER; the gate is n_spots(B) < n_spots(A)

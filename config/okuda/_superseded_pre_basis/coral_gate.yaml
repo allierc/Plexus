@@ -8,9 +8,9 @@ general:
   boundary: free
   dim: 3
   world:
-  - 80.0
-  - 80.0
-  - 80.0
+    - 80.0
+    - 80.0
+    - 80.0
 _run:
   target_cells: 50000
   seed_cells: 2000
@@ -29,128 +29,117 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
-  at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 2000
-  seed: 0
-  vseed_cv: 0.15
-- op: cell_geometry
-  at: cell
-- op: cell_neighbours
-  at: cell
-- op: cell_chem_seed
-  at: cell
-  seed: 0
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.06
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.046
-  kk: 0.062
-  rate: 1.0
-- op: cell_chem_from_shape
-  at: cell
-  model: curvature
-  vertex_set: vertex
-  beta: 0.0
-  F0: 0.055
-  rate: 1.0
-- op: cell_grow
-  at: vertex
-  cell_set: cell
-  rate: 0.000866
-  a_sw: 0.35
-  hill: 4.0
-  rho: 0.1
-  vth_frac: 2.5
-  after_frame: 100
-  dt: 1.0
-  conserve_amount: true
-- op: cell_mechanics
-  model: monolayer
-  at: vertex
-  k_v: 6.0
-  kappa_s: 0.2
-  h0: 0.4
-  gamma: 0.06
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: edge_flip
-  at: vertex
-  l_th_frac: 0.28
-  every: 1
-  max_flips: 300
-- op: topo_record
-  at: vertex
-  every: 1
+  - op: mesh_seed
+    at: vertex
+    cell_set: cell
+    n_cells: 2000
+    seed: 0
+    vseed_cv: 0.15
+  - op: cell_geometry
+    at: cell
+  - op: cell_neighbours
+    at: cell
+  - op: cell_chem_seed
+    at: cell
+    seed: 0
+    mode: scatter
+    seed_frac: 0.06
+  - op: cell_chem_diffuse
+    at: cell
+    implementation: graph_laplacian
+    d_a: 0.08
+    d_h: 0.16
+    chi: 1.3
+  - op: cell_chem_react
+    at: cell
+    model: gray_scott
+    F: 0.046
+    kk: 0.062
+    rate: 1.0
+  - op: cell_chem_from_shape
+    at: cell
+    model: curvature
+    vertex_set: vertex
+    beta: 0.0
+    F0: 0.055
+    rate: 1.0
+  - op: cell_grow
+    at: vertex
+    cell_set: cell
+    rate: 0.000866
+    a_sw: 0.35
+    hill: 4.0
+    rho: 0.1
+    vth_frac: 2.5
+    after_frame: 100
+    dt: 1.0
+    conserve_amount: true
+  - op: cell_mechanics
+    model: monolayer
+    at: vertex
+    k_v: 6.0
+    kappa_s: 0.2
+    h0: 0.4
+    gamma: 0.06
+    mu: 1.0
+    dt: 1.0
+    relax_iters: 30
+    eta: 0.08
+    cap_frac: 0.12
+  - op: edge_flip
+    at: vertex
+    l_th_frac: 0.28
+    every: 1
+    max_flips: 300
+  - op: topo_record
+    at: vertex
+    every: 1
 schedule:
-- mesh_seed
-- cell_geometry
-- cell_neighbours
-- cell_chem_seed
-- cell_chem_diffuse
-- cell_chem_react
-- cell_chem_from_shape
-- cell_grow
-- cell_mechanics
-- edge_flip
-- topo_record
+  - mesh_seed
+  - cell_geometry
+  - cell_neighbours
+  - cell_chem_seed
+  - cell_chem_diffuse
+  - cell_chem_react
+  - cell_chem_from_shape
+  - cell_grow
+  - cell_mechanics
+  - edge_flip
+  - topo_record
 _discovery:
   comp_hash: Ca230941a0b1
   structure:
     operators:
-    - id: cell_adjacency0
-      op: cell_neighbours
-    - id: cell_diffuse0
-      op: cell_chem_diffuse
-      impl: graph_laplacian
-    - id: cell_geometry_3d0
-      op: cell_geometry
-    - id: cell_react0
-      op: cell_chem_react
-      impl: gierer_meinhardt
-    - id: grow_3d0
-      op: cell_grow
-      impl: hill_conserve_amount
-    - id: reconnect_t1_3d0
-      op: edge_flip
-    - id: seed_mesh_3d0
-      op: mesh_seed
-    - id: shape_energy_3d0
-      op: cell_mechanics
-      impl: monolayer
-    - id: shape_to_chem0
-      op: cell_chem_from_shape
-      impl: curvature
+      - id: cell_adjacency0
+        op: cell_neighbours
+      - id: cell_diffuse0
+        op: cell_chem_diffuse
+        impl: graph_laplacian
+      - id: cell_geometry_3d0
+        op: cell_geometry
+      - id: cell_react0
+        op: cell_chem_react
+        impl: gierer_meinhardt
+      - id: grow_3d0
+        op: cell_grow
+        impl: hill_conserve_amount
+      - id: reconnect_t1_3d0
+        op: edge_flip
+      - id: seed_mesh_3d0
+        op: mesh_seed
+      - id: shape_energy_3d0
+        op: cell_mechanics
+        impl: monolayer
+      - id: shape_to_chem0
+        op: cell_chem_from_shape
+        impl: curvature
     connections:
-    - src_op: cell_chem_react
-      dst_op: cell_grow
-      slot: gate
-  region: coral chemistry with the growth GATE wired -- Gray-Scott from coral_fixed_ball
-    on r002c_09_a23094's coupled structure
+      - src_op: cell_chem_react
+        dst_op: cell_grow
+        slot: gate
+  region: coral chemistry with the growth GATE wired -- Gray-Scott from coral_fixed_ball on r002c_09_a23094's coupled structure
   defect_fixes:
-  - D1 engine owns the clock (every=1)
-  - D2 one global dt=1.0
-  - D3 topo_snapshot every=1 == position stride
-  why: 'Two half-answers in the archive. r002c_09_a23094 carries the FULL Okuda coupling
-    (cell_chem_react -> cell_grow on the `gate` slot, plus cell_chem_from_shape:curvature)
-    and reached protr_peak 1.185 over all 900 frames with valid_frac 1.0 -- but its
-    Gierer-Meinhardt chemistry is DEAD, act_cv_peak 1.9e-05, so that shape was pure
-    mechanical buckling with the growth gate closed. coral_fixed_ball has the opposite:
-    Gray-Scott chemistry that is alive and BOUNDED (act_max 0.46-0.76 across the run,
-    against 9.5e5 for the Gierer-Meinhardt route) and no coupling at all, so it stays
-    a sphere at protr 1.006. This is the structure of the first with the chemistry
-    of the second.'
+    - D1 engine owns the clock (every=1)
+    - D2 one global dt=1.0
+    - D3 topo_snapshot every=1 == position stride
+  why: 'Two half-answers in the archive. r002c_09_a23094 carries the FULL Okuda coupling (cell_chem_react -> cell_grow on the `gate` slot, plus cell_chem_from_shape:curvature) and reached protr_peak 1.185 over all 900 frames with valid_frac 1.0 -- but its Gierer-Meinhardt chemistry is DEAD, act_cv_peak 1.9e-05, so that shape was pure mechanical buckling with the growth gate closed. coral_fixed_ball has the opposite: Gray-Scott chemistry that is alive and BOUNDED (act_max 0.46-0.76 across the run, against 9.5e5 for the Gierer-Meinhardt route) and no coupling at all, so it stays a sphere at protr 1.006. This is the structure of the first with the chemistry of the second.'
