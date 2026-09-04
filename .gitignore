@@ -138,3 +138,12 @@ prototype/eye/archive/run_03/blend_parts/meshes/
 # been committed by the time this rule was written, so they are untracked in the same commit; a
 # Studio spec worth keeping gets copied into config/si_material/ under a name someone chose.
 config/studio/
+
+# Session scratch. `.scratch/` is where a debugging session writes its one-off probes -- 88 of them
+# by the time this rule was written, from renderer A/B comparisons (`flat_ab.py`, `shadow_ab.py`) to
+# stride timings and token counts. None of it is authored and none of it is evidence: every file
+# reaches for a spec in config/ and prints a number to a terminal that is gone. It is ignored rather
+# than deleted because the hazard is not the disk, it is `git add -A`: PROMOTION_PROCESS.md records a
+# session that swept a concurrent session's staged files into a commit whose subject was about a
+# figure, and 88 untracked files in the repo root are 88 chances to do it again.
+.scratch/
