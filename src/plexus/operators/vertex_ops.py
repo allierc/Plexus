@@ -835,9 +835,11 @@ class Divide3D(Structural):
         # right for a closed vesicle, where a septum midpoint left at the chord would dimple the
         # surface inward at every division. It is a SPHERE assumption, and on a flat sheet it is
         # simply wrong: |p| is measured from the world origin, so it lifts the midpoints off the
-        # plane. Measured on `mesh_mpm_step1_sheet_flat`, it was the entire residual
-        # out-of-plane drift once the solver itself was constrained -- sd(z) growing to 5.4% of
-        # an edge purely from division, on a sheet whose mechanics could no longer leave the plane.
+        # plane. Measured on a flat-disc sheet spec (`mesh_mpm_step1_sheet_flat`, DELETED with the
+        # rest of the sheet ladder on 2026-09-04 -- the number is kept here because the spec is not),
+        # it was the entire residual out-of-plane drift once the solver itself was constrained --
+        # sd(z) growing to 5.4% of an edge purely from division, on a sheet whose mechanics could
+        # no longer leave the plane.
         self.project = bool(params.get("project", True))
 
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
