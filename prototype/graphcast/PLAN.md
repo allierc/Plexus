@@ -913,3 +913,85 @@ because ω is now fitted on 20 frames instead of 290.
 So the next move is a frame **weighting** rather than a split — the two parameters want different
 parts of the trajectory, and the objective should say so. This spec is the control that would be
 measured against.
+
+---
+
+## 15. Stage 4 — the GraphCast operator
+
+### Where a variant lands in Plexus, and two of R1's "options" are not options
+
+Plexus has exactly three places a variant can live, and choosing wrongly is how a switch ends up in
+code instead of in a file:
+
+| mechanism | means | selected by | precedent |
+|---|---|---|---|
+| `model=` on `@register_operator` | a **different rule** under one operator name | `model:` | `wave_field` — travelling / counter / envelope |
+| `implementation=` | the **same rule, different numerics** | `impl:` | MPM's `warp` vs `default` |
+| ordinary params | a **knob** of one rule | the operator line | `n_passes`, `hidden_dim` |
+
+Mapping R1's four switches onto that changes two of them:
+
+- **`message: simple | graphcast`** → **`model=`**. A different rule, not a knob: GraphCast carries
+  a residually-updated **edge latent** across layers and `simple` has no edge state at all.
+- **`n_passes: 1…16`** → a **param**. Same rule, deeper.
+- **`embedding: none | free`** → a **param**; but **`ngp` is a schedule composition**,
+  `[hash_encoding, gnn_message]`, with the encoder writing a field the rule reads. Better than a
+  param value because it keeps the residual attributable to a named mechanism.
+- **`encoder_decoder: off | on`** → also a **schedule composition**,
+  `[gc_scatter, gnn_message, gc_gather]` versus not.
+
+So the four families land as: `known_ode` and `gnn_message` are separate **operators**; `simple` vs
+`graphcast` is a **`model=` variant** of the second; the hashtable and the encoder/decoder are
+**schedule entries**. Fewer switches, more composition — the direction the whole restructure went.
+
+**Consequence for G1, and it is a threshold change that must be recorded rather than absorbed.** The
+pre-registered count of 24 assumed four switches multiplying out. If `encoder_decoder` and the
+hashtable become schedule compositions, the enumerated matrix is `2 message-models × 4 n_passes ×
+2 embedding params = 16`, and the compositions are separate specs. **G1's 24 has not been changed
+here** — it will be, in the commit that makes the compositions real, and not before.
+
+### What the operator must reproduce
+
+From `papers/weathernext/weathernext/utils/`:
+
+- `InteractionNetwork` with `update_edge_fn` and `update_node_fn`, each an MLP **followed by**
+  LayerNorm with the residual added after (`dense.py:131` — post-norm, not pre-norm)
+- `use_edge_residuals=True`: the edge latent **persists and accumulates** across layers
+- `include_sent_messages_in_node_update=False`: the node update sees only **received** messages
+- layers built per index (`processor_edges_{index}_`), so parameters are **unshared** — a stack of
+  16 distinct layers, not one layer applied 16 times
+
+### Gates, fixed before the code (R9)
+
+Four already pre-registered and unchanged: **G5** (`simple` ≡ `NeuralGNN` at copied weights, < 1e-5),
+**G6** (1 vs 16 passes at init bit-identical), **G8** (K=20 rollout < 2× the GT norm), **G15**
+(graphcast vs simple against a 3-seed floor).
+
+Four are new, and each names one published feature so that a degenerate implementation cannot pass
+by tying with `simple`:
+
+| id | what | threshold |
+|---|---|---|
+| **G31** | the edge latent **persists** — zeroing it between layers changes the output | relative change > 0.10 |
+| **G32** | layers are **unshared** — parameters linear in depth | `params(16)/params(1)` ∈ [15.2, 16.8] |
+| **G33** | the node update ignores **sent** messages | permutation leaves output bit-identical |
+| **G34** | graphcast **contains** simple — edge latent off, depth 1, they agree | < 1e-5 |
+
+**G31 and G34 are the pair that matters.** G5 says `simple` is the model we already trust; G34 says
+`graphcast` *contains* it; G31 says the extra state is *actually running*. Without G31, an
+implementation that quietly degenerates would **pass G15 by tying**, and we would conclude "the
+extra machinery does not pay" about machinery that was never exercised.
+
+### Order of work
+
+1. G31–G34 into `gates.py` — **done**, before any operator code.
+2. `ops_graphcast.py`: `gnn_message` gains `model="graphcast"` — the edge-latent interaction
+   network. Reuses `Lateral`, `radius_graph`, `lin_edge`/`lin_phi` naming.
+3. G32, G33, G34 first: they need no training and no data, only a built operator.
+4. G31 next: needs one forward pass on real data.
+5. Only then a fit, and only then G15.
+
+**A dependency to settle before step 3.** G5 compares against `connectome-gnn`'s `NeuralGNN` at
+copied weights. That class is in another repo with its own config object, so G5 is either an
+import across repos or a re-derivation here — and a re-derivation is not the gate. This is the one
+stage-4 gate whose cost is not yet known.

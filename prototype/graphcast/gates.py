@@ -472,6 +472,55 @@ def build_table() -> dict[str, Gate]:
                      "30, a 40x separation, verified in the generator's summary.json rather than "
                      "assumed. If G30 fails while G28 and G29 pass, the finding is that the sum is "
                      "not identifiable at this rate ratio, and the ratio is a config knob."),
+        # ---- stage 4: THE GraphCast OPERATOR IS THE FORM IT CLAIMS TO BE ------------------ #
+        # G5 and G15 already ask "is `simple` the known model" and "is graphcast different from
+        # simple". These four ask the question BETWEEN them, which neither covers: is the thing
+        # labelled `graphcast` actually the GraphCast form? Each names one feature of the published
+        # processor (papers/weathernext/utils/{typed_graph_net,deep_gnn,dense}.py) and fails if that
+        # feature is absent, so a degenerate implementation cannot pass by tying with `simple`.
+        Gate("G31", "bookkeeping", "the EDGE LATENT persists across layers",
+             "zeroing the edge latent between layers changes the output by > 10%",
+             "relative change in the node output", 4, _gt(0.10),
+             explain="THE ONE THING THAT MAKES GraphCast GraphCast, and the one a reimplementation "
+                     "silently drops. Their processor gives every edge a 512-d state that is "
+                     "residually updated at every layer and CARRIED FORWARD (deep_gnn.py: "
+                     "use_edge_residuals=True), so an edge remembers what it has communicated. "
+                     "`simple` has no edge state at all. A version that recomputes the edge "
+                     "feature from scratch each layer is arithmetically `simple` with more "
+                     "weights, and would pass G15 by TYING with it -- after which the conclusion "
+                     "'the extra machinery does not pay' would be drawn about machinery that was "
+                     "never run. The test zeroes the carried latent between layers and requires "
+                     "the output to move; 10% because anything smaller is indistinguishable from "
+                     "the run-to-run floor already measured at 0.015 for R^2_W."),
+        Gate("G32", "bookkeeping", "the layers are UNSHARED, not a recurrent stack",
+             "params(16 passes) / params(1 pass) within 5% of 16",
+             "ratio, dimensionless", 4, _within(15.2, 16.8),
+             explain="GraphCast builds each of its 16 layers with its OWN parameters -- the code "
+                     "names them processor_edges_{index}_ per step -- so depth costs parameters "
+                     "linearly. A recurrent stack that applies one layer 16 times is a different "
+                     "model with the same forward shape, and the two are indistinguishable from a "
+                     "loss curve. Counting parameters settles it in one line. The 5% band allows "
+                     "for the encoder/decoder and embedding tensors that do not scale with depth."),
+        Gate("G33", "bookkeeping", "the node update sees RECEIVED messages only",
+             "permuting the sent-message aggregate leaves the output bit-identical",
+             "max |delta| over the node output", 4, _eq(0.0),
+             explain="`include_sent_messages_in_node_update=False` in their InteractionNetwork, and "
+                     "it is a modelling choice rather than an optimisation: a node is updated by "
+                     "what reaches it, not by what it emitted. Including sent messages makes the "
+                     "update depend on a node's out-degree, which on an irregular graph is a "
+                     "property of the sampling rather than of the system. Testable exactly: build "
+                     "the sent-message aggregate, permute it, and require the output not to move "
+                     "at all -- if it moves, the aggregate is being read."),
+        Gate("G34", "bookkeeping", "graphcast DEGENERATES to simple when its extra state is off",
+             "graphcast at n_passes 1 with the edge latent disabled equals simple",
+             "max |delta| as a fraction of the state range", 4, _lt(1e-5),
+             explain="G5's converse, and the pair is what makes G15 readable. G5 says `simple` is "
+                     "arithmetically the model we already trust. This says `graphcast` CONTAINS "
+                     "`simple` -- switch off the one feature that distinguishes them and the two "
+                     "compute the same numbers. Together they mean any difference G15 later "
+                     "measures is attributable to the edge latent and to nothing else: not to a "
+                     "different initialisation, a different normalisation, or a transposed index. "
+                     "Same 1e-5 tolerance as G5, because it is the same kind of claim."),
         # ---- tier 3: measurement -------------------------------------------------------- #
         Gate("G17", "measurement", "ZAPBench held-out prediction of d(dF/F)/dt",
              "R^2 > 0.268, the parameter-free kNN spatial pool", "held-out R^2", 6, _gt(0.268)),
