@@ -114,3 +114,49 @@ spelling** -- declared here rather than quietly migrated.
 All three frozen gate hashes are unchanged -- `00_spheroid` `c648b915791284fa`, `01_junction`
 `09278b16dc861705`, `02_ecm_block` `78ff4878e7afe8f7` -- because the migration touches `operators:`
 and `schedule:` and never the `_gate:` block that `--freeze-reference` hashes.
+
+---
+
+## The `before_frame: 3` window, removed from the live specs on 4 September
+
+`before_frame: 3` is a **template value, not a decision**. Across 1,482 chemistry seeds: 1,478 say
+`3`, three say `1`, and one says **906**.
+
+### It is a behaviour change, and here is its size
+
+Measured on `config/okuda/apop_loop_small.yaml` at 12 frames, **under
+`PLEXUS_STRICT_DETERMINISM=1`**, where the noise floor is exactly `0.000e+00` on both arrays:
+
+| | vertex positions | cell chemistry |
+|---|---|---|
+| same spec, run twice | 0.000e+00 | 0.000e+00 |
+| `before_frame` 3 -> dropped | **0.000e+00** | **1.468e-01**, from row 1 |
+
+The positions are byte-identical only because 12 frames is too short for
+`chem -> cell_chem_from_shape -> cell_grow -> geometry` to close the loop; on that spec's real 900
+they would not be.
+
+**AND THE FIRST ATTEMPT AT THIS MEASUREMENT WAS NOISE.** Without the determinism flag the SAME spec
+run twice differed by `9.6e-04` -- CPU `index_add` reductions are not order-stable across threads --
+which is larger than most effects worth looking for. `gate_00_spheroid` happens to be exactly
+reproducible on CPU and `apop_loop_small` is not, so "it was deterministic last time" is not a
+property of the platform. Set the flag or measure nothing.
+
+### Scope: the live specs only
+
+| tree | count | done |
+|---|---|---|
+| `config/atlas/` | 58 seeds, 43 specs | **window dropped in all; 30 also moved to `seed:`; 10 blocked by ordering** |
+| `config/promotion/` | 165 | **not edited** -- `_spec_copy` REGENERATES these from their sources on every submission, so an edit lasts until the next run |
+| `config/okuda/` | 1,256 | **not edited, deliberately** -- these are ARCHIVED campaign specs, and a spec that no longer reproduces the run it recorded is worse than a spec with an odd window |
+
+So `config/okuda/` and the live tree now DISAGREE about the window, and that is the intended state:
+the archive reproduces its own evidence, and new work does not inherit a template nobody chose.
+
+### Still outstanding
+
+`config/okuda/stage_buds_reseed.yaml` declares `before_frame: 906` on a 3,000-frame run, with
+`cell_chem_diffuse`, `cell_chem_react` and `cell_chem_from_shape` all in the same schedule -- so for
+30% of that run the chemistry is overwritten every frame and, by the operator's own docstring,
+"no operator that writes to `chem` can accumulate anything". The spec is NAMED `_reseed`, so it may
+be deliberate. It is archived, so it was left alone with the rest of `config/okuda/`.
