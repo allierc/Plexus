@@ -47,9 +47,9 @@ operators:
   - op: cell_chem_seed
     at: cell
     seed: 0
-    mode: cones
     n_spots: 9
     cone_deg: 22.8
+    model: cones
   - op: cell_chem_diffuse
     at: cell
     implementation: graph_laplacian

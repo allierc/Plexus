@@ -47,7 +47,6 @@ operators:
   - op: cell_chem_seed
     at: cell
     seed: 0
-    mode: scatter
     seed_frac: 0.06
   - op: cell_chem_diffuse
     at: cell

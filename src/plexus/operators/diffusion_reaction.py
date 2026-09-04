@@ -196,13 +196,26 @@ class CellRDSeed(Structural):
         # (`simplex`) the total the species are normalised to. 1.0 is the May-Leonard simplex.
         self.p0 = float(params.get("p0", 1.0))
         self.chan = _chan(params, type(self).__name__, self.n_species)
-        self.mode = params.get("mode", "scatter")               # "noise" | "scatter" | "patch" | "cones"
-        if self.mode not in self.MODES:
+        # `mode:` BECAME THE `model:` AXIS, 4 September. Five ways of writing x_0 are five claims
+        # about HOW PATTERNING NUCLEATES -- from random fluctuation, from a placed patch, from N
+        # fixed foci -- and seeding it in cones puts part of the campaign's answer in by hand. That
+        # is a hypothesis, and it belongs where the registry can see it. See AXES.md.
+        #
+        # AND IT UNBLOCKS THE SEED MIGRATION. The variants READ DIFFERENT THINGS: `scatter` and
+        # `noise` use no geometry whatever, while `patch` and `cones` read `cen`. On the `model:`
+        # axis each carries its own typed signature (R1(c)), so "may this seed move ahead of
+        # `cell_geometry` in the schedule?" is answerable FROM THE REGISTRY instead of from a
+        # hard-coded list inside a migration tool. 1,232 archived specs are blocked on exactly that
+        # question, and only the 15 `cones` ones actually need to say no.
+        if "mode" in params:
             raise ValueError(
-                f"cell_chem_seed: unknown mode {self.mode!r}; known: {list(self.MODES)}. "
+                "seed_cell_chem: `mode` is gone -- write `model:`. How a pattern nucleates is a "
+                "hypothesis, not a setting. "
                 + ("`tip` was removed on 6 August -- it re-seeded every frame, which makes it a "
                    "moving boundary condition and annihilates every operator that writes to "
-                   "`chem`. Use `scatter` with `before_frame: 3`." if self.mode == "tip" else ""))
+                   "`chem`. Use `model: scatter`." if params.get("mode") == "tip" else "")
+                + " See AXES.md.")
+        self.mode = getattr(type(self), "NUCLEATION", "scatter")
         self.seed_frac = float(params.get("seed_frac", 0.06))   # (scatter) fraction of strong activator seeds
         self.A = float(params.get("A", 1.0)); self.B = float(params.get("B", 3.0))   # (noise) steady state (A, B/A)
         self.noise = float(params.get("noise", 0.04))
@@ -318,6 +331,50 @@ class CellRDSeed(Structural):
                     _nu, torch.full_like(_v, 0.5), _v)[:, None]
         clvl.state = st
         return {}
+
+
+@register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
+                   model="noise")
+class CellRDSeedNoise(CellRDSeed):
+    """`noise` MODEL of seed_cell_chem -- the homogeneous steady state plus NOISE -- patterning from fluctuation alone, the strictest test that the pattern is emergent.
+
+    Geometry: no geometry. That is not a footnote: a seed reading no geometry may be moved ahead of
+    `cell_geometry` into a `seed:` section, and one reading `cen` may not. See AXES.md.
+    """
+    NUCLEATION = "noise"
+
+
+@register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
+                   model="patch")
+class CellRDSeedPatch(CellRDSeed):
+    """`patch` MODEL of seed_cell_chem -- a LOCALIZED activation source, placed by hand -- a bud/tube driver.
+
+    Geometry: reads `cen`. That is not a footnote: a seed reading no geometry may be moved ahead of
+    `cell_geometry` into a `seed:` section, and one reading `cen` may not. See AXES.md.
+    """
+    NUCLEATION = "patch"
+
+
+@register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
+                   model="cones")
+class CellRDSeedCones(CellRDSeed):
+    """`cones` MODEL of seed_cell_chem -- N FIXED radial activation cones (Okuda Fig 5's multi-tube) -- the strongest hand in the answer, and the honest place to declare it.
+
+    Geometry: reads `cen`. That is not a footnote: a seed reading no geometry may be moved ahead of
+    `cell_geometry` into a `seed:` section, and one reading `cen` may not. See AXES.md.
+    """
+    NUCLEATION = "cones"
+
+
+@register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed",
+                   model="simplex")
+class CellRDSeedSimplex(CellRDSeed):
+    """`simplex` MODEL of seed_cell_chem -- three species normalised to a simplex -- the May-Leonard initial condition for cyclic competition.
+
+    Geometry: no geometry. That is not a footnote: a seed reading no geometry may be moved ahead of
+    `cell_geometry` into a `seed:` section, and one reading `cen` may not. See AXES.md.
+    """
+    NUCLEATION = "simplex"
 
 
 @register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", implementation="graph_laplacian")

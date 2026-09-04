@@ -15,9 +15,9 @@ general:
   boundary: free
   dim: 3
   world:
-  - 80.0
-  - 80.0
-  - 80.0
+    - 80.0
+    - 80.0
+    - 80.0
 _run:
   target_cells: 50000
   seed_cells: 2000
@@ -38,81 +38,80 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
-  at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 2000
-  radius: 5.0
-  jitter: 0.15
-  seed: 138857
-  vseed_cv: 0.15
-  p0: 3.5
-- op: cell_chem_seed
-  at: cell
-  mode: scatter
-  n_spots: 1
-  cone_deg: 8.0
-  before_frame: 3
-  seed: 138857
-  seed_frac: 0.06
-- op: topo_record
-  at: vertex
-  every: 1
+  - op: mesh_seed
+    at: vertex
+    cell_set: cell
+    before_frame: 1
+    n_cells: 2000
+    radius: 5.0
+    jitter: 0.15
+    seed: 138857
+    vseed_cv: 0.15
+    p0: 3.5
+  - op: cell_chem_seed
+    at: cell
+    n_spots: 1
+    cone_deg: 8.0
+    before_frame: 3
+    seed: 138857
+    seed_frac: 0.06
+  - op: topo_record
+    at: vertex
+    every: 1
 schedule:
-- mesh_seed
-- cell_chem_seed
-- topo_record
+  - mesh_seed
+  - cell_chem_seed
+  - topo_record
 _discovery:
   comp_hash: C9ccf5dcf260
   structure:
     operators:
-    - id: cell_chem_diffuse0
-      op: cell_chem_diffuse
-      impl: graph_laplacian
-    - id: cell_chem_from_shape0
-      op: cell_chem_from_shape
-      impl: curvature
-    - id: cell_chem_react0
-      op: cell_chem_react
-      impl: gray_scott
-    - id: cell_chem_seed0
-      op: seed_cell_chem
-      impl: cone
-    - id: cell_die0
-      op: cell_die
-    - id: cell_divide0
-      op: cell_divide
-      impl: hertwig
-    - id: cell_geometry0
-      op: cell_geometry
-    - id: cell_grow0
-      op: cell_grow
-      impl: hill_conserve_amount
-    - id: cell_mechanics0
-      op: cell_mechanics
-      impl: default
-    - id: cell_neighbours0
-      op: cell_neighbours
-    - id: cell_shape_probe0
-      op: cell_shape_probe
-      impl: shape_index
-    - id: edge_flip0
-      op: edge_flip
-    - id: interface_tension0
-      op: interface_tension
-    - id: mesh_seed0
-      op: seed_mesh
+      - id: cell_chem_diffuse0
+        op: cell_chem_diffuse
+        impl: graph_laplacian
+      - id: cell_chem_from_shape0
+        op: cell_chem_from_shape
+        impl: curvature
+      - id: cell_chem_react0
+        op: cell_chem_react
+        impl: gray_scott
+      - id: cell_chem_seed0
+        op: seed_cell_chem
+        impl: cone
+      - id: cell_die0
+        op: cell_die
+      - id: cell_divide0
+        op: cell_divide
+        impl: hertwig
+      - id: cell_geometry0
+        op: cell_geometry
+      - id: cell_grow0
+        op: cell_grow
+        impl: hill_conserve_amount
+      - id: cell_mechanics0
+        op: cell_mechanics
+        impl: default
+      - id: cell_neighbours0
+        op: cell_neighbours
+      - id: cell_shape_probe0
+        op: cell_shape_probe
+        impl: shape_index
+      - id: edge_flip0
+        op: edge_flip
+      - id: interface_tension0
+        op: interface_tension
+      - id: mesh_seed0
+        op: seed_mesh
     connections:
-    - src_op: cell_chem_react
-      dst_op: cell_grow
-      slot: gate
-    - src_op: cell_chem_react
-      dst_op: interface_tension
-      slot: site
+      - src_op: cell_chem_react
+        dst_op: cell_grow
+        slot: gate
+      - src_op: cell_chem_react
+        dst_op: interface_tension
+        slot: site
   region: emergent RD + purse-string + death
   defect_fixes:
-  - D1 engine owns the clock (every=1)
-  - D2 one global dt=1.0
-  - D3 topo_snapshot every=1 == position stride
+    - D1 engine owns the clock (every=1)
+    - D2 one global dt=1.0
+    - D3 topo_snapshot every=1 == position stride
 plotting: {renderer: vtk_mesh}

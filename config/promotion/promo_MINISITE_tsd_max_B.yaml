@@ -45,7 +45,6 @@ operators:
     at: cell
   - op: cell_chem_seed
     at: cell
-    mode: scatter
     n_spots: 1
     cone_deg: 8.0
     seed: 0
@@ -55,7 +54,6 @@ operators:
     at: cell
     before_frame: 3
     chan: 2
-    mode: scatter
     seed_frac: 0.12
     seed: 7
   - op: cell_neighbours

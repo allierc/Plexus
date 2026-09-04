@@ -47,10 +47,10 @@ operators:
   - op: cell_chem_seed
     at: cell
     seed: 0
-    mode: cones
     seed_frac: 0.06
     n_spots: 6
     cone_deg: 8.0
+    model: cones
   - op: cell_chem_diffuse
     at: cell
     implementation: graph_laplacian

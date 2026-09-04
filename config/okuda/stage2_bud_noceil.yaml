@@ -45,7 +45,6 @@ operators:
     at: cell
   - op: seed_cell_chem
     at: cell
-    mode: scatter
     n_spots: 1
     cone_deg: 8.0
     seed: 0

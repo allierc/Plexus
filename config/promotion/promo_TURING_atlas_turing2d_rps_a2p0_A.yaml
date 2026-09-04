@@ -7,8 +7,8 @@ general:
   dim: 2
   boundary: free
   world:
-  - 49.4
-  - 49.4
+    - 49.4
+    - 49.4
 sets:
   cell:
     n: 4000
@@ -25,39 +25,39 @@ sets:
         boundary: free
 fields: {}
 operators:
-- op: cell_chem_seed
-  at: cell
-  seed: 0
-  before_frame: 3
-  mode: simplex
-  n_species: 3
-- op: radius_graph
-  at: cell
-  radius: 0.95
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  chi: 1.0
-  d:
-  - 0.02
-  - 0.02
-  - 0.02
-- op: cell_chem_react
-  at: cell
-  model: rock_paper_scissor
-  a: 2.0
-  rate: 0.05
+  - op: cell_chem_seed
+    at: cell
+    seed: 0
+    before_frame: 3
+    n_species: 3
+    model: simplex
+  - op: radius_graph
+    at: cell
+    radius: 0.95
+  - op: cell_chem_diffuse
+    at: cell
+    implementation: graph_laplacian
+    chi: 1.0
+    d:
+      - 0.02
+      - 0.02
+      - 0.02
+  - op: cell_chem_react
+    at: cell
+    model: rock_paper_scissor
+    a: 2.0
+    rate: 0.05
 schedule:
-- cell_chem_seed
-- radius_graph
-- cell_chem_diffuse
-- cell_chem_react
+  - cell_chem_seed
+  - radius_graph
+  - cell_chem_diffuse
+  - cell_chem_react
 plotting:
   renderer: mpl2d
   background: black
   dot_fill: 0.9
   blend: additive
   species:
-  - '#ff0000'
-  - '#00ff00'
-  - '#0000ff'
+    - '#ff0000'
+    - '#00ff00'
+    - '#0000ff'

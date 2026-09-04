@@ -35,7 +35,6 @@ operators:
     at: cell
   - op: cell_chem_seed
     at: cell
-    mode: scatter
     seed_frac: 0.06
   - op: cell_neighbours
     at: cell

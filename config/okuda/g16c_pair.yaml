@@ -45,13 +45,11 @@ operators:
   - op: cell_chem_seed
     at: cell
     seed: 0
-    mode: scatter
     seed_frac: 0.12
     chan: 0
   - op: cell_chem_seed
     at: cell
     seed: 7
-    mode: scatter
     seed_frac: 0.12
     chan: 2
   - op: cell_neighbours

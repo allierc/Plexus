@@ -43,13 +43,12 @@ operators:
     at: cell
   - op: cell_chem_seed
     at: cell
-    mode: cones
     n_spots: 1
     cone_deg: 8.0
     seed: 0
+    model: cones
   - op: cell_chem_seed
     at: cell
-    mode: scatter
     seed_frac: 0.1
     after_frame: 900
     seed: 0
