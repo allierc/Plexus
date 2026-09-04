@@ -932,8 +932,6 @@ def run_pair(phase, spec, side_a, side_b, what, frames, submit=True, sides=None)
     its own reference is not a gate."""
     import cluster as C
     dirs = {t: _side_dir(phase, spec, t) for t in ("A", "B")}
-    for d in dirs.values():
-        os.makedirs(d, exist_ok=True)
     names = {}
     for tag, side in (("A", side_a), ("B", side_b)):
         run_name = f"promo_{_pair_tag(phase, spec)}_{tag}"
@@ -942,9 +940,18 @@ def run_pair(phase, spec, side_a, side_b, what, frames, submit=True, sides=None)
             # THE CORE SIDE NEEDS A SPEC TOO, and in its own folder: `Plexus_Main.py -o generate
             # promotion/<name>` resolves to `config/promotion/<name>.yaml`. Writing only the okuda
             # side's copy is how side A once died on a missing file while side B passed.
+            # THE SPEC RESOLVES BEFORE THE DIRECTORY IS MADE. `_spec_copy` raises FileNotFoundError
+            # for a row whose spec does not exist -- `ecm_block` and `01c_tissue` have never had one
+            # in any commit -- and main() catches that and prints SKIPPED. Creating the two side
+            # directories first left four EMPTY folders named for rows that never ran, which reads
+            # as a run that produced nothing rather than a row with no spec.
             _spec_copy(spec, run_name, frames, cfg_dir=(
                 _side_paths(side)[1] if side.startswith("okuda")
                 else os.path.join(_side_root(side), "config", "promotion")))
+            os.makedirs(dirs[tag], exist_ok=True)
+    else:
+        for d in dirs.values():
+            os.makedirs(d, exist_ok=True)
     if submit:
         # NORMALLY BOTH SIDES, TOGETHER -- that is the protocol and `sides` defaults to both.
         # `--sides A` exists for ONE situation: a bug that killed one side of a phase while the
