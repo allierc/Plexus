@@ -43,9 +43,9 @@ general:
   boundary: wall
   dim: 3
   world:
-  - 1.0
-  - 1.0
-  - 1.0
+    - 1.0
+    - 1.0
+    - 1.0
   units:
     length_um: 1000.0
     force_nN: 6666.666666666667
@@ -63,8 +63,8 @@ plotting:
   slow_motion: 4
   color_field: deformation
   color_range:
-  - 0.0
-  - 0.35
+    - 0.0
+    - 0.35
   cross_section:
     axis: z
     at: 0.5
@@ -85,99 +85,83 @@ sets:
         youngs: 30.0
         density: 1.0
         block:
-        - 0.15
-        - 0.05
-        - 0.15
-        - 0.85
-        - 0.45
-        - 0.85
+          - 0.15
+          - 0.05
+          - 0.15
+          - 0.85
+          - 0.45
+          - 0.85
 fields:
   mpm_grid:
     frame: mpm_grid
     n_grid: 64
+seed:
+  - op: seed_plate
+    at: vertex
+    shape: sheet
+    nq: 48
+    half_width: 0.25
+    axis: 1
+    height: 0.46
+    centre:
+      - 0.5
+      - 0.5
+    standoff: 0.3
 operators:
-- op: seed_plate
-  at: vertex
-  shape: sheet
-  nq: 48
-  half_width: 0.25
-  axis: 1
-  height: 0.46
-  centre:
-  - 0.5
-  - 0.5
-  standoff: 0.3
-- op: surface_drive
-  at: vertex
-  axis: 1
-  by: -0.11
-  over: 320
-- op: mesh_contact
-  at: mpm_particle
-  surface: vertex
-  k_frac: 0.45
-  mu: 0.4
-  dt: 0.0032
-  n_grid: 64
-  a_max: 100000.0
-  centre: centroid
-  centre_offset:
-  - 0.0
-  - 0.3
-  - 0.0
-- op: mpm_strain
-  at: mpm_particle
-  implementation: warp
-- op: mpm_scatter
-  at: mpm_particle
-  to: mpm_grid
-  drag: 0.5
-  a_max: 100000.0
-  implementation: warp
-- op: mpm_grid_update
-  at: mpm_grid
-  wall_damp: 0.7
-- op: mpm_gather
-  at: mpm_particle
-  from: mpm_grid
-  wall_damp: 0.7
-  wall_contact: 0.04
-  vmax: 1.0e9
-  implementation: warp
-- op: mesh_inside
-  at: mpm_particle
-  n_grid: 64
+  - op: surface_drive
+    at: vertex
+    axis: 1
+    by: -0.11
+    over: 320
+  - op: mesh_contact
+    at: mpm_particle
+    surface: vertex
+    k_frac: 0.45
+    mu: 0.4
+    dt: 0.0032
+    n_grid: 64
+    a_max: 100000.0
+    centre: centroid
+    centre_offset:
+      - 0.0
+      - 0.3
+      - 0.0
+  - op: mpm_strain
+    at: mpm_particle
+    implementation: warp
+  - op: mpm_scatter
+    at: mpm_particle
+    to: mpm_grid
+    drag: 0.5
+    a_max: 100000.0
+    implementation: warp
+  - op: mpm_grid_update
+    at: mpm_grid
+    wall_damp: 0.7
+  - op: mpm_gather
+    at: mpm_particle
+    from: mpm_grid
+    wall_damp: 0.7
+    wall_contact: 0.04
+    vmax: 1.0e9
+    implementation: warp
+  - op: mesh_inside
+    at: mpm_particle
+    n_grid: 64
 schedule:
-- seed_plate
-- surface_drive
-- substep_dt: 0.0004
-  steps:
-  - mesh_contact
-  - mpm_strain
-  - mpm_scatter
-  - mpm_grid_update
-  - mpm_gather
-- mesh_inside
+  - surface_drive
+  - substep_dt: 0.0004
+    steps:
+      - mesh_contact
+      - mpm_strain
+      - mpm_scatter
+      - mpm_grid_update
+      - mpm_gather
+  - mesh_inside
 descriptions:
   movie:
-    description: A large purple cube is subjected to a compressive force from a thin, grey mesh sheet
-      on its top surface. As time progresses, the cube undergoes significant deformation, flattening and
-      expanding outward under the pressure. The internal stress distribution becomes visible as a heat
-      map, transitioning from dark purple to bright yellow and red. By the final frame, the cube has been
-      compressed into a much thinner, wider shape with high-intensity stress concentrated at the bottom
-      and center.
-    objects: "The primary object is a large, roughly cubic volume of particles that starts as a dark purple\
-      \ mass. A thin, grey rectangular mesh sheet sits on top of the cube, acting as the source of external\
-      \ pressure. A smaller, blue rectangular inset in the top-left corner provides a zoomed-in view of\
-      \ the surface deformation. A white wireframe box defines the 1 mm\xB3 simulation domain, with a\
-      \ 0.25 mm scale bar provided for spatial reference."
+    description: A large purple cube is subjected to a compressive force from a thin, grey mesh sheet on its top surface. As time progresses, the cube undergoes significant deformation, flattening and expanding outward under the pressure. The internal stress distribution becomes visible as a heat map, transitioning from dark purple to bright yellow and red. By the final frame, the cube has been compressed into a much thinner, wider shape with high-intensity stress concentrated at the bottom and center.
+    objects: "The primary object is a large, roughly cubic volume of particles that starts as a dark purple mass. A thin, grey rectangular mesh sheet sits on top of the cube, acting as the source of external pressure. A smaller, blue rectangular inset in the top-left corner provides a zoomed-in view of the surface deformation. A white wireframe box defines the 1 mm³ simulation domain, with a 0.25 mm scale bar provided for spatial reference."
   movie_mpm_particle:
-    description: A large cube of particles undergoes a deformation process over time. The particles shift
-      from a uniform blue state to a gradient of red and purple. The overall shape of the particle mass
-      compresses and tilts slightly as the simulation progresses. The movement appears smooth and continuous,
-      representing an elastic deformation of a 1 mm cube.
-    objects: The primary object is a large, dense collection of particles forming a roughly cubic shape.
-      These particles transition from a solid blue color to a gradient of red at the bottom and purple
-      at the top. A smaller, static blue cube is shown in an inset box in the upper left corner for reference.
-      The entire simulation is contained within a wireframe bounding box with a scale bar indicating 0.25
-      mm.
+    description: A large cube of particles undergoes a deformation process over time. The particles shift from a uniform blue state to a gradient of red and purple. The overall shape of the particle mass compresses and tilts slightly as the simulation progresses. The movement appears smooth and continuous, representing an elastic deformation of a 1 mm cube.
+    objects: The primary object is a large, dense collection of particles forming a roughly cubic shape. These particles transition from a solid blue color to a gradient of red at the bottom and purple at the top. A smaller, static blue cube is shown in an inset box in the upper left corner for reference. The entire simulation is contained within a wireframe bounding box with a scale bar indicating 0.25 mm.

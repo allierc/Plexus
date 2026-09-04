@@ -7,9 +7,9 @@ general:
   boundary: free
   dim: 3
   world:
-  - 14.0
-  - 14.0
-  - 14.0
+    - 14.0
+    - 14.0
+    - 14.0
   units:
     length_um: 10.0
     time_s: 600.0
@@ -21,10 +21,10 @@ plotting:
   movie_max_frames: 300
   mesh_edges: true
   curve:
-  - quantity: area
-    ticks: 4
-  - quantity: radius
-    ticks: 4
+    - quantity: area
+      ticks: 4
+    - quantity: radius
+      ticks: 4
 sets:
   vertex:
     n: 25584
@@ -41,58 +41,47 @@ sets:
         width: 2
         integration: first_order
 fields: {}
+seed:
+  - op: mesh_seed
+    at: vertex
+    cell_set: cell
+    n_cells: 200
+    radius: 4.55
+    jitter: 0.8
+    p0: 3.5
+    seed: 0
+    vseed_cv: 0.0
 operators:
-- op: mesh_seed
-  at: vertex
-  before_frame: 1
-  cell_set: cell
-  n_cells: 200
-  radius: 4.55
-  jitter: 0.8
-  p0: 3.5
-  seed: 0
-  vseed_cv: 0.0
-- op: cell_geometry
-  at: cell
-- op: cell_mechanics
-  at: vertex
-  p0: 3.5
-  mu: 1.0
-  relax_iters: 1
-  eta: 0.02
-  cap_frac: 0.015
-  K_V: 2.0
-  K_R: 0.0
-  K_A: 80.0
-  K_P: 0.0
-  Lambda: 28.4
-  Gamma: 2.0791666666666666
-- op: edge_flip
-  at: vertex
-  every: 4
-  engine_clock: true
-  l_th_frac: 0.35
-  max_flips: 30
-- op: topo_record
-  at: vertex
-  every: 1
+  - op: cell_geometry
+    at: cell
+  - op: cell_mechanics
+    at: vertex
+    p0: 3.5
+    mu: 1.0
+    relax_iters: 1
+    eta: 0.02
+    cap_frac: 0.015
+    K_V: 2.0
+    K_R: 0.0
+    K_A: 80.0
+    K_P: 0.0
+    Lambda: 28.4
+    Gamma: 2.0791666666666666
+  - op: edge_flip
+    at: vertex
+    every: 4
+    engine_clock: true
+    l_th_frac: 0.35
+    max_flips: 30
+  - op: topo_record
+    at: vertex
+    every: 1
 schedule:
-- mesh_seed
-- cell_geometry
-- cell_mechanics
-- edge_flip
-- topo_record
+  - cell_geometry
+  - cell_mechanics
+  - edge_flip
+  - topo_record
 descriptions:
   movie:
-    description: A spherical polycrystalline structure is shown within a cubic simulation
-      box. Over the course of the frames, the internal grain boundaries of the sphere
-      undergo a coarsening process. The "area" and "radius" plots on the right indicate
-      a gradual decrease in the average grain area and a stabilization of the overall
-      radius. The simulation captures the evolution of microstructure as the grains
-      rearrange and grow over time.
-    objects: The primary object is a large, spherical polycrystalline aggregate centered
-      within a 3D bounding box. The sphere is composed of numerous smaller polygonal
-      grains, which are represented by a light beige or cream color. The boundaries
-      between these grains are defined by thin, dark lines forming a Voronoi-like
-      tessellation. A scale bar in the bottom left corner indicates a physical dimension
-      of 25 micrometers.
+    description: A spherical polycrystalline structure is shown within a cubic simulation box. Over the course of the frames, the internal grain boundaries of the sphere undergo a coarsening process. The "area" and "radius" plots on the right indicate a gradual decrease in the average grain area and a stabilization of the overall radius. The simulation captures the evolution of microstructure as the grains rearrange and grow over time.
+    objects: The primary object is a large, spherical polycrystalline aggregate centered within a 3D bounding box. The sphere is composed of numerous smaller polygonal grains, which are represented by a light beige or cream color. The boundaries between these grains are defined by thin, dark lines forming a Voronoi-like tessellation. A scale bar in the bottom left corner indicates a physical dimension of 25 micrometers.
