@@ -80,7 +80,19 @@ class OperatorContract:
     kind: str | None = None
     family: str | None = None
     set: str | None = None
-    signature: dict = field(default_factory=dict)
+    signature: dict = field(default_factory=dict)         # the DEFAULT variant's, kept for callers
+    # ONE SIGNATURE PER VARIANT, because variants of one contract do NOT read the same things.
+    # `signature` above was built from the FIRST registration only and every later variant inherited
+    # it silently -- the extension branch below checks KIND and nothing else. The defect is shipped
+    # and measurable: `cell_chem_diffuse`'s contract carries `graph_laplacian`'s
+    # {inputs:[cell], reads:[chem], maps:[edge_index]} while `interface_weighted` declares
+    # INPUTS=["cell","vertex"], READS=["chem","pos"], MAPS=["E_srce","E_trgt","E_face"] -- a second
+    # SET, a second state BLOCK and three different MAPS, none of which appear in the contract the
+    # atlas and the validator read as truth.
+    #
+    # `signature` is NOT removed. It is what the audit tools and the atlas already call, and a
+    # contract whose default variant is the only one registered -- most of them -- is unchanged.
+    signatures: dict = field(default_factory=dict)        # variant name -> that variant's signature
     implementations: dict = field(default_factory=dict)   # variant name -> class (models + impls)
     default: str | None = None
     # WHICH AXIS EACH VARIANT VARIES. `model` = a different biological hypothesis at this slot;
@@ -212,6 +224,10 @@ def register_operator(*names: str, implementation: str | None = None,
                         f"{contract.kind!r}; a variant may not change the kind.")
             contract.implementations[impl] = cls
             contract.axis[impl] = axis
+            # EVERY variant, including the first -- so `signatures` is complete rather than
+            # "the ones that came second", and `signatures[contract.default]` is always the same
+            # object `signature` holds.
+            contract.signatures[impl] = cls.signature() if hasattr(cls, "signature") else {}
         return cls
     return decorator
 
