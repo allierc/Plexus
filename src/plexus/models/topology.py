@@ -86,7 +86,7 @@ def _insert_after(ring, u, v, w):
     return False
 
 
-def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None, emap=None):
+def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None, emap=None, births=None):
     """Divide face f by an edge-midpoint septum across edges `ea` and `eb` (pass the two edges the
     cell's SHORT axis crosses -> the septum runs perpendicular to the long axis, Hertwig's rule ->
     compact daughters). Defaults to roughly-opposite edges. Mutates `rings` (f -> two daughters,
@@ -104,7 +104,14 @@ def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None, emap=None):
     Passed a dict, this updates it in place for the four faces a division touches (the mother, the
     new daughter, and the two neighbours that gain a midpoint) and leaves the rest alone -- the same
     map a rebuild would produce, since `_edge_face_map` is a pure function of `rings` and no other
-    ring changed. Passed None it rebuilds, so every other caller is unaffected."""
+    ring changed. Passed None it rebuilds, so every other caller is unaffected.
+
+    `births` -- A LIST TO APPEND THE VERTEX PARENTAGE TO, and it is reported rather than recomputed
+    because this function is the only place that knows it. Each new vertex is the midpoint of a
+    named edge, so its parents are that edge's two endpoints: `(m1, (a0, a1))` and `(m2, (b0, b1))`.
+    Without it a per-vertex quantity has no value at a vertex born mid-run -- a monolayer's
+    apico-basal separation would be zero on the septum, i.e. a cell of zero height along the seam it
+    just grew. Passed None nothing is recorded and the function is unchanged."""
     r = rings[f]
     k = len(r)
     if k < 4:                                   # need >=4 edges to split two non-adjacent ones cleanly
@@ -132,6 +139,9 @@ def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None, emap=None):
         p_a = p_a * (ra / max(np.linalg.norm(p_a), 1e-9))
         p_b = p_b * (rb / max(np.linalg.norm(p_b), 1e-9))
     pos.append(p_a); pos.append(p_b)
+    if births is not None:                      # (new vertex, the two endpoints it was born between)
+        births.append((m1, (int(a0), int(a1))))
+        births.append((m2, (int(b0), int(b1))))
 
     # THE OLD RINGS OF THE TWO NEIGHBOURS, taken BEFORE `_insert_after` mutates them in place --
     # `_emap_drop` needs the keys as they were, and after the insert they are gone.
@@ -169,7 +179,7 @@ def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None, emap=None):
 
 
 # --------------------------------------------------------------------------------------------------
-def face_collapse_3d(rings, pos, f):
+def face_collapse_3d(rings, pos, f, births=None):
     """T2 / cell extrusion: collapse triangular face `f` to a point, so the sheet closes over it.
 
     THE INVERSE OF `divide_face_3d`, and the operator family the algebra was missing. Plexus2 lists
@@ -193,6 +203,12 @@ def face_collapse_3d(rings, pos, f):
     vertex moved to the centroid). Returns True if the collapse happened AND left a valid closed
     surface -- on any failure `rings` and `pos` are left untouched, because a half-applied topology
     edit is worse than a refused one.
+
+    `births` -- THE SAME OUT-PARAMETER `divide_face_3d` TAKES, because a merge is a birth with three
+    parents. `pos[keep] = c` moves the survivor to the centroid of the three, so a per-vertex
+    quantity must travel the same way or the survivor silently keeps `r[0]`'s value and the
+    extrusion site jumps. Appended only on success, after the closure check, for the same reason the
+    ring edit is: a half-applied edit is worse than a refused one.
     """
     r = rings[f]
     if r is None or len(r) != 3:
@@ -221,6 +237,8 @@ def face_collapse_3d(rings, pos, f):
     for g in range(len(rings)):
         rings[g] = None if trial[g] is None else np.asarray(trial[g], dtype=np.int64)
     pos[keep] = c
+    if births is not None:                      # the survivor is reborn from all three of them
+        births.append((keep, (keep,) + tuple(sorted(drop))))
     return True
 
 
