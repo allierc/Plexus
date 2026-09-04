@@ -1498,43 +1498,45 @@ class LiveMovie:
             pass
         return None
 
-    def _mono_shell_points(self, H, name, pd, sc):
-        """The apical and basal surfaces of a monolayer, in the SAME coordinates as `pd`.
+    def _mono_shell_frame(self, H, name, pd, sc):
+        """`(points, vertex normals, vertex thickness, E_srce, E_trgt)` for a monolayer mesh, in the
+        SAME coordinates as `pd`. None for every other model, which is the gate.
 
-        Empty for every other model, which is the gate: a mesh carries the thickness only if
-        `cell_mechanics[model: monolayer]` published it, so a mid-surface run draws what it always
-        drew and pays one dict lookup.
+        The ingredients rather than the two surfaces, because the section needs to offset the
+        CROSSING POINTS of the cut plane -- not the vertices -- and that means interpolating the
+        normal and the thickness along the crossing edge. Slicing two separately-offset surfaces
+        and pairing the results by nearest neighbour is what this replaced; it drew a scribble,
+        because `slice` returns points in the order it meets them and the k-th point of one surface
+        is not above the k-th of the other.
 
-        BUILT FROM `pd.points`, NOT FROM THE LEVEL. `_mesh_xyz` already returns RENDER coordinates,
-        and taking them and then applying the placement offset again put the shells tens of units
-        outside the section window -- drawn, off-frame, and indistinguishable from not drawn. The
-        mid-surface actor is the one thing already in the right frame, so the offset is taken from
-        it. A translation does not change a normal; a uniform scale scales the thickness with it.
+        Taken from `pd.points` -- the mid-surface actor's own array, already in render coordinates.
+        `_mesh_xyz` returns those too, and applying the placement offset to them a second time put
+        the shells tens of units outside the window, which is indistinguishable from not drawing.
         """
         try:
             lvl = H.level(name)
             m = getattr(lvl, "mesh", None) or getattr(lvl, "_mesh", None)
             if m is None:
-                return []
+                return None
             # EITHER SPELLING: the operator writes `mono_h` on the live table, and the recorder
-            # stores it as a SCALAR, so the replay -- the pass that writes the movie that is kept --
-            # gets it back as `scalar_mono_h`.
+            # stores it as a SCALAR, so the replay gets it back as `scalar_mono_h`.
             _h = m.get("mono_h", m.get("scalar_mono_h"))
             if _h is None:
-                return []
+                return None
             import torch as _t
             from plexus.operators.vertex_ops import monolayer_shells
+            _np_ = lambda v: (v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v))
+            es, et, ef = _np_(m["E_srce"]), _np_(m["E_trgt"]), _np_(m["E_face"])
             nF = int(m["nF"])
-            P = np.asarray(pd.points, np.float32)
-            _as = lambda v, d=_t.long: _t.as_tensor(np.asarray(v), dtype=d)   # noqa: E731
+            P = np.asarray(pd.points, np.float64)
+            _as = lambda v: _t.as_tensor(np.asarray(v), dtype=_t.long)                # noqa: E731
             h = _t.full((nF,), float(np.asarray(_h).ravel()[0]) * float(sc), dtype=_t.float32)
-            ap, ba, _, _ = monolayer_shells(_t.as_tensor(P, dtype=_t.float32),
-                                            _as(m["E_srce"]), _as(m["E_trgt"]), _as(m["E_face"]),
-                                            nF, h)
-            return [("apical", ap.numpy().astype(np.float32), "#d9534f"),
-                    ("basal", ba.numpy().astype(np.float32), "#4a86c8")]
+            _, _, n, hv = monolayer_shells(_t.as_tensor(P, dtype=_t.float32),
+                                           _as(es), _as(et), _as(ef), nF, h)
+            return (P, n.numpy().astype(np.float64), hv.numpy().astype(np.float64),
+                    es.astype(np.int64), et.astype(np.int64))
         except Exception:                                # noqa: BLE001 -- a shell is not the run
-            return []
+            return None
 
     def _update_cross_section(self, H):
         """Scatter whatever is inside the slab, in the plane of the other two axes."""
@@ -1740,45 +1742,57 @@ class LiveMovie:
             # drawing cannot drift from the model, and sliced by the same plane as the mid-surface.
             # Red outside, blue inside: two distinct surfaces, not a measurement against a truth.
             for _nm, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
-                _cut = {}
-                for _lbl, _pts, _col in self._mono_shell_points(H, _nm, _pd, _sc):
-                    try:
-                        _sh = self.pv.PolyData(_pts, _pd.faces)
-                        _sl = _sh.slice(normal=_nrm, origin=_org)
-                        if _sl.n_points < 3:
-                            continue
-                        _P = np.asarray(_sl.points)
-                        _u, _v = _P[:, a], _P[:, b]
-                        _cut[_lbl] = (_u, _v)
-                        _th = np.arctan2(_v - _v.mean(), _u - _u.mean())
-                        _o = np.append(np.argsort(_th), np.argsort(_th)[0])
-                        self._cs_mesh_series.append(
-                            self.cs.line(_u[_o], _v[_o], color=_col, width=2.0))
-                    except Exception:                    # noqa: BLE001
-                        pass
-                # THE LATERAL WALLS -- the rungs between apical and basal, and the thing that makes a
-                # section read as a MONOLAYER rather than as two unrelated curves. A cell's lateral
-                # face is the quad joining its apical and basal edges, so in the cut plane it is the
-                # segment from a basal point to the apical point above it.
+                # THE WALL, BUILT THE WAY THE REFERENCE SECTION BUILDS IT -- and it took reading
+                # `discovery_okuda/ops/run_tyssue_round.py::_cross_screen` to get right, after three
+                # attempts at inferring it from the picture.
                 #
-                # MATCHED BY NEAREST NEIGHBOUR, not by index: the two shells are sliced separately
-                # and `slice` returns points in whatever order it meets them, so the k-th apical
-                # point is not above the k-th basal one. Over a wall whose thickness is far smaller
-                # than its radius of curvature the nearest basal point IS the one below.
+                # That function finds the mesh edges that CROSS the plane, keeps the crossing point,
+                # and draws a quad from each crossing point to the next, spanning outward surface to
+                # inward surface. Its two surfaces are the crossing point X and `X * inner` with
+                # `inner = 0.82` -- so the wall in every okuda_ECM section is 18% of the radius
+                # because a renderer constant says so, with no basal surface and no thickness in the
+                # model at all. That is why a MID-SURFACE run shows a thick banded ring, and why a
+                # faithful apical/basal drawing of a real monolayer looks thin beside it: h0/R here
+                # is 2-4%, not 18%.
+                #
+                # Same construction, real thickness. The crossing points are offset along the
+                # INTERPOLATED VERTEX NORMAL by the model's own h/2 -- `monolayer_shells` supplies
+                # both -- so the ticks are radial by construction rather than by nearest-neighbour
+                # matching between two separately sliced surfaces, which is what made the earlier
+                # attempt a scribble.
                 try:
-                    _ua, _va = _cut["apical"]; _ub, _vb = _cut["basal"]
-                    _n = int((self.style or {}).get("cross_section", {}).get("walls", 90))
-                    if _n > 0 and len(_ua) and len(_ub):
-                        _pick = np.unique(np.linspace(0, len(_ua) - 1, min(_n, len(_ua))).astype(int))
-                        _d = ((_ub[None, :] - _ua[_pick, None]) ** 2
-                              + (_vb[None, :] - _va[_pick, None]) ** 2)
-                        _j = np.argmin(_d, axis=1)
-                        _wc = (self.style or {}).get("mesh_color", "#e6dcc0")
-                        for _k, _jj in zip(_pick, _j):
-                            self._cs_mesh_series.append(
-                                self.cs.line(np.array([_ub[_jj], _ua[_k]]),
-                                             np.array([_vb[_jj], _va[_k]]), color=_wc, width=1.0))
-                except (KeyError, ValueError):           # not a monolayer, or a degenerate cut
+                    _sh = self._mono_shell_frame(H, _nm, _pd, _sc)
+                    if _sh is not None:
+                        _P, _nrmv, _hv, _es0, _es1 = _sh
+                        _pr = _P[:, ax] - y0
+                        _c = np.flatnonzero(_pr[_es0] * _pr[_es1] < 0)
+                        if len(_c) > 3:
+                            _s0, _s1 = _es0[_c], _es1[_c]
+                            _f = (-_pr[_s0] / (_pr[_s1] - _pr[_s0]))[:, None]
+                            _X = _P[_s0] + _f * (_P[_s1] - _P[_s0])
+                            _N = _nrmv[_s0] + _f * (_nrmv[_s1] - _nrmv[_s0])
+                            _N = _N / (np.linalg.norm(_N, axis=1, keepdims=True) + 1e-12)
+                            _h = (_hv[_s0] + _f[:, 0] * (_hv[_s1] - _hv[_s0]))[:, None]
+                            _ap = _X + 0.5 * _h * _N
+                            _ba = _X - 0.5 * _h * _N
+                            _o = np.argsort(np.arctan2(_X[:, b] - _X[:, b].mean(),
+                                                       _X[:, a] - _X[:, a].mean()))
+                            _ap, _ba = _ap[_o], _ba[_o]
+                            _cl = np.append(np.arange(len(_o)), 0)
+                            self._cs_mesh_series.append(self.cs.line(
+                                _ap[_cl, a], _ap[_cl, b], color="#d9534f", width=2.0))
+                            self._cs_mesh_series.append(self.cs.line(
+                                _ba[_cl, a], _ba[_cl, b], color="#4a86c8", width=2.0))
+                            _n = int((self.style or {}).get("cross_section", {}).get("walls", 0))
+                            if _n > 0:
+                                _wc = (self.style or {}).get("mesh_color", "#e6dcc0")
+                                for _k in np.unique(np.linspace(0, len(_o) - 1,
+                                                                min(_n, len(_o))).astype(int)):
+                                    self._cs_mesh_series.append(self.cs.line(
+                                        np.array([_ba[_k, a], _ap[_k, a]]),
+                                        np.array([_ba[_k, b], _ap[_k, b]]),
+                                        color=_wc, width=1.0))
+                except Exception:                        # noqa: BLE001 -- the section is not the run
                     pass
             # LAST, AFTER EVERY SERIES IS BACK. Adding a plot re-derives the chart's range from its
             # data, so a range set before the series were added was overwritten by the last `line`
