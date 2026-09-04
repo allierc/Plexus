@@ -105,7 +105,6 @@ operators:
     at: vertex
     cell_set: cell
     p0: 3.5
-    mode: chem_low
     chan: 2
     a_sw: 0.25
     max_mark_frac: 0.1
@@ -113,6 +112,7 @@ operators:
     shrink_rate: 0.15
     critical_frac: 0.15
     after_frame: 600
+    model: chem_low
   - op: cell_mechanics
     at: vertex
     p0: 3.5

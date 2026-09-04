@@ -57,11 +57,11 @@ operators:
     at: vertex
     cell_set: cell
     p0: 3.5
-    mode: competition
     max_mark_frac: 0.005
     min_age: 4
     shrink_rate: 0.05
     critical_frac: 0.15
+    model: competition
   - op: cell_mechanics
     at: vertex
     K_A: 1.0

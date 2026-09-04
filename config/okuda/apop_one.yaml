@@ -63,11 +63,12 @@ operators:
     at: vertex
     cell_set: cell
     p0: 3.5
-    mode: list
     cells:
       - 900
     shrink_rate: 0.05
     critical_frac: 0.15
+    model: prescribed
+    region: list
   - op: edge_flip
     at: vertex
     l_th_frac: 0.28

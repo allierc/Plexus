@@ -88,10 +88,11 @@ operators:
     shrink_rate: 0.15
     critical_frac: 0.15
     min_age: 4
-    mode: band
     band_deg: 6.0
     n_bands: 1
     after_frame: 600
+    model: prescribed
+    region: band
   - op: cell_mechanics
     at: vertex
     p0: 3.5

@@ -112,10 +112,10 @@ operators:
     shrink_rate: 0.05
     critical_frac: 0.15
     min_age: 4
-    mode: chem_low
     chan: 2
     a_sw: 0.45
     after_frame: 600
+    model: chem_low
   - op: cell_mechanics
     at: vertex
     p0: 3.5

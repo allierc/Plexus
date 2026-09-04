@@ -101,8 +101,8 @@ operators:
     p0: 3.5
     shrink_rate: 0.05
     critical_frac: 0.15
-    mode: chem_low
     a_sw: 0.25
+    model: chem_low
   - op: edge_flip
     at: vertex
     l_th_frac: 0.28

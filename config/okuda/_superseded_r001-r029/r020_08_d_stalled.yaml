@@ -84,7 +84,7 @@ operators:
     shrink_rate: 0.05
     critical_frac: 0.15
     max_mark_frac: 0.005
-    mode: stalled
+    model: stalled
   - op: cell_mechanics
     at: vertex
     K_A: 1.0

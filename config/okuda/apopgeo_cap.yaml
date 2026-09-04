@@ -50,8 +50,9 @@ operators:
     shrink_rate: 0.05
     critical_frac: 0.15
     min_age: 0
-    mode: cone
     cone_deg: 22.8
+    model: prescribed
+    region: cone
   - op: cell_mechanics
     at: vertex
     K_A: 1.0

@@ -63,10 +63,11 @@ operators:
     at: vertex
     cell_set: cell
     p0: 3.5
-    mode: cone
     cone_deg: 45.0
     shrink_rate: 0.05
     critical_frac: 0.15
+    model: prescribed
+    region: cone
   - op: edge_flip
     at: vertex
     l_th_frac: 0.28
