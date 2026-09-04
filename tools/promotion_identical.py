@@ -95,7 +95,29 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OKUDA = os.path.join(ROOT, "discovery_okuda")
 CFG_OKUDA = os.path.join(ROOT, "config", "okuda")
 LOG_OKUDA = os.path.join(ROOT, "log", "okuda")
-OUT = os.path.join(ROOT, "log", "promotion")
+# TWIN OUTPUT IS GENERATED DATA, so it lives with the generated data. `graphs_data/` is the symlink
+# onto the GraphData filer that every other run in this repo writes through; `log/` is for the
+# harness's own bookkeeping. Moved here on 4 September -- a twin run is two full simulations, which
+# is the same kind of object as anything under `graphs_data/<campaign>/`, and putting it under
+# `log/` was what made a 393 GB tree look like a log directory and invite a `rm -rf`.
+#
+#
+# `_worktrees/` DOES NOT MOVE WITH IT, and that separation is the whole lesson of 4 September. The
+# worktrees are CODE -- side A executes `run_one.py` from inside one -- and they used to sit in the
+# output tree. Deleting the output therefore deleted the code out from under fifteen running jobs,
+# every okuda side lost its `cd` target mid-flight, and the wrapper then died on
+# `git worktree add ... exit 128` because git still held the registration for a directory that was
+# gone. Output is deletable at any time by design; the thing a job is running must not be inside it.
+OUT = os.path.join(ROOT, "graphs_data", "promotion")
+WORKTREES = os.path.join(ROOT, "log", "_worktrees")
+
+# UNSET `DISPLAY` BEFORE ANYTHING CAN LOOK AT IT. A VS Code remote session exports a DISPLAY whose
+# X server this container cannot authenticate to, and VTK does not fall back quietly from that: one
+# path aborts the PROCESS with `BadValue ... X_GLXCreateContext`, which killed this wrapper after it
+# had submitted and was waiting on jobs. `render_vtk.offscreen()` does exactly this, but only once a
+# render function is called, which is too late. With no DISPLAY, VTK goes to EGL/OSMesa directly,
+# and nothing here ever wants an on-screen window.
+os.environ.pop("DISPLAY", None)
 sys.path.insert(0, OKUDA)
 
 # =============================================================================================
@@ -160,14 +182,14 @@ PAIRS = [
     ("G", "gates/gate_00_spheroid",     None, 0.0, "okuda@0da57dd0", "core", "the growth line: seed, geometry, grow, belt, mechanics, T1, divide, sync"),
     ("G", "gates/gate_01_nosync",       None, 0.0, "okuda@0da57dd0", "core", "gate 01's own arm: the belt WITHOUT the re-keying operator"),
     ("G", "gates/gate_01_nomyosin",     None, 0.0, "okuda@0da57dd0", "core", "gate 01's contrast arm: the same tissue with no belt"),
-    # 01b RECONSTRUCTED, not replayed. `log/okuda_ECM/01b_myosin_pools/spec.yaml` is one of the
-    # 43 PROSE records -- `what` and `operators_exercised`, no `sets`, no `schedule` -- so
-    # `suite_ecm` cannot see it and there is nothing to load. The two operators it exercises that
-    # gate 00 does not are `medioapical_myosin` and `junction_myosin[two_pool]`, and this row is
-    # gate 00 with exactly those two changes: the medial pool added before the belt, and the belt
-    # switched to the two-pool model. Everything else is gate 00 verbatim, so a DIFFER here names
-    # one of those two operators rather than the tissue.
-    ("G", "gates/gate_01b_myosin_pools", None, 0.0, "okuda@0da57dd0", "core", "the two myosin pools: a medial pool exporting onto a two-pool belt"),
+    # 01b IS NOT IN THIS SUITE, and the gap is declared rather than left as an absence. Its spec was
+    # a RECONSTRUCTION -- `log/okuda_ECM/01b_myosin_pools/spec.yaml` is one of the 43 PROSE records
+    # (`what` and `operators_exercised`, no `sets`, no `schedule`), so there was never anything to
+    # replay -- and it was deleted on 2026-09-04 because it carried NO `_gate:` BLOCK: `run_gates`
+    # filters on that key, so for its whole life it was a spec in the gates folder that could not be
+    # run and could not fail, and this row was twinning it anyway. The two operators it was meant to
+    # cover, `medioapical_myosin` and `junction_myosin[two_pool]`, are therefore UNTWINNED TODAY.
+    # Restoring it means writing the thresholds first and the row second, in that order.
     # ---- THE TWO MPM GATES HAVE NO OKUDA TWIN, and that is a fact about okuda's runner rather
     # than a gap in the promotion. `run_one.py` reads `H.level("vertex")` in three places -- the
     # heartbeat, the live snapshot and the cell ceiling -- so a spec with no mesh set dies with
@@ -210,8 +232,11 @@ def _worktree(ref):
     stale reference this file exists to refuse. A worktree costs a checkout of the tracked files
     (`log/` is gitignored, so none of the 15 GB comes with it) and gives a real, runnable okuda at
     the old commit, which can then be submitted beside the new one.
+
+    IT LIVES IN `log/_worktrees/`, NOT IN THE OUTPUT TREE. See the note on `OUT`: a worktree is the
+    code a running job is executing, and the output tree is meant to be deletable at any moment.
     """
-    d = os.path.join(OUT, "_worktrees", ref.replace("/", "_"))
+    d = os.path.join(WORKTREES, ref.replace("/", "_"))
     if os.path.isdir(os.path.join(d, ".git")) or os.path.isfile(os.path.join(d, ".git")):
         return d
     os.makedirs(os.path.dirname(d), exist_ok=True)
@@ -605,7 +630,7 @@ _OKUDA_OP_MODULE = {
 }
 
 
-def _okuda_entry(pair_dir, cfg_dir, run_name):
+def _okuda_entry(out_dir, cfg_dir, run_name):
     """The okuda side's entry point: `run_one.py`, or a launcher that registers what it omits.
 
     Returns a path to run instead of `run_one.py`. When the spec needs nothing extra the answer IS
@@ -620,7 +645,7 @@ def _okuda_entry(pair_dir, cfg_dir, run_name):
     need = sorted({_OKUDA_OP_MODULE[n] for n in names if n in _OKUDA_OP_MODULE})
     if not need:
         return "run_one.py"
-    path = os.path.join(pair_dir, f"_launch_{run_name}.py")
+    path = os.path.join(out_dir, f"_launch_{run_name}.py")
     with open(path, "w") as f:
         f.write('"""Register the okuda op modules `run_one.py` does not import, then run it.\n\n'
                 'Written by tools/promotion_identical.py. `run_one.py` is executed under\n'
@@ -675,15 +700,18 @@ def _check_record_clocks(cfg, spec):
                       f"raise record_cap above {nf + 1} to put both clocks on 1.", flush=True)
 
 
-def _bsub_lines(pair_dir, spec, side, run_name, frames):
-    """The bsub command for one side. Both sides go into ONE remote script, so they are submitted
-    together and the scheduler runs them at the same time -- 'in parallel' is a property of the
-    submission, not a hope about the queue."""
+def _bsub_lines(out_dir, spec, side, run_name, frames):
+    """The bsub command for one side, writing EVERYTHING into that side's own directory.
+
+    `out_dir` is `log/promotion/<phase>_<spec>_<A|B>` -- the launcher, the job script, its stdout and
+    stderr, and (for the core side) `--output_root`. There is no pair directory above it: a twin is
+    two sibling folders whose names differ only in the last character, and the comparison reads one
+    against the other."""
     import cluster as C
     home, _cfg, _log = _side_paths(side)
     if side.startswith("okuda"):
-        entry = _okuda_entry(pair_dir, _cfg, run_name)
-        script = os.path.join(pair_dir, f"{run_name}.sh")
+        entry = _okuda_entry(out_dir, _cfg, run_name)
+        script = os.path.join(out_dir, f"{run_name}.sh")
         with open(script, "w") as f:
             f.write("\n".join([
                 "#!/bin/bash -l",
@@ -709,7 +737,7 @@ def _bsub_lines(pair_dir, spec, side, run_name, frames):
                 + " --device cuda:0 --campaign promotion",
             ]) + "\n")
     else:
-        script = os.path.join(pair_dir, f"{run_name}.sh")
+        script = os.path.join(out_dir, f"{run_name}.sh")
         with open(script, "w") as f:
             f.write("\n".join([
                 "#!/bin/bash -l",
@@ -719,10 +747,10 @@ def _bsub_lines(pair_dir, spec, side, run_name, frames):
                 "export MPLBACKEND=Agg",
                 "export PLEXUS_STRICT_DETERMINISM=1",
                 f"conda run -n {C.ENV} python Plexus_Main.py -o generate promotion/{run_name} "
-                f"--output_root {C.cpath(pair_dir)} --device cuda:0 --force",
+                f"--output_root {C.cpath(out_dir)} --device cuda:0 --force",
             ]) + "\n")
     os.chmod(script, 0o755)
-    out = C.cpath(os.path.join(pair_dir, f"{run_name}.out"))
+    out = C.cpath(os.path.join(out_dir, f"{run_name}.out"))
     gpu = "-gpu num=1 " if C.GPU != "0" else ""
     excl = "".join(f'-R "hname!={h}" ' for h in C.EXCLUDE_HOSTS if h)
     return (f"cd {C.cpath(ROOT)} && bsub -n {C.NCPUS} {gpu}{excl}-q {C.QUEUE} -W {C.WALL} "
@@ -872,8 +900,22 @@ def compare(dir_a, dir_b, tol=0.0):
     return ok, _digest(A), _digest(B), rep
 
 
-def _side_dir(pair_dir, side):
-    return os.path.join(pair_dir, "A" if side == "a" else "B")
+def _pair_tag(phase, spec):
+    """The pair's NAME, which is a prefix and not a directory: `G_gates_gate_01_nomyosin`."""
+    return f"{_ptag(phase)}_{_stag(spec)}"
+
+
+def _side_dir(phase, spec, tag):
+    """A side's directory: `log/promotion/<phase>_<spec>_<A|B>`.
+
+    FLAT, AND THAT IS THE POINT. The old layout put a pair directory above the two sides and then
+    kept each run TWICE inside it -- once where the runner natively wrote it
+    (`<pair>/graphs_data/promotion/<name>/` for the core, the worktree's `log/okuda/<name>/` for
+    okuda) and once in the `A/`/`B/` mirror the comparison read. Measured on one pair, that was the
+    same 7,507,620,532-byte `trajectory.npz` at two different inodes. Worse than the disk: after a
+    killed run the mirror held one attempt and the native tree another, with nothing in the names to
+    say which was which. One directory per side, and the run writes into it."""
+    return os.path.join(OUT, f"{_pair_tag(phase, spec)}_{tag}")
 
 
 # ---------------------------------------------------------------------------------- the run
@@ -889,19 +931,27 @@ def run_pair(phase, spec, side_a, side_b, what, frames, submit=True, sides=None)
     to finish would silently be compared against the first's leftovers. A gate that can overwrite
     its own reference is not a gate."""
     import cluster as C
-    pair_dir = os.path.join(OUT, f"{_ptag(phase)}_{_stag(spec)}")
-    os.makedirs(pair_dir, exist_ok=True)
+    dirs = {t: _side_dir(phase, spec, t) for t in ("A", "B")}
     names = {}
     for tag, side in (("A", side_a), ("B", side_b)):
-        run_name = f"promo_{_ptag(phase)}_{_stag(spec)}_{tag}"
+        run_name = f"promo_{_pair_tag(phase, spec)}_{tag}"
         names[tag] = (side, run_name)
         if submit:
             # THE CORE SIDE NEEDS A SPEC TOO, and in its own folder: `Plexus_Main.py -o generate
             # promotion/<name>` resolves to `config/promotion/<name>.yaml`. Writing only the okuda
             # side's copy is how side A once died on a missing file while side B passed.
+            # THE SPEC RESOLVES BEFORE THE DIRECTORY IS MADE. `_spec_copy` raises FileNotFoundError
+            # for a row whose spec does not exist -- `ecm_block` and `01c_tissue` have never had one
+            # in any commit -- and main() catches that and prints SKIPPED. Creating the two side
+            # directories first left four EMPTY folders named for rows that never ran, which reads
+            # as a run that produced nothing rather than a row with no spec.
             _spec_copy(spec, run_name, frames, cfg_dir=(
                 _side_paths(side)[1] if side.startswith("okuda")
                 else os.path.join(_side_root(side), "config", "promotion")))
+            os.makedirs(dirs[tag], exist_ok=True)
+    else:
+        for d in dirs.values():
+            os.makedirs(d, exist_ok=True)
     if submit:
         # NORMALLY BOTH SIDES, TOGETHER -- that is the protocol and `sides` defaults to both.
         # `--sides A` exists for ONE situation: a bug that killed one side of a phase while the
@@ -911,8 +961,11 @@ def run_pair(phase, spec, side_a, side_b, what, frames, submit=True, sides=None)
         # -- what the protocol forbids is reusing a STALE ARCHIVE, not a sibling submitted an hour
         # ago from the same code.
         want = [t for t in ("A", "B") if t in (sides or "AB")]
-        lines = [_bsub_lines(pair_dir, spec, names[t][0], names[t][1], frames) for t in want]
-        runner = os.path.join(pair_dir, f"_submit{'' if len(want) == 2 else '_' + ''.join(want)}.sh")
+        lines = [_bsub_lines(dirs[t], spec, names[t][0], names[t][1], frames) for t in want]
+        # THE SUBMITTER IS ONE SCRIPT FOR BOTH SIDES, so it cannot live in either side's directory
+        # without implying it belongs to that side. It goes beside them, named for the pair.
+        runner = os.path.join(OUT, f"_submit_{_pair_tag(phase, spec)}"
+                                   f"{'' if len(want) == 2 else '_' + ''.join(want)}.sh")
         with open(runner, "w") as f:
             f.write("#!/bin/bash -l\n" + "\n".join(lines) + "\n")
         os.chmod(runner, 0o755)
@@ -924,53 +977,104 @@ def run_pair(phase, spec, side_a, side_b, what, frames, submit=True, sides=None)
         else:
             t = want[0]
             print(f"  [{spec}] submitted SIDE {t} ONLY: {names[t][1]} ({names[t][0]})", flush=True)
-    return names, pair_dir
+    return names, dirs
 
 
-def _landed(side, run_name, pair_dir):
-    """Has this side written the file the comparison reads?"""
-    return os.path.exists(_out_path(side, run_name, pair_dir))
+def _landed(side, run_name, side_dir):
+    """Has this side written the file the comparison reads -- natively, or after promotion?"""
+    return os.path.exists(_out_path(side, run_name, side_dir)) or os.path.exists(
+        os.path.join(side_dir, "traj.npz" if side.startswith("okuda") else "trajectory.npz"))
 
 
-def _out_path(side, run_name, pair_dir):
+def _out_path(side, run_name, side_dir):
+    """Where the RUNNER writes, which is not yet where the comparison reads.
+
+    Neither runner can be told to write straight into `side_dir`: okuda's `run_one.py` writes under
+    its own tree's `log/okuda/<name>/`, and `Plexus_Main.py --output_root X` always lands in
+    `X/graphs_data/<campaign>/<name>/`. `promote_side` moves the contents up afterwards and deletes
+    the shell, so the duplicate exists only while the job is in flight."""
     if side.startswith("okuda"):
         return os.path.join(_side_paths(side)[2], run_name, "traj.npz")
-    return os.path.join(pair_dir, "graphs_data", "promotion", run_name, "trajectory.npz")
+    return os.path.join(side_dir, "graphs_data", "promotion", run_name, "trajectory.npz")
 
 
-def _collect_live(names, pair_dir):
-    """Mirror every side that has landed, now, without waiting for its partner."""
+# The two names a runner gives its trajectory, and the zarr beside it. These are the files worth
+# GB, and the only ones `_collect_live` refuses to copy: a live mirror exists so a human can watch a
+# run, and nobody watches a 7.5 GB npz. `promote_side` moves them once, at the end.
+_HEAVY = ("trajectory.npz", "traj.npz", "simulation.zarr")
+
+
+def _collect_live(names, dirs):
+    """Show what has landed, WITHOUT copying the heavy files.
+
+    The previous version copied the whole native tree on every poll, so a finished side existed
+    twice for the rest of the run -- and if the wrapper was then killed, the two copies were a
+    finished attempt and a live one with nothing to tell them apart. Here the poll copies only the
+    small artefacts (stills, movies, json), and `promote_side` MOVES the rest when the side is done.
+    """
     for tag, (side, run_name) in names.items():
-        if not _landed(side, run_name, pair_dir):
+        d = dirs[tag]
+        if not _landed(side, run_name, d):
             continue
-        src = os.path.dirname(_out_path(side, run_name, pair_dir))
-        dst = os.path.join(pair_dir, tag)
-        if os.path.abspath(src) == os.path.abspath(dst):
+        src = os.path.dirname(_out_path(side, run_name, d))
+        if not os.path.isdir(src) or os.path.abspath(src) == os.path.abspath(d):
             continue
         try:
-            shutil.copytree(src, dst, dirs_exist_ok=True)
+            for f in os.listdir(src):
+                if f in _HEAVY:
+                    continue
+                sp, dp = os.path.join(src, f), os.path.join(d, f)
+                if os.path.isdir(sp):
+                    shutil.copytree(sp, dp, dirs_exist_ok=True)
+                elif not os.path.exists(dp) or os.path.getmtime(sp) > os.path.getmtime(dp):
+                    shutil.copy2(sp, dp)
         except Exception as e:                    # a file being written under us is not a failure
-            print(f"    [{os.path.basename(pair_dir)}/{tag}] partial mirror ({type(e).__name__})")
+            print(f"    [{os.path.basename(d)}] partial mirror ({type(e).__name__})")
 
 
-def collect(spec, names, pair_dir):
-    """Copy each side's output into the pair directory, so the comparison reads from one place and
-    the okuda tree is left alone."""
+def promote_side(side, run_name, side_dir):
+    """MOVE the runner's native output up into `side_dir`, then delete the shell it wrote into.
+
+    A move, not a copy, and on purpose: source and destination are on the same filesystem, so this
+    is a rename and the trajectory is stored ONCE. The old `collect` copied, which is how one pair
+    came to hold the same 7.5 GB npz at two inodes."""
+    src = os.path.dirname(_out_path(side, run_name, side_dir))
+    if os.path.isdir(src) and os.path.abspath(src) != os.path.abspath(side_dir):
+        _move_up(src, side_dir)
+    _sweep_shells(side_dir)
+
+
+def _move_up(src, side_dir):
+    for f in os.listdir(src):
+        sp, dp = os.path.join(src, f), os.path.join(side_dir, f)
+        if os.path.exists(dp):
+            shutil.rmtree(dp, ignore_errors=True) if os.path.isdir(dp) else os.remove(dp)
+        shutil.move(sp, dp)
+    shutil.rmtree(src, ignore_errors=True)
+
+
+def _sweep_shells(side_dir):
+    """THE SCAFFOLDING GOES TOO, and there are two trees of it, not one. `--output_root X` makes
+    `Plexus_Main` create BOTH `X/graphs_data/<campaign>/<name>/` (the run) and `X/log/<campaign>/
+    <name>/` (its `_complete` / `_completed_generate` markers). Promoting only the first leaves a
+    `log/` beside the trajectory holding four marker files, which is exactly the kind of directory
+    that gets read later as evidence of something.
+
+    SEPARATE FROM THE MOVE, and unconditional, because a side that has ALREADY been promoted still
+    has to be swept: the first version returned early when the source was gone and therefore never
+    reached this.
+    """
+    for shell in ("graphs_data", "log"):
+        top = os.path.join(side_dir, shell)
+        if os.path.isdir(top):
+            shutil.rmtree(top, ignore_errors=True)
+
+
+def collect(spec, names, dirs):
+    """Move each side's output into its own directory. Returns {tag: dir}, which is what compares."""
     for tag, (side, run_name) in names.items():
-        dst = os.path.join(pair_dir, tag)
-        src = (os.path.join(_side_paths(side)[2], run_name) if side.startswith("okuda")
-               # the core runner writes under `--output_root/graphs_data/<pre_folder>/<name>/`
-               else os.path.join(pair_dir, "graphs_data", "promotion", run_name))
-        if os.path.isdir(src) and os.path.abspath(src) != os.path.abspath(dst):
-            # `dirs_exist_ok` because the rmtree above CAN LEAVE THE DIRECTORY STANDING and say
-            # nothing: `log/` is an NFS bind-mount, and NFS silly-renames a file that is still open
-            # to `.nfsXXXX` instead of unlinking it, so the parent cannot be removed and
-            # `ignore_errors=True` swallows exactly that failure. The next line then raised
-            # FileExistsError -- AFTER the verdict had been computed and printed, so a run that had
-            # already decided IDENTICAL still exited on a traceback.
-            shutil.rmtree(dst, ignore_errors=True)
-            shutil.copytree(src, dst, dirs_exist_ok=True)
-    return {t: os.path.join(pair_dir, t) for t in names}
+        promote_side(side, run_name, dirs[tag])
+    return dict(dirs)
 
 
 def main():
@@ -1062,6 +1166,14 @@ def main():
         # protocol: the two sides must not be separated by an hour of drift in the tree they read.
         if a.batch and not a.compare_only:
             while _running() >= 2 * a.batch:
+                # MIRROR WHILE WE WAIT FOR A SLOT, not only in the wait loop below. `_collect_live`
+                # used to run only after EVERY pair had been submitted -- and with `--batch 8` the
+                # submission itself blocks on free slots, so it takes as long as the whole suite.
+                # A pair that finished in 138 seconds therefore had an EMPTY directory bearing its
+                # name for the next two hours, with its output still in the runner's native tree,
+                # which reads as a run that produced nothing.
+                for _j in jobs:
+                    _collect_live(_j[6], _j[7])
                 time.sleep(45)
             # SETTLE BEFORE THE NEXT POLL. `bsub` returns as soon as the scheduler accepts the job,
             # and `bjobs` does not list it for a few seconds -- so a tight loop reads a stale count
@@ -1109,8 +1221,8 @@ def main():
             mine = "|".join(rn for *_r, names, _pd in jobs for _side, rn in names.values())
             st = C._ssh(f"bjobs -w 2>/dev/null | grep -cE '{mine}' || true", timeout=30)
             queue_empty = st is not None and (st.stdout or "").strip().startswith("0")
-            landed = all(_landed(side, rn, pd)
-                         for *_r, names, pd in jobs for side, rn in names.values())
+            landed = all(_landed(side, rn, pd[t])
+                         for *_r, names, pd in jobs for t, (side, rn) in names.items())
             if queue_empty and landed:
                 break
             time.sleep(60)
@@ -1140,9 +1252,12 @@ def main():
                     ttl = (f"{spec}   A={sa}  B={sb}   {da} vs {db}   "
                            + ("IDENTICAL" if ok else f"DIFFER: {rep['why'][:60]}"))
                     lab = (f"A  {sa}", f"B  {sb}")
-                    _R.compare_still(dirs["A"], dirs["B"], os.path.join(pd, "compare.png"),
+                    # BESIDE the two sides, named for the pair -- a comparison belongs to neither
+                    # of them, and a third DIRECTORY would put a folder back above the twins.
+                    _cmp = os.path.join(OUT, _pair_tag(phase, spec))
+                    _R.compare_still(dirs["A"], dirs["B"], _cmp + "_compare.png",
                                      labels=lab, title=ttl)
-                    _R.compare(dirs["A"], dirs["B"], os.path.join(pd, "compare.mp4"),
+                    _R.compare(dirs["A"], dirs["B"], _cmp + "_compare.mp4",
                                labels=lab, title=ttl)
             except Exception as e:
                 print(f"  [{spec}] comparison render skipped ({type(e).__name__}: {str(e)[:60]})")

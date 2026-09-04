@@ -31,7 +31,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: seed_mesh
+- op: mesh_seed
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -43,7 +43,7 @@ operators:
   p0: 3.5
 - op: cell_geometry
   at: cell
-- op: seed_cell_chem
+- op: cell_chem_seed
   at: cell
   mode: scatter
   n_spots: 1
@@ -136,9 +136,9 @@ operators:
   at: vertex
   every: 1
 schedule:
-- seed_mesh
+- mesh_seed
 - cell_geometry
-- seed_cell_chem
+- cell_chem_seed
 - cell_neighbours
 - cell_chem_diffuse
 - cell_chem_react
@@ -200,4 +200,3 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride
-plotting: {renderer: vtk_mesh}

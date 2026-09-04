@@ -835,7 +835,12 @@ def compare(dir_a, dir_b, out, style="mesh", fill=1.0, labels=("A", "B"), title=
     L = max(box_of(dir_a, fa), box_of(dir_b, fb))
     # one activator range across BOTH sides, for the same reason one camera box: a per-side range
     # would normalise away exactly the difference the picture exists to show.
-    vals = [np.asarray(a, float) for f in (fa, fb) for _p, _m, a in f if a is not None]
+    # FOUR, NOT THREE. `frames_of` yields (pos, mesh, activator, colour); this line unpacked three
+    # and raised `ValueError: too many values to unpack (expected 3)` on EVERY call -- caught by the
+    # caller's try/except, which printed "comparison render skipped" and moved on. So the twin suite
+    # produced compare.png (whose own unpack at :731 is correct) and never compare.mp4, and the
+    # missing clip read as a run that had not finished rendering rather than as a broken line here.
+    vals = [np.asarray(a, float) for f in (fa, fb) for _p, _m, a, _c in f if a is not None]
     lo = float(min(np.nanmin(v) for v in vals)) if vals else 0.0
     hi = float(max(np.nanmax(v) for v in vals)) if vals else 1.0
 
@@ -849,8 +854,8 @@ def compare(dir_a, dir_b, out, style="mesh", fill=1.0, labels=("A", "B"), title=
     # was nF a few ticks ago on THIS side" is per-side, and feeding it the other side's tick array
     # would silently mis-date the just-divided highlight.
     _lab_tk, _lab_idx = (ta, ia) if _has_ticks(ta) else (tb, ib)
-    nFa = [int(m["nF"]) for _q, m, _a in fa]
-    nFb = [int(m["nF"]) for _q, m, _a in fb]
+    nFa = [int(m["nF"]) for _q, m, _a, _c in fa]
+    nFb = [int(m["nF"]) for _q, m, _a, _c in fb]
     keep = [None, None]
     for k in range(n):
         when = _when(_lab_tk, int(_lab_idx[k]), max(len(fa), len(fb)))
