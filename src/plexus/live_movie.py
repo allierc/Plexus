@@ -1498,39 +1498,41 @@ class LiveMovie:
             pass
         return None
 
-    def _mono_shell_points(self, H, name, sc, ct):
-        """The apical and basal vertex positions of a monolayer mesh, in RENDER coordinates.
+    def _mono_shell_points(self, H, name, pd, sc):
+        """The apical and basal surfaces of a monolayer, in the SAME coordinates as `pd`.
 
-        Empty for every other model, which is the whole gate: a mesh carries `mono_h` only if
-        `cell_mechanics[model: monolayer]` published it, so a mid-surface run draws exactly what it
-        drew before and pays one dict lookup for the privilege. `mono_h` is per-FACE, so it rides
-        `mesh_face_offsets` into the trajectory alongside `A0` and the replay has it too.
+        Empty for every other model, which is the gate: a mesh carries the thickness only if
+        `cell_mechanics[model: monolayer]` published it, so a mid-surface run draws what it always
+        drew and pays one dict lookup.
+
+        BUILT FROM `pd.points`, NOT FROM THE LEVEL. `_mesh_xyz` already returns RENDER coordinates,
+        and taking them and then applying the placement offset again put the shells tens of units
+        outside the section window -- drawn, off-frame, and indistinguishable from not drawn. The
+        mid-surface actor is the one thing already in the right frame, so the offset is taken from
+        it. A translation does not change a normal; a uniform scale scales the thickness with it.
         """
         try:
             lvl = H.level(name)
             m = getattr(lvl, "mesh", None) or getattr(lvl, "_mesh", None)
-            if m is None or "mono_h" not in m:
+            if m is None:
+                return []
+            # EITHER SPELLING: the operator writes `mono_h` on the live table, and the recorder
+            # stores it as a SCALAR, so the replay -- the pass that writes the movie that is kept --
+            # gets it back as `scalar_mono_h`.
+            _h = m.get("mono_h", m.get("scalar_mono_h"))
+            if _h is None:
                 return []
             import torch as _t
             from plexus.operators.vertex_ops import monolayer_shells
-            nv, nF = int(m["Nv"]), int(m["nF"])
+            nF = int(m["nF"])
+            P = np.asarray(pd.points, np.float32)
             _as = lambda v, d=_t.long: _t.as_tensor(np.asarray(v), dtype=d)   # noqa: E731
-            pos = _t.as_tensor(np.asarray(self._mesh_xyz(lvl, nv, 1.0, (0.0, 0.0, 0.0))),
-                               dtype=_t.float32)
-            # A SCALAR ON THE TABLE, BROADCAST BACK. v1 is a uniform thickness; see the note on
-            # `Mesh.SCALAR_RECORD` for why it is not carried per face.
-            h = _t.full((nF,), float(np.asarray(m["mono_h"]).ravel()[0]), dtype=_t.float32)
-            ap, ba, _, _ = monolayer_shells(pos, _as(m["E_srce"]), _as(m["E_trgt"]),
-                                            _as(m["E_face"]), nF, h)
-            out = []
-            for lbl, arr, col in (("apical", ap, "#d9534f"), ("basal", ba, "#4a86c8")):
-                q = arr.numpy()
-                # THE SAME MAPPING THE MID-SURFACE GOT. `_mesh_xyz` applies `scale` about the
-                # centroid and then the placement offset; taking the shells in raw coordinates and
-                # forgetting it drew them at the origin while the tissue sat elsewhere.
-                q = (q - q.mean(0)) * sc if sc != 1.0 else q - np.asarray(ct, float)
-                out.append((lbl, q.astype(np.float32), col))
-            return out
+            h = _t.full((nF,), float(np.asarray(_h).ravel()[0]) * float(sc), dtype=_t.float32)
+            ap, ba, _, _ = monolayer_shells(_t.as_tensor(P, dtype=_t.float32),
+                                            _as(m["E_srce"]), _as(m["E_trgt"]), _as(m["E_face"]),
+                                            nF, h)
+            return [("apical", ap.numpy().astype(np.float32), "#d9534f"),
+                    ("basal", ba.numpy().astype(np.float32), "#4a86c8")]
         except Exception:                                # noqa: BLE001 -- a shell is not the run
             return []
 
@@ -1633,6 +1635,13 @@ class LiveMovie:
                 # x 11..39 around a tissue living at x -11..11 -- a slice of empty space beside the
                 # cells. Reading the centre off what is actually drawn fixes it for both paths and,
                 # unlike moving the drawing box, leaves the 3D camera alone.
+                # `cross_section.offset` -- MOVE THE WINDOW OFF THE CONTENT CENTRE, in world units.
+                # A section that frames the whole object proves its SHAPE and cannot show its wall:
+                # an epithelium of thickness 0.35 on a shell of radius 18.7 is 1.9% of the frame,
+                # about one pixel, so the apical and basal curves land on each other and the thing
+                # the section exists to show is the thing it cannot resolve. Offsetting lets a spec
+                # put a small window on the wall instead of a large one on the whole shell.
+                _off = (self.style or {}).get("cross_section", {}).get("offset") or (0.0, 0.0)
                 _ctr = self._drawn_centre(H)
                 if _ctr is None:
                     # NOT CACHED YET. The window is computed ONCE and kept, so computing it on a
@@ -1641,7 +1650,7 @@ class LiveMovie:
                     # x -14..14 and the replay, which writes the movie that is kept, framed x 11..39
                     # around a tissue living at x -11..11. Leaving `_cs_rng` unset retries next frame.
                     return
-                _cx, _cy = float(_ctr[a]), float(_ctr[b])
+                _cx = float(_ctr[a]) + float(_off[0]); _cy = float(_ctr[b]) + float(_off[1])
                 self._cs_rng = ([_cx - _sp / 2, _cx + _sp / 2], [_cy - _sp / 2, _cy + _sp / 2])
                 print(f"[live-movie] cross section: axes fixed to "
                       f"{'the declared span' if _decl else 'the box'}, "
@@ -1731,7 +1740,7 @@ class LiveMovie:
             # drawing cannot drift from the model, and sliced by the same plane as the mid-surface.
             # Red outside, blue inside: two distinct surfaces, not a measurement against a truth.
             for _nm, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
-                for _lbl, _pts, _col in self._mono_shell_points(H, _nm, _sc, _ct):
+                for _lbl, _pts, _col in self._mono_shell_points(H, _nm, _pd, _sc):
                     try:
                         _sh = self.pv.PolyData(_pts, _pd.faces)
                         _sl = _sh.slice(normal=_nrm, origin=_org)
@@ -2080,6 +2089,15 @@ class _ReplayLevel:
             self._face_cols = {k: np.asarray(z[f"{name}__mesh_{k}"])
                                for k in ("age", "ndiv", "apop", "inhib")
                                if f"{name}__mesh_{k}" in z.files}
+            # AND THE PER-ROW SCALARS, which are one number a frame rather than a column, so they
+            # need no offsets at all. Omitting them is how the monolayer's thickness reached the
+            # trajectory and still did not reach the picture: `scalar_mono_h` was recorded on every
+            # frame, and the replay -- the pass that writes the movie that is kept -- handed the
+            # renderer a mesh dict of six keys that did not include it, so the cross section drew the
+            # mid-surface alone and a thick epithelium looked exactly like a thin one.
+            self._scalar_cols = {k[len(name) + len("__mesh_"):]: np.asarray(z[k])
+                                 for k in z.files
+                                 if k.startswith(f"{name}__mesh_scalar_")}
             # AND THE PER-HALF-EDGE COLUMNS, on `mesh_offsets` like E_srce/E_trgt/E_face. `e_myo` is
             # the only quantity in this model that lives on a JUNCTION, so without it neither the
             # myosin curve nor a myosin edge colour can be drawn from a trajectory at all.
@@ -2115,6 +2133,8 @@ class _ReplayLevel:
             ea, eb = int(o[self.t]), int(o[self.t + 1])  # this COLUMN's offsets, not the mesh's
             if eb > ea:
                 d[k] = v[ea:eb]
+        for k, v in getattr(self, "_scalar_cols", {}).items():
+            d[k] = v[self.t]                             # one number a frame; no offsets to cut
         return d
 
     def get(self, key):

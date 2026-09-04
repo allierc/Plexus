@@ -26,7 +26,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 16.0
+    span: 3.0
   curve:
   - quantity: cells
     xlabel: frame
