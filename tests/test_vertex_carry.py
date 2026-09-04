@@ -141,3 +141,75 @@ def test_a_declared_but_absent_array_is_skipped():
     declare_vertex_carry(m, "not_written_yet")
     m.carry_vertices([(0, (1, 2))], dt=torch.float32, dev="cpu")                 # must not raise
     assert "not_written_yet" not in m
+
+
+# --------------------------------------------------------------------------------------------- #
+#  THE INTEGRATION CASE. Everything above calls `carry_vertices` and the topology functions
+#  DIRECTLY. None of it runs `cell_divide`, so none of it can tell whether the operator actually
+#  collects the births and spends them -- which is the wiring this rung is, and the part a unit test
+#  on a cube cannot reach.
+# --------------------------------------------------------------------------------------------- #
+def test_cell_divide_carries_a_declared_array_on_a_real_tissue(tmp_path):
+    """Seed a 24-cell vesicle, declare a per-vertex array, divide, and check every NEW vertex.
+
+    The array is `arange`, so each vertex starts holding its own index. A vertex left at its stale
+    reservoir value therefore holds a number >= Nv0, while any carried value is a blend of SEEDED
+    vertices and must be <= the largest seeded index. That is the assertion, and it is the one that
+    separates "carried" from "happens to have changed".
+
+    NOT ALWAYS A HALF-INTEGER, and the first version of this test asserted that it was and failed on
+    h[50] = 23.25. Within ONE `cell_divide` call, `divide_face_3d` inserts each midpoint into the
+    rings of the two NEIGHBOURING faces; a face divided later in the same sweep can therefore split
+    an edge whose endpoint is a vertex born moments earlier, and its midpoint is the mean of a mean.
+    That is the chained-birth case `test_births_are_applied_in_order` covers in miniature -- here it
+    arises on its own, which is the better evidence that the ordering matters in production.
+    """
+    import yaml
+    from plexus.engine import build
+    from plexus.models.registry import get_operator
+    from plexus.schema import load as load_spec
+
+    raw = {"general": {"name": "carry_probe", "seed": 0, "n_frames": 1, "dt": 1.0, "dim": 3,
+                       "world": [40.0, 40.0, 40.0]},
+           "sets": {"vertex": {"n": 4096, "mesh": "half_edge", "cell_set": "cell"},
+                    "cell": {"n": 1024, "state": {"area": {"width": 1}, "cen": {"width": 3}}}},
+           "fields": {},
+           "operators": [{"op": "mesh_seed", "at": "vertex", "before_frame": 1, "cell_set": "cell",
+                          "n_cells": 24, "radius": 5.0, "jitter": 0.18, "p0": 3.5, "seed": 0},
+                         {"op": "cell_divide", "at": "vertex", "cell_set": "cell", "every": 1,
+                          "factor": 0.0, "p0": 3.5}],
+           "schedule": ["mesh_seed", "cell_divide"]}
+    path = str(tmp_path / "carry_probe.yaml")
+    yaml.safe_dump(raw, open(path, "w"))
+    sim = load_spec(path)
+    H = build(sim, device="cpu")
+
+    def _op(o):
+        return get_operator(o.op, variant=o.impl)(
+            {**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, "cpu")
+
+    # `mesh_seed` IS RUN THROUGH THE TICK PATH, NOT `engine.seed()`. It is declared under
+    # `operators:` with `kind: seed` -- the deprecated spelling the loader still accepts via the
+    # legacy seed-window -- so `seed(H, sim)` does not run it and the mesh has no `A0`. Driving the
+    # operators in schedule order is what `test_operator_dt` does and is the honest reproduction.
+    _op(sim.operators[0]).forward(H)
+    lvl = H.level("vertex")
+    m = lvl.mesh
+    Nv0 = int(m["Nv"])
+
+    m["h"] = torch.arange(float(lvl.state.shape[0]))
+    declare_vertex_carry(m, "h")
+    before = m["h"].clone()
+
+    _op(sim.operators[-1]).forward(H)
+
+    Nv1 = int(m["Nv"])
+    assert Nv1 > Nv0, "no vertex was added -- `factor: 0.0` should divide every cell"
+    seeded_max = float(before[:Nv0].max())
+    for i in range(Nv0, Nv1):
+        v = float(m["h"][i])
+        assert v != float(before[i]), f"vertex {i} kept its stale reservoir value {v}"
+        assert v <= seeded_max, (
+            f"h[{i}]={v} exceeds the largest seeded value {seeded_max}, so it is not a blend of "
+            f"seeded vertices -- the carry did not run and this is reservoir data")
+        assert v >= 0.0
