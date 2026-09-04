@@ -394,11 +394,30 @@ class CellDiffuse(Lateral):
         return {self.at: (coef[None, :] * lap) * occ}
 
 
-@register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", implementation="interface_weighted")
+@register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", model="interface_weighted")
 class CellDiffuseInterfaceWeighted(Lateral):
-    """`interface_weighted` implementation of cell_chem_diffuse -- the OKUDA finite-volume form, and the
-    MISSING HALF of the chemistry<->shape coupling. Same contract as `graph_laplacian` (set=cell,
-    kind=lateral, family=fields, EMIT=velocity into chem); only the numerics differ.
+    """`interface_weighted` MODEL of cell_chem_diffuse -- the OKUDA finite-volume form, and the
+    MISSING HALF of the chemistry<->shape coupling.
+
+    `model:`, NOT `implementation:`, AND THE TEST IS THE CONTINUUM LIMIT. Two implementations must be
+    two ways of computing the SAME equation -- plexus2 allows them to differ in numerical assumptions,
+    spatial representation, dimension or differentiability "while preserving the same biological
+    semantics". These do not preserve it. This operator is a finite-volume discretisation of
+    div(D grad c) on the tissue's own geometry; `graph_laplacian` is an unweighted graph average, and
+    refining the mesh does NOT make it converge to the diffusion equation on a non-uniform tissue --
+    it converges to something else. An unweighted Laplacian is not a coarser scheme for a
+    finite-volume operator, it is a different constitutive law.
+    "Transport is limited by the wall two cells share and diluted by the receiving cell's volume"
+    versus "it is not" is a claim ABOUT THE TISSUE, so it belongs on the axis that carries claims.
+
+    IT IS NOT A NEW OPERATOR EITHER: the biological transformation is the same one -- a signalling
+    molecule moves between neighbouring cells, set=cell, kind=lateral, family=fields, reads chem,
+    writes chem -- and plexus2 reserves a new contract for a DISTINCT biological transformation.
+    The precedent is `cell_mechanics[model: monolayer]` against its `default`: one name, one
+    contract, two hypotheses about what a cell is.
+
+    (This docstring used to open "Same contract as `graph_laplacian` ... only the numerics differ",
+    and then argue the opposite three paragraphs down. A reader could quote whichever half suited.)
 
         dc_i/dt = D * kappa * ( sum_j A_ij (c_j - c_i) ) / v_i
 
