@@ -1740,6 +1740,7 @@ class LiveMovie:
             # drawing cannot drift from the model, and sliced by the same plane as the mid-surface.
             # Red outside, blue inside: two distinct surfaces, not a measurement against a truth.
             for _nm, _nv, _pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+                _cut = {}
                 for _lbl, _pts, _col in self._mono_shell_points(H, _nm, _pd, _sc):
                     try:
                         _sh = self.pv.PolyData(_pts, _pd.faces)
@@ -1748,12 +1749,37 @@ class LiveMovie:
                             continue
                         _P = np.asarray(_sl.points)
                         _u, _v = _P[:, a], _P[:, b]
+                        _cut[_lbl] = (_u, _v)
                         _th = np.arctan2(_v - _v.mean(), _u - _u.mean())
                         _o = np.append(np.argsort(_th), np.argsort(_th)[0])
                         self._cs_mesh_series.append(
                             self.cs.line(_u[_o], _v[_o], color=_col, width=2.0))
                     except Exception:                    # noqa: BLE001
                         pass
+                # THE LATERAL WALLS -- the rungs between apical and basal, and the thing that makes a
+                # section read as a MONOLAYER rather than as two unrelated curves. A cell's lateral
+                # face is the quad joining its apical and basal edges, so in the cut plane it is the
+                # segment from a basal point to the apical point above it.
+                #
+                # MATCHED BY NEAREST NEIGHBOUR, not by index: the two shells are sliced separately
+                # and `slice` returns points in whatever order it meets them, so the k-th apical
+                # point is not above the k-th basal one. Over a wall whose thickness is far smaller
+                # than its radius of curvature the nearest basal point IS the one below.
+                try:
+                    _ua, _va = _cut["apical"]; _ub, _vb = _cut["basal"]
+                    _n = int((self.style or {}).get("cross_section", {}).get("walls", 90))
+                    if _n > 0 and len(_ua) and len(_ub):
+                        _pick = np.unique(np.linspace(0, len(_ua) - 1, min(_n, len(_ua))).astype(int))
+                        _d = ((_ub[None, :] - _ua[_pick, None]) ** 2
+                              + (_vb[None, :] - _va[_pick, None]) ** 2)
+                        _j = np.argmin(_d, axis=1)
+                        _wc = (self.style or {}).get("mesh_color", "#e6dcc0")
+                        for _k, _jj in zip(_pick, _j):
+                            self._cs_mesh_series.append(
+                                self.cs.line(np.array([_ub[_jj], _ua[_k]]),
+                                             np.array([_vb[_jj], _va[_k]]), color=_wc, width=1.0))
+                except (KeyError, ValueError):           # not a monolayer, or a degenerate cut
+                    pass
             # LAST, AFTER EVERY SERIES IS BACK. Adding a plot re-derives the chart's range from its
             # data, so a range set before the series were added was overwritten by the last `line`
             # call and the panel autoscaled to the data's own extent -- wider than tall, which drew

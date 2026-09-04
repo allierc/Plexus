@@ -31,6 +31,7 @@ plotting:
     at: 0.5
     thickness: 6
     span: 46.0
+    walls: 110
   curve:
   - quantity: cells
     xlabel: frame
@@ -95,7 +96,7 @@ operators:
   at: vertex
   k_v: 6.0
   kappa_s: 0.2
-  h0: 0.35
+  h0: 0.7
   gamma: 0.06
   mu: 1.0
   relax_iters: 30
