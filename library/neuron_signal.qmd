@@ -1,0 +1,98 @@
+---
+title: "neuron_signal"
+subtitle: "One transfer function for every connection in the network:"
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: neuron`]{.op-badge} [`prediction: none`]{.op-badge}
+
+One transfer function for every connection in the network:
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `neuron` (the set the operator acts on).
+- **Reads** &mdash; `edge_set`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+psi(x_j) = phi(x_j)
+
+The claim is that neurons differ in how they integrate but speak a common language. This is
+the reference's first experiment, and the NeuralGraph PDE_N2 generator, whose message is
+W @ phi(u) with no per-type term inside phi.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `edge_set` | connectivity_matrix_as_edge_set | **required** |
+| `weight` | synaptic_weight_block | "w" |
+| `g` | coupling_gain | &ndash; |
+| `w` | transfer_width_gamma | &ndash; |
+| `h` | transfer_threshold | &ndash; |
+| `activation` | transfer_nonlinearity | "tanh" |
+| `field` | external_modulation_block | None |
+| `block` | membrane_state_block | "voltage" |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: neuron_signal, at: neuron, edge_set: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`synaptic_transmission`]{.op-badge} [`connectome`]{.op-badge} [`recurrent`]{.op-badge} [`rate_model`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/neural.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neural.py) &mdash; the registered operator.
+
+```python
+@register_operator("neuron_signal", family="signalling", set="neuron", kind="lateral",
+                   model="shared")
+class NeuronSignalShared(_NeuronSignal):
+    """One transfer function for every connection in the network:
+
+        psi(x_j) = phi(x_j)
+
+    The claim is that neurons differ in how they integrate but speak a common language. This is
+    the reference's first experiment, and the NeuralGraph PDE_N2 generator, whose message is
+    W @ phi(u) with no per-type term inside phi.
+    """
+
+    def psi(self, x_pre, p_pre, p_post):
+        return self.act(x_pre)
+```

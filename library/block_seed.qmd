@@ -1,0 +1,184 @@
+---
+title: "block_seed"
+subtitle: "Fill the two slabs beyond a free gap with particles, once, at frame 0: the rigid walls the matrix and the tissue are confined between."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Fill the two slabs beyond a free gap with particles, once, at frame 0: the rigid walls the matrix and the tissue are confined between.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `gap_half`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+matrix and the tissue are confined between.
+
+particle -> particle: rewrites every position in the set at the opening of the trajectory.
+
+    occupied = { x : |x_a - c_a| > g }           a = the confined axis
+
+g is `gap_half`, the half-width of the free gap in world units, and c the domain centre. The
+slabs run from there to the box wall, less `margin`. The particles are a jittered lattice
+rather than fibres, because a block is isotropic where the matrix is not.
+
+The block is a SECOND MPM set with its own Lame parameters, typically two orders of magnitude
+stiffer than the matrix, which is what lets it act as a wall while still being a continuum
+that deforms measurably under load.
+
+Reference: Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for
+history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196 (MPM).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `gap_half` | free_half_gap | **required** |
+| `axis` | confined_axis | 2 |
+| `centre` | domain_centre | [0.5, 0.5, 0.5] |
+| `margin` | wall_clearance | 0.012 |
+| `seed` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: block_seed, at: particle, gap_half: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`solid_obstacle`]{.op-badge} [`material_seeding`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/ecm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/ecm_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("block_seed", family="seed", set="particle", kind="seed")
+class BlockSeed(Structural):
+    """Fill the two slabs beyond a free gap with particles, once, at frame 0: the rigid walls the
+    matrix and the tissue are confined between.
+
+    particle -> particle: rewrites every position in the set at the opening of the trajectory.
+
+        occupied = { x : |x_a - c_a| > g }           a = the confined axis
+
+    g is `gap_half`, the half-width of the free gap in world units, and c the domain centre. The
+    slabs run from there to the box wall, less `margin`. The particles are a jittered lattice
+    rather than fibres, because a block is isotropic where the matrix is not.
+
+    The block is a SECOND MPM set with its own Lame parameters, typically two orders of magnitude
+    stiffer than the matrix, which is what lets it act as a wall while still being a continuum
+    that deforms measurably under load.
+
+    Reference: Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for
+    history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196 (MPM).
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["gap_half"]
+    MECHANISM_TAGS = ["solid_obstacle", "material_seeding"]
+    PARAM_ROLES = {"gap_half": "free_half_gap", "axis": "confined_axis",
+                   "centre": "domain_centre", "margin": "wall_clearance"}
+    REFERENCE = ("Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for "
+                 "history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "mpm_block")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.axis = int(params.get("axis", 2))
+        self.gap_half = float(params["gap_half"])
+        # A WALL CLEARANCE, not a cosmetic margin. `mpm_gather` treats the outer `wall_contact` shell
+        # specially and a particle seeded exactly on the boundary starts inside that shell, so the
+        # block's outermost layer would begin the run in a contact correction it never leaves.
+        self.margin = float(params.get("margin", 0.012))
+        self.seed = int(params.get("seed", 0))
+        self._done = False
+
+    def forward(self, H, mask=None):
+        if self._done:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        n, D = pos.shape
+        g = torch.Generator(device="cpu").manual_seed(self.seed)
+        ax, c = self.axis, self.centre[self.axis]
+        lo, hi = self.margin, 1.0 - self.margin
+
+        # A JITTERED LATTICE, NOT UNIFORM NOISE. MPM resolves a material by how evenly its particles
+        # fill the cells: uniform random sampling leaves holes and clumps at this density, and a clump
+        # is a stiffness the material was not given. One particle per lattice site plus a fraction of
+        # the spacing is what the stock block provisions do.
+        half = n // 2
+        per = []
+        for sgn in (+1.0, -1.0):
+            t0, t1 = c + sgn * self.gap_half, c + sgn * (0.5 - self.margin)
+            th = abs(t1 - t0)
+            # cube-root split of the slab's aspect ratio, so the lattice is roughly isotropic
+            k = max(1, int(round((half * th * th / max((hi - lo) ** 2, 1e-9)) ** (1.0 / 3.0))))
+            nx = max(1, int(round((half / max(k, 1)) ** 0.5)))
+            grid = torch.stack(torch.meshgrid(
+                torch.linspace(lo, hi, nx), torch.linspace(lo, hi, nx),
+                torch.linspace(min(t0, t1), max(t0, t1), k), indexing="ij"), -1).reshape(-1, 3)
+            per.append(grid)
+        p = torch.cat(per)
+        if p.shape[0] < n:
+            p = torch.cat([p, p[: n - p.shape[0]]])
+        p = p[:n]
+        # reorder the columns so column `ax` is the slab-normal one
+        if ax != 2:
+            idx = [0, 1, 2]; idx[2], idx[ax] = idx[ax], idx[2]
+            p = p[:, idx]
+        spacing = (hi - lo) / max(int(round(n ** (1.0 / 3.0))), 1)
+        p = p + (torch.rand(p.shape, generator=g) - 0.5) * spacing * 0.35
+        p[:, ax] = p[:, ax].clamp(min(lo, c - 0.5 + self.margin), max(hi, c + 0.5 - self.margin))
+        p = p.clamp(lo, hi)
+        # anything that landed in the free gap is pushed back into its own slab
+        d = p[:, ax] - c
+        bad = d.abs() < self.gap_half
+        if bad.any():
+            p[bad, ax] = c + torch.sign(torch.where(d[bad] == 0, torch.ones_like(d[bad]), d[bad])) \
+                * (self.gap_half + spacing * 0.5)
+        lvl.get("pos")[:] = p.to(pos.device, pos.dtype)
+        self._done = True
+        print(f"[block_seed] {n} particles in two slabs beyond +/-{self.gap_half:.4g} of "
+              f"{c:.3g} on axis {ax} ({100 * (1 - 2 * self.gap_half):.0f}% of the box)", flush=True)
+        return {}
+```

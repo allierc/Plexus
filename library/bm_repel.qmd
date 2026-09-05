@@ -1,0 +1,223 @@
+---
+title: "bm_repel"
+subtitle: "Excluded volume between membrane nodes: push apart anything closer than a target spacing, and never pull."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Excluded volume between membrane nodes: push apart anything closer than a target spacing, and never pull.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+and never pull.
+
+basement_membrane -> basement_membrane: reads pos, emits an acceleration.
+
+l* is the target spacing in world units and k_rep the repulsion stiffness in inverse time
+squared. Only the pushing half exists: at L >= l* the term is zero.
+
+THIS IS NOT A MISSING REPULSION -- a spring already pushes when compressed. It is an unopposed
+ATTRACTION. The crosslink rewire bonds each node to its nearest few REGARDLESS of distance, so
+a bond can be thrown clear across a hole, and such long bonds haul the rim inward into knots of
+short edges beside a hole that never closes. Cutting the attraction outright is not an option,
+because a network that only pushes bears no tension and could not resist the epithelium at all.
+A separate short-range push, acting only between UNBONDED neighbours, removes the artefact
+without removing the tension.
+
+Reference: Plexus (this work); steric exclusion between the elements of a crosslinked sheet.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `w` | repel_stiffness_over_bond_stiffness | &ndash; |
+| `every` | neighbour_rebuild_period | 20 |
+| `k` | &ndash; | 0.0 |
+| `overdamped_gamma` | &ndash; | 0.0 |
+| `range_scale` | &ndash; | 1.0 |
+| `law` | &ndash; | "linear" |
+| `p2` | &ndash; | 1.6 |
+| `p3` | &ndash; | 1.0 |
+| `sigma_scale` | &ndash; | 0.7 |
+| `aggr` | &ndash; | "sum" if self.law == "linear" else "mean" |
+| `max_neighbours` | &ndash; | 6 if self.law == "linear" else 18 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: bm_repel, at: particle}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`basement_membrane`]{.op-badge} [`excluded_volume`]{.op-badge} [`steric_repulsion`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("bm_repel", family="boundary", set="particle", kind="lateral")
+class BasementMembraneRepel(Lateral):
+    """Excluded volume between membrane nodes: push apart anything closer than a target spacing,
+    and never pull.
+
+    basement_membrane -> basement_membrane: reads pos, emits an acceleration.
+
+        a_i = k_rep sum_j (l* - L_ij) (x_i - x_j) / L_ij        over unbonded j with L_ij < l*
+
+    l* is the target spacing in world units and k_rep the repulsion stiffness in inverse time
+    squared. Only the pushing half exists: at L >= l* the term is zero.
+
+    THIS IS NOT A MISSING REPULSION -- a spring already pushes when compressed. It is an unopposed
+    ATTRACTION. The crosslink rewire bonds each node to its nearest few REGARDLESS of distance, so
+    a bond can be thrown clear across a hole, and such long bonds haul the rim inward into knots of
+    short edges beside a hole that never closes. Cutting the attraction outright is not an option,
+    because a network that only pushes bears no tension and could not resist the epithelium at all.
+    A separate short-range push, acting only between UNBONDED neighbours, removes the artefact
+    without removing the tension.
+
+    Reference: Plexus (this work); steric exclusion between the elements of a crosslinked sheet.
+    """
+
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["basement_membrane", "excluded_volume", "steric_repulsion"]
+    PARAM_ROLES = {"w": "repel_stiffness_over_bond_stiffness", "every": "neighbour_rebuild_period"}
+    REFERENCE = ("Yurchenco, P.D. (2011) Cold Spring Harb. Perspect. Biol. 3:a004911 (collagen IV and "
+                 "laminin networks have a characteristic protomer-set mesh size).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.k = float(params.get("k", 0.0))              # absolute; = w * k_bond, set by the spec
+        self.every = int(params.get("every", 20))
+        self.gamma = float(params.get("overdamped_gamma", 0.0))
+        self.range_scale = float(params.get("range_scale", 1.0))   # repel range, in units of l*
+        # `ar` swaps the one-sided linear spring for Plexus's own attraction_repulsion law, run in
+        # its purely repulsive form and over a longer range, which relaxes the sheet closer to a
+        # hexagonal spacing than the linear one-sided spring does. The parameters must be checked
+        # first: f(0) = p0 - p2, and a positive value there is an ATTRACTIVE core, so any pair that
+        # closes inside it welds together and the set clumps
+        # (2D: d/hex 0.471 -> 0.242, worse than random). p0 = 0 removes the core and leaves a single
+        # decaying repulsion, which is the law CGI uses to scatter points evenly over a surface.
+        self.law = str(params.get("law", "linear")).lower()        # "linear" | "ar"
+        self.p2 = float(params.get("p2", 1.6))
+        self.p3 = float(params.get("p3", 1.0))
+        self.sigma_scale = float(params.get("sigma_scale", 0.7))   # sigma, in units of l*
+        self.aggr = str(params.get("aggr", "sum" if self.law == "linear" else "mean")).lower()
+        self.max_neighbours = int(params.get("max_neighbours", 6 if self.law == "linear" else 18))
+        self._i = self._j = None
+        self._said = False
+
+    def forward(self, H, mask=None):
+        if self.k <= 0.0:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        # the live sheet is published by the seed operator, not a level field: the reserve is parked at
+        # the tissue centre, and letting it into the neighbour search puts 40k particles in one cell.
+        alive = getattr(H, "membrane_alive", None)
+        if alive is None:
+            return {}
+        l_star = float(getattr(H, "membrane_l_star", 0.0) or 0.0)
+        if l_star <= 0.0:
+            return {}                       # the remodel operator has not frozen the target yet
+        rng = self.range_scale * l_star
+        idx = alive.nonzero(as_tuple=True)[0]
+        if idx.numel() < 8:
+            return {}
+        frame = int(getattr(H, "frame", 0) or 0)
+        if self._i is None or frame % max(self.every, 1) == 0 or self._i.numel() == 0:
+            # borrow the bond operator's cell list rather than duplicate it -- it is the same search at
+            # a different radius, and its `cutoff` is the cell size, so it has to be swapped, not passed.
+            finder = H.__dict__.get("_bm_bond_op")
+            if finder is None:
+                return {}
+            keep, finder.cutoff = finder.cutoff, rng
+            try:
+                sub = pos[idx]
+                i, j = (finder._neighbours_celllist(sub, self.max_neighbours) if sub.shape[0] > 20000
+                        else finder._build_pairwise(sub, self.max_neighbours))
+            finally:
+                finder.cutoff = keep
+            n2 = pos.shape[0] + 1
+            uk = torch.unique(torch.minimum(idx[i], idx[j]) * n2 + torch.maximum(idx[i], idx[j]))
+            self._i, self._j = (uk // n2).long(), (uk % n2).long()
+        d = pos[self._j] - pos[self._i]
+        L = d.norm(dim=-1).clamp_min(1e-9)
+        if self.law == "ar":
+            # f = -p2 * exp(-(r^2)^p3 / 2 sigma^2), the attraction_repulsion law with its attractive
+            # term dropped. It multiplies the SEPARATION VECTOR, not the unit vector -- that is the
+            # operator's own convention, and it is what makes the force fall off smoothly to nothing
+            # rather than being truncated at the neighbour radius the way the linear form is.
+            sig = self.sigma_scale * l_star
+            amp = -self.p2 * torch.exp(-((L * L) ** self.p3) / (2.0 * sig * sig))
+            f = (self.k * amp)[:, None] * d
+            # k IS NOT A STIFFNESS HERE AND DOES NOT SCALE LIKE ONE. `amp` is O(1), so the step is
+            # dt*k*amp*d and the usable range is set by k*dt being of order 1 -- hundreds at a
+            # typical dt, not the 1e4-1e6 a spring constant would take. Past that the sheet
+            # overshoots and scrambles to a fixed point near where it started, which reads as "no
+            # effect" when it is in fact "far too strong".
+        else:
+            # ONE-SIDED: zero for anything at or beyond l*, so this can never pull.
+            f = (self.k * (L - l_star).clamp_max(0.0))[:, None] * (d / L[:, None])
+        acc = torch.zeros_like(pos)
+        acc.index_add_(0, self._i, f)
+        acc.index_add_(0, self._j, -f)
+        if self.aggr == "mean":
+            # the attraction_repulsion operator's own default: average over neighbours, so the force a
+            # node feels does not scale with how many happen to be in range.
+            deg = torch.zeros(pos.shape[0], device=pos.device, dtype=pos.dtype)
+            one = torch.ones_like(L)
+            deg.index_add_(0, self._i, one)
+            deg.index_add_(0, self._j, one)
+            acc = acc / deg.clamp(min=1.0)[:, None]
+        if self.gamma > 0:
+            acc = acc / self.gamma
+        if not self._said:
+            print(f"[bm_repel] excluded volume k={self.k:.3g} at l*={l_star:.5g} over "
+                  f"{self._i.numel():,} pairs: repulsion sets the spacing, the crosslinks carry the load",
+                  flush=True)
+            self._said = True
+        return {lvl.name: acc}
+```

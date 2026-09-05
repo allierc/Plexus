@@ -1,0 +1,261 @@
+---
+title: "neural_seed"
+subtitle: "Establish x_0 for a neuron set from a frozen connectome region manifest: real somata at their real positions, rather than points scattered in a box."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: neuron`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Establish x_0 for a neuron set from a frozen connectome region manifest: real somata at their real positions, rather than points scattered in a box.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `neuron` (the set the operator acts on).
+- **Reads** &mdash; `region`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+their real positions, rather than points scattered in a box.
+
+neuron -> neuron: reads a file, writes pos, voltage and neurite_dir, once, at the opening
+of the trajectory.
+
+xyz_i is the soma position in NANOMETRES and side the cube's edge in the same units; the
+mapping is affine and isotropic, so every distance ratio is preserved. Nanometres and not
+voxels: on an anisotropic dataset a voxel cube is a cuboid, and placing neurons from voxel
+coordinates would stretch the region along one axis. v0_sd is a spread in the units of x,
+and it is nonzero by default so that v = 0 is not a fixed point the whole population sits
+at. It also writes the connectome provenance -- body id, cell type id -- as per-node
+buffers rather than state, because an identity is not a quantity and nothing integrates it.
+
+It queries nothing. The region was selected once, offline, by `plexus.io.neuprint`, which
+bisected a cube until it held about the requested number of neurons and recorded which ones
+they were. A seed that re-ran the selection would make the identity of the neurons a
+function of the server's contents on the day the specification ran, so two runs of one
+specification could be two different circuits. What the specification names is a manifest;
+what the manifest names is a dataset, a query, a cube and a list of body ids.
+
+Because the world box IS the cube, `side_um` in the manifest is exactly the
+`general.units.length_um` a specification should declare -- the one number that makes any
+micrometre statement about the run possible. It is checked, not assumed.
+
+Order matters and is also checked. The manifest's row order is the neuron index order, and
+the same order `plexus.io.connectome` used to build `edge_index`. A count mismatch between
+the manifest and the set is refused rather than truncated: silently seeding the first N of a
+different region is indistinguishable, in the output, from seeding the right one.
+
+Reference: region frozen by plexus.io.neuprint from a NeuPrint server; hemibrain connectome
+from Scheffer, L. K. et al. (2020). A connectome and analysis of the adult Drosophila
+central brain. eLife 9:e57443.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `region` | frozen_region_manifest_dir | **required** |
+| `v0_sd` | initial_voltage_spread | 0.5 |
+| `v0_mean` | initial_voltage_mean | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: neural_seed, at: neuron, region: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`connectome`]{.op-badge} [`anatomy`]{.op-badge} [`initial_condition`]{.op-badge} [`neuprint`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/neural.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neural.py) &mdash; the registered operator.
+
+```python
+@register_operator("neural_seed", family="seed", set="neuron", kind="seed")
+class NeuralSeed(Seed):
+    """Establish x_0 for a neuron set from a frozen connectome region manifest: real somata at
+    their real positions, rather than points scattered in a box.
+
+    neuron -> neuron: reads a file, writes pos, voltage and neurite_dir, once, at the opening
+    of the trajectory.
+
+        x_i = (xyz_i - bounds_lo) / side          the cube becomes the unit box
+        v_i = v0_mean + v0_sd z_i,  z_i ~ N(0, 1)
+
+    xyz_i is the soma position in NANOMETRES and side the cube's edge in the same units; the
+    mapping is affine and isotropic, so every distance ratio is preserved. Nanometres and not
+    voxels: on an anisotropic dataset a voxel cube is a cuboid, and placing neurons from voxel
+    coordinates would stretch the region along one axis. v0_sd is a spread in the units of x,
+    and it is nonzero by default so that v = 0 is not a fixed point the whole population sits
+    at. It also writes the connectome provenance -- body id, cell type id -- as per-node
+    buffers rather than state, because an identity is not a quantity and nothing integrates it.
+
+    It queries nothing. The region was selected once, offline, by `plexus.io.neuprint`, which
+    bisected a cube until it held about the requested number of neurons and recorded which ones
+    they were. A seed that re-ran the selection would make the identity of the neurons a
+    function of the server's contents on the day the specification ran, so two runs of one
+    specification could be two different circuits. What the specification names is a manifest;
+    what the manifest names is a dataset, a query, a cube and a list of body ids.
+
+    Because the world box IS the cube, `side_um` in the manifest is exactly the
+    `general.units.length_um` a specification should declare -- the one number that makes any
+    micrometre statement about the run possible. It is checked, not assumed.
+
+    Order matters and is also checked. The manifest's row order is the neuron index order, and
+    the same order `plexus.io.connectome` used to build `edge_index`. A count mismatch between
+    the manifest and the set is refused rather than truncated: silently seeding the first N of a
+    different region is indistinguishable, in the output, from seeding the right one.
+
+    Reference: region frozen by plexus.io.neuprint from a NeuPrint server; hemibrain connectome
+    from Scheffer, L. K. et al. (2020). A connectome and analysis of the adult Drosophila
+    central brain. eLife 9:e57443.
+    """
+
+    EMIT = None                        # writes x_0 directly; returns {}
+    INPUTS = ["neuron"]
+    OUTPUTS = ["neuron"]
+    READS = []                         # reads a file, not state
+    WRITES = ["pos", "voltage", "neurite_dir"]
+    MAPS = []
+    SUPPORTED_DIMS = [2, 3]            # the manifest is 3D; a 2D world takes the first two axes
+    DIFFERENTIABLE = False             # establishes x_0 from data; nothing to differentiate
+    MAY_MUTATE_INTEGRATED_STATE = True # a seed writes the state buffer -- that is what a seed is
+    REQUIRES_PARAMS = ["region"]
+    MECHANISM_TAGS = ["connectome", "anatomy", "initial_condition", "neuprint"]
+    PARAM_ROLES = {"region": "frozen_region_manifest_dir", "v0_sd": "initial_voltage_spread",
+                   "v0_mean": "initial_voltage_mean"}
+    REFERENCE = ("Region frozen by plexus.io.neuprint from a NeuPrint server; hemibrain "
+                 "connectome from Scheffer, L. K. et al. (2020). A connectome and analysis of "
+                 "the adult Drosophila central brain. eLife 9:e57443.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "neuron")
+        self.region = params["region"]
+        self.v0_mean = float(params.get("v0_mean", 0.0))
+        self.v0_sd = float(params.get("v0_sd", 0.5))   # a spread, so v = 0 is not a fixed point
+
+    def _load(self):
+        # `region_path` owns the convention -- a bare name resolves to
+        # graphs_data/neural_regions/<name> -- so the importer that writes a region and the seed
+        # that reads it cannot disagree about where one lives.
+        from plexus.io.neuprint import region_path
+        root = region_path(self.region)
+        man = json.load(open(os.path.join(root, "manifest.json")))
+        z = np.load(os.path.join(root, "neurons.npz"), allow_pickle=True)
+        return root, man, z
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        root, man, z = self._load()
+        # Nanometres, not voxels: on an anisotropic dataset a voxel cube is a cuboid, so the
+        # importer crops in nm and stores both. Placing neurons from `xyz_vox` would stretch the
+        # region along the thin axis by the anisotropy ratio, with nothing to show for it.
+        xyz = np.asarray(z["xyz_nm"], np.float64)
+        lo = np.asarray(z["bounds_lo_nm"], np.float64)
+        side = float(z["bounds_side_nm"])
+        n = xyz.shape[0]
+        if n != lvl.n:
+            raise ValueError(
+                f"neural_seed: the region {root} holds {n} neurons but the set {self.at!r} has "
+                f"{lvl.n} slots. Set `per_parent` (or `n`) to {n} -- seeding a prefix would run "
+                f"a different circuit than the one the manifest and the connectome describe.")
+        D = H.dim
+        unit = (xyz - lo) / side                                   # the cube -> the unit box
+        dev = lvl.state.device
+        st = lvl.state.clone()                                     # clone-and-reassign: autograd-safe
+        px0, px1 = lvl.state_schema["pos"]
+        st[:, px0:px1] = torch.as_tensor(unit[:, :D], dtype=st.dtype, device=dev)
+        if "neurite_dir" in lvl.state_schema and "neurite_dir" in z.files:
+            nd = np.asarray(z["neurite_dir"], np.float64)[:, :D]
+            d0, d1 = lvl.state_schema["neurite_dir"]
+            st[:, d0:d1] = torch.as_tensor(nd, dtype=st.dtype, device=dev)
+        vx0, vx1 = lvl.state_schema["voltage"]
+        v0 = self.v0_mean + self.v0_sd * torch.randn(
+            (n, vx1 - vx0), generator=getattr(H, "rng", None), device=dev, dtype=st.dtype)
+        st[:, vx0:vx1] = v0
+        lvl.state = st
+        # provenance, as per-node buffers rather than as state: a body id is an identity, not a
+        # quantity, and nothing integrates it.
+        lvl.register_buffer("body_id", torch.as_tensor(np.asarray(z["body_id"], np.int64),
+                                                       device=dev))
+        lvl.register_buffer("cell_type_id", torch.as_tensor(np.asarray(z["type_id"], np.int64),
+                                                            device=dev))
+        lvl.cell_type_names = [str(t) for t in np.asarray(z["type_names"], dtype=object)]
+        lvl.region_manifest = man
+        r = man["region"]
+        # The region's physical size lands in two places, and both matter.
+        H.region = r                                # (1) on the Hierarchy, so every downstream
+        #                                                 consumer reads the same number rather
+        #                                                 than re-deriving it.
+        self._check_units(H, r)                     # (2) checked against the spec's declaration.
+        print(f"[neural_seed] {n} neurons from {man['source']['dataset']} -- cube of "
+              f"{r['side_um']:.3f} um at {np.round(lo).astype(int).tolist()} nm, "
+              f"{len(lvl.cell_type_names)} cell types"
+              + (f", {int((np.abs(np.asarray(z['neurite_dir'])).sum(1) > 0).sum())} "
+                 f"neurite directions" if "neurite_dir" in z.files else ""), flush=True)
+        return {}
+
+    @staticmethod
+    def _check_units(H, r):
+        """The world box IS the cube, so `general.units.length_um` must equal the manifest's
+        `side_um`. Checked, not assumed.
+
+        `length_um` is the one number converting every result of this run into micrometres, and
+        a specification carries it as a literal copied by hand from a manifest at some point in
+        the past. Re-run the importer with a different target and the cube changes size while
+        the literal does not; from then on every distance the run reports is wrong by that
+        ratio, with nothing in the output to show for it. So a declared unit is compared against
+        the region actually loaded, and a mismatch stops the run.
+
+        An undeclared unit block is not an error -- a dimensionless mechanism study is a legal
+        and honest state -- but it is worth printing what the number would have been, because
+        the manifest knows it and the reader is one line away from being able to use it.
+        """
+        u = getattr(getattr(H, "config", None), "units", None)
+        side = float(r["side_um"])
+        if u is None or not getattr(u, "declared", False):
+            print(f"[neural_seed] units: NONE DECLARED -- this region is {side:.4f} um across; "
+                  f"`general.units: {{length_um: {side:.6f}}}` would make that quotable.",
+                  flush=True)
+            return
+        got = float(u.length_um)
+        if abs(got - side) > 1e-6 * max(side, 1.0):
+            raise ValueError(
+                f"neural_seed: the spec declares general.units.length_um = {got:.6f} but the "
+                f"region it loads is {side:.6f} um across. The world box IS the cube, so these "
+                f"are the same number; they differ by a factor {got / side:.4f}, which is the "
+                f"factor by which every micrometre this run reports would be wrong.")
+```

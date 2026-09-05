@@ -1,6 +1,6 @@
 ---
 title: "signal"
-subtitle: "Passive connectome signalling on a neuron set."
+subtitle: "Passive connectome signalling: a neuron relaxes toward the summed input arriving along its incoming synapses."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Passive connectome signalling on a neuron set."
 
 [`lateral`]{.op-badge} [`acts on: neuron`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Passive connectome signalling on a neuron set.
+Passive connectome signalling: a neuron relaxes toward the summed input arriving along its incoming synapses.
 :::
 
 ```{=html}
@@ -42,20 +42,30 @@ Passive connectome signalling on a neuron set.
 
 ## Mechanism
 
-A fixed-connectome Lateral operator: each neuron integrates a first-order voltage ODE
-driven by weighted, activated input from its presynaptic neighbours,
+its incoming synapses. A firing-rate network, with no spikes and no channel dynamics.
 
-    tau * dv_i/dt = -v_i + b_i + sum_{e: post(e)=i} W_e * phi(v_{pre(e)}) .
+(neuron, synapse) -> neuron: reads the neuron voltage and the synapse weight, traverses
+the `pre` and `post` incidence maps, emits dv/dt.
 
-"Passive" means the synaptic weight `W_e` is a fixed edge parameter -- no synapse state
-(a stateful `synapse_ode` is a later PR). The connectome is read as a `synapse` EDGE-SET
-(PR2): gather phi(v) along the `pre` incidence map, weight by the synapse `w` block, and
-scatter onto the `post` neuron via `H.scatter_along` (an Aggregate along an incidence
-map). First-order in voltage, so EMIT=velocity; the engine integrates the neuron's
-`voltage` coordinate (PR1's schema-driven, boundary-free integration).
+    dv_i/dt = ( -v_i + b + sum_{e : post(e) = i} W_e phi(v_pre(e)) ) / tau
 
-This is the paper's degenerate case: drop the synapse state and the edge-set collapses
-to a plain weighted connectome, one Lateral operator on the neuron set.
+v_i is the membrane voltage of neuron i and tau its membrane time constant, in the same
+time units as the specification's dt -- it is the only timescale in the operator, so
+everything is measured against it. b is `bias`, a constant resting drive in voltage units.
+W_e is the fixed weight of synapse e, taken from the synapse set's `weight` block, and its
+sign is what makes the synapse excitatory or inhibitory. phi is `activation`, the
+presynaptic nonlinearity -- relu (the default, a threshold-linear rate), tanh, softplus,
+sigmoid, or identity for a purely linear network.
+
+The two maps are part of the signature, not an implementation detail: `pre` lifts each
+neuron's voltage onto the synapses leaving it, and `post` aggregates the resulting currents
+back onto the neuron receiving them. That aggregation is what makes the connectome, rather
+than a dense matrix, the object the operator acts over.
+
+Reference: Wilson, H. R. & Cowan, J. D. (1972). Excitatory and inhibitory interactions in
+localized populations of model neurons. Biophys. J. 12:1-24; Hopfield, J. J. (1984).
+Neurons with graded response have collective computational properties like those of
+two-state neurons. PNAS 81:3088-3092.
 
 ## Parameters
 
@@ -81,53 +91,43 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
-[`src/plexus/operators/signal.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/signal.py) &mdash; the registered operator.
+[`src/plexus/operators/field_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/field_ops.py) &mdash; the registered operator.
 
 ```python
-"""signal -- passive connectome signalling on a neuron set.
-
-A fixed-connectome Lateral operator: each neuron integrates a first-order voltage ODE
-driven by weighted, activated input from its presynaptic neighbours,
-
-    tau * dv_i/dt = -v_i + b_i + sum_{e: post(e)=i} W_e * phi(v_{pre(e)}) .
-
-"Passive" means the synaptic weight `W_e` is a fixed edge parameter -- no synapse state
-(a stateful `synapse_ode` is a later PR). The connectome is read as a `synapse` EDGE-SET
-(PR2): gather phi(v) along the `pre` incidence map, weight by the synapse `w` block, and
-scatter onto the `post` neuron via `H.scatter_along` (an Aggregate along an incidence
-map). First-order in voltage, so EMIT=velocity; the engine integrates the neuron's
-`voltage` coordinate (PR1's schema-driven, boundary-free integration).
-
-This is the paper's degenerate case: drop the synapse state and the edge-set collapses
-to a plain weighted connectome, one Lateral operator on the neuron set.
-"""
-from __future__ import annotations
-
-import torch
-import torch.nn.functional as F
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-_ACT = {
-    "relu": torch.relu,
-    "tanh": torch.tanh,
-    "softplus": F.softplus,
-    "sigmoid": torch.sigmoid,
-    "identity": lambda x: x,
-}
-
-
-@register_operator("signal", family="interaction", set="neuron", kind="lateral")
+@register_operator("signal", family="signalling", set="neuron", kind="lateral")
 class Signal(Lateral):
-    EMIT = "velocity"                     # first-order voltage ODE (dv/dt); engine integrates the `voltage` coordinate
-    # typed signature (Plexus2 sec. 2.1): a morphism from (neuron, synapse) to neuron,
-    # reading neuron voltage + synapse weight, writing the neuron voltage derivative,
-    # traversing the pre/post incidence maps. The maps are PART of the signature.
+    """Passive connectome signalling: a neuron relaxes toward the summed input arriving along
+    its incoming synapses. A firing-rate network, with no spikes and no channel dynamics.
+
+    (neuron, synapse) -> neuron: reads the neuron voltage and the synapse weight, traverses
+    the `pre` and `post` incidence maps, emits dv/dt.
+
+        dv_i/dt = ( -v_i + b + sum_{e : post(e) = i} W_e phi(v_pre(e)) ) / tau
+
+    v_i is the membrane voltage of neuron i and tau its membrane time constant, in the same
+    time units as the specification's dt -- it is the only timescale in the operator, so
+    everything is measured against it. b is `bias`, a constant resting drive in voltage units.
+    W_e is the fixed weight of synapse e, taken from the synapse set's `weight` block, and its
+    sign is what makes the synapse excitatory or inhibitory. phi is `activation`, the
+    presynaptic nonlinearity -- relu (the default, a threshold-linear rate), tanh, softplus,
+    sigmoid, or identity for a purely linear network.
+
+    The two maps are part of the signature, not an implementation detail: `pre` lifts each
+    neuron's voltage onto the synapses leaving it, and `post` aggregates the resulting currents
+    back onto the neuron receiving them. That aggregation is what makes the connectome, rather
+    than a dense matrix, the object the operator acts over.
+
+    Reference: Wilson, H. R. & Cowan, J. D. (1972). Excitatory and inhibitory interactions in
+    localized populations of model neurons. Biophys. J. 12:1-24; Hopfield, J. J. (1984).
+    Neurons with graded response have collective computational properties like those of
+    two-state neurons. PNAS 81:3088-3092.
+    """
+
+    EMIT = "velocity"                     # first-order: dv/dt, engine-integrated on the voltage block
     INPUTS = ["neuron", "synapse"]
     OUTPUTS = ["neuron"]
     READS = ["voltage", "w"]              # neuron membrane voltage; synapse weight block W_e
@@ -143,7 +143,9 @@ class Signal(Lateral):
         "bias": "resting_drive",
         "weight": "synapse_weight_block",
     }
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = ("Wilson, H. R. & Cowan, J. D. (1972). Excitatory and inhibitory interactions "
+                 "in localized populations of model neurons. Biophys. J. 12:1-24; Hopfield, "
+                 "J. J. (1984). PNAS 81:3088-3092.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

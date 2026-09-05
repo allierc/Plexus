@@ -1,0 +1,292 @@
+---
+title: "surface_drive"
+subtitle: "Move a seeded surface along one axis at a prescribed rate, and publish its velocity: the loading protocol of a displacement-controlled indentation."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Move a seeded surface along one axis at a prescribed rate, and publish its velocity: the loading protocol of a displacement-controlled indentation.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+loading protocol of a displacement-controlled indentation.
+
+vertex -> vertex: reads pos, writes pos and the surface's velocity buffer in place.
+
+    x_a(t) <- x_a(0) + by * clamp((t - hold) / over, 0, 1)
+
+`by` is a signed displacement along `axis`, in world units, applied over `over` frames after
+`hold` frames of rest. `target` is the alternative spelling, an absolute final coordinate of
+the surface's CENTROID -- which is the tool's low point for a flat plate, its centre for a
+sphere and neither for a pyramid, so three rungs of a ladder meant to differ only in the tool
+would need three different numbers to travel the same distance. `by` means the same thing for
+every shape, and is the one a ladder wants. `grow` is the third way a tool can move: it SCALES
+the surface about its own centroid, so a shell can indent by inflating rather than descending.
+
+KINEMATIC, NOT DYNAMIC, and that is the modelling decision. The tool is rigid and its position
+is imposed; it does not accelerate under the reaction it collects. `mesh_contact` still
+computes that reaction and accumulates it per vertex, so the load the material puts back is
+MEASURED even though it is not integrated -- the difference between a one-way coupling that
+reports its own residual and one that hides it.
+
+The velocity is PUBLISHED rather than inferred. The contact's friction law needs the surface's
+velocity at the contact point, and a prescribed tool knows its own exactly; writing it means
+the friction reads the motion that is happening rather than a finite difference of it.
+
+Reference: Plexus (this work); the loading protocol of a displacement-controlled indentation.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `by` | signed_displacement_along_axis | &ndash; |
+| `target` | final_centroid_position_on_axis | &ndash; |
+| `over` | frames_of_travel | 0 |
+| `rigid` | reset_from_seed_or_translate_live | True |
+| `axis` | motion_axis | 1 |
+| `hold` | frames_held_before_moving | 0 |
+| `grow` | &ndash; | None |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: surface_drive, at: vertex}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`prescribed_kinematics`]{.op-badge} [`rigid_indenter`]{.op-badge} [`moving_boundary`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd).
+
+## Source
+
+[`src/plexus/operators/contact_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/contact_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("surface_drive", "plate_drive", family="mechanics", set="vertex",
+                   kind="structural")
+class SurfaceDrive(Structural):
+    """Move a seeded surface along one axis at a prescribed rate, and publish its velocity: the
+    loading protocol of a displacement-controlled indentation.
+
+    vertex -> vertex: reads pos, writes pos and the surface's velocity buffer in place.
+
+        x_a(t) <- x_a(0) + by * clamp((t - hold) / over, 0, 1)
+        v_a    = by / over                                    published for the contact to read
+
+    `by` is a signed displacement along `axis`, in world units, applied over `over` frames after
+    `hold` frames of rest. `target` is the alternative spelling, an absolute final coordinate of
+    the surface's CENTROID -- which is the tool's low point for a flat plate, its centre for a
+    sphere and neither for a pyramid, so three rungs of a ladder meant to differ only in the tool
+    would need three different numbers to travel the same distance. `by` means the same thing for
+    every shape, and is the one a ladder wants. `grow` is the third way a tool can move: it SCALES
+    the surface about its own centroid, so a shell can indent by inflating rather than descending.
+
+    KINEMATIC, NOT DYNAMIC, and that is the modelling decision. The tool is rigid and its position
+    is imposed; it does not accelerate under the reaction it collects. `mesh_contact` still
+    computes that reaction and accumulates it per vertex, so the load the material puts back is
+    MEASURED even though it is not integrated -- the difference between a one-way coupling that
+    reports its own residual and one that hides it.
+
+    The velocity is PUBLISHED rather than inferred. The contact's friction law needs the surface's
+    velocity at the contact point, and a prescribed tool knows its own exactly; writing it means
+    the friction reads the motion that is happening rather than a finite difference of it.
+
+    Reference: Plexus (this work); the loading protocol of a displacement-controlled indentation.
+    """
+
+    EMIT = None                        # moves positions in place; no integrable delta
+    SUPPORTED_DIMS = [3]
+    # `target`, not `to`: the schema reserves `to` and `from` for FIELD references, so a scalar
+    # there would be resolved as a field name and the specification would fail to load.
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["prescribed_kinematics", "rigid_indenter", "moving_boundary"]
+    PARAM_ROLES = {"by": "signed_displacement_along_axis",
+                   "target": "final_centroid_position_on_axis", "over": "frames_of_travel",
+                   "rigid": "reset_from_seed_or_translate_live",
+                   "axis": "motion_axis", "hold": "frames_held_before_moving"}
+    REFERENCE = "Plexus (this work); the loading protocol of a displacement-controlled indentation."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.axis = int(params.get("axis", 1))
+        # Growth as a prescription: the third way a tool can move, and the one a spheroid needs.
+        # `by` and `target` translate the surface; `grow` SCALES it about its own centroid by a
+        # declared factor over `over` frames, so a shell can indent a gel by inflating instead of by
+        # descending -- and it stays a kinematic tool while doing it.
+        #
+        # Not `cell_grow` plus `cell_mechanics`: those SOLVE a tissue, and a solved tissue sharing
+        # a schedule with an MPM continuum is a different experiment, since the two have timesteps
+        # orders of magnitude apart. Prescribing the growth keeps the coupling one-way on purpose:
+        # the gel feels the shell and the shell feels nothing.
+        self.grow = params.get("grow", None)
+        self.grow = None if self.grow is None else float(self.grow)
+        if self.grow is not None:
+            if "target" in params or "by" in params:
+                raise ValueError("surface_drive: `grow` scales the surface and `by`/`target` "
+                                 "translate it -- declare one motion, not two")
+        elif ("target" in params) == ("by" in params):
+            raise ValueError("surface_drive: declare exactly one of `grow:` (a scale factor "
+                             "about the centroid), `by:` (a signed displacement "
+                             "along the axis, the same for every tool shape) or `target:` (an "
+                             "absolute coordinate of the surface's centroid)")
+        self.target = float(params["target"]) if "target" in params else None
+        self.by = float(params["by"]) if "by" in params else None
+        self.over = int(params.get("over", 0))          # 0 -> the whole run, resolved at frame 0
+        self.hold = int(params.get("hold", 0))
+        # RIGID BY DEFAULT: a tool's shape is its own, and resetting from the seeded positions is
+        # exact at every frame instead of accumulating one increment's rounding per step.
+        self.rigid = bool(params.get("rigid", True))
+        self._from = None
+        self._v0 = None
+        self._y_prev = None
+        self._f_prev = 1.0
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or not int(m.get("Nv", 0)):
+            return {}                                   # the seed has not run yet
+        Nv = int(m["Nv"])
+        pos = lvl.get("pos")
+        if self._from is None:
+            v0 = m.get("verts0", None)
+            self._v0 = (torch.as_tensor(v0[:Nv, self.axis], device=pos.device, dtype=pos.dtype)
+                        if v0 is not None else pos[:Nv, self.axis].clone())
+            self._from = float(self._v0.mean())      # the surface's own centroid on that axis
+            _p0 = m.get("verts0", None)
+            self._p0 = (torch.as_tensor(np.asarray(_p0)[:Nv], device=pos.device, dtype=pos.dtype)
+                        if _p0 is not None else pos[:Nv].clone())
+            self._c0 = self._p0.mean(0, keepdim=True)
+            if self.grow is not None:
+                self.target = self._from
+            if self.target is None:
+                self.target = self._from + self.by
+            self._y_prev = self._from
+            self.over = self.over or max(1, int(getattr(H, "n_frames", 0) or 1) - self.hold)
+        f = int(getattr(H, "frame", 0) or 0)
+        u = min(1.0, max(0.0, (f - self.hold) / float(self.over)))
+        y = self._from + u * (self.target - self._from)
+        # ZERO BEFORE AND AFTER THE TRAVEL. Hoisted above the branches because BOTH need it and the
+        # growth branch returns before the translation branch's copy was ever reached.
+        moving = (self.hold <= f < self.hold + self.over)
+        # A TRANSLATION OF THE SEEDED SHAPE, NOT AN ASSIGNMENT. `pos[:Nv, axis] = y` is the same
+        # thing for a plate, whose vertices all share one coordinate on that axis -- and it FLATTENS
+        # a sphere into a disc on the first frame. The offset is measured from the seeded positions,
+        # so the shape is exact at every frame rather than drifting with whatever the last one did.
+        if self.grow is not None:
+            # ABOUT THE SEEDED CENTROID, from the SEEDED positions -- exact at every frame rather
+            # than a product of 400 incremental multiplications.
+            f = 1.0 + u * (self.grow - 1.0)
+            if self.rigid:
+                # FROM THE SEEDED SHAPE: exact at every frame, and right for a tool.
+                pos[:Nv] = self._c0 + (self._p0 - self._c0) * f
+            else:
+                # INCREMENTAL, ABOUT THE LIVE CENTROID, so whatever else shaped the surface this
+                # frame survives. Resetting from the seed is what a rigid tool wants and what
+                # DESTROYS a solved one: `cell_mechanics` would run every frame and be discarded,
+                # and the shell would read as rigid while a schedule full of operators said
+                # otherwise. The ratio is per-frame, so 400 of them compose to `grow`.
+                _c = pos[:Nv].mean(0, keepdim=True)
+                _r = f / max(self._f_prev, 1e-12)
+                pos[:Nv] = _c + (pos[:Nv] - _c) * _r
+            self._f_prev = f
+            v = ((self.grow - 1.0) / (self.over * float(getattr(H, "dt", 1.0)))) if moving else 0.0
+            vv = m.get("Vv", None)
+            if vv is None or vv.shape[0] < Nv:
+                vv = torch.zeros(pos.shape[0], 3, device=pos.device, dtype=pos.dtype)
+                m["Vv"] = vv
+            # THE SURFACE VELOCITY OF AN INFLATING SHELL IS RADIAL and proportional to the radius,
+            # which is what the friction law needs and what a single axis-aligned number cannot say.
+            #
+            # FROM THE LIVE POSITIONS, NOT THE SEEDED ONES. `_p0` is the frame-0 vertex array, and
+            # `cell_divide` APPENDS vertices -- so the moment a cell split this was 796 rows being
+            # written into 1,160 and the run died on a shape mismatch. The live array is the right
+            # one anyway: after a division the new vertices have a radius too, and it is theirs.
+            _cv = pos[:Nv].mean(0, keepdim=True)
+            vv[:Nv] = (pos[:Nv] - _cv) * v
+            self._y_prev = y
+            self._say(v)
+            return {}
+        if self.rigid:
+            pos[:Nv, self.axis] = self._v0 + (y - self._from)
+        else:
+            # INCREMENTAL, so whatever else moved the surface this frame SURVIVES. Resetting from
+            # the seeded positions is exact for a rigid tool and destroys a solved one: a spheroid
+            # under `cell_mechanics` would have its shape overwritten on the drive axis every frame,
+            # so the mechanics would run and be discarded and the surface would read as rigid while
+            # a schedule full of operators said otherwise.
+            pos[:Nv, self.axis] = pos[:Nv, self.axis] + (y - self._y_prev)
+        self._y_prev = y
+        # `moving` IS HOISTED ABOVE: not the mean rate, because a friction law told the tool is
+        # still moving while it is parked would shear the material it is resting on for the whole
+        # hold, and the hold exists precisely to show the material at rest under a static load.
+        v = (self.target - self._from) / (self.over * float(getattr(H, "dt", 1.0))) if moving else 0.0
+        # THE VELOCITY BUFFER IS THIS OPERATOR'S, NOT THE SEED'S. `seed_plate` allocated it and
+        # `seed_mesh` -- which predates all of this and serves 461 specs -- does not, so a surface
+        # built by the second and driven by this died on `KeyError: 'Vv'`. The operator that
+        # publishes a quantity is the one that should create the place to put it.
+        vv = m.get("Vv", None)
+        if vv is None or vv.shape[0] < Nv:
+            vv = torch.zeros(pos.shape[0], 3, device=pos.device, dtype=pos.dtype)
+            m["Vv"] = vv
+        vv[:Nv] = 0.0
+        vv[:Nv, self.axis] = v
+        m["plate_height"] = y
+        self._say(v)
+        return {}
+
+    def _say(self, v):
+        if not self._said:
+            if self.grow is not None:
+                print(f"[surface_drive] {self.at}: scaling x{self.grow:g} about its centroid over "
+                      f"{self.over} frames after a {self.hold}-frame hold", flush=True)
+                self._said = True
+                return
+            print(f"[surface_drive] {self.at}: axis {self.axis}, {self._from:.4g} -> {self.target:.4g} "
+                  f"over {self.over} frames after a {self.hold}-frame hold; "
+                  f"speed {abs(v):.5g} box units per unit time", flush=True)
+            self._said = True
+        return {}
+```

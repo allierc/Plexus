@@ -1,6 +1,6 @@
 ---
 title: "mpm_grid"
-subtitle: "The Eulerian background grid FIELD + the shared transfer kernel for the"
+subtitle: "MLS-MPM background grid over the world box, with square cells dx = world_size[1] / n_grid."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "The Eulerian background grid FIELD + the shared transfer kernel for t
 
 [`field`]{.op-badge} [`frame: None`]{.op-badge}
 
-The Eulerian background grid FIELD + the shared transfer kernel for the
+MLS-MPM background grid over the world box, with square cells dx = world_size[1] / n_grid.
 :::
 
 ```{=html}
@@ -39,83 +39,81 @@ The Eulerian background grid FIELD + the shared transfer kernel for the
 
 ## Description
 
-decomposed MLS-MPM operators (mpm_strain / p2g / mpm_grid_update / g2p).
+Channels: m (mass), mv (momentum [.,dim]), c (liquid colour for CSF), v (velocity
+[.,dim]). Pure scratch: p2g zeroes + scatters into it each substep, grid_update
+solves on it, g2p reads it back.
 
-The grid is a FIELD, not an entity: transient scratch rebuilt every substep. p2g
-scatters mass/momentum/colour into it, mpm_grid_update solves on it, g2p reads it back.
-The B-spline weight helper lives here because both p2g (scatter) and g2p (gather)
-recompute it from the (pre-advection) particle positions -- so no per-substep scratch
-needs threading and the numbers match the `mls_mpm_mechanics` oracle.
+THE CELL SIZE COMES FROM THE WORLD, which it did not before. This used to read
+`dx = 1.0 / n_grid` with axes 1.. assumed to span [0,1] and only axis 0 scaled by `width`, so
+`n_grid` meant "cells per unit length". On a box that is not 1 unit across -- a 0.1 m water
+scene, say -- that puts a 1.0-wide grid on a 0.1-wide world: the cell is 10x too large, only
+~10 of 96 cells per axis carry any mass, and the failure is not subtle. `MPMGather` clamps
+positions into [2*dx, box[k] - 2*dx] with `box` correct and `dx` wrong, which crushes a 0.1 m
+cube into a 0.058 m slab on the first substep.
 
-Dimension-generic (the dimension contract): the grid is `dim`-dimensional -- a
-[nx, ny] square grid in 2D, an [nx, ny, nz] cube in 3D -- and the B-spline kernel
-spans the 3^dim stencil. The 2D path is bit-identical to the original (3x3 stencil,
-`gx*ny + gy` row-major flatten); the 3D path mirrors MPM_pytorch's MPM_3D (27-cell
-stencil, `x*ny*nz + y*nz + z`). axis 0 spans the world width, the others span 1.
+`n_grid` means CELLS ACROSS AXIS 1, not cells per unit length. The two readings coincide when
+the world is one unit across on that axis, which is the default, so a specification that does
+not declare a world gets the same dx and the same node count either way. They diverge exactly
+where it matters: on a box that is not one unit across.
+
+inv_dx IS NOT 1.0/dx. `1.0 / (1.0 / n) != float(n)` for 640 of the first 4,096 integers -- the
+first offender is n = 49 -- so the reciprocal round-trip is exact only by luck at the n_grid
+values in use (48, 64, 96, 128, 192). Deriving it from the integer directly keeps byte-identity
+on the corpus, and keeps it for a spec that picks n_grid = 49 tomorrow.
 
 ## Source
 
-[`src/plexus/operators/mpm_grid.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_grid.py)
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py)
 
 ```python
-"""mpm_grid -- the Eulerian background grid FIELD + the shared transfer kernel for the
-decomposed MLS-MPM operators (mpm_strain / p2g / mpm_grid_update / g2p).
-
-The grid is a FIELD, not an entity: transient scratch rebuilt every substep. p2g
-scatters mass/momentum/colour into it, mpm_grid_update solves on it, g2p reads it back.
-The B-spline weight helper lives here because both p2g (scatter) and g2p (gather)
-recompute it from the (pre-advection) particle positions -- so no per-substep scratch
-needs threading and the numbers match the `mls_mpm_mechanics` oracle.
-
-Dimension-generic (the dimension contract): the grid is `dim`-dimensional -- a
-[nx, ny] square grid in 2D, an [nx, ny, nz] cube in 3D -- and the B-spline kernel
-spans the 3^dim stencil. The 2D path is bit-identical to the original (3x3 stencil,
-`gx*ny + gy` row-major flatten); the 3D path mirrors MPM_pytorch's MPM_3D (27-cell
-stencil, `x*ny*nz + y*nz + z`). axis 0 spans the world width, the others span 1.
-"""
-from __future__ import annotations
-
-import itertools
-
-import torch
-
-from plexus.models.base import Field
-from plexus.models.registry import register_field
-
-
-def stencil_offsets(dim: int, device="cpu") -> torch.Tensor:
-    """The 3^dim quadratic-B-spline stencil offsets, row-major (last axis fastest).
-    2D -> [9,2] == `[[i,j] for i in 0..2 for j in 0..2]`; 3D -> [27,3] (matches the
-    MPM_3D offset ordering: idx//9, (idx%9)//3, idx%3)."""
-    return torch.tensor(list(itertools.product(range(3), repeat=dim)),
-                        dtype=torch.float32, device=device)
-
-
-# 2D stencil kept as a module constant for back-compat (p2g/g2p now build per-dim)
-_OFFSETS = stencil_offsets(2)
-
-
 @register_field("mpm_grid")
 class MPMGrid(Field):
-    """MLS-MPM background grid on [0,width]x[0,1](x[0,1]) with square cells dx = 1/n_grid.
+    """MLS-MPM background grid over the world box, with square cells dx = world_size[1] / n_grid.
     Channels: m (mass), mv (momentum [.,dim]), c (liquid colour for CSF), v (velocity
     [.,dim]). Pure scratch: p2g zeroes + scatters into it each substep, grid_update
-    solves on it, g2p reads it back."""
+    solves on it, g2p reads it back.
+
+    THE CELL SIZE COMES FROM THE WORLD, which it did not before. This used to read
+    `dx = 1.0 / n_grid` with axes 1.. assumed to span [0,1] and only axis 0 scaled by `width`, so
+    `n_grid` meant "cells per unit length". On a box that is not 1 unit across -- a 0.1 m water
+    scene, say -- that puts a 1.0-wide grid on a 0.1-wide world: the cell is 10x too large, only
+    ~10 of 96 cells per axis carry any mass, and the failure is not subtle. `MPMGather` clamps
+    positions into [2*dx, box[k] - 2*dx] with `box` correct and `dx` wrong, which crushes a 0.1 m
+    cube into a 0.058 m slab on the first substep.
+
+    `n_grid` means CELLS ACROSS AXIS 1, not cells per unit length. The two readings coincide when
+    the world is one unit across on that axis, which is the default, so a specification that does
+    not declare a world gets the same dx and the same node count either way. They diverge exactly
+    where it matters: on a box that is not one unit across.
+
+    inv_dx IS NOT 1.0/dx. `1.0 / (1.0 / n) != float(n)` for 640 of the first 4,096 integers -- the
+    first offender is n = 49 -- so the reciprocal round-trip is exact only by luck at the n_grid
+    values in use (48, 64, 96, 128, 192). Deriving it from the integer directly keeps byte-identity
+    on the corpus, and keeps it for a spec that picks n_grid = 49 tomorrow.
+    """
 
     RECORD = False                                   # transient scratch -- not recorded/rendered
 
-    def __init__(self, name, width=1.0, n_grid=128, dim=2, device="cpu", **kw):
+    def __init__(self, name, width=1.0, n_grid=128, dim=2, device="cpu", world_size=None, **kw):
         super().__init__(name)
         self.dim = int(dim)
-        self.ny = int(n_grid)                        # cells per unit length (axes 1..)
-        self.nx = int(round(float(width) * self.ny)) # axis 0 spans the world width
-        self.width = float(width)
-        self.dx = 1.0 / self.ny
-        self.inv_dx = float(self.ny)
+        # `width` is the legacy axis-0 scalar and stays the fallback: a caller that does not pass
+        # the per-axis box gets exactly the old geometry, [width] x [1] x [1].
+        box = [float(w) for w in world_size] if world_size else \
+              [float(width)] + [1.0] * (self.dim - 1)
+        if len(box) != self.dim:
+            raise ValueError(f"MPMGrid: world_size has {len(box)} entries but dim={self.dim}")
+        self.world_size = box
+        self.width = box[0]
+        self.n_grid = int(n_grid)                    # cells across axis 1
+        self.inv_dx = float(n_grid) / box[1]         # NOT 1.0/dx -- see the note above
+        self.dx = box[1] / float(n_grid)
+        n_k = [max(1, int(round(box[k] * self.inv_dx))) for k in range(self.dim)]
+        self.nx, self.ny = n_k[0], n_k[1]
         if self.dim == 2:
             self.shape = (self.nx, self.ny)
-        else:                                        # 3D cube: axes 1,2 span [0,1]
-            self.nz = self.ny
+        else:
+            self.nz = n_k[2]
             self.shape = (self.nx, self.ny, self.nz)
         n = 1
         for s in self.shape:
@@ -129,36 +127,4 @@ class MPMGrid(Field):
     @property
     def grid(self):                                  # [1,*shape] view for the recorder (mass density)
         return self.m.view((1,) + self.shape)
-
-
-def bspline(X, inv_dx, offsets, shape, periodic):
-    """Quadratic B-spline weights of each particle over its 3^dim grid stencil.
-    Returns (fx [N,D], weight [N,S], flat [N*S]) where S = 3^D. Dimension-generic; the
-    2D call reduces bit-identically to the original `w[:,oi,0]*w[:,oj,1]`, `gx*ny+gy`."""
-    D = X.shape[1]
-    base = (X * inv_dx - 0.5).floor().long()                          # [N,D]
-    fx = X * inv_dx - base.float()                                    # [N,D]
-    w = torch.stack([0.5 * (1.5 - fx) ** 2,
-                     0.75 - (fx - 1) ** 2,
-                     0.5 * (fx - 0.5) ** 2], dim=1)                   # [N,3,D]
-    oidx = offsets.long()                                            # [S,D]
-    weight = torch.ones(X.shape[0], offsets.shape[0], device=X.device)
-    for k in range(D):                                               # prod_k w[:, o_k, k]
-        weight = weight * w[:, oidx[:, k], k]
-    gpos = base[:, None, :] + oidx[None]                             # [N,S,D]
-    comps = []
-    for k in range(D):
-        comps.append(gpos[..., k] % shape[k] if periodic
-                     else gpos[..., k].clamp(0, shape[k] - 1))
-    flat = comps[0]                                                  # row-major flatten over `shape`
-    for k in range(1, D):
-        flat = flat * shape[k] + comps[k]
-    return fx, weight, flat.reshape(-1)
-
-
-def sub_dt(H, fallback):
-    """The current substep dt: the schedule's `{substep: N, dt}` loop sets `H.sub_dt`;
-    fall back to the operator's own `dt_sub` param if run outside a substep loop."""
-    sd = getattr(H, "sub_dt", None)
-    return float(sd if sd is not None else fallback)
 ```

@@ -1,6 +1,6 @@
 ---
 title: "grid"
-subtitle: "A pure-state continuum: a C-channel scalar grid, NO behaviour."
+subtitle: "A C-channel scalar field on a square-pixel grid."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A pure-state continuum: a C-channel scalar grid, NO behaviour."
 
 [`field`]{.op-badge} [`frame: grid`]{.op-badge}
 
-A pure-state continuum: a C-channel scalar grid, NO behaviour.
+A C-channel scalar field on a square-pixel grid.
 :::
 
 ```{=html}
@@ -39,55 +39,35 @@ A pure-state continuum: a C-channel scalar grid, NO behaviour.
 
 ## Description
 
-A field is *what it is* (a discretized scalar density over the domain), not what is
-done to it. All dynamics -- deposit (set->field), diffuse/decay (field->field), and
-sense (field->set) -- are OPERATORS in the schedule, never methods here. The field
-only holds its grid and the geometry of its discretization (the world<->pixel map),
-so every field-coupled model (slime, reaction-diffusion, morphogen) reuses it.
+the geometry to index it, and has no dynamics of its own -- operators supply those.
 
-One channel per coupling target: the slime case uses one channel per species (per
-`type` of the coupled set), so categorical separation needs no new field code.
+The domain is the box [0, W] x [0, 1] in 2D, or [0, W] x [0, 1] x [0, 1] in 3D, where W is
+`width` in world units. `res` is R, the resolution in pixels per world unit, so a pixel is
+dx = 1/R world units on every axis and the grid is nx = round(W R) by R (by R). The state is
+one `grid` buffer of shape [C, nx, ny(, nz)], C being the number of channels: a channel per
+species is the usual reading, and `deposit` writes each element into the channel of its own
+type.
 
-Dimension-generic (the dimension contract): a `dim` selects a 2D grid `[C, nx, ny]`
-or a 3D grid `[C, nx, ny, nz]`; the world<->pixel map (`pix`) and the field operators
-(deposit / diffuse) are written N-D so the same field serves 2D and 3D slime.
+Reference: none -- a regular scalar grid is a representation, not a result.
 
 ## Source
 
-[`src/plexus/operators/scalar_field.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/scalar_field.py)
+[`src/plexus/operators/field_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/field_ops.py)
 
 ```python
-"""ScalarField -- a pure-state continuum: a C-channel scalar grid, NO behaviour.
-
-A field is *what it is* (a discretized scalar density over the domain), not what is
-done to it. All dynamics -- deposit (set->field), diffuse/decay (field->field), and
-sense (field->set) -- are OPERATORS in the schedule, never methods here. The field
-only holds its grid and the geometry of its discretization (the world<->pixel map),
-so every field-coupled model (slime, reaction-diffusion, morphogen) reuses it.
-
-One channel per coupling target: the slime case uses one channel per species (per
-`type` of the coupled set), so categorical separation needs no new field code.
-
-Dimension-generic (the dimension contract): a `dim` selects a 2D grid `[C, nx, ny]`
-or a 3D grid `[C, nx, ny, nz]`; the world<->pixel map (`pix`) and the field operators
-(deposit / diffuse) are written N-D so the same field serves 2D and 3D slime.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Field
-from plexus.models.registry import register_field
-
-
 @register_field("grid", frame="grid")
 class ScalarField(Field):
-    """A C-channel scalar field on a square-pixel grid over the box [0,W]x[0,1](x[0,1]).
+    """A C-channel scalar field on a square-pixel grid. Pure state: it holds a continuum and
+    the geometry to index it, and has no dynamics of its own -- operators supply those.
 
-    Pure state: a `grid` buffer `[C, *shape]` (shape = (nx, ny) in 2D, (nx, ny, nz) in
-    3D) plus the geometry to map a world position to a voxel (`pix`). Pixels are
-    square, dx = 1/R; axis 0 spans the world width W, the other axes span 1. Operators
-    read/write `grid` directly.
+    The domain is the box [0, W] x [0, 1] in 2D, or [0, W] x [0, 1] x [0, 1] in 3D, where W is
+    `width` in world units. `res` is R, the resolution in pixels per world unit, so a pixel is
+    dx = 1/R world units on every axis and the grid is nx = round(W R) by R (by R). The state is
+    one `grid` buffer of shape [C, nx, ny(, nz)], C being the number of channels: a channel per
+    species is the usual reading, and `deposit` writes each element into the channel of its own
+    type.
+
+    Reference: none -- a regular scalar grid is a representation, not a result.
     """
 
     def __init__(self, name, couples_to=None, components=1, res=200, width=1.0, dim=2, device="cpu"):
@@ -107,14 +87,13 @@ class ScalarField(Field):
         self.register_buffer("grid", torch.zeros((self.C,) + self.shape, device=device))
 
     def pix(self, *coords):
-        """Nearest voxel indices of world positions (per-axis int-cast of the shader).
+        """The voxel a world position falls in: nearest-voxel, not interpolated.
 
-        Accepts D coordinate tensors (x, y[, z]) and returns a D-tuple of index
-        tensors. Axis 0 spans [0, W], every other axis spans [0, 1]; each maps by the
-        common pixels-per-unit R. The 2D call `pix(x, y)` returns `(gx, gy)` exactly as
-        before (back-compatible). When `self.periodic`, indices WRAP modulo the grid
-        (a torus) instead of clamping to the edge -- so a sensor reaching past one
-        side reads the other (matching the periodic particle wrap in `_integrate`)."""
+        Takes D coordinate tensors (x, y[, z]) and returns a D-tuple of index tensors. Axis 0
+        spans [0, W], every other axis spans [0, 1], and all of them map through the same
+        pixels-per-world-unit R. Under `self.periodic` the index wraps modulo the grid rather
+        than clamping to the edge, so a sensor reaching past one side reads the other -- the
+        same torus the periodic particle wrap uses."""
         out = []
         for k, c in enumerate(coords):
             box = self.width if k == 0 else 1.0

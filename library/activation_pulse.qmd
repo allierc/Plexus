@@ -1,6 +1,6 @@
 ---
 title: "activation_pulse"
-subtitle: "Paint a clocked activation field. ONE operator, two timing modes,"
+subtitle: "Paint a clocked activation field: where a stimulus is, and when it arrives there."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Paint a clocked activation field. ONE operator, two timing modes,"
 
 [`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Paint a clocked activation field. ONE operator, two timing modes,
+Paint a clocked activation field: where a stimulus is, and when it arrives there.
 :::
 
 ```{=html}
@@ -42,23 +42,33 @@ Paint a clocked activation field. ONE operator, two timing modes,
 
 ## Mechanism
 
-chosen by whether a per-pixel delay map is given:
+operator with two timing modes, chosen by whether a delay map is given.
 
-* no `delay_from` (the old `pulse_stimulus`) -- a SHARED clock painted with a spatial
-  profile. Reads the scalar clock p(t) from `H.signals[clock]` (written by a `pacemaker`)
-  and writes
-                                                or `uniform`.
-  It owns WHERE; the pacemaker owns WHEN -- so one clock can drive many sites.
+field -> field: writes one channel of the field named by `at:`, in place.
 
-* with `delay_from` (the old `phase_delay_pulse`) -- a PER-PIXEL delayed wave. Every pixel
-  runs the same raised bump but offset by a local delay tau(x,y) = max_delay * delay_map(x,y):
-  a delay GRADIENT makes neighbouring regions fire in sequence -- a travelling activation
-  wave. The delay map is an `image` field. This mode owns both WHEN (per pixel) and WHERE
-  (via the map), so it needs no pacemaker.
+Without `delay_from`, every point shares one clock and differs only in how strongly it is
+stimulated:
 
-`kind=field`: writes the activation grid named by `at:` in place, returns {}. Downstream
-`pulse_to_contraction` / `pulse_to_active_stress` read the activation field either way; the
-waveform is the same raised bump as `pacemaker`, so force<->stress<->wave stay clean swaps.
+    a(x, t) = p(t) exp(-|x - x0|^2 / 2 sigma^2)        profile: gaussian
+    a(x, t) = p(t)                                     profile: uniform
+
+p(t) is the scalar published by a `pacemaker` under the key named in `clock`, x0 is
+`center` in world coordinates and sigma is `radius`, the stimulus width in world units.
+Every point beats at the same instant, which is a claim that conduction is instantaneous.
+
+With `delay_from` naming a normalised [0, 1] field m(x), each point instead runs the same
+beat shifted in time:
+
+    tau(x) = T_max m(x)
+
+T_max is `max_delay`, the delay in ticks where the map reads 1, and P, d, phi are the
+period, duration and phase in ticks as in `pacemaker`. The activation is then a wave
+travelling outward along whatever gradient the delay map encodes, at a speed set by
+1 / grad tau -- which is how a conduction system is expressed without simulating one. A
+delay map at a different resolution from the field is resampled by interpolation.
+
+Reference: none -- a prescribed stimulus is a boundary condition, not a mechanism. Plexus
+(this work).
 
 ## Parameters
 
@@ -88,68 +98,68 @@ operators:
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`hash_encoding`](hash_encoding.qmd), [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 
-[`src/plexus/operators/activation_pulse.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/activation_pulse.py) &mdash; the registered operator.
+[`src/plexus/operators/field_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/field_ops.py) &mdash; the registered operator.
 
 ```python
-"""activation_pulse -- paint a clocked activation field. ONE operator, two timing modes,
-chosen by whether a per-pixel delay map is given:
-
-* no `delay_from` (the old `pulse_stimulus`) -- a SHARED clock painted with a spatial
-  profile. Reads the scalar clock p(t) from `H.signals[clock]` (written by a `pacemaker`)
-  and writes
-      a(x, t) = p(t) * profile(x),    profile = Gaussian bump at `center` (width `radius`)
-                                                or `uniform`.
-  It owns WHERE; the pacemaker owns WHEN -- so one clock can drive many sites.
-
-* with `delay_from` (the old `phase_delay_pulse`) -- a PER-PIXEL delayed wave. Every pixel
-  runs the same raised bump but offset by a local delay tau(x,y) = max_delay * delay_map(x,y):
-      s = (t - tau + phase) mod period;   a = sin(pi s / duration) if s < duration else 0
-  a delay GRADIENT makes neighbouring regions fire in sequence -- a travelling activation
-  wave. The delay map is an `image` field. This mode owns both WHEN (per pixel) and WHERE
-  (via the map), so it needs no pacemaker.
-
-`kind=field`: writes the activation grid named by `at:` in place, returns {}. Downstream
-`pulse_to_contraction` / `pulse_to_active_stress` read the activation field either way; the
-waveform is the same raised bump as `pacemaker`, so force<->stress<->wave stay clean swaps.
-"""
-from __future__ import annotations
-
-import math
-
-import torch
-import torch.nn.functional as Fnn
-
-from plexus.models.base import FieldUpdate
-from plexus.models.registry import register_operator
-
-
 @register_operator("activation_pulse", family="fields", set="field", kind="field")
 class ActivationPulse(FieldUpdate):
-    EMIT = None                       # writes a prescribed field; never engine-integrated
+    """Paint a clocked activation field: where a stimulus is, and when it arrives there. One
+    operator with two timing modes, chosen by whether a delay map is given.
+
+    field -> field: writes one channel of the field named by `at:`, in place.
+
+    Without `delay_from`, every point shares one clock and differs only in how strongly it is
+    stimulated:
+
+        a(x, t) = p(t) exp(-|x - x0|^2 / 2 sigma^2)        profile: gaussian
+        a(x, t) = p(t)                                     profile: uniform
+
+    p(t) is the scalar published by a `pacemaker` under the key named in `clock`, x0 is
+    `center` in world coordinates and sigma is `radius`, the stimulus width in world units.
+    Every point beats at the same instant, which is a claim that conduction is instantaneous.
+
+    With `delay_from` naming a normalised [0, 1] field m(x), each point instead runs the same
+    beat shifted in time:
+
+        tau(x) = T_max m(x)
+        s(x, t) = (t - tau(x) + phi) mod P
+        a(x, t) = sin(pi s / d)  if s < d,  else 0
+
+    T_max is `max_delay`, the delay in ticks where the map reads 1, and P, d, phi are the
+    period, duration and phase in ticks as in `pacemaker`. The activation is then a wave
+    travelling outward along whatever gradient the delay map encodes, at a speed set by
+    1 / grad tau -- which is how a conduction system is expressed without simulating one. A
+    delay map at a different resolution from the field is resampled by interpolation.
+
+    Reference: none -- a prescribed stimulus is a boundary condition, not a mechanism. Plexus
+    (this work).
+    """
+
+    EMIT = None                       # writes a prescribed field in place; never engine-integrated
     SUPPORTED_DIMS = [2, 3]           # dimension-generic: N-D Gaussian/uniform profile on the [C,nx,ny(,nz)] field
     REQUIRES_PARAMS = []              # no required params — field target from `at:`; all timing knobs optional
     MECHANISM_TAGS = ["activation_field", "gaussian_source", "phase_delay", "travelling_wave", "spatial_clock"]
     PARAM_ROLES = {"radius": "stimulus_width", "center": "stimulus_site", "clock": "pacemaker_signal",
                    "period": "beat_interval", "duration": "active_width",
                    "max_delay": "phase_delay_gain", "delay_from": "delay_map"}
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = "Plexus (this work); a prescribed stimulus, i.e. a boundary condition."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.field_name = params.get("_at") or params.get("to")   # activation field at `at:`
         self.channel = int(params.get("channel", 0))
         self.delay_from = params.get("delay_from")                 # None -> shared clock; set -> per-pixel wave
-        # shared-clock mode (old pulse_stimulus):
+        # shared-clock mode: one clock, a spatial profile
         self.clock = str(params.get("clock", "pacemaker"))         # H.signals key to read p(t)
         self.profile = str(params.get("profile", "gaussian"))      # "gaussian" (localised) | "uniform" (global)
         c = params.get("center", [0.5, 0.5])
         self.center = [float(x) for x in c]                        # N-D site; missing axes default to 0.5 at forward
         self.sigma = float(params.get("radius", 0.12))
-        # per-pixel wave mode (old phase_delay_pulse):
+        # per-pixel wave mode: the same beat, delayed by a map
         self.period = float(params.get("period", 150.0))           # ticks between beats
         self.duration = float(params.get("duration", 30.0))        # active width (ticks)
         self.phase = float(params.get("phase", 0.0))               # global tick offset
@@ -158,7 +168,7 @@ class ActivationPulse(FieldUpdate):
     def forward(self, H, mask=None):
         fld = H.fields[self.field_name]
         if self.delay_from is None:
-            # --- shared clock x spatial profile (old pulse_stimulus) ------------------ #
+            # --- shared clock x spatial profile: every point beats at once --------------- #
             dev = fld.grid.device
             shape, R, D = fld.shape, fld.R, len(fld.shape)         # (nx,ny) 2D or (nx,ny,nz) 3D
             # pixel-centre world coordinates per axis: axis 0 spans [0, width], the rest [0, 1]
@@ -173,7 +183,7 @@ class ActivationPulse(FieldUpdate):
             p = float((getattr(H, "signals", None) or {}).get(self.clock, 0.0))   # this tick's clock value
             fld.grid[self.channel] = p * bump
         else:
-            # --- per-pixel delayed wave (old phase_delay_pulse) ----------------------- #
+            # --- per-pixel delayed wave: the beat arrives late where the map is high ----- #
             out = fld.grid[self.channel]                           # [nx, ny] activation channel to write
             delay = H.fields[self.delay_from].grid[0].to(out.device)   # [nx, ny] normalised 0..1
             if delay.shape != out.shape:                           # map at a different resolution: resample

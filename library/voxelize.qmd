@@ -1,0 +1,249 @@
+---
+title: "voxelize"
+subtitle: "Splat a per-element scalar onto a regular grid: the discrete set becomes a continuous field that can be viewed, saved, or handed to a model that expects a volume."
+---
+
+::: {.op-head}
+![](../figures/icons/exchange.png){.op-logo}
+
+[`exchange`]{.op-badge} [`acts on: neuron`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Splat a per-element scalar onto a regular grid: the discrete set becomes a continuous field that can be viewed, saved, or handed to a model that expects a volume.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
+- **Acts on** &mdash; `neuron` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+field that can be viewed, saved, or handed to a model that expects a volume.
+
+neuron -> field: reads pos and the `block:` state, writes the `to:` field in place.
+
+    A(v) = sum_i K(|c_v - r_i|) x_i                     normalize: none
+    A(v) = sum_i K(|c_v - r_i|) x_i / (eps + sum_i K)   normalize: density
+
+c_v is the centre of voxel v and r_i the position of element i, both in world units; x_i is
+the scalar being rendered, taken from the state block named by `block`. K is the splat
+kernel: `gaussian`, exp(-|d|^2 / 2 sigma^2), or `nearest`, which deposits into the
+containing voxel only. sigma is `radius`-independent and measured in VOXELS, not world
+units, so it follows the field's resolution rather than the domain -- doubling `res` at
+fixed sigma renders a proportionally finer kernel. The stencil is truncated at `radius`
+voxels, defaulting to 3 sigma, which captures 99.7% of a Gaussian; a tighter cut is a
+different kernel and is recorded as one rather than called an optimisation.
+
+The two normalisations answer different questions, so the choice belongs in the record and
+not in a default nobody reads. `none` is an activity DENSITY: bright where neurons are
+dense as well as where they are active, defined everywhere, and zero far from any neuron.
+`density` divides by the local neuron density, giving a local MEAN of the rendered quantity
+-- independent of how many cells happen to be there, but ill-posed in empty space, where
+`eps` is what decides the answer. Neither is more correct, and a downstream model trained
+on one is not trained on the other.
+
+The grid is rebuilt every tick, never accumulated. A splat adding into the previous tick's
+grid would integrate the activity in time, and the result would look like a plausible field
+while being a running sum -- a difference invisible in any single frame.
+
+Resolution belongs to the field, not to this operator: the field declares `res:` and this
+reads its shape, so 64 -> 128 is a one-line change in one place.
+
+Reference: none -- this is a rendering, not a mechanism. Plexus (this work).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `block` | source_state_block | "voltage" |
+| `sigma` | kernel_width_voxels | 1.5 |
+| `radius` | stencil_half_width_voxels | max(1, int(round(3 * self.sigma |
+| `normalize` | density_normalisation | "none" |
+| `kernel` | splat_kernel | "gaussian" |
+| `eps` | empty_space_regulariser | 1e-6 |
+| `channel` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: voxelize, at: neuron}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`rasterization`]{.op-badge} [`observation`]{.op-badge} [`projection`]{.op-badge} [`volume_render`]{.op-badge}  
+
+## Related operators
+
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`mpm_scatter`](mpm_scatter.qmd), [`p2g`](p2g.qmd), [`mpm_gather`](mpm_gather.qmd).
+
+## Source
+
+[`src/plexus/operators/encoding_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/encoding_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("voxelize", family="harness", set="neuron", kind="exchange")
+class Voxelize(Exchange):
+    """Splat a per-element scalar onto a regular grid: the discrete set becomes a continuous
+    field that can be viewed, saved, or handed to a model that expects a volume.
+
+    neuron -> field: reads pos and the `block:` state, writes the `to:` field in place.
+
+        A(v) = sum_i K(|c_v - r_i|) x_i                     normalize: none
+        A(v) = sum_i K(|c_v - r_i|) x_i / (eps + sum_i K)   normalize: density
+
+    c_v is the centre of voxel v and r_i the position of element i, both in world units; x_i is
+    the scalar being rendered, taken from the state block named by `block`. K is the splat
+    kernel: `gaussian`, exp(-|d|^2 / 2 sigma^2), or `nearest`, which deposits into the
+    containing voxel only. sigma is `radius`-independent and measured in VOXELS, not world
+    units, so it follows the field's resolution rather than the domain -- doubling `res` at
+    fixed sigma renders a proportionally finer kernel. The stencil is truncated at `radius`
+    voxels, defaulting to 3 sigma, which captures 99.7% of a Gaussian; a tighter cut is a
+    different kernel and is recorded as one rather than called an optimisation.
+
+    The two normalisations answer different questions, so the choice belongs in the record and
+    not in a default nobody reads. `none` is an activity DENSITY: bright where neurons are
+    dense as well as where they are active, defined everywhere, and zero far from any neuron.
+    `density` divides by the local neuron density, giving a local MEAN of the rendered quantity
+    -- independent of how many cells happen to be there, but ill-posed in empty space, where
+    `eps` is what decides the answer. Neither is more correct, and a downstream model trained
+    on one is not trained on the other.
+
+    The grid is rebuilt every tick, never accumulated. A splat adding into the previous tick's
+    grid would integrate the activity in time, and the result would look like a plausible field
+    while being a running sum -- a difference invisible in any single frame.
+
+    Resolution belongs to the field, not to this operator: the field declares `res:` and this
+    reads its shape, so 64 -> 128 is a one-line change in one place.
+
+    Reference: none -- this is a rendering, not a mechanism. Plexus (this work).
+    """
+
+    EMIT = None                        # writes a Field in place, returns no delta
+    INPUTS = ["neuron"]
+    OUTPUTS = []                       # a field, not a set
+    READS = ["pos", "voltage"]
+    WRITES = []                        # the field's grid; not a state block on any set
+    MAPS = []                          # positional coupling, not a named map
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True              # index_add of a Gaussian weight: gradients flow to x_i
+    REQUIRES_PARAMS = []               # the field is the spec's `to:`; every knob has a default
+    MECHANISM_TAGS = ["rasterization", "observation", "projection", "volume_render"]
+    PARAM_ROLES = {"block": "source_state_block", "sigma": "kernel_width_voxels",
+                   "radius": "stencil_half_width_voxels", "normalize": "density_normalisation",
+                   "kernel": "splat_kernel", "eps": "empty_space_regulariser"}
+    REFERENCE = "Plexus (this work); a rendering, not a mechanism."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "neuron")
+        self.field = params.get("to") or params.get("field")
+        self.block = params.get("block", "voltage")
+        self.channel = int(params.get("channel", 0))
+        self.kernel = str(params.get("kernel", "gaussian"))
+        self.sigma = float(params.get("sigma", 1.5))          # in VOXELS, so it follows `res`
+        self.radius = int(params.get("radius", max(1, int(round(3 * self.sigma)))))
+        self.normalize = str(params.get("normalize", "none"))
+        self.eps = float(params.get("eps", 1e-6))
+        self._stencil = None
+
+    def _offsets(self, D, device):
+        if self._stencil is None or self._stencil.shape[1] != D:
+            r = self.radius
+            ax = torch.arange(-r, r + 1, device=device)
+            self._stencil = torch.stack(torch.meshgrid(*([ax] * D), indexing="ij"),
+                                        -1).reshape(-1, D)
+        return self._stencil
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        fld = H.field(self.field)
+        pos = lvl.get("pos")                                   # [N, D] in the world box
+        val = lvl.get(self.block)[:, :1] * lvl.occ[:, None]    # [N, 1] dormant contribute nothing
+        if mask is not None:
+            val = val * mask[:, None].float()
+        dev = pos.device
+        D = pos.shape[-1]
+        shape = torch.tensor(fld.shape[:D], device=dev)        # (nx, ny[, nz])
+        # world -> voxel. Axis 0 spans the world width; the others span 1 (the ScalarField
+        # convention), so the scale is per-axis and a non-cubic box does not silently stretch.
+        box = torch.tensor([fld.width] + [1.0] * (D - 1), device=dev, dtype=pos.dtype)
+        g = pos / box * shape.to(pos.dtype)                    # [N, D] continuous voxel coords
+        base = torch.floor(g).long()
+        offs = self._offsets(D, dev)                           # [K, D]
+        idx = base[:, None, :] + offs[None, :, :]              # [N, K, D]
+        d = g[:, None, :] - (idx.to(g.dtype) + 0.5)            # to the voxel CENTRE
+        r2 = (d * d).sum(-1)                                   # [N, K]
+        if self.kernel == "gaussian":
+            w = torch.exp(-r2 / (2.0 * self.sigma ** 2))
+        elif self.kernel == "nearest":
+            w = (r2 <= 0.75).to(g.dtype)                       # the containing voxel only
+        else:
+            raise ValueError(f"voxelize: kernel must be 'gaussian' or 'nearest', got {self.kernel!r}")
+        inside = ((idx >= 0) & (idx < shape)).all(-1)          # [N, K]
+        w = w * inside.to(w.dtype)
+        flat = torch.zeros_like(idx[..., 0])
+        stride = 1
+        for k in range(D - 1, -1, -1):                         # row-major over (nx, ny, nz)
+            flat = flat + idx[..., k].clamp(0, int(shape[k]) - 1) * stride
+            stride *= int(shape[k])
+        num = torch.zeros(stride, device=dev, dtype=w.dtype)
+        num.index_add_(0, flat.reshape(-1), (w * val).reshape(-1))
+        if self.normalize == "density":
+            den = torch.zeros(stride, device=dev, dtype=w.dtype)
+            den.index_add_(0, flat.reshape(-1), w.reshape(-1))
+            num = num / (den + self.eps)
+        elif self.normalize != "none":
+            raise ValueError(f"voxelize: normalize must be 'none' or 'density', "
+                             f"got {self.normalize!r}")
+        grid = fld.grid.clone()                                # rebuilt, never accumulated
+        grid[self.channel] = num.reshape(tuple(int(s) for s in shape))
+        fld.grid = grid
+        return {}
+
+    def render_metadata(self, H) -> dict:
+        """What this render IS, for the record that travels with the volume.
+
+        A rendered volume without its kernel and its normalisation is a stack of numbers that
+        cannot be reproduced or compared with another stack. The downstream adapter
+        (`plexus.io.walrus`) writes this verbatim into the dataset."""
+        fld = H.field(self.field)
+        lvl = H.level(self.at)
+        man = getattr(lvl, "region_manifest", None)
+        return {
+            "source_set": self.at, "source_field": self.block,
+            "resolution": [int(s) for s in fld.shape],
+            "world_box": [float(fld.width)] + [1.0] * (len(fld.shape) - 1),
+            "kernel": self.kernel, "sigma_voxels": self.sigma,
+            "stencil_radius_voxels": self.radius,
+            "normalize": self.normalize, "eps": self.eps,
+            "region": (man or {}).get("region"),
+            "voxel_size_um": (None if not man else
+                              man["region"]["side_um"] / float(fld.shape[0])),
+        }
+```

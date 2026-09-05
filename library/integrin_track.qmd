@@ -1,0 +1,170 @@
+---
+title: "integrin_track"
+subtitle: "Ride the fibres' cell ends on the epithelial surface: a prescribed constraint on one row of particles, rather than on the grid."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Ride the fibres' cell ends on the epithelial surface: a prescribed constraint on one row of particles, rather than on the grid.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `surface`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+of particles, rather than on the grid.
+
+integrin -> integrin: reads the recorded surface, writes the position and velocity of the
+innermost particle of each fibre.
+
+    x_(a,0) = c + u_a S R(theta_a, phi_a, t)
+    v_(a,0) = (x_(a,0)(t) - x_(a,0)(t-1)) / dt
+
+This is the constraint a grid boundary condition should have been. Overwriting the velocity of
+every grid NODE inside the tissue smears the condition over the B-spline stencil and produces a
+standoff of about one and a half cells, set by the stencil width rather than by anything
+physical. Here the prescription touches `n_fibres` PARTICLES and the sheet feels them only
+through ordinary MPM contact: a local constraint with a global consequence.
+
+The epithelium is a recording and cannot be an MPM body, so the cell end has to be prescribed
+rather than solved, and the reaction it would feel is discarded.
+
+Reference: Plexus (this work); the surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `surface` | &ndash; | **required** |
+| `scale` | surface_rescale | 1.0 |
+| `centre` | &ndash; | [0.5, 0.5, 0.5] |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: integrin_track, at: particle, surface: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`integrin`]{.op-badge} [`focal_adhesion`]{.op-badge} [`kinematic_boundary`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("integrin_track", family="mechanics", set="particle", kind="structural")
+class IntegrinTrack(Structural):
+    """Ride the fibres' cell ends on the epithelial surface: a prescribed constraint on one row
+    of particles, rather than on the grid.
+
+    integrin -> integrin: reads the recorded surface, writes the position and velocity of the
+    innermost particle of each fibre.
+
+        x_(a,0) = c + u_a S R(theta_a, phi_a, t)
+        v_(a,0) = (x_(a,0)(t) - x_(a,0)(t-1)) / dt
+
+    This is the constraint a grid boundary condition should have been. Overwriting the velocity of
+    every grid NODE inside the tissue smears the condition over the B-spline stencil and produces a
+    standoff of about one and a half cells, set by the stencil width rather than by anything
+    physical. Here the prescription touches `n_fibres` PARTICLES and the sheet feels them only
+    through ordinary MPM contact: a local constraint with a global consequence.
+
+    The epithelium is a recording and cannot be an MPM body, so the cell end has to be prescribed
+    rather than solved, and the reaction it would feel is discarded.
+
+    Reference: Plexus (this work); the surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["integrin", "focal_adhesion", "kinematic_boundary"]
+    PARAM_ROLES = {"scale": "surface_rescale"}
+    REFERENCE = "Eschenbruch, J. et al. (2021) Cells 10:1979."
+    MAY_MUTATE_INTEGRATED_STATE = True
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        import numpy as np
+        self.at = params.get("_at", "integrin_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        z = np.load(str(params["surface"]))
+        self.smap = torch.as_tensor(np.asarray(z["smap"], np.float32)) * self.scale
+        self.T = int(self.smap.shape[0])
+        self._said = False
+
+    def forward(self, H, mask=None):
+        u = getattr(H, "integrin_dir", None)
+        idx = getattr(H, "integrin_inner", None)
+        if u is None or idx is None:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        t = min(self.T - 1, max(0, int(getattr(H, "frame", 0) or 0)))
+        R = _radius(self.smap[t].to(dev, dt_), u)
+        Rn = _radius(self.smap[min(self.T - 1, t + 1)].to(dev, dt_), u)
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        lvl.get("pos")[idx] = c + u * R[:, None]
+        # AND ITS VELOCITY, WHICH IS THE WHOLE MECHANISM. Setting a position and zeroing the velocity
+        # was how 142 and 143 came back as exact nulls -- the fibres' cell ends tracked the surface to
+        # 0.2969 against 0.2973 while their outer ends did not move by one part in ten thousand, at
+        # BOTH the sub-cell length and the resolved one. In MPM a particle reaches its neighbours only
+        # through `mpm_scatter`, which puts `mass * velocity` on the grid: a particle that is teleported
+        # and then told it is at rest scatters ZERO momentum, so the constraint is invisible to the grid
+        # and the material above it never learns its base is moving. A moving boundary has to carry the
+        # velocity of its motion, dR/dt along its own direction, and then the fibre is dragged the way
+        # anything is dragged in MPM.
+        #
+        # This is also why the flat rig disagreed: `FibreRig`'s prescribed row is STATIC and the load is
+        # applied to the sheet, so zeroing its velocity was correct there. The spheroid asks the fibre
+        # to pull the sheet outward, which is the opposite direction of causation.
+        if "vel" in lvl.state_schema:
+            dt_frame = float(getattr(H, "dt", 0.0) or 0.0) or 0.004
+            lvl.get("vel")[idx] = u * ((Rn - R) / dt_frame)[:, None]
+        if not self._said:
+            v_ = float((u * ((Rn - R) / 0.004)[:, None]).norm(dim=1).mean())
+            print(f"[integrin_track] {idx.numel()} fibre cell ends prescribed on the recorded surface "
+                  f"(one row of particles, not a grid condition), carrying the surface's own velocity "
+                  f"|v| = {v_:.4g} box units per unit time", flush=True)
+            self._said = True
+        return {}
+```

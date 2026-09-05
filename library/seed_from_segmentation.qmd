@@ -1,0 +1,231 @@
+---
+title: "seed_from_segmentation"
+subtitle: "Populate tissue -> cell -> particle from a measured instance segmentation."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Populate tissue -> cell -> particle from a measured instance segmentation.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `from`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D.
+
+## Mechanism
+
+Was `kind="exchange"` (an `Exchange` subclass reusing the field-sampling machinery for
+its numerics) with a `family="seed"` tag that already said what it actually was; the
+mismatch let it masquerade as ordinary dynamics and skip the seed lifecycle guarantees
+(never scheduled, runs once, before frame 0) -- exactly the case `Seed` exists to rule
+out. The numerics (reading a field, scattering onto particles) are unchanged; only the
+lifecycle classification is corrected.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `from` | label_field | **required** |
+| `youngs_min` | param_lo | 40.0 |
+| `youngs_max` | param_hi | 220.0 |
+| `cell_set` | middle_level | "cell" |
+| `jitter` | &ndash; | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: seed_from_segmentation, at: particle, from: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`instance_segmentation`]{.op-badge} [`cell_identity`]{.op-badge} [`heterogeneous_material`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd).
+
+## Source
+
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("seed_from_segmentation", family="seed", set="particle", kind="seed")
+class SeedFromSegmentation(Seed):
+    """Populate tissue -> cell -> particle from a measured instance segmentation. Runs once.
+
+    Was `kind="exchange"` (an `Exchange` subclass reusing the field-sampling machinery for
+    its numerics) with a `family="seed"` tag that already said what it actually was; the
+    mismatch let it masquerade as ordinary dynamics and skip the seed lifecycle guarantees
+    (never scheduled, runs once, before frame 0) -- exactly the case `Seed` exists to rule
+    out. The numerics (reading a field, scattering onto particles) are unchanged; only the
+    lifecycle classification is corrected.
+    """
+
+    EMIT = None
+    # It establishes the configuration -- where the cells are and which particles belong to
+    # them -- and writes the state buffer directly to do it. The engine's integration
+    # invariant forbids that for a dynamics operator, correctly; a Seed is exempted because
+    # establishing x_0 IS writing the state buffer (see base.Seed).
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = ["from"]
+    SUPPORTED_DIMS = [2]
+    MECHANISM_TAGS = ["instance_segmentation", "cell_identity", "heterogeneous_material"]
+    PARAM_ROLES = {"youngs_min": "param_lo", "youngs_max": "param_hi",
+                   "from": "label_field", "cell_set": "middle_level"}
+    REFERENCE = "instance segmentation measured from the beat; see prototype/cardio_cells"
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("from")
+        self.at = params.get("_at", "mpm_particle")
+        self.cell_set = params.get("cell_set", "cell")
+        self.y_lo = float(params.get("youngs_min", 40.0))
+        self.y_hi = float(params.get("youngs_max", 220.0))
+        self.props = params.get("props")               # optional measured per-cell json
+        self.jitter = float(params.get("jitter", 0.0))
+        self._done = False
+
+    def _cell_values(self, n_cells, device):
+        """Per-cell Young's modulus: from the MEASURED beat when a props file is given, else a
+        deterministic spread so the tissue is heterogeneous but reproducible.
+
+        Measured is the interesting case. A cell that moved little in the recording is either stiff
+        or weakly contractile; mapping amplitude to stiffness INVERSELY is one hypothesis about
+        which, it is stated here rather than hidden, and the alternative (amplitude -> contraction
+        gain) is the same one line the other way round.
+        """
+        if self.props:
+            path = self.props if os.path.isabs(self.props) else graphs_data_path(self.props)
+            if os.path.exists(path):
+                d = json.load(open(path))
+                amp = torch.tensor([d.get(str(k), {}).get("amp", float("nan"))
+                                    for k in range(1, n_cells + 1)], device=device)
+                good = torch.isfinite(amp)
+                if good.any():
+                    a = amp.clone()
+                    a[~good] = a[good].median()
+                    lo, hi = torch.quantile(a, 0.05), torch.quantile(a, 0.95)
+                    u = ((a - lo) / (hi - lo + 1e-9)).clamp(0, 1)
+                    return self.y_lo + (1.0 - u) * (self.y_hi - self.y_lo), "measured beat amplitude"
+        g = torch.Generator(device="cpu").manual_seed(12345)
+        u = torch.rand(n_cells, generator=g).to(device)
+        return self.y_lo + u * (self.y_hi - self.y_lo), "deterministic spread (no props file)"
+
+    def forward(self, H, mask=None):
+        if self._done:
+            return {}
+        self._done = True
+        lvl = H.level(self.at)
+        fld = H.fields[self.field_name]
+        dev = lvl.state.device
+        px0, px1 = lvl.state_schema["pos"]
+        n_cells = int(fld.n_labels)
+
+        # ---- where each label lives, in world coordinates ---------------------------------
+        gridl = fld.grid[0]                                     # [nx,ny] int64
+        nx, ny = gridl.shape
+        gx, gy = torch.meshgrid(torch.arange(nx, device=dev), torch.arange(ny, device=dev),
+                                indexing="ij")
+        flat = gridl.reshape(-1)
+        wx = (gx.reshape(-1).double() + 0.5) / nx * fld.width
+        wy = (gy.reshape(-1).double() + 0.5) / ny * fld.width
+        inside = flat > 0
+        lab_in, wx_in, wy_in = flat[inside], wx[inside], wy[inside]
+        cnt = torch.bincount(lab_in, minlength=n_cells + 1).clamp(min=1)
+        cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+        cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+
+        # ---- the CELL level moves onto its own segmented cell -----------------------------
+        moved_cells = 0
+        if self.cell_set in H.levels:
+            cl = H.level(self.cell_set)
+            cx0, cx1 = cl.state_schema["pos"]
+            m = min(cl.n, n_cells)
+            st = cl.state.clone()
+            st[:m, cx0] = cx[1:m + 1].float()
+            st[:m, cx0 + 1] = cy[1:m + 1].float()
+            cl.state = st
+            moved_cells = m
+            if cl.n != n_cells:
+                print(f"  [seed_from_segmentation] the {self.cell_set!r} set has {cl.n} entities "
+                      f"and the map has {n_cells} cells -- seeding {m}. Declare "
+                      f"per_parent: {n_cells} to use all of them.", flush=True)
+
+        # ---- each particle is placed INSIDE its own cell's mask ---------------------------
+        # ordering by label makes the members of one cell contiguous, so a particle can be given a
+        # pixel of its OWN cell by index arithmetic instead of a python loop over 472 cells
+        order = torch.argsort(lab_in)
+        lab_s, wx_s, wy_s = lab_in[order], wx_in[order], wy_in[order]
+        start = torch.cumsum(torch.bincount(lab_s, minlength=n_cells + 1), 0) - \
+            torch.bincount(lab_s, minlength=n_cells + 1)
+
+        pidx = lvl.parent if lvl.parent is not None else torch.zeros(lvl.n, dtype=torch.long,
+                                                                     device=dev)
+        pcell = (pidx % n_cells) + 1 if lvl.parent is not None else None
+        if pcell is None or moved_cells == 0:
+            # no declared cell level: assign each particle the label it already sits on
+            pos = lvl.state[:, px0:px1]
+            cid = fld.sample_label(pos)
+        else:
+            cid = pcell.clamp(1, n_cells)
+            g = torch.Generator(device="cpu").manual_seed(777)
+            u = torch.rand(lvl.n, generator=g).to(dev)
+            k = (start[cid] + (u * cnt[cid].float()).long().clamp(max=0 + cnt[cid] - 1))
+            k = k.clamp(0, lab_s.numel() - 1)
+            newpos = torch.stack([wx_s[k].float(), wy_s[k].float()], 1)
+            if self.jitter > 0:
+                newpos = newpos + (torch.rand_like(newpos) - 0.5) * self.jitter
+            st = lvl.state.clone(); st[:, px0:px1] = newpos; lvl.state = st
+
+        # ---- one material per cell, shared exactly by its particles -----------------------
+        yc, how = self._cell_values(n_cells, dev)
+        y_all = torch.cat([yc[:1], yc])                          # index 0 = background, unused
+        p_y = y_all[cid.clamp(0, n_cells)]
+        from plexus.models.entities import _lame
+        mu, la = _lame(p_y)
+        liquid = getattr(lvl, "is_liquid", None)
+        if liquid is not None:
+            mu = torch.where(liquid, torch.zeros_like(mu), mu)
+        lvl.mu, lvl.la = mu, la
+        for nm, val in (("youngs", p_y), ("cell_id", cid.float())):
+            if nm in getattr(lvl, "_buffers", {}):
+                setattr(lvl, nm, val)
+            else:
+                lvl.register_buffer(nm, val)
+
+        print(f"  [seed_from_segmentation] {n_cells} cells from {self.field_name!r}; "
+              f"{lvl.n} particles ({lvl.n / max(n_cells,1):.0f} per cell); "
+              f"youngs {float(yc.min()):.0f}-{float(yc.max()):.0f} from {how}; "
+              f"cell centres seeded: {moved_cells}", flush=True)
+        return {}
+```

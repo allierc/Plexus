@@ -1,6 +1,6 @@
 ---
 title: "pulse_to_active_stress"
-subtitle: "The STRESS constitutive law: an activation field -> per-particle active stress."
+subtitle: "Active contraction as a STRESS: an activation field becomes a per-particle active stress tensor along a prescribed contraction axis, which the grid solve then transmits."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "The STRESS constitutive law: an activation field -> per-particle acti
 
 [`exchange`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-The STRESS constitutive law: an activation field -> per-particle active stress.
+Active contraction as a STRESS: an activation field becomes a per-particle active stress tensor along a prescribed contraction axis, which the grid solve then transmits.
 :::
 
 ```{=html}
@@ -42,23 +42,32 @@ The STRESS constitutive law: an activation field -> per-particle active stress.
 
 ## Mechanism
 
-(Renamed from `pulse_to_active_stress`, kept as a transitional alias: the operator names the
-MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
+tensor along a prescribed contraction axis, which the grid solve then transmits.
 
-The mechanical alternative to `active_force` (the FORCE law). Instead of injecting a
-per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and
-elastically recoils -> short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS
+field -> particle: reads an activation field and a unit-vector direction field, writes a
+per-particle active stress that `mpm_scatter` adds to the elastic Kirchhoff stress.
 
-onto the side-channel `H.active_stress` (the same `H.part_accel` idiom). The MLS-MPM `p2g` scatter
-ADDS it to the fixed-corotated elastic stress before forming the affine momentum matrix, so the
-tissue feels the stress only through its DIVERGENCE: a patch under uniform -A nn^T SHORTENS along n
-and is stretched/sheared by its neighbours. Interior forces appear only where A or n vary, plus at
-the boundary -- coordinated shortening / shear (the "direction map = contraction AXIS" reading),
-not a pointwise push. This is the standard cardiac active-stress formulation.
+    A -> A (1 + beta (lambda_p - 1))           the length-dependent scaling
 
-`kind=exchange`, `EMIT=None` (the stress is consumed by the MPM substep, never engine-
-integrated). forward() returns NO delta (`{}`) -- it only sets the `H.active_stress` side-channel,
-which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -> pure elastic).
+c is the activation at the particle, dimensionless; n_p is the unit contraction axis read from
+the `direction_from` vector field, so n n^T is the projector onto that axis and the stress is
+UNIAXIAL -- the material pulls along n and does nothing across it, which is what a fibre does.
+A is `amplitude`, in pressure units. The minus sign makes it contractile: a positive activation
+is a tension.
+
+beta is `stretch_activation`, the Frank-Starling effect: a real cardiomyocyte contracts HARDER
+when stretched, so the tension is scaled by the local fibre stretch lambda_p = |F_p n_p|. At
+beta = 0 it is off. It is a stretch-REGULATED size lever, so it grows the contraction without
+the runaway that raising `amplitude` alone produces.
+
+A stress rather than a body force is the mechanically correct route: it enters the momentum
+balance as a divergence, so it is transmitted through the material and conserves momentum,
+where a body force does neither. `active_force` is the other hypothesis.
+
+Reference: Simha, R. A. & Ramaswamy, S. (2002). Hydrodynamic fluctuations and instabilities in
+ordered suspensions of self-propelled particles. Phys. Rev. Lett. 89:058101; Marchetti, M. C.
+et al. (2013). Rev. Mod. Phys. 85:1143-1189. The length-dependent scaling follows the
+Niederer-Hunter-Smith cardiac contraction model.
 
 $$
 \boldsymbol\sigma_{\text{active}}(\mathbf x) \;=\;
@@ -92,45 +101,45 @@ operators:
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd).
+Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`mpm_scatter`](mpm_scatter.qmd), [`p2g`](p2g.qmd).
 
 ## Source
 
-[`src/plexus/operators/active_stress.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/active_stress.py) &mdash; the registered operator.
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
 
 ```python
-"""active_stress -- the STRESS constitutive law: an activation field -> per-particle active stress.
-
-(Renamed from `pulse_to_active_stress`, kept as a transitional alias: the operator names the
-MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
-
-The mechanical alternative to `active_force` (the FORCE law). Instead of injecting a
-per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and
-elastically recoils -> short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS
-
-    sigma_active(x) = - amplitude * a(x) * n(x) n(x)^T      (n = unit contraction axis)
-
-onto the side-channel `H.active_stress` (the same `H.part_accel` idiom). The MLS-MPM `p2g` scatter
-ADDS it to the fixed-corotated elastic stress before forming the affine momentum matrix, so the
-tissue feels the stress only through its DIVERGENCE: a patch under uniform -A nn^T SHORTENS along n
-and is stretched/sheared by its neighbours. Interior forces appear only where A or n vary, plus at
-the boundary -- coordinated shortening / shear (the "direction map = contraction AXIS" reading),
-not a pointwise push. This is the standard cardiac active-stress formulation.
-
-`kind=exchange`, `EMIT=None` (the stress is consumed by the MPM substep, never engine-
-integrated). forward() returns NO delta (`{}`) -- it only sets the `H.active_stress` side-channel,
-which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -> pure elastic).
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Exchange
-from plexus.models.registry import register_operator
-
-
 @register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange")
-class ActiveStress(Exchange):                    # (alias `pulse_to_active_stress` for one migration cycle)
+class ActiveStress(Exchange):                   
+    """Active contraction as a STRESS: an activation field becomes a per-particle active stress
+    tensor along a prescribed contraction axis, which the grid solve then transmits.
+
+    field -> particle: reads an activation field and a unit-vector direction field, writes a
+    per-particle active stress that `mpm_scatter` adds to the elastic Kirchhoff stress.
+
+        sigma_p^act = -A c(x_p) (n_p n_p^T)        with, optionally,
+        A -> A (1 + beta (lambda_p - 1))           the length-dependent scaling
+
+    c is the activation at the particle, dimensionless; n_p is the unit contraction axis read from
+    the `direction_from` vector field, so n n^T is the projector onto that axis and the stress is
+    UNIAXIAL -- the material pulls along n and does nothing across it, which is what a fibre does.
+    A is `amplitude`, in pressure units. The minus sign makes it contractile: a positive activation
+    is a tension.
+
+    beta is `stretch_activation`, the Frank-Starling effect: a real cardiomyocyte contracts HARDER
+    when stretched, so the tension is scaled by the local fibre stretch lambda_p = |F_p n_p|. At
+    beta = 0 it is off. It is a stretch-REGULATED size lever, so it grows the contraction without
+    the runaway that raising `amplitude` alone produces.
+
+    A stress rather than a body force is the mechanically correct route: it enters the momentum
+    balance as a divergence, so it is transmitted through the material and conserves momentum,
+    where a body force does neither. `active_force` is the other hypothesis.
+
+    Reference: Simha, R. A. & Ramaswamy, S. (2002). Hydrodynamic fluctuations and instabilities in
+    ordered suspensions of self-propelled particles. Phys. Rev. Lett. 89:058101; Marchetti, M. C.
+    et al. (2013). Rev. Mod. Phys. 85:1143-1189. The length-dependent scaling follows the
+    Niederer-Hunter-Smith cardiac contraction model.
+    """
+
     EMIT = None                         # stress is consumed by the MPM substep, not integrated
     SUPPORTED_DIMS = [2]                 # 2D — contraction axis n and n n^T are 2-vectors / 2x2
     REQUIRES_PARAMS = ["from", "direction_from"]

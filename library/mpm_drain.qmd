@@ -1,0 +1,146 @@
+---
+title: "mpm_drain"
+subtitle: "Retire particles past the outlet plane, through a damping sponge rather than a cliff."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Retire particles past the outlet plane, through a damping sponge rather than a cliff.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `face`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+A particle deleted while still inside a live grid node's stencil is a momentum discontinuity
+that propagates back upstream, so the sponge damps velocity over `sponge` cells first and the
+kill plane sits clear of anything worth measuring.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `face` | outlet_face | **required** |
+| `at_fraction` | outlet_plane_fraction | 0.04 |
+| `sponge` | sponge_width_cells | 8.0 |
+| `damp` | &ndash; | 0.15 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: mpm_drain, at: particle, face: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`outlet`]{.op-badge} [`continuous_flow`]{.op-badge} [`absorbing_boundary`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd).
+
+## Source
+
+[`src/plexus/continuous_engine.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/continuous_engine.py) &mdash; the registered operator.
+
+```python
+@register_operator("mpm_drain", family="mpm", set="particle", kind="structural")
+class MPMDrain(Operator):
+    """Retire particles past the outlet plane, through a damping sponge rather than a cliff.
+
+    A particle deleted while still inside a live grid node's stencil is a momentum discontinuity
+    that propagates back upstream, so the sponge damps velocity over `sponge` cells first and the
+    kill plane sits clear of anything worth measuring.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["face"]
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["outlet", "continuous_flow", "absorbing_boundary"]
+    PARAM_ROLES = {"face": "outlet_face", "at_fraction": "outlet_plane_fraction",
+                   "sponge": "sponge_width_cells"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "mpm_particle")
+        self.axis, self.sign = _face(params["face"])
+        self.frac = float(params.get("at_fraction", 0.04))    # plane, as a fraction of the box
+        self.sponge = float(params.get("sponge", 8.0))        # cells of damping above the plane
+        self.damp = float(params.get("damp", 0.15))           # velocity kept AT the plane; 1.0 at
+        #                                                       the top of the band, ramped between
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        dev = p.state.device
+        D = int(getattr(H, "dim", 3))
+        box = torch.as_tensor(list(H.world_size)[:D], device=dev, dtype=p.state.dtype)
+        dx = float(H.field(next(iter(H.fields))).dx) if len(H.fields) else float(box[0]) / 96.0
+        x = p.state[:, self.axis]
+        L = float(box[self.axis])
+        plane = self.frac * L if self.sign < 0 else (1.0 - self.frac) * L
+        band = self.sponge * dx
+
+        live = p.occ > 0
+        if self.sign < 0:                       # flow travels toward LOW coordinate
+            gone = live & (x < plane)
+            insponge = live & (x < plane + band) & (x >= plane)
+        else:
+            gone = live & (x > plane)
+            insponge = live & (x > plane - band) & (x <= plane)
+
+        # A GRADED SPONGE, NOT A STEP. `v *= damp` over a flat band leaves fluid arriving at nearly
+        # full speed at the top of the sponge and stopping abruptly at the bottom, which is a
+        # stagnation the grid answers by pushing the fluid SIDEWAYS: it turns into a radial sheet
+        # that runs outward ABOVE the kill plane, never descends again, and curls up at its rim.
+        # That rim is the "bounce".
+        #
+        # Ramping the damping with depth -- untouched entering the band, `damp` at the plane --
+        # takes the momentum out over several cells instead of at one, and the fluid arrives slow
+        # enough to be removed rather than deflected. The drain still runs ONCE PER FRAME while the
+        # substep loop runs 25 times, so it cannot be instantaneous; the sponge is what covers that
+        # gap, and it is why the band has to be several cells wide rather than a plane.
+        v = p.get("vel")
+        if bool(insponge.any()):
+            _d = (x[insponge] - plane).abs() / max(band, 1e-12)      # 0 at the plane, 1 at the top
+            _f = self.damp + (1.0 - self.damp) * _d.clamp(0.0, 1.0)
+            v[insponge] = v[insponge] * _f[:, None]
+        if bool(gone.any()):
+            p.occ[gone] = 0.0
+            if hasattr(p, "mass"):
+                pass                            # mass is a material property; occ alone removes it
+            p.state[gone, :D] = -1.0 * box      # park off-domain so it is neither drawn nor sensed
+            p.C[gone] = 0.0
+        return {}
+```

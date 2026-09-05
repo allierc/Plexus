@@ -36,13 +36,6 @@ A point with position + velocity (the interacting-particle / boid leaf).
 - **Depth** &mdash; `0` (0 = leaf, higher = container).
 - **Is** &mdash; a set of nodes with the state schema below; operators act *within* it (`lateral`), *across* its containment (`aggregate` / `broadcast`), or *onto fields* (`exchange`).
 
-## State schema
-
-| block | columns |
-|---|---|
-| `pos` | (0, 2) |
-| `vel` | (2, 4) |
-
 ## Source
 
 [`src/plexus/models/entities.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/models/entities.py)
@@ -50,7 +43,7 @@ A point with position + velocity (the interacting-particle / boid leaf).
 ```python
 @register_entity(
     "particle", depth=0,
-    state_schema={"pos": (0, 2), "vel": (2, 4)},
+    state_schema=spatial_schema,                 # dim -> StateSchema (pos|vel, D-wide each)
     render={"color_by": "node_type", "arrows": "vel"},
 )
 class Particle:

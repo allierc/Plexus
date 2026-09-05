@@ -1,0 +1,142 @@
+---
+title: "mesh_inside"
+subtitle: "A measurement, as an operator: how many matrix particles are behind the surface, and how deep."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+A measurement, as an operator: how many matrix particles are behind the surface, and how deep.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+deep. It counts and does not correct, which is the whole point of it.
+
+particle -> particle: reads pos and the surface, writes nothing; records the count and the
+maximum depth per frame.
+
+`cell_exclude` answers the same question by PROJECTING the offenders out, which makes the
+count unmeasurable by construction -- with the backstop on, the answer is always zero and the
+contact is never tested. This operator only counts, so the claim "the contact holds the matrix
+out on its own" becomes a number that can come back wrong.
+
+It runs once per FRAME rather than per substep, because a per-substep count would report the
+transient depth reached inside a substep rather than what the frame ended with.
+
+Reference: none -- this is a measurement, not a mechanism. Plexus (this work).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `n_grid` | &ndash; | 64 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: mesh_inside, at: particle}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`diagnostic`]{.op-badge} [`non_penetration`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/contact_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/contact_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("mesh_inside", family="hierarchy", set="particle", kind="lateral")
+class MeshInsideCount(Lateral):
+    """A measurement, as an operator: how many matrix particles are behind the surface, and how
+    deep. It counts and does not correct, which is the whole point of it.
+
+    particle -> particle: reads pos and the surface, writes nothing; records the count and the
+    maximum depth per frame.
+
+    `cell_exclude` answers the same question by PROJECTING the offenders out, which makes the
+    count unmeasurable by construction -- with the backstop on, the answer is always zero and the
+    contact is never tested. This operator only counts, so the claim "the contact holds the matrix
+    out on its own" becomes a number that can come back wrong.
+
+    It runs once per FRAME rather than per substep, because a per-substep count would report the
+    transient depth reached inside a substep rather than what the frame ended with.
+
+    Reference: none -- this is a measurement, not a mechanism. Plexus (this work).
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["diagnostic", "non_penetration"]
+    REFERENCE = "Plexus (this work); a measurement, not a mechanism."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "mpm_particle")
+        self.n_grid = int(params.get("n_grid", 64))
+
+    def forward(self, H, mask=None):
+        op = _LIVE.get("contact")
+        if op is None or op._built is None:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        c = torch.tensor(op.centre, device=dev, dtype=dt_)
+        d = pos - c
+        r = d.norm(dim=1).clamp_min(1e-12)
+        u = d / r[:, None]
+        M = op._built
+        _, _, b = _bins_of(u, M["G"])
+        near = r < M["rmax"][b] + 1e-9
+        n_in, dmax = 0, 0.0
+        if bool(near.any()):
+            idx = torch.nonzero(near).squeeze(1)
+            hit, tri, t, w = op._query(M, pos[idx], u[idx], r[idx])
+            deep = hit & (t > r[idx])
+            n_in = int(deep.sum())
+            if n_in:
+                dmax = float((t[deep] - r[idx][deep]).max())
+        _f = getattr(H, "frame", None)
+        INSIDE_HISTORY.append(dict(frame=-1 if _f is None else int(_f), n_inside=n_in,
+                                   depth_max_cells=dmax * self.n_grid))
+        return {}
+```

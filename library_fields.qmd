@@ -27,10 +27,10 @@ resources:
 
 
 ::: {.op-grid}
-<a class="op-card" href="library/grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">grid</span><span class="op-card-sub">A C-channel scalar field on a square-pixel grid. Pure state: it holds a continuum and</span></span></a>
+<a class="op-card" href="library/grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">grid</span><span class="op-card-sub">A C-channel scalar field on a square-pixel grid.</span></span></a>
 <a class="op-card" href="library/image.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">image</span><span class="op-card-sub">A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1].</span></span></a>
 <a class="op-card" href="library/label_image.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">label_image</span><span class="op-card-sub">An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.</span></span></a>
 <a class="op-card" href="library/mpm_grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">mpm_grid</span><span class="op-card-sub">MLS-MPM background grid over the world box, with square cells dx = world_size[1] / n_grid.</span></span></a>
-<a class="op-card" href="library/prescribed.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">prescribed</span><span class="op-card-sub">A field that is measured rather than solved: its values come from a video, one frame</span></span></a>
-<a class="op-card" href="library/vector_grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">vector_grid</span><span class="op-card-sub">A 2-channel UNIT-VECTOR field d(x) = (dx, dy) read from a TIFF -- the contraction</span></span></a>
+<a class="op-card" href="library/prescribed.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">prescribed</span><span class="op-card-sub">A field that is measured rather than solved: its values come from a video, one frame per tick, so the continuum is an input to the model instead of an output of it.</span></span></a>
+<a class="op-card" href="library/vector_grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">vector_grid</span><span class="op-card-sub">A 2-channel UNIT-VECTOR field d(x) = (dx, dy) read from a TIFF -- the contraction DIRECTION / active-stress-orientation map.</span></span></a>
 :::

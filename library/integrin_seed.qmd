@@ -1,0 +1,160 @@
+---
+title: "integrin_seed"
+subtitle: "Lay the integrin fibres down once: `layers` particles per fibre, running outward from the epithelial surface."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Lay the integrin fibres down once: `layers` particles per fibre, running outward from the epithelial surface.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `surface`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+epithelial surface.
+
+integrin -> integrin: writes every position at the opening of the trajectory.
+
+`length` is the fibre's full extent in world units and `layers` how many material points
+discretise it, so length/layers is the particle spacing along the fibre. l = 0 is the CELL end,
+which `integrin_track` prescribes, and the outermost layer is the tip that binds the membrane.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `surface` | &ndash; | **required** |
+| `length` | fibre_rest_length | 0.004 |
+| `layers` | particles_per_fibre | 3 |
+| `scale` | surface_rescale | 1.0 |
+| `centre` | &ndash; | [0.5, 0.5, 0.5] |
+| `seed` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: integrin_seed, at: particle, surface: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`integrin`]{.op-badge} [`hemidesmosome`]{.op-badge} [`cell_matrix_anchoring`]{.op-badge} [`material_seeding`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("integrin_seed", family="seed", set="particle", kind="seed")
+class IntegrinSeed(Structural):
+    """Lay the integrin fibres down once: `layers` particles per fibre, running outward from the
+    epithelial surface.
+
+    integrin -> integrin: writes every position at the opening of the trajectory.
+
+        x_(a,l) = c + u_a (S R(theta_a, phi_a) + l * length / layers),   l = 0 .. layers-1
+
+    `length` is the fibre's full extent in world units and `layers` how many material points
+    discretise it, so length/layers is the particle spacing along the fibre. l = 0 is the CELL end,
+    which `integrin_track` prescribes, and the outermost layer is the tip that binds the membrane.
+    """
+
+    EMIT = None
+    # kind="seed", not "structural". This operator establishes x_0 -- it lays the fibres down once
+    # and `forward` returns {} thereafter -- and every other `*_seed` in the
+    # registry (bm_seed, ecm_seed, block_seed, mesh_seed, adhesion_seed, cell_chem_seed,
+    # neural_seed) is already kind="seed". Registering it as a dynamics kind made it the one
+    # operator tripping the family/kind invariant, so `[warn] integrin_seed: family="seed"
+    # ... a seed masquerading as a dynamics kind` printed on EVERY invocation of Plexus_Main.
+    # It was the warning telling the truth, not a false positive to be exempted.
+    #
+    # AS A DYNAMICS KIND IT ALSO RAN EVERY TICK, doing nothing but a `self._done` check for
+    # the whole run. `kind="seed"` puts it under the seed lifecycle instead: `engine.seed()`
+    # for a spec with a `seed:` section, or the `_seed_window` gate for the legacy spelling,
+    # which confines it to the opening frames and preserves its ordering after `bm_seed`.
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["integrin", "hemidesmosome", "cell_matrix_anchoring", "material_seeding"]
+    PARAM_ROLES = {"length": "fibre_rest_length", "layers": "particles_per_fibre",
+                   "scale": "surface_rescale"}
+    REFERENCE = ("Hynes, R. O. (2002) Cell 110:673 (integrins as bidirectional mechanical links "
+                 "between the cytoskeleton and the matrix).")
+    MAY_MUTATE_INTEGRATED_STATE = True
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        import numpy as np
+        self.at = params.get("_at", "integrin_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        self.length = float(params.get("length", 0.004))
+        self.layers = int(params.get("layers", 3))
+        self.seed = int(params.get("seed", 0))
+        z = np.load(str(params["surface"]))
+        self.smap0 = torch.as_tensor(np.asarray(z["smap"], np.float32)[0]) * self.scale
+        self._done = False
+
+    def forward(self, H, mask=None):
+        if self._done:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        n, dev, dt_ = pos.shape[0], pos.device, pos.dtype
+        nf = max(1, n // self.layers)
+        u = _sphere_dirs(nf, self.seed).to(dev)
+        R = _radius(self.smap0.to(dev), u)
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        # LAYER 0 IS THE CELL END and is the one `integrin_track` prescribes; the last layer sits at
+        # R + length, which is where `bm_seed` puts the sheet, so the fibre tip starts
+        # inside the membrane rather than beside it.
+        rows = [c + u * (R + self.length * (j / max(self.layers - 1, 1)))[:, None]
+                for j in range(self.layers)]
+        X = torch.cat(rows)[:n]
+        # IN PLACE ON THE VIEW. `Level.get` returns a slice of the state tensor, which is how every
+        # structural operator here writes -- `bm_seed` does the same thing one file over.
+        lvl.get("pos")[:X.shape[0]] = X.to(dev, dt_)
+        if "vel" in lvl.state_schema:
+            lvl.get("vel")[:] = 0.0
+        H.integrin_dir = u
+        H.integrin_inner = torch.arange(nf, device=dev)
+        self._done = True
+        print(f"[integrin_seed] {nf} fibres x {self.layers} particles, rest length {self.length:g} box "
+              f"units; layer 0 is the prescribed cell end", flush=True)
+        return {}
+```

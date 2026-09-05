@@ -1,6 +1,6 @@
 ---
 title: "bounce"
-subtitle: "Set. Reflect a self-propelled agent off the domain walls / obstacles."
+subtitle: "The boundary response for a heading-driven walker: turn it around before it leaves the world, rather than letting it exit and clamping it back."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Set. Reflect a self-propelled agent off the domain walls / obstacles.
 
 [`lateral`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Set. Reflect a self-propelled agent off the domain walls / obstacles.
+The boundary response for a heading-driven walker: turn it around before it leaves the world, rather than letting it exit and clamping it back.
 :::
 
 ```{=html}
@@ -42,21 +42,25 @@ Set. Reflect a self-propelled agent off the domain walls / obstacles.
 
 ## Mechanism
 
-A boundary condition on *orientation*, kept separate from propulsion: if a dt-step
-along the current heading would leave the box (or enter an obstacle), the heading is
-turned back inside. Run it AFTER `sense` (which steers) and BEFORE `glide` (which
-emits the propulsion velocity), so the velocity already points back inside --
-proactive bounce, no agent ever crosses the wall.
+world, rather than letting it exit and clamping it back.
 
-Dimension-generic (the dimension contract): `heading` is a unit VECTOR [N, D] in
-every dimension. Walls use **specular reflection** -- the heading component on any
-axis the step would exit is negated (`heading[out_axis] *= -1`), which works
-identically in 2D and 3D and replaces the old scalar-angle random re-heading.
-Obstacles (rect/disc walls, a 2D maze feature) still re-head randomly, since they
-have no single axis-aligned normal. Replaces the old 2D `bounce` + `bounce_3d`.
+cell -> cell: reads pos, heading and move_speed, writes heading in place.
 
-It mutates the heading (auxiliary control state, not the integrated position) and
-returns {} -- like the other in-place set ops, it is not a force.
+The element's tentative next position is x_i + dt s_i n_i, one step of `glide`. For every
+axis on which that would fall outside the box, the heading's component on that axis is
+negated -- which is specular reflection off an axis-aligned wall, and preserves the speed:
+
+    n_ia <- -n_ia   for each axis a where the step would exit,   then n_i <- n_i / |n_i|
+
+An obstacle (a 2D rectangle [x0, y0, x1, y1] or disc [cx, cy, r]) has no single axis-aligned
+normal to reflect against, so the element is re-headed instead. `noise` is the fraction of
+that re-heading that is random, from 0 to 1: 0 reverses the heading exactly, 1 picks an
+isotropic random direction, and intermediate values blend the two before renormalising.
+
+Under periodic boundaries the operator returns immediately: a torus has no wall.
+
+Reference: none -- specular reflection off a box is standard practice, not a result.
+Plexus (this work).
 
 ## Parameters
 
@@ -77,67 +81,44 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
-[`src/plexus/operators/bounce.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/bounce.py) &mdash; the registered operator.
+[`src/plexus/operators/motion_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/motion_ops.py) &mdash; the registered operator.
 
 ```python
-"""bounce -- set. Reflect a self-propelled agent off the domain walls / obstacles.
-
-A boundary condition on *orientation*, kept separate from propulsion: if a dt-step
-along the current heading would leave the box (or enter an obstacle), the heading is
-turned back inside. Run it AFTER `sense` (which steers) and BEFORE `glide` (which
-emits the propulsion velocity), so the velocity already points back inside --
-proactive bounce, no agent ever crosses the wall.
-
-Dimension-generic (the dimension contract): `heading` is a unit VECTOR [N, D] in
-every dimension. Walls use **specular reflection** -- the heading component on any
-axis the step would exit is negated (`heading[out_axis] *= -1`), which works
-identically in 2D and 3D and replaces the old scalar-angle random re-heading.
-Obstacles (rect/disc walls, a 2D maze feature) still re-head randomly, since they
-have no single axis-aligned normal. Replaces the old 2D `bounce` + `bounce_3d`.
-
-It mutates the heading (auxiliary control state, not the integrated position) and
-returns {} -- like the other in-place set ops, it is not a force.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-
-def _in_obstacles(x, y, obstacles):
-    """Bool mask: is (x, y) inside any obstacle? rect=[x0,y0,x1,y1], disc=[cx,cy,r]."""
-    hit = torch.zeros_like(x, dtype=torch.bool)
-    for o in (obstacles or []):
-        if len(o) == 4:
-            x0, y0, x1, y1 = o
-            hit = hit | ((x >= x0) & (x <= x1) & (y >= y0) & (y <= y1))
-        elif len(o) == 3:
-            cx, cy, r = o
-            hit = hit | (((x - cx) ** 2 + (y - cy) ** 2) <= r * r)
-    return hit
-
-
-def _random_unit(n, D, rng, device):
-    """A random unit vector per agent [n, D] (isotropic re-heading off obstacles)."""
-    v = torch.randn(n, D, generator=rng, device=device)
-    return v / v.norm(dim=1, keepdim=True).clamp(min=1e-9)
-
-
-@register_operator("bounce", family="motion", set="cell", kind="lateral")
+@register_operator("bounce", family="boundary", set="cell", kind="lateral")
 class Bounce(Lateral):
-    EMIT = None                                 # writes `heading` in place (specular wall reflection / obstacle re-head); returns {} — not an integrable delta
+    """The boundary response for a heading-driven walker: turn it around before it leaves the
+    world, rather than letting it exit and clamping it back.
+
+    cell -> cell: reads pos, heading and move_speed, writes heading in place.
+
+    The element's tentative next position is x_i + dt s_i n_i, one step of `glide`. For every
+    axis on which that would fall outside the box, the heading's component on that axis is
+    negated -- which is specular reflection off an axis-aligned wall, and preserves the speed:
+
+        n_ia <- -n_ia   for each axis a where the step would exit,   then n_i <- n_i / |n_i|
+
+    An obstacle (a 2D rectangle [x0, y0, x1, y1] or disc [cx, cy, r]) has no single axis-aligned
+    normal to reflect against, so the element is re-headed instead. `noise` is the fraction of
+    that re-heading that is random, from 0 to 1: 0 reverses the heading exactly, 1 picks an
+    isotropic random direction, and intermediate values blend the two before renormalising.
+
+    Under periodic boundaries the operator returns immediately: a torus has no wall.
+
+    Reference: none -- specular reflection off a box is standard practice, not a result.
+    Plexus (this work).
+    """
+
+    EMIT = None                                 # writes heading in place, returns no delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic specular wall reflection
     REQUIRES_PARAMS = []                         # no required params — `noise` optional
     MECHANISM_TAGS = ["boundary_condition", "wall_reflection", "obstacle_avoidance", "steering"]
     REQUIRES_TYPE_PROPS = ["move_speed"]        # needs the step length it is about to take
     PARAM_ROLES = {"noise": "obstacle_reheading_randomness"}
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = "Plexus (this work); specular reflection off a box is standard practice."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

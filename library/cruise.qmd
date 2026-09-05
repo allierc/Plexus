@@ -1,6 +1,6 @@
 ---
 title: "cruise"
-subtitle: "Velocity_cruise (was cruise) -- Vicsek active-matter self-propulsion: drive the velocity toward a cruising speed (inertial, second-order; the velocity-dynamic sibling of `glide`)."
+subtitle: "Drive the speed toward a target without turning the particle."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Velocity_cruise (was cruise) -- Vicsek active-matter self-propulsion:
 
 [`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Velocity_cruise (was cruise) -- Vicsek active-matter self-propulsion: drive the velocity toward a cruising speed (inertial, second-order; the velocity-dynamic sibling of `glide`).
+Drive the speed toward a target without turning the particle.
 :::
 
 ```{=html}
@@ -42,20 +42,22 @@ Velocity_cruise (was cruise) -- Vicsek active-matter self-propulsion: drive the 
 
 ## Mechanism
 
-Drive each particle toward a constant cruising speed v0 and inject orientation
-noise. Paired with `alignment` (neighbour velocity alignment) over a `radius_graph`,
-this is the metric Vicsek model: the balance of alignment (order) against noise
-(disorder) sets the polar order parameter phi = |mean(v_hat)| and drives the
-flocking phase transition -- ordered flock at low noise, disorder at high noise,
-travelling bands and rotating swirls in between.
+second-order sibling of `glide` -- the same self-propulsion, reached through a force.
 
-          + eta * xi_i                          (isotropic orientation noise)
-          [+ omega * v_perp_i]   (2D only)      (optional chirality -> swirls)
+particle -> particle: reads vel, emits an acceleration.
 
-Second-derivative law (an acceleration); composes additively with `alignment`,
-`cohesion`, `separation`, `drag`. Refs: Vicsek, Czirok, Ben-Jacob, Cohen & Shochet,
-PRL 75 (1995); the active-matter Vicsek generator in The Well (Ohana et al.,
-NeurIPS 2024, github.com/PolymathicAI/the_well), ported in prototype/well.
+v0 is the cruising speed in world units per time and k the restoring stiffness in inverse
+time, so 1/k is how long the particle takes to recover its speed after being slowed. The
+restoring term points along the current heading v_i/|v_i|, which is why it never turns the
+particle: speed and direction are decoupled, and only the noise and chirality terms rotate
+it. eta is `noise`, an isotropic random acceleration, and xi_i a standard normal vector --
+the Vicsek control parameter, trading order against disorder. c is `chirality`, in inverse
+time, a force at 90 degrees to the velocity; it makes trajectories curve consistently one
+way and so produces swirls. Chirality is 2D only, since a single rotation sense needs a
+plane to be defined in.
+
+Reference: Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian
+particles with energy depots. Phys. Rev. Lett. 80:5044-5047.
 
 ## Parameters
 
@@ -79,47 +81,43 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
-[`src/plexus/operators/velocity_cruise.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/velocity_cruise.py) &mdash; the registered operator.
+[`src/plexus/operators/motion_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/motion_ops.py) &mdash; the registered operator.
 
 ```python
-"""velocity_cruise (was cruise) -- Vicsek active-matter self-propulsion: drive the velocity toward a cruising speed (inertial, second-order; the velocity-dynamic sibling of `glide`).
-
-Drive each particle toward a constant cruising speed v0 and inject orientation
-noise. Paired with `alignment` (neighbour velocity alignment) over a `radius_graph`,
-this is the metric Vicsek model: the balance of alignment (order) against noise
-(disorder) sets the polar order parameter phi = |mean(v_hat)| and drives the
-flocking phase transition -- ordered flock at low noise, disorder at high noise,
-travelling bands and rotating swirls in between.
-
-    acc_i = k * (v0 - |vel_i|) * v_hat_i        (restore cruising speed)
-          + eta * xi_i                          (isotropic orientation noise)
-          [+ omega * v_perp_i]   (2D only)      (optional chirality -> swirls)
-
-Second-derivative law (an acceleration); composes additively with `alignment`,
-`cohesion`, `separation`, `drag`. Refs: Vicsek, Czirok, Ben-Jacob, Cohen & Shochet,
-PRL 75 (1995); the active-matter Vicsek generator in The Well (Ohana et al.,
-NeurIPS 2024, github.com/PolymathicAI/the_well), ported in prototype/well.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-
 @register_operator("velocity_cruise", "cruise", family="motion", set="particle", kind="lateral")
-class VelocityCruise(Lateral):                   # (alias `cruise`, one migration cycle)
-    EMIT = "acceleration"            # emits an acceleration
+class VelocityCruise(Lateral):
+    """Cruising: drive the speed toward a target without turning the particle. The inertial,
+    second-order sibling of `glide` -- the same self-propulsion, reached through a force.
+
+    particle -> particle: reads vel, emits an acceleration.
+
+        d2x_i/dt2 = k (v0 - |v_i|) v_i/|v_i|  +  eta xi_i  +  c (-v_iy, v_ix)
+
+    v0 is the cruising speed in world units per time and k the restoring stiffness in inverse
+    time, so 1/k is how long the particle takes to recover its speed after being slowed. The
+    restoring term points along the current heading v_i/|v_i|, which is why it never turns the
+    particle: speed and direction are decoupled, and only the noise and chirality terms rotate
+    it. eta is `noise`, an isotropic random acceleration, and xi_i a standard normal vector --
+    the Vicsek control parameter, trading order against disorder. c is `chirality`, in inverse
+    time, a force at 90 degrees to the velocity; it makes trajectories curve consistently one
+    way and so produces swirls. Chirality is 2D only, since a single rotation sense needs a
+    plane to be defined in.
+
+    Reference: Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian
+    particles with energy depots. Phys. Rev. Lett. 80:5044-5047.
+    """
+
+    EMIT = "acceleration"            # second-order: self-propulsion through a force
     SUPPORTED_DIMS = [2, 3]                     # speed restoration + isotropic noise are dimension-generic
     REQUIRES_PARAMS = ["v0"]
     MECHANISM_TAGS = ["self_propulsion", "vicsek", "active_matter"]
     PARAM_ROLES = {"v0": "cruising_speed", "noise": "orientation_noise", "chirality": "rotational_bias"}
-    REFERENCE = "Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian particles with energy depots. Phys. Rev. Lett. 80:5044-5047."
+    REFERENCE = ("Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian "
+                 "particles with energy depots. Phys. Rev. Lett. 80:5044-5047.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

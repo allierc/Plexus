@@ -1,6 +1,6 @@
 ---
 title: "drag"
-subtitle: "Viscous friction as a composable operator (not an integration knob)."
+subtitle: "Viscous drag: a force opposing the velocity and proportional to it."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Viscous friction as a composable operator (not an integration knob)."
 
 [`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Viscous friction as a composable operator (not an integration knob).
+Viscous drag: a force opposing the velocity and proportional to it.
 :::
 
 ```{=html}
@@ -42,13 +42,19 @@ Viscous friction as a composable operator (not an integration knob).
 
 ## Mechanism
 
-A `drag` force opposes velocity: acc = -k * vel. Modelling friction as an
-operator (rather than a `damping` field baked into the integrator) keeps the
-integrator generic and lets drag compose in the schedule with the other forces.
-It is a second-derivative contribution (an acceleration): `emit: acceleration`
-(the class default) sums it into a set the ENGINE integrates (e.g. alongside boids);
-`emit: mpm_acceleration` routes the same -k*v into the MPM substep as a body force
-(p2g reads H.delta as a_ext) -- this replaces the former `mpm_drag` operator.
+force law it produces the overdamped limit; composed with noise it is a Langevin bath.
+
+particle -> particle: reads vel, emits an acceleration.
+
+k is the drag coefficient, in inverse time -- 1/k is the time a particle takes to lose
+1 - 1/e of its speed, so large k means the velocity forgets its history within a step and
+the dynamics become effectively first-order. eta is `noise`, the amplitude of an isotropic
+random acceleration in world units per time squared, and xi_i a standard normal vector.
+Drag alone is dissipative; drag plus noise is a thermal bath whose equilibrium temperature
+is set by the ratio eta^2 / k, which is the fluctuation-dissipation relation.
+
+Reference: Stokes, G. G. (1851). On the effect of the internal friction of fluids on the
+motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106.
 
 $$
 \mathbf a_i \;=\; -\,k\,\mathbf v_i
@@ -76,39 +82,40 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
-[`src/plexus/operators/drag.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/drag.py) &mdash; the registered operator.
+[`src/plexus/operators/motion_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/motion_ops.py) &mdash; the registered operator.
 
 ```python
-"""Drag -- viscous friction as a composable operator (not an integration knob).
-
-A `drag` force opposes velocity: acc = -k * vel. Modelling friction as an
-operator (rather than a `damping` field baked into the integrator) keeps the
-integrator generic and lets drag compose in the schedule with the other forces.
-It is a second-derivative contribution (an acceleration): `emit: acceleration`
-(the class default) sums it into a set the ENGINE integrates (e.g. alongside boids);
-`emit: mpm_acceleration` routes the same -k*v into the MPM substep as a body force
-(p2g reads H.delta as a_ext) -- this replaces the former `mpm_drag` operator.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-
 @register_operator("drag", family="motion", set="particle", kind="lateral")
 class Drag(Lateral):
-    EMIT = "acceleration"            # emits an acceleration
+    """Viscous drag: a force opposing the velocity and proportional to it. Composed with a
+    force law it produces the overdamped limit; composed with noise it is a Langevin bath.
+
+    particle -> particle: reads vel, emits an acceleration.
+
+        d2x_i/dt2 = -k v_i  +  eta xi_i
+
+    k is the drag coefficient, in inverse time -- 1/k is the time a particle takes to lose
+    1 - 1/e of its speed, so large k means the velocity forgets its history within a step and
+    the dynamics become effectively first-order. eta is `noise`, the amplitude of an isotropic
+    random acceleration in world units per time squared, and xi_i a standard normal vector.
+    Drag alone is dissipative; drag plus noise is a thermal bath whose equilibrium temperature
+    is set by the ratio eta^2 / k, which is the fluctuation-dissipation relation.
+
+    Reference: Stokes, G. G. (1851). On the effect of the internal friction of fluids on the
+    motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106.
+    """
+
+    EMIT = "acceleration"            # second-order: a force on a body that has inertia
     SUPPORTED_DIMS = [2, 3]                      # acts on the D-vector velocity, dimension-generic
     REQUIRES_PARAMS = ["k"]                     # drag coefficient
     MECHANISM_TAGS = ["viscous_drag", "friction", "damping"]
     PARAM_ROLES = {"k": "drag_coefficient", "noise": "thermal_noise"}
-    REFERENCE = "Stokes, G. G. (1851). On the effect of the internal friction of fluids on the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106."
+    REFERENCE = ("Stokes, G. G. (1851). On the effect of the internal friction of fluids on "
+                 "the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

@@ -1,0 +1,826 @@
+---
+title: "cell_die"
+subtitle: "Cell elimination: the Die family, and the inverse of `cell_divide`."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Cell elimination: the Die family, and the inverse of `cell_divide`.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+its own ring to a point over several frames and is then removed from the surface.
+
+vertex -> vertex: shrinks the marked cells' target area and perimeter, then rebuilds the
+half-edge table when a ring has contracted far enough.
+
+    A0_j <- A0_j * (1 - 1/tau)          while the cell is dying
+    remove cell j when its ring has contracted to a triangle
+
+tau is the number of frames a cell takes to disappear. Extruding gradually rather than deleting
+outright is what keeps the surface valid at every frame: a face removed in one step would leave
+a hole its neighbours have no rule for closing.
+
+It matters that this family exists at all. Growth inflates and division subdivides, so a vertex
+model with no Die operator can only deform its sheet OUTWARD, and invagination -- one of the
+canonical morphologies -- is unreachable however the other parameters are set.
+
+The base contract carries no criterion of its own; every `model:` below differs ONLY in what
+marks a cell for death, exactly as `cell_divide`'s models differ only in what triggers a
+division.
+
+Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644; live-cell
+extrusion from an epithelium, Rosenblatt, J., Raff, M. C. & Cramer, L. P. (2001). Curr. Biol.
+11:1847-1857.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `cells` | explicit apoptotic cell indices | &ndash; |
+| `mode` | how dying cells are chosen | &ndash; |
+| `shrink_rate` | target-volume shrink per tick | 0.04 |
+| `critical_frac` | extrude below this fraction of v_ref | 0.12 |
+| `frac` | (band/cone/chem_low) size of the dying population | 0.04 |
+| `a_sw` | (chem_low) die where the activator is below this fraction of its max | 0.25 |
+| `max_mark_frac` | cap on the fraction of the tissue under sentence at once | 0.005 |
+| `cell_set` | &ndash; | "cell" |
+| `region` | &ndash; | "list" |
+| `compare` | &ndash; | "high" |
+| `field` | &ndash; | "elong" |
+| `field_frac` | &ndash; | 1.5 |
+| `cone_deg` | &ndash; | 22.8 |
+| `band_deg` | &ndash; | 8.0 |
+| `n_bands` | &ndash; | 1 |
+| `small_frac` | &ndash; | 0.35 |
+| `stall_frac` | &ndash; | _STALL_DEFAULT.get(self.mode, 0.5 |
+| `stall_margin` | &ndash; | 0.02 |
+| `min_age` | &ndash; | 4 |
+| `n_max` | &ndash; | 9 |
+| `n_min` | &ndash; | 3 |
+| `chan` | &ndash; | 0 |
+| `p0` | &ndash; | 3.72 |
+| `after_frame` | &ndash; | 0 |
+| `seed` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: cell_die, at: vertex}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`apoptosis`]{.op-badge} [`cell_elimination`]{.op-badge} [`extrusion`]{.op-badge} [`delamination`]{.op-badge} [`die`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd), [`cell_exclude`](cell_exclude.qmd).
+
+## Source
+
+[`src/plexus/operators/vertex_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/vertex_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("cell_die", set="vertex", kind="structural", family="population")
+class Apoptosis3D(Structural):
+    """Cell elimination: the Die family, and the inverse of `cell_divide`. A marked cell contracts
+    its own ring to a point over several frames and is then removed from the surface.
+
+    vertex -> vertex: shrinks the marked cells' target area and perimeter, then rebuilds the
+    half-edge table when a ring has contracted far enough.
+
+        A0_j <- A0_j * (1 - 1/tau)          while the cell is dying
+        remove cell j when its ring has contracted to a triangle
+
+    tau is the number of frames a cell takes to disappear. Extruding gradually rather than deleting
+    outright is what keeps the surface valid at every frame: a face removed in one step would leave
+    a hole its neighbours have no rule for closing.
+
+    It matters that this family exists at all. Growth inflates and division subdivides, so a vertex
+    model with no Die operator can only deform its sheet OUTWARD, and invagination -- one of the
+    canonical morphologies -- is unreachable however the other parameters are set.
+
+    The base contract carries no criterion of its own; every `model:` below differs ONLY in what
+    marks a cell for death, exactly as `cell_divide`'s models differ only in what triggers a
+    division.
+
+    Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644; live-cell
+    extrusion from an epithelium, Rosenblatt, J., Raff, M. C. & Cramer, L. P. (2001). Curr. Biol.
+    11:1847-1857.
+    """
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["apoptosis", "cell_elimination", "extrusion", "delamination", "die"]
+    REFERENCE = ("Monier, B. et al. (2015). Apico-basal forces exerted by apoptotic cells drive "
+                 "epithelium folding. Nature 518:245-248; tyssue B-Apoptosis (DamCB).")
+    PARAM_ROLES = {"cells": "explicit apoptotic cell indices", "mode": "how dying cells are chosen",
+                   "shrink_rate": "target-volume shrink per tick",
+                   "critical_frac": "extrude below this fraction of v_ref",
+                   "frac": "(band/cone/chem_low) size of the dying population",
+                   "a_sw": "(chem_low) die where the activator is below this fraction of its max",
+                   "max_mark_frac": "cap on the fraction of the tissue under sentence at once"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.cells = [int(c) for c in (params.get("cells") or [])]
+        # WHICH CELLS DIE is targeting, not a second mechanism: the shrink-shed-extrude pathway is
+        # identical in every mode, so these are one operator rather than four.
+        # DEFAULT `competition`, NOT `list`. The loop's `add_op` edit writes only the numeric
+        # parameters an operator declares, so a non-numeric default is what every composition the
+        # Proposer builds will actually run. `list` with no `cells` can never fire -- injecting it
+        # would have handed the search an operator that is inert by construction, which is the
+        # failure worth guarding against. `competition` is the default because it needs no
+        # chemistry, so it is available on every base, and it is the canonical cell-competition
+        # hypothesis.
+        #
+        # What makes a cell die is on the `model:` AXIS, not a `mode:` setting. It is the same kind
+        # of choice as what makes a cell divide, and `cell_divide` puts that on the model axis --
+        # two mechanisms for one question, in adjacent classes in this file.
+        #
+        # TWO OF THE THIRTEEN COLLAPSED INTO VALUES rather than becoming models, because they were
+        # never distinct hypotheses:
+        #   `list`/`band`/`cone` -> `model: prescribed` with `region:` -- three GEOMETRIES of one
+        #     claim ("the experimenter ablates this patch"), the `mesh_seed.shape` case.
+        #   `field_high`/`field_low` -> `model: field` with `compare:` -- the docstring below already
+        #     says these "carry no criterion of their own", so the direction is a value on one model.
+        if "mode" in params:
+            raise ValueError(
+                "cell_die: `mode` is gone -- write `model:`. What makes a cell die is a hypothesis, "
+                "the same kind `cell_divide` carries on `model:`. `list`/`band`/`cone` are now "
+                "`model: prescribed` with `region:`, and `field_high`/`field_low` are "
+                "`model: field` with `compare: high|low`.")
+        _death = getattr(type(self), "DEATH", "competition")
+        if _death == "prescribed":
+            _death = str(params.get("region", "list"))
+            if _death not in ("list", "band", "cone"):
+                raise ValueError(f"cell_die[prescribed]: region must be list|band|cone, "
+                                 f"got {_death!r}")
+        elif _death == "field":
+            _cmp = str(params.get("compare", "high"))
+            if _cmp not in ("high", "low"):
+                raise ValueError(f"cell_die[field]: compare must be high|low, got {_cmp!r}")
+            _death = "field_" + _cmp
+        self.mode = _death
+        #   list|band|cone|small|stalled|chem_low
+        #   LOCAL (vs neighbours): competition|smaller|dimmer|older|crowded|lonely
+        #   PUBLISHED FIELD: field_high|field_low -- see `_marked`. These two carry no criterion of
+        #   their own; `field` names a per-cell quantity some other operator measured and published
+        #   on the mesh, and `field_frac` is the multiple of its live MEDIAN that counts as
+        #   qualifying. Death stops needing a new branch for every new measurement.
+        self.field = str(params.get("field", "elong"))
+        self.field_frac = float(params.get("field_frac", 1.5))
+        self.frac = float(params.get("frac", 0.04))
+        self.cone_deg = float(params.get("cone_deg", 22.8))       # 10 cells across on a 2,000-cell ball
+        self.band_deg = float(params.get("band_deg", 8.0))        # half-width of each ring
+        self.n_bands = int(params.get("n_bands", 1))              # >1 -> that many latitude rings
+        self.small_frac = float(params.get("small_frac", 0.35))   # (small) die below this x v_ref
+        # THE THRESHOLD IS PER MODE, because the quantities have different dynamic ranges and one
+        # number cannot serve them. The activator spans zero to its maximum across a spot
+        # boundary, so a factor-of-two cut on it selects cells easily. Volume, age and growth vary
+        # by a few tens of percent between neighbours, so the same factor-of-two cut on those asks
+        # for a cell that essentially cannot exist in a healthy sheet, and the model then kills
+        # nothing while appearing to be under test.
+        # A silent rule is not a conservative rule -- it is an untested one, which this project has
+        # now paid for three times (rd_interface_tension twice, chem_low once).
+        _STALL_DEFAULT = {"dimmer": 0.5, "competition": 0.7, "older": 0.7,
+                          "stalled": 0.8, "smaller": 0.85}
+        self.stall_frac = float(params.get(
+            "stall_frac", _STALL_DEFAULT.get(self.mode, 0.5)))
+        #                                                          (stalled) die below this x the
+        self.stall_margin = float(params.get("stall_margin", 0.02))  # population's MEDIAN growth,
+        self.min_age = int(params.get("min_age", 4))              # once older than min_age, and
+        self.n_max = int(params.get("n_max", 9))          # (crowded) die at this many neighbours
+        self.n_min = int(params.get("n_min", 3))          # (lonely) die at this few
+        #   only while the median cell has actually grown by stall_margin -- see _marked
+        # WHICH SPECIES DECIDES WHO DIES: 0 by default; 2 reads the second RD system, which is
+        # what lets one chemistry drive growth and another drive death in the same tissue.
+        self.chan = int(params.get("chan", 0))
+        self.a_sw = float(params.get("a_sw", 0.25))               # fraction of the activator's own max
+        self.shrink = float(params.get("shrink_rate", 0.04))
+        self.crit = float(params.get("critical_frac", 0.12))      # x v_ref, the seed-time median
+        self.p0 = float(params.get("p0", 3.72))                   # target shape index, for P0
+        # HOW FAST, as distinct from WHO -- see forward(). 0.5% of the tissue marked at once is
+        # ~37 cells on the 7,400-cell parents this has to survive, against the 1,660 that `smaller`
+        # took uncapped.
+        self.max_mark_frac = float(params.get("max_mark_frac", 0.005))
+        self.after_frame = int(params.get("after_frame", 0))
+        self.every = _engine_owns_clock(params, default=1); self._k = 0
+        self.seed = int(params.get("seed", 0))
+
+    @staticmethod
+    def _ring_neighbours(rings, f):
+        """The faces sharing an EDGE with f, read off the rings before f is collapsed."""
+        r = rings[f]
+        if r is None:
+            return []
+        edges = {(int(r[i]), int(r[(i + 1) % len(r)])) for i in range(len(r))}
+        edges |= {(b, a) for a, b in edges}
+        out = set()
+        for g, rg in enumerate(rings):
+            if rg is None or g == f:
+                continue
+            for i in range(len(rg)):
+                if (int(rg[i]), int(rg[(i + 1) % len(rg)])) in edges:
+                    out.add(g); break
+        return sorted(out)
+
+    def _nb(self, m, nF, q):
+        """(neighbour mean of `q`, neighbour count) on the CELL ADJACENCY GRAPH.
+
+        Cedric, 9 August: "we could make a comparison graph network between adjacent cells to make
+        a proper rule of cell competition?" -- and then: "this death operator could have different
+        modes: game of life, too small vs others, too slow growth vs others, cell duration too long
+        vs others". They are one mechanism: every useful death rule is a LOCAL comparison, and they
+        differ only in which per-cell quantity is compared. So the graph is built once, here.
+
+        WHY LOCAL AND NOT GLOBAL. `chem_low` compared each cell against the whole field and marked
+        the tissue when the pattern weakened -- 2,000 cells shrank to 21.6% of their volume and not
+        one was extruded. `stalled` compared growth against the population median and marked NOBODY
+        on r010_12, because at rho = 0.1 every white cell grows at the SAME slow rate and none sits
+        below half the median. Uniformly slow is not the same as losing, and only the neighbour
+        graph can tell them apart. A local rule is also self-limiting: it cannot mark a uniform
+        field however extreme that field is.
+
+        Adjacency is the face across each half-edge -- the same relation rd_interface_tension uses
+        for the red/white ring, so "adjacent" means one thing in this file.
+        """
+        import torch as _t
+        es = _t.as_tensor(m["E_srce"], dtype=_t.long)
+        et = _t.as_tensor(m["E_trgt"], dtype=_t.long)
+        ef = _t.as_tensor(m["E_face"], dtype=_t.long)
+        twin = ShapeEnergy3D._twin_faces(es, et, ef, int(m["Nv"])).cpu().numpy()
+        efn = ef.cpu().numpy()
+        ok = (efn < nF) & (twin < nF) & (twin >= 0)
+        ssum = np.zeros(nF); cnt = np.zeros(nF)
+        np.add.at(ssum, efn[ok], q[twin[ok]])
+        np.add.at(cnt, efn[ok], 1.0)
+        mean = np.zeros(nF)
+        hit = cnt > 0
+        mean[hit] = ssum[hit] / cnt[hit]
+        return mean, cnt
+
+    def _loser(self, m, nF, q, below=True):
+        """Cells whose `q` is far from their neighbours' -- the shared body of every local mode."""
+        ag = m.get("age")
+        nb, cnt = self._nb(m, nF, q)
+        old_enough = (ag.detach().cpu().numpy()[:nF] >= self.min_age) if ag is not None \
+            else np.ones(nF, bool)
+        live = (cnt > 0) & old_enough
+        if below:
+            # the neighbours must be doing the thing, or a quiet patch culls itself from inside
+            return set(np.where(live & (nb > self.stall_margin)
+                                & (q < self.stall_frac * nb))[0].tolist())
+        return set(np.where(live & (q > nb / max(self.stall_frac, 1e-9)))[0].tolist())
+
+    def _q(self, m, H, nF, what):
+        """The per-cell quantity a local mode compares."""
+        if what == "growth":                                  # fractional growth SINCE BIRTH
+            v = m.get("V0f"); vb = m.get("Vbirth")
+            if v is None or vb is None:
+                return None
+            return np.maximum(v.detach().cpu().numpy()[:nF]
+                              / np.maximum(vb.detach().cpu().numpy()[:nF], 1e-12) - 1.0, 0.0)
+        if what == "volume":
+            v = m.get("V0f")
+            return None if v is None else v.detach().cpu().numpy()[:nF]
+        if what == "age":
+            a = m.get("age")
+            return None if a is None else a.detach().cpu().numpy()[:nF]
+        if what == "act":
+            clvl = H.level(self.cat)
+            if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
+                return None
+            h0, _ = clvl.state_schema["chem"]
+            return clvl.state[:nF, h0 + self.chan].detach().cpu().numpy()
+        # ANY FIELD PUBLISHED ON THE MESH, BY NAME. The four above are hard-coded because they are
+        # the engine's own bookkeeping (volume, birth volume, age, chemistry); anything an operator
+        # measures and publishes arrives here instead, so a new probe needs no branch of its own.
+        # `cell_shape_probe` writes `elong`; asking for a name nothing published returns None,
+        # which every caller reads as "unknown", never as zero.
+        v = m.get(what)
+        if v is None:
+            return None
+        v = v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
+        return v[:nF] if v.ndim == 1 and v.shape[0] >= nF else None
+
+    def _admit(self, flag, want, m, H, nF):
+        """Turn the mode's proposal into the marks actually TAKEN this tick.
+
+        A DEATH RATE, NOT A DEATH SET. Every state-defined rule re-evaluates each frame, so on a
+        growing tissue the marks ACCUMULATE: measured on the campaign's own best parents, `smaller`
+        killed 1,660 of 7,424 cells and took the run from protr 1.513 / grip 0.228 to 1.131 /
+        0.049, and every mode but `crowded` did something comparable. The thresholds were
+        calibrated on a static 400-cell sheet where a population is marked ONCE; nothing in them
+        bounds a flux, and a threshold on a state variable never can -- it names a set, and the set
+        refills as fast as the tissue can produce members of it.
+
+        `max_mark_frac` caps how much of the tissue may be under sentence AT ONCE, so the mode
+        chooses WHO dies and this chooses HOW FAST. `crowded` is the existence proof that a gentle
+        rate leaves a run intact: 104 deaths, no premise broken, grip 0.216 -> 0.116 where the
+        others reached ~0.01.
+
+        THE NAMED POPULATIONS ARE EXEMPT, because the cap bounds a flux and a set chosen once has
+        none: `apopgeo_half` deliberately sentences 45% of the sheet in one act, and capping it
+        would silently delete the hardest topology test this operator has.
+        """
+        if self.mode in ("list", "band", "cone"):
+            for f in want:
+                flag[f] = 1.0
+            return flag
+        held = np.where(flag > 0)[0]
+        room = max(1, int(self.max_mark_frac * nF)) - len(held)
+        if room <= 0:                       # the queue is full: let it drain before sentencing more
+            return flag
+        fresh = np.array(sorted(want - {int(x) for x in held}), dtype=np.int64)
+        if len(fresh) > room:
+            # WORST FIRST once the cap bites, so the rule still means what it says: a competition
+            # rule that culls an arbitrary subset of its losers is a lottery wearing the rule's name.
+            sev = self._severity(m, H, nF, fresh)
+            fresh = fresh[np.argsort(sev)[:room]] if sev is not None else fresh[:room]
+        flag[fresh] = 1.0
+        return flag
+
+    def _severity(self, m, H, nF, idx):
+        """How badly each of `idx` qualifies -- SMALLEST DIES FIRST. Only consulted when the rate
+        cap bites and the mode has named more cells than may die at once; a competition rule that
+        then culls an arbitrary subset of its losers would be a lottery wearing the rule's name."""
+        _Q = {"competition": "growth", "smaller": "volume", "dimmer": "act", "older": "age"}
+        if self.mode in _Q:
+            q = self._q(m, H, nF, _Q[self.mode])
+            if q is None:
+                return None
+            nb = self._nb(m, nF, q)[0]
+            r = q[idx] / np.maximum(nb[idx], 1e-12)
+            return -r if self.mode == "older" else r        # `older` loses by being ABOVE
+        if self.mode in ("small", "stalled"):
+            q = self._q(m, H, nF, "volume" if self.mode == "small" else "growth")
+            return None if q is None else q[idx]
+        if self.mode == "chem_low":
+            q = self._q(m, H, nF, "act")
+            return None if q is None else q[idx]
+        if self.mode == "crowded":
+            return -self._nb(m, nF, np.ones(nF))[1][idx].astype(float)   # most crowded first
+        if self.mode == "lonely":
+            return self._nb(m, nF, np.ones(nF))[1][idx].astype(float)
+        if self.mode in ("field_high", "field_low"):
+            q = self._q(m, H, nF, self.field)
+            if q is None:
+                return None
+            # SMALLEST DIES FIRST is this method's contract, so `field_high` -- where the WORST
+            # offender is the largest value -- has to be negated or the cap would spare exactly
+            # the cells the mode exists to remove.
+            return (-q[idx]) if self.mode == "field_high" else q[idx]
+        return None                                          # list/band/cone: a named population
+
+    def _marked(self, m, H, nF):
+        """The set of cell indices currently marked to die."""
+        if self.mode == "list":
+            return {c for c in self.cells if c < nF}
+        # THE CENTROID IS A PRECONDITION OF TWO MODES, NOT OF DEATH. This guard used to stand here
+        # unconditionally -- `if cen is None: return set()` -- so every mode in the operator was
+        # silently gated behind a quantity only `band` and `cone` read. A geometric precondition
+        # that switches off a competition rule, or a probe-driven one, is the same defect as an
+        # absolute threshold on a relative field: the operator goes quiet for a reason unrelated to
+        # its own mechanism, and quiet is indistinguishable from "nothing qualified".
+        u = None
+        if self.mode in ("band", "cone"):
+            cen = m.get("cen_np")                                  # per-cell centroid from the rings
+            if cen is None:
+                return set()
+            u = cen / (np.linalg.norm(cen, axis=1) + 1e-12)[:, None]
+        if self.mode == "band":                                    # `n_bands` latitude rings
+            lat = np.degrees(np.arcsin(np.clip(u[:, 2], -1, 1)))   # -90 .. +90
+            if self.n_bands <= 1:
+                return set(np.where(np.abs(lat) < self.band_deg)[0].tolist())
+            # evenly spaced in latitude, endpoints excluded so no ring sits on a pole
+            centres = np.linspace(-90.0, 90.0, self.n_bands + 2)[1:-1]
+            hit = np.zeros(len(lat), bool)
+            for c in centres:
+                hit |= np.abs(lat - c) < self.band_deg
+            return set(np.where(hit)[0].tolist())
+        if self.mode == "cone":                                     # one contiguous cap
+            ax = np.array([0.0, 0.0, 1.0])
+            return set(np.where(np.degrees(np.arccos(np.clip(u @ ax, -1, 1)))
+                                < self.cone_deg)[0].tolist())
+        if self.mode == "small":
+            # DEATH BY SIZE, and the one selection that is genuinely about the cell's own state
+            # rather than where it sits. A cell whose volume has fallen below `small_frac` of
+            # v_ref -- the seed-time median -- is squeezed out, which is what an epithelium does
+            # with a cell it can no longer accommodate. It re-evaluates for the same reason
+            # `chem_low` does: a cell arrives in this set by shrinking, not by being pushed.
+            v = m.get("V0f")
+            if v is None:
+                return set()
+            vv = v.detach().cpu().numpy()[:nF]
+            v_ref = float(m.get("v_ref", 1.0))
+            return set(np.where(vv < self.small_frac * v_ref)[0].tolist())
+        if self.mode == "stalled":
+            # CELL COMPETITION: a cell that is not growing while its neighbours are gets removed.
+            #
+            # RELATIVE, WHICH IS THE WHOLE POINT. `chem_low` marks every cell below a fraction of
+            # the activator's maximum, so when the pattern weakens it marks the WHOLE TISSUE:
+            # every cell shrinks, the activator maximum goes to zero, and not one cell is ever
+            # extruded -- because death needs a cell squeezed to a triangle by neighbours that are
+            # NOT shrinking too. A threshold against the population's own
+            # median cannot do that: it always names a minority, by construction.
+            #
+            # V0f/Vbirth is growth since birth and `age` is time since birth. Both are already
+            # carried across renumbering by `keep` -- in cell_divide and in this operator -- so this
+            # needs no new bookkeeping, which is the part that has gone wrong twice already.
+            v = m.get("V0f"); vb = m.get("Vbirth"); ag = m.get("age")
+            if v is None or vb is None:
+                return set()
+            vv = v.detach().cpu().numpy()[:nF]
+            vbb = np.maximum(vb.detach().cpu().numpy()[:nF], 1e-12)
+            # THE EXCESS OVER BIRTH SIZE, NOT THE RATIO -- and the first version compared ratios,
+            # which cannot work. V0f/Vbirth is >= 1 for any cell that has grown at all and exactly
+            # 1.0 for one that has not, so with a median near 1.4 a cut at 0.5 x median = 0.7 sits
+            # BELOW the floor and marks nobody. Measured: zero deaths across three runs and
+            # hundreds of frames. `g = ratio - 1` is fractional growth SINCE BIRTH -- 0 for a
+            # stalled cell -- and half the median excess is the comparison that was intended. On a
+            # synthetic population of 400 stalled cells among 1,600 growing ones: the ratio form
+            # marks 0, the excess form marks 618.
+            g = np.maximum(vv / vbb - 1.0, 0.0)
+            med = float(np.median(g))
+            # A GLOBALLY STALLED TISSUE IS NOT A TISSUE FULL OF LOSERS. If the median cell has not
+            # grown, there is no competition to lose and this marks nobody -- otherwise the same
+            # runaway that chem_low produced would return by another route.
+            if med < self.stall_margin:
+                return set()
+            old_enough = (ag.detach().cpu().numpy()[:nF] >= self.min_age) if ag is not None \
+                else np.ones(nF, bool)
+            return set(np.where((g < self.stall_frac * med) & old_enough)[0].tolist())
+        # ---- THE LOCAL FAMILY. All five compare a cell with the cells TOUCHING it; they differ
+        # only in what is compared, which is why they share `_loser`. Each is a different
+        # biological hypothesis about why a cell is eliminated, not a different way to compute one.
+        if self.mode == "competition":            # grows slower than its neighbours -- Myc-style
+            q = self._q(m, H, nF, "growth")       # cell competition, the loser is out-proliferated
+            return set() if q is None else self._loser(m, nF, q, below=True)
+        if self.mode == "smaller":                # smaller than its neighbours: squeezed out by a
+            q = self._q(m, H, nF, "volume")       # tissue that can no longer accommodate it
+            return set() if q is None else self._loser(m, nF, q, below=True)
+        if self.mode == "dimmer":                 # less activator than its neighbours -- the LOCAL
+            q = self._q(m, H, nF, "act")          # form of chem_low, which failed by being global
+            return set() if q is None else self._loser(m, nF, q, below=True)
+        if self.mode == "older":                  # has gone longer without dividing than its
+            q = self._q(m, H, nF, "age")          # neighbours: a cell that stopped cycling
+            return set() if q is None else self._loser(m, nF, q, below=False)
+        if self.mode in ("crowded", "lonely"):
+            # GAME OF LIFE, on the real adjacency rather than a lattice. A closed trivalent sheet
+            # gives every cell about six neighbours, so `crowded` fires where division has packed a
+            # region and `lonely` only after deaths have already thinned one -- which makes
+            # `lonely` a rule about how a wound SPREADS or heals, and worth having for that alone.
+            deg = self._nb(m, nF, np.ones(nF))[1]
+            ag = m.get("age")
+            old_enough = (ag.detach().cpu().numpy()[:nF] >= self.min_age) if ag is not None \
+                else np.ones(nF, bool)
+            if self.mode == "crowded":
+                return set(np.where(old_enough & (deg >= self.n_max))[0].tolist())
+            return set(np.where(old_enough & (deg > 0) & (deg <= self.n_min))[0].tolist())
+        if self.mode == "chem_low":                                 # die BETWEEN the spots
+            clvl = H.level(self.cat)
+            if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
+                return set()
+            h0, _h1 = clvl.state_schema["chem"]
+            a = clvl.state[:nF, h0 + self.chan].detach().cpu().numpy()
+            amax = float(np.nanmax(a)) if a.size else 0.0
+            if amax <= 1e-9:
+                return set()
+            return set(np.where(a < self.a_sw * amax)[0].tolist())
+        if self.mode in ("field_high", "field_low"):
+            # DEATH PLUGGED ONTO A MEASUREMENT SOMEONE ELSE MADE, which is the whole point of the
+            # pair. Every other mode in this operator computes its own criterion internally --
+            # eleven bespoke measurements living inside one Die -- and the only one that did not
+            # was `chem_low`, which reads the `chem` another operator wrote. These two generalise
+            # that: name a field, and any operator that publishes it can drive death without a
+            # line changing here. `cell_shape_probe` publishes `elong`; the next probe will
+            # publish something else and this will already work.
+            q = self._q(m, H, nF, self.field)
+            if q is None:
+                # UNPUBLISHED IS NOT ZERO. No probe ran, or its precondition was absent -- either
+                # way nothing is known about these cells, and killing none of them is the only
+                # honest reading. Killing all of them is what a `0 > thr` comparison on a
+                # zero-filled array would have done for `field_low`.
+                return set()
+            ok = np.isfinite(q)
+            if not ok.any():
+                return set()
+            # RELATIVE TO THE FIELD'S OWN SPREAD, for the reason every threshold here is: `elong`
+            # is a shape index near 3.7 and an aspect near 1.5, two quantities with no common
+            # scale, and one `frac` has to mean the same thing on both. The reference is the
+            # MEDIAN of the live cells, not the max: one runaway cell must not set the scale of
+            # the quantity that exists to find it. `frac` 1.5 with mode field_high therefore reads
+            # "half again the typical cell".
+            med = float(np.median(q[ok]))
+            if not np.isfinite(med) or abs(med) < 1e-12:
+                return set()
+            thr = self.field_frac * med
+            hit = (q > thr) if self.mode == "field_high" else (q < thr)
+            return set(np.where(ok & hit)[0].tolist())
+        return set()
+
+    def forward(self, H, mask=None):
+        # THE ACTED LEDGER IS BLIND TO THIS OPERATOR, AND TO THE WHOLE DIE FAMILY. Measured over
+        # rounds r001-r012 of the live campaign: 24 runs killed cells, 6,693 deaths in total, and
+        # `inert_operators` recorded `cell_die` as having acted in ZERO of them -- including
+        # runs that extruded 200 cells.
+        #
+        # The cause is structural, in both senses. `instrument._wrap` decides `acted` from
+        # `_nonzero(out) or (before != after)`, where `before`/`after` fingerprint the LEVEL STATE.
+        # A Die operator returns `{}` -- it has no delta to contribute -- and does its work by
+        # mutating the mesh: `nF`, the half-edge table, `alive`, and the per-face arrays. None of
+        # that is in the fingerprint, so the engine cannot see it and infers "nothing happened".
+        #
+        # HARMLESS TODAY AND NOT SAFE TO LEAVE. It never lands in `inert_operators`, so the
+        # inert-implies-inconclusive rule in `round.score` cannot misfire on it. But the ledger is
+        # the only cheap evidence that an operator RAN, and for this family it says nothing at all
+        # -- so a death run and a run where death was silently unreachable are indistinguishable in
+        # the record. That is the failure this project has paid for with `rd_interface_tension`
+        # (written off inert twice, never having fired) and `cell_chem_from_shape` (100% acted, changing
+        # nothing).
+        #
+        # THE FIX IS FOR THE OPERATOR TO REPORT, NOT FOR THE ENGINE TO GUESS. Fingerprinting the
+        # mesh would work and is the wrong shape: the engine would be inferring from a hash what
+        # this operator already knows exactly. `m["n_apop"]` is incremented here on every
+        # extrusion, so the operator can hand back a liveness record -- deaths this tick, cells
+        # marked, cells waiting to be shed -- and the ledger can record a fact instead of a
+        # deduction. That record is also what gate G13 needs: the frame a cell crosses the
+        # extrusion threshold, separate from the frame it is shed, which no downstream sampling
+        # stride can recover.
+        lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        # LOCAL, as Divide3D does: topology_ops imports from this module, so a
+        # module-level import here is circular.
+        from plexus.models.topology import (rings_from_flat_3d, flat_from_rings_3d,
+                                           face_collapse_3d)
+        births: list = []                        # see Divide3D: the per-vertex carry's parentage
+        self._k += 1
+        dev = m["V0f"].device; dt = m["V0f"].dtype
+        nF = int(m["nF"]); Nv = int(m["Nv"])
+        px0, px1 = lvl.state_schema["pos"]
+        pos_t = lvl.state[:Nv, px0:px1].detach().cpu().numpy().astype(np.float64)
+        es = m["E_srce"].cpu().numpy(); et = m["E_trgt"].cpu().numpy(); ef = m["E_face"].cpu().numpy()
+        rings = [np.asarray(r, np.int64) for r in rings_from_flat_3d(es, et, ef, nF)]
+        # per-cell centroid, for the geometric modes
+        m["cen_np"] = np.array([pos_t[r].mean(0) if r is not None and len(r) else np.zeros(3)
+                                for r in rings])
+        # MARKED CELLS ARE A PER-FACE FLAG, NOT A LIST OF INDICES, and the first version was a
+        # list. Every collapse renumbers the faces through `keep`, so `cells: [900]` pointed at a
+        # DIFFERENT cell after each death: marking one cell killed seven in the first smoke run,
+        # a cascade down the index space. The flag rides the same `keep` map as `alive` and `age`,
+        # so a cell stays the cell it was.
+        flag = m.get("apop_flag")
+        if flag is None or len(flag) != nF:
+            base = np.zeros(nF, np.float64)
+            if flag is not None:                       # carried across a topology change already
+                base[:min(len(flag), nF)] = flag[:min(len(flag), nF)]
+            flag = base
+        # AN INDEX IS NOT AN IDENTITY, A REGION IS -- so `list` marks ONCE and the state-defined
+        # modes re-evaluate. `cells: [900]` names the cell at index 900 AT THE MOMENT IT IS READ,
+        # and every collapse renumbers the faces through `keep`; re-reading it each frame therefore
+        # hands the mark to a fresh victim after every death. Measured before this guard: marking
+        # one cell killed three, at ticks 86, 164 and 236, each reporting exactly one marked cell.
+        #
+        # This is the seed-window argument of the Plexus2 paper in a second place. There, an
+        # initial condition re-applied every timestep "converts it from an initial condition into a
+        # moving boundary condition"; here a one-off selection re-applied every timestep converts a
+        # death sentence into a death RATE. `seed` is a kind so the runtime can impose the window;
+        # this operator is `structural`, so it imposes its own.
+        _want = set()
+        if self.mode in ("list", "band", "cone"):     # a POPULATION chosen once; see below
+            if not m.get("apop_marked_once"):
+                _want = {f for f in self._marked(m, H, nF) if f < nF}
+                m["apop_marked_once"] = True
+        else:
+            # chem_low IS THE ONLY MODE THAT MAY RE-EVALUATE, and band/cone sat on this branch
+            # until it was measured. A geometric region LOOKS like state and is not: as the equator
+            # constricts, fresh cells rotate INTO the band and are marked, so a ring of 24 became a
+            # mouth that ate the sphere -- 2,000 cells down to 497 by frame 270. A ring or a cap is
+            # a POPULATION chosen at one moment, exactly like an index list. Only a chemical
+            # threshold is a genuine ongoing condition: a cell whose activator has fallen should
+            # now die, and no cell enters that set merely by being pushed.
+            _want = {f for f in self._marked(m, H, nF) if f < nF}
+        flag = self._admit(flag, _want, m, H, nF)
+        m["apop_flag"] = flag
+        marked = {int(f) for f in np.where(flag > 0)[0]}
+        if not marked:
+            return {}
+        V0f = m["V0f"].detach().cpu().numpy().astype(np.float64)
+        A0 = m["A0"].detach().cpu().numpy().astype(np.float64)
+        v_ref = float(m.get("v_ref", 1.0))
+        crit = self.crit * v_ref
+        # 1. SHRINK. cell_mechanics contracts the cell toward the smaller target; T1 then finds its
+        #    edges short and sheds neighbours. Nothing is removed here.
+        for f in marked:
+            if f < nF:
+                V0f[f] = max(V0f[f] * (1.0 - self.shrink), 1e-9)
+                A0[f] = max(A0[f] * (1.0 - self.shrink) ** (2.0 / 3.0), 1e-9)
+        m["V0f"] = torch.as_tensor(V0f, dtype=dt, device=dev)
+        m["A0"] = torch.as_tensor(A0, dtype=dt, device=dev)
+        # P0 FOLLOWS A0, as it does everywhere else in this file: the target perimeter of a cell
+        # with target area A is p0*sqrt(A). Leaving it behind would make the shrinking cell chase a
+        # perimeter its area no longer supports, which is a shape-index error, not a size one.
+        m["P0"] = torch.as_tensor(self.p0 * np.sqrt(np.maximum(A0, 1e-9)), dtype=dt, device=dev)
+        # 2. EXTRUDE the ones that are now triangles AND small enough.
+        # A DYING CELL'S CONTENTS GO SOMEWHERE: the sum of activity in the dying cell's vicinity
+        # should not change much, by construction.
+        #
+        # Simply dropping the row from the cell state takes its activator and inhibitor out of the
+        # tissue with it. That is a discontinuity in a conserved quantity, injected at every death
+        # and accounted for nowhere -- a cell is extruded and its
+        # chemistry is simply gone. Real extrusion hands the contents to the neighbours that close
+        # over the gap.
+        #
+        # AMOUNT, NOT CONCENTRATION. The cell holds a * v; the neighbours receive that amount and
+        # each converts it back to a concentration by its own volume. Distributing the
+        # CONCENTRATION would create or destroy material whenever the neighbours are a different
+        # size from the deceased, which is exactly the accounting error this fixes.
+        clvl_c = H.level(self.cat)
+        _has_chem = clvl_c is not None and "chem" in getattr(clvl_c, "state_schema", {})
+        _bequest = []                       # (neighbour indices, amount per channel)
+        gone = 0
+        for f in sorted(marked, reverse=True):
+            if f >= nF or rings[f] is None or len(rings[f]) != 3:
+                continue
+            if V0f[f] > crit:
+                continue
+            nbrs = [int(g) for g in self._ring_neighbours(rings, f) if g < nF]
+            if face_collapse_3d(rings, pos_t, f, births=births):
+                gone += 1
+                if _has_chem and nbrs:
+                    h0, h1 = clvl_c.state_schema["chem"]
+                    amt = clvl_c.state[f, h0:h1].detach().clone() * float(V0f[f])
+                    _bequest.append((nbrs, amt))
+        if gone == 0:
+            return {}
+        if _bequest:
+            cs = clvl_c.state.clone()
+            h0, h1 = clvl_c.state_schema["chem"]
+            for nbrs, amt in _bequest:
+                # DO NOT POUR INTO A CELL THAT IS ITSELF VANISHING. The divisor is the recipient's
+                # volume, and a cell that is MARKED but cannot reach a triangle shrinks to the
+                # 1e-9 floor and stays there -- so a bequest divided by that floor injects a
+                # concentration many orders of magnitude too large in one step, and a few of those
+                # compound. Without this guard the conservation rule above becomes an AMPLIFIER,
+                # by dividing by a number the model allows to reach zero.
+                live = [g for g in nbrs if float(V0f[g]) >= crit]
+                if not live:
+                    # every neighbour is on its way out too: the material leaves with the cell,
+                    # which is what happened before conservation existed and is the honest
+                    # alternative to inventing somewhere to put it
+                    continue
+                # AND THE BEQUEST MUST LEAVE THE RECIPIENT INSIDE THE INTEGRATOR'S BASIN.
+                # Conservation is correct as conservation and unbounded as CONCENTRATION: the
+                # increment is share/V_g, and Gray-Scott integrates stably only while its
+                # activator stays in the region its own kinetics bound. A bequest that pushes a
+                # neighbour outside it diverges under explicit Euler, and the divergence is not
+                # gentle -- measured on tsd_cap10 and tsd_cap25, act_mean_floor reached -7.29e11
+                # and -2.42e23 before going NaN at frame 1430, while tsd_cap10_fast with FIVE
+                # TIMES the deaths stayed clean at 0.0465. The amount of death is not the
+                # variable; the two failing runs are the SLOW ones (shrink 0.05 against 0.15), so
+                # cells linger near the extrusion threshold and their neighbours receive many
+                # small bequests instead of few.
+                #
+                # `ceil` is the field's own running maximum, which is the only scale available
+                # that the chemistry itself sets -- the same argument that makes a_sw a fraction
+                # rather than an absolute. Material that cannot be placed without leaving the
+                # basin is DROPPED AND COUNTED, never silently injected: a conservation law that
+                # is quietly violated is worse than one that reports where it failed, because the
+                # first is indistinguishable from a working one.
+                share = amt / float(len(live))
+                # TORCH, NOT NUMPY: `cs` is the cell state and lives on the GPU. `np.nanmax` on a
+                # CUDA tensor raises "can't convert cuda:0 device type tensor to numpy", which
+                # killed the two runs this bound exists to fix -- so the fix's first outing failed
+                # for a reason unrelated to the fix. Hoisted out of the per-neighbour loop too: it
+                # is a property of the field, not of the recipient.
+                # ELEMENTWISE, AND PER COLUMN. The bequest spans every chemistry channel the cell
+                # carries, so `inc` and `room` are vectors: a scalar comparison on them raises
+                # "Boolean value of Tensor with more than one value is ambiguous", and a single
+                # ceiling taken from channel 0 would clamp the substrate against the activator's
+                # maximum. Each column is bounded by its own.
+                ceil = torch.nan_to_num(cs[:nF, h0:h1], nan=0.0).amax(dim=0) if nF else None
+                for g in live:
+                    inc = share / float(V0f[g])
+                    if ceil is None:
+                        cs[g, h0:h1] += inc
+                        continue
+                    room = (ceil - cs[g, h0:h1]).clamp(min=0.0)
+                    fits = torch.minimum(inc, room)
+                    over = (inc - fits).sum()
+                    if float(over) > 0:
+                        m["apop_spill"] = m.get("apop_spill", 0.0) + float(over) * float(V0f[g])
+                    cs[g, h0:h1] += fits
+            clvl_c.state = cs
+        # 3. REBUILD, exactly as cell_divide does: `keep` maps new face -> old face and carries every
+        #    per-face array across, so nothing can fall out of step with the mesh.
+        # THE PER-VERTEX CARRY, spent here for the same reason `reindex_faces` is spent beside the
+        # per-face one: a topology edit that changes who a row IS must be followed by every array
+        # that is indexed by that row, in the same place, or the fourth operator does not get the
+        # memo. With no `vertex_carry` declared this walks an empty name list and returns, so every
+        # existing spec is byte-identical -- which is the claim R1 has to make and the twin measures.
+        if hasattr(m, "carry_vertices") and births:
+            m.carry_vertices(births, dt=dt, dev=dev, level=lvl)
+        es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
+        def _car(name, arr=None):
+            a = (arr if arr is not None else m[name].detach().cpu().numpy().astype(np.float64))
+            return torch.as_tensor(np.asarray([a[i] for i in keep], np.float64), dtype=dt, device=dev)
+        m["A0"] = _car("A0", A0); m["V0f"] = _car("V0f", V0f)
+        m["P0"] = torch.as_tensor(self.p0 * np.sqrt(np.maximum(
+            m["A0"].detach().cpu().numpy(), 1e-9)), dtype=dt, device=dev)
+        for nm in ("Vbirth", "divjit", "age", "ndiv", "alive"):
+            if nm in m:
+                m[nm] = _car(nm)
+        _carry_face_state(m, keep, dt, dev)
+        m["apop_flag"] = np.asarray([flag[i] for i in keep], np.float64)   # identity, across renumbering
+        st = lvl.state.clone()
+        st[:len(pos_t), px0:px1] = torch.as_tensor(pos_t, dtype=dt, device=dev)
+        lvl.state = st
+        m["E_srce"] = torch.as_tensor(es2, device=dev); m["E_trgt"] = torch.as_tensor(et2, device=dev)
+        m["E_face"] = torch.as_tensor(ef2, device=dev); m["nF"] = nF2
+        # THE CELL SET FOLLOWS THE MESH. `chem` is indexed by face, so a death that compacts the
+        # faces and not the chemistry silently re-assigns every activator value to a different
+        # cell -- the same class of error as a per-face target left behind by division.
+        clvl = H.level(self.cat)
+        if clvl is not None and clvl.state.shape[0] >= nF:
+            # MEASURED INNOCENT, and worth recording because it was the obvious suspect. At every
+            # death min(a) BEFORE this copy equals min(a) AFTER it -- tick 34 read -0.03872 on
+            # both sides. The negative activator that breaks P12 on every run where cells die
+            # arrives from the reaction/diffusion step operating on a mesh a death has just
+            # perturbed, not from this reindex. Ruled out by experiment as well: removing
+            # cell_chem_from_shape left it at -0.0948, and quartering chi left it at -0.0689.
+            # ONE ENGINE CALL: state, occupancy, the coordinate delta accumulator AND the extra
+            # first-order block deltas, which the hand-rolled version below never reached (its
+            # guard tests `isinstance(key, tuple)` and `_delta_blocks` is keyed by level NAME).
+            if not H.renumber_set(self.cat, keep, n_new=nF2):
+                # LOUD, BECAUSE THE SILENT VERSION COST A WEEK. This returned False on every call
+                # for the whole promotion and both call sites discarded it; the code it replaced at
+                # least printed a warning. The counter also rides `MeshTable.SCALAR_RECORD`, so a
+                # gate row can assert it stayed zero instead of a human having to read a log.
+                m["renumber_failed"] = int(m.get("renumber_failed", 0)) + 1
+                print(f"[cell_die] renumber_set({self.cat!r}) DID NOT ACT -- the cell state, its "
+                      f"occupancy and its pending deltas are now mis-indexed against the mesh, and "
+                      f"the chemistry will scramble from here", flush=True)
+        # THE PENDING DELTAS MUST BE RENUMBERED TOO, AND THIS IS THE BUG THAT BROKE P12 ON EVERY
+        # RUN WHERE A CELL DIED.
+        #
+        # The engine zeroes the delta accumulator once per TICK and integrates at the END of the
+        # schedule, so `cell_chem_diffuse` and `cell_chem_react` deposit their per-cell deltas early and the
+        # engine applies them last. An operator that RENUMBERS the set in between leaves every one
+        # of those deltas pointing at a different cell -- a large negative flux meant for one cell
+        # lands on another that has almost no activator, and the concentration goes negative. That
+        # is exactly what happens: the activator goes NEGATIVE on every model that kills anything,
+        # decaying afterwards as the scrambled deltas diffuse away, while a no-death control never
+        # leaves zero.
+        #
+        # `cell_divide` never hit it because appending is not renumbering: daughters go to indices
+        # >= nF and every existing cell keeps its own. Removal is the first operation in this
+        # engine that moves a row.
+        #
+        # Permuting the accumulator with the SAME `keep` map fixes it wherever the operator sits
+        # in the schedule. Confirmed independently by moving apoptosis ahead of the chemistry --
+        # act_min held at 0.0000 for the whole run and P12 and P4 both cleared -- but that is a
+        # discipline every spec would have to remember, and this is the guarantee instead.
+        # (the deltas were renumbered by `H.renumber_set` above, together with the state)
+        m["n_apop"] = int(m.get("n_apop", 0)) + gone
+        # LOUD, because a death is not recoverable and the count must be auditable against the
+        # cell count: nF -> nF2 should differ by exactly `gone` and by nothing else.
+        print(f"[cell_die] tick {self._k}: extruded {gone} cell(s), {nF} -> {nF2} faces "
+              f"(marked {len(marked)}, total {m['n_apop']})", flush=True)
+        return {}
+```

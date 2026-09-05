@@ -1,0 +1,155 @@
+---
+title: "cell_chem_react"
+subtitle: "Gray-Scott autocatalysis: an activator that makes more of itself by consuming a substrate the system slowly replenishes."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Gray-Scott autocatalysis: an activator that makes more of itself by consuming a substrate the system slowly replenishes.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `cell` (the set the operator acts on).
+- **Reads** &mdash; `F`, `kk`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+the system slowly replenishes. Pattern by substrate DEPLETION rather than by inhibition.
+
+cell -> cell: reads chem, emits d(chem)/dt. No relation is traversed -- the reaction is local.
+
+a and u are dimensionless concentrations. F is the feed rate, in inverse time: it both tops the
+substrate back up toward 1 and removes activator. k is the extra kill rate on the activator, in
+the same units, so the activator decays at F + k while the substrate is replenished at F -- and
+the whole morphology of the model is set by where (F, k) sits in that two-dimensional plane.
+r is `rate`, a dimensionless time rescaling of the whole reaction, so a pattern can be made to
+develop in fewer frames; it must be raised together with the diffusion for the two to stay in
+proportion.
+
+The a^2 u term is cubic, which is what makes the model bistable: a small activator
+perturbation dies, and a large enough one grows until it exhausts its local substrate and
+splits. That is why Gray-Scott makes spots that replicate, where an activator-inhibitor model
+makes a stationary peak.
+
+Reference: Gray, P. & Scott, S. K. (1984). Autocatalytic reactions in the isothermal,
+continuous stirred tank reactor. Chem. Eng. Sci. 39:1087-1097; Pearson, J. E. (1993). Complex
+patterns in a simple system. Science 261:189-192 (the (F, k) morphology map).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `F` | feed_rate | **required** |
+| `kk` | kill_rate | **required** |
+| `rate` | reaction_time_scale | 1.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: cell_chem_react, at: cell, F: ..., kk: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`reaction`]{.op-badge} [`autocatalysis`]{.op-badge} [`turing`]{.op-badge} [`gray_scott`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/diffusion_reaction.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/diffusion_reaction.py) &mdash; the registered operator.
+
+```python
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="gray_scott")
+class CellReactGrayScott(Lateral):
+    """Gray-Scott autocatalysis: an activator that makes more of itself by consuming a substrate
+    the system slowly replenishes. Pattern by substrate DEPLETION rather than by inhibition.
+
+    cell -> cell: reads chem, emits d(chem)/dt. No relation is traversed -- the reaction is local.
+
+        da/dt = r ( u a^2 - (F + k) a )        a = activator, and its own autocatalyst
+        du/dt = r ( -u a^2 + F (1 - u) )       u = substrate, fed toward 1
+
+    a and u are dimensionless concentrations. F is the feed rate, in inverse time: it both tops the
+    substrate back up toward 1 and removes activator. k is the extra kill rate on the activator, in
+    the same units, so the activator decays at F + k while the substrate is replenished at F -- and
+    the whole morphology of the model is set by where (F, k) sits in that two-dimensional plane.
+    r is `rate`, a dimensionless time rescaling of the whole reaction, so a pattern can be made to
+    develop in fewer frames; it must be raised together with the diffusion for the two to stay in
+    proportion.
+
+    The a^2 u term is cubic, which is what makes the model bistable: a small activator
+    perturbation dies, and a large enough one grows until it exhausts its local substrate and
+    splits. That is why Gray-Scott makes spots that replicate, where an activator-inhibitor model
+    makes a stationary peak.
+
+    Reference: Gray, P. & Scott, S. K. (1984). Autocatalytic reactions in the isothermal,
+    continuous stirred tank reactor. Chem. Eng. Sci. 39:1087-1097; Pearson, J. E. (1993). Complex
+    patterns in a simple system. Science 261:189-192 (the (F, k) morphology map).
+    """
+
+    N_SPECIES = 2
+    SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["F", "kk"]
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    MECHANISM_TAGS = ["reaction", "autocatalysis", "turing", "gray_scott"]
+    PARAM_ROLES = {"F": "feed_rate", "kk": "kill_rate", "rate": "reaction_time_scale"}
+    REFERENCE = "Gray, P. & Scott, S. K. (1984). Chem. Eng. Sci. 39:1087-1097; Pearson, J. E. (1993). Science 261:189-192."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.F = float(params["F"]); self.kk = float(params["kk"]); self.rate = float(params.get("rate", 1.0))
+        # WHICH SPECIES THIS INSTANCE OWNS: 0 is the first pair (chem columns 0,1) and is the
+        # default, so every existing spec is unchanged. A second RD system lives at chan 2.
+        self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        # `chan` NAMES THE PAIR THIS INSTANCE OWNS. It was hard-wired to columns 0 and 1, so a
+        # second species in the same buffer was unreachable: two `cell_chem_react` operators would both
+        # have driven the same two columns and the second would simply have overwritten the first.
+        c = self.chan
+        a = chem[:, c]; u = chem[:, c + 1]
+        uaa = u * a * a
+        da = uaa - (self.F + self.kk) * a
+        du = -uaa + self.F * (1.0 - u)
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        # zero in every column but this species', so the delta is additive with the other species'
+        out = torch.zeros_like(chem)
+        out[:, c] = self.rate * da
+        out[:, c + 1] = self.rate * du
+        return {self.at: out * occ}
+```

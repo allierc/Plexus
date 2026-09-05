@@ -509,10 +509,24 @@ $\hat{\mathbf h}$ toward it (up to `turn_speed` $\omega$) and renormalise."""),
 #  Introspection helpers
 # --------------------------------------------------------------------------- #
 def first_sentence(doc: str) -> str:
-    """One-line purpose from a docstring: strip a leading `name --` / `name:` tag."""
-    line = (doc or "").strip().split("\n", 1)[0].strip()
-    line = re.sub(r"^[\w<>./()-]+\s*(--|—|:)\s*", "", line)
-    return line[:1].upper() + line[1:] if line else ""
+    """The first SENTENCE of a docstring, over however many lines it is wrapped across.
+
+    Taking the first LINE truncates mid-sentence on any docstring whose opening sentence wraps,
+    which is most of them. So the leading paragraph is joined first -- up to the blank line -- and
+    then cut at the first sentence end, ignoring the full stops inside `a.b` and `Fig. 2`.
+    A leading `name --` or `name:` tag is stripped.
+    """
+    para = []
+    for ln in (doc or "").strip().split("\n"):
+        if not ln.strip():
+            break
+        para.append(ln.strip())
+    text = " ".join(para)
+    text = re.sub(r"^[\w<>./()-]+\s*(--|—|:)\s*", "", text)
+    m = re.search(r"(?<![A-Z])(?<!\b[A-Za-z])\.(?=\s+[A-Z(`]|$)", text)
+    if m:
+        text = text[:m.end()]
+    return text[:1].upper() + text[1:] if text else ""
 
 
 # --- prose cleanup: strip unreadable ASCII display-math from docstrings -------- #

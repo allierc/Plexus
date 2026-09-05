@@ -1,0 +1,480 @@
+---
+title: "bm_bond"
+subtitle: "Springs between neighbouring membrane particles, built once and thereafter breakable."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Springs between neighbouring membrane particles, built once and thereafter breakable.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+breakable. They are what makes the sheet a membrane rather than a cloud of stiff dust.
+
+basement_membrane -> basement_membrane: reads pos, emits an acceleration.
+
+    L_e     = |x_j - x_i|
+
+rest_e is each bond's own rest length, recorded when it formed, in world units; k is the
+crosslink stiffness in inverse time squared, so k times a length is an acceleration. The sheet
+therefore resists stretching IN ITS OWN PLANE, which is how a basement membrane carries load
+and is mostly what collagen IV contributes.
+
+HOOKEAN IN THE EXTENSION, NOT IN THE STRAIN, and the difference is not cosmetic. k * strain is
+k (L - rest) / rest, and rest is the particle spacing -- a small number -- so writing the force
+that way multiplies the declared stiffness by 1/rest, which for a typical spacing is a factor
+of several hundred. A nominal stiffness then acts as an enormous one, one percent of strain
+produces an acceleration that moves a particle several times its own spacing in a frame, and
+the sheet oscillates and tears itself apart before the tissue has grown into it. The BREAKING
+criterion stays relative, because strain is the right dimensionless failure measure; only the
+force is extension-based.
+
+`aniso` makes crosslinks stiffer around the girth than along the long axis -- the molecular
+corset: a sheet resisting circumferential expansion more than meridional expansion squeezes the
+middle and pushes growth into the ends. A bond's orientation is measured against the local
+circle of latitude.
+
+It emits an acceleration rather than moving particles itself, so the engine integrates it
+alongside everything else acting on the set rather than behind the solver's back.
+
+Reference: Topfer, U. et al. (2022). Basement membrane stiffness determines organ shape.
+Collagen IV is the principal contributor to basement-membrane stiffness.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `k` | bond_stiffness | 2.0e5 |
+| `cutoff` | neighbour_search_radius | 0.020 |
+| `max_neighbours` | bonds_per_particle | 6 |
+| `damp` | bond_damping | 0.0 |
+| `graph_mode` | &ndash; | False |
+| `snapshot_every` | &ndash; | 20 |
+| `rebond_every` | &ndash; | 20 |
+| `aniso` | &ndash; | 1.0 |
+| `record_hoop` | &ndash; | False |
+| `centre` | &ndash; | [0.5, 0.5, 0.5] |
+| `k_adhesion_hint` | &ndash; | 0.0 |
+| `overdamped_gamma` | &ndash; | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: bm_bond, at: particle}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`crosslink`]{.op-badge} [`basement_membrane`]{.op-badge} [`elastic_network`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("bm_bond", family="mechanics", set="particle", kind="lateral")
+class BasementMembraneBond(Lateral):
+    """Crosslinks: springs between neighbouring membrane particles, built once and thereafter
+    breakable. They are what makes the sheet a membrane rather than a cloud of stiff dust.
+
+    basement_membrane -> basement_membrane: reads pos, emits an acceleration.
+
+        L_e     = |x_j - x_i|
+        f_e     = k (L_e - rest_e) (x_j - x_i) / L_e            on i, and -f_e on j
+        strain_e = (L_e - rest_e) / rest_e                       reported, and used for breaking
+
+    rest_e is each bond's own rest length, recorded when it formed, in world units; k is the
+    crosslink stiffness in inverse time squared, so k times a length is an acceleration. The sheet
+    therefore resists stretching IN ITS OWN PLANE, which is how a basement membrane carries load
+    and is mostly what collagen IV contributes.
+
+    HOOKEAN IN THE EXTENSION, NOT IN THE STRAIN, and the difference is not cosmetic. k * strain is
+    k (L - rest) / rest, and rest is the particle spacing -- a small number -- so writing the force
+    that way multiplies the declared stiffness by 1/rest, which for a typical spacing is a factor
+    of several hundred. A nominal stiffness then acts as an enormous one, one percent of strain
+    produces an acceleration that moves a particle several times its own spacing in a frame, and
+    the sheet oscillates and tears itself apart before the tissue has grown into it. The BREAKING
+    criterion stays relative, because strain is the right dimensionless failure measure; only the
+    force is extension-based.
+
+    `aniso` makes crosslinks stiffer around the girth than along the long axis -- the molecular
+    corset: a sheet resisting circumferential expansion more than meridional expansion squeezes the
+    middle and pushes growth into the ends. A bond's orientation is measured against the local
+    circle of latitude.
+
+    It emits an acceleration rather than moving particles itself, so the engine integrates it
+    alongside everything else acting on the set rather than behind the solver's back.
+
+    Reference: Topfer, U. et al. (2022). Basement membrane stiffness determines organ shape.
+    Collagen IV is the principal contributor to basement-membrane stiffness.
+    """
+
+    # `mpm_acceleration` routes the force into the MPM substep as an external body force; `acceleration`
+    # hands it to the engine, which integrates v += dt*a; x += dt*v directly. The spring graph needs the
+    # second, and the spec sets `emit:` per run -- `_resolve_emit` reads the spec ahead of this default.
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["crosslink", "basement_membrane", "elastic_network"]
+    PARAM_ROLES = {"k": "bond_stiffness", "cutoff": "neighbour_search_radius",
+                   "max_neighbours": "bonds_per_particle", "damp": "bond_damping"}
+    REFERENCE = "Topfer, U. et al. (2022) Development 149:dev200456."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        # STABILITY BOUND, stated because it is the thing that limits this number: the bond is a
+        # spring-mass oscillator with omega = sqrt(k), and explicit integration needs
+        # dt_sub < 2/omega. At dt_sub = 2e-4 that is k < 1e8; 2e5 gives ~70 substeps per period, which
+        # is stable with room to spare.
+        self.k = float(params.get("k", 2.0e5))
+        # ...AND THAT ARGUMENT ONLY HOLDS FOR THE MPM PATH. `emit: acceleration` hands the force to the
+        # ENGINE, which integrates once per FRAME at dt = 4e-3 -- twenty times the MPM substep. The limit
+        # is dt < 2/omega with omega = sqrt(k_eff), and k_eff is not k but the SUM over a node's bonds,
+        # about 4.6 of them, so the ceiling drops by another factor of 4.6:
+        #
+        #     k_max  =  4 / (dt^2 * bonds_per_node)   ~  5.4e4  at dt = 4e-3
+        #
+        # Above it the sheet does not wobble, it diverges: the first graph-mode run returned a mean
+        # crosslink strain of INFINITY at k = 2e5, a value that is obviously wrong and would have been
+        # obviously wrong to average into a sweep. Checked here rather than discovered there.
+        self.graph_mode = bool(params.get("graph_mode", False))
+        self.snapshot_every = int(params.get("snapshot_every", 20))
+        self.rebond_every = int(params.get("rebond_every", 20))   # ongoing crosslinking
+        self.aniso = float(params.get("aniso", 1.0))          # circumferential : meridional stiffness
+        self.record_hoop = bool(params.get("record_hoop", False))
+        self.centre_t = torch.tensor([float(v) for v in params.get("centre", [0.5, 0.5, 0.5])])
+        # the adhesion stiffness acting on the same nodes; the spec passes it so the ceiling can see it
+        self.k_adh_hint = float(params.get("k_adhesion_hint", 0.0))
+        self.gamma = float(params.get("overdamped_gamma", 0.0))
+        self.cutoff = float(params.get("cutoff", 0.020))
+        self.max_nb = int(params.get("max_neighbours", 6))
+        self.damp = float(params.get("damp", 0.0))
+        self.i = self.j = self.rest = self.alive = None
+        self._said = False
+
+    def _check_stability(self, bonds_per_node, dt_frame=4.0e-3):
+        """Refuse a stiffness the frame-rate integration cannot carry.
+
+        CALIBRATED AGAINST A SWEEP, not derived and left. The textbook dt < 2/omega using the crosslinks
+        alone gives 4.4e4; a measured sweep over k = 200..40,000 put the real transition between 5,000
+        and 10,000, six times lower:
+
+          k    200-5,000   bonds ~50,700   strain 0.101-0.106   stable
+          k       10,000   bonds  33,421   strain 0.114         transition
+          k   20,000+      bonds  63,615   strain 2.02          diverged
+
+        Two corrections to the textbook form. The INTEGRIN spring pulls on the same node, so it belongs
+        in the effective stiffness; and the usable criterion with drag present is dt*omega < 1, not the
+        marginal 2. (The diverged runs also over-secrete -- 29k nodes against 11k -- because the
+        secretion setpoint keys on mean radius and an exploding sheet has a large one. A numerical
+        failure that reads as biology.)
+        """
+        if not self.graph_mode:
+            return                                   # MPM path: integrated at the substep, ~70 per period
+        # THE CRITERION DEPENDS ON WHICH EQUATION OF MOTION IS BEING INTEGRATED, and using the wrong one
+        # refuses exactly the runs that motivated the change. Inertial (v += dt*a) is a spring-mass
+        # oscillator, dt*sqrt(k_eff) < 1. Overdamped (x += dt*F/gamma) is first order, dt*k_eff/gamma < 2.
+        # Either way k_eff is the sum over the node's OWN bonds plus its tether, not k alone.
+        #
+        #     inertial     k_max = (1/dt^2 - kappa)/z   ~ 9.0e3
+        #     overdamped   k_max = (2*gamma/dt - kappa)/z ~ 1.7e5   at gamma = 2000
+        #
+        # 19x, not the 120x I first claimed -- that figure dropped the coordination factor z, which is
+        # the same term that made the first version of this guard 13x too generous.
+        #
+        # Worth stating because it changes what a stiffness sweep MEANS: overdamped, k and gamma enter
+        # only as k/gamma, a relaxation RATE. So the ceiling is not a property of the sheet, it can be
+        # moved by raising gamma -- at the cost of a sheet that responds more slowly than the tissue grows.
+        z = max(bonds_per_node, 1.0)
+        if self.gamma > 0:
+            k_max = (2.0 * self.gamma / dt_frame - self.k_adh_hint) / z
+        else:
+            k_max = (1.0 / dt_frame ** 2 - self.k_adh_hint) / z
+        if self.k > k_max:
+            raise RuntimeError(
+                f"bm_bond: k = {self.k:.3g} exceeds the explicit-integration ceiling "
+                f"{k_max:.3g} for graph mode at dt = {dt_frame:g} with {bonds_per_node:.1f} bonds per "
+                f"node. The spring graph is integrated once per FRAME, not at the MPM substep, so it "
+                f"cannot carry the stiffness the MPM path could: this run would return an infinite "
+                f"strain rather than a soft sheet. Either lower k, or give the membrane its own substep "
+                f"loop (which is what moving off MPM gave up).")
+
+    def _neighbours_celllist(self, pos, k):
+        """k nearest within `cutoff`, in O(N) instead of O(N^2), via a uniform cell list.
+
+        WHY THIS REPLACED THE CHUNKED PAIRWISE SEARCH. The old comment here said a grid hash was "more
+        code for a cost paid a single time", which was true at 40k nodes and false the moment secretion
+        started re-bonding and the deposition term began measuring local sparsity every frame. At 45k the
+        pairwise form is 2e9 distances; at 500k it is 2.5e11, and it is no longer paid once.
+
+        Cell size IS the cutoff, so every neighbour within range lies in the particle's own cell or one
+        of the 26 around it. On a shell at this density that is order 100 candidates per node rather than
+        N, and the total work becomes linear.
+        """
+        n = pos.shape[0]
+        dev = pos.device
+        c = torch.div(pos, self.cutoff, rounding_mode="floor").long()
+        c = c - c.min(0).values                                  # non-negative cell coords
+        G = int(c.max().item()) + 2
+        cid = (c[:, 0] * G + c[:, 1]) * G + c[:, 2]
+        order = torch.argsort(cid)
+        cid_s = cid[order]
+        uniq, counts = torch.unique_consecutive(cid_s, return_counts=True)
+        starts = torch.cumsum(counts, 0) - counts
+
+        off = torch.tensor([[dx, dy, dz] for dx in (-1, 0, 1) for dy in (-1, 0, 1) for dz in (-1, 0, 1)],
+                           device=dev, dtype=torch.long)
+        best_d = torch.full((n, k), 1e9, device=dev, dtype=pos.dtype)
+        best_j = torch.zeros((n, k), device=dev, dtype=torch.long)
+        for o in off:
+            nid = ((c[:, 0] + o[0]) * G + (c[:, 1] + o[1])) * G + (c[:, 2] + o[2])
+            slot = torch.searchsorted(uniq, nid).clamp(max=uniq.numel() - 1)
+            ok = uniq[slot] == nid
+            cnt = torch.where(ok, counts[slot], torch.zeros_like(counts[slot]))
+            if int(cnt.max()) == 0:
+                continue
+            m = int(cnt.max())
+            # a fixed (n, m) candidate block per offset: m is the fullest cell, single digits here
+            ar = torch.arange(m, device=dev)[None, :]
+            valid = ar < cnt[:, None]
+            idx = (starts[slot][:, None] + ar).clamp(max=n - 1)
+            cand = order[idx]
+            d = (pos[:, None, :] - pos[cand]).norm(dim=-1)
+            d = torch.where(valid & (cand != torch.arange(n, device=dev)[:, None]), d,
+                            torch.full_like(d, 1e9))
+            allj = torch.cat([best_j, cand], 1)
+            alld = torch.cat([best_d, d], 1)
+            sel = torch.topk(-alld, k, dim=1).indices
+            best_d = torch.gather(alld, 1, sel)
+            best_j = torch.gather(allj, 1, sel)
+        keep = best_d <= self.cutoff
+        rows = torch.arange(n, device=dev)[:, None].expand_as(best_j)
+        return rows[keep], best_j[keep]
+
+    def _build(self, pos, live=None):
+        # O(N^2) ONCE, at frame 0, in chunks. 20-40k particles is 1.6e9 pairs if done in one tensor, so
+        # it is chunked; it runs once, and the alternative (a grid hash) is more code for a cost paid
+        # a single time.
+        n = pos.shape[0]
+        # COMPACT TO THE LIVE NODES FIRST, then map back. Filtering afterwards is what the pairwise path
+        # did and it was affordable there; for the cell list it is fatal. The unsecreted reserve is parked
+        # at a SINGLE POINT (the tissue centre), so with a cell the size of the cutoff that one cell holds
+        # every dormant particle -- 41,667 of them at reserve 12.5. The candidate block is sized by the
+        # fullest cell, so it became (45000, 41667, 3): a 14 GiB allocation that killed six jobs on a 22
+        # GiB card. Bonds can only ever form between live nodes, so they are the only ones to search.
+        idx = None
+        if live is not None:
+            idx = live.nonzero(as_tuple=True)[0]
+            sub = pos[idx]
+        else:
+            sub = pos
+        m = sub.shape[0]
+        k = min(self.max_nb, max(m - 1, 1))
+        if m > 20000:
+            i, j = self._neighbours_celllist(sub, k)
+        else:
+            i, j = self._build_pairwise(sub, k)
+        if idx is not None:
+            i, j = idx[i], idx[j]
+        n2 = n + 1
+        uk = torch.unique(torch.minimum(i, j) * n2 + torch.maximum(i, j))
+        return (uk // n2).long(), (uk % n2).long()
+
+    def _build_pairwise(self, pos, k):
+        """The original chunked O(N^2) search, kept as the reference the cell list is checked against."""
+        n = pos.shape[0]
+        I, J = [], []
+        step = max(1, 4096 ** 2 // max(n, 1))
+        for a in range(0, n, step):
+            b = min(n, a + step)
+            d = (pos[a:b, None, :] - pos[None, :, :]).norm(dim=-1)
+            d[:, :] = torch.where(d > 0, d, torch.full_like(d, 1e9))
+            near = d <= self.cutoff
+            k = min(self.max_nb, n - 1)
+            idx = torch.topk(torch.where(near, -d, torch.full_like(d, -1e9)), k, dim=1).indices
+            keep = torch.gather(near, 1, idx)
+            rows = (torch.arange(a, b, device=pos.device)[:, None]).expand_as(idx)
+            I.append(rows[keep]); J.append(idx[keep])
+        return torch.cat(I), torch.cat(J)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        # BONDED INCREMENTALLY, NOT REBUILT. The first version recomputed the whole network whenever
+        # secretion fired, and the run stalled at frame 1: `_build` is an O(n^2) neighbour search over
+        # 30k particles, which is affordable once at seeding and not once per frame. Secretion adds a few
+        # hundred particles at a time, so only THEY need neighbours -- and bonding only the new material
+        # carries every existing rest length forward untouched, which the rebuild had to reconstruct by
+        # key just to avoid erasing the remodelling history.
+        # CROSSLINKS FORMED BY THE REWIRE OPERATOR, appended here. `bm_crosslink` decides
+        # WHICH pairs bond -- that is a change to the edge set and belongs in a `rewire` operator, beside
+        # `bm_unbond` -- while this operator stays the owner of the bond arrays. Same
+        # split as secretion: the structural operator chooses, this one wires in.
+        _rb = getattr(H, "membrane_rebond", None)
+        if _rb is not None and self.i is not None and _rb[0].numel():
+            H.membrane_rebond = None
+            ai, aj = _rb
+            self.i = torch.cat([self.i, ai]); self.j = torch.cat([self.j, aj])
+            self.rest = torch.cat([self.rest, (pos[aj] - pos[ai]).norm(dim=-1).detach().clamp_min(1e-9)])
+            self.alive = torch.cat([self.alive, torch.ones(ai.numel(), dtype=torch.bool, device=dev)])
+
+        new = getattr(H, "membrane_new", None)
+        if new is not None and self.i is not None and new.numel():
+            H.membrane_new = None
+            live = getattr(H, "membrane_alive", None)
+            p = pos.detach()
+            d = (p[new][:, None, :] - p[None, :, :]).norm(dim=-1)
+            d[torch.arange(new.numel(), device=p.device), new] = 1e9
+            if live is not None:
+                d = torch.where(live[None, :], d, torch.full_like(d, 1e9))
+            k = min(self.max_nb, p.shape[0] - 1)
+            idx = torch.topk(-d, k, dim=1).indices
+            keep = torch.gather(d, 1, idx) <= self.cutoff
+            rows = new[:, None].expand_as(idx)
+            ni, nj = rows[keep], idx[keep]
+            n2 = p.shape[0] + 1
+            key_new = torch.minimum(ni, nj) * n2 + torch.maximum(ni, nj)
+            key_old = torch.minimum(self.i, self.j) * n2 + torch.maximum(self.i, self.j)
+            fresh = torch.unique(key_new)
+            fresh = fresh[~torch.isin(fresh, key_old)]
+            if fresh.numel():
+                ai, aj = (fresh // n2).long(), (fresh % n2).long()
+                self.i = torch.cat([self.i, ai]); self.j = torch.cat([self.j, aj])
+                self.rest = torch.cat([self.rest,
+                                       (p[aj] - p[ai]).norm(dim=-1).clamp_min(1e-9)])
+                self.alive = torch.cat([self.alive,
+                                        torch.ones(ai.numel(), dtype=torch.bool, device=p.device)])
+        if self.i is None:
+            self.i, self.j = self._build(pos.detach(), getattr(H, "membrane_alive", None))
+            self.rest = (pos[self.j] - pos[self.i]).norm(dim=-1).detach().clamp_min(1e-9)
+            self.alive = torch.ones_like(self.rest, dtype=torch.bool)
+            if self.i.numel() == 0:
+                raise RuntimeError(
+                    f"bm_bond: ZERO bonds among {pos.shape[0]} particles at cutoff "
+                    f"{self.cutoff:g}. A membrane with no crosslinks is not a membrane -- it is stiff "
+                    f"dust, and every downstream fragmentation number would be vacuous. Either the "
+                    f"shell was seeded at the wrong scale or the cutoff is below the particle spacing "
+                    f"(~sqrt(4*pi*R^2/N)).")
+            # LIVE nodes, not the whole set. Dividing by all 45,000 -- of which 41,000 are unsecreted
+            # reserve parked at the centre -- gave 0.42 bonds per node instead of 5.6, a ceiling 13x too
+            # high, and the guard passed a run that returned an infinite strain. A denominator that
+            # includes material which does not exist yet is not a coordination number.
+            _live = getattr(H, "membrane_alive", None)
+            _n = int(_live.sum()) if _live is not None else pos.shape[0]
+            self._check_stability(self.i.numel() / max(_n, 1) * 2.0)
+            print(f"[bm_bond] {self.i.numel()} bonds on {pos.shape[0]} particles "
+                  f"({self.i.numel() / max(pos.shape[0], 1):.1f} per particle), k={self.k:g}, "
+                  f"cutoff={self.cutoff:g}", flush=True)
+        d = pos[self.j] - pos[self.i]
+        L = d.norm(dim=-1).clamp_min(1e-9)
+        strain = (L - self.rest) / self.rest
+        # HOOKEAN IN THE EXTENSION, NOT IN THE STRAIN. `k * strain` is `k * (L - rest) / rest`, and
+        # `rest` is the particle spacing -- a small number -- so writing the force that way scales
+        # the declared stiffness by 1/rest, a factor of several hundred at a typical spacing. One
+        # percent of strain then produces an acceleration that moves a particle several times its
+        # own spacing in a frame, and the sheet overshoots, oscillates and tears itself apart
+        # before the tissue has grown into it. The BREAKING criterion stays relative, since strain
+        # is the right dimensionless failure measure; only the force is extension-based.
+        # THE CORSET. `aniso` makes crosslinks stiffer around the girth than along the long axis, which
+        # is the "molecular corset" idea: a sheet that resists circumferential expansion more than
+        # meridional expansion should squeeze the middle and push growth into the ends.
+        #
+        # A bond's orientation is measured against the local parallel (the circle of latitude): a bond
+        # lying along it is circumferential and gets the full factor, one lying along the meridian gets
+        # none. `aniso = 1` is isotropic and reproduces every run to date bit-for-bit.
+        kk = self.k
+        if self.aniso != 1.0:
+            mid = 0.5 * (pos[self.i] + pos[self.j]) - self.centre_t.to(pos)
+            rad = mid / mid.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            axis = torch.tensor([0.0, 0.0, 1.0], device=pos.device, dtype=dt_)
+            par = torch.cross(axis.expand_as(rad), rad, dim=1)          # local circle of latitude
+            # ITS LENGTH IS sin(colatitude), AND THAT IS PHYSICS, NOT A NORMALISATION NUISANCE. The
+            # circumferential direction is undefined at the poles, where the parallels shrink to a point.
+            # Normalising with a clamp turned that near-zero vector into a unit vector of NOISE, so polar
+            # bonds drew a random stiffness boost instead of none -- and the recorded hoop tension came
+            # out HIGHER at the poles than the equator (8.63 against 7.01), which is a corset backwards.
+            #
+            # Keeping the length as a weight makes the anisotropy vanish smoothly toward the poles, which
+            # is what a corset does: it grips the girth and nothing at the ends.
+            sin_th = par.norm(dim=1, keepdim=True)
+            par = par / sin_th.clamp_min(1e-12)
+            circ = ((d / L[:, None]) * par).sum(1).abs() * sin_th[:, 0]
+            kk = self.k * (1.0 + (self.aniso - 1.0) * circ)
+        f = (kk * (L - self.rest) * self.alive.to(dt_))[:, None] * (d / L[:, None])
+        # the sheet's own hoop tension, by direction -- this is what a corset would press with, and it is
+        # what the growth gate can read in the next pass. Without it the corset cannot reach the tissue.
+        if self.record_hoop:
+            th = torch.acos((mid_u := (0.5 * (pos[self.i] + pos[self.j]) - self.centre_t.to(pos)))[:, 2]
+                            / mid_u.norm(dim=1).clamp_min(1e-12)).clamp(0, math.pi)
+            nb_ = 32
+            bin_ = (th / math.pi * nb_).long().clamp(0, nb_ - 1)
+            ten = (kk * (L - self.rest)).clamp_min(0.0) * self.alive.to(dt_)
+            acc_ = torch.zeros(nb_, device=pos.device, dtype=dt_).index_add_(0, bin_, ten)
+            cnt_ = torch.zeros(nb_, device=pos.device, dtype=dt_).index_add_(0, bin_, self.alive.to(dt_))
+            HOOP_TRACE.append((acc_ / cnt_.clamp_min(1.0)).detach().cpu().numpy())
+        acc = torch.zeros_like(pos)
+        acc.index_add_(0, self.i, f)
+        acc.index_add_(0, self.j, -f)
+        # F/gamma, so the emitted quantity is a VELOCITY, not an acceleration. gamma = 0 leaves the
+        # inertial path untouched, so the two can be compared at the same operating point.
+        if self.gamma > 0:
+            acc = acc / self.gamma
+        # per-particle strain for the renderer: mean |strain| over its live bonds
+        s_abs = (strain.abs() * self.alive.to(dt_))
+        cnt = torch.zeros(pos.shape[0], device=dev, dtype=dt_)
+        tot = torch.zeros(pos.shape[0], device=dev, dtype=dt_)
+        for a, b in ((self.i, self.j), (self.j, self.i)):
+            cnt.index_add_(0, a, self.alive.to(dt_))
+            tot.index_add_(0, a, s_abs)
+        MEMBRANE_STRAIN.append((tot / cnt.clamp_min(1.0)).detach().to("cpu", torch.float16).numpy())
+        H.membrane_bonds = (self.i, self.j, self.rest, self.alive)     # for the break operator
+        H.__dict__["_bm_bond_op"] = self         # the crosslink operator reuses this neighbour search
+        _f = int(getattr(H, "frame", -1) or -1)
+        if self.snapshot_every > 0 and _f >= 0 and _f % self.snapshot_every == 0:
+            _k = self.alive
+            BOND_SNAPSHOTS.append((_f,
+                                   self.i[_k].detach().cpu().numpy().astype("int32"),
+                                   self.j[_k].detach().cpu().numpy().astype("int32"),
+                                   strain[_k].detach().cpu().numpy().astype("float16")))
+        return {lvl.name: acc}
+```

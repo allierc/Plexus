@@ -1,6 +1,6 @@
 ---
 title: "chemotax"
-subtitle: "Set <- field. Nodes follow (or flee) a field's gradient."
+subtitle: "Move along a chemical gradient, up it or down it."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Set <- field. Nodes follow (or flee) a field's gradient."
 
 [`exchange`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Set <- field. Nodes follow (or flee) a field's gradient.
+Move along a chemical gradient, up it or down it.
 :::
 
 ```{=html}
@@ -42,23 +42,28 @@ Set <- field. Nodes follow (or flee) a field's gradient.
 
 ## Mechanism
 
-The Keller-Segel coupling: each selected node gets `gain * grad(field)` sampled at its
-position (gain<0 to flee). ONE operator for both integration routings, chosen by `emit:`:
+counterpart of `sense`, which samples the field at discrete points instead.
 
-* `emit: velocity` (default) -- a velocity the ENGINE integrates; it simply sums with any
-  other velocity the node carries (e.g. attraction_repulsion). This is the old `chemotaxis`.
-* `emit: mpm_acceleration` -- the SAME `gain*grad` returned as a body acceleration routed to
-  the MPM substep (p2g reads `H.delta` as `a_ext`), or added into a 2nd-order set's delta.
-  This is the old `chemo_force`.
+particle -> particle: reads pos and the gradient of the `from:` field, emits a velocity.
 
-The returned vector is identical either way (`gain*grad`); only the engine's interpretation
-differs -- which is exactly why the two former operators are one operator plus an `emit:`
-switch, and why `forward` never branches on `emit`. The gradient itself is `Field.grad_at`
-(Axis B: spatial field math lives on the grid, not copied into every operator).
+chi is `gain`, the chemotactic sensitivity, in world units squared per unit time per field
+unit -- it converts a field gradient into a speed. Its sign is the direction of travel:
+positive climbs the gradient (attraction), negative descends it (repulsion). eta is
+`noise`, an isotropic exploration velocity, and xi_i a standard normal vector. `channel`
+picks one channel of a multi-species field; omitting it sums over all of them, so the
+element responds to any trail.
 
-`channel: null` (default) sums all channels (follow any trail); `by_material` flips the sign
-per phase (solids climb `+|gain|`, liquids flee `-|gain|`); `noise` adds isotropic
-exploration. The field may be deposited (slime), reaction-diffused, or prescribed (a video).
+With `by_material: true` the sign is taken from the particle's own phase instead of from
+`gain`: solids climb the gradient with +|chi| and liquids descend it with -|chi|, so one
+field drives both phases in opposite directions -- solid into the filaments, liquid into
+the voids.
+
+Emits a velocity by default, the overdamped reading. A specification writing
+`emit: mpm_acceleration` routes the same quantity to the MPM substep as a body force
+instead, which is a different physical claim about what the gradient does.
+
+Reference: Keller, E. F. & Segel, L. A. (1971). Model for chemotaxis. J. Theor. Biol.
+30:225-234.
 
 ## Parameters
 
@@ -83,46 +88,43 @@ operators:
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd).
+Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`mpm_scatter`](mpm_scatter.qmd), [`p2g`](p2g.qmd), [`mpm_gather`](mpm_gather.qmd).
 
 ## Source
 
-[`src/plexus/operators/chemotax.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/chemotax.py) &mdash; the registered operator.
+[`src/plexus/operators/field_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/field_ops.py) &mdash; the registered operator.
 
 ```python
-"""chemotax -- set <- field. Nodes follow (or flee) a field's gradient.
-
-The Keller-Segel coupling: each selected node gets `gain * grad(field)` sampled at its
-position (gain<0 to flee). ONE operator for both integration routings, chosen by `emit:`:
-
-* `emit: velocity` (default) -- a velocity the ENGINE integrates; it simply sums with any
-  other velocity the node carries (e.g. attraction_repulsion). This is the old `chemotaxis`.
-* `emit: mpm_acceleration` -- the SAME `gain*grad` returned as a body acceleration routed to
-  the MPM substep (p2g reads `H.delta` as `a_ext`), or added into a 2nd-order set's delta.
-  This is the old `chemo_force`.
-
-The returned vector is identical either way (`gain*grad`); only the engine's interpretation
-differs -- which is exactly why the two former operators are one operator plus an `emit:`
-switch, and why `forward` never branches on `emit`. The gradient itself is `Field.grad_at`
-(Axis B: spatial field math lives on the grid, not copied into every operator).
-
-`channel: null` (default) sums all channels (follow any trail); `by_material` flips the sign
-per phase (solids climb `+|gain|`, liquids flee `-|gain|`); `noise` adds isotropic
-exploration. The field may be deposited (slime), reaction-diffused, or prescribed (a video).
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Exchange
-from plexus.models.registry import register_operator
-
-
 @register_operator("chemotax", family="fields", set="particle", kind="exchange")
 class Chemotax(Exchange):
-    EMIT = "velocity"                           # default routing; override in the spec with `emit: mpm_acceleration`
-    # typed signature (Plexus2 sec. 2.1): field -> set (Exchange). Reads the `from:`
-    # field gradient at each node's position, writes a velocity/accel on the node.
+    """Chemotaxis: move along a chemical gradient, up it or down it. The continuum-sensing
+    counterpart of `sense`, which samples the field at discrete points instead.
+
+    particle -> particle: reads pos and the gradient of the `from:` field, emits a velocity.
+
+        dx_i/dt = chi grad c(x_i)  +  eta xi_i
+
+    chi is `gain`, the chemotactic sensitivity, in world units squared per unit time per field
+    unit -- it converts a field gradient into a speed. Its sign is the direction of travel:
+    positive climbs the gradient (attraction), negative descends it (repulsion). eta is
+    `noise`, an isotropic exploration velocity, and xi_i a standard normal vector. `channel`
+    picks one channel of a multi-species field; omitting it sums over all of them, so the
+    element responds to any trail.
+
+    With `by_material: true` the sign is taken from the particle's own phase instead of from
+    `gain`: solids climb the gradient with +|chi| and liquids descend it with -|chi|, so one
+    field drives both phases in opposite directions -- solid into the filaments, liquid into
+    the voids.
+
+    Emits a velocity by default, the overdamped reading. A specification writing
+    `emit: mpm_acceleration` routes the same quantity to the MPM substep as a body force
+    instead, which is a different physical claim about what the gradient does.
+
+    Reference: Keller, E. F. & Segel, L. A. (1971). Model for chemotaxis. J. Theor. Biol.
+    30:225-234.
+    """
+
+    EMIT = "velocity"                           # first-order by default; `emit: mpm_acceleration` reroutes it
     INPUTS = ["particle"]
     OUTPUTS = ["particle"]
     READS = ["pos"]
@@ -132,7 +134,8 @@ class Chemotax(Exchange):
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["gradient_following", "field_templated_aggregation", "field_templated_flow"]
     PARAM_ROLES = {"gain": "field_sensitivity", "noise": "exploration_noise"}
-    REFERENCE = "Keller, E. F. & Segel, L. A. (1971). Model for chemotaxis. J. Theor. Biol. 30:225-234."
+    REFERENCE = ("Keller, E. F. & Segel, L. A. (1971). Model for chemotaxis. J. Theor. Biol. "
+                 "30:225-234.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

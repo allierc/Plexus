@@ -1,0 +1,209 @@
+---
+title: "bm_remodel"
+subtitle: "Crosslink turnover: the rest lengths creep toward the current ones, so the sheet can GROW rather than only stretch."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Crosslink turnover: the rest lengths creep toward the current ones, so the sheet can GROW rather than only stretch.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+rather than only stretch.
+
+basement_membrane -> basement_membrane: rewrites the bonds' reference state. No delta.
+
+    rest_e <- rest_e + (L_e - rest_e) dt / tau        capped at `cap` per frame
+
+tau is the turnover timescale in frames and `cap` the largest fractional change a rest length
+may take in one frame, both dimensionless. This is a Maxwell-like relaxation of the REFERENCE
+state, which is what turnover does mechanically: material is removed under load and redeposited
+at the new spacing, so the sheet forgets the strain over a timescale. It does not relieve the
+current force -- that would make the membrane a fluid -- it moves the reference the force is
+measured from.
+
+A purely elastic basement membrane cannot accommodate the epithelium it encloses. An acinus
+whose radius grows severalfold imposes a linear stretch far above any crosslink failure strain,
+so lowering or raising that threshold does not help: every value is smaller than the strain
+growth imposes, and the sheet is destroyed at all of them. The conclusion is not that the model
+is broken but that a membrane which only stretches MUST fail, so a growing epithelium has to
+remodel and re-secrete its basement membrane.
+
+Fragmentation therefore becomes a race, which is the interesting statement: tau against the
+growth timescale decides everything. Remodel faster than the tissue grows and the sheet stays
+intact and unstressed; slower, and strain accumulates until crosslinks fail. One number
+separates "the membrane keeps up" from "the membrane tears", and neither is assumed.
+
+Reference: Ku, H.-Y. et al. (2023). Basement membrane mechanics regulates matrix
+metalloproteinase expression. Dev. Cell 58:211-223; Villeneuve, C. et al. (2024). Proteolytic
+softening releases pressure and permits local division. Nat. Cell Biol. 26:207-218.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `tau` | turnover_timescale_in_frames | 60.0 |
+| `cap` | max_rest_growth_per_frame | 0.02 |
+| `target` | &ndash; | "own" |
+| `mesh_w` | &ndash; | 1.0 |
+| `l_star` | &ndash; | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: bm_remodel, at: particle}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`basement_membrane`]{.op-badge} [`crosslink_turnover`]{.op-badge} [`stress_relaxation`]{.op-badge} [`matrix_remodelling`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("bm_remodel", family="population", set="particle", kind="lateral")
+class BasementMembraneRemodel(Lateral):
+    """Crosslink turnover: the rest lengths creep toward the current ones, so the sheet can GROW
+    rather than only stretch.
+
+    basement_membrane -> basement_membrane: rewrites the bonds' reference state. No delta.
+
+        rest_e <- rest_e + (L_e - rest_e) dt / tau        capped at `cap` per frame
+
+    tau is the turnover timescale in frames and `cap` the largest fractional change a rest length
+    may take in one frame, both dimensionless. This is a Maxwell-like relaxation of the REFERENCE
+    state, which is what turnover does mechanically: material is removed under load and redeposited
+    at the new spacing, so the sheet forgets the strain over a timescale. It does not relieve the
+    current force -- that would make the membrane a fluid -- it moves the reference the force is
+    measured from.
+
+    A purely elastic basement membrane cannot accommodate the epithelium it encloses. An acinus
+    whose radius grows severalfold imposes a linear stretch far above any crosslink failure strain,
+    so lowering or raising that threshold does not help: every value is smaller than the strain
+    growth imposes, and the sheet is destroyed at all of them. The conclusion is not that the model
+    is broken but that a membrane which only stretches MUST fail, so a growing epithelium has to
+    remodel and re-secrete its basement membrane.
+
+    Fragmentation therefore becomes a race, which is the interesting statement: tau against the
+    growth timescale decides everything. Remodel faster than the tissue grows and the sheet stays
+    intact and unstressed; slower, and strain accumulates until crosslinks fail. One number
+    separates "the membrane keeps up" from "the membrane tears", and neither is assumed.
+
+    Reference: Ku, H.-Y. et al. (2023). Basement membrane mechanics regulates matrix
+    metalloproteinase expression. Dev. Cell 58:211-223; Villeneuve, C. et al. (2024). Proteolytic
+    softening releases pressure and permits local division. Nat. Cell Biol. 26:207-218.
+    """
+
+    EMIT = None                     # rewrites the bonds' reference state; no delta
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["basement_membrane", "crosslink_turnover", "stress_relaxation",
+                      "matrix_remodelling"]
+    PARAM_ROLES = {"tau": "turnover_timescale_in_frames", "cap": "max_rest_growth_per_frame"}
+    REFERENCE = ("Ku, H.-Y. et al. (2023) Dev. Cell 58:211 (BM mechanics regulates MMP, MMP remodels "
+                 "BM); Villeneuve, C. et al. (2024) Nat. Cell Biol. 26:207 (proteolytic softening "
+                 "releases pressure and permits local division).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.tau = float(params.get("tau", 60.0))
+        self.cap = float(params.get("cap", 0.02))
+        self.target = str(params.get("target", "own")).lower()    # "own" | "mesh" | "fixed"
+        self.mesh_w = float(params.get("mesh_w", 1.0))            # how far toward the common spacing
+        lst = params.get("l_star", 0.0)
+        self._l_star = float(lst) if lst else None                # None = freeze it from frame 0
+        self._said = False
+
+    def forward(self, H, mask=None):
+        b = getattr(H, "membrane_bonds", None)
+        if b is None:
+            return {}
+        i, j, rest, alive = b
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        L = (pos[j] - pos[i]).norm(dim=-1).clamp_min(1e-9)
+        # CAPPED PER FRAME. Without it a single violent frame -- a contact transient, an instability --
+        # is written permanently into the reference state, and the sheet would remember a shock it should
+        # have forgotten. The cap is a fraction of the current rest length.
+        # TOWARD WHAT? `L` -- each bond's OWN current length -- is what this used to relax to, and that
+        # turns out to be why the sheet never evens out. If every spring remembers its own length, the
+        # network has no common preferred spacing, so a disordered configuration IS its equilibrium and
+        # relaxation cannot improve on it. Measured at the end of a run: cv of the rest lengths is 0.521.
+        # Anchors, crosslinking and deposition were all tested against the holes and none of them
+        # mattered, because none of them touches where the disorder is stored.
+        #
+        # A real collagen IV network has a characteristic mesh size -- protomers are a defined length --
+        # so `mesh` relaxes rest lengths toward the spacing the sheet's own density implies, which gives
+        # the network something uniform to relax TO. `own` is the previous behaviour, kept because every
+        # run to date used it.
+        # `fixed` GOES ONE STEP FURTHER, AND THE STEP MATTERS. `mesh` relaxes toward the sheet's OWN
+        # current mean, which is self-referential: if secretion under-delivers, the mean spacing grows
+        # and the springs simply accept the sparser sheet. The holes get ratified rather than closed.
+        # A collagen IV protomer has a defined length, so the mesh size is set by the MOLECULE, not by
+        # whatever density happens to exist. Holding l* fixed makes N = 4*pi*R^2/l*^2 the number of nodes
+        # the sheet needs, secretion the only thing that can supply it, and a shortfall visible as
+        # tension and holes -- a result, not an artefact. l* is frozen from the frame-0 sheet, which is
+        # the one configuration that was seeded evenly on purpose.
+        if self.target == "fixed":
+            if self._l_star is None:
+                self._l_star = float(L[alive].mean()) if float(alive.sum()) > 0 else float(rest.mean())
+                print(f"[bm_remodel] target l* = {self._l_star:.5g} (frozen from frame 0); "
+                      f"the sheet must SECRETE to hold it as it grows", flush=True)
+            H.membrane_l_star = self._l_star
+            tgt = torch.full_like(L, self._l_star)
+        elif self.target == "mesh":
+            live_n = float(alive.to(rest.dtype).sum())
+            l_star = L[alive].mean() if live_n > 0 else rest.mean()
+            tgt = (1.0 - self.mesh_w) * L + self.mesh_w * l_star
+        else:
+            tgt = L
+        d = ((tgt - rest) / max(self.tau, 1e-9)).clamp(-self.cap * rest, self.cap * rest)
+        rest += d * alive.to(rest.dtype)
+        if not self._said:
+            print(f"[bm_remodel] crosslink turnover tau={self.tau} frames "
+                  f"(cap {self.cap:g} of rest per frame): the sheet forgets strain over tau, so "
+                  f"fragmentation is a race between turnover and growth", flush=True)
+            self._said = True
+        return {}
+```

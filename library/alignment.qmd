@@ -1,6 +1,6 @@
 ---
 title: "alignment"
-subtitle: "Velocity_align (was alignment) -- Vicsek-style neighbour velocity alignment (the NOMINAL model);"
+subtitle: "Velocity alignment: accelerate toward the mean velocity of the neighbours."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Velocity_align (was alignment) -- Vicsek-style neighbour velocity ali
 
 [`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Velocity_align (was alignment) -- Vicsek-style neighbour velocity alignment (the NOMINAL model);
+Velocity alignment: accelerate toward the mean velocity of the neighbours.
 :::
 
 ```{=html}
@@ -42,38 +42,26 @@ Velocity_align (was alignment) -- Vicsek-style neighbour velocity alignment (the
 
 ## Mechanism
 
-Reynolds' boids alignment rule is recovered as a SPECIAL CASE.
+boids steering rule, and on its own the Vicsek model -- the one term that turns a set of
+independently moving particles into a collectively moving one.
 
-Each receiver i steers toward the (weighted) mean velocity of its graph neighbours
-j -- the edges left by a `rewire` op such as `radius_graph`. This is the alignment
-interaction at the heart of the Vicsek model of active matter and of boids:
+particle -[neighbour relation]-> particle: reads pos and vel, emits an acceleration.
 
-NOMINAL -- Vicsek (`gate: none`, `per_type: false`): every radius neighbour counts
-equally (w_ij = 1). Paired with `cruise` over a `radius_graph` this is the
-metric Vicsek model, whose polar order undergoes the noise-driven flocking
-transition (flock <-> disorder, with bands/swirls in between).
+a is the alignment strength, in inverse time, since (v_j - v_i) already carries a velocity.
+g_ij is the weight the receiver gives that neighbour: `gate: none` sets every g_ij to 1, so
+all neighbours inside the rewire's radius count equally (Vicsek and boids both do this);
+`gate: contact` instead applies a smoothstep falling from 1 to 0 between (1 - softness) r
+and r, in world units, so influence fades with distance rather than stopping at a cliff.
+eta is `noise`, isotropic Vicsek noise on the alignment, and xi_i a standard normal vector;
+it is the control parameter of the order-disorder transition, and 0 by default.
 
-SPECIAL CASE -- boids (`per_type: true`): fold in the set's per-type alignment
-strength (the `alignment` type property), reproducing Reynolds' boids alignment
-term exactly; compose with `cohesion` + `separation` for the full boids law.
+With `per_type: true` the whole term is scaled by the receiver's own `alignment` weight,
+dimensionless -- the boids special case, where types align to different degrees.
 
-OPTION -- `gate: contact`: a smoothstep contact gate weights w_ij by how close i
-and j are (1 in contact, 0 at radius r), for dense/contact active matter with no
-discontinuity as neighbours drift in and out of range.
-
-OPTION -- `noise`: isotropic orientation noise added to the alignment acceleration
-(off by default). In the canonical Vicsek model the noise eta lives ON the heading
-update, so the order/disorder transition can be driven here instead of (or with) the
-`noise` in `cruise` -- raise it to melt the flock into a disordered gas.
-
-Second-derivative law (an acceleration): the engine integrates vel += dt*acc,
-pos += dt*vel. No 1/|d|^2 term, so it needs no `min_radius` and composes cleanly
-with `cruise`, `cohesion`, `separation`, `drag`.
-
-Refs: Vicsek, Czirok, Ben-Jacob, Cohen & Shochet, PRL 75 (1995) (active matter);
-Reynolds, SIGGRAPH 1987 (boids); the active-matter Vicsek generator in The Well
-(Ohana et al., NeurIPS 2024, github.com/PolymathicAI/the_well), ported in
-prototype/well/well_ops.py.
+Reference: Vicsek, T., Czirok, A., Ben-Jacob, E., Cohen, I. & Shochet, O. (1995). Novel
+type of phase transition in a system of self-driven particles. Phys. Rev. Lett.
+75:1226-1229. The per-type variant follows Reynolds, C. W. (1987). SIGGRAPH Comput.
+Graph. 21(4):25-34.
 
 $$
 \mathbf a_i \;=\; a_2\,w^a_i\,\big\langle \mathbf v_j-\mathbf v_i\big\rangle_{j\in\mathcal N(i)}
@@ -106,68 +94,51 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`stillinger_weber`](stillinger_weber.qmd).
 
 ## Source
 
-[`src/plexus/operators/velocity_align.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/velocity_align.py) &mdash; the registered operator.
+[`src/plexus/operators/interaction_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/interaction_ops.py) &mdash; the registered operator.
 
 ```python
-"""velocity_align (was alignment) -- Vicsek-style neighbour velocity alignment (the NOMINAL model);
-Reynolds' boids alignment rule is recovered as a SPECIAL CASE.
-
-Each receiver i steers toward the (weighted) mean velocity of its graph neighbours
-j -- the edges left by a `rewire` op such as `radius_graph`. This is the alignment
-interaction at the heart of the Vicsek model of active matter and of boids:
-
-    acc_i = a * (sum_j w_ij (vel_j - vel_i)) / (sum_j w_ij)
-
-NOMINAL -- Vicsek (`gate: none`, `per_type: false`): every radius neighbour counts
-equally (w_ij = 1). Paired with `cruise` over a `radius_graph` this is the
-metric Vicsek model, whose polar order undergoes the noise-driven flocking
-transition (flock <-> disorder, with bands/swirls in between).
-
-SPECIAL CASE -- boids (`per_type: true`): fold in the set's per-type alignment
-strength (the `alignment` type property), reproducing Reynolds' boids alignment
-term exactly; compose with `cohesion` + `separation` for the full boids law.
-
-OPTION -- `gate: contact`: a smoothstep contact gate weights w_ij by how close i
-and j are (1 in contact, 0 at radius r), for dense/contact active matter with no
-discontinuity as neighbours drift in and out of range.
-
-OPTION -- `noise`: isotropic orientation noise added to the alignment acceleration
-(off by default). In the canonical Vicsek model the noise eta lives ON the heading
-update, so the order/disorder transition can be driven here instead of (or with) the
-`noise` in `cruise` -- raise it to melt the flock into a disordered gas.
-
-Second-derivative law (an acceleration): the engine integrates vel += dt*acc,
-pos += dt*vel. No 1/|d|^2 term, so it needs no `min_radius` and composes cleanly
-with `cruise`, `cohesion`, `separation`, `drag`.
-
-Refs: Vicsek, Czirok, Ben-Jacob, Cohen & Shochet, PRL 75 (1995) (active matter);
-Reynolds, SIGGRAPH 1987 (boids); the active-matter Vicsek generator in The Well
-(Ohana et al., NeurIPS 2024, github.com/PolymathicAI/the_well), ported in
-prototype/well/well_ops.py.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-from plexus.geometry import minimum_image
-
-
 @register_operator("velocity_align", "alignment", family="interaction", set="particle", kind="lateral")
-class VelocityAlign(Lateral):                    # (alias `alignment`, one migration cycle)
-    EMIT = "acceleration"            # emits an acceleration
+class VelocityAlign(Lateral):
+    """Velocity alignment: accelerate toward the mean velocity of the neighbours. The third
+    boids steering rule, and on its own the Vicsek model -- the one term that turns a set of
+    independently moving particles into a collectively moving one.
+
+    particle -[neighbour relation]-> particle: reads pos and vel, emits an acceleration.
+
+        d2x_i/dt2 = a  ( sum_j g_ij (v_j - v_i) ) / ( sum_j g_ij )  +  eta xi_i
+
+    a is the alignment strength, in inverse time, since (v_j - v_i) already carries a velocity.
+    g_ij is the weight the receiver gives that neighbour: `gate: none` sets every g_ij to 1, so
+    all neighbours inside the rewire's radius count equally (Vicsek and boids both do this);
+    `gate: contact` instead applies a smoothstep falling from 1 to 0 between (1 - softness) r
+    and r, in world units, so influence fades with distance rather than stopping at a cliff.
+    eta is `noise`, isotropic Vicsek noise on the alignment, and xi_i a standard normal vector;
+    it is the control parameter of the order-disorder transition, and 0 by default.
+
+    With `per_type: true` the whole term is scaled by the receiver's own `alignment` weight,
+    dimensionless -- the boids special case, where types align to different degrees.
+
+    Reference: Vicsek, T., Czirok, A., Ben-Jacob, E., Cohen, I. & Shochet, O. (1995). Novel
+    type of phase transition in a system of self-driven particles. Phys. Rev. Lett.
+    75:1226-1229. The per-type variant follows Reynolds, C. W. (1987). SIGGRAPH Comput.
+    Graph. 21(4):25-34.
+    """
+
+    EMIT = "acceleration"                       # second-order: a boid has momentum
     SUPPORTED_DIMS = [2, 3]                     # velocity neighbour-mean is dimension-generic
     REQUIRES_PARAMS = []                        # no required params — all knobs optional (defaults in __init__)
     OPTIONAL_TYPE_PROPS = ["alignment"]        # read per-receiver only when `per_type: true` (boids)
     MECHANISM_TAGS = ["velocity_alignment", "collective_motion", "vicsek"]
     PARAM_ROLES = {"a": "alignment_strength", "gate": "neighbour_weighting",
                    "r": "contact_radius", "noise": "orientation_noise"}
-    REFERENCE = "Vicsek, T. et al. (1995). Novel type of phase transition in a system of self-driven particles. Phys. Rev. Lett. 75:1226-1229."
+    REFERENCE = ("Vicsek, T., Czirok, A., Ben-Jacob, E., Cohen, I. & Shochet, O. (1995). "
+                 "Novel type of phase transition in a system of self-driven particles. "
+                 "Phys. Rev. Lett. 75:1226-1229; per-type variant: Reynolds, C. W. (1987). "
+                 "SIGGRAPH Comput. Graph. 21(4):25-34.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

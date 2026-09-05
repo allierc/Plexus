@@ -1,0 +1,200 @@
+---
+title: "bm_sense"
+subtitle: "The epithelium reads the membrane it is resting on: each cell senses how much basement membrane is under it, and a shortfall becomes a chemical signal the rest of the model can act on -- the matrix-to-cell half of the coupling."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+The epithelium reads the membrane it is resting on: each cell senses how much basement membrane is under it, and a shortfall becomes a chemical signal the rest of the model can act on -- the matrix-to-cell half of the coupling.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; `map`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+membrane is under it, and a shortfall becomes a chemical signal the rest of the model can act
+on -- the matrix-to-cell half of the coupling.
+
+vertex -> cell: reads the mesh geometry and a recorded membrane map, writes one channel of the
+cell set's `chem` block in place.
+
+    L_f    = M(theta(u_f), phi(u_f))                  the membrane level in that direction
+
+M is the recorded equirectangular membrane map for this frame. p_ref is the membrane level
+counted as fully supported, in the map's own units, so the ratio L/p_ref is dimensionless and
+the deficit runs from 0 (fully anchored) to 1 (no membrane at all). `sharp` is the exponent
+on that deficit: 1 is linear, and larger values confine the signal to cells that are almost
+completely unsupported.
+
+The direction is centroid-referenced, built by exactly the construction the map was binned
+with and the one `ecm_gate_growth` uses, so the three cannot drift apart. A cell with no live
+half-edge has no direction, and is given no deficit rather than the deficit of whatever
+direction the origin happens to point in.
+
+Reference: Streuli, C. H. (2009). Integrins and cell-fate determination. Curr. Opin. Cell
+Biol. 21:194-198 (anchorage and the cell cycle); Frantz, C., Stewart, K. M. & Weaver, V. M.
+(2010). The extracellular matrix at a glance. J. Cell Sci. 123:4195-4200 (the ECM as a signal).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `map` | &ndash; | **required** |
+| `p_ref` | membrane_reference_level | 1.0 |
+| `sharp` | deficit_sharpness | 1.0 |
+| `chan` | chem_channel_written | 0 |
+| `cell_set` | &ndash; | "cell" |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: bm_sense, at: vertex, map: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`mechanosensing`]{.op-badge} [`integrin_signalling`]{.op-badge} [`anchorage_dependence`]{.op-badge} [`matrix_to_cell_feedback`]{.op-badge} [`morphogen_source`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd).
+
+## Source
+
+[`src/plexus/operators/contact_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/contact_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("bm_sense", family="signalling", set="vertex", kind="structural")
+class BMSense3D(Structural):
+    """The epithelium reads the membrane it is resting on: each cell senses how much basement
+    membrane is under it, and a shortfall becomes a chemical signal the rest of the model can act
+    on -- the matrix-to-cell half of the coupling.
+
+    vertex -> cell: reads the mesh geometry and a recorded membrane map, writes one channel of the
+    cell set's `chem` block in place.
+
+        u_f    = (c_f - c_tissue) / |c_f - c_tissue|      the cell's own direction
+        L_f    = M(theta(u_f), phi(u_f))                  the membrane level in that direction
+        def_f  = clamp(1 - L_f / p_ref, 0, 1)^sharp       the deficit
+
+    M is the recorded equirectangular membrane map for this frame. p_ref is the membrane level
+    counted as fully supported, in the map's own units, so the ratio L/p_ref is dimensionless and
+    the deficit runs from 0 (fully anchored) to 1 (no membrane at all). `sharp` is the exponent
+    on that deficit: 1 is linear, and larger values confine the signal to cells that are almost
+    completely unsupported.
+
+    The direction is centroid-referenced, built by exactly the construction the map was binned
+    with and the one `ecm_gate_growth` uses, so the three cannot drift apart. A cell with no live
+    half-edge has no direction, and is given no deficit rather than the deficit of whatever
+    direction the origin happens to point in.
+
+    Reference: Streuli, C. H. (2009). Integrins and cell-fate determination. Curr. Opin. Cell
+    Biol. 21:194-198 (anchorage and the cell cycle); Frantz, C., Stewart, K. M. & Weaver, V. M.
+    (2010). The extracellular matrix at a glance. J. Cell Sci. 123:4195-4200 (the ECM as a signal).
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["map"]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["mechanosensing", "integrin_signalling", "anchorage_dependence",
+                      "matrix_to_cell_feedback", "morphogen_source"]
+    PARAM_ROLES = {"p_ref": "membrane_reference_level", "sharp": "deficit_sharpness",
+                   "chan": "chem_channel_written"}
+    REFERENCE = ("Streuli, C. H. (2009). Integrins and cell-fate determination. Curr. Opin. Cell "
+                 "Biol. 21:194-198; Frantz, C., Stewart, K. M. & Weaver, V. M. (2010). The "
+                 "extracellular matrix at a glance. J. Cell Sci. 123:4195-4200.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.cat = params.get("cell_set", "cell")
+        z = np.load(str(params["map"]))
+        self.P = torch.as_tensor(np.asarray(z["pmap"], np.float32))
+        self.T = int(self.P.shape[0])
+        self.p_ref = float(params.get("p_ref", 1.0))
+        self.sharp = float(params.get("sharp", 1.0))
+        self.chan = int(params.get("chan", 0))
+        self._frame, self._t, self._said = -1, 0, False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        clvl = H.level(self.cat)
+        if m is None or clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
+            return {}
+        nF = int(m["nF"])
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        f = int(getattr(H, "frame", -1) or -1)
+        if f != self._frame:
+            self._frame = f
+            self._t = min(self.T - 1, max(0, f))
+
+        # PER-CELL DIRECTION, centroid-referenced -- the same construction the map was binned with,
+        # and the same one `ecm_gate_growth` uses, so the two cannot drift apart.
+        es, ef = m["E_srce"], m["E_face"]
+        live = ef < nF
+        e_s, e_f = es[live].long(), ef[live].long()
+        cnt = torch.zeros(nF, device=dev, dtype=dt_).index_add_(
+            0, e_f, torch.ones_like(e_f, dtype=dt_))
+        cen = torch.zeros(nF, 3, device=dev, dtype=dt_).index_add_(0, e_f, pos[e_s].to(dt_))
+        ok = cnt > 0
+        cen[ok] /= cnt[ok, None]
+        origin = cen[ok].mean(0) if ok.any() else torch.zeros(3, device=dev, dtype=dt_)
+        d = cen - origin
+        u = d / d.norm(dim=1).clamp_min(1e-9)[:, None]
+        M = self.P[self._t].to(dev, dt_)
+        nth, nph = M.shape
+        th = torch.acos(u[:, 2].clamp(-1, 1))
+        ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
+        lig = M[(th / math.pi * nth).long().clamp(0, nth - 1),
+                (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+        # A CELL WITH NO LIVE HALF-EDGE HAS NO DIRECTION, so it is given no deficit rather than the
+        # deficit of whatever direction the origin happens to point in.
+        def_ = (1.0 - lig / max(self.p_ref, 1e-12)).clamp(0.0, 1.0) ** self.sharp
+        def_ = torch.where(ok, def_, torch.zeros_like(def_))
+
+        ci, _ = clvl.state_schema["chem"]
+        clvl.state[:nF, ci + self.chan] = def_.to(clvl.state.dtype)
+        SENSE_TRACE.append((int((def_ > 0.5).sum()), float(def_.max()), float(def_.mean())))
+        if not self._said:
+            print(f"[bm_sense] writing the membrane deficit into {self.cat}.chem[:, {self.chan}] "
+                  f"({self.T} frames, p_ref {self.p_ref}, sharp {self.sharp}); frame {f}: "
+                  f"{int((def_ > 0.5).sum())} of {nF} cells above 0.5, max {float(def_.max()):.3f}",
+                  flush=True)
+            self._said = True
+        return {}
+```

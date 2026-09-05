@@ -1,6 +1,6 @@
 ---
 title: "sediment"
-subtitle: "A per-agent constant directional drift (a first-order body force at"
+subtitle: "A constant drift velocity, the terminal speed at which drag already balances the settling force, so no acceleration is ever resolved."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A per-agent constant directional drift (a first-order body force at"
 
 [`lateral`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
 
-A per-agent constant directional drift (a first-order body force at
+A constant drift velocity, the terminal speed at which drag already balances the settling force, so no acceleration is ever resolved.
 :::
 
 ```{=html}
@@ -42,23 +42,20 @@ A per-agent constant directional drift (a first-order body force at
 
 ## Mechanism
 
-the AGENT level, the type-selectable sibling of `gravity`).
+balances the settling force, so no acceleration is ever resolved.
 
-`gravity` is a CELL-level body force: it feeds the MPM substep as a_ext and so acts
-on the whole soft body uniformly -- it cannot express a per-type force (both agent
-types are dragged identically by the sedimenting fluid). `sediment` instead returns a
-velocity delta `{agent: v}` with `v = (gx, gy)` and lets the ENGINE integrate the
-position, exactly like `glide` returns a propulsion velocity. Because
-the drift is a CONSTANT direction (it never decorrelates like a heading), a small
-magnitude on a confined agent set produces a persistent settling toward one pole.
+cell -> cell: reads nothing, emits a velocity.
 
-The point is DIFFERENTIAL sedimentation: instantiate it twice with a per-type selector
-(`at: 'agent[type=a]' gy: -0.1` + `at: 'agent[type=b]' gy: 0.1`) so the two types drift
-oppositely along the gravity axis and sort into a REPRODUCIBLE animal-vegetal (y) axis
--- the oriented-symmetry-break the type-blind `gravity` cannot set.
+gx and gy are the drift components in world units per time. `g` is a convenience: it sets
+gy = -g, i.e. straight down, since the y axis is the screen's vertical in 2D. Note that the
+drift is written on axes 0 and 1 only, so in a 3D specification there is no settling along
+z -- use `gravity` with `gz` if a genuine third component is wanted.
 
-Default direction is -y (down); override `gx`/`gy` for a sideways or tilted drift.
-EMIT is `velocity` so it composes with the first-order agent set (glide/chemotax/repel).
+Distinguished from `gravity` by being first-order: gravity is an acceleration the medium
+has not yet damped, this is the steady state after it has.
+
+Reference: Stokes, G. G. (1851). On the effect of the internal friction of fluids on the
+motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106 (Stokes settling).
 
 ## Parameters
 
@@ -81,47 +78,40 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
-[`src/plexus/operators/sediment.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/sediment.py) &mdash; the registered operator.
+[`src/plexus/operators/motion_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/motion_ops.py) &mdash; the registered operator.
 
 ```python
-"""sediment -- a per-agent constant directional drift (a first-order body force at
-the AGENT level, the type-selectable sibling of `gravity`).
-
-`gravity` is a CELL-level body force: it feeds the MPM substep as a_ext and so acts
-on the whole soft body uniformly -- it cannot express a per-type force (both agent
-types are dragged identically by the sedimenting fluid). `sediment` instead returns a
-velocity delta `{agent: v}` with `v = (gx, gy)` and lets the ENGINE integrate the
-position (`pos += dt * v`), exactly like `glide` returns a propulsion velocity. Because
-the drift is a CONSTANT direction (it never decorrelates like a heading), a small
-magnitude on a confined agent set produces a persistent settling toward one pole.
-
-The point is DIFFERENTIAL sedimentation: instantiate it twice with a per-type selector
-(`at: 'agent[type=a]' gy: -0.1` + `at: 'agent[type=b]' gy: 0.1`) so the two types drift
-oppositely along the gravity axis and sort into a REPRODUCIBLE animal-vegetal (y) axis
--- the oriented-symmetry-break the type-blind `gravity` cannot set.
-
-Default direction is -y (down); override `gx`/`gy` for a sideways or tilted drift.
-EMIT is `velocity` so it composes with the first-order agent set (glide/chemotax/repel).
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-
 @register_operator("sediment", family="motion", set="cell", kind="lateral")
 class Sediment(Lateral):
-    EMIT = "velocity"                                # a velocity delta; the ENGINE integrates pos
+    """Sedimentation: a constant drift velocity, the terminal speed at which drag already
+    balances the settling force, so no acceleration is ever resolved.
+
+    cell -> cell: reads nothing, emits a velocity.
+
+        dx_i/dt = (gx, gy)
+
+    gx and gy are the drift components in world units per time. `g` is a convenience: it sets
+    gy = -g, i.e. straight down, since the y axis is the screen's vertical in 2D. Note that the
+    drift is written on axes 0 and 1 only, so in a 3D specification there is no settling along
+    z -- use `gravity` with `gz` if a genuine third component is wanted.
+
+    Distinguished from `gravity` by being first-order: gravity is an acceleration the medium
+    has not yet damped, this is the steady state after it has.
+
+    Reference: Stokes, G. G. (1851). On the effect of the internal friction of fluids on the
+    motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106 (Stokes settling).
+    """
+
+    EMIT = "velocity"                                # first-order: a terminal velocity, not a force
     SUPPORTED_DIMS = [2, 3]                           # uniform drift is dimension-generic
     REQUIRES_PARAMS = []                             # no required params — all knobs optional (defaults in __init__)
     PARAM_ROLES = {"g": "sediment_magnitude", "gx": "sediment_x", "gy": "sediment_y"}
-    REFERENCE = "Stokes, G. G. (1851). Trans. Camb. Phil. Soc. 9:8-106 (Stokes settling)."
+    REFERENCE = ("Stokes, G. G. (1851). On the effect of the internal friction of fluids on "
+                 "the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106 (Stokes settling).")
     MECHANISM_TAGS = ["body_force", "differential_sedimentation"]
 
     def __init__(self, params, device="cpu"):

@@ -1,0 +1,619 @@
+---
+title: "mesh_contact"
+subtitle: "Particle-to-surface contact against a LIVE triangulated surface: the surface pushes material points out of itself, drags on them, and feels the equal and opposite reaction."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Particle-to-surface contact against a LIVE triangulated surface: the surface pushes material points out of itself, drags on them, and feels the equal and opposite reaction.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `surface`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+material points out of itself, drags on them, and feels the equal and opposite reaction.
+
+particle -> particle (and, through VERTEX_FORCE, back onto the surface's vertices): reads
+pos and the surface set's mesh, emits an external acceleration the MPM substep consumes.
+
+    d_i   = the depth of particle i behind its nearest face, along that face's normal n
+    a_n   = k d_i n                                          the penalty, normal to the face
+    v_t   = (v_i - v_face) - ((v_i - v_face) . n) n          relative tangential velocity
+
+k is set by `k_frac` as a fraction of the largest penalty the substep can carry without going
+unstable, so it is a dimensionless safety fraction rather than a stiffness a specification has
+to calibrate. mu is the dimensionless Coulomb friction coefficient. eps_v is a slip
+regularisation velocity, in world units per unit time: it replaces the discontinuous sign of
+the true Coulomb law with a smooth ramp, so that a particle at rest is not given an
+arbitrarily directed friction force. `scale` maps the surface's own coordinates into the
+material's box.
+
+The reaction is distributed to the face's three vertices by the same barycentric weights that
+located the contact point, which is what makes it a genuine equal-and-opposite pair rather
+than a force applied to a surface that never feels it.
+
+THE SURFACE IS LIVE, NOT REPLAYED. It is a vertex set in this hierarchy, read at the frame it
+is in. A replayed surface would make the input a claim about a FILE rather than about a model:
+a cached mesh can silently disagree with the specification that names it, and cannot be
+regenerated to check. The surface therefore comes from a `seed` operator like every other
+initial condition.
+
+What that rules out, stated rather than hidden: two subsystems whose timesteps differ by five
+orders of magnitude -- an epithelium at minutes per frame against a matrix at milliseconds --
+cannot share a schedule, and a replay was how that would be dodged. A surface on this path
+must therefore be PRESCRIBED, with its kinematics written by an operator such as
+`surface_drive`, or else solved on the matrix's own clock. That is a modelling constraint,
+not a regression.
+
+Reference: Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Improved coupling of finite element
+method with material point method based on a particle-to-surface contact algorithm. Comput.
+Methods Appl. Mech. Engrg. 293:1-19 -- the scheme this implements. The grid-node alternative
+is Lian, Y. P., Zhang, X. & Liu, Y. (2011). Comput. Methods Appl. Mech. Engrg. 200:3482-3494.
+The surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `surface` | &ndash; | **required** |
+| `k_frac` | penalty_fraction_of_ceiling | 0.15 |
+| `mu` | friction_coefficient | 0.4 |
+| `scale` | tissue_to_box_scale | 1.0 |
+| `eps_v` | slip_regularisation_velocity | 1.0e-3 |
+| `centre` | &ndash; | [0.5, 0.5, 0.5] |
+| `centre_offset` | &ndash; | [0.0, 0.0, 0.0] |
+| `a_max` | &ndash; | 3.0e4 |
+| `dt` | &ndash; | 3.2e-3 |
+| `band_cells` | &ndash; | 3.0 |
+| `n_grid` | &ndash; | 64 |
+| `cap_rows` | &ndash; | 2 |
+| `map_theta` | &ndash; | 32 |
+| `map_phi` | &ndash; | 64 |
+| `verbose` | &ndash; | True |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: mesh_contact, at: particle, surface: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`cell_matrix_contact`]{.op-badge} [`particle_to_surface`]{.op-badge} [`friction`]{.op-badge} [`moving_boundary`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/contact_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/contact_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("mesh_contact", family="boundary", set="particle", kind="lateral")
+class MeshContact(Lateral):
+    """Particle-to-surface contact against a LIVE triangulated surface: the surface pushes
+    material points out of itself, drags on them, and feels the equal and opposite reaction.
+
+    particle -> particle (and, through VERTEX_FORCE, back onto the surface's vertices): reads
+    pos and the surface set's mesh, emits an external acceleration the MPM substep consumes.
+
+        d_i   = the depth of particle i behind its nearest face, along that face's normal n
+        a_n   = k d_i n                                          the penalty, normal to the face
+        v_t   = (v_i - v_face) - ((v_i - v_face) . n) n          relative tangential velocity
+        a_t   = -mu |a_n| v_t / (|v_t| + eps_v)                  regularised Coulomb friction
+
+    k is set by `k_frac` as a fraction of the largest penalty the substep can carry without going
+    unstable, so it is a dimensionless safety fraction rather than a stiffness a specification has
+    to calibrate. mu is the dimensionless Coulomb friction coefficient. eps_v is a slip
+    regularisation velocity, in world units per unit time: it replaces the discontinuous sign of
+    the true Coulomb law with a smooth ramp, so that a particle at rest is not given an
+    arbitrarily directed friction force. `scale` maps the surface's own coordinates into the
+    material's box.
+
+    The reaction is distributed to the face's three vertices by the same barycentric weights that
+    located the contact point, which is what makes it a genuine equal-and-opposite pair rather
+    than a force applied to a surface that never feels it.
+
+    THE SURFACE IS LIVE, NOT REPLAYED. It is a vertex set in this hierarchy, read at the frame it
+    is in. A replayed surface would make the input a claim about a FILE rather than about a model:
+    a cached mesh can silently disagree with the specification that names it, and cannot be
+    regenerated to check. The surface therefore comes from a `seed` operator like every other
+    initial condition.
+
+    What that rules out, stated rather than hidden: two subsystems whose timesteps differ by five
+    orders of magnitude -- an epithelium at minutes per frame against a matrix at milliseconds --
+    cannot share a schedule, and a replay was how that would be dodged. A surface on this path
+    must therefore be PRESCRIBED, with its kinematics written by an operator such as
+    `surface_drive`, or else solved on the matrix's own clock. That is a modelling constraint,
+    not a regression.
+
+    Reference: Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Improved coupling of finite element
+    method with material point method based on a particle-to-surface contact algorithm. Comput.
+    Methods Appl. Mech. Engrg. 293:1-19 -- the scheme this implements. The grid-node alternative
+    is Lian, Y. P., Zhang, X. & Liu, Y. (2011). Comput. Methods Appl. Mech. Engrg. 200:3482-3494.
+    The surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386.
+    """
+
+    EMIT = "mpm_acceleration"          # consumed by `mpm_scatter` as a_ext, like `ecm_from_cell`
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]      # a live vertex set; there is no archive path any more
+    MECHANISM_TAGS = ["cell_matrix_contact", "particle_to_surface", "friction", "moving_boundary"]
+    PARAM_ROLES = {"k_frac": "penalty_fraction_of_ceiling", "mu": "friction_coefficient",
+                   "scale": "tissue_to_box_scale", "eps_v": "slip_regularisation_velocity"}
+    REFERENCE = ("Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Improved coupling of finite "
+                 "element method with material point method based on a particle-to-surface "
+                 "contact algorithm. Comput. Methods Appl. Mech. Engrg. 293:1-19 -- the scheme "
+                 "this implements. The grid-node alternative is Lian, Y. P., Zhang, X. & Liu, Y. "
+                 "(2011). Comput. Methods Appl. Mech. Engrg. 200:3482-3494. The surface is "
+                 "Okuda, S. et al. (2018). Sci. Rep. 8:2386.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "mpm_particle")
+        # THE STAR-SHAPE REFERENCE, AND IT MAY MOVE WITH THE SURFACE.
+        #
+        #   centre: [x, y, z]   a fixed point in the box, as before.
+        #   centre: centroid    the LIVE surface's own centroid, re-read every frame.
+        #
+        # A fixed point is right for a surface that stays put and wrong for one that travels: the
+        # forbidden region is the side of the surface the reference sits on, so a sphere driven
+        # 0.15 of a box downward leaves its own reference behind and the ray cast starts pointing
+        # at the wrong face. `centroid` also removes the drift the plate had -- its declared
+        # standoff of 0.30 grew to 0.50 over the descent, which is a 90 -> 150 walk in the contact's
+        # bin rows for a geometry that never changed.
+        #
+        # `centre_offset` is added to whichever, so a plate says `centre: centroid` with an offset
+        # into the piston body and the standoff is then constant by construction.
+        _c = params.get("centre", [0.5, 0.5, 0.5])
+        self.centre_track = isinstance(_c, str) and str(_c).lower() in ("centroid", "surface")
+        self.centre = [0.0, 0.0, 0.0] if self.centre_track else [float(v) for v in _c]
+        self.centre_offset = [float(v) for v in params.get("centre_offset", [0.0, 0.0, 0.0])]
+        self.scale = float(params.get("scale", 1.0))
+        # THE PENALTY AS A FRACTION OF THE EXPLICIT CEILING. In acceleration form the contact is
+        # a = k*d, integrated at the substep, so it is stable only while dt_sub*sqrt(k) < 1, i.e.
+        # k < 1/dt_sub^2. Written as a fraction so the number cannot be quoted as an absolute
+        # stiffness that happens to be three hundred times past its own limit, which is how the
+        # first version of the flat rig and `flat_mpm` both failed.
+        self.k_frac = float(params.get("k_frac", 0.15))
+        self.mu = float(params.get("mu", 0.4))
+        self.eps_v = float(params.get("eps_v", 1.0e-3))
+        self.a_max = float(params.get("a_max", 3.0e4))
+        self.dt_frame = float(params.get("dt", 3.2e-3))
+        self.band_cells = float(params.get("band_cells", 3.0))   # prefilter width, in grid cells
+        self.n_grid = int(params.get("n_grid", 64))
+        self.cap_rows = int(params.get("cap_rows", 2))
+        self.map_theta = int(params.get("map_theta", 32))        # the pressure map's own resolution
+        self.map_phi = int(params.get("map_phi", 64))
+        self.verbose = bool(params.get("verbose", True))
+
+        # THE SURFACE IS A SET, NOT A FILE. See the class docstring for why the archive path is gone.
+        self.surface = str(params["surface"])
+        if "tissue" in params:
+            raise ValueError("mesh_contact: `tissue:` (the replayed mesh archive) is deleted. Seed "
+                             "the surface as a vertex set -- `seed_plate` or `seed_mesh` -- and "
+                             f"name it with `surface: <set>` instead of {params['tissue']!r}")
+        if "mesh_stride" in params:
+            raise ValueError("mesh_contact: `mesh_stride:` counted pass-2 frames per KEPT mesh in "
+                             "the archive. A live surface has one mesh per frame and no cadence to "
+                             "reconcile, so the parameter has no meaning; remove it")
+        # `scale` is how the two subsystems keep their own coordinates. The tissue must stay in
+        # its own world about the ORIGIN, because `cell_mechanics` penalises (|pos| - R0)^2 from
+        # the world origin -- translating the vesicle into the matrix's box would tear it apart.
+        # So the mapping happens at the point of use and on a COPY: the surface is centred on its
+        # own centroid, scaled by `scale`, and placed at `centre`. Nothing moves the tissue.
+        self._frame = -2
+        self._built = None
+        self._dom = None
+        self._newframe = False
+        # THE COUNTER SHARES THIS OPERATOR'S BINS rather than rebuilding them: two bin structures
+        # that disagree would have the diagnostic measuring a different surface from the one the
+        # contact acted on, which is the one way a non-penetration count can be wrong and look right.
+        _LIVE["contact"] = self
+
+    # ---- the mesh of one frame ------------------------------------------------------------
+    def _mesh_live(self, H, dev, dt_):
+        """Vertices, half-edges and the surface's own velocity, read off the live vertex set.
+
+        IN THE STAR FRAME, WHICH IS THE ONE CONVERSION THIS OWES. Everything below assumes the
+        surface is given about the ray origin, and a live set is in box coordinates -- so `centre`
+        is subtracted here and added back in `forward` when the hit point is reconstructed. Getting
+        this wrong does not crash: it reports zero contacts, which reads as "the surface never
+        touched anything".
+
+        `Vv` comes off the mesh table because the surface KNOWS its velocity -- `plate_drive` writes
+        it. The archive path had to recover it by differencing two cached meshes and dividing by a
+        stride, which is one place a cadence could disagree with the positions it was handed.
+        """
+        lvl = H.level(self.surface)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or not int(m.get("Nv", 0)):
+            return None
+        nv = int(m["Nv"])
+        P = lvl.get("pos")[:nv].to(dt_)
+        if self.centre_track:
+            self.centre = [a + b for a, b in zip(P.mean(0).detach().to("cpu").tolist(),
+                                                 self.centre_offset)]
+        # THE SURFACE'S OWN FRAME, SCALED. `V` is what everything below works in: the surface about
+        # the ray origin. With `scale: 1` and a set already in box units this is the old behaviour
+        # exactly (`P - centre`); with a scale it is the archive's mapping done live -- centre on
+        # the surface's OWN centroid, scale, and let `centre` place that origin in the box.
+        if self.scale != 1.0:
+            V = (P - P.mean(0)) * self.scale
+        else:
+            V = P - torch.tensor(self.centre, device=dev, dtype=dt_)
+        vv = m.get("Vv", None)
+        # A COPY, AND SCALED WITH THE GEOMETRY. `.to()` with a matching dtype returns THE SAME
+        # TENSOR, so this aliased the live mesh table's velocity buffer -- harmless while the
+        # contact only read it, and a trap waiting for the first line that does not.
+        Vv = (torch.zeros_like(V) if vv is None
+              else vv[:nv].to(device=dev, dtype=dt_).clone() * self.scale)
+        return V, m["E_srce"].to(dev), m["E_trgt"].to(dev), m["E_face"].to(dev), Vv
+
+    def _build(self, dev, dt_, H):
+        """Everything about the surface that changes once per frame: triangles, their bins, and the
+        vertex velocity the friction law needs. Rebuilt every frame, because a live surface has
+        moved by definition.
+        """
+        got = self._mesh_live(H, dev, dt_)
+        return None if got is None else self._build_from(*got, dev=dev, dt_=dt_)
+
+    def _build_from(self, V, es, et, ef, Vv, dev, dt_):
+        """The geometry, given the four arrays -- split out so `selftest` can certify the lookup on
+        a surface it builds in memory instead of one a run has to produce first."""
+        nv, nF = V.shape[0], int(ef.max()) + 1
+        # FACE CENTROIDS. Every face contributes each of its vertices exactly once as a half-edge
+        # source, so a scatter-mean over `E_srce` is the polygon's centroid with no ring ordering
+        # required -- and the ordering is exactly what a re-meshed tissue does not hand over.
+        cnt = torch.bincount(ef, minlength=nF).clamp_min(1)
+        cen = torch.zeros(nF, 3, device=dev, dtype=dt_)
+        cen.index_add_(0, ef, V[es])
+        cen = cen / cnt[:, None].to(dt_)
+        # ONE TRIANGLE PER HALF-EDGE: (face centroid, source vertex, target vertex). A fan, but
+        # built from the half-edge list rather than from a ring, so it is correct for a polygon of
+        # any size and needs no ordering. The centroid is a VIRTUAL vertex: whatever reaction it
+        # receives is handed to the face's real vertices, equally, at the end.
+        A, B, C = cen[ef], V[es], V[et]
+        nrm = torch.cross(B - A, C - A, dim=1)
+        nrm = nrm / nrm.norm(dim=1, keepdim=True).clamp_min(1e-20)
+        # OUTWARD, DECIDED BY THE STAR-SHAPE. The mesh is centroid-referenced, so a face's own
+        # position is its outward direction and the winding never has to be trusted.
+        flip = ((nrm * (A + B + C)).sum(1) < 0)
+        nrm = torch.where(flip[:, None], -nrm, nrm)
+
+        # THE BIN GRID, SIZED BY THIS FRAME'S LARGEST TRIANGLE. The 3x3 query below is exact only
+        # while a triangle fits inside a bin, and the faces shrink sixfold in angular size between
+        # frame 0 (edge 0.17 rad) and the last (0.028 rad); a fixed grid is wrong at one end or a
+        # hundred times more expensive than it needs to be at the other. The 99.9th percentile
+        # rather than the maximum, because one sliver of a just-divided cell should not set the
+        # resolution of the whole lookup -- and the largest triangles are the ones a 3x3 query has
+        # the most slack for, since they are found from any of their three corners.
+        rA, rB, rC = (A.norm(dim=1), B.norm(dim=1), C.norm(dim=1))
+        rmin = torch.minimum(torch.minimum(rA, rB), rC).clamp_min(1e-9)
+        # BY THE FACE'S OWN RADIUS, NOT ITS NEAREST CORNER'S. `rmin` is the minimum corner radius, so
+        # one vertex near the centroid sends a face's apparent angular size to infinity -- and a
+        # budded tissue has them: measured on 08b_s2_big's final mesh, rmin reaches 0.14 against a
+        # median radius of 14.7, which put the 99.9th percentile of `ang` at 6.19 RADIANS (355 deg)
+        # and collapsed `nrow` to its floor of 4. That is ~32 bins for 184,974 triangles, ~5,800 to a
+        # bin, which destroys this structure's own premise ("a triangle spans at most one bin") and
+        # makes the query allocate [n, 9K] with K ~ 5,800. On a sphere rmin ~ rmed so it never showed:
+        # on the reference tissue both forms give 0.0586 rad and the same 53 rows.
+        rmed = torch.maximum(torch.minimum(torch.maximum(rA, rB), torch.maximum(rB, rC)),
+                             torch.minimum(rA, rC)).clamp_min(1e-20)     # the MEDIAN corner radius
+        ang = (torch.maximum((B - A).norm(dim=1),
+                             torch.maximum((C - A).norm(dim=1), (C - B).norm(dim=1))) / rmed)
+        a999 = float(torch.quantile(ang.float(), 0.999))
+        nrow = int(min(200, max(4, math.floor(math.pi / max(a999, 1e-3)))))
+        G = _grid(nrow, dev)
+        nb = G["nbin"]
+
+        # EACH TRIANGLE INTO THE BUCKETS OF ITS THREE CORNERS. With the grid sized as above a
+        # triangle spans at most one bin, so a particle whose direction lies inside the triangle has
+        # one of its corners in its own bin or in a neighbouring one -- which is what the 3x3 query
+        # covers. Registered three times rather than once so a triangle straddling a bin edge is
+        # found from either side.
+        u3 = torch.cat([A, B, C]) / torch.cat([rA, rB, rC]).clamp_min(1e-20)[:, None]
+        _, _, b3 = _bins_of(u3, G)
+        tri3 = torch.arange(A.shape[0], device=dev).repeat(3)
+        order = torch.argsort(b3 * (A.shape[0] + 1) + tri3)
+        b3, tri3 = b3[order], tri3[order]
+        counts = torch.bincount(b3, minlength=nb)
+        K = int(counts.max())
+        first = torch.zeros(nb + 1, dtype=torch.long, device=dev)
+        first[1:] = torch.cumsum(counts, 0)
+        slot = torch.arange(b3.shape[0], device=dev) - first[b3]
+        table = torch.full((nb, K), -1, dtype=torch.long, device=dev)
+        table[b3, slot] = tri3
+        # AND THE OUTERMOST RADIUS IN EACH BUCKET, which is the prefilter: a particle further out
+        # than any corner of any triangle the bucket holds, plus a margin, cannot be in contact and
+        # is never tested. This is what keeps the query over ~1% of the matrix instead of all of it.
+        # Taken through the table rather than by a scatter-max, which has no deterministic
+        # implementation and would make a re-run non-reproducible for a number that is a maximum.
+        # A COARSE SURFACE RAILS THIS GRID, and the cost of that is checked where it is
+        # actually incurred -- see `_query`. `K` alone is the wrong yardstick: the query allocates
+        # [n_candidates, 9K], so 127 per bucket is gigabytes against 500,000 candidates and a few
+        # megabytes against the 20,000 that a small shell's prefilter actually keeps. Budgeting on
+        # K refused a run that fits comfortably, which is a guard doing the damage it exists to
+        # prevent.
+        rtri = torch.maximum(torch.maximum(rA, rB), rC)
+        rmax = torch.where(table >= 0, rtri[table.clamp_min(0)],
+                           torch.zeros_like(rtri[0]).expand(nb, K)).max(dim=1).values
+
+        # VERTEX VELOCITY comes off the surface itself (`_mesh_live`), because the operator that
+        # moves it knows it exactly. Nothing is differenced here.
+        return dict(V=V, Vv=Vv, es=es, et=et, ef=ef, cnt=cnt, A=A, B=B, C=C, nrm=nrm,
+                    table=table, rmax=rmax, G=G, nv=nv, nF=nF, K=K, n_tri=int(A.shape[0]))
+
+    # ---- the contact ----------------------------------------------------------------------
+    def _query(self, M, x, u, r):
+        """For each candidate particle, the outermost triangle its own direction hits.
+
+        Returns (hit, tri, t, w) -- whether a face was found, which one, the radius of the surface
+        along the particle's ray, and the three barycentric weights.
+        """
+        dev = x.device
+        it, ph, _ = _bins_of(u, M["G"])
+        bn = _neighbours(it, ph, M["G"])                                       # [n,9]
+        # THE BUDGET, WHERE THE ALLOCATION IS. Six [n, 9K] tensors of 3 floats each are built below,
+        # so the peak is about n*9K*72 bytes; the cap is in ENTRIES and is compared against what
+        # this call will really ask for rather than against a bucket depth that says nothing on its
+        # own. It fires only on a surface that is BOTH angularly coarse and near a lot of material,
+        # which is the case that ran a run out of memory at frame 230 of 400 with an error naming an
+        # allocation and not a cause.
+        # 5e7 ENTRIES, NOT 4e8. The first number came from costing an entry at 72 bytes -- six
+        # [n, 9K, 3] tensors -- but each is float32, so an entry is 12 bytes in ONE of them and the
+        # peak is a handful of those plus the intermediates. A single [n, 9K, 3] of 2.75e8 entries
+        # is 3.3 GB, which is what the run actually asked for and the guard waved through. At 5e7
+        # the largest single allocation is ~600 MB and the peak a few GB.
+        _cap = float(os.environ.get("PLEXUS_CONTACT_MAX_ENTRIES", "5.0e7"))
+        _need = float(x.shape[0]) * 9.0 * float(M["K"])
+        if _need > _cap:
+            raise ValueError(
+                f"mesh_contact: this frame's lookup would allocate [{x.shape[0]:,}, "
+                f"9x{M['K']}] = {_need:.3g} entries, about {_need * 72 / 1e9:.1f} GB. The surface "
+                f"is too COARSE for the number of particles near it: {M['G']['nrow']} bin rows "
+                f"(floor 4) over {M['n_tri']:,} sub-triangles, up to {M['K']} per bucket, so the "
+                f"premise that a triangle spans at most one bin does not hold. Give the surface "
+                f"more faces, or move `centre` further from it. "
+                f"(PLEXUS_CONTACT_MAX_ENTRIES overrides; expect the memory.)")
+        cand = M["table"][bn].reshape(x.shape[0], -1)                          # [n, 9K]
+        ok = cand >= 0
+        ci = cand.clamp_min(0)
+        A = M["A"][ci]; B = M["B"][ci]; C = M["C"][ci]                         # [n, 9K, 3]
+        # MOLLER-TRUMBORE, with the ray from the tissue centroid along the particle's own
+        # direction. `t` is then the radius of the surface in that direction -- the curved-surface
+        # form of the flat rig's interpolated `z_face` -- and the weights fall out of the same
+        # solve rather than being a second, separate projection.
+        e1, e2 = B - A, C - A
+        uu = u[:, None, :]
+        p = torch.cross(uu.expand_as(e2), e2, dim=2)
+        det = (e1 * p).sum(2)
+        inv = 1.0 / torch.where(det.abs() < 1e-20, torch.full_like(det, 1e-20), det)
+        s = -A                                              # ray origin is the centroid = 0
+        w1 = (s * p).sum(2) * inv
+        q = torch.cross(s, e1, dim=2)
+        w2 = (uu * q).sum(2) * inv
+        t = (e2 * q).sum(2) * inv
+        tol = 1e-6
+        good = ok & (det.abs() > 1e-20) & (w1 >= -tol) & (w2 >= -tol) & (w1 + w2 <= 1 + tol) & (t > 0)
+        tt = torch.where(good, t, torch.full_like(t, -1.0))
+        best = tt.argmax(dim=1)                             # the OUTERMOST face on the ray
+        ar = torch.arange(x.shape[0], device=dev)
+        hit = good[ar, best]
+        tri = ci[ar, best]
+        tb = t[ar, best]
+        w = torch.stack([1.0 - w1[ar, best] - w2[ar, best], w1[ar, best], w2[ar, best]], 1)
+        return hit, tri, tb, w
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        # `or -1` WOULD MAKE FRAME 0 READ AS -1, because 0 is falsy -- and frame 0 is the frame
+        # that opens the history, so the aggregation below would index an empty list.
+        f = getattr(H, "frame", None)
+        f = -1 if f is None else int(f)
+        # REBUILT ONCE PER FRAME AND NOT PER SUBSTEP. The surface's position is a frame-level fact --
+        # `plate_drive` writes it once, before the substep block -- so rebuilding inside the block
+        # would cost eight bin tables to describe one geometry. The build is a few milliseconds
+        # against a frame's eight substeps.
+        if f != self._frame:
+            self._frame, self._newframe = f, True
+            self._built = self._build(dev, dt_, H)
+        elif self._built is None:
+            # the seed ran between this frame's substeps; pick the surface up without opening a
+            # second history row for a frame that already has one
+            self._built = self._build(dev, dt_, H)
+        M = self._built
+        if M is None:
+            # THE SEED HAS NOT RUN. `seed` operators are confined to the opening frames and the
+            # contact may be scheduled inside a substep block that runs on the same frame, so an
+            # empty surface is an ordering fact and not an error -- but a silent zero would make a
+            # mis-ordered schedule look like a run in which nothing ever touched.
+            if not getattr(self, "_said_empty", False):
+                print(f"[mesh_contact] surface `{self.surface}` is empty at frame {f}; no contact "
+                      f"until its seed has run", flush=True)
+                self._said_empty = True
+            return {self.at: torch.zeros_like(pos)}
+        dt_sub = float(getattr(H, "sub_dt", None) or self.dt_frame)
+        k = (self.k_frac / dt_sub) ** 2
+        dx = 1.0 / self.n_grid
+
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        d = pos - c
+        r = d.norm(dim=1).clamp_min(1e-12)
+        u = d / r[:, None]
+        # THE PREFILTER: only particles inside the outermost corner their own bucket holds, plus a
+        # margin. Everything else is beyond any face this direction can offer and is never tested.
+        _, _, b = _bins_of(u, M["G"])
+        near = r < (M["rmax"][b] + self.band_cells * dx)
+        acc = torch.zeros_like(pos)
+        if not bool(near.any()):
+            self._record(f, 0, 0.0, 0.0, 0.0, acc, None, None, M, dev, dt_)
+            return {self.at: acc}
+        idx = torch.nonzero(near).squeeze(1)
+        hit, tri, t, w = self._query(M, pos[idx], u[idx], r[idx])
+        if not bool(hit.any()):
+            self._record(f, 0, 0.0, 0.0, 0.0, acc, None, None, M, dev, dt_)
+            return {self.at: acc}
+        idx, tri, t, w = idx[hit], tri[hit], t[hit], w[hit]
+        n_hat = M["nrm"][tri]
+        xs = c + t[:, None] * u[idx]                       # the point on the surface, on the ray
+        depth = ((xs - pos[idx]) * n_hat).sum(1).clamp_min(0.0)
+        inside = depth > 0
+        idx, tri, w, n_hat, depth = idx[inside], tri[inside], w[inside], n_hat[inside], depth[inside]
+        if idx.numel() == 0:
+            self._record(f, 0, 0.0, 0.0, 0.0, acc, None, None, M, dev, dt_)
+            return {self.at: acc}
+        a_n = k * depth
+        # THE FACE'S OWN VELOCITY at the contact point: the two real vertices by their weights, and
+        # the virtual centroid by the mean of the face's vertices. Friction against the GRID's
+        # velocity instead would be friction against whatever else is in the cell, which is the weld
+        # this scheme exists to avoid.
+        ef = M["ef"][tri]
+        vface = torch.zeros(M["nF"], 3, device=dev, dtype=dt_)
+        vface.index_add_(0, M["ef"], M["Vv"][M["es"]])
+        vface = vface / M["cnt"][:, None].to(dt_)
+        v_surf = (w[:, 0:1] * vface[ef] + w[:, 1:2] * M["Vv"][M["es"][tri]]
+                  + w[:, 2:3] * M["Vv"][M["et"][tri]])
+        v_p = lvl.get("vel")[idx] if "vel" in lvl.state_schema else torch.zeros_like(v_surf)
+        dv = v_p - v_surf
+        dv_t = dv - (dv * n_hat).sum(1)[:, None] * n_hat
+        speed = dv_t.norm(dim=1)
+        # REGULARISED COULOMB: saturates at mu*a_n, linear below `eps_v`, so a resting contact does
+        # not chatter. `eps_v` is a slip velocity and not a fudge factor.
+        a_t = torch.minimum(self.mu * a_n, self.mu * a_n * speed / self.eps_v)
+        a_par = a_n[:, None] * n_hat - a_t[:, None] * dv_t / speed.clamp_min(1e-12)[:, None]
+        # THE CLAMP IS HERE, not in the scatter, so what is recorded as the reaction is what acts.
+        mag = a_par.norm(dim=1)
+        a_par = a_par * (self.a_max / mag.clamp_min(1e-20)).clamp(max=1.0)[:, None]
+        acc.index_add_(0, idx, a_par)
+
+        # THE REACTION. Mass is uniform across the matrix, so force and acceleration differ by one
+        # constant and the residual below is the same number either way; it is written in force
+        # units because that is what a vertex would receive.
+        m = float(getattr(lvl, "mass", torch.ones(1, device=dev)).reshape(-1)[0])
+        if self.verbose and not getattr(self, "_m_printed", False):
+            print(f"[mesh_contact] particle mass {m:.4g}; penalty k = {k:.4g} in acceleration "
+                  f"units = ({self.k_frac}/dt_sub)^2 against the explicit ceiling "
+                  f"1/dt_sub^2 = {1.0 / dt_sub ** 2:.4g}; own clamp at a = {self.a_max:.4g}",
+                  flush=True)
+            self._m_printed = True
+        fvert = torch.zeros(M["nv"], 3, device=dev, dtype=dt_)
+        fvert.index_add_(0, M["es"][tri], (-m * w[:, 1:2]) * a_par)
+        fvert.index_add_(0, M["et"][tri], (-m * w[:, 2:3]) * a_par)
+        # the virtual centroid's share, handed to the face's own vertices in equal parts
+        fface = torch.zeros(M["nF"], 3, device=dev, dtype=dt_)
+        fface.index_add_(0, ef, (-m * w[:, 0:1]) * a_par)
+        fvert.index_add_(0, M["es"], fface[M["ef"]] / M["cnt"][M["ef"], None].to(dt_))
+
+        self._record(f, int(idx.numel()), float(depth.max()), float(speed.mean()),
+                     float(a_n.max()), acc * m, fvert, (idx, tri, depth, a_par, m), M, dev, dt_)
+        if mask is not None:
+            acc = acc * mask[:, None].float()
+        return {self.at: acc * lvl.occ[:, None].float()}
+
+    # ---- what it writes down --------------------------------------------------------------
+    def _record(self, f, n_con, dmax, slip, a_max_seen, fpart, fvert, detail, M, dev, dt_):
+        """ONE ROW PER FRAME, AGGREGATED OVER THE FRAME'S OWN SUBSTEPS -- not the first substep's
+        values wearing the frame's name.
+
+        The first version kept whichever substep had the most contacts, which reported the frame's
+        pressure map from a single instant and its residual from another; the peak quantities
+        (contacts, penetration, residual) are maxima over the substeps and the continuous ones
+        (slip, pressure) are means, so each is aggregated the way its own question asks.
+        """
+        resid = 0.0
+        if fvert is not None:
+            resid = float((fpart.sum(0) + fvert.sum(0)).norm()
+                          / fpart.norm(dim=1).sum().clamp_min(1e-30))
+        if self._newframe:
+            CONTACT_HISTORY.append(dict(frame=f, n_contact=0, depth_max=0.0, slip=0.0, a_max=0.0,
+                                        momentum_residual=0.0, n_tri=M["n_tri"],
+                                        nrow=M["G"]["nrow"], K=M["K"], n_sub=0))
+            PRESSURE_MAP.append(np.zeros((self.map_theta, self.map_phi), np.float32))
+            VERTEX_FORCE.append(None)
+            self._newframe = False
+            if self.verbose and (f < 2 or f % 50 == 0):
+                print(f"[mesh_contact] frame {f}: {M['n_tri']} triangles, {M['G']['nbin']} bins in "
+                      f"{M['G']['nrow']} rows (max {M['K']} per bucket), {n_con} contacts, "
+                      f"penetration {dmax / (1.0 / self.n_grid):.2f} cells, momentum residual "
+                      f"{resid:.2e}", flush=True)
+        row = CONTACT_HISTORY[-1]
+        row["n_sub"] += 1
+        row["n_contact"] = max(row["n_contact"], n_con)
+        row["depth_max"] = max(row["depth_max"], dmax)
+        row["a_max"] = max(row["a_max"], a_max_seen)
+        row["momentum_residual"] = max(row["momentum_residual"], resid)
+        row["slip"] += (slip - row["slip"]) / row["n_sub"]
+        PRESSURE_MAP[-1] += (self._pressure(detail, M, dev, dt_) - PRESSURE_MAP[-1]) / row["n_sub"]
+        if fvert is not None:
+            VERTEX_FORCE[-1] = fvert.detach().to("cpu", torch.float32).numpy()
+
+    def _pressure(self, detail, M, dev, dt_):
+        """The reaction as a pressure by direction, on the same (theta, phi) grid `apical_map` uses.
+
+        Binned by direction and divided by the area each bin covers -- R^2 dOmega, with dOmega
+        exact per row rather than sin(theta) d(theta), which diverges from it precisely at the poles
+        where the bins are slivers and the error would read as a polar pressure.
+        """
+        nth, nph = self.map_theta, self.map_phi
+        P = torch.zeros(nth * nph, device=dev, dtype=dt_)
+        Rm = torch.zeros(nth * nph, device=dev, dtype=dt_)
+        cntm = torch.zeros(nth * nph, device=dev, dtype=dt_)
+        if self._dom is None:
+            e = torch.linspace(0, math.pi, nth + 1, device=dev, dtype=dt_)
+            self._dom = (e[:-1].cos() - e[1:].cos()) * (2 * math.pi / nph)
+        # the surface radius per bin, from the mesh's own vertices
+        Vv = M["V"]
+        rv = Vv.norm(dim=1).clamp_min(1e-12)
+        uv = Vv / rv[:, None]
+        thv = torch.acos(uv[:, 2].clamp(-1, 1)); phv = torch.atan2(uv[:, 1], uv[:, 0]) % (2 * math.pi)
+        bv = ((thv / math.pi * nth).long().clamp(0, nth - 1) * nph
+              + (phv / (2 * math.pi) * nph).long().clamp(0, nph - 1))
+        Rm.index_add_(0, bv, rv); cntm.index_add_(0, bv, torch.ones_like(rv))
+        Rm = Rm / cntm.clamp_min(1.0)
+        if detail is not None:
+            idx, tri, depth, a_par, m = detail
+            xs = M["A"][tri]
+            r_ = xs.norm(dim=1).clamp_min(1e-12); u_ = xs / r_[:, None]
+            th = torch.acos(u_[:, 2].clamp(-1, 1)); ph = torch.atan2(u_[:, 1], u_[:, 0]) % (2 * math.pi)
+            b = ((th / math.pi * nth).long().clamp(0, nth - 1) * nph
+                 + (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1))
+            P.index_add_(0, b, m * a_par.norm(dim=1))
+        area = (Rm.reshape(nth, nph) ** 2) * self._dom[:, None]
+        return (P.reshape(nth, nph) / area.clamp_min(1e-12)).detach().to("cpu",
+                                                                        torch.float32).numpy()
+```

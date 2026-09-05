@@ -1,0 +1,190 @@
+---
+title: "junction_sync"
+subtitle: "Re-key the per-junction myosin onto the half-edge arrays a topology operator has just changed, so what is recorded for a frame is what that frame's mechanics actually used."
+---
+
+::: {.op-head}
+![](../figures/icons/rewire.png){.op-logo}
+
+[`rewire`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Re-key the per-junction myosin onto the half-edge arrays a topology operator has just changed, so what is recorded for a frame is what that frame's mechanics actually used.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{R}\!:E$ **Rewire**: rebuild the relation $E$ each tick.
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+changed, so what is recorded for a frame is what that frame's mechanics actually used.
+
+vertex -> vertex: reads pos and the keyed store, rewrites m["myo"] and m["myo_amount"].
+
+    myo_e  = gain * store[key(v_i, v_j)]     re-read at the CURRENT half-edge indices
+    N_e    = store[key(v_i, v_j)] * l_e      the amount, for the conservation ledger
+
+The kind is `rewire` because the relation is what changed and this is the state following it.
+
+It is an operator rather than a line inside `cell_divide` because the carry is done from the
+other side. Per-FACE state already survives topology: the topology operators rebuild the mesh
+and reindex every per-face array through the `keep` map, so A0, P0, V0f, age and ndiv are
+never left pointing at a face that moved. Per-HALF-EDGE state has no such carry, and adding
+one to each topology operator would mean editing them again for the next per-junction state.
+Keying by vertex pair instead lets one operator map the store onto whatever half-edge arrays
+now exist.
+
+In the schedule it goes after every operator that can rewire or resize the half-edge arrays,
+and before `topo_record`:
+
+    junction_myosin -> cell_mechanics -> edge_flip -> cell_divide
+                    -> junction_sync -> topo_record
+
+It cannot change a trajectory, by construction. `cell_mechanics` reads m["myo"] in the same
+frame `junction_myosin` writes it, before any topology operator runs, and the next frame's
+`junction_myosin` overwrites it from the store; nothing in between reads it. So the array
+this writes is read by exactly one thing, `topo_record`, and adding it to a schedule leaves
+every position, every division and every T1 bit-identical -- the fix to a recording defect
+must not be able to alter what is being recorded.
+
+Reference: none -- this is bookkeeping that keeps a mechanism correct, not a mechanism.
+Plexus (this work).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `myo_new` | myosin_of_a_newborn_junction | 1.0 |
+| `inherit` | &ndash; | True |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: junction_sync, at: vertex}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`junction_state`]{.op-badge} [`topology_persistent`]{.op-badge} [`bookkeeping`]{.op-badge}  
+
+## Related operators
+
+Other **rewire** operators: [`radius_graph`](radius_graph.qmd), [`edge_flip`](edge_flip.qmd), [`cell_neighbours`](cell_neighbours.qmd), [`bm_unbond`](bm_unbond.qmd), [`adhesion_turnover`](adhesion_turnover.qmd), [`bm_crosslink`](bm_crosslink.qmd).
+
+## Source
+
+[`src/plexus/operators/junction_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/junction_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("junction_sync", family="mechanics", set="vertex", kind="rewire")
+class JunctionMyosinSync(Rewire):
+    """Re-key the per-junction myosin onto the half-edge arrays a topology operator has just
+    changed, so what is recorded for a frame is what that frame's mechanics actually used.
+
+    vertex -> vertex: reads pos and the keyed store, rewrites m["myo"] and m["myo_amount"].
+
+        myo_e  = gain * store[key(v_i, v_j)]     re-read at the CURRENT half-edge indices
+        N_e    = store[key(v_i, v_j)] * l_e      the amount, for the conservation ledger
+
+    The kind is `rewire` because the relation is what changed and this is the state following it.
+
+    It is an operator rather than a line inside `cell_divide` because the carry is done from the
+    other side. Per-FACE state already survives topology: the topology operators rebuild the mesh
+    and reindex every per-face array through the `keep` map, so A0, P0, V0f, age and ndiv are
+    never left pointing at a face that moved. Per-HALF-EDGE state has no such carry, and adding
+    one to each topology operator would mean editing them again for the next per-junction state.
+    Keying by vertex pair instead lets one operator map the store onto whatever half-edge arrays
+    now exist.
+
+    In the schedule it goes after every operator that can rewire or resize the half-edge arrays,
+    and before `topo_record`:
+
+        junction_myosin -> cell_mechanics -> edge_flip -> cell_divide
+                        -> junction_sync -> topo_record
+
+    It cannot change a trajectory, by construction. `cell_mechanics` reads m["myo"] in the same
+    frame `junction_myosin` writes it, before any topology operator runs, and the next frame's
+    `junction_myosin` overwrites it from the store; nothing in between reads it. So the array
+    this writes is read by exactly one thing, `topo_record`, and adding it to a schedule leaves
+    every position, every division and every T1 bit-identical -- the fix to a recording defect
+    must not be able to alter what is being recorded.
+
+    Reference: none -- this is bookkeeping that keeps a mechanism correct, not a mechanism.
+    Plexus (this work).
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = False
+    MECHANISM_TAGS = ["junction_state", "topology_persistent", "bookkeeping"]
+    PARAM_ROLES = {"myo_new": "myosin_of_a_newborn_junction"}
+    REFERENCE = "Plexus (this work); bookkeeping that keeps a mechanism correct, not a mechanism."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.myo_new = float(params.get("myo_new", 1.0))
+        self.inherit = bool(params.get("inherit", True))
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or m.get("myo_keys") is None:
+            return {}                      # no junction myosin in this specification: nothing to carry
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        es, live, vi, vj, stride, key, length = _live_edges(m, pos)
+        if not bool(live.any()):
+            return {}
+        was = int(m["myo"].shape[0]) if m.get("myo") is not None else 0
+        val, _ = _lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_)
+        # The store holds what the model chose to store; `myo` is what the mechanics reads. For
+        # the default model those are the same number and `myo_gain` is 1. For `two_pool` the
+        # store is a line density and the multiplier is that density scaled to a tissue mean of
+        # `activity`, so the gain is activity / <n>. The owning operator leaves the gain on the
+        # mesh and this operator applies it, which is what keeps this one model-agnostic. The
+        # gain used is the one computed BEFORE the topology operators ran -- a mean over some
+        # thousands of junctions, of which a handful were just cut, so it does not move at that
+        # scale.
+        gain = float(m.get("myo_gain", 1.0))
+        m["myo"] = _scatter_full(es, live, (gain * val).clamp(0.0, 5.0), dev, dt_)
+        # And the amount, on the same footing. `myo` is a density -- normalised, for `two_pool` --
+        # so no sum of it says how much myosin there is; N_e = (stored density) * l_e does, and it
+        # is the quantity the conservation ledger is written in. Zero on dead slots: an amount.
+        m["myo_amount"] = _scatter_full(es, live, val * length, dev, dt_, fill=0.0)
+        SYNC_TRACE.append((int(es.shape[0]), was, int(live.sum())))
+        if not self._said:
+            print(f"[junction_sync] re-keying myosin after the topology operators "
+                  f"({was} half-edges written -> {int(es.shape[0])} now)", flush=True)
+            self._said = True
+        return {}
+```

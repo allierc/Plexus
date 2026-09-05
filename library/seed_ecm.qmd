@@ -1,0 +1,385 @@
+---
+title: "seed_ecm"
+subtitle: "Lay the matrix out once, at frame 0: the box minus a cavity, filled with aligned fibres."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Lay the matrix out once, at frame 0: the box minus a cavity, filled with aligned fibres.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+particle -> particle: rewrites every position in the set, and the per-particle material, at
+the opening of the trajectory.
+
+The occupied region is the box minus a cylindrical cavity of radius `cavity_r` and half-height
+`cavity_h`, both in world units -- the space the tissue will grow into. Within it, particles
+are laid down as `n_fibres` segments of length `fibre_len`, also in world units, whose
+directions are biased by `align`: 0 is isotropic and 1 fully aligned, so `align` is the
+dimensionless order parameter of the fibre network the tissue must push through.
+
+A structural operator rather than a set provision, because the stock provision seeds a block
+or a ball and the matrix is neither -- it is the COMPLEMENT of a shape. Writing it as an
+operator also puts the cavity in the specification, beside the stiffness it is being tested
+against, rather than in a seeder.
+
+Particles are never PLACED in the cavity rather than deleted from it. A cut-out would leave
+the discarded particles occupying memory and mass, and an MPM particle with zero occupancy
+still costs a scatter every substep.
+
+Reference: Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for
+history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196 (MPM).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `cavity_r` | cavity_radius | 0.22 |
+| `cavity_h` | cavity_half_height | 0.07 |
+| `fibre_len` | fibre_length | 0.16 |
+| `n_fibres` | fibre_count | 900 |
+| `align` | fibre_alignment_strength | 0.0 |
+| `centre` | &ndash; | [0.5, 0.5, 0.5] |
+| `axis` | &ndash; | 1 |
+| `margin` | &ndash; | 0.03 |
+| `plate_half` | &ndash; | None |
+| `block` | &ndash; | None |
+| `cavity_sphere` | &ndash; | False |
+| `shell_r` | &ndash; | None |
+| `dense_axis` | &ndash; | 2 |
+| `dense_cone_deg` | &ndash; | 0.0 |
+| `dense_boost` | &ndash; | 1.0 |
+| `align_dir` | &ndash; | [1.0, 0.0, 0.0] |
+| `jitter` | &ndash; | 0.004 |
+| `seed` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: seed_ecm, at: particle}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`matrix_seeding`]{.op-badge} [`fibre_alignment`]{.op-badge} [`cavity`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/ecm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/ecm_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("ecm_seed", "seed_ecm", family="seed", set="particle", kind="seed")
+class ECMSeed(Structural):
+    """Lay the matrix out once, at frame 0: the box minus a cavity, filled with aligned fibres.
+
+    particle -> particle: rewrites every position in the set, and the per-particle material, at
+    the opening of the trajectory.
+
+    The occupied region is the box minus a cylindrical cavity of radius `cavity_r` and half-height
+    `cavity_h`, both in world units -- the space the tissue will grow into. Within it, particles
+    are laid down as `n_fibres` segments of length `fibre_len`, also in world units, whose
+    directions are biased by `align`: 0 is isotropic and 1 fully aligned, so `align` is the
+    dimensionless order parameter of the fibre network the tissue must push through.
+
+    A structural operator rather than a set provision, because the stock provision seeds a block
+    or a ball and the matrix is neither -- it is the COMPLEMENT of a shape. Writing it as an
+    operator also puts the cavity in the specification, beside the stiffness it is being tested
+    against, rather than in a seeder.
+
+    Particles are never PLACED in the cavity rather than deleted from it. A cut-out would leave
+    the discarded particles occupying memory and mass, and an MPM particle with zero occupancy
+    still costs a scatter every substep.
+
+    Reference: Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for
+    history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196 (MPM).
+    """
+    EMIT = None                       # rewrites positions in place at frame 0; no integrable delta
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["matrix_seeding", "fibre_alignment", "cavity"]
+    PARAM_ROLES = {"cavity_r": "cavity_radius", "cavity_h": "cavity_half_height",
+                   "fibre_len": "fibre_length", "n_fibres": "fibre_count",
+                   "align": "fibre_alignment_strength"}
+    REFERENCE = ("Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for "
+                 "history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "mpm_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        # THE CAVITY IS A DISC, and its two radii are separate numbers on purpose. A sphere would
+        # confine the ball equally in every direction, which is the one case where the matrix
+        # cannot tell us anything the ball's own mechanics does not: it would stay a ball. A disc
+        # is anisotropic confinement -- free in two axes, pinched in the third -- so the shape the
+        # tissue takes is a fact about the coupling rather than about the ball.
+        self.cavity_r = float(params.get("cavity_r", 0.22))     # in-plane radius
+        self.cavity_h = float(params.get("cavity_h", 0.07))     # half-thickness along `axis`
+        self.axis = int(params.get("axis", 1))                  # the pinched axis
+        self.margin = float(params.get("margin", 0.03))         # keep clear of the domain walls
+        # SOLID BLOCKS, top and bottom: no matrix is seeded inside them. `None` = no blocks. The
+        # blocks are the SAME object `plate_confine` holds the matrix out of during the run, so the
+        # two numbers have to agree -- pass the same `gap_half` to both, from one place in the spec.
+        # Seeding matrix into a solid and then relying on the confinement operator to evict it would
+        # start the run with a shock the material never recovers from.
+        self.plate_half = params.get("plate_half", None)
+        self.plate_half = None if self.plate_half is None else float(self.plate_half)
+        # A BLOCK REGION, in the framework's own vocabulary. `MPMParticle.provision` already accepts
+        # `block: [x0,y0,z0,x1,y1,z1]` for a type that FILLS a box instead of a disc, and the stock MPM
+        # demos build their falling cubes with it. Fibres cannot use that path -- the provision places
+        # points and this operator places STRANDS -- so the same six numbers are accepted here and the
+        # fibre CENTRES are drawn inside the box, inset by half a fibre so a strand stays in the cube it
+        # belongs to. Without it the only regions this operator could seed were "the whole domain" and
+        # "the whole domain minus a cavity", which is why a cube of matrix had to be faked with plates.
+        self.block = params.get("block", None)
+        self.block = None if self.block is None else [float(v) for v in self.block]
+        self.cavity_sphere = bool(params.get("cavity_sphere", False))
+        # A SHELL, WHICH IS THE ONLY AFFORDABLE GEOMETRY FOR A SPHEROID IN A MATRIX. Filling the box
+        # at a usable particle density costs a million particles (ppc 4 at dx = 1/64 is 4*64^3 per
+        # unit volume) and spends nearly all of them on a far field that never moves. `shell_r` caps
+        # the radius a fibre CENTRE may be drawn at, so the matrix is the shell between the cavity
+        # and it -- a strand may still stick out by half its length, which is why this is a cap on
+        # centres and not a clamp on particles: clamping would pile mass on the outer surface.
+        self.shell_r = params.get("shell_r", None)
+        self.shell_r = None if self.shell_r is None else float(self.shell_r)
+        # A DENSER REGION, so the matrix's ARCHITECTURE is anisotropic and not just its orientation.
+        # Fibre alignment alone gave a 1.50x directional pressure difference (measured: 1448 along the
+        # alignment axis against 2123 / 2176 across it) -- real, but small, because MPM interpolates
+        # every particle onto a continuum grid and a fibrous ARRANGEMENT of an isotropic material
+        # responds nearly isotropically. Putting MORE FIBRES in a region changes the mass and stiffness
+        # the grid actually sees, which is a difference the continuum cannot average away.
+        #
+        # The region is the pair of cones about `dense_axis` within `dense_cone_deg` of it: dense at the
+        # poles, sparse around the equator. Chosen so the suppression is AXISYMMETRIC and therefore
+        # measurable by the semi-axes already recorded -- an off-centre dense blob makes a more striking
+        # picture and needs a metric nobody has written.
+        self.dense_axis = int(params.get("dense_axis", 2))
+        self.dense_cone = float(params.get("dense_cone_deg", 0.0))     # 0 = uniform
+        self.dense_boost = float(params.get("dense_boost", 1.0))
+        self.n_fibres = int(params.get("n_fibres", 900))
+        self.fibre_len = float(params.get("fibre_len", 0.16))
+        # 0 = isotropic directions, 1 = every fibre parallel to `align_dir`. Anything between is a
+        # von-Mises-like spread about it, which is what a real matrix looks like near a boundary.
+        self.align = float(params.get("align", 0.0))
+        self.align_dir = [float(v) for v in params.get("align_dir", [1.0, 0.0, 0.0])]
+        self.jitter = float(params.get("jitter", 0.004))        # across-fibre thickness
+        self.seed = int(params.get("seed", 0))
+        self._done = False
+
+    def _outside_cavity(self, pos):
+        """True where a point is IN the matrix -- outside the cavity AND outside the solid blocks."""
+        c = torch.tensor(self.centre, device=pos.device, dtype=pos.dtype)
+        d = pos - c
+        ax = self.axis
+        along = d[:, ax].abs()
+        radial = torch.sqrt((d ** 2).sum(1) - d[:, ax] ** 2 + 1e-12)
+        # A DISC BY DEFAULT, A SPHERE ON REQUEST. The disc is two numbers because anisotropic
+        # confinement is the experiment the cavity was written for; a hole that a SPHEROID will occupy
+        # is a sphere, and setting r = h on the disc gives a cylinder with flat ends, which is a
+        # different shape wearing the right radius.
+        if self.cavity_sphere:
+            ok = ~(d.norm(dim=1) < self.cavity_r)
+        else:
+            ok = ~((radial < self.cavity_r) & (along < self.cavity_h))
+        if self.plate_half is not None:
+            ok = ok & (d[:, ax].abs() < self.plate_half)
+        return ok
+
+    def forward(self, H, mask=None):
+        if self._done:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        n, D = pos.shape
+        dev, dt_ = pos.device, pos.dtype
+        g = torch.Generator(device="cpu").manual_seed(self.seed)
+
+        # FIBRE DIRECTIONS. Isotropic by default; `align` mixes toward a chosen axis. Normalised
+        # AFTER mixing so a partially aligned fibre is still a unit vector.
+        d = torch.randn(self.n_fibres, D, generator=g)
+        d = d / d.norm(dim=1, keepdim=True).clamp_min(1e-9)
+        if self.align > 0:
+            a = torch.tensor(self.align_dir, dtype=d.dtype)
+            a = a / a.norm().clamp_min(1e-9)
+            d = (1.0 - self.align) * d + self.align * a
+            d = d / d.norm(dim=1, keepdim=True).clamp_min(1e-9)
+
+        # FIBRE CENTRES, REJECTION-SAMPLED OUT OF THE CAVITY. Rejection rather than a closed-form
+        # placement because the cavity is a parameter: a formula would have to be rewritten for
+        # every new cavity shape, and a rejection loop would not.
+        lo, hi = self.margin, 1.0 - self.margin
+        if self.block is not None:
+            b = torch.tensor(self.block, dtype=torch.float32).reshape(2, D)
+            inset = 0.5 * self.fibre_len
+            blo = (b[0] + inset).clamp(lo, hi)
+            bhi = (b[1] - inset).clamp(lo, hi)
+            blo, bhi = torch.minimum(blo, bhi), torch.maximum(blo, bhi)
+            # AND THE CAVITY STILL APPLIES INSIDE THE BLOCK. The hole is what the spheroid will
+            # occupy, so it has to be absent from the matrix from frame 0 -- a fibre seeded where the
+            # ball is going to be is in contact before the run starts, which is the defect the cavity
+            # exists to prevent. Rejection, as everywhere else here, because the cavity's shape is a
+            # parameter and a closed form would have to be rewritten for the next one.
+            got = []
+            for _ in range(64):
+                c = torch.rand(self.n_fibres * 2, D, generator=g) * (bhi - blo) + blo
+                c = c[self._outside_cavity(c.to(dev)).cpu()]
+                got.append(c)
+                if sum(x.shape[0] for x in got) >= self.n_fibres:
+                    break
+            centres = torch.cat(got)[: self.n_fibres]
+            print(f"[ecm_seed] block region {self.block}: {centres.shape[0]} fibre centres inside it, "
+                  f"inset by half a fibre ({inset:.3f}), cavity r={self.cavity_r:g} h={self.cavity_h:g} "
+                  f"left empty", flush=True)
+        else:
+            centres = None
+        keep = []
+        for _ in range(64):
+            c = torch.rand(self.n_fibres * 2, D, generator=g) * (hi - lo) + lo
+            c = c[self._outside_cavity(c.to(dev)).cpu()]
+            if self.shell_r is not None:
+                c0 = torch.tensor(self.centre, dtype=c.dtype)
+                c = c[(c - c0).norm(dim=1) < self.shell_r - 0.5 * self.fibre_len]
+            keep.append(c)
+            need = self.n_fibres * (max(self.dense_boost, 1.0) if self.dense_cone > 0 else 1.0)
+
+            if sum(x.shape[0] for x in keep) >= need:
+                break
+        centres = torch.cat(keep) if centres is None else centres
+        if self.block is None and self.dense_cone > 0 and self.dense_boost != 1.0:
+            # IMPORTANCE SAMPLING, not a second sampling pass: keep every candidate in the cone and
+            # thin the rest by 1/boost, so the ACCEPTED set has `boost` times the areal density inside
+            # the cone. The particle count is unchanged -- `per = n // n_fibres` -- so this redistributes
+            # material rather than adding it, and the sparse region really does get sparser.
+            c0 = torch.tensor(self.centre, dtype=centres.dtype)
+            v = centres - c0
+            vn = v.norm(dim=1).clamp_min(1e-9)
+            cosang = (v[:, self.dense_axis] / vn).abs()
+            in_cone = cosang > math.cos(math.radians(self.dense_cone))
+            u01 = torch.rand(centres.shape[0], generator=g)
+            centres = centres[in_cone | (u01 < 1.0 / self.dense_boost)]
+        centres = centres[: self.n_fibres]
+        if centres.shape[0] < self.n_fibres:                  # cavity larger than the box
+            centres = centres.repeat((self.n_fibres // max(centres.shape[0], 1)) + 1, 1)
+            centres = centres[: self.n_fibres]
+
+        # A STRAND CLEARS THE CAVITY AS A WHOLE, OR IT IS NOT SEEDED THERE. The per-particle eviction
+        # below is a backstop and was doing this job: a strand whose CENTRE was outside the cavity but
+        # whose ends crossed it had those ends teleported onto the rim while the rest stayed put, so
+        # the strand was born already torn. Measured on `04c` before this: 64 of 10,000 strands had an
+        # internal gap of up to seventeen times their own particle spacing at frame 0, and they are
+        # the long straight streaks in the movie. The test is the distance from the cavity centre to
+        # the SEGMENT, not to its midpoint, and a strand that fails it is pushed out along its own
+        # centre's radius until it passes -- direction and length untouched, so the seeded fibre
+        # architecture is unchanged.
+        if self.cavity_sphere and self.cavity_r > 0:
+            c0 = torch.tensor(self.centre, dtype=centres.dtype)
+            half = 0.5 * self.fibre_len
+            need_r = self.cavity_r + 2 * self.jitter
+            for _ in range(8):
+                w = c0 - centres
+                t = (w * d).sum(1, keepdim=True).clamp(-half, half)
+                dist = (w - t * d).norm(dim=1)
+                bad = dist < need_r
+                if not bool(bad.any()):
+                    break
+                u = centres[bad] - c0
+                un = u / u.norm(dim=1, keepdim=True).clamp_min(1e-9)
+                centres[bad] = centres[bad] + un * (need_r - dist[bad] + 1e-4)[:, None]
+            print(f"[ecm_seed] {int(bad.sum())} strand(s) still crossing the cavity after "
+                  f"whole-strand eviction", flush=True)
+
+        # PARTICLES ALONG THE FIBRES, evenly spaced with a little across-fibre thickness so a
+        # fibre reads as a strand rather than a line of dots.
+        per = max(1, n // self.n_fibres)
+        t = (torch.arange(per, dtype=torch.float32) / max(per - 1, 1) - 0.5) * self.fibre_len
+        p = (centres[:, None, :] + t[None, :, None] * d[:, None, :]).reshape(-1, D)
+        f = d[:, None, :].expand(-1, per, -1).reshape(-1, D)
+        if p.shape[0] < n:                                    # top up with whole fibres
+            k = n - p.shape[0]
+            p = torch.cat([p, p[:k]])
+            f = torch.cat([f, f[:k]])
+        p, f = p[:n], f[:n]
+        p = p + torch.randn(p.shape, generator=g) * self.jitter
+        p = p.clamp(lo, hi)
+
+        # A FIBRE THAT CROSSES THE CAVITY IS PULLED OUT OF IT. Seeding by centres alone leaves
+        # particles inside the cavity whenever a fibre straddles the boundary -- and a single
+        # matrix particle sitting where the cell ball is about to be is not a small error: it is
+        # in contact from frame 0, so "the moment of first contact", which is the one event this
+        # experiment exists to observe, would be frame 0 for the whole run.
+        # INTO THE SLAB FIRST, THEN OUT OF THE CAVITY. A particle beyond a plate has to come back
+        # along the plate normal; a particle in the cavity has to go out through its rim. Doing the
+        # cavity push first and clamping afterwards can drop a particle straight back into the cavity.
+        if self.plate_half is not None:
+            lim = self.plate_half - self.jitter * 2
+            p[:, self.axis] = (p[:, self.axis] - self.centre[self.axis]).clamp(-lim, lim) \
+                + self.centre[self.axis]
+        inside = ~self._outside_cavity(p.to(dev)).cpu()
+        if inside.any():
+            c = torch.tensor(self.centre, dtype=p.dtype)
+            v = p[inside] - c
+            rad = v.clone(); rad[:, self.axis] = 0
+            rn = rad.norm(dim=1, keepdim=True).clamp_min(1e-9)
+            push = torch.zeros_like(v)
+            push += rad / rn * (self.cavity_r + self.jitter * 2)        # out through the rim
+            push[:, self.axis] = torch.sign(v[:, self.axis]) * (self.cavity_h + self.jitter * 2)
+            p[inside] = (c + push).clamp(lo, hi)
+
+        # WRITTEN THROUGH THE VIEW. `Level.get` returns a slice of the state matrix, so an
+        # in-place assignment IS the write; there is no setter, and `lvl.set(...)` does not exist.
+        lvl.get("pos")[:] = p.to(dev, dt_)
+        # THE FIBRE DIRECTIONS LIVE ON THE OPERATOR, not in the state matrix: the schema is fixed
+        # at construction and has no `fibre` block. Keeping them here means an anisotropic term
+        # can read them without a schema migration, and means they cannot be silently zeroed by
+        # something that rewrites state.
+        self.fibre = f.to(dev, dt_)
+        self._done = True
+        n_in = int((~self._outside_cavity(lvl.get("pos"))).sum())
+        print(f"[ecm_seed] {n} particles on {self.n_fibres} fibres; cavity r={self.cavity_r} "
+              f"h={self.cavity_h} about axis {self.axis}"
+              + ("" if self.plate_half is None
+                 else f"; solid blocks beyond +/-{self.plate_half:.3f} "
+                      f"({100 * (1 - 2 * self.plate_half):.0f}% of the box)")
+              + ("" if self.dense_cone <= 0 or self.dense_boost == 1.0
+                 else f"; density x{self.dense_boost:g} within {self.dense_cone:g} deg of axis "
+                      f"{self.dense_axis}")
+              + f"; {n_in} left inside the cavity or a block", flush=True)
+        return {}
+```

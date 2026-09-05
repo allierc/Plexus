@@ -1,0 +1,199 @@
+---
+title: "integrin_pull"
+subtitle: "The force the fibre's OUTER end exerts on the membrane patch it binds -- and the equal and opposite reaction on the fibre."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+The force the fibre's OUTER end exerts on the membrane patch it binds -- and the equal and opposite reaction on the fibre.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+opposite reaction on the fibre.
+
+integrin -> (integrin, basement_membrane): reads both positions, emits an acceleration on each.
+
+    f = k (x_tip - x_membrane)          on the membrane particle
+    -f                                  on the fibre tip
+
+k is the bond stiffness in inverse time squared. Each fibre is BOUND at seeding to the membrane
+particle nearest its tip, and holds that particular one thereafter.
+
+THE GRID IS NOT ENOUGH FOR THIS, and the reason is a mass ratio. A fibre reaches the sheet
+through the grid node they share, whose velocity is the MASS-WEIGHTED mean of everything in that
+cell -- and there are far more sheet particles per cell than prescribed fibre ends, so the
+puller carries a small fraction of the mass it is trying to move. Grid contact is a good model
+for two bodies pressing on each other and a poor one for a molecule holding onto one.
+
+Both forces are returned as `mpm_acceleration`, so both still pass through the grid solve and
+both bodies' deformation gradients see the load. This adds a relation; it does not bypass the
+mechanics.
+
+Reference: Plexus (this work); integrin-mediated attachment of a cell to its basement membrane.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `k` | bond_stiffness | 1.0e5 |
+| `gamma` | drag_the_force_is_divided_by | 1.0 |
+| `rupture` | bond_extension_at_which_it_lets_go | 0.0 |
+| `integrin_set` | &ndash; | "integrin_particle" |
+| `pull_from` | &ndash; | "tip" |
+| `rest_length` | &ndash; | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: integrin_pull, at: particle}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`integrin`]{.op-badge} [`hemidesmosome`]{.op-badge} [`cell_matrix_anchoring`]{.op-badge} [`adhesion_force`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("integrin_pull", family="mechanics", set="particle", kind="lateral")
+class IntegrinPull(Lateral):
+    """The force the fibre's OUTER end exerts on the membrane patch it binds -- and the equal and
+    opposite reaction on the fibre.
+
+    integrin -> (integrin, basement_membrane): reads both positions, emits an acceleration on each.
+
+        f = k (x_tip - x_membrane)          on the membrane particle
+        -f                                  on the fibre tip
+
+    k is the bond stiffness in inverse time squared. Each fibre is BOUND at seeding to the membrane
+    particle nearest its tip, and holds that particular one thereafter.
+
+    THE GRID IS NOT ENOUGH FOR THIS, and the reason is a mass ratio. A fibre reaches the sheet
+    through the grid node they share, whose velocity is the MASS-WEIGHTED mean of everything in that
+    cell -- and there are far more sheet particles per cell than prescribed fibre ends, so the
+    puller carries a small fraction of the mass it is trying to move. Grid contact is a good model
+    for two bodies pressing on each other and a poor one for a molecule holding onto one.
+
+    Both forces are returned as `mpm_acceleration`, so both still pass through the grid solve and
+    both bodies' deformation gradients see the load. This adds a relation; it does not bypass the
+    mechanics.
+
+    Reference: Plexus (this work); integrin-mediated attachment of a cell to its basement membrane.
+    """
+
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    MECHANISM_TAGS = ["integrin", "hemidesmosome", "cell_matrix_anchoring", "adhesion_force"]
+    PARAM_ROLES = {"k": "bond_stiffness", "gamma": "drag_the_force_is_divided_by",
+                   "rupture": "bond_extension_at_which_it_lets_go"}
+    REFERENCE = "Walko, G. et al. (2015) Cell Tissue Res. 360:363 (hemidesmosome architecture)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.integrin_set = params.get("integrin_set", "integrin_particle")
+        self.k = float(params.get("k", 1.0e5))
+        self.gamma = float(params.get("gamma", 1.0))
+        self.rupture = float(params.get("rupture", 0.0))     # 0 = permanent
+        # WHICH END OF THE FIBRE PULLS. `tip` is the design as written -- the fibre's material carries
+        # the load from its prescribed base to its outer end, and the bond is the last link. 148 shows
+        # that middle step is the one that fails: base at 0.2969, tip at 0.1015, a fibre "stretched" to
+        # fifty times its rest length that transmits nothing, because in MPM the deformation gradient is
+        # advected by the GRID's velocity gradient and does not measure the distance between particles.
+        # Two particles more than a cell apart are simply two bodies. `inner` therefore runs the bond
+        # from the prescribed base itself, with the fibre's length as the bond's REST LENGTH: the rope
+        # is then explicit, its length is still a material property of the fibre, and rupture is still
+        # one comparison on the fibre's own extension. The fibre particles remain, and remain drawn.
+        self.pull_from = str(params.get("pull_from", "tip")).lower()
+        self.rest = float(params.get("rest_length", 0.0))
+        self.bond = None
+        self.bound = None
+        self._said = False
+
+    def forward(self, H, mask=None):
+        idx_in = getattr(H, "integrin_inner", None)
+        if idx_in is None:
+            return {}
+        ml = H.level(self.at)
+        il = H.level(self.integrin_set)
+        mp, ip = ml.get("pos"), il.get("pos")
+        nf = int(idx_in.numel())
+        tip = ip[:nf] if self.pull_from == "inner" else ip[-nf:]
+        if self.bond is None:
+            # NEAREST AT SEEDING, THEN FIXED. A bond that re-binds to whatever is nearest each frame is
+            # not a bond, it is a field -- and it would hide exactly the failure this operator exists to
+            # measure, since a fibre that has torn free would silently grab a neighbour.
+            b = torch.empty(nf, dtype=torch.long, device=mp.device)
+            blk = 512
+            for a0 in range(0, nf, blk):
+                b1 = min(nf, a0 + blk)
+                b[a0:b1] = torch.cdist(tip[a0:b1], mp).argmin(dim=1)
+            self.bond = b
+            self.bound = torch.ones(nf, dtype=torch.bool, device=mp.device)
+            d0 = (tip - mp[b]).norm(dim=1)
+            print(f"[integrin_pull] {nf} fibres bound to their nearest membrane particle "
+                  f"(mean separation at seeding {float(d0.mean()):.2e} box units), k={self.k:g}, "
+                  f"rupture={'off' if self.rupture <= 0 else self.rupture}", flush=True)
+        d = tip - mp[self.bond]
+        # THE REST LENGTH ENTERS RADIALLY. A zero-rest-length bond would pull the sheet onto the fibre's
+        # end; a fibre holds it one length away, which is the whole reason the standoff is a material
+        # property rather than a balance.
+        if self.rest > 0:
+            nrm = d.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            d = d * (1.0 - self.rest / nrm)
+        if self.rupture > 0:
+            self.bound &= d.norm(dim=1) < self.rupture
+        f = (self.k / max(self.gamma, 1e-12)) * d * self.bound[:, None].to(d.dtype)
+        acc_m = torch.zeros_like(mp)
+        acc_m.index_add_(0, self.bond, f)                     # several fibres may share a patch
+        acc_i = torch.zeros_like(ip)
+        if self.pull_from == "inner":
+            acc_i[:nf] = -f            # discarded next substep: `integrin_track` re-prescribes the base
+        else:
+            acc_i[-nf:] = -f                                      # the reaction, on the fibre's own tip
+        if not self._said:
+            print(f"[integrin_pull] first-frame mean |force| {float(f.norm(dim=1).mean()):.4g}",
+                  flush=True)
+            self._said = True
+        return {ml.name: acc_m, il.name: acc_i}
+```

@@ -1,0 +1,258 @@
+---
+title: "medioapical_myosin"
+subtitle: "The apical meshwork: a second myosin pool, spread over the FACE as an areal density rather than along its edges, which assembles there and flows outward onto the belt."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+The apical meshwork: a second myosin pool, spread over the FACE as an areal density rather than along its edges, which assembles there and flows outward onto the belt.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `cell` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+rather than along its edges, which assembles there and flows outward onto the belt.
+
+cell -> cell: reads the face geometry and the per-edge tension, writes m["myo_med"] (the
+areal density) and m["myo_influx"] (the per-half-edge flux) on the mesh.
+
+    M_f      = rho_f A_f                                 the amount, from the stored density
+    dM_f/dt  = k_on A_f  -  M_f / tau_med  -  sum_e J_(f->e)
+    J_(f->e) = k_ex rho_f l_e (1 + beta_T (T_e/<T> - 1))
+
+rho_f is the areal density of myosin on face f, in amount per world unit squared, and A_f the
+face's apical area. k_on is myosin assembled per unit APICAL AREA per frame, so a cell that
+grows assembles more -- which is what makes this pool areal rather than a per-cell budget.
+tau_med is the meshwork's own turnover time, in frames. k_ex is the fraction of the cell's
+areal density handed to each unit LENGTH of its junctional belt per frame; the flux is
+proportional to l_e because the belt is what receives it and there is l_e of it. beta_T is
+the dimensionless tension bias: at beta_T = 0 the flux is blind to mechanics, and above it a
+junction under more than the mean tension T/<T> draws proportionally more.
+
+The shape factor is a PREDICTION, not a parameter. At steady state
+
+    rho* = k_on / (1/tau_med + k_ex P_f/A_f)
+
+so a cell with more perimeter per unit area drains faster and holds less medioapical myosin.
+P_f/A_f is fixed by shape alone, so the model says elongated cells are medioapically poorer
+than round ones of the same area -- with nothing added to make it say so.
+
+Reference: Munjal, A., Philippe, J.-M., Munro, E. & Lecuit, T. (2015). A self-organized
+biomechanical network drives shape changes during tissue morphogenesis. Nature 524:351-355
+(two apical pools, medioapical pulses flowing onto junctions); Rauzi, M., Lenne, P.-F. &
+Lecuit, T. (2010). Planar polarized actomyosin contractile flows control epithelial junction
+remodelling. Nature 468:1110-1114 (planar-polarised junctional myosin).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `k_on` | areal_assembly_rate | 0.05 |
+| `tau_med` | medioapical_turnover_time | 20.0 |
+| `k_ex` | export_rate_onto_the_belt | 0.05 |
+| `beta_T` | tension_bias_of_the_export | 0.0 |
+| `mesh_at` | &ndash; | "vertex" |
+| `rho0` | &ndash; | 1.0 |
+| `dt` | &ndash; | 1.0 |
+| `lam` | &ndash; | 1.0 |
+| `k_perim` | &ndash; | 1.0 |
+| `gam` | &ndash; | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: medioapical_myosin, at: cell}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`actomyosin_contraction`]{.op-badge} [`medioapical_pool`]{.op-badge} [`cortical_flow`]{.op-badge} [`topology_persistent`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/junction_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/junction_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("medioapical_myosin", family="mechanics", set="cell", kind="lateral")
+class MedioapicalMyosin(Lateral):
+    """The apical meshwork: a second myosin pool, spread over the FACE as an areal density
+    rather than along its edges, which assembles there and flows outward onto the belt.
+
+    cell -> cell: reads the face geometry and the per-edge tension, writes m["myo_med"] (the
+    areal density) and m["myo_influx"] (the per-half-edge flux) on the mesh.
+
+        M_f      = rho_f A_f                                 the amount, from the stored density
+        dM_f/dt  = k_on A_f  -  M_f / tau_med  -  sum_e J_(f->e)
+        J_(f->e) = k_ex rho_f l_e (1 + beta_T (T_e/<T> - 1))
+
+    rho_f is the areal density of myosin on face f, in amount per world unit squared, and A_f the
+    face's apical area. k_on is myosin assembled per unit APICAL AREA per frame, so a cell that
+    grows assembles more -- which is what makes this pool areal rather than a per-cell budget.
+    tau_med is the meshwork's own turnover time, in frames. k_ex is the fraction of the cell's
+    areal density handed to each unit LENGTH of its junctional belt per frame; the flux is
+    proportional to l_e because the belt is what receives it and there is l_e of it. beta_T is
+    the dimensionless tension bias: at beta_T = 0 the flux is blind to mechanics, and above it a
+    junction under more than the mean tension T/<T> draws proportionally more.
+
+    The shape factor is a PREDICTION, not a parameter. At steady state
+
+        rho* = k_on / (1/tau_med + k_ex P_f/A_f)
+
+    so a cell with more perimeter per unit area drains faster and holds less medioapical myosin.
+    P_f/A_f is fixed by shape alone, so the model says elongated cells are medioapically poorer
+    than round ones of the same area -- with nothing added to make it say so.
+
+    Reference: Munjal, A., Philippe, J.-M., Munro, E. & Lecuit, T. (2015). A self-organized
+    biomechanical network drives shape changes during tissue morphogenesis. Nature 524:351-355
+    (two apical pools, medioapical pulses flowing onto junctions); Rauzi, M., Lenne, P.-F. &
+    Lecuit, T. (2010). Planar polarized actomyosin contractile flows control epithelial junction
+    remodelling. Nature 468:1110-1114 (planar-polarised junctional myosin).
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = False        # writes m["myo_med"] / m["myo_influx"], not positions
+    MECHANISM_TAGS = ["actomyosin_contraction", "medioapical_pool", "cortical_flow",
+                      "topology_persistent"]
+    PARAM_ROLES = {"k_on": "areal_assembly_rate", "tau_med": "medioapical_turnover_time",
+                   "k_ex": "export_rate_onto_the_belt", "beta_T": "tension_bias_of_the_export"}
+    REFERENCE = ("Munjal, A., Philippe, J.-M., Munro, E. & Lecuit, T. (2015). A self-organized "
+                 "biomechanical network drives shape changes during tissue morphogenesis. Nature "
+                 "524:351-355; Rauzi, M., Lenne, P.-F. & Lecuit, T. (2010). Planar polarized "
+                 "actomyosin contractile flows control epithelial junction remodelling. Nature "
+                 "468:1110-1114.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        # ACTS ON `cell` AND READS THE MESH, which lives on the vertex Level. The mesh is the only
+        # place the face incidence exists, so the operator is declared on the set whose state it owns
+        # and reaches the geometry through `mesh_at`.
+        self.at = params.get("_at", "cell")
+        self.mesh_at = params.get("mesh_at", "vertex")
+        self.k_on = float(params.get("k_on", 0.05))
+        self.tau_med = float(params.get("tau_med", 20.0))
+        self.k_ex = float(params.get("k_ex", 0.05))
+        self.beta_T = float(params.get("beta_T", 0.0))
+        self.rho0 = float(params.get("rho0", 1.0))
+        self.dt = float(params.get("dt", 1.0))
+        self.lam = float(params.get("lam", 1.0))
+        self.k_perim = float(params.get("k_perim", 1.0))
+        self.gam = float(params.get("gam", 0.0))
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.mesh_at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        es, live, vi, vj, stride, key, length = _live_edges(m, pos)
+        if not bool(live.any()):
+            return {}
+        nF = int(m["nF"])
+        ef = m["E_face"][live].long()
+        # THE SAME AREA `cell_mechanics` MINIMISES AGAINST -- the Newell area-vector magnitude, from
+        # the same function, not a re-derivation. `eocc` masks the dead half-edges exactly as the
+        # energy's live-only path does.
+        eocc = live.to(dt_)
+        area, _, _, _ = face_geometry_3d(pos, m["E_srce"].long(), m["E_trgt"].long(),
+                                         m["E_face"].long().clamp(max=nF - 1), nF, eocc)
+        area = area.clamp_min(1e-9)
+
+        # ---- the stored state is a DENSITY, so `cell_divide`'s copy conserves the amount ------------
+        rho = m.get("myo_med")
+        if rho is None or rho.shape[0] < nF:
+            rho = torch.full((nF,), self.rho0, device=dev, dtype=dt_)
+        rho = rho[:nF].to(dt_)
+        # BOTH ARE DENSITIES, so `cell_divide`'s copy-onto-both-daughters conserves them. `myo_area` is
+        # NOT declared here on purpose: an area is extensive, copying it would give two daughters the
+        # mother's area each, and anything needing it after a division must recompute it.
+        _face_carry(m, "myo_med")
+        _face_carry(m, "myo_nstar_per_tau")
+
+        # ---- where the export lands ---------------------------------------------------------------
+        # With `beta_T` at 0 this is pure transport: every unit of belt receives at the same rate and
+        # the pattern of junctional myosin is set by geometry alone. That is deliberately the control
+        # -- a tension bias added on top has to beat it, and cannot be credited with what transport
+        # already does.
+        w = torch.ones_like(length)
+        if self.beta_T != 0.0:
+            myo_now = m.get("myo")
+            myo_l = (myo_now[live].to(dt_) if myo_now is not None and myo_now.shape[0] == es.shape[0]
+                     else torch.ones_like(length))
+            T = edge_tension(m, length, myo_l, ef, self.lam, self.k_perim, self.gam, dev, dt_)
+            w = (1.0 + self.beta_T * (T / T.mean().clamp_min(1e-9) - 1.0)).clamp_min(0.0)
+
+        # ---- the flux, per half-edge, and its reaction on the cell --------------------------------
+        # A HALF-EDGE HAS EXACTLY ONE FACE, so `J` computed per half-edge IS the flux from that face
+        # onto that piece of belt, and a junction -- two half-edges, one per cell -- collects a
+        # contribution from BOTH of the cells it separates. That is the geometry doing the
+        # bookkeeping: nothing has to look up "the other cell".
+        J = self.k_ex * rho[ef] * length * w * self.dt
+        drain = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef, J)
+
+        M = rho * area
+        M = M + (self.k_on * area - M / max(self.tau_med, 1e-9)) * self.dt - drain
+        rho = (M / area).clamp_min(0.0)
+        m["myo_med"] = rho.detach()
+        m["myo_med_total"] = float((rho * area).sum())          # the amount, for the ledger
+        m["myo_area"] = area.detach()
+        m["myo_k_ex"] = self.k_ex
+        # THE LOCAL STEADY STATE OF THE BELT, PER CELL. Setting dN/dt = 0 in the junctional equation
+        # with the flux from ONE side gives n* = tau_jun * k_ex * rho_f, which is the density a mature
+        # junction of this cell carries. It is the only scale in the model against which "a newborn
+        # junction starts weak" or "the cytokinetic ring is myosin-rich" can be stated as a FRACTION
+        # rather than as an absolute number that silently means something different at frame 400 than
+        # at frame 0. `tau_jun` belongs to the junction operator, so what is left here is the part this
+        # operator owns and the consumer multiplies by its own tau.
+        m["myo_nstar_per_tau"] = (self.k_ex * rho).detach()
+        # WHAT THE JUNCTION OPERATOR CONSUMES: an amount per half-edge, full-length so it is indexed
+        # the same way `myo` is, and re-derived every frame so it can never be stale. Filled with 0 on
+        # dead slots: an amount, not a multiplier.
+        m["myo_influx"] = _scatter_full(es, live, J.detach(), dev, dt_, fill=0.0)
+        if not self._said:
+            print(f"[medioapical_myosin] {nF} cells, k_on={self.k_on}, tau_med={self.tau_med}, "
+                  f"k_ex={self.k_ex}, beta_T={self.beta_T}; stored as an AREAL DENSITY so a division "
+                  f"conserves the amount", flush=True)
+            self._said = True
+        return {}
+```

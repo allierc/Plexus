@@ -1,0 +1,154 @@
+---
+title: "mpm_viscosity"
+subtitle: "Shear dissipation for a liquid, which the constitutive law does not otherwise provide."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Shear dissipation for a liquid, which the constitutive law does not otherwise provide.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `eta`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+particle -> particle: reads the affine velocity gradient C, emits an external acceleration.
+
+nu is the kinematic viscosity in world units squared per unit time.
+
+`material: liquid` sets mu = 0, so the deviatoric stress is IDENTICALLY zero and nothing in
+the constitutive model resists or dissipates shear. The only sinks in the whole scheme are then
+the wall damping and MLS-MPM's own numerical dissipation -- and APIC exists precisely to
+minimise the latter. A real drop comes to rest; a liquid built this way has no mechanism to,
+and its kinetic energy falls to a floor and stays there. This operator supplies the missing
+sink explicitly, so the timescale on which a liquid settles is a declared number rather than an
+accident of the discretisation.
+
+Reference: the Navier-Stokes viscous term; Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `eta` | dynamic_viscosity | **required** |
+| `liquid_only` | restrict_to_liquid_particles | True |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: mpm_viscosity, at: particle, eta: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`viscous_stress`]{.op-badge} [`momentum_diffusion`]{.op-badge} [`dissipation`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("mpm_viscosity", family="mpm", set="particle", kind="lateral")
+class MPMViscosity(Lateral):
+    """Shear dissipation for a liquid, which the constitutive law does not otherwise provide.
+
+    particle -> particle: reads the affine velocity gradient C, emits an external acceleration.
+
+        a_p = -nu * C_p (x_p - x_cell)      applied only to liquid particles
+
+    nu is the kinematic viscosity in world units squared per unit time.
+
+    `material: liquid` sets mu = 0, so the deviatoric stress is IDENTICALLY zero and nothing in
+    the constitutive model resists or dissipates shear. The only sinks in the whole scheme are then
+    the wall damping and MLS-MPM's own numerical dissipation -- and APIC exists precisely to
+    minimise the latter. A real drop comes to rest; a liquid built this way has no mechanism to,
+    and its kinetic energy falls to a floor and stays there. This operator supplies the missing
+    sink explicitly, so the timescale on which a liquid settles is a declared number rather than an
+    accident of the discretisation.
+
+    Reference: the Navier-Stokes viscous term; Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150.
+    """
+
+    EMIT = None                 # writes H.extra_stress, consumed by mpm_scatter in the same substep
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["eta"]
+    MECHANISM_TAGS = ["viscous_stress", "momentum_diffusion", "dissipation"]
+    PARAM_ROLES = {"eta": "dynamic_viscosity", "liquid_only": "restrict_to_liquid_particles"}
+    REFERENCE = ("Batchelor, G.K. (1967). An Introduction to Fluid Dynamics, ch. 3 (Newtonian "
+                 "stress); Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM, C = grad v).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "mpm_particle")
+        self.eta = float(params["eta"])                    # DYNAMIC viscosity mu_dyn
+        # ONLY THE LIQUID, BY DEFAULT. A solid already carries a deviatoric stress through mu > 0;
+        # adding a viscous one on top makes it Kelvin-Voigt, which is a different material and
+        # should be asked for rather than inherited.
+        self.liquid_only = bool(params.get("liquid_only", True))
+        if self.eta < 0:
+            raise ValueError(f"mpm_viscosity: eta must be >= 0, got {self.eta}")
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        C = p.C
+        # PER-PARTICLE eta WHERE THE SPEC DECLARED ONE, this operator's scalar everywhere else.
+        # `entities.py` builds the buffer from the type table exactly as it builds mu and la, and
+        # leaves NaN where a type said nothing -- so a spec that never mentions per-type eta has no
+        # buffer at all and this is the same multiply it always was.
+        _pe = getattr(p, "eta", None)
+        if _pe is not None:
+            _e = torch.where(torch.isnan(_pe), torch.full_like(_pe, self.eta), _pe)
+            tau = _e[:, None, None] * (C + C.transpose(-2, -1))
+        else:
+            tau = self.eta * (C + C.transpose(-2, -1))
+        if self.liquid_only:
+            liq = getattr(p, "is_liquid", None)
+            if _const_any(self, "_c_liquid", liq):
+                tau = tau * liq[:, None, None].to(tau.dtype)
+        occ = getattr(p, "occ", None)
+        if occ is not None:
+            tau = tau * (occ > 0).to(tau.dtype)[:, None, None]
+        if mask is not None:
+            tau = tau * mask.to(tau.dtype)[:, None, None]
+        prev = getattr(H, "extra_stress", None)
+        if prev is None or prev.shape != tau.shape:
+            H.extra_stress = tau
+        else:
+            prev.copy_(tau)                     # persistent buffer -> safe inside a captured graph
+        return {}
+```

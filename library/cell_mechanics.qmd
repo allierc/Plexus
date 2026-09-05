@@ -1,0 +1,364 @@
+---
+title: "cell_mechanics"
+subtitle: "3D vertex-model shape-energy force on the vesicle vertices: E = sum_f [ K_A(A_f-A0)^2 + K_P(P_f-P0)^2 + K_V(v_f - v_eq_f)^2 ] + Lambda*sum_e l_e ."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+3D vertex-model shape-energy force on the vesicle vertices: E = sum_f [ K_A(A_f-A0)^2 + K_P(P_f-P0)^2 + K_V(v_f - v_eq_f)^2 ] + Lambda*sum_e l_e .
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; `p0`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+E = sum_f [ K_A(A_f-A0)^2 + K_P(P_f-P0)^2 + K_V(v_f - v_eq_f)^2 ] + Lambda*sum_e l_e .
+NOT AN "AVM", WHICH IS WHAT THIS SAID AND IS A DIFFERENT MODEL. `AVM` is the Active Vertex
+Model of Barton, D. L., Henkes, S., Weijer, C. J. & Sknepnek, R. (2017), PLoS Comput. Biol.
+13(6):e1005569, and it differs from this in both of its defining ingredients: it is ACTIVE (the
+cells are self-propelled, active-matter dynamics on top of the vertex energy) and it is
+CENTRE-BASED (contacts are generated dynamically from cell CENTRE positions, a Voronoi
+construction). This operator is passive -- force = -grad E, overdamped, no active term -- and
+the degrees of freedom ARE the vertices of a half-edge mesh, which is the true-vertex lineage
+(Tyssue, Okuda). Borrowing the name imports
+a claim of self-propulsion the code does not make.
+
+K_V is a PER-CELL volume elasticity on each cell's wedge volume v_f (Turing_vertex Eq.3 / tyssue
+ClosedMonolayer), not a single global lumen term: it keeps every cell inflated and resists local
+buckling, so growth (ramping v_eq per cell) inflates the shell smoothly. Force = -grad E by one 3D
+autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `p0` | target_shape_index | **required** |
+| `K_A` | area_stiffness | 1.0 |
+| `K_P` | perimeter_stiffness | 1.0 |
+| `Lambda` | surface_tension | 0.1 |
+| `K_V` | cell_volume_elasticity | 0.5 |
+| `cap_frac` | stability_cap | 0.12 |
+| `centre` | origin_of_the_K_R_radial_term | None |
+| `K_R` | &ndash; | 0.0 |
+| `K_bend` | &ndash; | 0.0 |
+| `K_lumen` | &ndash; | 0.0 |
+| `Gamma` | &ndash; | 0.0 |
+| `mu` | &ndash; | 1.0 |
+| `dt` | &ndash; | 1.0 |
+| `relax_iters` | &ndash; | 6 |
+| `eta` | &ndash; | 0.08 |
+| `plane_axis` | &ndash; | None |
+| `antiinv` | &ndash; | 0.0 |
+| `smooth_iters` | &ndash; | 0 |
+| `smooth_w` | &ndash; | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: cell_mechanics, at: vertex, p0: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`vertex_model`]{.op-badge} [`shape_energy`]{.op-badge} [`cell_volume_elasticity`]{.op-badge} [`vesicle`]{.op-badge} [`force_balance`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/vertex_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/vertex_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("cell_mechanics", set="vertex", kind="lateral", family="mechanics")
+class ShapeEnergy3D(Lateral):
+    """3D vertex-model shape-energy force on the vesicle vertices:
+        E = sum_f [ K_A(A_f-A0)^2 + K_P(P_f-P0)^2 + K_V(v_f - v_eq_f)^2 ] + Lambda*sum_e l_e .
+    NOT AN "AVM", WHICH IS WHAT THIS SAID AND IS A DIFFERENT MODEL. `AVM` is the Active Vertex
+    Model of Barton, D. L., Henkes, S., Weijer, C. J. & Sknepnek, R. (2017), PLoS Comput. Biol.
+    13(6):e1005569, and it differs from this in both of its defining ingredients: it is ACTIVE (the
+    cells are self-propelled, active-matter dynamics on top of the vertex energy) and it is
+    CENTRE-BASED (contacts are generated dynamically from cell CENTRE positions, a Voronoi
+    construction). This operator is passive -- force = -grad E, overdamped, no active term -- and
+    the degrees of freedom ARE the vertices of a half-edge mesh, which is the true-vertex lineage
+    (Tyssue, Okuda). Borrowing the name imports
+    a claim of self-propulsion the code does not make.
+
+    K_V is a PER-CELL volume elasticity on each cell's wedge volume v_f (Turing_vertex Eq.3 / tyssue
+    ClosedMonolayer), not a single global lumen term: it keeps every cell inflated and resists local
+    buckling, so growth (ramping v_eq per cell) inflates the shell smoothly. Force = -grad E by one 3D
+    autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity."""
+    SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["p0"]
+    INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
+    MAPS = ["E_srce", "E_trgt", "E_face"]
+    MECHANISM_TAGS = ["vertex_model", "shape_energy", "cell_volume_elasticity", "vesicle", "force_balance"]
+    # THE SECOND CITATION WAS THE WRONG OKUDA 2015, AND THE PAGES WERE WRONG TOO. It read
+    # "Biomech. Model. Mechanobiol. 14:413-421 (3D volume/surface)": that paper is 413-425,
+    # and it is the VISCOSITY paper -- local velocity fields to make vertex dynamics Galilean
+    # invariant -- which this operator does not implement. The 3D volume/surface energy is the
+    # other Okuda 2015, in Biophysics and Physicobiology.
+    REFERENCE = ("Farhadifar, R., Roper, J.-C., Aigouy, B., Eaton, S. & Julicher, F. (2007). "
+                 "Curr. Biol. 17(24):2095-2104, doi:10.1016/j.cub.2007.11.049 -- the vertex-model "
+                 "shape energy (area, perimeter, line tension) this generalises; "
+                 "Okuda, S., Inoue, Y. & Adachi, T. (2015). Three-dimensional vertex model for "
+                 "simulating multicellular morphogenesis. Biophys. Physicobiol. 12:13-20 -- the "
+                 "3D volume/surface form. NOT an Active Vertex Model: see the class docstring.")
+    PARAM_ROLES = {"p0": "target_shape_index", "K_A": "area_stiffness", "K_P": "perimeter_stiffness",
+                   "Lambda": "surface_tension", "K_V": "cell_volume_elasticity", "cap_frac": "stability_cap",
+                   "centre": "origin_of_the_K_R_radial_term"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.K_A = float(params.get("K_A", 1.0)); self.K_P = float(params.get("K_P", 1.0))
+        self.p0 = float(params.get("p0", 3.9)); self.Lambda = float(params.get("Lambda", 0.1))
+        self.K_V = float(params.get("K_V", 0.5)); self.K_R = float(params.get("K_R", 0.0))
+        _c = params.get("centre", None)
+        self._centre = None if _c is None else torch.tensor([float(v) for v in _c])
+        # DIHEDRAL bending (Wardetzky): penalises adjacent-cell normal deviation -> smooths the local folds
+        # the hollow metric flags (division-injected cap tilts). High-frequency: unlike the radial K_R it
+        # does NOT flatten gentle whole-shell/tube curvature. 0 = off (default). See _shape_energy_core.
+        self.K_bend = float(params.get("K_bend", 0.0))
+        # GLOBAL LUMEN incompressibility (isoperimetric): penalise enclosing less volume than a sphere of
+        # the current area -> distinguishes sphere from a per-cell-volume-preserving buckle. 0=off. Coral only.
+        self.K_lumen = float(params.get("K_lumen", 0.0))
+        self.Gamma = float(params.get("Gamma", 0.0))             # cortical contractility (1/2)Gamma*P^2 -> rounds cells
+        self.Gam_l = 0.0                # per-JUNCTION (1/2)Gamma*l^2; set by model=marinari, not by a spec
+        self.mu = float(params.get("mu", 1.0))
+        self.dt = float(params.get("dt", 1.0)); self.relax_iters = int(params.get("relax_iters", 6))
+        self.eta = float(params.get("eta", 0.08)); self.cap_frac = float(params.get("cap_frac", 0.12))
+        # ANTI-INVERSION filtered step (IPC-analog, differentiable): hollow caps are inverting faces
+        # (signed wedge volume v_f flips sign at the division septum). Each bounded-Euler substep, scale
+        # back the move of any vertex whose incident face would drop v_f below `antiinv` x median(v_f) --
+        # a move that only makes an already-inverted face WORSE is blocked, a recovering move is allowed.
+        # Straight-through (scale detached) so the rollout stays differentiable. 0 = off (default).
+        # `plane_axis` -- CONSTRAIN THE SOLVER TO A PLANE, which is what makes this a 2D vertex
+        # model. The ENERGY is unchanged; only the descent is projected, so a flat sheet stays in
+        # its plane by construction rather than by a restoring force fighting it.
+        #
+        # A PENALTY CANNOT DO THIS JOB. This loop takes `relax_iters` free 3D steps per frame and
+        # an external penalty corrects only once afterwards, so the sheet undulates by many times
+        # the declared gap in between. Raising the penalty stiffness does not help: an explicit
+        # penalty is stability-limited exactly where it would start to bite, and the run diverges
+        # before it becomes strong enough to hold the sheet flat.
+        #
+        # None (the default) leaves every existing run untouched.
+        _pa = params.get("plane_axis", None)
+        self.plane_axis = None if _pa is None else int(_pa)
+        self.antiinv = float(params.get("antiinv", 0.0))
+        # Lloyd-like tangential regularization (vertex-model analog of Turing's surface_lloyd): rounds cells
+        self.smooth_iters = int(params.get("smooth_iters", 0)); self.smooth_w = float(params.get("smooth_w", 0.0))
+
+    def _antiinv_scale(self, x, step, es, et, ef, nF, eocc, vf_ref, floor):
+        """Straight-through per-vertex step scale (detached) that halves the move of any vertex whose
+        incident face would drop its signed wedge volume below `floor` AND below its current value ---
+        i.e. block moves that push a face toward inversion, allow recovering moves. A few backtracks."""
+        scale = torch.ones(x.shape[0], 1, device=x.device, dtype=x.dtype)
+        for _ in range(5):
+            _, _, _, vf = face_geometry_3d(x + step * scale, es, et, ef, nF, eocc)
+            bad = (vf < floor) & (vf < vf_ref)                   # per-face: inverting and getting worse
+            if not bool(bad.any()):
+                break
+            badv = torch.zeros(x.shape[0], device=x.device, dtype=x.dtype)
+            badv.index_add_(0, es, bad.to(x.dtype)[ef] * eocc)   # half-edge src vertices of the bad faces
+            scale = torch.where((badv > 0)[:, None], scale * 0.5, scale)
+        return scale.detach()
+
+    def _grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, vocc, twin_face=None,
+              myo_e=None):
+        """dE/d(pos), through the hand-written warp kernels when they apply, autograd otherwise.
+
+        WARP IS THE DEFAULT. The energy is unchanged -- `vertex_warp` implements the derivative OF
+        `_shape_energy_core`, checked term by term against `torch.autograd.grad` in
+        `tests/test_vertex_warp.py` at a relative error of ~3.5e-07, which is float32 round-off.
+        What changes is the cost: the autograd backward was the single largest entry in the frame's
+        profile (25.6 s of 85.8 s on `mesh_mpm_spheroid_nominal` at frame 380), and it is
+        LAUNCH-bound rather than arithmetic-bound -- 3.27 ms per call whether the mesh has 1,188
+        half-edges or 71,988. The warp path is 0.40 ms at every one of those sizes: 8.1x on the
+        gradient, 3.5x on the whole frame (120.5 -> 34.1 ms/frame end to end).
+
+        IT FALLS BACK RATHER THAN REFUSING, and says so once: on CPU, in float64, without warp
+        installed, or when `K_bend` / `K_lumen` is on -- those two terms are not ported, and a term
+        silently dropped from a gradient is a different model, not a faster one. The fallback is the
+        ONLY way the autograd route is reached; there is no operator key that forces it, because
+        which route differentiates one and the same energy is a backend choice and not a model.
+
+        NOT BIT-IDENTICAL, and neither is the thing it replaces. Both accumulate per-face sums with
+        float32 atomics whose order is not fixed -- warp's `atomic_add` and torch's `index_add` --
+        so two runs of the UNMODIFIED default already differ from each other.
+        """
+        # LOCAL AND LATE: `try_shape_energy_grad` is defined at the BOTTOM of this file, below the
+        # class that calls it, so a module-level import would be a forward reference.
+        from plexus.operators.vertex_ops import try_shape_energy_grad
+        g = try_shape_energy_grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t,
+                                  eocc, vocc, twin_face, myo_e)
+        if g is not None:
+            return g
+        with torch.enable_grad():
+            p = p.detach().requires_grad_(True)
+            # THE RADIAL TERM'S ORIGIN, AND WHY IT HAS TO BE DECLARABLE. `K_R` penalises
+            # (|pos| - R0)^2 with |pos| measured from the WORLD ORIGIN, so an energy that reads as
+            # translation-invariant is not: place the tissue at [25,25,25] of a 50-unit box and every
+            # vertex sits 43 units out against an R0 of 4.65, and the term tears the shell apart --
+            # 685 cells instead of 6,786, measured. Every other term (areas, perimeters, volumes,
+            # edge lengths) IS translation-invariant, so evaluating the whole energy on `p - centre`
+            # changes only this one and leaves the gradient of the rest identical.
+            #
+            # DEFAULT [0, 0, 0], so the 461 specs that never asked are bit-identical.
+            if self._centre is not None:
+                p_e = p - self._centre.to(p.device, p.dtype)
+            else:
+                p_e = p
+            E = _shape_energy_core(p_e, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
+                                   self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc,
+                                   self.K_bend, twin_face, self.K_lumen, myo_e, self.Gam_l)
+            g = torch.autograd.grad(E, p)[0]
+        return torch.nan_to_num(g)
+
+    def _grad_myo(self, m, *a, **kw):
+        """`_grad` with the mesh's per-junction myosin, if a junction operator has supplied one.
+
+        Read through the MESH rather than passed down the call chain, because the operator that writes it
+        (`junction_ops.junction_myosin`) runs at a different point in the schedule and the two never see
+        each other. Absent -> None -> the energy reduces to the scalar-Lambda form exactly.
+        """
+        myo = m.get("myo") if isinstance(m, dict) else None
+        if myo is not None and myo.shape[0] != a[1].shape[0]:
+            # A FRAME RELAXED WITH NO MYOSIN AT ALL, which is the operator being off rather than the
+            # operator being approximated -- and it used to happen in silence. It should now be
+            # unreachable: `junction_sync` re-keys the array after every topology operator, so a
+            # mismatch here means the sync is missing from the schedule or is placed before the operator
+            # that resized the buffer. Counted and announced once rather than raised, because raising
+            # would take down every archived specification that predates the sync operator.
+            MYO_SKIPPED.append((int(myo.shape[0]), int(a[1].shape[0])))
+            if len(MYO_SKIPPED) == 1:
+                print(f"[cell_mechanics] myosin array is {myo.shape[0]} long against "
+                      f"{a[1].shape[0]} half-edges -- relaxing WITHOUT myosin this frame. Schedule "
+                      f"`junction_sync` after the topology operators.", flush=True)
+            myo = None
+        return self._grad(*a, myo_e=myo, **kw)
+
+    @staticmethod
+    def _twin_faces(es, et, ef, Nv):
+        """Per half-edge -> the face on the OTHER side of that (undirected) edge, for the dihedral term.
+        Twin of half-edge (u->v) is the half-edge (v->u); match by integer key. Closed mesh: always found."""
+        key = es * Nv + et; twinkey = et * Nv + es
+        order = torch.argsort(key); ks = key[order]
+        pos = torch.searchsorted(ks, twinkey).clamp(max=key.shape[0] - 1)
+        found = ks[pos] == twinkey
+        return torch.where(found, ef[order[pos]], ef)          # fallback to self (no penalty) if no twin
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); pos_full = lvl.get("pos")
+        v_full = torch.zeros_like(pos_full)
+        m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {self.at: v_full}
+        Nv = int(m["Nv"]); nF = int(m["nF"]); es = m["E_srce"]; et = m["E_trgt"]; ef = m["E_face"]
+        E = es.shape[0]; dev = pos_full.device; dt = pos_full.dtype
+        # `plane_axis` TRAVELS WITH THE REST. `cell_divide` heals the two fresh daughters and
+        # their one-ring with `_relax_subset`, a SECOND descent loop reading these numbers -- and
+        # a constraint the main loop honours and that one does not is a constraint the run does
+        # not have. Measured: with the main relax projected into the plane and this omitted, the
+        # sheet still drifted to sd(z) = 5.5% of an edge, and the drift tracked division activity.
+        m["mech"] = dict(K_A=self.K_A, K_P=self.K_P, K_V=self.K_V, K_R=self.K_R, Lambda=self.Lambda,
+                         Gamma=self.Gamma, eta=self.eta, cap_frac=self.cap_frac,
+                         plane_axis=self.plane_axis)   # for cell_divide local relax
+        x0 = pos_full[:Nv].detach().clone()
+        R0t = torch.as_tensor(float(m["R0"]), dtype=dt, device=dev)
+        with torch.no_grad():
+            cap = self.cap_frac * (x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-6)
+        # Relax the LIVE vertices only: the energy is summed over the live faces and half-edges, so
+        # `eocc` and `vocc` are all-ones here and the occupancy masking inside `_shape_energy_core`
+        # is a no-op. (There is no padded-reservoir variant any more: whether the body below is
+        # traced by a fusing compiler is the engine's `compile:` decision, not this operator's.)
+        eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
+        twin = self._twin_faces(es, et, ef, Nv) if self.K_bend > 0 else None   # dihedral neighbour faces
+        x = x0.clone()
+        floor = None
+        if self.antiinv > 0:                                 # anti-inversion floor = frac of median live wedge vol
+            _, _, _, vf0 = face_geometry_3d(x, es, et, ef, nF, eocc)
+            floor = self.antiinv * (vf0[vf0 > 0].median() if (vf0 > 0).any() else vf0.new_tensor(1e-9)).clamp(min=1e-9)
+        for _ in range(max(1, self.relax_iters)):
+            step = -(self.eta * self.mu) * self._grad_myo(m, x, es, et, ef, nF, m["A0"], m["P0"],
+                                                      m["V0f"], m["alive"], R0t, eocc, vocc, twin)
+            step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+            if floor is not None:                            # block any substep that drives a face toward inversion
+                _, _, _, vf_cur = face_geometry_3d(x, es, et, ef, nF, eocc)
+                step = step * self._antiinv_scale(x, step, es, et, ef, nF, eocc, vf_cur, floor)
+            if self.plane_axis is not None:                   # 2D vertex model: no motion off the sheet
+                step[:, self.plane_axis] = 0.0
+            x = x + step
+        if self.smooth_iters and self.smooth_w > 0:      # Lloyd-like tangential regularization -> rounder cells
+            es, et = m["E_srce"], m["E_trgt"]
+            ones = torch.ones(es.shape[0], device=x.device, dtype=x.dtype)
+            with torch.no_grad():
+                for _ in range(self.smooth_iters):
+                    nbr = torch.zeros_like(x).index_add(0, es, x[et])          # sum of edge-neighbours per vertex
+                    deg = torch.zeros(Nv, device=x.device, dtype=x.dtype).index_add(0, es, ones).clamp(min=1)
+                    xs = (1 - self.smooth_w) * x + self.smooth_w * (nbr / deg[:, None])
+                    x = xs * (x.norm(dim=1, keepdim=True) / xs.norm(dim=1, keepdim=True).clamp(min=1e-9))  # keep on shell
+        # DIVIDED BY THE ENGINE'S dt, NOT BY THIS OPERATOR'S, so the two cancel BY CONSTRUCTION.
+        #
+        # This is a UNIT CONVERSION and nothing else: the relaxation above solved a DISPLACEMENT
+        # (`x - x0`), using `eta`, `cap_frac` and `relax_iters`, none of which involve a timestep.
+        # `EMIT = "velocity"` means the engine will apply `pos += v * general.dt`, so the only
+        # divisor that returns the displacement actually solved is `general.dt`.
+        #
+        # IT USED TO DIVIDE BY `self.dt`, and the two cancelled in every spec ever written because
+        # both were 1.0. The moment a spec lowered `general.dt` to co-schedule an MPM continuum --
+        # 0.0032 -- and left this at 1.0, the tissue relaxed at 0.32% of the rate it had solved for:
+        # a vesicle that reaches 7,814 cells reached 270. NOTHING LOOKED WRONG. The shell stayed
+        # round, every shape diagnostic passed, the contact behaved; it read as a growth-rate
+        # problem and it was a unit-of-time problem, and it took a spec-for-spec ablation to find.
+        # A parameter that must always equal another parameter is not a parameter.
+        #
+        # BIT-IDENTICAL FOR THE CORPUS: 1,606 of the 1,610 operator lines that declare a `dt` in
+        # `config/` already set it to their spec's `general.dt`, so the ratio was already 1. The
+        # four that did not were the specs this was found in.
+        _dt = float(getattr(H, "dt", self.dt) or self.dt)
+        if "dt" in self.params and abs(float(self.params["dt"]) - _dt) > 1e-12 * max(_dt, 1.0) \
+                and not getattr(self, "_dt_warned", False):
+            self._dt_warned = True
+            from plexus.paths import warn
+            warn(f"[warn] cell_mechanics: `dt: {self.params['dt']}` is IGNORED -- the divisor is "
+                 f"general.dt ({_dt}) so that the engine's own multiplication cancels it. Remove "
+                 f"the parameter; leaving it in the spec suggests a knob that is not there.")
+        v_full[:Nv] = (x - x0) / max(_dt, 1e-9)
+        if mask is not None:
+            v_full = v_full * mask[:, None].float()
+        return {self.at: v_full}
+```

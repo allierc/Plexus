@@ -1,6 +1,6 @@
 ---
 title: "glide"
-subtitle: "Set (lateral). Self-propulsion: glide along the heading at constant speed (overdamped, first-order; the heading-kinematic sibling of `cruise`)."
+subtitle: "Move along the heading at the speed the element's own type carries."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Set (lateral). Self-propulsion: glide along the heading at constant s
 
 [`lateral`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Set (lateral). Self-propulsion: glide along the heading at constant speed (overdamped, first-order; the heading-kinematic sibling of `cruise`).
+Move along the heading at the speed the element's own type carries.
 :::
 
 ```{=html}
@@ -42,17 +42,21 @@ Set (lateral). Self-propulsion: glide along the heading at constant speed (overd
 
 ## Mechanism
 
-A first-derivative dynamics operator: it returns a velocity delta
-`v_i = move_speed_i * heading_i` and lets the ENGINE integrate the position, exactly like attraction_repulsion returns a dpos. It does NOT
-touch `pos`, and it is purely propulsion -- domain/obstacle reflection is a separate
-`bounce` operator (run before glide), so this stays one concern.
+The heading is state that other operators steer; this one only walks it.
 
-Dimension-generic (the dimension contract): `heading` is a unit VECTOR [N, D] in
-every dimension, so `vel = speed * heading` is the same law in 2D and 3D -- no
-`cos/sin` special case. Replaces the old scalar-angle 2D law and the `advance_3d`
-counterpart with one operator.
+cell -> cell: reads heading and the per-type move_speed, emits a velocity.
 
-Renamed from the prototype `motility` (it is the slime "move" step).
+n_i is the unit heading vector and s_i the per-type `move_speed`, in world units per time.
+eta is `noise`, an isotropic translational noise of the same units, and xi_i a standard
+normal vector; with it the element is an active Brownian particle, without it a straight
+walker that only turns when something else rewrites its heading.
+
+Emits a velocity, not an acceleration: this is the overdamped, first-order sibling of
+`velocity_cruise`, which drives the same speed through inertia instead.
+
+Reference: the noisy case is the active Brownian particle; see Romanczuk, P., Bar, M.,
+Ebeling, W., Lindner, B. & Schimansky-Geier, L. (2012). Active Brownian particles: from
+individual to collective stochastic dynamics. Eur. Phys. J. Spec. Top. 202:1-162.
 
 ## Parameters
 
@@ -73,45 +77,44 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
-[`src/plexus/operators/glide.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/glide.py) &mdash; the registered operator.
+[`src/plexus/operators/motion_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/motion_ops.py) &mdash; the registered operator.
 
 ```python
-"""glide -- set (lateral). Self-propulsion: glide along the heading at constant speed (overdamped, first-order; the heading-kinematic sibling of `cruise`).
-
-A first-derivative dynamics operator: it returns a velocity delta
-`v_i = move_speed_i * heading_i` and lets the ENGINE integrate the position
-(`pos += dt * v`), exactly like attraction_repulsion returns a dpos. It does NOT
-touch `pos`, and it is purely propulsion -- domain/obstacle reflection is a separate
-`bounce` operator (run before glide), so this stays one concern.
-
-Dimension-generic (the dimension contract): `heading` is a unit VECTOR [N, D] in
-every dimension, so `vel = speed * heading` is the same law in 2D and 3D -- no
-`cos/sin` special case. Replaces the old scalar-angle 2D law and the `advance_3d`
-counterpart with one operator.
-
-Renamed from the prototype `motility` (it is the slime "move" step).
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-
 @register_operator("glide", family="motion", set="cell", kind="lateral")
 class Glide(Lateral):
-    EMIT = "velocity"             # emits a velocity; the ENGINE integrates pos
+    """Self-propulsion: move along the heading at the speed the element's own type carries.
+    The heading is state that other operators steer; this one only walks it.
+
+    cell -> cell: reads heading and the per-type move_speed, emits a velocity.
+
+        dx_i/dt = s_i n_i  +  eta xi_i
+
+    n_i is the unit heading vector and s_i the per-type `move_speed`, in world units per time.
+    eta is `noise`, an isotropic translational noise of the same units, and xi_i a standard
+    normal vector; with it the element is an active Brownian particle, without it a straight
+    walker that only turns when something else rewrites its heading.
+
+    Emits a velocity, not an acceleration: this is the overdamped, first-order sibling of
+    `velocity_cruise`, which drives the same speed through inertia instead.
+
+    Reference: the noisy case is the active Brownian particle; see Romanczuk, P., Bar, M.,
+    Ebeling, W., Lindner, B. & Schimansky-Geier, L. (2012). Active Brownian particles: from
+    individual to collective stochastic dynamics. Eur. Phys. J. Spec. Top. 202:1-162.
+    """
+
+    EMIT = "velocity"             # first-order: the engine integrates pos from this
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
     REQUIRES_PARAMS = []                        # no required params — speed from `move_speed` type prop; noise optional
     MECHANISM_TAGS = ["self_propulsion", "motility", "active_brownian"]
     REQUIRES_TYPE_PROPS = ["move_speed"]
     PARAM_ROLES = {"noise": "translational_noise"}
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = ("Romanczuk, P., Bar, M., Ebeling, W., Lindner, B. & Schimansky-Geier, L. "
+                 "(2012). Active Brownian particles: from individual to collective stochastic "
+                 "dynamics. Eur. Phys. J. Spec. Top. 202:1-162.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

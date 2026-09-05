@@ -1,6 +1,6 @@
 ---
 title: "p2g"
-subtitle: "Mpm_scatter (was p2g) (particle -> mpm_grid): the MLS-MPM particle-to-grid scatter."
+subtitle: "Particle to grid: the first step of the MLS-MPM cycle."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Mpm_scatter (was p2g) (particle -> mpm_grid): the MLS-MPM particle-to
 
 [`exchange`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Mpm_scatter (was p2g) (particle -> mpm_grid): the MLS-MPM particle-to-grid scatter.
+Particle to grid: the first step of the MLS-MPM cycle.
 :::
 
 ```{=html}
@@ -42,16 +42,37 @@ Mpm_scatter (was p2g) (particle -> mpm_grid): the MLS-MPM particle-to-grid scatt
 
 ## Mechanism
 
-Computes the fixed-corotated stress (with snow hardening from Jp) -> affine momentum
-matrix, applies the external body force + Stokes drag to the local velocity, then
-scatters mass, momentum and the liquid colour field onto the background grid via the
-quadratic B-spline weights. Writes the `mpm_grid` field; returns {}. Step 2 of the
-decomposed MLS-MPM (oracle: `mls_mpm_mechanics`).
+its momentum, and the impulse of its own internal stress onto the grid nodes around it.
 
-Dimension-generic: the affine/stress are D x D, the scatter spans the 3^D stencil.
-The 2D path is bit-identical (analytic det + analytic polar rotation cs/sn); 3D uses
-`torch.linalg.det` and an SVD polar rotation R = U Vh (proper-rotation sign fixed),
-matching MPM_pytorch's MPM_3D stress.
+particle -> mpm_grid: reads pos, vel, F, C and the Lame parameters; writes the grid field in
+place. It emits nothing -- the grid IS the output.
+
+    m_n      += sum_p w_n m_p
+
+tau_p is the Kirchhoff stress of the FIXED-COROTATED elastic law: R_p is the rotation from the
+polar decomposition F = R S, so (F - R) measures how far the deformation is from a pure
+rotation and 2 mu (F - R) F^T is the shear response; lambda J (J - 1) is the volumetric one,
+with J = det F the ratio of current to rest volume. mu and lambda are the Lame parameters in
+pressure units, derived per particle from the type's `youngs`. A LIQUID has mu = 0, so its
+whole constitutive law is the volumetric term -- it resists departures from the volume it was
+born at and nothing else -- which is why a liquid type may declare `bulk_modulus` instead: at
+mu = 0 the bulk modulus IS lambda, and Young's modulus is not defined.
+
+The C_p (x_n - x_p) term is the APIC affine velocity: carrying a per-particle velocity GRADIENT
+as well as a velocity is what stops the transfer from dissipating angular momentum, which is
+the difference between a rotating body that keeps rotating and one that grinds to a halt.
+
+`dt_sub` is the substep timestep, and the whole cycle is stable only below the CFL ceiling
+dt < dx / sqrt(E/rho): the sound speed sqrt(E/rho) must not cross a cell in one step.
+`a_max` clamps any external acceleration handed in by another operator -- a stability device,
+and one that silently bounds any penalty contact relying on depth to generate force.
+`body_force: grid` hands the uniform part of the body force to the grid solve instead, which is
+where canonical MLS-MPM puts it; the two are algebraically identical until the mass floor
+binds.
+
+Reference: Hu, Y. et al. (2018). A moving least squares material point method with displacement
+discontinuity and two-way rigid body coupling. ACM Trans. Graph. 37(4):150; Sulsky, D., Chen,
+Z. & Schreyer, H. L. (1994). Comput. Methods Appl. Mech. Eng. 118:179-196.
 
 $$
 \boldsymbol\sigma = 2\mu(\mathbf F-\mathbf R)\mathbf F^{\!\top} + \lambda(J-1)J\,\mathbf I,
@@ -74,7 +95,11 @@ weights $w_{ig}$. Step 2 of the MLS-MPM decomposition.
 | `dt_sub` | MLS-MPM substep dt | 2e-4 |
 | `drag` | Stokes drag coefficient | 0.0 |
 | `a_max` | external-acceleration clamp | 200.0 |
+| `body_force` | body_force_application_site | "particle" |
+| `store_stress` | cache Cauchy stress to a per-particle buffer | False |
 | `to` | &ndash; | "mpm_grid" |
+| `polar` | &ndash; | "higham" |
+| `polar_iters` | &ndash; | 6 |
 
 ## Minimal spec
 
@@ -85,48 +110,68 @@ operators:
 
 ## Mechanism-search tags
 
-**Mechanism** &mdash; [`particle_to_grid`]{.op-badge} [`fixed_corotated_stress`]{.op-badge}  
+**Mechanism** &mdash; [`particle_to_grid`]{.op-badge} [`fixed_corotated_stress`]{.op-badge} [`shared_grid_accumulate`]{.op-badge}  
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd).
+Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`mpm_scatter`](mpm_scatter.qmd), [`mpm_gather`](mpm_gather.qmd).
 
 ## Source
 
-[`src/plexus/operators/mpm_scatter.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_scatter.py) &mdash; the registered operator.
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
 
 ```python
-"""mpm_scatter (was p2g) (particle -> mpm_grid): the MLS-MPM particle-to-grid scatter.
-
-Computes the fixed-corotated stress (with snow hardening from Jp) -> affine momentum
-matrix, applies the external body force + Stokes drag to the local velocity, then
-scatters mass, momentum and the liquid colour field onto the background grid via the
-quadratic B-spline weights. Writes the `mpm_grid` field; returns {}. Step 2 of the
-decomposed MLS-MPM (oracle: `mls_mpm_mechanics`).
-
-Dimension-generic: the affine/stress are D x D, the scatter spans the 3^D stencil.
-The 2D path is bit-identical (analytic det + analytic polar rotation cs/sn); 3D uses
-`torch.linalg.det` and an SVD polar rotation R = U Vh (proper-rotation sign fixed),
-matching MPM_pytorch's MPM_3D stress.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Exchange
-from plexus.models.registry import register_operator
-from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
-
-
 @register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
-class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
+class MPMScatter(Exchange):                
+    """Particle to grid: the first step of the MLS-MPM cycle. Every particle deposits its mass,
+    its momentum, and the impulse of its own internal stress onto the grid nodes around it.
+
+    particle -> mpm_grid: reads pos, vel, F, C and the Lame parameters; writes the grid field in
+    place. It emits nothing -- the grid IS the output.
+
+        w_n(x_p)  = the quadratic B-spline weight of node n at particle p, over a 3^D stencil
+        tau_p     = 2 mu_p (F_p - R_p) F_p^T  +  I lambda_p J_p (J_p - 1)
+        m_n      += sum_p w_n m_p
+        (mv)_n   += sum_p w_n m_p ( v_p + C_p (x_n - x_p) )  -  (4 dt / dx^2) w_n V_p tau_p (x_n - x_p)
+
+    tau_p is the Kirchhoff stress of the FIXED-COROTATED elastic law: R_p is the rotation from the
+    polar decomposition F = R S, so (F - R) measures how far the deformation is from a pure
+    rotation and 2 mu (F - R) F^T is the shear response; lambda J (J - 1) is the volumetric one,
+    with J = det F the ratio of current to rest volume. mu and lambda are the Lame parameters in
+    pressure units, derived per particle from the type's `youngs`. A LIQUID has mu = 0, so its
+    whole constitutive law is the volumetric term -- it resists departures from the volume it was
+    born at and nothing else -- which is why a liquid type may declare `bulk_modulus` instead: at
+    mu = 0 the bulk modulus IS lambda, and Young's modulus is not defined.
+
+    The C_p (x_n - x_p) term is the APIC affine velocity: carrying a per-particle velocity GRADIENT
+    as well as a velocity is what stops the transfer from dissipating angular momentum, which is
+    the difference between a rotating body that keeps rotating and one that grinds to a halt.
+
+    `dt_sub` is the substep timestep, and the whole cycle is stable only below the CFL ceiling
+    dt < dx / sqrt(E/rho): the sound speed sqrt(E/rho) must not cross a cell in one step.
+    `a_max` clamps any external acceleration handed in by another operator -- a stability device,
+    and one that silently bounds any penalty contact relying on depth to generate force.
+    `body_force: grid` hands the uniform part of the body force to the grid solve instead, which is
+    where canonical MLS-MPM puts it; the two are algebraically identical until the mass floor
+    binds.
+
+    Reference: Hu, Y. et al. (2018). A moving least squares material point method with displacement
+    discontinuity and two-way rigid body coupling. ACM Trans. Graph. 37(4):150; Sulsky, D., Chen,
+    Z. & Schreyer, H. L. (1994). Comput. Methods Appl. Mech. Eng. 118:179-196.
+    """
+
     EMIT = None                 # particle->grid: writes the mpm_grid field in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []        # no required params — `to` defaults to mpm_grid, all knobs optional
     REQUIRES_TYPE_PROPS = ["youngs"]
-    MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress"]
+    # a liquid has no Young's modulus (nu -> 1/2 makes E = 3K(1-2nu) -> 0); it has a bulk modulus,
+    # and for mu = 0 that IS lambda. Either spelling satisfies the requirement.
+    TYPE_PROP_ALTERNATIVES = {"youngs": ("bulk_modulus",)}
+    MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate"]
     PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt", "drag": "Stokes drag coefficient",
-                   "a_max": "external-acceleration clamp"}
+                   "a_max": "external-acceleration clamp",
+                   "body_force": "body_force_application_site",
+                   "store_stress": "cache Cauchy stress to a per-particle buffer"}
     REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM P2G); Sulsky, D. et al. (1994)."
 
     def __init__(self, params, device="cpu"):
@@ -136,6 +181,47 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.drag = float(params.get("drag", 0.0))
         self.a_max = float(params.get("a_max", 200.0))
+        # WHERE THE BODY FORCE IS APPLIED. "particle" (default, and every existing run) folds it
+        # into the particle velocity before P2G; "grid" hands the uniform part to the grid solve,
+        # which is where canonical MLS-MPM puts it. See _hand_body_force_to_grid for why the two
+        # are algebraically identical until the mass clamp binds, and for the measurement showing
+        # that on this spec family it does not.
+        self.body_force = str(params.get("body_force", "particle"))
+        if self.body_force not in ("particle", "grid"):
+            raise ValueError(f"mpm_scatter: body_force must be 'particle' or 'grid', "
+                             f"got {self.body_force!r}")
+        # HOW THE POLAR ROTATION IS FOUND, in 3D. The fixed-corotated stress needs the rotation R
+        # from F = R S, and there are two numerical routes to the same rotation:
+        #
+        #   svd     `torch.linalg.svd` -> a cuSOLVER call. It is an EXTERN kernel: no compiler
+        #           fuses it, and -- decisively -- it CANNOT BE CAPTURED into a CUDA graph, so a
+        #           specification using it forfeits the substep capture, which is worth about 2x
+        #           on its own. It also costs roughly a microsecond per 3x3 matrix, and this runs
+        #           once per particle per substep.
+        #   higham  the Newton polar iteration R <- (R + R^-T)/2, built from matmuls and a cofactor
+        #           cross product. Converges quadratically from F, captures, fuses, and is several
+        #           times faster on the same batch. It agrees with the SVD rotation to float32.
+        #
+        # The default is `higham`. The difference in a trajectory is bounded rather than
+        # amplifying, and 2D specifications are unaffected entirely: `forward` takes the analytic
+        # 2x2 rotation branch and never consults this parameter.
+        #
+        # `polar: svd` remains available for a specification that must reproduce a stored 3D result
+        # byte for byte.
+        # core operators -- both sides of the comparison move together.
+        self.polar = str(params.get("polar", "higham")).lower()
+        self.polar_iters = int(params.get("polar_iters", 6))
+        # KEEP THE CAUCHY STRESS, OPTIONALLY. The fixed-corotated law below produces the Kirchhoff
+        # stress tau = J.sigma, uses it to build the affine momentum matrix, and then overwrites the
+        # variable with its dt-scaled form -- so the one tensor in the solver that says what the
+        # material is actually carrying is computed 8,000 times a run and discarded every time. With
+        # `store_stress: true` it is cached to a per-particle `sigma` buffer (Cauchy, i.e. tau/J) that
+        # diagnostics and colourings can read instead of re-deriving a proxy from F.
+        #
+        # DEFAULT OFF, and the guard is what makes this safe to add to a shared operator: when off,
+        # nothing is allocated and the only cost is one branch per substep. The cached value is read,
+        # never written back, so the mechanics cannot be changed by asking for it.
+        self.store_stress = bool(params.get("store_stress", False))
 
     def forward(self, H, mask=None):
         p = H.level(self.at); g = H.field(self.to); dev = p.state.device
@@ -159,6 +245,7 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         # per-particle body force from particle-level force operators (e.g. pulse_to_contraction,
         # drag) -- the symmetric counterpart of the parent-delta path above (gravity).
         a_ext = a_ext + torch.nan_to_num(H.delta(p.name))
+        a_ext = _hand_body_force_to_grid(self, H, a_ext, dev, D)
         V = V + dt * (a_ext - self.drag * V)                       # body force + Stokes drag (local; G2P resets V)
 
         F, C, mass = p.F, p.C, p.mass
@@ -180,7 +267,7 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
             J = torch.linalg.det(F)
         mu, la = p.mu, p.la
         snow = getattr(p, "is_snow", None)
-        if snow is not None and snow.any():                        # snow hardening from the plastic ratio Jp
+        if _const_any(self, "_c_snow", snow):                      # snow hardening from the plastic ratio Jp
             h = torch.exp((10.0 * (1.0 - p.Jp)).clamp(-6.0, 6.0))
             mu = torch.where(snow, p.mu * h, p.mu)
             la = torch.where(snow, p.la * h, p.la)
@@ -189,11 +276,31 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
             r = torch.sqrt(cs * cs + sn * sn) + 1e-9
             cs, sn = cs / r, sn / r
             R = torch.stack([torch.stack([cs, -sn], -1), torch.stack([sn, cs], -1)], -2)
+        elif self.polar == "higham":                               # Newton polar iteration
+            R = _polar_higham(F, self.polar_iters)
         else:                                                      # SVD polar rotation R = U Vh (proper rotation)
+            # THE SIGN FLIP IS A MULTIPLY, NOT A BOOLEAN MASK, and the two are bit-for-bit the
+            # same: `torch.equal` True, max|diff| 0.000e+00 over 1,500 matrices. What changes is
+            # the SHAPE of the work. `U[det(U) < 0, :, -1] *= -1` is `aten.nonzero` -- the number
+            # of rows it writes depends on how many matrices are improper rotations, which is
+            # ~50% here and drifts as the body deforms. Under torch.compile that is a
+            # data-dependent shape: dynamo cuts the graph in half at this line and then recompiles
+            # on every new count until it hits the recompile limit and falls back to eager for the
+            # rest of the run ("___stack2 size mismatch at index 0, expected 13, actual 15").
+            # Multiplying the last column by +-1 touches every row unconditionally, so the shape
+            # is static and the scatter can be one graph -- which is also the precondition for
+            # capturing the substep as a CUDA graph.
+            #
+            # IN PLACE ON THE CLONE, not `torch.cat` of the columns. Reassembling with `cat`
+            # changes the memory layout, the following matmul picks a different kernel, and the
+            # result moves by 6e-8 -- small, but enough to break the promotion suite's
+            # byte-identity gate for no gain. Writing the column back keeps U contiguous.
             U, sig, Vh = torch.linalg.svd(F)
             U = U.clone(); Vh = Vh.clone()
-            negU = torch.det(U) < 0; U[negU, :, -1] *= -1
-            negV = torch.det(Vh) < 0; Vh[negV, -1, :] *= -1
+            sgnU = torch.where(torch.det(U) < 0, -1.0, 1.0)
+            sgnV = torch.where(torch.det(Vh) < 0, -1.0, 1.0)
+            U[:, :, -1] = U[:, :, -1] * sgnU[:, None]
+            Vh[:, -1, :] = Vh[:, -1, :] * sgnV[:, None]
             R = U @ Vh
         stress = 2 * mu[:, None, None] * ((F - R) @ F.transpose(-2, -1)) \
             + eye * (la * J * (J - 1))[:, None, None]
@@ -204,25 +311,88 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         act = getattr(H, "active_stress", None)
         if act is not None:
             stress = stress + act
+        # THE SAME CHANNEL, FOR A DIFFERENT MECHANISM. `extra_stress` is any additive Kirchhoff
+        # stress written by an operator upstream in the substep -- today the Newtonian viscous
+        # stress from `mpm_viscosity`. Kept separate from `active_stress` so the two compose
+        # rather than clobber, and so a spec that reads `active_stress` back means what it says.
+        xtr = getattr(H, "extra_stress", None)
+        if xtr is not None:
+            stress = stress + xtr
+        # TURGOR / OSMOTIC PRESSURE (optional, default OFF): an isotropic OUTWARD pressure carried
+        # by this set, written as a per-particle `turgor` buffer by the `mpm_turgor` operator. The
+        # sign is the one that makes a cell a cell: tau here is Kirchhoff (positive = tension), a
+        # fluid at pressure P has sigma = -P.I, so a POSITIVE `turgor` SUBTRACTS from tau and pushes
+        # the material outward -- the same sign the liquid's own `la*J*(J-1)` takes when J < 1
+        # (compressed -> pushes out). Absent buffer -> byte-identical; the buffer lives on the LEVEL,
+        # so `mpm_turgor at: cytosol` pressurises the cytosol and leaves nucleus/membrane untouched
+        # even though all three scatter into the same grid.
+        turg = getattr(p, "turgor", None)
+        if turg is not None:
+            stress = stress - eye * turg[:, None, None]
+        if self.store_stress:
+            # CAUCHY, NOT KIRCHHOFF. What the lines above build is tau = J.sigma (the fixed-corotated
+            # first Piola P times F^T), which is the form MLS-MPM scatters; sigma = tau / J is the
+            # stress per unit CURRENT area, which is what "Cauchy stress" means and what a von Mises
+            # invariant is normally quoted from. Captured here, after any active stress has been added
+            # and BEFORE the dt / p_vol rescale on the next line, so it is the material's stress and
+            # not a momentum increment.
+            sig = stress / J.abs().clamp_min(1e-9)[:, None, None]
+            if getattr(p, "sigma", None) is None or p.sigma.shape != sig.shape:
+                p.register_buffer("sigma", torch.zeros_like(sig))
+            p.sigma.copy_(sig.detach())
         stress = (-dt * 4 * inv_dx * inv_dx) * p.p_vol[:, None, None] * stress
         affine = stress + mass[:, None, None] * C
 
         fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
-        # DORMANT particles (occ==0, e.g. a cell_grow reserve) contribute NOTHING to the grid:
+        # DORMANT particles (occ==0, e.g. a agent_grow reserve) contribute NOTHING to the grid:
         # mask the scatter weights by occupancy. Byte-identical when all particles are live.
         occ = getattr(p, "occ", None)
         if occ is not None:
             weight = weight * (occ > 0).to(weight.dtype)[:, None]
         dpos_phys = (offsets[None] - fx[:, None, :]) * dx
         mom = mass[:, None, None] * V[:, None, :] + (affine[:, None] @ dpos_phys[..., None]).squeeze(-1)
-        gm = torch.zeros(g.n_cells, device=dev); gmv = torch.zeros(g.n_cells, D, device=dev)
+        # THE GRID IS SHARED BY EVERY SET THAT SCATTERS INTO IT, so only the FIRST scatter of a
+        # micro-step may zero it. This used to allocate fresh zeros unconditionally and assign
+        # them, which meant a spec with two particle sets kept only the LAST one: nucleus momentum
+        # was deposited, then thrown away by the cytosol's scatter, and the grid solve ran on the
+        # cytosol alone.
+        #
+        # WHAT IT LOOKED LIKE, because like the substep-binding defect it does not announce itself.
+        # A nucleus falling inside a cytosol shell fell SLOWER than gravity (z = 0.7061 at the tick
+        # free-fall puts at 0.6835) and was crushed from an rms thickness of 0.0248 to 0.0093 while
+        # still in mid-air, where nothing was touching it. The same nucleus with no cytosol tracked
+        # free-fall to four decimals and held 0.0248 exactly. It reads as "the nucleus is too soft"
+        # and it is actually "the nucleus is gathering a velocity field it never contributed to":
+        # inside the cavity the cytosol deposits no mass, so `gmv / gm.clamp(1e-10)` there is the
+        # B-spline tails divided by nearly nothing.
+        #
+        # WHY IT SURVIVED THIS LONG. Every MPM spec in the corpus scatters ONE set -- multi-material
+        # is done with `types:` inside a single `mpm_particle` set (see
+        # config/material/material_3d_multimaterial.yaml: jelly + water + snow, one set, one
+        # scatter). Multi-SET MPM is what the composed cell introduced, and it is the only thing
+        # this ever affected. With one set the stamp is always stale and the zeros are always
+        # fresh, so single-set runs stay bit-identical.
+        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. This used to read
+        # `H.micro`, a python int the engine advances every substep, and compare it to a stamp on
+        # the field. That works, but it is a per-substep side effect no CUDA-graph replay can
+        # reproduce -- and it made dynamo recompile on every substep, because it specialises on
+        # integer attributes of an nn.Module. The engine binds the i-th OCCURRENCE of a token to
+        # the i-th INSTANCE, so occurrence 0 of `mpm_scatter` for a given grid is ALWAYS the first
+        # one in a substep: the engine stamps `_zeroes_grid` on it when `inst` is built.
+        _fresh = getattr(self, "_zeroes_grid", True)
+        # STEP 2: WRITE INTO THE FIELD'S OWN BUFFERS, never a fresh allocation. Assigning
+        # `g.m = torch.zeros(...)` rebinds the attribute to new storage every substep; a captured
+        # graph holds the address it saw at capture time, so the replay silently writes somewhere
+        # the rest of the run no longer reads. Measured: capture SUCCEEDS with this left as it was,
+        # raises nothing, and produces a 6-tick checksum of 22816.79 against the correct 22132.22.
+        gm, gmv, gc = g.m, g.mv, g.c
+        if _fresh:
+            gm.zero_(); gmv.zero_(); gc.zero_()
         gm.index_add_(0, flat, (weight * mass[:, None]).reshape(-1))
         gmv.index_add_(0, flat, (weight[..., None] * mom).reshape(-1, D))
-        gc = torch.zeros(g.n_cells, device=dev)
         liquid = getattr(p, "is_liquid", None)
-        if liquid is not None and liquid.any():                    # liquid colour for the CSF surface tension
+        if _const_any(self, "_c_liquid", liquid):                  # liquid colour for the CSF surface tension
             lw = (weight * (mass * liquid.to(mass.dtype))[:, None]).reshape(-1)
             gc.index_add_(0, flat, lw)
-        g.m, g.mv, g.c = gm, gmv, gc
         return {}
 ```

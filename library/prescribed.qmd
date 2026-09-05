@@ -1,6 +1,6 @@
 ---
 title: "prescribed"
-subtitle: "A scalar field *prescribed* from external data (currently a"
+subtitle: "A field that is measured rather than solved: its values come from a video, one frame per tick, so the continuum is an input to the model instead of an output of it."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A scalar field *prescribed* from external data (currently a"
 
 [`field`]{.op-badge} [`frame: prescribed`]{.op-badge}
 
-A scalar field *prescribed* from external data (currently a
+A field that is measured rather than solved: its values come from a video, one frame per tick, so the continuum is an input to the model instead of an output of it.
 :::
 
 ```{=html}
@@ -39,27 +39,38 @@ A scalar field *prescribed* from external data (currently a
 
 ## Description
 
-video), plus the `playback` operator that advances it frame by frame.
+per tick, so the continuum is an input to the model instead of an output of it.
 
-Some fields are not evolved by a PDE (diffuse/decay) but read from data: a recorded
-movie becomes a time-varying scalar field over the domain. The field is pure state
-(it holds the video buffer and the current grid); `playback` sets the grid to the
-current tick's frame (a field self-update, returns {}). A coupling operator such as
-`chemotaxis` then drives the particles from it -- the same set<->field Exchange the
-slime trail used, but the field is supplied rather than deposited.
+Pure state: the whole `video` buffer [T, nx, ny] read from a TIFF, the current `grid`
+[1, nx, ny], and the world-to-pixel geometry. One channel only. No dynamics of its own --
+`playback` is the operator that advances it, and nothing writes back into it.
 
-This is the Plexus form of ParticleGraph's `node_value_map: video_bisons.tif`.
+The video is flipped vertically on load, because image rows run top to bottom while the
+domain's y axis runs bottom to top; without the flip every gradient read from it would
+point the wrong way.
+
+Reference: none -- a prescribed field is data, not a model.
 
 ## Source
 
-[`src/plexus/operators/prescribed_field.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/prescribed_field.py)
+[`src/plexus/operators/field_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/field_ops.py)
 
 ```python
 @register_field("prescribed", frame="prescribed")
 class PrescribedField(Field):
-    """A 1-channel scalar field whose grid is read from a video `[T, ny, nx]` (tif).
-    Pure state: the `video` buffer `[T, nx, ny]`, the current `grid` `[1, nx, ny]`,
-    and the world<->pixel geometry. No dynamics -- `playback` drives it."""
+    """A field that is measured rather than solved: its values come from a video, one frame
+    per tick, so the continuum is an input to the model instead of an output of it.
+
+    Pure state: the whole `video` buffer [T, nx, ny] read from a TIFF, the current `grid`
+    [1, nx, ny], and the world-to-pixel geometry. One channel only. No dynamics of its own --
+    `playback` is the operator that advances it, and nothing writes back into it.
+
+    The video is flipped vertically on load, because image rows run top to bottom while the
+    domain's y axis runs bottom to top; without the flip every gradient read from it would
+    point the wrong way.
+
+    Reference: none -- a prescribed field is data, not a model.
+    """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu"):
         super().__init__(name)                                 # a video binds to no set (no couples_to)

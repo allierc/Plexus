@@ -1,6 +1,6 @@
 ---
 title: "radius_graph"
-subtitle: "Relation-building (rewire) operators: construct a Level's `edge_index`."
+subtitle: "The neighbour relation: two particles interact when they are close enough."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Relation-building (rewire) operators: construct a Level's `edge_index
 
 [`rewire`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Relation-building (rewire) operators: construct a Level's `edge_index`.
+The neighbour relation: two particles interact when they are close enough.
 :::
 
 ```{=html}
@@ -42,11 +42,24 @@ Relation-building (rewire) operators: construct a Level's `edge_index`.
 
 ## Mechanism
 
-A `rewire` operator rebuilds the within-set relation E each tick so it tracks the
-live configuration, then emits no delta -- lateral operators (interaction,
-springs, ...) read the edges it leaves on the Level. Separating "who interacts"
-(rewire) from "how they interact" (lateral) is what lets a dense pairwise law
-become O(E) message passing.
+lateral law in this module reads what this writes, so it is scheduled before them.
+
+particle -> particle: reads pos, writes the set's `edge_index` in place.
+
+    E = { (i, j) : r_min < |x_j - x_i| <= r_max,  both live }
+
+r_max is `radius` and r_min the optional `min_radius`, both in world units. r_max is the
+interaction cutoff -- the physical claim that beyond it the law is negligible -- and
+changing it changes the model, not the discretization. r_min excludes a pair that is
+closer than it, which keeps a 1/|d| law such as `separation` off its singularity. The
+relation is symmetric: every pair appears in both directions, and there are no self-edges.
+Under periodic boundaries the distance is the minimum-image one.
+
+`block` is how many receivers are scored per pass, a memory knob and not physics: the
+O(N^2) distance matrix is never materialised, which is what carries this to 1e4-1e5 nodes.
+
+Reference: none -- a cutoff neighbour list is standard practice, not a result. Plexus
+(this work).
 
 $$
 E \;=\; \big\{\,(i,j)\;:\; r_{\min} \le \lVert\mathbf x_i-\mathbf x_j\rVert < r\,\big\}
@@ -61,7 +74,6 @@ Rebuilds the neighbour relation each tick: an edge for every pair within `radius
 | `radius` | &ndash; | **required** |
 | `min_radius` | inner_cutoff_radius | 0.0 |
 | `block` | block_size | 2048 |
-| `compile` | torch.compile the O(N^2) block distance+mask kernel | False |
 
 ## Minimal spec
 
@@ -76,47 +88,48 @@ operators:
 
 ## Related operators
 
-_&ndash;_
+Other **rewire** operators: [`edge_flip`](edge_flip.qmd), [`cell_neighbours`](cell_neighbours.qmd), [`junction_sync`](junction_sync.qmd), [`bm_unbond`](bm_unbond.qmd), [`adhesion_turnover`](adhesion_turnover.qmd), [`bm_crosslink`](bm_crosslink.qmd).
 
 ## Source
 
-[`src/plexus/operators/graph.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/graph.py) &mdash; the registered operator.
+[`src/plexus/operators/interaction_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/interaction_ops.py) &mdash; the registered operator.
 
 ```python
-"""Relation-building (rewire) operators: construct a Level's `edge_index`.
-
-A `rewire` operator rebuilds the within-set relation E each tick so it tracks the
-live configuration, then emits no delta -- lateral operators (interaction,
-springs, ...) read the edges it leaves on the Level. Separating "who interacts"
-(rewire) from "how they interact" (lateral) is what lets a dense pairwise law
-become O(E) message passing.
-"""
-from __future__ import annotations
-
-from plexus.models.base import Rewire
-from plexus.models.registry import register_operator
-from plexus.geometry import edges_radius_blockwise
-
-
 @register_operator("radius_graph", family="topology", set="particle", kind="rewire")
 class RadiusGraph(Rewire):
-    """Set `Level.edge_index` to all live pairs within `radius` (optionally beyond
-    `min_radius`). Blockwise build -> scales to 1e4-1e5 nodes; minimum-image under
-    periodic BC. Run before a pairwise lateral operator in the schedule."""
-    EMIT = None                                 # rewire: rebuilds edge_index; returns {} — no integrable delta
+    """The neighbour relation: two particles interact when they are close enough. Every
+    lateral law in this module reads what this writes, so it is scheduled before them.
+
+    particle -> particle: reads pos, writes the set's `edge_index` in place.
+
+        E = { (i, j) : r_min < |x_j - x_i| <= r_max,  both live }
+
+    r_max is `radius` and r_min the optional `min_radius`, both in world units. r_max is the
+    interaction cutoff -- the physical claim that beyond it the law is negligible -- and
+    changing it changes the model, not the discretization. r_min excludes a pair that is
+    closer than it, which keeps a 1/|d| law such as `separation` off its singularity. The
+    relation is symmetric: every pair appears in both directions, and there are no self-edges.
+    Under periodic boundaries the distance is the minimum-image one.
+
+    `block` is how many receivers are scored per pass, a memory knob and not physics: the
+    O(N^2) distance matrix is never materialised, which is what carries this to 1e4-1e5 nodes.
+
+    Reference: none -- a cutoff neighbour list is standard practice, not a result. Plexus
+    (this work).
+    """
+
+    EMIT = None                                 # rewire: rebuilds edge_index in place, returns no delta
     SUPPORTED_DIMS = [2, 3]                      # pairwise distances are dimension-generic
     REQUIRES_PARAMS = ["radius"]
     MECHANISM_TAGS = ["radius_graph", "neighbor_search", "rewire"]
-    PARAM_ROLES = {"min_radius": "inner_cutoff_radius", "block": "block_size",
-                   "compile": "torch.compile the O(N^2) block distance+mask kernel"}
-    REFERENCE = "Plexus (this work)."
+    PARAM_ROLES = {"min_radius": "inner_cutoff_radius", "block": "block_size"}
+    REFERENCE = "Plexus (this work); a cutoff neighbour list is standard practice."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.r_max = float(params["radius"])
         self.r_min = float(params.get("min_radius", 0.0))
         self.block = int(params.get("block", 2048))
-        self.compile = bool(params.get("compile", False))    # torch.compile the O(N^2) distance kernel
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
@@ -125,7 +138,7 @@ class RadiusGraph(Rewire):
             lvl.get("pos"), lvl.occ, self.r_min, self.r_max,
             periodic=getattr(H, "periodic", False),
             world_width=getattr(H, "world_size", getattr(H, "world_width", 1.0)),
-            block=self.block, compile=self.compile,
+            block=self.block,
         )
         return {}
 ```
