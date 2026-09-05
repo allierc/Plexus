@@ -1,19 +1,27 @@
 """Where a triangulated surface meets a continuum, and what each tells the other.
 
-    seed_plate        an open planar half-edge patch -- sheet, disc, disc with a hole, or grid
-    plate_drive       and its prescribed rigid descent, so the surface is a piston
-    mesh_contact      the vertex mesh pushes MPM particles out of itself, and feels the reaction
-    mesh_inside       which particles are inside the closed surface -- the test the contact needs
-    surface_track     the surface's own moving frame, kept across division and death
-    plate_confine     a rigid half-space (a projection; `block_seed` is the material version)
-    bm_sense          the epithelium reads the membrane it is resting on
-    ecm_load          the load the matrix puts back on the tissue
-    ecm_gate_growth   and what that load does to growth -- entry condition `'mg_scale' in m`
+Two representations meet here: a vertex mesh, which is a surface, and an MPM (material point
+method) continuum, which is a volume. Every operator below is one direction of that meeting --
+the surface pushing the material out of itself, or the material pushing back on the surface.
 
-WHY NOT GRID-BASED CONTACT. CFEMP (Lian et al. 2011, CMAME 200:3482) resolves contact by comparing
-the two bodies' velocities at shared grid nodes, and needs mesh and grid to be comparable in size.
-Ours are not: a cell is 0.73 dx and the basement membrane 0.1 dx, so both bodies live inside one
-grid cell and the grid hands them ONE velocity -- the weld that `test_03_mesh_contact` measured.
+In the order they appear below:
+
+    mesh_contact     lateral     the surface pushes particles out, and collects the reaction
+    mesh_inside      lateral     how many particles are behind the surface, and how deep
+    bm_sense         structural  the epithelium reads the membrane it is resting on
+    plate_confine    structural  a rigid half-space, as a projection
+    seed_plate       seed        an open planar patch: sheet, disc, disc with a hole, or grid
+    surface_drive    structural  its prescribed rigid descent, so the surface is a piston
+    surface          entity      one patch of a tracked surface: a direction and a radius
+    surface_track    structural  the surface's own moving frame, kept across division and death
+    ecm_load         structural  the load the matrix puts back on the tissue
+    ecm_gate_growth  structural  and what that load does to the cell cycle
+
+The contact is particle-to-surface, not grid-based. Resolving contact by comparing the two
+bodies' velocities at shared grid nodes requires the mesh and the grid cells to be comparable in
+size. Here they are not -- a cell and the basement membrane are both a fraction of one grid cell
+across -- so both bodies would live inside a single cell and the grid would hand them one shared
+velocity, welding them together.
 """
 from __future__ import annotations
 import math
@@ -78,29 +86,47 @@ def _neighbours(it, ph, G):
 
 @register_operator("mesh_contact", family="boundary", set="particle", kind="lateral")
 class MeshContact(Lateral):
-    """Particle-to-surface contact against a LIVE triangulated surface.
+    """Particle-to-surface contact against a LIVE triangulated surface: the surface pushes
+    material points out of itself, drags on them, and feels the equal and opposite reaction.
 
-    Penalty in the face normal, regularised Coulomb friction against the face's own velocity, and
-    the reaction distributed to the face's vertices by the barycentric weights that built it.
+    particle -> particle (and, through VERTEX_FORCE, back onto the surface's vertices): reads
+    pos and the surface set's mesh, emits an external acceleration the MPM substep consumes.
 
-    NO REPLAY. The surface is a vertex set in this hierarchy, read at the frame it is in --
-    `surface: <set>`. The archive path (`tissue: <npz>`, a cache of 200 meshes with a `mesh_stride`
-    and a linear interpolation between kept frames) IS DELETED, along with the interpolation, the
-    stride arithmetic and the finite-differenced vertex velocity that went with it.
+        d_i   = the depth of particle i behind its nearest face, along that face's normal n
+        a_n   = k d_i n                                          the penalty, normal to the face
+        v_t   = (v_i - v_face) - ((v_i - v_face) . n) n          relative tangential velocity
+        a_t   = -mu |a_n| v_t / (|v_t| + eps_v)                  regularised Coulomb friction
 
-    WHY, AND WHAT IT COST TO LEARN. A replayed input is a claim about a FILE, not about a model.
-    Gate 04 read a 32.7 MB npz built in August from a spec that no longer resolved -- its parent had
-    drifted to `rate: 0.03` against the `0.003457` that made the cache -- so the gate was green
-    against an artefact nobody could rebuild, and `tools/export_tissue.py` existed only to paper
-    over that. The surface now comes from a `seed` operator like every other initial condition
-    (`seed_plate`, `seed_mesh`), which means it is declared, regenerated on every run, and cannot
-    silently disagree with the spec that names it.
+    k is set by `k_frac` as a fraction of the largest penalty the substep can carry without going
+    unstable, so it is a dimensionless safety fraction rather than a stiffness a specification has
+    to calibrate. mu is the dimensionless Coulomb friction coefficient. eps_v is a slip
+    regularisation velocity, in world units per unit time: it replaces the discontinuous sign of
+    the true Coulomb law with a smooth ramp, so that a particle at rest is not given an
+    arbitrarily directed friction force. `scale` maps the surface's own coordinates into the
+    material's box.
 
-    WHAT THIS RULES OUT, STATED RATHER THAN HIDDEN: two subsystems whose clocks differ by ~10^5 --
-    an epithelium at 600 s a frame against a matrix at 3.2 ms -- cannot share a schedule, and the
-    replay was how that was dodged. A surface on this path must therefore be PRESCRIBED (kinematics
-    written by an operator, e.g. `plate_drive`) or solved on the matrix's own clock. That is a
-    modelling constraint, not a regression.
+    The reaction is distributed to the face's three vertices by the same barycentric weights that
+    located the contact point, which is what makes it a genuine equal-and-opposite pair rather
+    than a force applied to a surface that never feels it.
+
+    THE SURFACE IS LIVE, NOT REPLAYED. It is a vertex set in this hierarchy, read at the frame it
+    is in. A replayed surface would make the input a claim about a FILE rather than about a model:
+    a cached mesh can silently disagree with the specification that names it, and cannot be
+    regenerated to check. The surface therefore comes from a `seed` operator like every other
+    initial condition.
+
+    What that rules out, stated rather than hidden: two subsystems whose timesteps differ by five
+    orders of magnitude -- an epithelium at minutes per frame against a matrix at milliseconds --
+    cannot share a schedule, and a replay was how that would be dodged. A surface on this path
+    must therefore be PRESCRIBED, with its kinematics written by an operator such as
+    `surface_drive`, or else solved on the matrix's own clock. That is a modelling constraint,
+    not a regression.
+
+    Reference: Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Improved coupling of finite element
+    method with material point method based on a particle-to-surface contact algorithm. Comput.
+    Methods Appl. Mech. Engrg. 293:1-19 -- the scheme this implements. The grid-node alternative
+    is Lian, Y. P., Zhang, X. & Liu, Y. (2011). Comput. Methods Appl. Mech. Engrg. 200:3482-3494.
+    The surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386.
     """
 
     EMIT = "mpm_acceleration"          # consumed by `mpm_scatter` as a_ext, like `ecm_from_cell`
@@ -110,13 +136,11 @@ class MeshContact(Lateral):
     PARAM_ROLES = {"k_frac": "penalty_fraction_of_ceiling", "mu": "friction_coefficient",
                    "scale": "tissue_to_box_scale", "eps_v": "slip_regularisation_velocity"}
     REFERENCE = ("Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Improved coupling of finite "
-                 "element method with material point method based on a particle-to-surface contact "
-                 "algorithm (ICFEMP). Comput. Methods Appl. Mech. Engrg. 293:1-19. "
-                 "doi:10.1016/j.cma.2015.04.005 -- the scheme this operator implements. Grid-node "
-                 "coupling (CFEMP, Lian, Y. P., Zhang, X. & Liu, Y. (2011) CMAME 200:3482-3494, "
-                 "doi:10.1016/j.cma.2011.07.014) is the alternative it was chosen over: it needs "
-                 "mesh and grid cells of comparable size, which this prototype violates. The "
-                 "surface is Okuda, S. et al. (2018) Sci. Rep. 8:2386.")
+                 "element method with material point method based on a particle-to-surface "
+                 "contact algorithm. Comput. Methods Appl. Mech. Engrg. 293:1-19 -- the scheme "
+                 "this implements. The grid-node alternative is Lian, Y. P., Zhang, X. & Liu, Y. "
+                 "(2011). Comput. Methods Appl. Mech. Engrg. 200:3482-3494. The surface is "
+                 "Okuda, S. et al. (2018). Sci. Rep. 8:2386.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -564,23 +588,28 @@ class MeshContact(Lateral):
 
 @register_operator("mesh_inside", family="hierarchy", set="particle", kind="lateral")
 class MeshInsideCount(Lateral):
-    """How many matrix particles are behind the surface, and how deep -- measured, not fixed.
+    """A measurement, as an operator: how many matrix particles are behind the surface, and how
+    deep. It counts and does not correct, which is the whole point of it.
+
+    particle -> particle: reads pos and the surface, writes nothing; records the count and the
+    maximum depth per frame.
 
     `cell_exclude` answers the same question by PROJECTING the offenders out, which makes the
-    count unmeasurable by construction: with the backstop on, the answer is always zero and the
-    contact is never tested. This operator only counts, so "the contact holds the matrix out on its
-    own" is a number that can come back wrong.
+    count unmeasurable by construction -- with the backstop on, the answer is always zero and the
+    contact is never tested. This operator only counts, so the claim "the contact holds the matrix
+    out on its own" becomes a number that can come back wrong.
 
-    It shares `mesh_contact`'s bin structure through the same module and runs once per FRAME, at
-    frame level, because a per-substep count would report the transient depth inside a substep
-    rather than what the frame ended with.
+    It runs once per FRAME rather than per substep, because a per-substep count would report the
+    transient depth reached inside a substep rather than what the frame ended with.
+
+    Reference: none -- this is a measurement, not a mechanism. Plexus (this work).
     """
 
     EMIT = None
     SUPPORTED_DIMS = [3]
     REQUIRES_PARAMS = []
     MECHANISM_TAGS = ["diagnostic", "non_penetration"]
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = "Plexus (this work); a measurement, not a mechanism."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -726,7 +755,32 @@ SENSE_TRACE: list = []
 
 @register_operator("bm_sense", family="signalling", set="vertex", kind="structural")
 class BMSense3D(Structural):
-    """Write the basement-membrane deficit under each cell into `cell.chem[:, chan]`."""
+    """The epithelium reads the membrane it is resting on: each cell senses how much basement
+    membrane is under it, and a shortfall becomes a chemical signal the rest of the model can act
+    on -- the matrix-to-cell half of the coupling.
+
+    vertex -> cell: reads the mesh geometry and a recorded membrane map, writes one channel of the
+    cell set's `chem` block in place.
+
+        u_f    = (c_f - c_tissue) / |c_f - c_tissue|      the cell's own direction
+        L_f    = M(theta(u_f), phi(u_f))                  the membrane level in that direction
+        def_f  = clamp(1 - L_f / p_ref, 0, 1)^sharp       the deficit
+
+    M is the recorded equirectangular membrane map for this frame. p_ref is the membrane level
+    counted as fully supported, in the map's own units, so the ratio L/p_ref is dimensionless and
+    the deficit runs from 0 (fully anchored) to 1 (no membrane at all). `sharp` is the exponent
+    on that deficit: 1 is linear, and larger values confine the signal to cells that are almost
+    completely unsupported.
+
+    The direction is centroid-referenced, built by exactly the construction the map was binned
+    with and the one `ecm_gate_growth` uses, so the three cannot drift apart. A cell with no live
+    half-edge has no direction, and is given no deficit rather than the deficit of whatever
+    direction the origin happens to point in.
+
+    Reference: Streuli, C. H. (2009). Integrins and cell-fate determination. Curr. Opin. Cell
+    Biol. 21:194-198 (anchorage and the cell cycle); Frantz, C., Stewart, K. M. & Weaver, V. M.
+    (2010). The extracellular matrix at a glance. J. Cell Sci. 123:4195-4200 (the ECM as a signal).
+    """
 
     EMIT = None
     SUPPORTED_DIMS = [3]
@@ -737,8 +791,9 @@ class BMSense3D(Structural):
                       "matrix_to_cell_feedback", "morphogen_source"]
     PARAM_ROLES = {"p_ref": "membrane_reference_level", "sharp": "deficit_sharpness",
                    "chan": "chem_channel_written"}
-    REFERENCE = ("Streuli, C. H. (2009) Curr. Opin. Cell Biol. 21:194 (anchorage and the cycle); "
-                 "Frantz, C. et al. (2010) J. Cell Sci. 123:4195 (the ECM as a signal).")
+    REFERENCE = ("Streuli, C. H. (2009). Integrins and cell-fate determination. Curr. Opin. Cell "
+                 "Biol. 21:194-198; Frantz, C., Stewart, K. M. & Weaver, V. M. (2010). The "
+                 "extracellular matrix at a glance. J. Cell Sci. 123:4195-4200.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -807,7 +862,28 @@ PLATE_CONTACT: list = []
 
 @register_operator("plate_confine", family="boundary", set="vertex", kind="structural")
 class PlateConfine3D(Structural):
-    """Confine a set between two rigid plates normal to `axis`, at `centre` +/- `gap_half`."""
+    """Confine a set between two rigid plates: a hard boundary imposed as a PROJECTION rather
+    than as a force, so nothing can be pushed through it however hard it is pressed.
+
+    vertex -> vertex: reads pos, writes pos in place.
+
+        g(t) = g0 + (g1 - g0) clamp((t - t0)/(t1 - t0), 0, 1)     the gap, closing over time
+        x_a <- c_a + sign(x_a - c_a) min(|x_a - c_a|, g(t))       projected back inside
+
+    a is the confined axis, c the gap centre on it, and g the free HALF-gap, all in world units.
+    g0 is `gap_half` and g1 `gap_half_end`, closing linearly between frames `close_from` and
+    `close_to` -- which is how a compression assay is written. `stiff` is the fraction of the
+    violation actually corrected each frame, from 0 (no confinement) to 1 (a perfectly rigid
+    wall); values below 1 make the plate compliant without giving it a stiffness in force units.
+
+    A projection rather than a penalty because a boundary that must not be crossed cannot be one:
+    a penalty is bounded by whatever acceleration clamp keeps the substep stable, and past that
+    depth it stops growing. `block_seed` is the material version of the same wall, for when the
+    plate itself must deform.
+
+    Reference: Plexus (this work); the confinement geometry of Okuda, S. et al. (2018). Sci. Rep.
+    8:2386.
+    """
 
     EMIT = None                        # moves positions in place; no integrable delta
     SUPPORTED_DIMS = [3]
@@ -818,7 +894,8 @@ class PlateConfine3D(Structural):
     PARAM_ROLES = {"gap_half": "free_half_gap", "gap_half_end": "final_free_half_gap",
                    "close_from": "frame_closing_starts", "close_to": "frame_closing_ends", "stiff": "projection_fraction",
                    "axis": "confined_axis", "centre": "gap_centre_on_axis"}
-    REFERENCE = "Plexus (this work); the confinement geometry of Okuda, S. et al. (2018) Sci. Rep. 8:2386."
+    REFERENCE = ("Plexus (this work); the confinement geometry of Okuda, S. et al. (2018). "
+                 "Sci. Rep. 8:2386.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -970,22 +1047,36 @@ def _plate_half_edges(quads):
 
 @register_operator("seed_plate", family="seed", set="vertex", kind="seed")
 class SeedPlate(Structural):
-    """Frame-0: an open planar half-edge patch normal to `axis`, and its half-edge table.
+    """An open planar half-edge patch, laid out once at frame 0: the rigid tool a
+    parallel-plate or nanoindentation assay presses with.
 
-    WHERE THE PATCH SITS RELATIVE TO `mesh_contact`'s `centre:` IS THE WHOLE DESIGN, and it is the
-    one thing a spec can get wrong silently. The contact is star-shaped: it casts a ray from
+    vertex -> vertex: writes every position and the mesh's half-edge table, at the opening of the
+    trajectory.
+
+    The patch is normal to `axis`, sits at `height` on it, and spans `half_width` in world units,
+    subdivided into `nq` quads across. `shape` chooses the topology: `sheet` is the full square,
+    `disc` its inscribed circle, `annulus` a disc with an inner hole of radius `hole_frac` times
+    the outer one, and `grid` a set of `bars` strips per side each covering `bar_frac` of its
+    period -- a tool that presses on some of the material and lets the rest flow between.
+
+    WHERE THE PATCH SITS RELATIVE TO THE CONTACT'S `centre:` IS THE DESIGN, and it is the one
+    thing a specification can get wrong silently. The contact is star-shaped: it casts a ray from
     `centre` along each particle's own direction, calls the outward normal the one pointing AWAY
     from `centre`, and pushes anything it finds BETWEEN `centre` and the surface further out. So
-    `centre` names the region the material is forbidden to enter -- the tissue's interior for the
-    spheroid, and for a piston the BODY OF THE PISTON, i.e. a point on the far side of the plate
-    from the material. Declare `centre` in the plate's plane and the ray cast is degenerate; declare
-    it on the material's side and the plate pushes the wrong way.
+    `centre` names the region the material is forbidden to enter -- the tissue's interior for a
+    spheroid, and for a piston the BODY of the piston, a point on the far side of the plate from
+    the material. Declared in the plate's own plane, the ray cast is degenerate; declared on the
+    material's side, the plate pushes the wrong way.
 
-    `standoff` REPORTS THE CONSEQUENCE AT FRAME 0 rather than leaving it to be discovered: the
-    distance from the declared `centre` to the plate, which is what sizes the contact's direction
-    bins. Too small and a rim face is seen edge-on and the bin grid collapses to its floor of four
-    rows; too large and the angular size of a face falls under the 200-row cap and a face spans more
-    than one bin, which is the assumption the 3x3 lookup rests on.
+    `standoff`, the distance from the declared centre to the plate, is reported at frame 0 rather
+    than left to be discovered, because it is what sizes the contact's direction bins. Too small
+    and a rim face is seen edge-on and the bin grid collapses to its floor; too large and the
+    angular size of a face falls below one bin, so a face spans several -- which is the assumption
+    the local lookup rests on.
+
+    Reference: Plexus (this work); the indenter geometry of a nanoindentation or parallel-plate
+    compression assay. The half-edge layout is that of Okuda, S. et al. (2013). Biomech. Model.
+    Mechanobiol. 12:627-644, as used by `seed_mesh`.
     """
 
     EMIT = None                        # writes positions and the mesh table; no integrable delta
@@ -998,9 +1089,9 @@ class SeedPlate(Structural):
                    "height": "position_on_axis", "axis": "patch_normal_axis",
                    "hole_frac": "inner_over_outer_radius", "bars": "strips_per_side",
                    "bar_frac": "strip_width_over_period"}
-    REFERENCE = ("Plexus (this work). The indenter geometry of a nanoindentation / parallel-plate "
-                 "compression assay; the half-edge layout is Okuda, S. et al. (2013) "
-                 "Biomech. Model. Mechanobiol. 12:627-644, as used by `seed_mesh`.")
+    REFERENCE = ("Plexus (this work); the indenter geometry of a nanoindentation or "
+                 "parallel-plate compression assay. The half-edge layout is Okuda, S. et al. "
+                 "(2013). Biomech. Model. Mechanobiol. 12:627-644.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -1103,34 +1194,39 @@ class SeedPlate(Structural):
 @register_operator("surface_drive", "plate_drive", family="mechanics", set="vertex",
                    kind="structural")
 class SurfaceDrive(Structural):
-    """Move a seeded SURFACE along one axis at a prescribed rate, and publish its velocity.
+    """Move a seeded surface along one axis at a prescribed rate, and publish its velocity: the
+    loading protocol of a displacement-controlled indentation.
 
-    `plate_drive` IS AN ALIAS AND NOT THE NAME. The operator translates whatever surface the set
-    holds -- a plate, a sphere, a cap -- so naming it for one of them made the sphere rung read as
-    a mistake. Canonical name first, on the `seed_mesh`/`mesh_seed` precedent.
+    vertex -> vertex: reads pos, writes pos and the surface's velocity buffer in place.
 
-    KINEMATIC, NOT DYNAMIC, AND THAT IS THE MODELLING DECISION. The plate is a rigid indenter whose
-    position is imposed; it does not accelerate under the reaction it collects. `mesh_contact` still
-    computes that reaction and still accumulates it per vertex (`VERTEX_FORCE`), so the load the
-    material puts back is MEASURED here even though it is not integrated -- which is the difference
-    between a one-way coupling that reports its own residual and one that hides it.
+        x_a(t) <- x_a(0) + by * clamp((t - hold) / over, 0, 1)
+        v_a    = by / over                                    published for the contact to read
 
-    THE VELOCITY IS PUBLISHED, NOT INFERRED. The contact's friction law needs the surface's velocity
-    at the contact point, and on the replay path it gets it by differencing consecutive cached
-    meshes. A prescribed plate KNOWS its velocity exactly, so it writes it, and the friction is then
-    reading the motion that is happening rather than a finite difference of it.
+    `by` is a signed displacement along `axis`, in world units, applied over `over` frames after
+    `hold` frames of rest. `target` is the alternative spelling, an absolute final coordinate of
+    the surface's CENTROID -- which is the tool's low point for a flat plate, its centre for a
+    sphere and neither for a pyramid, so three rungs of a ladder meant to differ only in the tool
+    would need three different numbers to travel the same distance. `by` means the same thing for
+    every shape, and is the one a ladder wants. `grow` is the third way a tool can move: it SCALES
+    the surface about its own centroid, so a shell can indent by inflating rather than descending.
+
+    KINEMATIC, NOT DYNAMIC, and that is the modelling decision. The tool is rigid and its position
+    is imposed; it does not accelerate under the reaction it collects. `mesh_contact` still
+    computes that reaction and accumulates it per vertex, so the load the material puts back is
+    MEASURED even though it is not integrated -- the difference between a one-way coupling that
+    reports its own residual and one that hides it.
+
+    The velocity is PUBLISHED rather than inferred. The contact's friction law needs the surface's
+    velocity at the contact point, and a prescribed tool knows its own exactly; writing it means
+    the friction reads the motion that is happening rather than a finite difference of it.
+
+    Reference: Plexus (this work); the loading protocol of a displacement-controlled indentation.
     """
 
     EMIT = None                        # moves positions in place; no integrable delta
     SUPPORTED_DIMS = [3]
-    # `target`, NOT `to`: the schema reserves `to`/`from` for FIELD references (`mpm_scatter`'s
-    # `to: mpm_grid`), so a scalar there is resolved as a field name and the spec dies with
-    # "references unknown field 0.35".
-    # `by` OR `target`, AND `by` IS THE ONE A LADDER WANTS. `target` is an absolute coordinate of
-    # the surface's CENTROID, which is the tool's low point for a flat plate, its centre for a
-    # sphere, and neither for a pyramid -- so three rungs meant to differ only in the tool would
-    # have had to declare three different numbers to travel the same distance. `by` is that
-    # distance, signed along the axis, and it means the same thing for every shape.
+    # `target`, not `to`: the schema reserves `to` and `from` for FIELD references, so a scalar
+    # there would be resolved as a field name and the specification would fail to load.
     REQUIRES_PARAMS = []
     DIFFERENTIABLE = False
     MAY_MUTATE_INTEGRATED_STATE = True
@@ -1145,8 +1241,8 @@ class SurfaceDrive(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
         self.axis = int(params.get("axis", 1))
-        # GROWTH AS A PRESCRIPTION, which is the third way a tool can move and the one a spheroid
-        # needs. `by`/`target` translate the surface; `grow` SCALES it about its own centroid by a
+        # Growth as a prescription: the third way a tool can move, and the one a spheroid needs.
+        # `by` and `target` translate the surface; `grow` SCALES it about its own centroid by a
         # declared factor over `over` frames, so a shell can indent a gel by inflating instead of by
         # descending -- and it stays a kinematic tool while doing it.
         #
@@ -1287,14 +1383,14 @@ class SurfaceDrive(Structural):
         return {}
 
 
-@register_entity("surface")            # BY SET NAME. Registering this as "surface_element"
-class SurfaceElement:  # while the set is called "surface" means the provision never runs, and the
-    # operator dies on a missing `u` buffer -- the same trap the membrane set fell into.
-    """One patch of the epithelial surface: a direction, a radius, and the velocity of that radius.
+@register_entity("surface")            # registered under the SET's name, not the class's
+class SurfaceElement:
+    """One patch of a tracked epithelial surface: a direction u, the radius R along it, and the
+    buffers those live in.
 
-    Registered because entities resolve BY SET NAME -- an unregistered name silently falls back to a bare
-    pos/vel schema, which for this set is actually all that is needed, but relying on a fallback is how
-    the membrane set died inside `mpm_strain` with a missing attribute.
+    Registered under the name `surface` because entities resolve BY SET NAME. An unregistered name
+    falls back silently to a bare position/velocity schema, and the operator then dies on a
+    missing `u` buffer -- which reads like a bug in the operator and is a missing registration.
     """
     @staticmethod
     def provision(lvl, parent, s, H, device):
@@ -1305,14 +1401,22 @@ class SurfaceElement:  # while the set is called "surface" means the provision n
 
 @register_operator("surface_track", family="hierarchy", set="particle", kind="structural")
 class SurfaceTrack(Structural):
-    """Write the epithelial surface into the `surface` Level each frame, WITHOUT binning.
+    """Write a recorded epithelial surface into the `surface` set each frame, interpolated rather
+    than binned, so the surface a strain field sees is smooth.
 
-    The old lookup took `R(u, t)` from the cell of a 32x64 table that `u` fell into -- a nearest-bin
-    interpolation, i.e. the crudest one available, on a field that is smooth. Here each element's radius
-    is a distance-weighted average over the `k` nearest directions of the recorded map, which is
-    continuous in `u` and has no cell edges for a strain field to remember.
+    particle -> surface: reads a recorded angular radius map, writes each element's direction u
+    and radius R in place.
 
-    The map is still the pass-1 recording; what changes is how it is read.
+        R(u, t) = sum_j w_j R_j / sum_j w_j ,   w_j = 1 / (|u - u_j| + eps)
+
+    over the k directions of the recorded map nearest to u. A nearest-bin lookup -- reading R from
+    whichever cell of the map u falls into -- is the crudest interpolation available, and it is
+    applied to a field that is smooth; its cell edges become discontinuities a strain field
+    remembers. The distance-weighted average over the k nearest directions is continuous in u and
+    has no edges. `scale` rescales the recorded surface, and `jitter` with `seed` disorders the
+    lattice of tracked directions so it does not itself impose a pattern.
+
+    Reference: Plexus (this work); the surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386.
     """
     EMIT = None
     SUPPORTED_DIMS = [3]
@@ -1322,7 +1426,7 @@ class SurfaceTrack(Structural):
     MECHANISM_TAGS = ["prescribed_boundary", "replay", "smooth_interpolation"]
     PARAM_ROLES = {"k": "interpolation_neighbours", "scale": "surface_rescale",
                    "seed": "lattice_seed", "jitter": "lattice_disorder"}
-    REFERENCE = "Plexus (this work); the surface is Okuda, S. et al. (2018) Sci. Rep. 8:2386."
+    REFERENCE = "Plexus (this work); the surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -1408,7 +1512,28 @@ LOAD_TRACE: list = []
 
 @register_operator("ecm_load", family="mechanics", set="vertex", kind="structural")
 class ECMLoad3D(Structural):
-    """Push the vertex mesh inward with a recorded matrix pressure map P(theta, phi, t)."""
+    """The second half of the coupling: the matrix pushing back on the tissue, from a pressure
+    map the matrix pass recorded.
+
+    vertex -> vertex: reads pos and a recorded pressure map, writes pos in place.
+
+        s_i = min( gain * P(theta_i, phi_i, t) / mu * dt ,  cap_frac * r_i )
+        x_i <- x_i - s_i u_i                                  inward, along the surface normal
+
+    P is the recorded pressure in that direction, normalised by the 99th percentile of the
+    nonzero map so that 1 is a strongly loaded direction rather than an absolute pressure -- which
+    means `gain` carries the units and is the one number setting how hard the matrix is allowed to
+    push. mu is the vertex mobility, so pressure over mobility is a velocity; `dt` is the frame
+    timestep. `cap_frac` bounds any one frame's displacement to a fraction of the local radius,
+    which is what stops a spike in the map from inverting a cell.
+
+    This is a partitioned coupling: the matrix pass ran first and recorded what it felt, and this
+    replays that record onto the tissue in a later pass. The two are therefore not solved
+    simultaneously, and the tissue's response here cannot feed back into the pressure it is given.
+
+    Reference: Plexus (this work); the reaction to the contact of Okuda, S. et al. (2018). Sci.
+    Rep. 8:2386.
+    """
 
     EMIT = None                        # moves positions in place; no integrable delta
     SUPPORTED_DIMS = [3]
@@ -1418,7 +1543,8 @@ class ECMLoad3D(Structural):
     MECHANISM_TAGS = ["matrix_to_cell_feedback", "mechanical_resistance", "partitioned_coupling"]
     PARAM_ROLES = {"gain": "load_coupling_gain", "mu": "vertex_mobility",
                    "dt": "frame_timestep", "cap_frac": "max_step_as_radius_fraction"}
-    REFERENCE = "Plexus (this work); the reaction to Okuda, S. et al. (2018) Sci. Rep. 8:2386 contact."
+    REFERENCE = ("Plexus (this work); the reaction to the contact of Okuda, S. et al. (2018). "
+                 "Sci. Rep. 8:2386.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -1481,33 +1607,43 @@ class ECMLoad3D(Structural):
 
 @register_operator("ecm_gate_growth", family="population", set="vertex", kind="structural")
 class ECMGrowthGate3D(Structural):
-    """The matrix's stress slows the CELL CYCLE where it presses hardest.
+    """Mechanosensitive growth: the matrix's pressure slows the CELL CYCLE where it presses
+    hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.
 
-    THE MECHANISM, AND WHY IT IS STRONGER THAN A FORCE. `ecm_load` pushes the vertices inward: a
-    mechanical correction that fights the growth every frame and is bounded by how hard you dare push
-    before cells invert. This operator instead gates the RATE -- a cell facing a stressed matrix grows
-    its target volume more slowly, so it reaches `cell_divide`'s volume-doubling threshold later and
-    DIVIDES LESS OFTEN. That difference integrates over 400 frames, so a few percent of stress
-    anisotropy becomes a visible shape anisotropy, which a force of the same size cannot do.
+    vertex -> vertex: reads the per-cell growth scale and a recorded pressure map, rewrites that
+    scale and the target area, perimeter, volume and radius derived from it.
 
-    It is also the biology: proliferation under mechanical load is suppressed, not just deformed
-    (Helmlinger 1997; Montel 2011 measured spheroids stalling under external pressure). The tissue is
-    not being pushed into an ovoid -- it is GROWING into one, because the directions differ in how much
-    the matrix objects.
+        gate_f = floor + (1 - floor) / (1 + (P_f / p_half)^n)
+        f      = s_now / s_prev                      the factor growth just applied
+        s_f   <- s_prev (1 + gate_f (f - 1))         the same growth, gated
 
-    HOW IT INTERCEPTS WITHOUT REWRITING THE GROWTH OPERATOR. `cell_grow` keeps a per-cell
-    cumulative scale `mg_scale` and multiplies it by (1 + rate.(rho + Hill(a))) each tick, then derives
-    A0/P0/V0f/R0 from it. This operator runs AFTER it, remembers the scale it left behind last frame,
-    and reads the factor growth just applied as `f = s_now / s_prev`. The gated scale is then
-    `s_prev * (1 + gate.(f - 1))` -- exact, and it needs to know nothing about `rate`, `rho` or the Hill
-    function, so it cannot drift out of step with them. Five lines of A0/P0/V0f/R0 bookkeeping are
-    duplicated from that operator, which is the price of not editing a shared file; they are marked.
+    P_f is the recorded pressure in the cell's own direction, normalised as in `ecm_load`, and
+    p_half the pressure at which growth is slowed halfway, in those same normalised units. n is
+    `hill`, the dimensionless sharpness of the switch. `floor` is the minimum growth fraction a
+    fully pressed cell retains, and it matters: at floor 0 a cell in the most stressed direction
+    stops dividing entirely and the tissue can only grow the other way, which produces a dramatic
+    shape for a reason closer to a wall than to mechanosensing.
 
-    THE GATE IS A CHOICE OF FUNCTIONAL FORM, and it is stated rather than buried: a Hill in the
-    normalised pressure, `gate = floor + (1 - floor) / (1 + (P/p_half)^n)`. `floor` matters -- with
-    floor 0 a cell in the most stressed direction stops dividing entirely and the tissue can only grow
-    the other way, which produces a dramatic shape for a reason that is closer to a wall than to
-    mechanosensing.
+    Gating the RATE is stronger than applying a force. `ecm_load` pushes the vertices inward,
+    which fights the growth every frame and is bounded by how hard one dares push before cells
+    invert. A cell whose target volume grows more slowly reaches the division threshold later and
+    divides less often, and that difference integrates over a whole trajectory -- so a few percent
+    of pressure anisotropy becomes a visible shape anisotropy, which a force of the same size
+    cannot produce.
+
+    It is also the biology: proliferation under mechanical load is suppressed, not merely
+    deformed.
+
+    It intercepts growth without rewriting the growth operator. `cell_grow` keeps a per-cell
+    cumulative scale and multiplies it each tick; this runs after it, remembers the scale left
+    behind last frame, and reads the factor just applied as their ratio. Gating that ratio is
+    exact and needs to know nothing about the growth law's own rate or its Hill function, so the
+    two cannot drift out of step.
+
+    Reference: Helmlinger, G., Netti, P. A., Lichtenbeld, H. C., Melder, R. J. & Jain, R. K.
+    (1997). Solid stress inhibits the growth of multicellular tumor spheroids. Nat. Biotechnol.
+    15:778-783; Montel, F. et al. (2011). Stress clamp experiments on multicellular tumor
+    spheroids. Phys. Rev. Lett. 107:188102.
     """
 
     EMIT = None
@@ -1519,8 +1655,10 @@ class ECMGrowthGate3D(Structural):
                       "matrix_to_cell_feedback", "anisotropic_growth"]
     PARAM_ROLES = {"p_half": "half_suppression_pressure", "hill": "gate_sharpness",
                    "floor": "minimum_growth_fraction"}
-    REFERENCE = ("Helmlinger, G. et al. (1997) Nat. Biotechnol. 15:778; "
-                 "Montel, F. et al. (2011) Phys. Rev. Lett. 107:188102.")
+    REFERENCE = ("Helmlinger, G. et al. (1997). Solid stress inhibits the growth of "
+                 "multicellular tumor spheroids. Nat. Biotechnol. 15:778-783; Montel, F. et al. "
+                 "(2011). Stress clamp experiments on multicellular tumor spheroids. Phys. Rev. "
+                 "Lett. 107:188102.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
