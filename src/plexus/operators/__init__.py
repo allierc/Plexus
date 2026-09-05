@@ -1,20 +1,20 @@
 """The operator library. Importing this package self-registers every operator.
 
-TEN MODULES, GROUPED BY MECHANISM, where there were fifty-five files holding one operator each.
-That directory was unreadable in a specific way rather than merely long: to find out what acts on an
-MPM particle you opened eight files, and the eight could not be compared because they were never on
-the screen together. The two implementations of `cell_mechanics` -- the 3D vertex model and the monolayer --
-are the case that settles it: they are one contract with two bodies, and reading them one after the
-other is how anyone can tell which one a spec is getting.
+The modules are grouped BY MECHANISM, not one file per operator. The alternative is unreadable in
+a specific way rather than merely long: finding out what acts on an MPM particle would mean
+opening eight files, and the eight could never be compared because they would never be on the
+screen together. The two implementations of `cell_mechanics` -- the 3D vertex model and the
+monolayer -- settle it. They are one contract with two bodies, and reading them one after the
+other is how anyone can tell which one a specification is getting.
 
     vertex_ops           the 3D vertex model: seed, geometry, mechanics, grow, divide, die, T1
-    diffusion_reaction   chemistry on the cell GRAPH, and the two shape<->chemistry couplings
+    diffusion_reaction   chemistry on the cell GRAPH, and the two shape-chemistry couplings
     junction_ops         myosin, on junctions and across the apex, plus the cytokinetic ring
     ecm_ops              the matrix as MPM material, and the stiff blocks that confine it
     membrane_ops         the basement membrane, its crosslink network, and the integrin links
     contact_ops          where a triangulated surface meets a continuum, both directions
     mpm_ops              MLS-MPM: the grid, the four-step cycle, and the forces on it
-    motion_ops           how a body moves with nothing acting on it: drag, glide, walls, gravity
+    motion_ops           single-body motion: drag, glide, sediment, walls, gravity
     encoding_ops         a learnable field written from its own coordinates
     interaction_ops      pairwise laws, and the relation they act over
     field_ops            a continuum bound to a set: deposit / diffuse / decay / sense
@@ -22,19 +22,14 @@ other is how anyone can tell which one a spec is getting.
                          local update, the signalling through W, and the field modulating it
     observation          NOT a mechanism: how the state is looked at (voxelize)
 
-THE OLD MODULE NAMES ARE GONE. `plexus.operators.drag`, `plexus.operators.mpm_grid` and 43 others
-were one-line re-export shims left behind when the operators were grouped into the modules above.
-Their docstrings said thirty files imported them; by the time they were removed the true number was
-SEVEN, all rewritten to import from the grouped module directly. A shim that outlives its callers
-is not compatibility, it is a second name for the same thing -- and `mpm_grid`, `mpm_scatter` and
-`mpm_gather` were the worst of them, because they read as three separate operator modules when they
-are three operators in one file. Anything still importing an old name gets an ImportError naming
-the module, which is the correct answer and not a regression.
+Every module opens with its own contracts listed IN THE ORDER THEY APPEAR IN THE FILE, then the
+models and implementations of those contracts. Each contract's docstring states the mechanism, its
+typed morphism, the equation it implements, every symbol in that equation with its units, and the
+publication it comes from where there is one.
 
-WHAT IS NOT IN THE CORE. `mpm_boundary` and `bm_strain` are registered in `discovery_okuda` only.
-`AUDIT.md` rejects both -- the first overwrites grid-node velocity, so the constraint is kinematic
-and its standoff is set by the B-spline stencil width; the second is "not a mechanism" -- and a
-rejection that lives only in a markdown file is one the next reader re-promotes by accident.
+There are no per-operator module names. A module that re-exports one operator reads as a separate
+mechanism when it is one line of a file, so an import of a name that used to exist raises rather
+than resolving -- which is the correct answer and not a regression.
 """
 from __future__ import annotations
 
@@ -65,12 +60,12 @@ from . import neural                # noqa: F401  neural_seed, neuron_update (ph
 #                                                 (psi: shared | type_pre | type_pairwise),
 #                                                 neuron_field_input (Omega)
 from . import observation           # noqa: F401  voxelize -- a REPRESENTATION, not a mechanism
-# THE CONTINUOUS-FLOW OPERATORS LIVE WITH THEIR ENGINE, BUT MUST REGISTER WITH THE ATLAS. `mpm_emit`
-# and `mpm_drain` are defined in plexus/continuous_engine.py, next to the run() that refuses a spec
-# using one without the other. Importing them only when that engine is selected is too late:
-# `schema.load` validates every operator NAME before anything chooses an engine, so a spec naming
-# mpm_emit died with KeyError before the engine key was read. It imports models.base and
-# models.registry only, so there is no cycle back into this package.
+# The continuous-flow operators live with their engine but must still register here. `mpm_emit`
+# and `mpm_drain` are defined in plexus/continuous_engine.py, beside the run() that refuses a
+# specification using one without the other. Importing them only when that engine is selected
+# would be too late: `schema.load` validates every operator NAME before anything chooses an
+# engine, so a specification naming mpm_emit would fail before the engine key was read. That
+# module imports models.base and models.registry only, so there is no cycle back into this one.
 from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
