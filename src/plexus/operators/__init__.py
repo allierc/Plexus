@@ -15,12 +15,11 @@ other is how anyone can tell which one a specification is getting.
     contact_ops          where a triangulated surface meets a continuum, both directions
     mpm_ops              MLS-MPM: the grid, the four-step cycle, and the forces on it
     motion_ops           single-body motion: drag, glide, sediment, walls, gravity
-    encoding_ops         a learnable field written from its own coordinates
+    encoding_ops         fields that REPRESENT rather than simulate: hash_encoding, voxelize
     interaction_ops      pairwise laws, and the relation they act over
     field_ops            a continuum bound to a set: deposit / diffuse / decay / sense
     neural               a recurrent circuit: the seed that places a connectome region, the
                          local update, the signalling through W, and the field modulating it
-    observation          NOT a mechanism: how the state is looked at (voxelize)
 
 Every module opens with its own contracts listed IN THE ORDER THEY APPEAR IN THE FILE, then the
 models and implementations of those contracts. Each contract's docstring states the mechanism, its
@@ -35,7 +34,7 @@ from __future__ import annotations
 
 # --- the mechanism modules -------------------------------------------------------------------
 from . import encoding_ops          # noqa: F401  hash_encoding -- a learnable field from its
-                                   #               own coordinates (Instant-NGP)
+                                   #               own coordinates; voxelize -- a set, splatted
 from . import interaction_ops       # noqa: F401  radius_graph, attraction_repulsion, squared_law,
 #                                                 cohesion, separation, velocity_align, stillinger_weber
 from . import motion_ops            # noqa: F401  drag, glide, velocity_cruise, sediment,
@@ -59,7 +58,6 @@ from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, sur
 from . import neural                # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
 #                                                 (psi: shared | type_pre | type_pairwise),
 #                                                 neuron_field_input (Omega)
-from . import observation           # noqa: F401  voxelize -- a REPRESENTATION, not a mechanism
 # The continuous-flow operators live with their engine but must still register here. `mpm_emit`
 # and `mpm_drain` are defined in plexus/continuous_engine.py, beside the run() that refuses a
 # specification using one without the other. Importing them only when that engine is selected
@@ -70,4 +68,4 @@ from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "neural", "observation", "continuous_engine"]
+           "contact_ops", "neural", "continuous_engine"]
