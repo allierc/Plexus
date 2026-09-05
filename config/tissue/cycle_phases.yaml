@@ -58,6 +58,7 @@ plotting:
   - '#2e9e4f'
   - '#e8b024'
   - '#e03b2f'
+  mesh_mark_division: false
 sets:
   vertex:
     n: 25584
