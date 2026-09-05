@@ -1089,6 +1089,27 @@ class Divide3D(Structural):
         # the rest of the run.
         self.max_cells = int(params.get("max_cells", 0) or 0)
         self.factor = float(params.get("factor", 2.0))           # divide when volume >= factor x birth volume
+        # `split_cv` -- ASYMMETRIC DIVISION, AND IT IS A PARAMETER AND NOT A MODEL. The two daughters
+        # were given `vf/2` each, exactly, at every division; real cells do not split down the
+        # middle. Cadart et al. measure the asymmetry in mammalian cells and find it small but not
+        # zero, and it matters here for the same reason `cycle_cv` does: a perfectly even split is a
+        # noise-free channel, and a size-control rule that only ever has to correct deviations IT
+        # created cannot be told apart from one that corrects deviations it did not.
+        #
+        # Randomising how a cell splits is not a different hypothesis about what a cell IS, so by
+        # AXES.md it is a value -- the same axis as `cycle_cv`, `vseed_cv` and `age_seed`, and not a
+        # `model:` of its own.
+        #
+        # WHAT IT PERTURBS IS THE TARGET, NOT THE SEPTUM, and that limit is stated rather than
+        # papered over: `divide_face_3d` still cuts the ring between the two edges furthest apart
+        # across the cell's short axis, so the GEOMETRIC halves are what they were. `split_cv` sets
+        # the two daughters' target volumes to `p*v` and `(1-p)*v`, and the mechanics then pulls the
+        # real volumes apart to match. A faithful asymmetry would move the septum itself, which is a
+        # change to `divide_face_3d` and to every spec's topology, not to a target.
+        #
+        # The fraction is drawn per division, clipped to [0.2, 0.8]: outside that a "daughter" is a
+        # fragment and the pair is not a division, it is an extrusion with extra steps.
+        self.split_cv = float(params.get("split_cv", 0.0))
         self.cycle_cv = float(params.get("cycle_cv", 0.0))       # STOCHASTIC CELL CYCLE: Gaussian CV of each daughter's
         #   cell-cycle length (fresh division threshold). >0 keeps division waves broken up (desynchronised) as the
         #   tissue proliferates -- essential at scale so max-rate division never outruns relaxation. 0 -> uniform reset_noise.
@@ -1315,16 +1336,23 @@ class Divide3D(Structural):
                                  births=births)
             if res is None:
                 continue
-            half = vf[f] * 0.5                                    # each daughter is born at half the actual volume
+            # THE SPLIT FRACTION, 0.5 UNLESS `split_cv` SAYS OTHERWISE -- see __init__ for why this
+            # is a parameter and what it does and does not move.
+            _p = 0.5 if self.split_cv <= 0 else float(
+                np.clip(0.5 + self.split_cv * 0.5 * rng.standard_normal(), 0.2, 0.8))
+            half = vf[f] * _p                                     # daughter A's share of the actual volume
+            other = vf[f] * (1.0 - _p)                            # daughter B's
             if self.g1_ramp:                                     # birth-at-target: v_eq = actual birth volume (no K_V mismatch);
                 iso = A0[f] / max(V0f[f], 1e-12) ** (2.0 / 3.0)  # keep A0 isoperimetric-consistent A0 ~ v_eq^{2/3}
                 a0d = iso * half ** (2.0 / 3.0); v0d = half       # (P0 = p0*sqrt(A0) recomputed below)
+                a0e = iso * other ** (2.0 / 3.0); v0e = other
             else:
-                a0d = A0[f] * 0.5; v0d = V0f[f] * 0.5             # legacy: half the mother's targets
+                a0d = A0[f] * _p; v0d = V0f[f] * _p               # legacy: the mother's targets, split
+                a0e = A0[f] * (1.0 - _p); v0e = V0f[f] * (1.0 - _p)
             A0[f] = a0d; V0f[f] = v0d; Vbirth[f] = half           # daughter A (kept at index f)
             djit[f] = self._fresh_djit(rng); age[f] = 0           # fresh (desync'd) thresholds; reset cell-cycle age
             ndiv[f] = ndiv[f] + 1
-            A0.append(a0d); V0f.append(v0d); Vbirth.append(half); alive.append(1.0)   # daughter B
+            A0.append(a0e); V0f.append(v0e); Vbirth.append(other); alive.append(1.0)  # daughter B
             djit.append(self._fresh_djit(rng)); age.append(0); ndiv.append(ndiv[f])
             daughter_mothers.append(f)
             ndone += 1
@@ -2293,6 +2321,88 @@ class Divide3DTimer(Divide3D):
 
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
         return age >= self.cycle * jit
+
+
+@register_operator("cell_divide", model="adder", set="vertex", kind="structural", family="population")
+class Divide3DAdder(Divide3D):
+    """Divide once the cell has ADDED a constant volume since birth: `v >= v_birth + delta*jit*v_ref`.
+
+    THE THIRD POINT ON THE AXIS THE OTHER TWO ALREADY DEFINE, and the one the modern literature
+    actually supports. A sizer reads the cell's absolute size and corrects a deviation in ONE
+    generation; a doubler reads only the cell's own birth volume and corrects nothing, so under
+    exponential growth it is a timer wearing a sizer's clothes. An adder reads BOTH -- the increment
+    is absolute, the starting point is the cell's own -- and halves a size deviation each generation
+    rather than erasing it or preserving it. It is the intermediate this file argues about in two
+    docstrings and did not have.
+
+        born at v_b, divides at v_b + D, daughters at (v_b + D)/2
+        a cell born 2e too large divides 2e too large and its daughters are e too large
+
+    IT IS ALSO THE MEASURED ONE. Taheri-Araghi et al. found the added volume per generation to be
+    independent of birth size across bacterial species and growth conditions, and Cadart et al.
+    report the same near-adder behaviour in mammalian cells, arising there from a combination of
+    size-dependent growth and size-dependent cycle duration rather than from a single sensed
+    quantity -- which is why `concerted` below exists as its own model instead of being folded in.
+
+    `delta` IS IN UNITS OF `v_ref`, the seed-time median cell volume, exactly as `factor` is. That
+    is deliberate: the two rules then differ only in what the threshold is measured FROM, so a spec
+    can be moved between them without retuning, and `delta: 1.0` puts the steady state at the same
+    place `factor: 2.0` does for a population that starts uniform.
+    """
+    MECHANISM_TAGS = ["division", "adder", "size_control", "incremental_threshold",
+                      "absolute_increment"]
+    REFERENCE = ("Taheri-Araghi, S. et al. (2015). Cell-size control and homeostasis in bacteria. "
+                 "Curr. Biol. 25:385-391; Cadart, C. et al. (2018). Size control in mammalian cells "
+                 "involves modulation of both growth rate and cell cycle duration. "
+                 "Nat. Commun. 9:3275.")
+    PARAM_ROLES = {"delta": "volume added per cycle, in units of v_ref"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.delta = float(params.get("delta", 1.0))
+
+    def _trigger(self, v_now, v_birth, jit, age, v_ref):
+        return v_now >= v_birth + self.delta * jit * v_ref
+
+
+@register_operator("cell_divide", model="concerted", set="vertex", kind="structural",
+                   family="population")
+class Divide3DConcerted(Divide3D):
+    """Size AND time together: divide when `w*(v/(factor*jit*v_ref)) + (1-w)*(age/(cycle*jit)) >= 1`.
+
+    THE POINT OF CADART ET AL. IS THAT NEITHER READING ALONE IS WHAT MAMMALIAN CELLS DO. They report
+    size control arising from the modulation of BOTH growth rate and cycle duration, so a rule that
+    consults only volume or only the clock is measuring one half of the mechanism and attributing
+    the whole effect to it. This model makes the mixture explicit and puts its weight in the spec
+    rather than in the choice of which single-quantity model to select.
+
+    THE TWO TERMS ARE EACH NORMALISED TO THEIR OWN THRESHOLD BEFORE THEY ARE MIXED, which is what
+    makes `size_weight` dimensionless and readable: each term is "how far this cell is through the
+    cycle by that measure", 1.0 meaning ready, so the sum crossing 1 means the two readings TOGETHER
+    say ready. Mixing a volume and an age directly would make the weight carry units and its value
+    uninterpretable.
+
+    `size_weight: 1.0` IS EXACTLY THE SIZER AND `0.0` EXACTLY THE TIMER, by construction, so this
+    model contains both as limits and a sweep over one parameter moves continuously between them.
+    That is the reason to have it as well as them and not instead of them: the endpoints stay
+    available under their own names, with their own docstrings and their own citations.
+    """
+    MECHANISM_TAGS = ["division", "size_control", "concerted", "growth_rate_modulation",
+                      "cycle_duration_modulation"]
+    REFERENCE = ("Cadart, C. et al. (2018). Size control in mammalian cells involves modulation of "
+                 "both growth rate and cell cycle duration. Nat. Commun. 9:3275.")
+    PARAM_ROLES = {"size_weight": "weight on the size reading; 1 = sizer, 0 = timer"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.cycle = float(params.get("cycle", 8.0))
+        self.size_weight = float(params.get("size_weight", 0.5))
+
+    def _trigger(self, v_now, v_birth, jit, age, v_ref):
+        w = self.size_weight
+        by_size = v_now / max(self.factor * jit * v_ref, 1e-12)
+        by_time = age / max(self.cycle * jit, 1e-12)
+        return (w * by_size + (1.0 - w) * by_time) >= 1.0
 
 
 @register_operator("topo_record", set="vertex", kind="structural", family="harness")
