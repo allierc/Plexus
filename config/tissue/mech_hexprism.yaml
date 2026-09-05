@@ -1,17 +1,17 @@
 general:
-  name: ab_02_reduction_monolayer
+  name: mech_hexprism
   seed: 0
-  n_frames: 20
+  n_frames: 8
   dt: 1.0
-  record_cap: 24
+  record_cap: 12
   boundary: free
   dim: 3
   world:
-  - 12.0
-  - 12.0
-  - 12.0
+  - 4.0
+  - 4.0
+  - 4.0
 plotting:
-  renderer: vtk_points
+  renderer: vtk_mesh
   background: black
   mesh_style: surface
   mesh_edges: true
@@ -19,10 +19,14 @@ plotting:
   surface_opacity: 1.0
   surface_color: '#cfd8e3'
   fps: 30
-  zoom: 1.6
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    walls: 48
 sets:
   vertex:
-    n: 1024
+    n: 64
     mesh: half_edge
     cell_set: cell
     state:
@@ -40,7 +44,7 @@ sets:
         width: 3
         integration: first_order
   cell:
-    n: 256
+    n: 16
     state:
       area:
         width: 1
@@ -52,40 +56,19 @@ seed:
   model: apicobasal
   at: vertex
   cell_set: cell
-  shape: disc
-  n_cells: 60
-  radius: 5.0
-  centre:
-  - 0.0
-  - 0.0
-  - 1.0
-  jitter: 0.15
+  shape: hexagon
+  n_cells: 1
+  jitter: 0.0
   p0: 3.5
   seed: 0
-  h0: 0.4
+  h0: 1.0
+  radius: 1.0
 operators:
 - op: cell_geometry
   at: cell
-- op: cell_mechanics
-  model: monolayer
-  at: vertex
-  k_v: 4.0
-  kappa_s: 0.2
-  gamma: 0.0
-  Lambda: 0.0
-  K_R: 0.0
-  mu: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-  mono_k: 1.2
-  plane_axis: 2
-  rest_calibration: volume_only
-  h0: 0.4
 - op: topo_record
   at: vertex
   every: 1
 schedule:
 - cell_geometry
-- cell_mechanics
 - topo_record

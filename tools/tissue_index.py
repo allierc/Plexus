@@ -16,9 +16,10 @@ import yaml
 # WHAT EACH GROUP IS, keyed by filename prefix. The prefix is the only grouping the filesystem
 # itself can express, which is why the specs were renamed to carry one.
 GROUPS = [
-    ("ab_",     "the apico-basal ladder, in order -- each rung adds one thing"),
-    ("shape_",  "seed geometry: one hypothesis, several surfaces"),
+    ("mech_",   "the apico-basal mechanics: what a cell is, and whether it reduces"),
+    ("divide_", "what makes a cell divide, and what the tissue does when it does"),
     ("cycle_",  "the cell cycle as per-cell state"),
+    ("shape_",  "seed geometry: one hypothesis, several surfaces"),
     ("apop",    "the okuda apoptosis series, re-seeded on a flat sheet"),
     ("",        "pre-existing okuda runs, left as they were found"),
 ]

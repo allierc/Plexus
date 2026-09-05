@@ -1,15 +1,18 @@
 general:
-  name: ab_05_shell_sep_free
+  name: cycle_phases
   seed: 0
-  n_frames: 80
+  n_frames: 401
   dt: 1.0
-  record_cap: 84
+  record_cap: 403
   boundary: free
   dim: 3
   world:
-  - 16.0
-  - 16.0
-  - 16.0
+  - 50.0
+  - 50.0
+  - 50.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
 plotting:
   renderer: vtk_points
   background: black
@@ -29,7 +32,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 15.0
+    span: 34.0
     walls: 64
     loc:
     - 0.015
@@ -43,13 +46,21 @@ plotting:
     xlabel: frame
     ylabel: cells
     ticks: 4
-  - quantity: area
+  - quantity: volume
     xlabel: frame
-    ylabel: cell area
+    ylabel: cell volume
     ticks: 4
+  scale_bar_corner: right
+  scale_bar_lift: -0.07
+  mesh_color_by: phase
+  phase_colors:
+  - '#3b57c0'
+  - '#2e9e4f'
+  - '#e8b024'
+  - '#e03b2f'
 sets:
   vertex:
-    n: 16384
+    n: 25584
     mesh: half_edge
     cell_set: cell
     state:
@@ -67,27 +78,27 @@ sets:
         width: 3
         integration: first_order
   cell:
-    n: 4096
+    n: 12800
     state:
       area:
         width: 1
       cen:
         width: 3
+      chem:
+        width: 2
+        integration: first_order
 fields: {}
-seed:
-- op: seed_mesh
-  model: apicobasal
-  at: vertex
-  cell_set: cell
-  n_cells: 1280
-  radius: 5.0
-  jitter: 0.18
-  p0: 3.5
-  seed: 0
-  h0: 1.8
 operators:
 - op: cell_geometry
   at: cell
+- op: cell_grow
+  at: vertex
+  cell_set: cell
+  rate: 0.003457
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
 - op: cell_mechanics
   model: apicobasal
   at: vertex
@@ -95,16 +106,59 @@ operators:
   kappa_s: 0.2
   gamma: 0.0
   Lambda: 0.0
-  K_R: 0.0
+  K_R: 0.4
   mu: 1.0
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
   sep_mu: 1.0
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: cell_cycle
+  at: vertex
+  cell_set: cell
+  t_g1: 110.0
+  t_s: 80.0
+  t_g2: 40.0
+  t_m: 10.0
+  g1_size: 1.6
+  phase_cv: 0.15
+  seed: 0
+- op: cell_divide
+  model: cycle
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  cycle_cv: 0.15
+  split_cv: 0.12
 - op: topo_record
   at: vertex
   every: 1
 schedule:
 - cell_geometry
+- cell_grow
 - cell_mechanics
+- edge_flip
+- cell_cycle
+- cell_divide
 - topo_record
+seed:
+- op: seed_mesh
+  at: vertex
+  cell_set: cell
+  n_cells: 200
+  radius: 5.0
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+  model: apicobasal
+  h0: 0.4
