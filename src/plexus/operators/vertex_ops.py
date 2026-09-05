@@ -25,7 +25,7 @@ import numpy as np
 import torch
 from scipy.spatial import SphericalVoronoi
 from plexus.models.base import Lateral, Structural
-from plexus.models.mesh import MeshTable
+from plexus.models.mesh import MeshTable, declare_vertex_carry
 from plexus.models.registry import register_operator
 from plexus.models.base import Rewire
 from plexus.models.topology import (rings_from_flat_3d, flat_from_rings_3d,
@@ -468,6 +468,101 @@ class SeedMesh3D(Structural):
         else:
             lvl._mesh = MeshTable(**seeded)      # spec has no `mesh:` declaration yet
         return {}
+
+
+@register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed",
+                   implementation="apicobasal")
+class SeedMeshApicoBasal(SeedMesh3D):
+    """`apicobasal` IMPLEMENTATION of seed_mesh -- the same epithelium, seeded WITH ITS THICKNESS.
+
+    R2 of the apico-basal promotion, and the whole of it: the representation exists and does not
+    move yet.
+
+    WHAT IT ADDS. One per-vertex block, `sep`, the apico-basal HALF-separation, so that
+
+        apical_i = pos_i + sep_i          basal_i = pos_i - sep_i
+
+    `(pos, sep)` is an invertible linear map on R^6 of `(apical, basal)`, so this IS the full
+    doubled degree-of-freedom set -- it removes the kinematic identity `a_i, b_i = x_i +/- (H_i/2)n_i`
+    that `monolayer_shells` imposes, and nothing else. Apical and basal can now slide past each
+    other, which is what wedging, bottle cells and apical constriction are made of and what the
+    mid-surface hypothesis forbids at every parameter value.
+
+    IT IS AN IMPLEMENTATION AND NOT A MODEL, by this operator's own written test: `shape: sphere |
+    disc` is a VALUE "because a flat patch and a closed shell are the same hypothesis about the
+    tissue seeded into two different geometries", and a thickness at birth is the same kind of
+    statement about the initial condition. The HYPOTHESIS lives in `cell_mechanics[model:
+    apicobasal]` at R3; this only writes x_0. Registering a separate class also leaves the default
+    class untouched, so every existing spec is byte-identical.
+
+    THE SEPARATION IS ALONG THE VERTEX NORMAL, half the cell thickness each way. Vertex normals
+    rather than face normals is the load-bearing choice inherited from `monolayer_design.md`: on a
+    curved sheet it makes the apical and basal caps DIFFER in area, which is what gives bending
+    stiffness ~ kappa_s h^2 without an explicit K_bend. Face normals give parallel caps and no
+    single-cell bending term at all.
+
+    `h0` IS THE FULL CELL THICKNESS, and `sep` is half of it, so that `|a_i - b_i| = h0`. Stated
+    because the monolayer's own `h0` means the same thing and a factor of two here would be
+    invisible until a cap-area ratio came out wrong.
+    """
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.h0 = float(params.get("h0", 0.4))                 # FULL thickness; sep is h0/2
+        self.sep_block = str(params.get("sep_block", "sep"))
+
+    def forward(self, H, mask=None):
+        out = super().forward(H, mask)                         # pos, occ and the mesh table
+        lvl = H.level(self.at)
+        if self.sep_block not in lvl.state_schema:
+            raise ValueError(
+                f"seed_mesh[apicobasal] needs a `{self.sep_block}` block on the {self.at!r} set -- "
+                f"declare it under `sets:` as `{self.sep_block}: {{width: 3, integration: "
+                f"first_order}}`. Without it there is nowhere to put the apico-basal separation and "
+                f"the run would be the mid-surface model wearing a different operator's name.")
+        # THE SPATIAL SCHEMA MUST STILL BE THE SPATIAL SCHEMA. `_resolve_schema` says "the spec
+        # always wins", so a `state:` block REPLACES the set's schema rather than extending it, and
+        # `schema_from_spec` defaults every block to first_order/free. A spec that declares `sep`
+        # and restates `pos` without `boundary: world` runs perfectly well and silently loses the
+        # world clamp -- positions stop being confined and nothing says so. Checked here because
+        # this operator is the only thing that knows the spec meant to keep a spatial set spatial.
+        _coord = lvl.state_schema.coordinate
+        if _coord is None or _coord.name != "pos":
+            raise ValueError(
+                f"seed_mesh[apicobasal]: the {self.at!r} set's coordinate block is "
+                f"{_coord.name if _coord else None!r}, not `pos`. Declaring a `state:` block "
+                f"REPLACES the schema; restate `pos` as "
+                f"{{width: 3, role: coordinate, integration: second_order_coordinate, "
+                f"boundary: world}} alongside `{self.sep_block}`.")
+        if _coord.boundary != "world":
+            raise ValueError(
+                f"seed_mesh[apicobasal]: `pos` has boundary {_coord.boundary!r}, not 'world'. The "
+                f"spec's `state:` block dropped the world clamp -- the run would not be confined "
+                f"and nothing else would say so.")
+        m = getattr(lvl, "_mesh", None)
+        Nv = int(m["Nv"])
+        pos = lvl.get("pos")[:Nv]
+        # THE SAME NORMAL THE ENERGY USES, not a second definition of it. `monolayer_shells`
+        # returns (apical, basal, vertex_normal, vertex_thickness) and its docstring is explicit
+        # about why one formula with two callers beats two copies: "Two copies of 'offset along the
+        # vertex normal by h/2' would agree until one of them changed, and the picture would then
+        # stop being a picture of the model." The thickness argument is a dummy here -- only the
+        # normal is taken -- because at R2 the separation is uniform and `h0` sets it directly.
+        nF = int(m["nF"])
+        _h = torch.full((nF,), self.h0, dtype=pos.dtype, device=pos.device)
+        _a, _b, n, _hv = monolayer_shells(pos, m["E_srce"], m["E_trgt"], m["E_face"], nF, _h)
+        c0, c1 = lvl.state_schema[self.sep_block]
+        st = lvl.state.clone()
+        st[:, c0:c1] = 0.0
+        st[:Nv, c0:c1] = (0.5 * self.h0) * n
+        lvl.state = st
+        # DECLARED FOR THE CARRY, so a vertex born on a septum inherits its parents' separation
+        # instead of the buffer's zero -- a cell of zero height along the seam it just grew.
+        # R1(b) built `carry_vertices`; this is its first real consumer.
+        declare_vertex_carry(m, self.sep_block)
+        print(f"[seed_mesh:apicobasal] {Nv} vertices carry an apico-basal separation of "
+              f"h0/2 = {0.5 * self.h0:g} along the vertex normal (cell thickness {self.h0:g})",
+              flush=True)
+        return out
 
 
 @register_operator("cell_mechanics", set="vertex", kind="lateral", family="mechanics")
@@ -1058,7 +1153,7 @@ class Divide3D(Structural):
         # memo. With no `vertex_carry` declared this walks an empty name list and returns, so every
         # existing spec is byte-identical -- which is the claim R1 has to make and the twin measures.
         if hasattr(m, "carry_vertices") and births:
-            m.carry_vertices(births, dt=dt, dev=dev)
+            m.carry_vertices(births, dt=dt, dev=dev, level=lvl)
         es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
         A0a = np.array([A0[i] for i in keep], np.float64)
         V0fa = np.array([V0f[i] for i in keep], np.float64)
@@ -1774,7 +1869,7 @@ class Apoptosis3D(Structural):
         # memo. With no `vertex_carry` declared this walks an empty name list and returns, so every
         # existing spec is byte-identical -- which is the claim R1 has to make and the twin measures.
         if hasattr(m, "carry_vertices") and births:
-            m.carry_vertices(births, dt=dt, dev=dev)
+            m.carry_vertices(births, dt=dt, dev=dev, level=lvl)
         es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
         def _car(name, arr=None):
             a = (arr if arr is not None else m[name].detach().cpu().numpy().astype(np.float64))

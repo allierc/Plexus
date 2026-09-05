@@ -25,7 +25,10 @@ from __future__ import annotations
 import numpy as np
 import torch
 
+from plexus.models.base import Level
 from plexus.models.mesh import MeshTable, declare_vertex_carry
+from plexus.models.state import (Block, StateSchema, FIRST_ORDER, SECOND_ORDER_COORDINATE,
+                                 SECOND_ORDER_RATE, BOUNDARY_WORLD)
 from plexus.models.topology import divide_face_3d, face_collapse_3d, rings_from_flat_3d
 
 
@@ -213,3 +216,51 @@ def test_cell_divide_carries_a_declared_array_on_a_real_tissue(tmp_path):
             f"h[{i}]={v} exceeds the largest seeded value {seeded_max}, so it is not a blend of "
             f"seeded vertices -- the carry did not run and this is reservoir data")
         assert v >= 0.0
+
+
+def test_carry_reaches_a_level_state_block_not_only_a_mesh_column():
+    """A declared name may live on the LEVEL, not in the mesh table -- and R2 walked into this.
+
+    A per-vertex quantity can be a mesh column or a state block on the Level. The apico-basal
+    separation is the second kind, deliberately: a state block reaches the trajectory through the
+    generic per-set recording path, so it never touches FACE_RECORD/EDGE_RECORD/snapshot() and does
+    not trip the NO NEW RECORDED ARRAYS rule.
+
+    The first `carry_vertices` only looked in the table. `declare_vertex_carry(m, "sep")` succeeded,
+    `m.get("sep")` returned None, the loop skipped it -- SILENTLY -- and every vertex born by
+    division kept the buffer's zero. Measured on `ab_sphere` at 60 frames: all 66 newly born
+    vertices held |sep| = 0.0000 against a seeded 0.2000, which is a cell of zero height along the
+    seam it had just grown. That is the exact failure the carry exists to prevent, so it gets a test
+    that fails without the fix rather than a comment.
+    """
+    schema = StateSchema([
+        Block("pos", 3, role="coordinate", integration=SECOND_ORDER_COORDINATE,
+              boundary=BOUNDARY_WORLD),
+        Block("vel", 3, role="rate", integration=SECOND_ORDER_RATE, boundary="free"),
+        Block("sep", 3, integration=FIRST_ORDER, boundary="free"),
+    ])
+    lvl = Level("vertex", depth=0, state=torch.zeros(6, schema.dim), state_schema=schema)
+    c0, c1 = schema["sep"]
+    lvl.state[0, c0:c1] = torch.tensor([0.0, 0.0, 2.0])
+    lvl.state[1, c0:c1] = torch.tensor([0.0, 0.0, 4.0])
+
+    m = MeshTable()
+    declare_vertex_carry(m, "sep")
+    assert "sep" not in m, "the fixture must NOT put the block in the table -- that is the point"
+
+    m.carry_vertices([(2, (0, 1))], dt=torch.float32, dev="cpu", level=lvl)
+    assert float(lvl.state[2, c1 - 1]) == 3.0, (
+        "the new vertex kept the buffer's zero: the carry looked only in the mesh table")
+    assert float(lvl.state[3, c1 - 1]) == 0.0, "an untouched vertex moved"
+
+
+def test_a_level_block_is_not_needed_when_the_name_is_a_mesh_column():
+    """The table still wins when the name is there, so passing `level` changes nothing else."""
+    m = MeshTable()
+    m["h"] = torch.arange(6.0)
+    declare_vertex_carry(m, "h")
+    schema = StateSchema([Block("pos", 3, role="coordinate",
+                                integration=SECOND_ORDER_COORDINATE, boundary=BOUNDARY_WORLD)])
+    lvl = Level("vertex", depth=0, state=torch.zeros(6, schema.dim), state_schema=schema)
+    m.carry_vertices([(0, (2, 4))], dt=torch.float32, dev="cpu", level=lvl)
+    assert float(m["h"][0]) == 3.0
