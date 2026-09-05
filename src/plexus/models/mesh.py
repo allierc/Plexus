@@ -200,7 +200,13 @@ class MeshTable(dict):
     # EVERY NAME IS OPTIONAL. A run without an inhibitor has no `inhib`; the key is simply absent
     # from the snapshot, and the reader draws nothing -- which is the same None-safe contract
     # `topo_record`'s `cp()` has always had.
-    FACE_RECORD = ("A0", "P0", "V0f", "age", "ndiv", "apop", "inhib", "myo_med")
+    # `phase` JOINS THE LIST BECAUSE A CYCLE THAT CANNOT BE SEEN IS A CYCLE NOBODY WILL CHECK.
+    # `cell_cycle` writes it per face; without it recorded, the renderer draws a uniform tissue and
+    # the only evidence the operator ran is that the cell count went up -- which a timer with no
+    # phases would also produce. `phase_t` is deliberately NOT here: it is the operator's own
+    # bookkeeping, it is reconstructible from `phase` and the frame index, and a recorded array is
+    # a promise to keep it meaningful.
+    FACE_RECORD = ("A0", "P0", "V0f", "age", "ndiv", "apop", "inhib", "myo_med", "phase")
 
     # THE RECORDED NAME IS NOT ALWAYS THE LIVE ONE, and two of the four colours above were lost to
     # exactly that. The operators write `m["apop_flag"]` (`cell_die`) and `m["inhib_frac"]`

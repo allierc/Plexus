@@ -1224,10 +1224,18 @@ class Divide3D(Structural):
         ndiv = ([0] * nF) if (ndiv is None or ndiv.shape[0] != nF) else ndiv.detach().cpu().numpy().tolist()
         # volume-primary + bounded duration: divide if (2x volume AND old enough) OR (past max cycle length)
         v_ref = float(m.get("v_ref", 1.0))                       # SEED-TIME MEDIAN cell volume
+        # A MODEL MAY ANSWER FROM THE TABLE INSTEAD OF FROM THE FOUR SCALARS. `_trigger` sees
+        # (v_now, v_birth, jit, age, v_ref) and that is the right interface for every rule that
+        # reads size or time -- but `model: cycle` reads a PHASE another operator owns, which is not
+        # among them. `_ready_mask` is the opt-in: a model that defines it gets one per-face boolean
+        # computed once, and every model that does not is untouched.
+        _mask = self._ready_mask(m, nF) if hasattr(self, "_ready_mask") else None
+
         def _ready(f):
             if rings[f] is None or len(rings[f]) < 4 or alive[f] <= 0:
                 return False
-            vol_ok = self._trigger(vf[f], Vbirth[f], djit[f], age[f], v_ref)
+            vol_ok = bool(_mask[f]) if _mask is not None else \
+                self._trigger(vf[f], Vbirth[f], djit[f], age[f], v_ref)
             return (vol_ok and age[f] >= self.min_cycle) or (age[f] >= self.max_cycle)
         cand = [f for f in range(nF) if _ready(f)]
         # THE POPULATION CEILING, and it is a HARD STOP rather than a throttle. Once the tissue has
@@ -2323,6 +2331,258 @@ class Divide3DTimer(Divide3D):
         return age >= self.cycle * jit
 
 
+@register_operator("cell_cycle", set="vertex", kind="structural", family="population")
+class CellCycle3D(Structural):
+    """G1 -> S -> G2 -> M as per-cell STATE, advanced by a declared rule. It divides nothing.
+
+    WHY THIS IS ITS OWN CONTRACT AND NOT A `model:` OF `cell_divide`, by this repo's own two tests.
+    `cell_divide._trigger`'s docstring says "THE ONLY THING A `model=` VARIANT OF cell_divide
+    CHANGES" is the trigger, and a four-phase machine is not a trigger -- it is state, transitions
+    and its own couplings. And AXES.md's second test is decisive: "a variant that needs a second SET
+    or a second state BLOCK is making a different claim". A cycle needs `phase`. So it cannot live
+    on that contract, and the split is the same one already drawn between `cell_grow` (what the cell
+    ASKS for) and `cell_divide` (what the topology DOES): this operator says when a cell is ready,
+    `cell_divide[model: cycle]` performs the division.
+
+        phase    0 = G1, 1 = S, 2 = G2, 3 = M
+        phase_t  frames spent in the current phase
+
+    THE PHASE DURATIONS ARE NOT EQUAL AND THE DEFAULTS SAY SO. A mammalian cycle of about 24 h runs
+    roughly G1 11 h, S 8 h, G2 4 h, M 1 h, so the defaults are in that proportion (110/80/40/10 of
+    240 frames). It matters for more than realism: **G1 is where nearly all the variability lives**,
+    and every model below differs ONLY in how a cell leaves G1. S, G2 and M are clocks in all of
+    them, which is what the measurements report and also what makes the models comparable -- one
+    transition changes, so a difference between two runs has one possible cause.
+
+    WHAT THE DAUGHTERS INHERIT, AND THE TRAP IN IT. `m["face_carry"]` reindexes a declared per-face
+    array through division, death and T1, and its docstring is explicit that `keep` COPIES the
+    parent's value onto BOTH daughters -- so what is carried must be INTENSIVE. `phase` (a label)
+    and `phase_t` (a time) are; an inhibitor AMOUNT would not be, and would double at every
+    division. That is why `inhibitor_dilution` below stores a CONCENTRATION and dilutes it by the
+    volume ratio, which is also the physically right thing: halving the volume and halving the
+    amount leaves the concentration where it was.
+
+    RESET IS DETECTED, NOT SIGNALLED. A cell that has just divided is the one carrying `age == 0`
+    while its inherited phase is still M -- `cell_divide` zeroes `age` for both daughters and the
+    carry copies M onto them -- so the reset needs no second channel between the two operators and
+    cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.
+    """
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
+    MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "phase_progression", "restriction_point",
+                      "size_checkpoint"]
+    REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
+                 "size. Science 348:1245075 (the G1 size checkpoint); Schmoller, K.M. et al. "
+                 "(2015). Dilution of the cell-cycle inhibitor Whi5 controls budding-yeast cell "
+                 "size. Nature 526:268-272; Zatulovskiy, E. et al. (2020). Cell growth dilutes the "
+                 "cell cycle inhibitor Rb to trigger cell division. Science 369:466-471; "
+                 "Smith, J.A. & Martin, L. (1973). Do cells cycle? PNAS 70:1263-1267.")
+    PARAM_ROLES = {"t_g1": "G1 duration, frames", "t_s": "S duration, frames",
+                   "t_g2": "G2 duration, frames", "t_m": "M duration, frames",
+                   "g1_size": "G1 exit threshold, in units of v_ref",
+                   "phase_cv": "per-cell CV on the phase durations"}
+    G1, S, G2, M = 0, 1, 2, 3
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.t = [float(params.get("t_g1", 110.0)), float(params.get("t_s", 80.0)),
+                  float(params.get("t_g2", 40.0)), float(params.get("t_m", 10.0))]
+        self.g1_size = float(params.get("g1_size", 1.6))
+        self.phase_cv = float(params.get("phase_cv", 0.0))
+        self.every = _engine_owns_clock(params, default=1)
+        self.seed = int(params.get("seed", 0))
+        self._rng = np.random.default_rng(self.seed + 4242)
+
+    # ------------------------------------------------------------------ the rule
+    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
+        """G1 -> S. THE ONLY TRANSITION A MODEL CHANGES; the base is the size checkpoint.
+
+        A cell leaves G1 when it is big enough, not when it is old enough: this is the restriction
+        point in mammalian cells and Start in budding yeast, and it is the transition Ginzberg et al.
+        review as the one that has to be read on an ABSOLUTE scale for size control to work at all.
+        `g1_size` is therefore in units of `v_ref`, the seed-time median cell volume, exactly as
+        `cell_divide.factor` and `.delta` are.
+        """
+        return v_now >= self.g1_size * v_ref
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        nF = int(m["nF"]); dev = lvl.state.device; dt = lvl.state.dtype
+        _np = lambda k: (m[k].detach().cpu().numpy().astype(np.float64)     # noqa: E731
+                         if k in m and m[k] is not None else None)
+        ph = _np("phase"); pt = _np("phase_t"); cc = _np("cyc_inhib")
+        if ph is None or len(ph) != nF:
+            ph = np.zeros(nF); pt = np.zeros(nF); cc = np.ones(nF)
+        if pt is None or len(pt) != nF:
+            pt = np.zeros(nF)
+        if cc is None or len(cc) != nF:
+            cc = np.ones(nF)
+        # DECLARED ONCE, CARRIED BY THE TOPOLOGY FROM THEN ON -- see `_carry_face_state`.
+        m.setdefault("face_carry", set()).update({"phase", "phase_t", "cyc_inhib"})
+
+        _, _, _, vf = face_geometry_3d(lvl.get("pos")[:int(m["Nv"])].detach(),
+                                       m["E_srce"], m["E_trgt"], m["E_face"], nF)
+        v_now = vf.detach().cpu().numpy().astype(np.float64)
+        v_ref = float(m.get("v_ref", 1.0))
+        age = _np("age")
+        # THE RESET: just divided = age 0 while still carrying the mother's M. See the class note.
+        if age is not None and len(age) == nF:
+            born = (age <= 0) & (ph >= self.M)
+            ph[born] = self.G1; pt[born] = 0.0; cc[born] = 1.0
+        # DILUTION IS APPLIED TO EVERY CELL EVERY FRAME, whatever the model, because it is a
+        # statement about volume and not about the rule: a concentration in a growing cell falls.
+        vp = _np("cyc_vprev")
+        if vp is not None and len(vp) == nF:
+            cc = cc * np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0)
+        m["cyc_vprev"] = torch.as_tensor(v_now, dtype=dt, device=dev)
+        m.setdefault("face_carry", set()).add("cyc_vprev")
+
+        jit = _np("divjit")
+        jit = np.ones(nF) if jit is None or len(jit) != nF else jit
+        cvj = (1.0 + self.phase_cv * self._rng.standard_normal(nF)).clip(0.4, 1.8) \
+            if self.phase_cv > 0 else np.ones(nF)
+        pt = pt + 1.0
+        adv = np.zeros(nF, bool)
+        g1 = ph <= self.G1
+        if g1.any():
+            adv[g1] = self._leave_g1(v_now[g1], v_ref, pt[g1], self.t[0] * jit[g1] * cvj[g1],
+                                     cc[g1])
+        for k in (self.S, self.G2):
+            sel = ph == k
+            if sel.any():
+                adv[sel] = pt[sel] >= self.t[k] * jit[sel] * cvj[sel]
+        # M IS NOT ADVANCED HERE. A cell leaves M by DIVIDING, which is `cell_divide[model: cycle]`'s
+        # business; advancing it here would let a tissue with no divide operator cycle for ever
+        # while never making a cell, which is a population model that silently is not one.
+        ph = np.where(adv, np.minimum(ph + 1, self.M), ph)
+        pt = np.where(adv, 0.0, pt)
+        m["phase"] = torch.as_tensor(ph, dtype=dt, device=dev)
+        m["phase_t"] = torch.as_tensor(pt, dtype=dt, device=dev)
+        m["cyc_inhib"] = torch.as_tensor(cc, dtype=dt, device=dev)
+        return {}
+
+
+@register_operator("cell_cycle", model="timer", set="vertex", kind="structural", family="population")
+class CellCycleTimer(CellCycle3D):
+    """Every phase on a clock, G1 included: the NULL against which a checkpoint has to be an
+    improvement.
+
+    A cell leaves G1 after `t_g1` frames whether or not it has grown, so nothing in the cycle reads
+    size and nothing corrects a size deviation. It is here for the same reason `cell_divide[timer]`
+    is: paired with a growth rule that guarantees size, it is the strongest homeostasis available,
+    and alone it is the weakest. Which of the two it is depends entirely on what else is scheduled,
+    and that is worth being able to say out loud in a spec.
+    """
+    MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "timer", "size_independent"]
+
+    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
+        return phase_t >= tg1
+
+
+@register_operator("cell_cycle", model="transition_probability", set="vertex", kind="structural",
+                   family="population")
+class CellCycleTransitionProbability(CellCycle3D):
+    """Smith & Martin: G1 is not a duration, it is a CONSTANT HAZARD of starting.
+
+    Their observation was that cycle-time distributions are not bell-shaped -- they have a sharp
+    minimum and a long exponential tail -- and that this is what a random transition out of an
+    indeterminate "A state" produces, with the remaining phases a near-fixed "B phase". So the model
+    is: leave G1 with probability `p_g1` per frame, independent of how long the cell has waited.
+
+        P(still in G1 after k frames) = (1 - p_g1)^k        mean wait 1/p_g1 frames
+
+    IT IS MEMORYLESS AND THAT IS THE CLAIM, not a convenience: a cell that has been in G1 for a long
+    time is no more likely to leave than one that just arrived, which is exactly what distinguishes
+    it from `timer` and what the tail of the distribution is evidence for. `p_g1` defaults to
+    1/`t_g1`, so the MEAN G1 matches the timer's fixed G1 and the two differ only in shape.
+
+    Drawn from this operator's own generator, so a run is reproducible under
+    `PLEXUS_STRICT_DETERMINISM` for a given `seed`.
+    """
+    MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "transition_probability", "memoryless",
+                      "stochastic_start"]
+    REFERENCE = "Smith, J.A. & Martin, L. (1973). Do cells cycle? PNAS 70:1263-1267."
+    PARAM_ROLES = {"p_g1": "per-frame probability of leaving G1; default 1/t_g1"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.p_g1 = float(params.get("p_g1", 1.0 / max(self.t[0], 1.0)))
+
+    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
+        return self._rng.random(np.shape(v_now)) < self.p_g1
+
+
+@register_operator("cell_cycle", model="inhibitor_dilution", set="vertex", kind="structural",
+                   family="population")
+class CellCycleInhibitorDilution(CellCycle3D):
+    """The size checkpoint with a MECHANISM under it: an inhibitor, diluted by growth, crossing a
+    threshold.
+
+    A sizer has to answer "how does a cell know its own size", and the measured answer in two
+    systems is that it does not -- it reads the CONCENTRATION of an inhibitor that was synthesised
+    in a size-independent amount. Schmoller et al. showed this for Whi5 in budding yeast and
+    Zatulovskiy et al. for Rb in mammalian cells: the amount made per cycle does not scale with the
+    cell, so a small cell starts G1 with a HIGHER concentration, growth dilutes it, and Start fires
+    when it falls past a threshold. A big cell begins closer to the threshold and starts sooner,
+    which is a sizer without anything measuring size.
+
+        c <- c * (v_prev / v_now)     every frame, for every cell   (dilution, in the base class)
+        leave G1 when c <= inhib_thresh
+
+    THE CONCENTRATION IS THE STATE AND THE AMOUNT IS NOT, which is forced by `face_carry`: `keep`
+    copies a parent's value onto both daughters, so an amount would DOUBLE at every division. It is
+    also the physically correct choice -- halving the volume and halving the amount leaves the
+    concentration unchanged -- so the two daughters inherit the mother's concentration and the reset
+    to 1.0 at birth represents the size-independent synthesis burst, not a bookkeeping convenience.
+
+    This is `cell_divide[model: inhibitor_dilution]`'s missing half: as a division rule alone the
+    idea collapses into the sizer, because a fixed amount diluted to a fixed threshold is just a
+    constant absolute volume. It only becomes a distinct hypothesis once something owns the
+    inhibitor across the cycle, which is what this operator does.
+    """
+    MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "inhibitor_dilution", "size_control",
+                      "restriction_point", "mechanistic_sizer"]
+    REFERENCE = ("Schmoller, K.M., Turner, J.J., Koivomagi, M. & Skotheim, J.M. (2015). Dilution of "
+                 "the cell-cycle inhibitor Whi5 controls budding-yeast cell size. Nature "
+                 "526:268-272; Zatulovskiy, E., Zhang, S., Berenson, D.F., Topacio, B.R. & "
+                 "Skotheim, J.M. (2020). Cell growth dilutes the cell cycle inhibitor Rb to trigger "
+                 "cell division. Science 369:466-471.")
+    PARAM_ROLES = {"inhib_thresh": "concentration at which G1 ends, relative to its value at birth"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.inhib_thresh = float(params.get("inhib_thresh", 0.6))
+
+    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
+        return conc <= self.inhib_thresh
+
+
+@register_operator("cell_divide", model="cycle", set="vertex", kind="structural", family="population")
+class Divide3DCycle(Divide3D):
+    """Divide when `cell_cycle` says the cell is in M. The trigger reads a phase and nothing else.
+
+    THIS IS THE HALF OF THE SPLIT THAT DOES THE TOPOLOGY. Every other model on this contract answers
+    "has this cell earned a division" from volume or age directly; this one delegates that question
+    to the operator that owns the cycle, and asks only whether the answer is yes. Scheduling it
+    without `cell_cycle` divides nothing at all -- there is no `phase` on the table and the trigger
+    is false for every cell -- which is the honest failure for a spec that asked for a cycle-driven
+    tissue and did not schedule the cycle.
+    """
+    MECHANISM_TAGS = ["division", "cell_cycle", "mitosis", "phase_gated"]
+
+    def _trigger(self, v_now, v_birth, jit, age, v_ref):
+        return False                                    # replaced wholesale in forward, below
+
+    def _ready_mask(self, m, nF):
+        ph = m.get("phase")
+        if ph is None:
+            return np.zeros(nF, bool)
+        a = ph.detach().cpu().numpy() if hasattr(ph, "detach") else np.asarray(ph)
+        return (np.asarray(a, np.float64)[:nF] >= CellCycle3D.M)
+
+
 @register_operator("cell_divide", model="adder", set="vertex", kind="structural", family="population")
 class Divide3DAdder(Divide3D):
     """Divide once the cell has ADDED a constant volume since birth: `v >= v_birth + delta*jit*v_ref`.
@@ -2458,7 +2718,7 @@ class TopoSnapshot3D(Structural):
             # that only existed inside one frame's forward pass, and "where is growth stopped" is
             # the whole point of an inhibitor -- an invisible mechanism is one nobody can check.
             # None-safe, so a run without an inhibitor records None and the renderer draws nothing.
-            inhib=cp("inhib_frac"),
+            inhib=cp("inhib_frac"), phase=cp("phase"),
             # THE CONSERVATION LAW'S OWN ERROR TERM. Material a dying cell could not bequeath
             # without pushing a neighbour out of the integrator's basin is dropped and counted
             # here rather than injected. It must be ~0 on a healthy run; a large value says the

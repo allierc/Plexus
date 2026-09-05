@@ -1,11 +1,8 @@
-# The apico-basal promotion, as pictures
+# `config/tissue` -- the apico-basal promotion, as pictures
 
-Eight runs that walk the promotion from R1 to where it stands, so it can be checked by eye instead
-of only through the gate tables. Specs here in `config/tissue/`, movies in
-`graphs_data/tissue/<name>/movie.mp4` (plus `movie_kburns.mp4`, a slow orbit of the same run, and
-`3d.png`, the last frame).
-
-Generate any of them with:
+Runs that exist to be WATCHED, so the promotion can be checked by eye and not only through the gate
+tables. Specs here; movies in `graphs_data/tissue/<name>/movie.mp4`, beside `movie_kburns.mp4` (a
+slow orbit of the same run) and `3d.png` (the last frame).
 
 ```bash
 cd /workspace/Plexus
@@ -15,145 +12,170 @@ PYTHONPATH=src PLEXUS_STRICT_DETERMINISM=1 MPLBACKEND=Agg \
 ```
 
 **These are not gates.** No thresholds, no grading, no `_gate:` block -- the gates are in
-`config/gates/gate_ab_*.yaml` and the numbers are theirs. These exist to make the thing visible.
+`config/gates/gate_ab_*.yaml` and the numbers are theirs. These make the thing visible.
+
+Four groups, and the prefix says which:
+
+| prefix | what it is |
+|---|---|
+| `ab_01` .. `ab_08` | the promotion's ladder, in order -- each rung adds one thing |
+| `shape_*` | the seed-geometry gallery: one hypothesis, several surfaces |
+| `cycle_*` | the cell cycle as per-cell state |
+| `apop_*` | the okuda apoptosis series, re-seeded on a flat sheet |
+
+`b_star`, `r010_00_ctrl` and `r020_00_ctrl` predate this work and are left alone.
 
 ---
 
-## WHAT THE RENDERER DRAWS, AND WHY IT HAD TO CHANGE
+## What the renderers draw, and why both had to change
 
-`mesh_of`'s docstring has always called what it builds "the apical shell", and on a mid-surface run
-that was a figure of speech: there is one surface and it is the only thing there is to draw. This
-promotion makes it literal -- apical `= pos + sep`, basal `= pos - sep`, with `sep` a free per-vertex
-vector -- **and the renderer was still drawing the mid-surface.** A run where the separation did
-nothing and a run where it did everything produced the same picture, so the one thing the model adds
-was the one thing that could not be seen. `live_movie._mono_shell_frame` records that exact defect
-one level down, for the monolayer against a mid-surface run; it had returned one level up.
+`mesh_of`'s docstring has always called what it builds "the apical shell". On a mid-surface run that
+is a figure of speech -- there is one surface and it is the only thing to draw. This promotion makes
+it literal (apical `= pos + sep`, basal `= pos - sep`) **and the renderer was still drawing the
+mid-surface**, so a run where the separation did nothing and one where it did everything produced
+the same picture. `live_movie._mono_shell_frame` records that exact defect one level down; it had
+come back one level up.
 
-Two changes, both no-ops for every run that has no `sep`:
+Both fixes are no-ops for a run with no `sep`:
 
-* `render_vtk.py` -- the trajectory reader offsets the drawn surface to `pos + sep` when the run
-  carries a separation. So `ab_01`-`ab_06` show **the real apical surface**, not the mid-surface.
-* `live_movie.py` -- the cross-section's two shells are built from `sep` itself (direction
-  `sep/|sep|`, length `2|sep|`) instead of from `monolayer_shells`, which rebuilds a UNIFORM shell
-  from a single scalar mean thickness. A wedged cell, a bottle cell and a flat one would otherwise
-  all have drawn identically.
+* `render_vtk.py` -- the trajectory reader offsets the drawn surface to `pos + sep`.
+* `live_movie.py` -- the cross-section builds its two shells from `sep` itself rather than from
+  `monolayer_shells`, which rebuilds a UNIFORM shell from one scalar mean thickness. A wedged cell,
+  a bottle cell and a flat one would otherwise draw identically.
 
----
-
-## THE EIGHT
-
-### `ab_01_span_carried` -- R1/R2: the representation exists, and it is still
-200 cells, `h0: 0.4`, 60 frames. The **mid-surface** mechanics, unchanged, while every vertex carries
-a `sep` that nothing reads. Growth, division and T1 all run.
-
-*What to look for:* an ordinary growing vesicle. The point is that it is ordinary -- the doubled
-degree-of-freedom set rides through division and T1 without changing the tissue. The rung's real
-content is the carry, and the carry is checked by a number (`apicobasal_span_zero_fraction`), not by
-eye: at R2 every vertex born by division silently kept `sep = 0`, 66 of 462 of them, on a run that
-looked exactly like this one.
-
-### `ab_02_flat_apicobasal` + `ab_02_flat_monolayer` -- R3: the reduction identity
-A flat disc patch of 60 cells, 20 frames, the SAME seed, differing in one key: `model: apicobasal`
-against `model: monolayer`.
-
-*What to look for:* **the two movies should be the same movie.** On a flat patch with `sep` frozen at
-`(h0/2)n` the two caps are parallel planar copies of the ring, the polyhedron is a right prism, its
-volume is exactly the incumbent's `A_mid * h`, and the two models must therefore produce the same
-force. Play them side by side; any visible difference is a real difference. The gate measures it at
-7.85e-7 of a junction length over the first frame.
-
-### `ab_03_hexprism` -- R3: the one solid whose answer is on paper
-A single regular hexagon of side 1, thickness 1, 8 frames. Small and dull to watch, and that is the
-point: it is the only object in this promotion whose shape index is known analytically,
-`s = 3sqrt3 + 6` over `(3sqrt3/2)^(2/3)` = 5.924261377933605.
-
-**IT CARRIES NO `cell_mechanics`, DELIBERATELY, AND THE FIRST VERSION OF THIS SPEC DID.** The rung's
-claim is about the GEOMETRY -- that the promotion's volume and surface, evaluated on a solid whose
-answer is on paper, give that answer -- and nothing about that claim needs the tissue to move. All
-nine frames read side 1.00000, `A_mid` 2.59808, `V` 2.59808, `S` 11.19615 and `s` 5.924261, which
-are the analytic values exactly.
-
-Adding the flat patch's mechanics to it **collapsed the cell to a point in the first pass** -- side
-1.0 to 0.0126 to 0, volume to zero, a black frame -- for a reason worth keeping: the hexagon's six
-vertices are all at `z = 0` and `V0f` is the ORIGIN-REFERENCED wedge volume, which is identically
-0.0 for a polygon whose own plane contains the origin. So `V_eq = mono_k * 0 = 0`, the volume term
-asks for a cell of zero volume and the surface tension delivers one. It is the same trap recorded
-for the disc patch, which is why `ab_02` seeds at `centre: [0, 0, 1]` and not at the origin.
-
-*What to look for:* a clean hexagonal prism that does not change. If it ever does, the geometry has
-moved under a spec that asks nothing of it.
-
-### `ab_04_curved_frozen` -- R4: curvature, separation still frozen
-320 cells on a CLOSED shell of radius 5, 20 frames, `sep_mu: 0`. **Rendered through the
-`mesh_mpm_spheroid_nominal` picture** -- `vtk_points` with a cut plane, a box frame and two curve
-panels -- rather than as a bare surface, because a surface render of a shell shows only its outside
-and cannot say whether there is anything behind it.
-
-*What to look for:* the **cross-section inset, top left**. Apical in red on the outside, basal in
-blue on the inside, white radial ticks for the lateral walls between them. That ring is the whole
-promotion in one picture: two surfaces and a wall, where the incumbent has one surface and a number.
-The main view is a clean faceted sphere that relaxes and stays spherical.
-
-Measured on this run, and the section is faithful to it: mid-surface radius 5.000, apical shell
-5.200, basal shell 4.800, so the two are exactly `+/- h/2` about the mid-surface at `h = 0.4000`.
-Euler is 2 at every frame, asphericity stays under 0.003, and the measured apical:basal cap ratio is
-1.1735 against the closed form `((R + h/2)/(R - h/2))^2 = 1.1736` -- four decimal places, which is
-AB-C3.
-
-This is also the rung that measures the prism correction the mid-surface model drops
-(`V/(A_mid h) -> 1 + h^2/12R^2`), and the gate's guard rows exist because that closed form is only
-meaningful while the shell IS a sphere.
-
-### `ab_05_thickshell_free` -- R5: the separation becomes a solver outcome
-1280 cells, `h0: 1.8`, **`sep_mu: 1.0`**, 80 frames. The first rung where the thickness is solved
-rather than declared.
-
-*What to look for:* the surface is visibly lumpy by the end. **That lumpiness is the shell buckling,
-which is real, and not the caps crumpling, which was a defect and is fixed** -- see below. The
-thickness settles near 0.87 from a seeded 1.8 and is still drifting slowly at frame 80.
-
-### `ab_06_population` -- R6: everything at once
-The same tissue with `cell_grow`, `cell_divide`, `cell_die[crowded]` and `edge_flip` all running,
-120 frames. **This rung is not graded yet** -- `config/gates/gate_ab_population.yaml` is written and
-has never been run.
-
-*What to look for:* cells dividing and the tissue growing while the mesh stays a closed, trivalent,
-Euler-2 surface. The claim of the rung is that the whole topology stack survives the doubling
-verbatim, with only the vertex carry added.
-
-### `ab_07_section_thickshell` -- the thickness itself
-The same run as `ab_05`, rendered through the OTHER renderer so the cross-section overlay draws the
-apical and basal surfaces and the wall between them.
-
-*What to look for:* the wall thickness around the section, and whether it is smooth or speckled. This
-is the view that shows what the promotion added; the others show a surface.
+The section then drew the mid-surface twice more before it was clean: once as a bright ring between
+apical and basal, once as the particle scatter, whose points ARE the mesh vertices. Hence
+`cross_section.mid`, `mid_color`, `wall_color` and `points`.
 
 ---
 
-## THE DEFECT THESE PICTURES WERE ABOUT TO SHOW, AND THE FIX
+## The ladder
 
-While building `ab_06` the free separation was found to be **unstable**, and the cause was in the
-energy, not the population operators. `apicobasal_geometry_3d` measured each cell's VOLUME by fanning
-the cap from its centroid -- correct -- while measuring that cap's AREA as `||Newell||`, the area of
-the ring's PLANAR PROJECTION. Those are two different surfaces. A crumpled cap and a flat one with
-the same outline have the same Newell area, so **surface tension did not resist crumpling at all**,
-and `sep` relaxed downhill into a checkerboard.
+### `ab_01_span_carried` -- the representation exists, and it is still
+200 cells, `h0: 0.4`, 60 frames, the **mid-surface** mechanics unchanged while every vertex carries a
+`sep` nothing reads. Growth, division and T1 all run.
 
-The fix measures each cap on the surface its volume is measured on: the same centroid fan, summed as
-true triangle areas. No new term, no new parameter, and on a planar convex ring the two agree
-exactly -- which is why the flat patch (`ab_02`) and the hexagonal prism (`ab_03`) never noticed and
-a curved shell did.
+*What to look for:* an ordinary growing vesicle -- the point is that it is ordinary. The rung's real
+content is a number, not a picture: 33 divisions made exactly 66 new vertices and **every one got a
+span** (zero-span fraction 0.000% at every frame). At R2 they silently kept `sep = 0`, 66 of 462, on
+a run that looked exactly like this one. The shortest span, 0.196999 against a seeded 0.2, is the
+carry's own arithmetic: a new vertex takes the MEAN of its parents' span vectors, and the mean of two
+unit vectors θ apart is shorter by `cos(θ/2)`.
 
-Measured on this spec at 80 frames, before and after:
+### `ab_02_reduction_apicobasal` + `ab_02_reduction_monolayer` -- the reduction identity
+A flat disc of 60 cells, 20 frames, the SAME seed, differing in one key: `model: apicobasal` against
+`model: monolayer`.
 
-| | thickness correlation across an edge | thickness cv | median thickness | within-cell cv vs between-cell |
-|---|---|---|---|---|
-| Newell cap area | +0.12 -> **-0.42** (checkerboard) | 0.021 -> **1.199** | 1.428 -> **0.237** | 1.187 vs 0.236 |
-| fan cap area | +0.71 -> **+0.46** (smooth) | 0.015 -> **0.052** | 1.428 -> 0.866, levelling | **0.038 vs 0.031** |
+*What to look for:* **the two movies should be the same movie.** On a flat patch with `sep` frozen the
+caps are parallel planar copies of the ring, the polyhedron is a right prism, its volume is exactly
+the incumbent's `A_mid * h`. Measured over the first frame: **7.85e-07** of a junction length, one
+float32 ulp. Over twenty frames they separate to 4.4e-2 -- not a defect but a tangential instability
+amplifying at ~1.3x per gradient step, which is why the gate row is windowed and the whole-run form
+is `known_red`.
 
-Neighbouring vertices correlate instead of anti-correlating, the thickness field stays smooth and
-nearly uniform, and the median settles instead of collapsing. **Every movie here was rendered with
-the fix in place.**
+### `ab_03_hexprism_analytic` -- the one solid whose answer is on paper
+A single regular hexagon, side 1, height 1. Small and dull, deliberately: it is the only object here
+whose shape index is known analytically, `(3sqrt3 + 6) / (3sqrt3/2)^(2/3) = 5.924261377933605`. All
+nine frames read side 1.00000, `A_mid` 2.59808, `V` 2.59808, `S` 11.19615, `s` 5.924261.
 
-`AB_STATE_2026-09-05.md` has the rest, including the one thing that matters most: **no gate has been
-re-run against the fixed energy**, so every table under `log/gates/` is stale.
+**IT CARRIES NO `cell_mechanics`, AND THE FIRST VERSION DID.** Adding the flat patch's mechanics
+collapsed the cell to a point in the first pass -- side 1.0 to 0.0126 to 0, a black frame -- because
+the hexagon's six vertices are all at `z = 0` and `V0f` is the ORIGIN-REFERENCED wedge volume, which
+is identically 0.0 for a polygon whose own plane contains the origin. `V_eq = mono_k * 0 = 0`, so the
+volume term asks for a cell of zero volume and the surface tension delivers one. Same trap as the
+disc patch, which is why `ab_02` seeds at `centre: [0, 0, 1]`.
+
+*What to look for:* a clean hexagonal prism that does not change. If it changes, geometry moved under
+a spec that asks nothing of it.
+
+### `ab_04_shell_sep_frozen` -- curvature, separation frozen
+320 cells on a closed shell of radius 5, `sep_mu: 0`. Rendered through the
+`mesh_mpm_spheroid_nominal` picture -- `vtk_points`, cut plane, box frame, curve panels -- because a
+surface render of a shell shows only its outside.
+
+*What to look for:* the **cross-section inset**. Apical red outside, basal blue inside, white rungs
+for the lateral walls. That ring is the promotion in one image: two surfaces and a wall, where the
+incumbent has one surface and a scalar. Mid-surface radius 5.000, apical 5.200, basal 4.800 -- exactly
+`+/- h/2` at `h = 0.4000` -- Euler 2 throughout, and the measured cap ratio 1.1735 against the closed
+form 1.1736, which is gate row AB-C3.
+
+### `ab_05_shell_sep_free` -- the separation becomes a solver outcome
+1280 cells, `h0: 1.8`, `sep_mu: 1.0`, 80 frames. The first rung where thickness is solved.
+
+*What to look for:* the surface is lumpy by the end. **That is the shell buckling, which is real, and
+not the caps crumpling, which was a defect and is fixed.** Thickness settles 1.428 -> 0.866 with
+neighbour correlation staying positive (+0.46) and spread cv 0.052. Under the old Newell cap area the
+same run went to a checkerboard: correlation **-0.42**, cv **1.199**, median collapsing to 0.237.
+
+### `ab_06_divide_sparse` -- division that is sparse in time and across cells
+The same shell with `edge_flip`, `cell_grow` and clock-driven `cell_divide`, 480 frames.
+
+*What to look for:* divisions arriving in a trickle, not a wave -- 96 of 480 frames carry one, the
+largest adding 185 cells of ~1300. **The synchrony this fixes was `vseed_cv`**, which spreads the
+division THRESHOLD and is a phase only for a rule that reads size; a clock-driven tissue divided
+1279 of 1280 cells in a single frame however wide it was. `age_seed` spreads the cell-cycle PHASE,
+which is the quantity a clock reads.
+
+### `ab_07_divide_uniform_volume` -- the pairing that should uniformise, and does not
+`cell_grow[model: timer]` with `cell_divide[model: timer]`: growth drives every cell to one target in
+`cycle_frames`, so a clock-fired division should find them all the same size.
+
+*What to look for:* division from frame 3 (the phase spread working) but a cell-volume cv that goes
+0.18 -> 0.53 by frame 40 and sits near 0.61. **Recorded, not fixed.** The timer controller drives
+`V0f`, a WEDGE target, while the polyhedron volume also carries the thickness, so a uniform wedge
+target is not a uniform cell.
+
+### `ab_08_growing_ball` -- the twin of `gate_00_spheroid`, and it stays round
+Built from `G_gates_gate_00_spheroid_B`'s own spec: same seed, same `cell_grow`, same sizer
+`cell_divide`, same `edge_flip`, same 401 frames, same units, same `K_R: 0.4`. Three changes -- the
+apicobasal seed, the apicobasal mechanics at `sep_mu: 1.0`, and `junction_myosin`/`junction_sync`
+dropped because that energy has no myosin term.
+
+*What to look for:* **a smooth uniform ball**, against the lobed shells of ab_06/07. The difference is
+`K_R`. Nothing else holds a shell spherical, and buckling satisfies the cells' volume term more
+cheaply than inflating does -- inflating costs surface area, corrugating at fixed area costs nothing.
+Measured on ab_07 at frame 480, the cells held **1.93x** what a smooth shell of that radius and
+thickness can contain, with asphericity tracking it 0.002 -> 0.199.
+
+---
+
+## The shape gallery
+
+`shape_ribbon`, `shape_moebius`, `shape_plane` -- 400 cells, the apicobasal energy with `sep` free.
+A shape is a plain VALUE on `seed_mesh`, by AXES.md's own example: the same hypothesis about the
+tissue, seeded into a different geometry.
+
+The periodic ones are **stitched, not cut** -- the point set is tiled at `u +/- L` and coincident
+vertices merged, so `edge_flip` can cross the join. Verified by the only test that separates a
+stitched band from a bent strip, the boundary-loop count: **ribbon 2 rims (255, 255), moebius exactly
+1 (261), plane 1 (236).** A cylinder has two, a Moebius band has one.
+
+**`shape_moebius` is not decoration.** It is the one seed here on which "apical" is not globally
+definable: the surface is non-orientable, so a normal carried once around comes back reversed and any
+model assuming a consistent outward side must fail somewhere. Gate row AB-B1 counts exactly that.
+Whether it actually bites has NOT been measured yet.
+
+---
+
+## The cell cycle
+
+`cycle_g1_s_g2_m` -- `ab_08_growing_ball` with `cell_cycle` owning G1/S/G2/M and
+`cell_divide[model: cycle]` doing nothing but the topology.
+
+*What to look for:* **the colours**, which are the textbook ones -- G1 blue, S green, G2 amber, M red
+-- because the reader already has that mapping and a private ramp would ask them to learn a second.
+A phase is a name, not a position on a scale. Cells run 200 -> 1136 over 401 frames with all four
+phases populating and turning over.
+
+The phase durations default to mammalian proportions (110/80/40/10 frames of 240, about G1 11 h,
+S 8 h, G2 4 h, M 1 h), and **every model differs only in how a cell leaves G1** -- which is where
+the variability is measured to be, and which makes the models comparable.
+
+---
+
+## The apoptosis series
+
+`apop_one`, `apop_many`, `apop_patch_big`, `apop_rings`, `apopgeo_half` -- the okuda series
+re-seeded on a flat sheet (`shape: plane`) with ORDINARY mid-surface cells, no second surface. What
+those runs stress is the renumber permutation when cells are removed, and they stress it better
+without an extra state block in the way. 601 frames each; run on `gpu_l4`.
