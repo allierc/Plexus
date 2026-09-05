@@ -38,10 +38,9 @@ seed:
 operators:
   - {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.01}
   - {op: neuron_signal, at: neuron, model: type_pairwise, edge_set: synapse, activation: tanh}
-  - {op: aggregate, at: assembly, child: neuron, block: voltage, into: activity}
   - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
       sigma: 6.0, normalize: none}
-schedule: [neuron_update, neuron_signal, aggregate, voxelize]
+schedule: [neuron_update, neuron_signal, voxelize]
 plotting: {renderer: vtk_points, background: black, point_size: 4.0}
 
 # --- auto: video descriptions (gemma-4-12B) ---

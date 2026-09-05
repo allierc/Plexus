@@ -103,12 +103,6 @@ operators:
     edge_set: synapse
     activation: tanh
 
-  - op: aggregate           # the assembly's mean voltage, along the containment map
-    at: assembly
-    child: neuron
-    block: voltage
-    into: activity
-
   - op: voxelize            # the neurons -> the 128^3 field. A representation, not a mechanism.
     at: neuron
     to: neural_activity
@@ -120,7 +114,6 @@ operators:
 schedule:
   - neuron_update
   - neuron_signal
-  - aggregate
   - voxelize
 
 plotting:

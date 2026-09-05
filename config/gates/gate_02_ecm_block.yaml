@@ -10,7 +10,7 @@
 #
 # WHAT IT EXERCISES: ecm_seed (fibres, not a homogeneous type-fill), the four-step MLS-MPM cycle
 # (mpm_strain / mpm_scatter / mpm_grid_update / mpm_gather) at 16 substeps a frame, ecm_stress, the
-# parent-level body force `gravity`, and `aggregate` as the parent's centroid readout.
+# and the parent-level body force `gravity`.
 #
 # LIFTED FROM `discovery_okuda/ops/test_02_ecm_block.py::build`, which is the one rig of the five
 # that already returned a spec dict. Five edits, each named:
@@ -52,8 +52,9 @@ plotting:
 
 sets:
   # THE MPM PARENT. Its accumulated delta is what `mpm_scatter` reads as `a_ext`, so `gravity` is
-  # declared once on one element and moves ninety thousand. Its position is a derived centroid,
-  # written by `aggregate`.
+  # declared once on one element and moves ninety thousand. Its POSITION IS NOT USED: it stays where
+  # it is declared. `aggregate` used to rewrite it as the centroid of the particles each tick and
+  # nothing ever read the result, so it was removed.
   cell:
     n: 1
     start: [[0.5, 0.44, 0.5]]        # the declared cube's centre
@@ -80,7 +81,6 @@ fields:
   mpm_grid: {frame: mpm_grid, n_grid: 64}
 
 operators:
-  - {op: aggregate, at: cell}
   # A CUBE OF FIBRES, not a cube of points: a `block:` type-fill would give homogeneous material and
   # the whole question is whether STRANDS carry a front differently. 1500 strands of 60 particles.
   - {op: ecm_seed, at: mpm_particle, centre: [0.5, 0.44, 0.5],
@@ -101,7 +101,6 @@ operators:
 # SIXTEEN SUBSTEPS A FRAME: dt 3.2e-3 over substep_dt 2e-4. The CFL ceiling for MPM is
 # dt < dx / sqrt(E/rho); at dx = 1/64 and E = 120 that is 1.6e-3, so 2e-4 has an 8x margin.
 schedule:
-  - aggregate
   - ecm_seed
   - gravity
   - ecm_stress
@@ -112,7 +111,7 @@ _gate:
   question: >
     Dropped from a quarter of the box, does a cube of matrix fibres fall at the gravity it was given,
     stay inside the domain, and rebound rather than slump?
-  operators_exercised: [aggregate, ecm_seed, gravity, ecm_stress, mpm_strain, mpm_scatter,
+  operators_exercised: [ecm_seed, gravity, ecm_stress, mpm_strain, mpm_scatter,
                         mpm_grid_update, mpm_gather]
   cross_check:
     archived_runs: [log/okuda_ECM/02b_ecm_block_bounce, log/okuda_ECM/02c_ecm_block_vonmises]
