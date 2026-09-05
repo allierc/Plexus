@@ -46,9 +46,9 @@ plotting:
     xlabel: frame
     ylabel: cells
     ticks: 4
-  - quantity: volume
+  - quantity: phase
     xlabel: frame
-    ylabel: cell volume
+    ylabel: '% in phase'
     ticks: 4
   scale_bar_corner: right
   scale_bar_lift: -0.07
@@ -129,6 +129,7 @@ operators:
   g1_size: 1.6
   phase_cv: 0.15
   seed: 0
+  seed_async: true
 - op: cell_divide
   model: cycle
   at: vertex
