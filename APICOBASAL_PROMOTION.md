@@ -324,10 +324,11 @@ Green: none of the new rows -- this rung makes the old ones quotable.*
 **R1 -- ADDITIVE PLUMBING, NO OPERATOR.** Separate commits, each with its own twin run: (a) per-`(set,
 block)` delta routing; (b) `carry_vertices` + `vertex_carry` + parentage out-params, wired as no-ops
 into `cell_divide` / `cell_die`; (c) `OperatorContract.signatures[variant]`, with the live
-`cell_chem_diffuse` divergence as its regression test; (d) the gate tooling; (e) **in its own commit
-and its own twin run, because it moves `occ` and the non-mesh fallback hashes `__occ`** -- the
-occ-leads-`nF` ordering fix. *Proves: the full twin suite is still byte-identical, so none of this
-moved a number.*
+`cell_chem_diffuse` divergence as its regression test; (d) the gate tooling; (e) the occ-leads-`nF` ordering fix -- **which turned out to need no
+code**: re-measured on 4 September on a fresh `REP_r023_07_B` the gap is nonzero on 0 of 1,801 rows,
+`99a7b054` having closed it on 22 August, after the pristine pin. What R1(e) actually was, therefore,
+is the correction of three documents that described a repaired defect as live. *Proves: the full twin
+suite is still byte-identical, so none of this moved a number.*
 
 **R2 -- THE REPRESENTATION EXISTS, AND IT IS STILL.** `seed_mesh[apicobasal]` + the `sep` block; no
 mechanics on `sep`. Specs `gate_ab_sphere` (R=5, h0=0.4, closed, K_R=0) and `gate_ab_hexprism`.
