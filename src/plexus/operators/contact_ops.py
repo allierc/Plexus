@@ -191,17 +191,11 @@ class MeshContact(Lateral):
             raise ValueError("mesh_contact: `mesh_stride:` counted pass-2 frames per KEPT mesh in "
                              "the archive. A live surface has one mesh per frame and no cadence to "
                              "reconcile, so the parameter has no meaning; remove it")
-        # `scale` IS HOW THE TWO SUBSYSTEMS KEEP THEIR OWN COORDINATES, and forbidding it on the
-        # live path was wrong. The archive path held the tissue about its own centroid in its own
-        # units (`export_tissue` writes `p - c`) and mapped it in here -- gate 04's epithelium was
-        # radius 17.58 TISSUE units and 0.15 of the box because 0.15/17.58 = 0.00853. That is what
-        # let the vesicle live in a 50-unit world about the ORIGIN, which is where `cell_mechanics`
-        # requires it: `K_R` penalises (|pos| - R0)^2 from the world origin, so translating the
-        # tissue into the matrix's box destroys it (measured: radius spread 0.006 -> 0.407 of the
-        # mean on the first recorded frame, before a single division).
-        #
-        # SO THE LIVE PATH DOES THE SAME MAPPING, at the point of use and on a COPY: the surface is
-        # centred on its own centroid, scaled, and placed at `centre`. Nothing moves the tissue.
+        # `scale` is how the two subsystems keep their own coordinates. The tissue must stay in
+        # its own world about the ORIGIN, because `cell_mechanics` penalises (|pos| - R0)^2 from
+        # the world origin -- translating the vesicle into the matrix's box would tear it apart.
+        # So the mapping happens at the point of use and on a COPY: the surface is centred on its
+        # own centroid, scaled by `scale`, and placed at `centre`. Nothing moves the tissue.
         self._frame = -2
         self._built = None
         self._dom = None
@@ -671,9 +665,9 @@ def selftest(surface="sphere", dev="cuda:0", n=40000, n_brute=400, **kw):
                 against EVERY triangle returns. Coverage alone would pass on a lookup that
                 confidently returns the wrong face.
 
-    THE SURFACE IS BUILT HERE, NOT LOADED. It used to take a path to a 32.7 MB mesh archive, so the
-    one check that certifies the lookup could not run without an artefact somebody had generated --
-    and the check would then be certifying the lookup against whatever that file happened to hold.
+    THE SURFACE IS BUILT HERE, NOT LOADED, so the one check that certifies the lookup needs no
+    artefact -- a check that loads a mesh archive certifies the lookup against whatever that file
+    happens to hold.
 
     RUN IT AS AN IMPORT, NOT AS `python -m`: this module registers its operators at import, and
     `-m` executes it a SECOND time under the name `__main__`, so the decorators raise
@@ -1246,11 +1240,10 @@ class SurfaceDrive(Structural):
         # declared factor over `over` frames, so a shell can indent a gel by inflating instead of by
         # descending -- and it stays a kinematic tool while doing it.
         #
-        # WHY NOT `cell_grow` + `cell_mechanics`. Those solve a tissue, and a solved tissue in the
-        # same schedule as an MPM continuum is a different experiment: `log/okuda_ECM/04_spheroid_ecm`
-        # -- the run this reproduces -- has NO vertex set at all and replays 200 cached meshes, so
-        # its coupling is one-way because the surface cannot answer. Prescribing the growth keeps
-        # that property without the cache: the gel feels the shell and the shell feels nothing.
+        # Not `cell_grow` plus `cell_mechanics`: those SOLVE a tissue, and a solved tissue sharing
+        # a schedule with an MPM continuum is a different experiment, since the two have timesteps
+        # orders of magnitude apart. Prescribing the growth keeps the coupling one-way on purpose:
+        # the gel feels the shell and the shell feels nothing.
         self.grow = params.get("grow", None)
         self.grow = None if self.grow is None else float(self.grow)
         if self.grow is not None:
