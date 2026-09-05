@@ -1,30 +1,52 @@
-"""MLS-MPM, as one module: the grid, the four-step cycle, and the two forces on it.
+"""MLS-MPM: a continuum solved on particles that carry the history and a grid that carries the
+coupling. The grid, the four-step cycle, and the forces that act on it.
 
-    mpm_grid            the background FIELD and the quadratic B-spline kernel (not an operator)
-    mpm_scatter (p2g)   particle -> grid: mass, momentum, and the internal stress impulse
-    mpm_grid_update     grid -> grid: the solve, gravity, and the wall conditions
-    mpm_gather (g2p)    grid -> particle: velocity, the affine C, and advection
-    mpm_strain          particle -> particle: F update and the material's response
-    mpm_turgor          particle -> particle: an isotropic outward pressure (a cell against its cortex)
-    mpm_anchor          a spring to a rest position, for a body that must not drift
-    mpm_spin            a prescribed angular velocity
-    apply_material_map  a per-particle material assignment from a map
-    mls_mpm_mechanics   the FENCED transitional oracle: the whole cycle in one operator
-    active_force        an activation field -> a per-particle body force
-    active_stress       an activation field -> a per-particle active stress tensor
-    seed_from_segmentation  a measured instance segmentation -> the particles and their material
+The material point method holds all the state on PARTICLES -- position, velocity, and the
+deformation gradient F recording everything a piece of material remembers about its history --
+and uses a background grid only as scratch, rebuilt every substep. That is what lets it handle
+large deformation and self-contact without ever remeshing: the grid is where bodies that never
+touch can influence one another, and the particles are where the physics lives.
 
-THE ORACLE IS STILL HERE AND IS STILL FENCED. `mls_mpm_mechanics` does in one operator what the
-four above do in four, and it exists so the decomposition can be checked against something. It is
-not the recommended path and it is not what a new spec should schedule.
+One substep is four operators, in this order and no other:
 
-WHY THE GRID IS IN THE SAME FILE. `stencil_offsets`, `bspline` and `sub_dt` were imported from
-`mpm_grid` by seven other files, so the kernel that defines the discretisation was a private
-detail of one of nine siblings. Every MPM operator's substep -- and the CFL ceiling that bounds it,
-dt < dx / sqrt(E/rho) -- is now readable in one place.
+    mpm_scatter      particle -> grid      mass, momentum, and the internal stress impulse
+    mpm_grid_update  grid -> grid          the solve, body forces, and the wall conditions
+    mpm_gather       grid -> particle      velocity, the affine velocity gradient C, advection
+    mpm_strain       particle -> particle  the F update and the material's response
 
-TWO REJECTED NEIGHBOURS ARE NOT HERE. `mpm_boundary` (kinematic, momentum not conserved, standoff
-set by the stencil width) and `bm_strain` stay in discovery_okuda; see membrane_ops and AUDIT.md.
+The substep is bounded by the CFL condition dt < dx / sqrt(E/rho): the sound speed of the
+material must not cross a grid cell in one step. That ceiling, the quadratic B-spline kernel and
+the stencil are all defined in this file, because they are the discretisation every operator here
+shares and none of them owns.
+
+In the order they appear below:
+
+    mpm_grid                field       the background grid and the B-spline kernel
+    mpm_scatter             exchange    step 1 of the cycle
+    mpm_grid_update         field       step 2
+    mpm_gather              exchange    step 3
+    mpm_strain              lateral     step 4
+    mpm_turgor              lateral     an isotropic outward pressure: a cell against its cortex
+    mpm_viscosity           lateral     the shear dissipation a mu = 0 liquid does not have
+    mpm_anchor              lateral     a spring to a rest position, for a body that must not drift
+    mpm_spin                lateral     a controller driving slow solid-body rotation
+    image / vector_grid     field       a scalar map and a unit-vector map, read from TIFFs
+    apply_material_map      exchange    a per-particle material assignment from a map
+    mls_mpm_mechanics       lateral     the FENCED oracle: the whole cycle in one operator
+    active_force            exchange    an activation field -> a per-particle body force
+    active_stress           exchange    an activation field -> a per-particle active stress
+    label_image             field       an integer instance map, indexed and never interpolated
+    seed_from_segmentation  seed        a measured segmentation -> particles and their material
+
+then the alternative implementations, which change only the numerics:
+
+    mpm_scatter[warp] [triton] [triton_colour]     fused kernels; the colour variant is atomic-free
+    mpm_gather[warp] [torch_loop27]                one batched reduction, or 27 sequential passes
+    mpm_strain[warp]     mpm_grid_update[warp] [nosync]
+
+The oracle is fenced and stays fenced. `mls_mpm_mechanics` does in one operator what the four
+steps do in four, and it exists so the decomposition can be checked against something. It is not
+the recommended path and not what a new specification should schedule.
 """
 from __future__ import annotations
 import functools
@@ -339,7 +361,44 @@ def _hand_body_force_to_grid(op, H, a_ext, dev, D):
 
 
 @register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
-class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
+class MPMScatter(Exchange):                
+    """Particle to grid: the first step of the MLS-MPM cycle. Every particle deposits its mass,
+    its momentum, and the impulse of its own internal stress onto the grid nodes around it.
+
+    particle -> mpm_grid: reads pos, vel, F, C and the Lame parameters; writes the grid field in
+    place. It emits nothing -- the grid IS the output.
+
+        w_n(x_p)  = the quadratic B-spline weight of node n at particle p, over a 3^D stencil
+        tau_p     = 2 mu_p (F_p - R_p) F_p^T  +  I lambda_p J_p (J_p - 1)
+        m_n      += sum_p w_n m_p
+        (mv)_n   += sum_p w_n m_p ( v_p + C_p (x_n - x_p) )  -  (4 dt / dx^2) w_n V_p tau_p (x_n - x_p)
+
+    tau_p is the Kirchhoff stress of the FIXED-COROTATED elastic law: R_p is the rotation from the
+    polar decomposition F = R S, so (F - R) measures how far the deformation is from a pure
+    rotation and 2 mu (F - R) F^T is the shear response; lambda J (J - 1) is the volumetric one,
+    with J = det F the ratio of current to rest volume. mu and lambda are the Lame parameters in
+    pressure units, derived per particle from the type's `youngs`. A LIQUID has mu = 0, so its
+    whole constitutive law is the volumetric term -- it resists departures from the volume it was
+    born at and nothing else -- which is why a liquid type may declare `bulk_modulus` instead: at
+    mu = 0 the bulk modulus IS lambda, and Young's modulus is not defined.
+
+    The C_p (x_n - x_p) term is the APIC affine velocity: carrying a per-particle velocity GRADIENT
+    as well as a velocity is what stops the transfer from dissipating angular momentum, which is
+    the difference between a rotating body that keeps rotating and one that grinds to a halt.
+
+    `dt_sub` is the substep timestep, and the whole cycle is stable only below the CFL ceiling
+    dt < dx / sqrt(E/rho): the sound speed sqrt(E/rho) must not cross a cell in one step.
+    `a_max` clamps any external acceleration handed in by another operator -- a stability device,
+    and one that silently bounds any penalty contact relying on depth to generate force.
+    `body_force: grid` hands the uniform part of the body force to the grid solve instead, which is
+    where canonical MLS-MPM puts it; the two are algebraically identical until the mass floor
+    binds.
+
+    Reference: Hu, Y. et al. (2018). A moving least squares material point method with displacement
+    discontinuity and two-way rigid body coupling. ACM Trans. Graph. 37(4):150; Sulsky, D., Chen,
+    Z. & Schreyer, H. L. (1994). Comput. Methods Appl. Mech. Eng. 118:179-196.
+    """
+
     EMIT = None                 # particle->grid: writes the mpm_grid field in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []        # no required params — `to` defaults to mpm_grid, all knobs optional
@@ -370,32 +429,24 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         if self.body_force not in ("particle", "grid"):
             raise ValueError(f"mpm_scatter: body_force must be 'particle' or 'grid', "
                              f"got {self.body_force!r}")
-        # HOW THE POLAR ROTATION IS FOUND, in 3-D. The fixed-corotated stress needs R from
-        # F = R S, and the obvious way to get it is an SVD -- but `torch.linalg.svd` on a
-        # batch of 3x3 matrices costs about a microsecond EACH, and this operator runs once
-        # per particle per substep: 45,000 particles x 25 substeps is 1.1 million 3x3 SVDs a
-        # frame, and on the zebrafish eye that single call measured 44.7 ms of the operator's
-        # 46.4 ms. "higham" replaces it with the Newton polar iteration
-        # R <- (R + R^-T)/2, which converges quadratically from F and costs 6.4 ms for the
-        # same batch -- 7x -- agreeing with the SVD rotation to 1.5e-6 with an orthogonality
-        # error of 2.4e-7, i.e. to float32. Default stays "svd": identical numbers unless asked.
-        # DEFAULT `higham`, CHANGED 24 AUGUST from `svd`. The polar factor R of the deformation
-        # gradient is the same rotation either way; these are two numerical routes to it.
+        # HOW THE POLAR ROTATION IS FOUND, in 3D. The fixed-corotated stress needs the rotation R
+        # from F = R S, and there are two numerical routes to the same rotation:
         #
         #   svd     `torch.linalg.svd` -> a cuSOLVER call. It is an EXTERN kernel: no compiler
         #           fuses it, and -- decisively -- it CANNOT BE CAPTURED into a CUDA graph, so a
-        #           spec using it forfeits the substep capture that is worth ~2x on its own.
-        #   higham  a Newton iteration built from matmuls and a cofactor cross product. Captures,
-        #           fuses, and on a two-set spec with the host syncs already gone it is faster.
+        #           specification using it forfeits the substep capture, which is worth about 2x
+        #           on its own. It also costs roughly a microsecond per 3x3 matrix, and this runs
+        #           once per particle per substep.
+        #   higham  the Newton polar iteration R <- (R + R^-T)/2, built from matmuls and a cofactor
+        #           cross product. Converges quadratically from F, captures, fuses, and is several
+        #           times faster on the same batch. It agrees with the SVD rotation to float32.
         #
-        # WHAT THE CHANGE COSTS, measured on cell_02 (a bouncing elastic nucleus) rather than
-        # asserted: max|diff| in position 2.4e-07 at 50 frames, 1.2e-06 at 200, 2.8e-05 at 600, and
-        # the two centres of mass stay within 3.8e-07 -- 9e-06 of the body radius. Bounded, not
-        # amplifying. 2D specs are UNAFFECTED: `forward` takes the analytic 2x2 rotation branch and
-        # never consults this parameter at all.
+        # The default is `higham`. The difference in a trajectory is bounded rather than
+        # amplifying, and 2D specifications are unaffected entirely: `forward` takes the analytic
+        # 2x2 rotation branch and never consults this parameter.
         #
-        # `polar: svd` remains available for a spec that must reproduce a stored 3D result byte for
-        # byte. The promotion twins are unaffected either way, because okuda schedules these same
+        # `polar: svd` remains available for a specification that must reproduce a stored 3D result
+        # byte for byte.
         # core operators -- both sides of the comparison move together.
         self.polar = str(params.get("polar", "higham")).lower()
         self.polar_iters = int(params.get("polar_iters", 6))
@@ -587,6 +638,38 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
 
 @register_operator("mpm_grid_update", family="mpm", set="field", kind="field")
 class MPMGridUpdate(FieldUpdate):
+    """The grid solve: the second step of the MLS-MPM cycle, and the only place the whole system
+    is coupled. Momentum becomes velocity, body forces are added, and the walls are imposed.
+
+    mpm_grid -> mpm_grid: reads and writes the grid field in place. No set is involved.
+
+        v_n = (mv)_n / m_n                      where m_n > mass_floor, else 0
+        v_n += dt g                             the body force
+        v_n = boundary(v_n, x_n)                walls, plates, obstacles
+
+    The division by nodal mass is what makes MPM a grid method: contact, incompressibility and
+    long-range force transmission all happen here, because this is the only step at which
+    particles that never touch can influence each other.
+
+    `mass_floor` guards that division, and it is a physical quantity rather than an epsilon: it is
+    a mass, so it must scale with the per-particle mass of the run. Fixed too high it binds at the
+    nodes where mass is LOWEST -- which is the interface -- and there it silently attenuates
+    exactly the terms that act at an interface. Left to None it is derived from dx and the density.
+
+    `surface_tension` adds the continuum surface force: a colour field is scattered by
+    `mpm_scatter`, mollified over `csf_smooth` passes, and its gradient gives an interface normal
+    whose divergence is the curvature, so the force is sigma kappa n concentrated in a band
+    `csf_band` wide. The colour must be normalised by rho dx^D to be a volume fraction; unnormalised
+    it carries the density and the resulting sigma is wrong by that factor.
+
+    `wall_damp` is the restitution at a wall: 1 is perfectly elastic and 0 fully inelastic. The
+    plate parameters close a gap between two rigid walls linearly between two frames, which is a
+    compression assay.
+
+    Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994).
+    Comput. Methods Appl. Mech. Eng. 118:179-196.
+    """
+
     EMIT = None                                 # field->field grid solve: writes grid velocity in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []                        # no required params — all optional (grid from `at:`, engine-injected)
@@ -605,16 +688,14 @@ class MPMGridUpdate(FieldUpdate):
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.surface_tension = float(params.get("surface_tension", 0.0))
         self.mass_floor = params.get("mass_floor", None)      # None -> derived from dx, rho
-        # THE SAME DEFECT, A HUNDRED TIMES LARGER. The CSF surface-tension term converts a nodal
-        # force to an acceleration with `dx^D / gm.clamp(min=1e-8)`, and 1e-8 is TEN THOUSAND times
-        # the per-particle mass of a 10M-particle run (1.4e-09). Measured on that run at frame 500:
-        # the floor binds on 59,932 of 122,868 occupied nodes -- 48.8% -- and scales the surface
-        # tension there by a median factor of 0.056. Surface tension acts AT THE INTERFACE, which is
-        # exactly where nodal mass is lowest, so the floor attenuates the term precisely where it is
-        # supposed to work, and worse the more particles a spec uses. NOT, HOWEVER, WHY THE SIGMA
-        # SWEEP DID NOTHING: that was measured to be the missing colour normalisation below, a factor
-        # of 1/(rho*dx^D) ~ 1e6, against this floor's median 18x on half the nodes. Both are real;
-        # they differ by five orders of magnitude, and setting `csf_rho` makes this floor inert.
+        # THE SAME DEFECT, AND HERE IT IS WORSE. The surface-tension term converts a nodal force
+        # to an acceleration by dividing by nodal mass, and a FIXED floor on that division is a
+        # mass -- so it must scale with the per-particle mass of the run, which falls as the
+        # particle count rises. A floor left at a fixed epsilon binds on a large fraction of
+        # occupied nodes in a fine run and attenuates the term there by an order of magnitude.
+        # Surface tension acts AT THE INTERFACE, which is exactly where nodal mass is lowest, so
+        # the floor weakens it precisely where it is supposed to work, and progressively worse the
+        # more particles a specification uses. Setting `csf_rho` makes this floor inert.
         self.csf_mass_floor = params.get("csf_mass_floor", None)   # None -> derived
         # WHAT "COLOUR = 1" MEANS -- WHICH THIS BLOCK NEVER KNEW, AND THE REASON THE PARAGRAPH ABOVE
         # IS TREATING A SYMPTOM. `mpm_scatter` deposits `weight * mass * is_liquid`, so `gc` is a
@@ -713,9 +794,9 @@ class MPMGridUpdate(FieldUpdate):
         # deformation gradient F, and `mpm_strain` updates F from the VELOCITY GRADIENT read off
         # the grid. Teleporting a particle's position never enters that path: the constitutive
         # model is never told it has been compressed, so no stress builds, nothing pushes back,
-        # and nothing bulges sideways. Measured on cell_12 -- half-height fell 2.8x while the
-        # equatorial radius moved by less than 0.1% and the volume proxy r^2*h fell 3.0x. That is
-        # a CROP, not a squash: matter displaced in z and never returned laterally.
+        # and nothing bulges sideways. The body's height falls, its equatorial radius does not
+        # move and its volume falls with the height. That is a CROP, not a squash: matter
+        # displaced along the plate normal and never returned laterally.
         #
         # Imposed here instead, in the same place and the same way as the reflective domain walls:
         # clamp the normal grid velocity of every node beyond the plate to the PLATE'S OWN
@@ -726,8 +807,8 @@ class MPMGridUpdate(FieldUpdate):
         # A MOVING PLATEN, IMPOSED ON THE GRID. `plate_confine` projects particle POSITIONS after
         # the substep block, and a projection is invisible to the constitutive model: stress comes
         # from F, F is updated from the velocity gradient, and teleporting a particle changes
-        # neither. Measured on cell_12: half-height fell 2.8x while the equatorial radius moved by
-        # 0.1% and r^2*h -- volume -- fell 3x. The cell was being cropped, not squashed.
+        # neither. The body is then cropped rather than squashed -- its height falls, its
+        # equatorial radius does not move, and its volume falls with its height.
         #
         # A rigid obstacle cannot fix it either: `_walls3d` zeroes grid velocity inside a solid,
         # which stops material entering but cannot expel what is already there. A plate has to
@@ -1134,7 +1215,13 @@ class MPMGridUpdate(FieldUpdate):
 @register_operator("mpm_grid_update", implementation="nosync", family="mpm",
                    set="field", kind="field")
 class MPMGridUpdateNoSync(MPMGridUpdate):
-    """`mpm_grid_update` with a sync-free 2D wall BC. Identical in 3D, where the default already is."""
+    """The grid solve with a sync-free 2D wall boundary condition: the same physics, with the
+    host synchronisation that the default 2D path incurs removed. Identical in 3D, where the
+    default already has none.
+
+    A host sync inside a substep blocks CUDA graph capture, so removing it is what lets the whole
+    substep be captured.
+    """
 
     MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions", "sync_free"]
 
@@ -1159,7 +1246,39 @@ class MPMGridUpdateNoSync(MPMGridUpdate):
 
 
 @register_operator("mpm_gather", "g2p", family="mpm", set="particle", kind="exchange")
-class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
+class MPMGather(Exchange):                 
+    """Grid to particle: the third step of the MLS-MPM cycle. Each particle reads back a
+    velocity and a velocity GRADIENT from the nodes around it, and is advected.
+
+    mpm_grid -> particle: reads the grid, writes pos and vel in place (which is why it declares
+    MAY_MUTATE_INTEGRATED_STATE -- it advects inside the substep rather than returning a delta).
+
+        v_p = sum_n w_n v_n
+        C_p = (4 / dx^2) sum_n w_n v_n (x_n - x_p)^T
+        x_p = x_p + dt v_p
+
+    C_p is the APIC affine velocity matrix, the local velocity gradient. Carrying it is what makes
+    the transfer nearly lossless: it is what `mpm_scatter` puts back on the grid next substep and
+    what `mpm_strain` integrates the deformation gradient from, so all three steps must agree about
+    it or the scheme leaks angular momentum.
+
+    `wall_contact` is the thickness of the layer within which a particle counts as touching a wall,
+    IN WORLD LENGTH -- which makes it a trap in any box that is not one unit across, since a value
+    tuned for a unit box selects the entire domain in a small one. `wall_contact_cells` states the
+    same thing in the only scale the grid has, so it follows the world.
+
+    `wall_damp_mode` is the difference between a restitution coefficient and a decay rate.
+    `per_impact` applies `wall_damp` once per wall crossing, which is what a restitution
+    coefficient means; `per_substep` applies it every substep a particle spends in the contact
+    layer, so the effective damping depends on how long it lingers and on the substep count.
+
+    `vmax` caps particle speed. It is a stability device, not physics, and a run where it binds is
+    reporting a different dynamics from the one it declared.
+
+    Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994).
+    Comput. Methods Appl. Mech. Eng. 118:179-196.
+    """
+
     EMIT = None                                    # advects pos/vel inside the MPM substep (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []                           # no required params — all optional (source grid defaults to `mpm_grid`)
@@ -1288,6 +1407,36 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
 
 @register_operator("mpm_strain", family="mpm", set="particle", kind="lateral")
 class MPMStrain(Lateral):
+    """The material update: the fourth step of the MLS-MPM cycle. Each particle advances its own
+    deformation gradient from the velocity gradient it just gathered, then applies its material law.
+
+    particle -> particle: reads F and C, writes F and the derived material state in place.
+
+        F_p <- (I + dt C_p) F_p
+        J_p  = det F_p
+
+    F is the deformation gradient, mapping a material line element from its rest configuration to
+    its current one, so it is dimensionless and equals the identity for unstrained material. J is
+    the ratio of current to rest volume. Everything a particle remembers about its history is in F,
+    which is why the material laws are applied HERE and read by `mpm_scatter` as a stress.
+
+    An ELASTIC particle keeps F entire. A LIQUID drops its SHAPE memory -- F is reset to an
+    isotropic matrix carrying only J -- because a liquid has no rest shape to be strained from. A
+    PLASTIC one has its singular values clipped to a yield band, so deformation beyond the band is
+    forgotten rather than stored as stress.
+
+    `liquid_volume` chooses how a liquid's volume is advanced, and the two are not equivalent.
+    `det` carries J through F, i.e. multiplies it by det(I + dt C) each substep. `trace` integrates
+    dJ/dt = J tr(C) directly. They agree to first order in dt, but the determinant form accumulates
+    a bias that drains a resting column's pressure over time and gets WORSE as the mesh is refined
+    -- the opposite of what a convergent scheme should do. `det` is the default because changing it
+    changes the numbers of every existing MPM specification.
+
+    Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D., Chen, Z. & Schreyer,
+    H. L. (1994). A particle method for history-dependent materials. Comput. Methods Appl. Mech.
+    Eng. 118:179-196.
+    """
+
     EMIT = None                 # particle->particle: updates F + material in place; returns {} — no delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []        # no required params — all knobs optional (defaults in __init__)
@@ -1302,8 +1451,8 @@ class MPMStrain(Lateral):
         # HOW A LIQUID'S VOLUME IS ADVANCED. `det` (the default) carries J through F exactly as
         # every existing spec has; `trace` uses J *= 1 + dt*tr(C) instead. See the long note in
         # forward() -- `det` loses a column's pressure at ~1.1%/s at rest and gets worse as the mesh
-        # is refined. This is OPT-IN because it changes the numbers of all 179 MPM specs, and the
-        # default stays where it is until the gate says what the new numbers are.
+        # is refined. It is OPT-IN because it changes the numbers of every existing MPM
+        # specification, and the default stays where it is until a gate says what the new ones are.
         self.liquid_volume = str(params.get("liquid_volume", "det")).lower()
         if self.liquid_volume not in ("det", "trace"):
             raise ValueError(f"liquid_volume must be 'det' or 'trace', got "
@@ -1454,14 +1603,12 @@ class MPMTurgor(Lateral):
         super().__init__(params, device)
         self.pressure = float(params["pressure"])           # excess of interior over exterior pressure
         self.at = params.get("_at", "mpm_particle")
-        # `mode: constant` WAS DELETED, 4 September. A vocabulary with one member is not an axis: it
-        # read the key, compared it to the only value it accepts, and raised. Nothing selected
-        # anything, and no spec set it. If a second turgor law is ever written it goes on the
-        # `model:` axis, where the registry can see it -- see AXES.md.
+        # There is no `mode:` here. A vocabulary with one member is not an axis, and a second
+        # turgor law would go on the `model:` axis where the registry can see it.
         if "mode" in params:
             raise ValueError(
                 "mpm_turgor: `mode` is gone -- it only ever accepted 'constant'. A second turgor "
-                "law would be `model:`, not a mode. See AXES.md.")
+                "law would be `model:`, not a mode.")
 
     def forward(self, H, mask=None):
         p = H.level(self.at)
@@ -1486,51 +1633,23 @@ class MPMTurgor(Lateral):
 # ==========================================================================================================
 @register_operator("mpm_viscosity", family="mpm", set="particle", kind="lateral")
 class MPMViscosity(Lateral):
-    """WHY A LIQUID HERE NEVER STOPS MOVING. `material: liquid` sets mu = 0, so the deviatoric
-    stress is IDENTICALLY ZERO and nothing in the constitutive model resists or dissipates shear.
-    The only sinks in the whole scheme are `wall_damp` and MLS-MPM's own numerical dissipation --
-    and APIC exists precisely to minimise the latter. A real drop comes to rest; this one has no
-    mechanism to.
+    """Shear dissipation for a liquid, which the constitutive law does not otherwise provide.
 
-    MEASURED, on material_3d_water_st050 (290k particles, 2400 frames): kinetic energy falls 500x
-    between frames 400 and 1600 and then STOPS FALLING -- 7e-5, 8e-5, 8e-5, 11e-5 at frames 1600,
-    1800, 2000, 2200. A plateau, not a decay. Of the residual at frame 2201, 29% IS SUB-GRID
-    JITTER (rms speed 0.0107, of which 0.0090 survives coarse-graining onto 4-cell boxes and
-    0.0058 does not), which is exactly the scale a viscosity acts on.
+    particle -> particle: reads the affine velocity gradient C, emits an external acceleration.
 
-    THE STRESS. Water is Newtonian: sigma = -p I + 2 mu_dyn D, with D the strain-rate tensor
-    (1/2)(grad v + grad v^T) and mu_dyn ~ 1.0e-3 Pa s. In MLS-MPM the affine matrix C IS the
-    velocity gradient, so D = (1/2)(C + C^T) and the Kirchhoff viscous stress is
+        a_p = -nu * C_p (x_p - x_cell)      applied only to liquid particles
 
-        tau_visc = mu_dyn * (C + C^T)
+    nu is the kinematic viscosity in world units squared per unit time.
 
-    added to the elastic stress with the SAME sign convention (positive = tension): under
-    extension a viscous fluid pulls back, exactly as an elastic one does. It costs one 3x3
-    symmetrisation per particle -- C is already carried -- and no extra P2G pass, because it goes
-    through the additive-stress channel `mpm_scatter` already reads for `pulse_to_active_stress`.
-    That channel is live on the warp path too (the kernel takes ACT as a mat33), so this operator
-    works at `implementation: warp` without a kernel change.
+    `material: liquid` sets mu = 0, so the deviatoric stress is IDENTICALLY zero and nothing in
+    the constitutive model resists or dissipates shear. The only sinks in the whole scheme are then
+    the wall damping and MLS-MPM's own numerical dissipation -- and APIC exists precisely to
+    minimise the latter. A real drop comes to rest; a liquid built this way has no mechanism to,
+    and its kinetic energy falls to a floor and stays there. This operator supplies the missing
+    sink explicitly, so the timescale on which a liquid settles is a declared number rather than an
+    accident of the discretisation.
 
-    HOW BIG SHOULD IT BE, AND WHAT IT IS HONEST TO CLAIM. Quote it as a Reynolds number or it means
-    nothing. Re = U L / nu with L the body's own size. In the water-drop scene (L ~ 0.2, U ~ 3.9 at
-    impact, U ~ 0.01 once settled) a kinematic nu of 3e-4 gives Re ~ 2300 DURING THE IMPACT -- high
-    enough that the splash is barely touched -- and Re ~ 6 ONCE SETTLED, where it dominates and the
-    jitter dies. That asymmetry is the physics doing the work, not a schedule: Re falls as U does.
-    A real centimetre-scale water drop lands at Re 1e4-1e5, so a splash genuinely IS near-inviscid
-    and real water genuinely does slosh; what stops a real puddle is viscosity acting on the small
-    scales over many seconds. Pushed far past the Reynolds-matched value this term becomes
-    numerical damping wearing a physics name, and should be called sub-grid or artificial
-    viscosity when it is used that way.
-
-    WHAT IT IS NOT. It is NOT `drag`, which is a body force -dragl*v and therefore damps UNIFORM
-    TRANSLATION -- it slows free fall. A viscous stress depends on the velocity GRADIENT, so a body
-    in rigid translation has C = 0, tau_visc = 0, and falls at exactly g. That is the gate.
-    It also will not stop the slow compaction of a drop (a volume error, not a momentum one), nor
-    the surface-tension implosion at high sigma (the CSF overpowering the bulk modulus).
-
-    STABILITY. An explicit viscous stress carries its own diffusion limit, dt < rho dx^2 / (2 D mu).
-    At mu 3e-4, rho 1, dx 1/96, D 3 that is 6.0e-2 against a 2e-4 substep -- 300x of headroom -- and
-    even mu 1e-2 leaves 9x. The operator reports the margin so a spec cannot walk past it silently.
+    Reference: the Navier-Stokes viscous term; Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150.
     """
 
     EMIT = None                 # writes H.extra_stress, consumed by mpm_scatter in the same substep
@@ -1584,6 +1703,26 @@ class MPMViscosity(Lateral):
 
 @register_operator("mpm_anchor", family="mechanics", set="particle", kind="lateral")
 class MPMAnchor(Lateral):
+    """A spring to a rest position: what holds a body that must not drift, without pinning it
+    rigidly.
+
+    particle -> particle: reads pos, emits an external acceleration the MPM substep consumes.
+
+        a_p = k (x_p^rest - x_p)
+
+    x_p^rest is the position the particle was seeded at, kept from frame 0, and k the anchor
+    stiffness in inverse time squared. A stiff anchor is a clamp and a soft one a compliant
+    substrate, so k is the whole modelling content: it says how firmly the tissue is attached to
+    whatever it sits on.
+
+    `where` selects the extent rather than the law -- `boundary` anchors a ring of particles
+    `ring` wide, `substrate` anchors all of them. The spring, the rest state and the hypothesis are
+    identical either way, which is why this is a value and not a model: the same claim about the
+    attachment, applied over two different regions.
+
+    Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM).
+    """
+
     EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["k"]
@@ -1596,9 +1735,8 @@ class MPMAnchor(Lateral):
         self.k = float(params["k"])
         # WHERE THE ANCHOR ACTS -- a VALUE, not a mode, and renamed to say so. `boundary` holds a
         # ring of particles, `substrate` holds all of them; the spring, the rest state and the
-        # hypothesis are identical either way. That is the `mesh_seed.shape: sphere | disc` case --
-        # "the same hypothesis about the tissue seeded into two different geometries" -- and the one
-        # `mode:` in this audit that was NOT a hypothesis in disguise. See AXES.md.
+        # hypothesis are identical either way -- the same claim about the attachment applied over
+        # two different regions -- which is what makes this a VALUE and not a model.
         if "mode" in params:
             raise ValueError(
                 "mpm_anchor: `mode` is now `applies_to` (boundary | substrate). It is a value, not "
@@ -1659,6 +1797,25 @@ class MPMAnchor(Lateral):
 
 @register_operator("mpm_spin", family="mechanics", set="particle", kind="lateral")
 class MPMSpin(Lateral):
+    """Drive a body toward slow solid-body rotation: a controller, not a constraint, so the body
+    is free to deform while it turns.
+
+    particle -> particle: reads pos and vel, emits an external acceleration.
+
+        v_p^target = omega * (axis x (x_p - c))
+        a_p        = spin_k (v_p^target - v_p)
+
+    omega is the target angular velocity in radians per unit time and c the rotation centre,
+    defaulting to the domain centre; in 3D `axis` is the rotation axis. spin_k is the controller
+    gain in inverse time, so 1/spin_k is how long the body takes to reach the target rotation.
+
+    A proportional controller rather than a prescribed velocity, because prescribing the velocity
+    would make the rotation kinematic and destroy any deformation the rotation itself causes --
+    which for a spinning deformable body is the thing worth watching.
+
+    Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM).
+    """
+
     EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["omega"]
@@ -1978,13 +2135,23 @@ def mls_mpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
 # --------------------------------------------------------------------------- #
 @register_operator("mls_mpm_mechanics", family="mpm", set="particle", kind="exchange")
 class MLSMPMMechanics(Exchange):
-    """Compound MLS-MPM mechanics at the particle level (P2G -> grid solve -> G2P ->
-    advect). Cell shape/rigidity emerge from the particles' elastic stress; per-cell-
-    type `youngs` sets the per-particle Lame parameters (mu, la).
+    """The whole MLS-MPM cycle in ONE operator: scatter, grid solve, gather, advect, and the
+    material update, all inside a single forward.
 
-    FENCED TRANSITIONAL operator -- breaks the one-concern + integration-invariant
-    rules on purpose, behind the `TRANSITIONAL` fence. See module docstring and
-    `ARCHITECTURAL_DEBT` for the decomposition roadmap.
+    particle -> particle: reads and writes pos, vel, F and C in place, allocating its own grid.
+
+    It is a FENCED TRANSITIONAL operator. It breaks the one-concern rule and the integration
+    invariant on purpose, and it exists for exactly one reason: the four-operator decomposition
+    has to be checkable against something that is known to work. A run of this and a run of
+    `mpm_scatter -> mpm_grid_update -> mpm_gather -> mpm_strain` should agree, and where they do
+    not, one of them is wrong.
+
+    It is not the recommended path. A new specification should schedule the four steps, because
+    only then can an operator be swapped, an implementation selected, or a force inserted between
+    two of them.
+
+    Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM); Sulsky, D. et al.
+    (1994). Comput. Methods Appl. Mech. Eng. 118:179-196.
     """
 
     EMIT = None                          # substep advects pos/vel in place (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
@@ -2349,7 +2516,15 @@ if HAVE_WARP:
 @register_operator("mpm_scatter", implementation="warp", family="mpm",
                    set="particle", kind="exchange")
 class MPMScatterWarp(MPMScatter):
-    """The scatter as one Warp kernel, global atomics. See the module docstring."""
+    """The scatter as one Warp kernel with global atomics: the same physics, one launch instead
+    of a batched gather-scatter over the 3^D stencil.
+
+    The wall here is ATOMIC CONTENTION rather than memory bandwidth -- every particle in a cell
+    writes to the same nodes -- so the speedup depends on how clustered the particles are.
+    `mpm_scatter[triton_colour]` is the atomic-free alternative.
+
+    CUDA-only.
+    """
 
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate",
                       "fused_kernel"]
@@ -2553,7 +2728,11 @@ if HAVE_WARP:
 @register_operator("mpm_gather", implementation="warp", family="mpm",
                    set="particle", kind="exchange")
 class MPMGatherWarp(MPMGather):
-    """G2P as one Warp kernel. Pure reads: no atomics, no sort, nothing shared."""
+    """The gather as one Warp kernel. Pure reads: no atomics, no sort, nothing shared between
+    threads, which is why this is the easiest of the four steps to make fast.
+
+    CUDA-only.
+    """
 
     MECHANISM_TAGS = ["grid_to_particle", "advection", "fused_kernel"]
     SUPPORTED_DIMS = [3]                       # see MPMScatterWarp: inherited [2, 3] was a lie
@@ -2694,7 +2873,11 @@ if HAVE_WARP:
 @register_operator("mpm_strain", implementation="warp", family="mpm",
                    set="particle", kind="lateral")
 class MPMStrainWarp(MPMStrain):
-    """The deformation-gradient update as one Warp kernel. Elastic + liquid; see the module note."""
+    """The deformation-gradient update and material response as one Warp kernel, elastic and
+    liquid branches both.
+
+    CUDA-only.
+    """
 
     MECHANISM_TAGS = ["elastic_strain", "plastic_flow", "incompressible_volume", "fused_kernel"]
     SUPPORTED_DIMS = [3]
@@ -2937,8 +3120,14 @@ if HAVE_WARP:
 @register_operator("mpm_grid_update", implementation="warp", family="mpm",
                    set="field", kind="field")
 class MPMGridUpdateWarp(MPMGridUpdate):
-    """The 3D grid solve -- mass normalisation, CSF surface tension, box walls, obstacles,
-    buoyancy -- as two Warp kernels instead of ~40 whole-grid torch ops."""
+    """The 3D grid solve -- mass normalisation, the continuum surface force, box walls, obstacles
+    and buoyancy -- as two Warp kernels rather than several dozen whole-grid torch operations.
+
+    The gain is launch overhead and memory traffic, not arithmetic: the torch path reads and writes
+    the whole grid once per term.
+
+    CUDA-only, and 3D only.
+    """
 
     MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions", "fused_kernel"]
     SUPPORTED_DIMS = [3]
@@ -3177,10 +3366,11 @@ if HAVE_TRITON:
 @register_operator("mpm_scatter", implementation="triton", family="mpm",
                    set="particle", kind="exchange")
 class MPMScatterTriton(MPMScatter):
-    """The scatter as ONE fused Triton kernel. See the module docstring for what it costs.
+    """The scatter as one fused Triton kernel. Subclasses the default, so every knob, contract
+    and default it declares stays exactly as it is -- what changes is how the delta is computed,
+    which is what the `implementation` axis is for.
 
-    Subclasses the default so every knob, contract and default it declares stays exactly as it is:
-    what changes is how the delta is computed, which is what the `implementation` axis is for.
+    CUDA-only.
     """
 
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate",
@@ -3364,7 +3554,14 @@ if HAVE_TRITON:
 @register_operator("mpm_scatter", implementation="triton_colour", family="mpm",
                    set="particle", kind="exchange")
 class MPMScatterTritonColour(MPMScatterTriton):
-    """Atomic-free P2G by 27-colour cell partition. See the block comment above."""
+    """The scatter with no atomics at all, by partitioning the grid into 27 colours: cells of one
+    colour cannot share a stencil node, so each colour's particles can be scattered in parallel
+    without contention, at the cost of 27 sequential passes.
+
+    Worth it exactly where atomic contention, and not bandwidth, is the wall.
+
+    CUDA-only.
+    """
 
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate",
                       "fused_kernel", "coloured_partition"]
@@ -3442,7 +3639,12 @@ class MPMScatterTritonColour(MPMScatterTriton):
 @register_operator("mpm_gather", implementation="torch_loop27", family="mpm",
                    set="particle", kind="exchange")
 class MPMGatherLoop27(MPMGather):
-    """G2P by 27 sequential passes over the stencil instead of one batched reduction."""
+    """The gather as 27 sequential passes over the stencil instead of one batched reduction.
+
+    Trades a large intermediate for repeated grid reads: it uses far less peak memory, which is
+    what lets a very large particle count fit at all, and is slower per step when memory is not the
+    constraint.
+    """
 
     MECHANISM_TAGS = ["grid_to_particle", "advection", "low_memory"]
     SUPPORTED_DIMS = [3]
@@ -3554,13 +3756,36 @@ class MPMGatherLoop27(MPMGather):
         return {}
 
 
-# ==========================================================================================================
-# MOVED HERE FROM `agent_ops.py`, 4 September: both laws turn an activation field into something
-# the MPM substep consumes -- a body accel (`active_force`) or an active stress (`active_stress`).
-# Neither one touches an agent set, and `mpm_scatter` is the only reader of what they emit.
-# ==========================================================================================================
+# ----------------------------------------------------------------------------------------------
+# The two active constitutive laws. Both turn an activation field into something the MPM substep
+# consumes -- a body acceleration (`active_force`) or an active stress (`active_stress`) -- and
+# `mpm_scatter` is the only reader of what either emits.
+# ----------------------------------------------------------------------------------------------
 @register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle", kind="exchange")
-class ActiveForce(Exchange):                     # (alias `pulse_to_contraction` for one migration cycle)
+class ActiveForce(Exchange):                    
+    """Active contraction as a BODY FORCE: an activation field becomes a per-particle
+    acceleration pointing along the field's own gradient.
+
+    field -> particle: reads the activation field at each particle's position, emits an external
+    acceleration the MPM substep consumes as a_ext.
+
+        a_p = s * A * grad c(x_p)
+
+    c is the activation field, dimensionless, and A is `amplitude`, converting a field gradient
+    into an acceleration. s is the sign chosen by `along`: `inward` contracts toward high
+    activation and `outward` pushes away from it. Because the force follows the GRADIENT, a
+    UNIFORM activation produces no force at all -- which is the model's central claim, that what
+    drives motion is the spatial variation of activity rather than its level.
+
+    This is the force constitutive law. `active_stress` is the other one: it turns the same
+    activation into a stress the grid solve transmits, which is the mechanically correct route for
+    a contractile continuum. A body force is the cruder claim -- that activity pushes on the
+    material directly -- and the two are different hypotheses, not two ways of computing one.
+
+    Reference: Marchetti, M. C. et al. (2013). Hydrodynamics of soft active matter. Rev. Mod. Phys.
+    85:1143-1189.
+    """
+
     EMIT = "mpm_acceleration"           # a body accel the MPM substep consumes as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2]                 # 2D — reads a 2-vector activation gradient / direction field
     REQUIRES_PARAMS = ["from"]                # the activation field to read
@@ -3573,10 +3798,10 @@ class ActiveForce(Exchange):                     # (alias `pulse_to_contraction`
         self.field_name = params.get("from")
         self.amplitude = float(params.get("amplitude", 50.0))
         self.channel = int(params.get("channel", 0))
-        # `mode:` SPLIT ONTO ITS TWO REAL AXES, 4 September. It carried three words doing two
-        # different jobs: `inward`/`outward` chose a SIGN on one rule, `directional` chose a
-        # DIFFERENT RULE. One key, two axes, and nothing in the registry could tell them apart.
-        # `along:` is the value; `model: directional` is the hypothesis. See AXES.md.
+        # `mode:` carried three words doing two different jobs: `inward`/`outward` chose a SIGN
+        # on one rule, while `directional` chose a DIFFERENT RULE. One key over two axes, and
+        # nothing in the registry could tell them apart. `along:` is the value; `model:
+        # directional` is the hypothesis.
         if "mode" in params:
             raise ValueError(
                 "active_force: `mode` is gone. `inward`/`outward` are now `along:` (a value on this "
@@ -3642,7 +3867,37 @@ class ActiveForceDirectional(ActiveForce):
 
 
 @register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange")
-class ActiveStress(Exchange):                    # (alias `pulse_to_active_stress` for one migration cycle)
+class ActiveStress(Exchange):                   
+    """Active contraction as a STRESS: an activation field becomes a per-particle active stress
+    tensor along a prescribed contraction axis, which the grid solve then transmits.
+
+    field -> particle: reads an activation field and a unit-vector direction field, writes a
+    per-particle active stress that `mpm_scatter` adds to the elastic Kirchhoff stress.
+
+        sigma_p^act = -A c(x_p) (n_p n_p^T)        with, optionally,
+        A -> A (1 + beta (lambda_p - 1))           the length-dependent scaling
+
+    c is the activation at the particle, dimensionless; n_p is the unit contraction axis read from
+    the `direction_from` vector field, so n n^T is the projector onto that axis and the stress is
+    UNIAXIAL -- the material pulls along n and does nothing across it, which is what a fibre does.
+    A is `amplitude`, in pressure units. The minus sign makes it contractile: a positive activation
+    is a tension.
+
+    beta is `stretch_activation`, the Frank-Starling effect: a real cardiomyocyte contracts HARDER
+    when stretched, so the tension is scaled by the local fibre stretch lambda_p = |F_p n_p|. At
+    beta = 0 it is off. It is a stretch-REGULATED size lever, so it grows the contraction without
+    the runaway that raising `amplitude` alone produces.
+
+    A stress rather than a body force is the mechanically correct route: it enters the momentum
+    balance as a divergence, so it is transmitted through the material and conserves momentum,
+    where a body force does neither. `active_force` is the other hypothesis.
+
+    Reference: Simha, R. A. & Ramaswamy, S. (2002). Hydrodynamic fluctuations and instabilities in
+    ordered suspensions of self-propelled particles. Phys. Rev. Lett. 89:058101; Marchetti, M. C.
+    et al. (2013). Rev. Mod. Phys. 85:1143-1189. The length-dependent scaling follows the
+    Niederer-Hunter-Smith cardiac contraction model.
+    """
+
     EMIT = None                         # stress is consumed by the MPM substep, not integrated
     SUPPORTED_DIMS = [2]                 # 2D — contraction axis n and n n^T are 2-vectors / 2x2
     REQUIRES_PARAMS = ["from", "direction_from"]
@@ -3695,13 +3950,12 @@ class ActiveStress(Exchange):                    # (alias `pulse_to_active_stres
         return {}                                                                 # no body-force delta
 
 
-# ==========================================================================================================
-# MOVED HERE FROM `agent_ops.py`, 4 September: it seeds MPM PARTICLES -- their positions inside a
-# measured mask and their per-cell Lame parameters -- so it belongs beside `ImageField`, whose
-# label-image sibling it defines, and beside the material it writes. Every other `kind="seed"`
-# operator already lives with its own domain module (`ecm_seed` in ecm_ops, `seed_mesh` in
-# vertex_ops, `neural_seed` in neural.py); there is no central seed module and this follows suit.
-# ==========================================================================================================
+# ----------------------------------------------------------------------------------------------
+# Seeding MPM particles from a measured segmentation: their positions inside a measured mask and
+# their per-cell Lame parameters. It lives here beside `ImageField`, whose label-image sibling it
+# defines, and beside the material it writes -- there is no central seed module, and every other
+# `kind="seed"` operator likewise sits with its own domain.
+# ----------------------------------------------------------------------------------------------
 @register_field("label_image", frame="label_image")
 class LabelImageField(Field):
     """An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.
