@@ -176,6 +176,29 @@ def load(path: str) -> Spec:
             # (`mesh_ops` twice, `edge_flip` falling back to the literal string "cell"). So the
             # pairing is repeated per operator, defaulted in one place, and stated in none -- which
             # is how `edge_flip` came to renumber a set it never declared it needed.
+            #
+            # AND `cell_set:` IS A STAND-IN FOR A MAP THIS SPEC CANNOT YET DECLARE. The paper names
+            # three (`parent` for containment, `pre`/`post` for incidence); this is none of them.
+            # It is a BIJECTION between the cell set's rows and the mesh's FACES, which are not a
+            # set at all but a table derived from E_srce/E_trgt/E_face.
+            #
+            # It is not `parent` because pi has to be a FUNCTION, and vertex -> cell is not one: on
+            # a trivalent mesh a vertex belongs to three cells. That is the whole reason the mesh
+            # took a different route from the hierarchy.
+            #
+            # THE ROUTE IT SHOULD EVENTUALLY TAKE NEEDS NO NEW PRIMITIVE, and plexus2.tex sec.
+            # Hierarchy now says so: a many-to-many relation IS a set with two functions out of it,
+            # and the half-edge table is that set -- every half-edge has exactly one source vertex
+            # and exactly one face. The mesh code already runs the two cross-level families without
+            # declaring them: `index_add(0, ef, ...)` in `face_geometry_3d` is Aggregate along
+            # half_edge -> cell, and `pos[es]` is Broadcast along half_edge -> vertex. Declaring a
+            # `half_edge` set with both legs would retire this key entirely.
+            #
+            # NOT DONE HERE, deliberately: it changes the topological master of every mesh spec in
+            # the repo, so it needs its own gate rung with a byte-identical twin, and the
+            # `cell_complex` promotion moves the target (there nF != nC and the bijection below
+            # stops holding). Designing it now would design it against a mesh already scheduled for
+            # replacement.
             cs = s.get("cell_set")
             if cs is None:
                 raise ValueError(
