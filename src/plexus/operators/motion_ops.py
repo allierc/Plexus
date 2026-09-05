@@ -1,16 +1,18 @@
-"""How a body moves when nothing else is acting on it: damping, drift, walls, gravity.
+"""Single-body motion: how one element moves when nothing else is acting on it.
 
-    drag            velocity-proportional damping -- the overdamped limit's other half
-    glide           move along the heading at a fixed speed
-    velocity_cruise (cruise) relax the speed toward a target without touching the direction
-    sediment        a settling velocity
-    attractor_flow  a prescribed vector field (Lorenz, Rossler, ... ) as the velocity
-    gravity         a uniform body force
-    bounce          the wall and obstacle response
+Every contract here reads one element's own state and writes one element's own delta. There is
+no neighbour relation and no interaction term anywhere in the module, which is what makes it
+obvious when a new operator does not belong here.
 
-These are the operators with no INTERACTION in them: each reads one element's own state and writes
-one element's own delta. Grouping them is what makes that visible -- and makes it obvious when a
-new operator does not belong.
+In the order they appear below:
+
+    drag             lateral   velocity-proportional damping: the overdamped limit's other half
+    glide            lateral   move along the heading at the type's own speed
+    sediment         lateral   a constant settling drift
+    attractor_flow   lateral   ride a prescribed chaotic vector field, one of ten systems
+    velocity_cruise  lateral   relax the speed toward a target without turning
+    bounce           lateral   the wall and obstacle response: reflect the heading
+    gravity          lateral   a uniform body force
 """
 from __future__ import annotations
 import torch
@@ -20,12 +22,31 @@ from plexus.models.registry import register_operator
 
 @register_operator("drag", family="motion", set="particle", kind="lateral")
 class Drag(Lateral):
-    EMIT = "acceleration"            # emits an acceleration
+    """Viscous drag: a force opposing the velocity and proportional to it. Composed with a
+    force law it produces the overdamped limit; composed with noise it is a Langevin bath.
+
+    particle -> particle: reads vel, emits an acceleration.
+
+        d2x_i/dt2 = -k v_i  +  eta xi_i
+
+    k is the drag coefficient, in inverse time -- 1/k is the time a particle takes to lose
+    1 - 1/e of its speed, so large k means the velocity forgets its history within a step and
+    the dynamics become effectively first-order. eta is `noise`, the amplitude of an isotropic
+    random acceleration in world units per time squared, and xi_i a standard normal vector.
+    Drag alone is dissipative; drag plus noise is a thermal bath whose equilibrium temperature
+    is set by the ratio eta^2 / k, which is the fluctuation-dissipation relation.
+
+    Reference: Stokes, G. G. (1851). On the effect of the internal friction of fluids on the
+    motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106.
+    """
+
+    EMIT = "acceleration"            # second-order: a force on a body that has inertia
     SUPPORTED_DIMS = [2, 3]                      # acts on the D-vector velocity, dimension-generic
     REQUIRES_PARAMS = ["k"]                     # drag coefficient
     MECHANISM_TAGS = ["viscous_drag", "friction", "damping"]
     PARAM_ROLES = {"k": "drag_coefficient", "noise": "thermal_noise"}
-    REFERENCE = "Stokes, G. G. (1851). On the effect of the internal friction of fluids on the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106."
+    REFERENCE = ("Stokes, G. G. (1851). On the effect of the internal friction of fluids on "
+                 "the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -48,13 +69,35 @@ class Drag(Lateral):
 
 @register_operator("glide", family="motion", set="cell", kind="lateral")
 class Glide(Lateral):
-    EMIT = "velocity"             # emits a velocity; the ENGINE integrates pos
+    """Self-propulsion: move along the heading at the speed the element's own type carries.
+    The heading is state that other operators steer; this one only walks it.
+
+    cell -> cell: reads heading and the per-type move_speed, emits a velocity.
+
+        dx_i/dt = s_i n_i  +  eta xi_i
+
+    n_i is the unit heading vector and s_i the per-type `move_speed`, in world units per time.
+    eta is `noise`, an isotropic translational noise of the same units, and xi_i a standard
+    normal vector; with it the element is an active Brownian particle, without it a straight
+    walker that only turns when something else rewrites its heading.
+
+    Emits a velocity, not an acceleration: this is the overdamped, first-order sibling of
+    `velocity_cruise`, which drives the same speed through inertia instead.
+
+    Reference: the noisy case is the active Brownian particle; see Romanczuk, P., Bar, M.,
+    Ebeling, W., Lindner, B. & Schimansky-Geier, L. (2012). Active Brownian particles: from
+    individual to collective stochastic dynamics. Eur. Phys. J. Spec. Top. 202:1-162.
+    """
+
+    EMIT = "velocity"             # first-order: the engine integrates pos from this
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
     REQUIRES_PARAMS = []                        # no required params — speed from `move_speed` type prop; noise optional
     MECHANISM_TAGS = ["self_propulsion", "motility", "active_brownian"]
     REQUIRES_TYPE_PROPS = ["move_speed"]
     PARAM_ROLES = {"noise": "translational_noise"}
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = ("Romanczuk, P., Bar, M., Ebeling, W., Lindner, B. & Schimansky-Geier, L. "
+                 "(2012). Active Brownian particles: from individual to collective stochastic "
+                 "dynamics. Eur. Phys. J. Spec. Top. 202:1-162.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -76,11 +119,31 @@ class Glide(Lateral):
 
 @register_operator("sediment", family="motion", set="cell", kind="lateral")
 class Sediment(Lateral):
-    EMIT = "velocity"                                # a velocity delta; the ENGINE integrates pos
+    """Sedimentation: a constant drift velocity, the terminal speed at which drag already
+    balances the settling force, so no acceleration is ever resolved.
+
+    cell -> cell: reads nothing, emits a velocity.
+
+        dx_i/dt = (gx, gy)
+
+    gx and gy are the drift components in world units per time. `g` is a convenience: it sets
+    gy = -g, i.e. straight down, since the y axis is the screen's vertical in 2D. Note that the
+    drift is written on axes 0 and 1 only, so in a 3D specification there is no settling along
+    z -- use `gravity` with `gz` if a genuine third component is wanted.
+
+    Distinguished from `gravity` by being first-order: gravity is an acceleration the medium
+    has not yet damped, this is the steady state after it has.
+
+    Reference: Stokes, G. G. (1851). On the effect of the internal friction of fluids on the
+    motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106 (Stokes settling).
+    """
+
+    EMIT = "velocity"                                # first-order: a terminal velocity, not a force
     SUPPORTED_DIMS = [2, 3]                           # uniform drift is dimension-generic
     REQUIRES_PARAMS = []                             # no required params — all knobs optional (defaults in __init__)
     PARAM_ROLES = {"g": "sediment_magnitude", "gx": "sediment_x", "gy": "sediment_y"}
-    REFERENCE = "Stokes, G. G. (1851). Trans. Camb. Phil. Soc. 9:8-106 (Stokes settling)."
+    REFERENCE = ("Stokes, G. G. (1851). On the effect of the internal friction of fluids on "
+                 "the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106 (Stokes settling).")
     MECHANISM_TAGS = ["body_force", "differential_sedimentation"]
 
     def __init__(self, params, device="cpu"):
@@ -183,14 +246,34 @@ def attractor_velocity(system: str, pos: torch.Tensor, params: dict | None = Non
     return torch.stack([xd, yd, zd], dim=-1)
 
 
-# --------------------------------------------------------------------------- #
-#  the operator -- a within-set (lateral) velocity field, engine-integrated
-# --------------------------------------------------------------------------- #
 @register_operator("attractor_flow", family="motion", set="particle", kind="lateral")
 class AttractorFlow(Lateral):
-    """Advect every particle along a strange-attractor vector field dx/dt = f(x) (see module
-    docstring for the ten systems + provenance). A first-derivative flow, so the engine does
-    x += dt*f(x) (forward Euler); a small dt keeps a dissipative flow pinned to its attractor."""
+    """Ride a prescribed chaotic vector field: every particle is advected by the same
+    dissipative flow, so the set traces out that system's strange attractor.
+
+    particle -> particle: reads pos, emits a velocity.
+
+        dx_i/dt = c f_system(x_i)
+
+    f_system is one of ten named autonomous 3D vector fields (`system`), each with its own
+    constants, which a specification overrides by naming them directly on the operator line:
+    lorenz (sigma, rho, beta), rossler (a, b, c), halvorsen (a), aizawa (a..f), sprott_b (a),
+    thomas (b), dadras (a..e), chen (a, b, c), chua (alpha, beta, m0, m1) and
+    rabinovich_fabrikant (alpha, gamma). c is `scale`, a dimensionless time rescaling: c > 1
+    runs the same trajectory faster. `clamp` caps |dx/dt| in world units per time and is a
+    safety device, not physics -- a nonzero value distorts the field wherever it binds.
+
+    3D only, and that is a theorem rather than a limitation of the code: by Poincare-Bendixson
+    a continuous autonomous flow in the plane cannot be chaotic. The engine integrates with
+    forward Euler, so the timestep must stay small; too large a one drifts off the attractor
+    that a dissipative flow would otherwise stay pinned to.
+
+    Reference: Lorenz, E. N. (1963). Deterministic nonperiodic flow. J. Atmos. Sci. 20:130-141;
+    Rossler, O. E. (1976). Phys. Lett. A 57:397-398; Chua, L. O. et al. (1986). IEEE Trans.
+    Circuits Syst. 33:1072-1118; Rabinovich, M. I. & Fabrikant, A. L. (1979). Sov. Phys. JETP
+    50:311-317; Chen, G. & Ueta, T. (1999). Int. J. Bifurcat. Chaos 9:1465-1466; Sprott, J. C.
+    (1994). Phys. Rev. E 50:R647-R650; Thomas, R. (1999). Int. J. Bifurcat. Chaos 9:1889-1905.
+    """
 
     EMIT = "velocity"                 # delta IS dx/dt; engine integrates x += dt * f(x)
     SUPPORTED_DIMS = [3]              # continuous autonomous chaos requires >=3D (Poincare-Bendixson)
@@ -200,7 +283,11 @@ class AttractorFlow(Lateral):
     PARAM_ROLES = {"system": f"which attractor: one of {list(ATTRACTOR_SYSTEMS)}",
                    "scale": "time-rescale the flow (f -> scale*f); >1 = faster",
                    "clamp": "max |velocity| safety cap (0 = off)"}
-    REFERENCE = "Lorenz, E. N. (1963). Deterministic nonperiodic flow. J. Atmos. Sci. 20:130-141."
+    REFERENCE = ("Lorenz, E. N. (1963). Deterministic nonperiodic flow. J. Atmos. Sci. "
+                 "20:130-141; Rossler (1976) Phys. Lett. A 57:397; Chua et al. (1986) IEEE "
+                 "TCAS 33:1072; Rabinovich & Fabrikant (1979) Sov. Phys. JETP 50:311; Chen & "
+                 "Ueta (1999) IJBC 9:1465; Sprott (1994) Phys. Rev. E 50:R647; Thomas (1999) "
+                 "IJBC 9:1889.")
 
     # spec-line keys that are plumbing/knobs, not per-system physical constants
     _NON_CONST = {"op", "at", "to", "from", "_at", "system", "scale", "clamp",
@@ -233,13 +320,35 @@ class AttractorFlow(Lateral):
 
 
 @register_operator("velocity_cruise", "cruise", family="motion", set="particle", kind="lateral")
-class VelocityCruise(Lateral):                   # (alias `cruise`, one migration cycle)
-    EMIT = "acceleration"            # emits an acceleration
+class VelocityCruise(Lateral):
+    """Cruising: drive the speed toward a target without turning the particle. The inertial,
+    second-order sibling of `glide` -- the same self-propulsion, reached through a force.
+
+    particle -> particle: reads vel, emits an acceleration.
+
+        d2x_i/dt2 = k (v0 - |v_i|) v_i/|v_i|  +  eta xi_i  +  c (-v_iy, v_ix)
+
+    v0 is the cruising speed in world units per time and k the restoring stiffness in inverse
+    time, so 1/k is how long the particle takes to recover its speed after being slowed. The
+    restoring term points along the current heading v_i/|v_i|, which is why it never turns the
+    particle: speed and direction are decoupled, and only the noise and chirality terms rotate
+    it. eta is `noise`, an isotropic random acceleration, and xi_i a standard normal vector --
+    the Vicsek control parameter, trading order against disorder. c is `chirality`, in inverse
+    time, a force at 90 degrees to the velocity; it makes trajectories curve consistently one
+    way and so produces swirls. Chirality is 2D only, since a single rotation sense needs a
+    plane to be defined in.
+
+    Reference: Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian
+    particles with energy depots. Phys. Rev. Lett. 80:5044-5047.
+    """
+
+    EMIT = "acceleration"            # second-order: self-propulsion through a force
     SUPPORTED_DIMS = [2, 3]                     # speed restoration + isotropic noise are dimension-generic
     REQUIRES_PARAMS = ["v0"]
     MECHANISM_TAGS = ["self_propulsion", "vicsek", "active_matter"]
     PARAM_ROLES = {"v0": "cruising_speed", "noise": "orientation_noise", "chirality": "rotational_bias"}
-    REFERENCE = "Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian particles with energy depots. Phys. Rev. Lett. 80:5044-5047."
+    REFERENCE = ("Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian "
+                 "particles with energy depots. Phys. Rev. Lett. 80:5044-5047.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -287,13 +396,35 @@ def _random_unit(n, D, rng, device):
 
 @register_operator("bounce", family="boundary", set="cell", kind="lateral")
 class Bounce(Lateral):
-    EMIT = None                                 # writes `heading` in place (specular wall reflection / obstacle re-head); returns {} — not an integrable delta
+    """The boundary response for a heading-driven walker: turn it around before it leaves the
+    world, rather than letting it exit and clamping it back.
+
+    cell -> cell: reads pos, heading and move_speed, writes heading in place.
+
+    The element's tentative next position is x_i + dt s_i n_i, one step of `glide`. For every
+    axis on which that would fall outside the box, the heading's component on that axis is
+    negated -- which is specular reflection off an axis-aligned wall, and preserves the speed:
+
+        n_ia <- -n_ia   for each axis a where the step would exit,   then n_i <- n_i / |n_i|
+
+    An obstacle (a 2D rectangle [x0, y0, x1, y1] or disc [cx, cy, r]) has no single axis-aligned
+    normal to reflect against, so the element is re-headed instead. `noise` is the fraction of
+    that re-heading that is random, from 0 to 1: 0 reverses the heading exactly, 1 picks an
+    isotropic random direction, and intermediate values blend the two before renormalising.
+
+    Under periodic boundaries the operator returns immediately: a torus has no wall.
+
+    Reference: none -- specular reflection off a box is standard practice, not a result.
+    Plexus (this work).
+    """
+
+    EMIT = None                                 # writes heading in place, returns no delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic specular wall reflection
     REQUIRES_PARAMS = []                         # no required params — `noise` optional
     MECHANISM_TAGS = ["boundary_condition", "wall_reflection", "obstacle_avoidance", "steering"]
     REQUIRES_TYPE_PROPS = ["move_speed"]        # needs the step length it is about to take
     PARAM_ROLES = {"noise": "obstacle_reheading_randomness"}
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = "Plexus (this work); specular reflection off a box is standard practice."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -336,9 +467,26 @@ class Bounce(Lateral):
 
 @register_operator("gravity", family="mechanics", set="cell", kind="lateral")
 class GravityOperator(Lateral):
-    EMIT = "mpm_acceleration"                  # a body accel the MPM substep consumes as a_ext;
-    # NOT engine-integrated on the cell (the cell is a centroid readout), so `cell` never
-    # enters H.emit_order and the engine never advects it under gravity.
+    """A uniform body force: the same acceleration on every element, independent of its state.
+
+    cell -> cell: reads nothing, emits an acceleration the MPM substep consumes.
+
+        a_i = (gx, gy, gz)
+
+    The three components are in world units per time squared. `g` is a convenience setting
+    gy = -g. The default direction is -y because in 2D that is the screen's vertical; in 3D the
+    screen's vertical is z, as both mplot3d and VTK put z up, so a 3D specification wanting a
+    fall that looks vertical writes `gy: 0.0, gz: -9.0`. gz defaults to 0, so a specification
+    written before z existed keeps the -y fall it had.
+
+    Emits `mpm_acceleration`, which the MPM substep consumes as an external body acceleration.
+    It is deliberately NOT engine-integrated on the cell set: a cell here is a centroid read out
+    from its material points, so integrating it directly would make it fall twice.
+
+    Reference: Newton, I. (1687). Philosophiae Naturalis Principia Mathematica.
+    """
+
+    EMIT = "mpm_acceleration"                  # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]                           # uniform body force is dimension-generic
     REQUIRES_PARAMS = []                              # no required params — direction/magnitude optional (default -y down)
     PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y",
@@ -352,12 +500,6 @@ class GravityOperator(Lateral):
         self.g = float(params.get("g", 10.0))            # magnitude (world units / time^2)
         self.gx = float(params.get("gx", 0.0))           # x-component (default 0)
         self.gy = float(params.get("gy", -self.g))       # y-component (default -g: down)
-        # z-COMPONENT, DEFAULT ZERO -- so every spec written before this line keeps the -y fall it
-        # had, bit for bit, and the promotion twins stay comparable. The default is -y because in 2D
-        # that IS the screen's vertical; in 3D the screen's vertical is z (mplot3d and VTK both put
-        # their own z up), so a 3D spec that wants a visible fall writes `gy: 0.0, gz: -9.0` and the
-        # drop is vertical in the picture as well as in the numbers. Two rungs of the cell ladder
-        # were read as "bouncing diagonally" for exactly this mismatch.
         self.gz = float(params.get("gz", 0.0))
 
     def forward(self, H, mask=None):
