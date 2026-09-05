@@ -150,6 +150,20 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # appears in half the corpus and would sweep every vertex-model spec into a directory nobody
     # chose.
     ("cell",        ("^cell_",)),
+    # THE TISSUE FOLDER -- the epithelium itself, written in the plexus2 spelling.
+    #
+    # WHY IT EXISTS SEPARATELY FROM `config/okuda/`. That folder is a 1,256-spec CAMPAIGN ARCHIVE:
+    # its specs are the record of what a search tried, they carry the spellings of the day they were
+    # written, and rewriting them costs the archive its own provenance. `config/tissue/` is the
+    # opposite kind of folder -- a small, hand-kept set of the runs the promotion is actually
+    # measured on, each in the CURRENT form: seeds in a `seed:` section, canonical operator names,
+    # hypotheses on the `model:` axis, no `mode:` and no seed window.
+    #
+    # NO TRIGGER SUBSTRINGS, deliberately, and for the reason `cell` has none: these specs are named
+    # for the experiment (`b_star`, `r010_00_ctrl`) rather than for the folder, and any substring
+    # short enough to match them would sweep half the corpus. They are addressed explicitly as
+    # `tissue/<name>`, which `add_pre_folder` honours through its `"/" in config_name` branch.
+    ("tissue",      ()),
     # THE NEURAL FOLDER. Recurrent circuits: a `neuron` set, a `synapse` edge-set carrying the
     # connectivity matrix, and the assemblies that contain them (`operators/neural.py`). Trigger
     # substrings are given because these specs are named for what they model -- `ctrnn_*`,
