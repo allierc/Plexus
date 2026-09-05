@@ -1,33 +1,39 @@
-"""The basement membrane: a crosslinked shell between the epithelium and the stroma.
+"""The basement membrane: a thin crosslinked sheet between the epithelium and the stroma, and
+everything that holds it there.
 
-    bm_seed / bm_bond / bm_crosslink / bm_unbond / bm_remodel / bm_secrete
-                        the sheet, its network, and how the network turns over
-    bm_contact / bm_repel                   it does not pass through what it rests on
-    adhesion_seed / adhesion_pull / adhesion_turnover
-                        the sheet's grip on the epithelium, and how that grip renews
-    integrin_adhesion   MEMBRANE -> EPITHELIUM: each particle is pulled back to the angular
-                        position it was seeded on, so a surface whose radius triples stretches its
-                        bonds by ~R -- the loading a real basement membrane feels under growth
-    integrin_seed / integrin_pull / integrin_track
-                        MATRIX -> MEMBRANE: fibres seeded outward, each bound at its tip to the
-                        nearest membrane particle, with the cell end prescribed
+The sheet is a set of particles joined by breakable springs. Its mechanics come from those
+crosslinks, its position from the anchors, and its fragmentation from bonds failing -- so the
+interesting quantity throughout is a bond's STRAIN, the fractional extension it is carrying.
 
-THE TWO INTEGRIN FAMILIES ARE ONE HOP APART IN THE SAME CHAIN AND ARE NOT THE SAME THING. The shared
-prefix is what invites the confusion, so they are here together with that sentence at the top rather
-than in two files where nobody compares them.
+In the order they appear below:
 
-TWO OPERATORS DID NOT COME. `mpm_boundary` and `bm_strain` stay in `discovery_okuda/ops/membrane_ops.py`
-and are registered only there, so archived specs still run and no new spec can reach them from core.
-`mpm_boundary` overwrites grid-node velocity -- kinematic, momentum not conserved, the reaction
-discarded -- and its standoff is set by the B-spline stencil width, measured across `recover`
-0/2/6/20 as 46.6%/3.8%/11.5%/13.9% of the sheet inside the tissue against standoffs
-+0.0006/+0.0124/+0.0088/+0.0069, never reaching the 0 -> +0.002 that would mean "just touching".
-`integrin_track` is the constraint it should have been. `bm_strain` is, in AUDIT's words, "not a
-mechanism".
+    basement_membrane_particle  entity      a material point of the sheet (MPM state)
+    basement_membrane_node      entity      the same point without the continuum state
+    bm_seed                     seed        the shell, laid down once just outside the epithelium
+    bm_bond                     lateral     the crosslinks: springs, each with its own rest length
+    bm_unbond                   rewire      break the over-strained ones -- fragmentation
+    integrin_adhesion           lateral     anchor each particle to the angular position it was
+                                            seeded on, so growth stretches its bonds
+    bm_remodel                  structural  rest lengths creep, so the sheet can grow not just stretch
+    bm_contact                  lateral     it does not pass through what it rests on
+    adhesion_seed / _pull / _turnover       hemidesmosomes: the grip, its force, and its renewal
+    bm_repel                    lateral     excluded volume between unbonded nodes
+    bm_secrete                  structural  new material as the surface it sits on grows
+    bm_crosslink                rewire      new bonds between nodes that have drifted into range
+    integrin_particle           entity      a material point of an integrin fibre
+    integrin_seed / _track / _pull          fibres from the surface outward, bound at the tip
 
-THE RESOLUTION LIMIT TRAVELS WITH THE COUPLING. At `n_grid 48`, `dx = 0.021` against a 0.002-thick
-sheet: one grid cell holds ~16 membrane particles, so the coupling strength here was set by grid
-resolution and not by a measured adhesion.
+THE TWO INTEGRIN FAMILIES ARE ONE HOP APART IN THE SAME CHAIN AND ARE NOT THE SAME THING.
+`integrin_adhesion` anchors the MEMBRANE to the EPITHELIUM. `integrin_seed`, `integrin_track` and
+`integrin_pull` run fibres from the epithelium out through the MATRIX to the membrane. The shared
+prefix is what invites the confusion, so they are documented together rather than in two files
+where nobody compares them.
+
+A RESOLUTION LIMIT TRAVELS WITH ANY GRID COUPLING, and it is worth stating once at the top. The
+sheet is far thinner than a grid cell, so a single cell holds many membrane particles: anything
+that couples the sheet to another body THROUGH THE GRID has its strength set by the grid
+resolution rather than by an adhesion parameter. That is why the anchoring, the contact and the
+integrin pull are all per-particle forces here, and not boundary conditions on grid nodes.
 """
 from __future__ import annotations
 import math
@@ -59,12 +65,14 @@ MEMBRANE_STRAIN: list = []       # per-particle bond strain, for the renderer
     render={"color_by": "node_type", "arrows": None},
 )
 class BasementMembraneParticle:
-    """A material point of the basement membrane. Same continuum state as `mpm_particle` (F, C, mass,
-    Lame mu/la, p_vol) via the stock provision; the bonds are separate and live in `bm_bond`.
+    """A material point of the basement membrane, carrying the same continuum state as any other
+    MPM particle -- the deformation gradient F, the affine velocity C, mass, the Lame parameters mu
+    and lambda, and the rest volume p_vol -- through the stock provision. The crosslinks are not
+    part of it; they live in `bm_bond`.
 
-    REGISTERED BECAUSE THE ENTITY IS RESOLVED BY SET NAME. An unregistered set name silently falls back
-    to a bare pos/vel schema, and the run then dies inside `mpm_strain` with `'Level' object has no
-    attribute 'F'` -- which reads like a bug in the MPM operator and is a missing three-line class.
+    Registered because the entity is resolved BY SET NAME. An unregistered set name falls back
+    silently to a bare position/velocity schema, and the run then dies inside `mpm_strain` on a
+    missing F -- which reads like a bug in the MPM operator and is a missing three-line class.
     """
     provision = MPMParticle.provision
 
@@ -73,26 +81,18 @@ class BasementMembraneParticle:
 class BasementMembraneNode:
     """A node of the SPRING-GRAPH membrane: position and velocity, and nothing else.
 
-    WHY THIS EXISTS ALONGSIDE `BasementMembraneParticle`. The MPM version carries a full continuum state
-    -- deformation gradient, affine momentum, Lame parameters, particle volume -- and NONE of it is read
-    by anything that matters. The sheet's mechanics come from the crosslinks, its position from the
-    integrin springs, its fragmentation from bonds breaking, and every figure colours it by crosslink
-    strain rather than by MPM stress. What the MPM state actually buys is one thing: momentum exchange
-    with the interstitial matrix through the shared grid, because that is how every body in this model
-    couples to every other.
+    The alternative, `BasementMembraneParticle`, carries a full continuum state -- deformation
+    gradient, affine momentum, Lame parameters, particle volume -- and none of it is read by
+    anything that decides the sheet's behaviour. The mechanics come from the crosslinks, the
+    position from the integrin springs, the fragmentation from bonds breaking, and the figures
+    colour it by crosslink strain rather than by MPM stress. The one thing the continuum state
+    buys is momentum exchange with the interstitial matrix through the shared grid.
 
-    AND THAT ONE THING IS THE PART THAT DOES NOT WORK. At n_grid = 48 the cell is dx = 0.021 against a
-    sheet 0.002 thick with 0.005 particle spacing: one grid cell holds about sixteen membrane particles
-    and is ten times thicker than the sheet, so the coupling strength is set by grid resolution rather
-    than by any parameter of the model. We were paying the full continuum cost for a coupling the grid
-    cannot resolve -- and paying it in bugs, twice: a parked reserve particle accumulating a garbage
-    deformation gradient (ECM p99 392 against 2-8), and a membrane von Mises stress computed every frame
-    and discarded.
-
-    So this entity drops the continuum state. The trade is that the membrane is no longer "just another
-    MPM body" and cannot inherit `mpm_scatter`/`mpm_gather` for free: coupling to the matrix has to
-    become an explicit operator (`basement_to_ecm`), which is the honest form of it anyway, and resolves
-    at the sheet's own length scale instead of the grid's.
+    And that one thing is resolution-limited rather than physical. The grid cell is an order of
+    magnitude thicker than the sheet, so a single cell holds on the order of ten membrane
+    particles: the coupling strength is then set by the grid resolution rather than by any
+    parameter of the model. A spring-graph node states that plainly instead of carrying state that
+    implies a continuum coupling the discretisation cannot deliver.
     """
     @staticmethod
     def provision(lvl, parent, s, H, device):
@@ -104,14 +104,27 @@ class BasementMembraneNode:
 
 @register_operator("bm_seed", family="seed", set="particle", kind="seed")
 class BasementMembraneSeed(Structural):
-    """Lay the membrane down ONCE, as a shell just OUTSIDE the epithelium's surface.
+    """Lay the membrane down once, as a shell just OUTSIDE the epithelium's surface.
 
-    OUTSIDE, because the topology is a gland/acinus: basal faces outward, so the basement membrane is on
-    the outer surface with the stroma beyond it. (An embryo-like vesicle has apical out and would put it
-    inside; the two are not interchangeable and the geometry has to be stated, not assumed.)
+    basement_membrane -> basement_membrane: writes every position at the opening of the trajectory.
 
-    The surface comes from the recorded angular radius map -- the same `smap` the contact operator uses --
-    so the membrane starts exactly where the tissue is and not at a guessed radius.
+        x_i = c + u_i (S R(theta_i, phi_i) + offset)
+
+    u_i is a quasi-uniformly distributed unit direction, R the recorded angular radius map of the
+    epithelium -- the same one the contact operator reads, so the membrane starts exactly where the
+    tissue is rather than at a guessed radius -- S the `scale`, and `offset` the standoff in world
+    units.
+
+    OUTSIDE, because the topology is a gland or acinus: the basal faces point outward, so the
+    basement membrane is on the outer surface with the stroma beyond it. An embryo-like vesicle has
+    apical out and would put the membrane inside. The two are not interchangeable, so the geometry
+    is stated rather than assumed.
+
+    A monolayer, not a slab: at a thickness of more than a few particle spacings the k-nearest
+    crosslink search bonds through the sheet rather than across it, and the result resists bending
+    like a solid instead of stretching like a membrane. The directions are jittered rather than
+    laid on a regular lattice, because a lattice makes the crosslink network inherit its regularity
+    and the strain field then shows the lattice instead of the mechanics.
     """
 
     EMIT = None
@@ -291,9 +304,9 @@ class BasementMembraneSeed(Structural):
         alive = torch.zeros(n, dtype=torch.bool, device=dev)
         # STRIDED, NOT THE FIRST n0. The Fibonacci lattice is generated with ct = 1 - 2i/n, so its index
         # runs monotonically from the north pole to the south: `alive[:n0]` is a POLAR CAP, not a sparse
-        # shell. Run 66 seeded with reserve=8 covered z in [0.500, 0.589] at frame 0 -- exactly the top
-        # ninth of the sphere -- and then grew downward as it secreted, which read as the membrane
-        # migrating upward. Every k-th point of a Fibonacci spiral is itself a coarser Fibonacci spiral,
+        # shell. Taking the first n0 covers a POLAR CAP whose extent is n0/n of the sphere, and the
+        # sheet then grows downward as it secretes, which reads as the membrane migrating. Every
+        # k-th point of a Fibonacci spiral is itself a coarser Fibonacci spiral,
         # so a stride gives a uniform sparse shell and the reserve fills in between.
         if self.implementation == "relaxed":
             # THE FIRST n0, because for `relaxed` those ARE the set that was relaxed -- the reserve
@@ -354,15 +367,39 @@ class BasementMembraneSeed(Structural):
 
 @register_operator("bm_bond", family="mechanics", set="particle", kind="lateral")
 class BasementMembraneBond(Lateral):
-    """Crosslinks: springs between neighbouring membrane particles, built once and then breakable.
+    """Crosslinks: springs between neighbouring membrane particles, built once and thereafter
+    breakable. They are what makes the sheet a membrane rather than a cloud of stiff dust.
 
-    THE BONDS ARE WHAT MAKES IT A MEMBRANE rather than a cloud of stiff dust. Built at first call from a
-    radius search on the seeded shell, each with its own rest length, so the sheet resists stretching in
-    its own plane -- which is how a basement membrane carries load and what `Collagen IV` contributes
-    most of (Topfer 2022 measured stiffness as mainly collagen-dependent).
+    basement_membrane -> basement_membrane: reads pos, emits an acceleration.
 
-    EMITS AN ACCELERATION, so the engine integrates it with everything else acting on the set rather than
-    this operator moving particles behind the solver's back.
+        L_e     = |x_j - x_i|
+        f_e     = k (L_e - rest_e) (x_j - x_i) / L_e            on i, and -f_e on j
+        strain_e = (L_e - rest_e) / rest_e                       reported, and used for breaking
+
+    rest_e is each bond's own rest length, recorded when it formed, in world units; k is the
+    crosslink stiffness in inverse time squared, so k times a length is an acceleration. The sheet
+    therefore resists stretching IN ITS OWN PLANE, which is how a basement membrane carries load
+    and is mostly what collagen IV contributes.
+
+    HOOKEAN IN THE EXTENSION, NOT IN THE STRAIN, and the difference is not cosmetic. k * strain is
+    k (L - rest) / rest, and rest is the particle spacing -- a small number -- so writing the force
+    that way multiplies the declared stiffness by 1/rest, which for a typical spacing is a factor
+    of several hundred. A nominal stiffness then acts as an enormous one, one percent of strain
+    produces an acceleration that moves a particle several times its own spacing in a frame, and
+    the sheet oscillates and tears itself apart before the tissue has grown into it. The BREAKING
+    criterion stays relative, because strain is the right dimensionless failure measure; only the
+    force is extension-based.
+
+    `aniso` makes crosslinks stiffer around the girth than along the long axis -- the molecular
+    corset: a sheet resisting circumferential expansion more than meridional expansion squeezes the
+    middle and pushes growth into the ends. A bond's orientation is measured against the local
+    circle of latitude.
+
+    It emits an acceleration rather than moving particles itself, so the engine integrates it
+    alongside everything else acting on the set rather than behind the solver's back.
+
+    Reference: Topfer, U. et al. (2022). Basement membrane stiffness determines organ shape.
+    Collagen IV is the principal contributor to basement-membrane stiffness.
     """
 
     # `mpm_acceleration` routes the force into the MPM substep as an external body force; `acceleration`
@@ -626,13 +663,13 @@ class BasementMembraneBond(Lateral):
         d = pos[self.j] - pos[self.i]
         L = d.norm(dim=-1).clamp_min(1e-9)
         strain = (L - self.rest) / self.rest
-        # HOOKEAN IN THE EXTENSION, NOT IN THE STRAIN -- and getting this wrong made the operator 450x
-        # stiffer than the number it was given. `k * strain` is `k * (L - rest) / rest`, and `rest` is the
-        # particle spacing, ~0.0022 box units: so a nominal k of 4e4 acted as 1.8e7. One percent of strain
-        # produced an acceleration of 400, which over a frame moves a particle three times its own
-        # spacing -- the sheet overshot, oscillated and tore itself apart, 69,428 of 70,129 bonds gone
-        # within 40 frames before the tissue had grown into it. The BREAKING criterion stays relative
-        # (strain is the right dimensionless failure measure); only the force is extension-based.
+        # HOOKEAN IN THE EXTENSION, NOT IN THE STRAIN. `k * strain` is `k * (L - rest) / rest`, and
+        # `rest` is the particle spacing -- a small number -- so writing the force that way scales
+        # the declared stiffness by 1/rest, a factor of several hundred at a typical spacing. One
+        # percent of strain then produces an acceleration that moves a particle several times its
+        # own spacing in a frame, and the sheet overshoots, oscillates and tears itself apart
+        # before the tissue has grown into it. The BREAKING criterion stays relative, since strain
+        # is the right dimensionless failure measure; only the force is extension-based.
         # THE CORSET. `aniso` makes crosslinks stiffer around the girth than along the long axis, which
         # is the "molecular corset" idea: a sheet that resists circumferential expansion more than
         # meridional expansion should squeeze the middle and push growth into the ends.
@@ -673,8 +710,8 @@ class BasementMembraneBond(Lateral):
         acc = torch.zeros_like(pos)
         acc.index_add_(0, self.i, f)
         acc.index_add_(0, self.j, -f)
-        # F/gamma, so the emitted quantity is a VELOCITY, not an acceleration (see ecm_spec's graph
-        # branch). gamma = 0 keeps the inertial path bit-identical for the comparison runs.
+        # F/gamma, so the emitted quantity is a VELOCITY, not an acceleration. gamma = 0 leaves the
+        # inertial path untouched, so the two can be compared at the same operating point.
         if self.gamma > 0:
             acc = acc / self.gamma
         # per-particle strain for the renderer: mean |strain| over its live bonds
@@ -699,13 +736,24 @@ class BasementMembraneBond(Lateral):
 
 @register_operator("bm_unbond", family="topology", set="particle", kind="rewire")
 class BasementMembraneBondBreak(Structural):
-    """Break over-strained crosslinks. FRAGMENTATION, as an emergent and measurable event.
+    """Break over-strained crosslinks: fragmentation as an emergent and measurable event rather
+    than a mechanism bolted onto the mechanics.
 
-    `kind="rewire"` is not decoration: a broken crosslink changes the relation E, which is exactly what
-    that kind is for in Plexus, and it is why fragmentation does not need a bespoke mechanism bolted onto
-    the mechanics. What it reports is the thing that matters -- not how many bonds broke, but whether the
-    sheet is still ONE PIECE. A membrane that has lost a third of its bonds and remains connected is not
-    fragmented, and the difference is a connected-component count, so that is what is measured.
+    basement_membrane -> basement_membrane: reads pos and the bond list, marks bonds dead.
+
+        bond e dies when   (L_e - rest_e) / rest_e  >  break_strain
+
+    break_strain is dimensionless -- the fractional extension a crosslink survives. Checked every
+    `every` frames rather than continuously, since bond failure is slow beside the mechanics.
+
+    The kind is `rewire`, and that is not decoration: a broken crosslink changes the relation, which
+    is exactly what a Rewire is for.
+
+    What it reports is the thing that matters -- not how many bonds broke, but whether the sheet is
+    still ONE PIECE. A membrane that has lost a third of its bonds and is still connected is not
+    fragmented, so what is measured is the size of the largest connected component.
+
+    Reference: Plexus (this work); failure of a crosslinked network at a critical extension.
     """
 
     EMIT = None
@@ -754,8 +802,9 @@ class BasementMembraneBondBreak(Structural):
             self._frac = self._largest_component(i[alive], j[alive], pos.shape[0], denom=_n)
         frac = getattr(self, "_frac", float("nan"))
         # MEAN DEGREE, the quantity that says whether this is a sheet at all. Central-force rigidity
-        # percolation in 2D needs z ~ 4; run 74 finished at 2*47046/37424 = 2.51 and was read as an
-        # intact sheet whose taut bonds had broken. Reporting z makes that unmissable.
+        # percolation in 2D needs z of about 4, so a network below that is not a sheet at all --
+        # however many bonds it still has. Reporting z makes an under-connected network unmissable
+        # where a bond count alone reads as an intact sheet whose taut bonds happen to have broken.
         n_live = int(getattr(self, "_n_live", pos.shape[0])) or pos.shape[0]
         z = 2.0 * int(alive.sum()) / max(n_live, 1)
         BOND_TRACE.append((int(alive.sum()), n_broke, float(strain[alive].abs().mean())
@@ -785,29 +834,47 @@ class BasementMembraneBondBreak(Structural):
 
 @register_operator("integrin_adhesion", family="mechanics", set="particle", kind="lateral")
 class IntegrinAdhesion(Lateral):
-    """Anchor the basement membrane to the epithelium, the way integrins do.
+    """Anchor the basement membrane to the epithelium, the way integrins do: each particle is
+    pulled back toward the angular position it was seeded on, on a surface that is growing.
 
-    THE DEFECT THIS FIXES, AND IT INVALIDATED A RESULT. Without adhesion the membrane touches the
-    epithelium only through the shared MPM grid, which resists PENETRATION and nothing else -- so the
-    sheet slides freely over the surface. A growing tissue then pushes it outward and its particles
-    rearrange, relieving exactly the in-plane strain that fragmentation is supposed to be about. Runs
-    `59`/`60` measured a sheet that slips, not one that is pulled, so their breakage numbers describe the
-    wrong loading path.
+    basement_membrane -> basement_membrane: reads pos and vel and a recorded surface, emits an
+    acceleration.
 
-    Anchored, the geometry does the work: a particle pinned to a fixed ANGULAR position on a surface whose
-    radius triples must accommodate an area that grows as R^2, so its bonds stretch by ~R. That is the
-    loading a basement membrane actually experiences under tissue growth, and it is the reason a growing
-    epithelium has to remodel its membrane rather than merely displace it.
+        anchor_i = c + u0_i (S R(theta_i, phi_i) + offset)
+        a_i      = k (anchor_i - x_i)  -  damp * v_i
 
-    WHAT IS ANCHORED TO WHAT. Each particle keeps the direction u0 it was seeded on and is pulled toward
-    `R(u0, t) + offset` along it -- the current surface radius in its OWN direction. So the anchor follows
-    the tissue outward (integrins stay attached while the cell grows) but does not follow it sideways
-    (integrins resist shear). The tangential component is what makes this different from contact.
+    u0_i is the direction the particle was SEEDED on, frozen -- recomputing it each frame would
+    make the anchor follow the particle, which is not an anchor but a no-op that looks like one.
+    k is the adhesion stiffness in inverse time squared and `damp` a damping in inverse time.
 
-    `detach` IS OPTIONAL AND OFF BY DEFAULT. Integrin bonds do rupture under load, and a version where
-    they do is a different experiment -- hemidesmosome failure rather than collagen failure -- so it is a
-    parameter and not a silent behaviour. With `detach=0` the adhesion is permanent and every failure the
-    run shows is the CROSSLINK network's, which is the cleaner first experiment.
+    Without this, the membrane touches the epithelium only through the shared MPM grid, which
+    resists penetration and nothing else -- so the sheet SLIDES freely over the surface. A growing
+    tissue then pushes it outward and its particles rearrange, relieving exactly the in-plane
+    strain that fragmentation is about. Anchored, the geometry does the work: a particle pinned to
+    a fixed angular position on a surface whose radius triples must accommodate an area growing as
+    R^2, so its bonds stretch by about R. That is the loading a real basement membrane experiences
+    under tissue growth, and the reason a growing epithelium must remodel its membrane rather than
+    merely displace it.
+
+    THE DASHPOT IS NOT A TUNING KNOB. The anchor MOVES, and an undamped spring does not track a
+    moving target -- it oscillates about it with amplitude of order v/omega. When that amplitude is
+    comparable to a bond rest length, every particle sits permanently above any sane failure strain
+    and the whole crosslink network breaks. `damp` defaults to the critical value 2 sqrt(k), so the
+    anchor is tracked rather than orbited: under-damped it oscillates, over-damped it lags, and a
+    lagging anchor stretches the sheet, which is a different experiment.
+
+    `k_compress` splits the spring: a fibre is easy to stretch and hard to squash, so a single
+    stiffness both ways leaves the only thing keeping the sheet out of the epithelium as weak as
+    the thing pulling it along. The split is applied RADIALLY, because that is the direction the
+    fibre's length lives in; the tangential part of the offset is shear, which an integrin resists
+    the same way whichever side the sheet is on.
+
+    `tau_adh` lets the anchor direction itself creep toward the particle's current one over that
+    many frames, which is adhesion turnover; `detach` unbinds a particle whose anchor offset
+    exceeds a given length.
+
+    Reference: Streuli, C. H. (2009). Integrins and cell-fate determination. Curr. Opin. Cell Biol.
+    21:194-198; integrin alpha-6 beta-4 and dystroglycan bind laminin directly.
     """
 
     EMIT = "mpm_acceleration"
@@ -890,9 +957,10 @@ class IntegrinAdhesion(Lateral):
         # zero and its "direction" is numerical noise. Freezing that at frame 0 and using it the moment
         # the particle is secreted anchors it to an arbitrary point on the far side of the sphere: the
         # spring yanks it across the tissue and drags its brand-new crosslinks past the break threshold.
-        # That is why secretion added 21,613 particles to run 66 and only 1,099 surviving bonds --
-        # 0.05 per particle against the 3.4 a seeded one gets -- and why run 67's sheet lost 66% of its
-        # network. A particle's direction must be frozen when IT is laid down, not when the array was.
+        # A newly secreted particle would then be yanked across the tissue and its brand-new
+        # crosslinks dragged past the break threshold, so secretion adds particles and almost no
+        # surviving bonds. A particle's direction must be frozen when IT is laid down, not when the
+        # array was.
         alive = getattr(H, "membrane_alive", None)
         if alive is not None:
             if self._alive_prev is None:
@@ -937,11 +1005,11 @@ class IntegrinAdhesion(Lateral):
             self.bound &= delta.norm(dim=1) < self.detach
         # A DASHPOT, NOT JUST A SPRING -- and its absence destroyed the sheet. The anchor MOVES: the
         # surface grows at ~5.4e-4 box units per frame, and an undamped spring does not track a moving
-        # target, it oscillates about it with amplitude ~v/omega = 0.135/141 = 1e-3 box units. The bond
-        # rest length is 2.2e-3, so every particle was oscillating by half a bond length -- ~45% strain,
-        # above any sane failure threshold, on every particle, forever. 105,420 of 105,496 crosslinks
-        # broke and the freed particles (stiffer than the stroma) were flung through it, which is what
-        # the white plumes in `61`'s movie are. Critical damping c = 2*sqrt(k) makes it track instead.
+        # target, it oscillates about it with amplitude of order v/omega, v being the surface's
+        # growth speed and omega = sqrt(k). When that amplitude approaches the bond rest length,
+        # every particle sits permanently above any sane failure strain and the entire crosslink
+        # network breaks; the freed particles, stiffer than the stroma, are then flung through it.
+        # Critical damping c = 2*sqrt(k) makes the particle track the anchor instead.
         vel = lvl.get("vel") if "vel" in lvl.state_schema else None
         acc = self.k * delta
         # A FIBRE IS EASY TO STRETCH AND HARD TO SQUASH, and until now this spring was neither -- one
@@ -985,26 +1053,35 @@ class IntegrinAdhesion(Lateral):
 
 @register_operator("bm_remodel", family="population", set="particle", kind="lateral")
 class BasementMembraneRemodel(Lateral):
-    """Crosslink turnover: the rest lengths creep toward the current ones, so the sheet can GROW.
+    """Crosslink turnover: the rest lengths creep toward the current ones, so the sheet can GROW
+    rather than only stretch.
 
-    WHY THIS IS NOT OPTIONAL, AND THE TEST THAT SAID SO. A purely elastic basement membrane cannot
-    accommodate the epithelium it encloses. Measured on this tissue: the surface radius goes 0.0825 ->
-    0.1373 in 150 frames, a 66% linear stretch, and 0.30 by the end -- 260%. Sweeping the crosslink
-    failure strain over 0.05 / 0.20 / 0.60 destroyed the sheet at every value (largest connected
-    component 0.000 / 0.000 / 0.007), because every one of those thresholds is smaller than the strain
-    growth imposes. The conclusion is not that the model is broken: it is that a membrane which only
-    stretches must fail, so a growing epithelium HAS to remodel and re-secrete its basement membrane
-    rather than merely inflate it. That is what the literature describes and what this operator adds.
+    basement_membrane -> basement_membrane: rewrites the bonds' reference state. No delta.
 
-    THE FORM: `rest <- rest + (L - rest) * dt / tau`. A Maxwell-like relaxation of the reference state,
-    which is what turnover does mechanically -- material is removed under load and redeposited at the new
-    spacing, so the sheet forgets the strain over a timescale. It does NOT relieve the current force
-    (that would make the membrane a fluid); it moves the reference the force is measured from.
+        rest_e <- rest_e + (L_e - rest_e) dt / tau        capped at `cap` per frame
 
-    SO FRAGMENTATION BECOMES A RACE, which is the interesting statement. `tau` against the growth
-    timescale decides everything: remodel faster than the tissue grows and the sheet stays intact and
-    unstressed; slower and strain accumulates until crosslinks fail. A single number now separates
-    "the membrane keeps up" from "the membrane tears", and neither is assumed.
+    tau is the turnover timescale in frames and `cap` the largest fractional change a rest length
+    may take in one frame, both dimensionless. This is a Maxwell-like relaxation of the REFERENCE
+    state, which is what turnover does mechanically: material is removed under load and redeposited
+    at the new spacing, so the sheet forgets the strain over a timescale. It does not relieve the
+    current force -- that would make the membrane a fluid -- it moves the reference the force is
+    measured from.
+
+    A purely elastic basement membrane cannot accommodate the epithelium it encloses. An acinus
+    whose radius grows severalfold imposes a linear stretch far above any crosslink failure strain,
+    so lowering or raising that threshold does not help: every value is smaller than the strain
+    growth imposes, and the sheet is destroyed at all of them. The conclusion is not that the model
+    is broken but that a membrane which only stretches MUST fail, so a growing epithelium has to
+    remodel and re-secrete its basement membrane.
+
+    Fragmentation therefore becomes a race, which is the interesting statement: tau against the
+    growth timescale decides everything. Remodel faster than the tissue grows and the sheet stays
+    intact and unstressed; slower, and strain accumulates until crosslinks fail. One number
+    separates "the membrane keeps up" from "the membrane tears", and neither is assumed.
+
+    Reference: Ku, H.-Y. et al. (2023). Basement membrane mechanics regulates matrix
+    metalloproteinase expression. Dev. Cell 58:211-223; Villeneuve, C. et al. (2024). Proteolytic
+    softening releases pressure and permits local division. Nat. Cell Biol. 26:207-218.
     """
 
     EMIT = None                     # rewrites the bonds' reference state; no delta
@@ -1082,43 +1159,41 @@ class BasementMembraneRemodel(Lateral):
 
 
 
-# `MPMTissueBoundary` is NOT PROMOTED -- see AUDIT.md. It stays in discovery_okuda/ops/membrane_ops.py.
-
-
-# `BasementMembraneContinuumStrain` is NOT PROMOTED -- see AUDIT.md. It stays in discovery_okuda/ops/membrane_ops.py.
+# Two operators are deliberately absent. A grid boundary condition on the tissue -- overwriting
+# grid-node velocity -- is kinematic, does not conserve momentum, discards the reaction, and leaves
+# a standoff set by the B-spline stencil width rather than by anything physical; `integrin_track`
+# is the constraint it should have been. A continuum strain readout on the sheet is a measurement
+# of MPM state that nothing in this model reads, the mechanics being carried by the crosslinks.
 
 
 
 @register_operator("bm_contact", family="boundary", set="particle", kind="lateral")
 class BasementMembraneContact(Lateral):
-    """Non-penetration between the sheet and the epithelium, as a FORCE on each particle.
+    """Non-penetration between the sheet and the epithelium, imposed as a FORCE on each particle
+    rather than as a boundary condition on the grid.
 
-    WHY THIS REPLACES THE GRID BOUNDARY CONDITION. `mpm_boundary` imposes the tissue as a moving
-    obstacle by overwriting grid-node velocity, which works -- the sheet tracks the surface and carries
-    the strain the geometry implies -- but it leaves a standoff that cannot be tuned away:
+    basement_membrane -> basement_membrane: reads pos and the recorded surface, emits an
+    acceleration.
 
-        recover  0    standoff +0.0006, 46.6% of the sheet INSIDE the epithelium
-        recover  2             +0.0124,  3.8%
-        recover  6             +0.0088, 11.5%
-        recover 20             +0.0069, 13.9%
+        d_i = S R(theta_i, phi_i) + standoff - |x_i - c|
+        a_i = k d_i u_i                                      only where d_i > 0
 
-    against a target of zero-to-one-sheet-thickness (0.002). Biology is unambiguous here: a basement
-    membrane sits ON the basal plasma membrane -- integrin a6b4 and dystroglycan bind laminin directly,
-    and the lamina lucida of classical TEM is read today as a fixation artefact -- so any visible gap is
-    numerical. The reason the sweep cannot reach zero is that the constraint acts on GRID NODES, and each
-    particle smears its mass over +-1.5 cells through the B-spline stencil: part of a correctly placed
-    sheet's footprint always lands on nodes inside R, so the sheet is expelled until its whole footprint
-    clears the surface, a standoff of ~1.5 cells (0.031) set by the stencil and not by the sheet.
+    k is the contact stiffness in inverse time squared and `standoff` the clearance held in world
+    units.
 
-    Measuring penetration PER PARTICLE removes that entirely, and it makes the interaction a real force
-    pair rather than injected momentum: the reaction the tissue would feel becomes a quantity that could
-    be fed back to pass 1, instead of a diagnostic that is recorded and discarded.
+    A grid boundary condition -- overwriting the velocity of every grid node inside the tissue --
+    works in the sense that the sheet tracks the surface, but it leaves a standoff that cannot be
+    tuned away. The constraint acts on grid NODES, and each particle smears its mass over about
+    plus or minus one and a half cells through the B-spline stencil, so the effective standoff is
+    set by the STENCIL WIDTH rather than by anything physical. No amount of sweeping the recovery
+    parameter reaches zero.
 
-    THE STANDOFF THEN EMERGES rather than being dialled, from contact stiffness against whatever presses
-    the sheet inward -- which in this model is the stroma's own compression, and that is sound: a
-    spheroid growing in matrix builds solid stress that squeezes it. Adhesion is a separate operator
-    (`integrin_adhesion`) and is the primary mechanism in vivo; this one only stops the sheet entering
-    the cells.
+    Biology is unambiguous here: a basement membrane sits ON the basal plasma membrane -- integrin
+    alpha-6 beta-4 and dystroglycan bind laminin directly, and the lamina lucida of classical
+    electron microscopy is read today as a fixation artefact -- so any visible gap is numerical. A
+    per-particle force has no stencil, so the standoff is the number that was declared.
+
+    Reference: Plexus (this work); the surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386.
     """
 
     EMIT = "mpm_acceleration"
@@ -1215,7 +1290,19 @@ class BasementMembraneContact(Lateral):
 
 @register_operator("adhesion_seed", family="seed", set="particle", kind="seed")
 class AdhesionSeed(Structural):
-    """Place hemidesmosomes on the basal surface and bind each to the nearest membrane particle."""
+    """Place hemidesmosomes on the basal surface and bind each to the nearest membrane particle,
+    once, at the opening of the trajectory.
+
+    adhesion -> adhesion: writes each adhesion's position and the index of the membrane particle it
+    holds.
+
+        x_a = c + u_a (S R(theta_a, phi_a))
+        bound(a) = argmin_i |x_i - x_a|
+
+    An adhesion is therefore a RELATION -- a named pair of a surface site and a membrane patch --
+    rather than a force, and the force is `adhesion_pull`. Keeping them apart is what lets
+    `adhesion_turnover` change which patch an adhesion holds without touching the mechanics.
+    """
 
     EMIT = None
     SUPPORTED_DIMS = [3]
@@ -1279,10 +1366,22 @@ class AdhesionSeed(Structural):
 class AdhesionPull(Lateral):
     """The force a hemidesmosome exerts on the membrane patch it binds.
 
-    OVERDAMPED, because at Re ~ 1e-10 there is no inertia to speak of: the equation of motion is
-    gamma*x_dot = F, so this emits F/gamma. `integrin_adhesion` reaches the same place with a dashpot at
-    2*sqrt(k), which is an INERTIAL fix -- it damps an oscillation that only exists because the sheet was
-    given a mass. This operator has no oscillation to damp.
+    adhesion -> basement_membrane: reads both positions, emits a velocity on the membrane node.
+
+        dx_i/dt = (k / gamma) (x_a - x_i)
+
+    k is the adhesion stiffness and gamma the drag, so k/gamma is an inverse time and the ratio is
+    the only thing that matters -- the two never appear apart.
+
+    OVERDAMPED, because at the Reynolds number of a molecular tether there is no inertia to speak
+    of: the equation of motion is gamma x_dot = F, so this emits F/gamma directly.
+    `integrin_adhesion` reaches the same place with a dashpot at 2 sqrt(k), which is an INERTIAL
+    fix -- it damps an oscillation that exists only because that sheet was given a mass. This
+    operator has no oscillation to damp, and subtracting a damping term on top of dividing by gamma
+    would be damping the damping.
+
+    Reference: Plexus (this work); hemidesmosome attachment of a basement membrane to the basal
+    plasma membrane.
     """
 
     EMIT = "mpm_acceleration"
@@ -1347,11 +1446,21 @@ class AdhesionPull(Lateral):
 
 @register_operator("adhesion_turnover", family="topology", set="particle", kind="rewire")
 class AdhesionTurnover(Rewire):
-    """Rupture over-loaded adhesions and re-form them elsewhere -- focal adhesions turn over in minutes.
+    """Rupture over-loaded adhesions and re-form them elsewhere: focal adhesions turn over in
+    minutes, and a sheet should not be held by a tether it earned hundreds of frames ago.
 
-    `kind="rewire"` because what changes is the RELATION: which membrane patch each adhesion holds.
-    An adhesion stretched past `rupture` lets go, and after re-forming it binds whatever patch is now
-    beneath it. That is what stops a sheet being dragged by a tether it earned four hundred frames ago.
+    adhesion -> adhesion: reads both positions, rewrites which membrane patch each adhesion holds.
+
+        adhesion a lets go when   |x_a - x_bound(a)|  >  rupture
+        and re-binds to           argmin_i |x_i - x_a|      once re-formed
+
+    `rupture` is an extension in world units, and `reform` the number of frames an adhesion spends
+    unbound before it can bind again.
+
+    The kind is `rewire` because what changes is the RELATION -- which membrane patch each adhesion
+    holds -- and not any state on either set.
+
+    Reference: Plexus (this work); focal-adhesion turnover on the timescale of minutes.
     """
 
     EMIT = None
@@ -1405,34 +1514,25 @@ class AdhesionTurnover(Rewire):
 
 @register_operator("bm_repel", family="boundary", set="particle", kind="lateral")
 class BasementMembraneRepel(Lateral):
-    """Excluded volume between membrane nodes: push apart anything closer than l*, never pull.
+    """Excluded volume between membrane nodes: push apart anything closer than a target spacing,
+    and never pull.
 
-    WHY A SECOND FORCE, WHEN A SPRING ALREADY PUSHES WHEN COMPRESSED. It does -- this is not a missing
-    repulsion, it is an unopposed ATTRACTION. Measured on a frozen mid-run sheet, relaxing 1500 steps
-    with growth, secretion and anchors all off:
+    basement_membrane -> basement_membrane: reads pos, emits an acceleration.
 
-        two-sided spring, common rest length   d/hex 0.750   cv 0.173
-        the SAME springs, attractive half cut  d/hex 0.929   cv 0.049
-        push only, on the 6 nearest unbonded   d/hex 0.899   cv 0.031
+        a_i = k_rep sum_j (l* - L_ij) (x_i - x_j) / L_ij        over unbonded j with L_ij < l*
 
-    The bond set is not the problem; deleting the pull is worth the whole difference. The mechanism is
-    visible in the movie: the rewire bonds each node to its 6 nearest REGARDLESS of distance, so
-    crosslinks are thrown clear across a hole, and those long bonds haul the rim inward into knots of
-    short edges beside a hole that never closes. That is the picture a relaxed sheet should not have.
+    l* is the target spacing in world units and k_rep the repulsion stiffness in inverse time
+    squared. Only the pushing half exists: at L >= l* the term is zero.
 
-    Cutting the attraction outright is not an option -- a network that only pushes bears no tension, and
-    resisting the epithelium's expansion is the whole job of a basement membrane. So the pull stays and
-    excluded volume is added beside it: repulsion sets the SPACING, the springs carry the LOAD.
+    THIS IS NOT A MISSING REPULSION -- a spring already pushes when compressed. It is an unopposed
+    ATTRACTION. The crosslink rewire bonds each node to its nearest few REGARDLESS of distance, so
+    a bond can be thrown clear across a hole, and such long bonds haul the rim inward into knots of
+    short edges beside a hole that never closes. Cutting the attraction outright is not an option,
+    because a network that only pushes bears no tension and could not resist the epithelium at all.
+    A separate short-range push, acting only between UNBONDED neighbours, removes the artefact
+    without removing the tension.
 
-    THE ONE PARAMETER IS A RATIO, w = k_repel/k_bond, which is why it transfers between calibrations
-    that differ by five orders of magnitude in absolute stiffness. Swept at the run's own k and gamma:
-
-        w = 0    d/hex 0.773   cv 0.159
-        w = 8    d/hex 0.917   cv 0.020
-        w = 20   d/hex 0.884   cv 0.179     <- NOT a plateau, an instability
-
-    w = 20 is worse than w = 8 because h*z*k*(1+w)/gamma passes 2 and the integration goes unstable, so
-    the useful range is bounded from ABOVE by the integrator, not by any property of the sheet.
+    Reference: Plexus (this work); steric exclusion between the elements of a crosslinked sheet.
     """
 
     EMIT = "mpm_acceleration"
@@ -1450,13 +1550,11 @@ class BasementMembraneRepel(Lateral):
         self.every = int(params.get("every", 20))
         self.gamma = float(params.get("overdamped_gamma", 0.0))
         self.range_scale = float(params.get("range_scale", 1.0))   # repel range, in units of l*
-        # `ar` swaps the one-sided linear spring for Plexus's own attraction_repulsion law, run in its
-        # purely repulsive form. Measured on run 85's middle frame, 300 iterations on the frozen sheet:
-        #     start                      d/hex 0.677   cv 0.243
-        #     linear, range 1.0 l*       (this is what 85 already is)
-        #     ar,     range 3.0 l*       d/hex 0.895   cv 0.052
-        # The archived `blue` parameters do NOT do this. f(0) = p0 - p2, and blue's is +0.022 -- an
-        # ATTRACTIVE core, so any pair that closes below r = 0.0011 welds together and the set clumps
+        # `ar` swaps the one-sided linear spring for Plexus's own attraction_repulsion law, run in
+        # its purely repulsive form and over a longer range, which relaxes the sheet closer to a
+        # hexagonal spacing than the linear one-sided spring does. The parameters must be checked
+        # first: f(0) = p0 - p2, and a positive value there is an ATTRACTIVE core, so any pair that
+        # closes inside it welds together and the set clumps
         # (2D: d/hex 0.471 -> 0.242, worse than random). p0 = 0 removes the core and leaves a single
         # decaying repulsion, which is the law CGI uses to scatter points evenly over a surface.
         self.law = str(params.get("law", "linear")).lower()        # "linear" | "ar"
@@ -1513,13 +1611,10 @@ class BasementMembraneRepel(Lateral):
             amp = -self.p2 * torch.exp(-((L * L) ** self.p3) / (2.0 * sig * sig))
             f = (self.k * amp)[:, None] * d
             # k IS NOT A STIFFNESS HERE AND DOES NOT SCALE LIKE ONE. `amp` is O(1), so the step is
-            # dt*k*amp*d and the usable range is set by k*dt ~ O(1) -- k ~ 250 at dt = 4e-3, not the
-            # 1e4-1e6 a spring constant would take. Swept on run 85's middle frame:
-            #     k =   25   d/hex 0.785      k =  600   0.855
-            #     k =  100   0.830            k = 1500   0.872
-            #     k =  250   0.846            k = 4000   0.730  <- overshoot
-            # Above that the sheet scrambles to a fixed point near where it started, which is what made
-            # runs 89-91 (k = 1.75e4) read as "no effect" rather than as "far too strong".
+            # dt*k*amp*d and the usable range is set by k*dt being of order 1 -- hundreds at a
+            # typical dt, not the 1e4-1e6 a spring constant would take. Past that the sheet
+            # overshoots and scrambles to a fixed point near where it started, which reads as "no
+            # effect" when it is in fact "far too strong".
         else:
             # ONE-SIDED: zero for anything at or beyond l*, so this can never pull.
             f = (self.k * (L - l_star).clamp_max(0.0))[:, None] * (d / L[:, None])
@@ -1546,32 +1641,30 @@ class BasementMembraneRepel(Lateral):
 
 @register_operator("bm_secrete", family="population", set="particle", kind="structural")
 class BasementMembraneSecrete(Structural):
-    """Lay down NEW membrane as the surface it sits on grows.
+    """Lay down NEW membrane as the surface it sits on grows: the sheet gains material rather
+    than only thinning.
 
-    WHY THIS OPERATOR HAS TO EXIST, stated as the measurement that forced it. A sheet anchored at fixed
-    angular positions on a sphere whose radius triples must cover nine times the area with the particles
-    it started with. It has only three ways out, and the runs found all three:
+    basement_membrane -> basement_membrane: activates dormant particles at the surface, gives them
+    positions, and lets the crosslink operator bond them in.
 
-      * SLIP -- at `k_adh = 2e4` and `4e4` nothing tears, but the sheet sinks through the apical surface
-        (gap +0.0040 -> -0.0117, 90% of particles below it by the end);
-      * TEAR -- at `k_adh = 2e5`, 94% of crosslinks break;
-      * NOTHING -- at `k_adh = 8e4` the sheet appears to hold, but the matrix stress p99 is 7120 against
-        2-8 in every stable run. That one is not a third option, it is an unstable simulation.
+        n_new(t) proportional to the area the surface gained this frame
+        x_new    placed in the sparsest directions of the current sheet
 
-    No stiffness avoids the trilemma, because the trilemma is not about stiffness. It is about material.
-    Real basement membrane is SECRETED continuously by the cells it sits on, which is why an acinus can
-    triple in size without its membrane thinning to nothing.
+    A sheet anchored at fixed angular positions on a sphere whose radius triples must cover nine
+    times the area with the particles it started with. It has exactly three ways out, and no
+    stiffness avoids the trilemma because the trilemma is not about stiffness:
 
-    WHERE NEW MATERIAL GOES. Into the most strained crosslinks, at their midpoints. That is a claim, not
-    a convenience: it says deposition is load-directed, which is what makes the operator do anything
-    interesting -- it relieves strain exactly where the sheet is closest to failing, so secretion and
-    fragmentation compete on the same variable. Depositing uniformly at random would be the null and is
-    available by setting `targeted = 0`.
+      * SLIP -- the adhesion is too weak, and the sheet sinks through the surface it should sit on;
+      * TEAR -- the adhesion is strong enough to hold, and the crosslinks fail instead;
+      * an APPARENT hold, in which the sheet neither slips nor tears but the matrix stress runs
+        orders of magnitude above every stable run -- which is not a third option, it is an
+        unstable simulation.
 
-    WHAT IT DOES NOT MODEL. The cells do not pay for it. Secretion here is free and instantaneous rather
-    than a flux out of the epithelium with a cost, because the coupling is one-way and the epithelium is
-    a replay: there is nothing to debit. `rate` caps how fast the reserve can be spent, which is the only
-    place a secretion timescale enters.
+    The trilemma is about MATERIAL. Real basement membrane is secreted continuously by the cells it
+    rests on, which is why an acinus can triple in size without its membrane thinning to nothing.
+
+    Reference: Plexus (this work); continuous secretion of basement-membrane components by the
+    epithelium they underlie.
     """
     EMIT = None
     SUPPORTED_DIMS = [3]
@@ -1644,8 +1737,8 @@ class BasementMembraneSecrete(Structural):
         # sphere stayed bare. Sampling bonds in proportion to strain fixed the aim and not the outcome,
         # because the deeper fault is the same in both: a site is a MIDPOINT OF AN EXISTING BOND. A patch
         # that has lost its crosslinks therefore cannot receive new material, so it dilutes further and
-        # loses more -- a one-way ratchet into bare. Run 67 ended with `strain_equator` exactly 0.0: not
-        # a small number, zero, meaning no non-polar particle had a single bond left.
+        # loses more -- a one-way ratchet into bare, whose end state is a strain of exactly zero
+        # away from the pole: not a small number, zero, meaning no particle there has a bond left.
         #
         # Cells are what secrete, and cells are everywhere on the surface. So the site is a LIVE PARTICLE,
         # chosen with weight (local sparsity x load), and the new material goes beside it, tangentially,
@@ -1757,8 +1850,8 @@ class BasementMembraneSecrete(Structural):
         # `mpm_strain` still integrates its deformation gradient from it. Sitting at the tissue centre for
         # hundreds of frames, F drifts arbitrarily far from identity. Activating it then promotes that
         # accumulated garbage into real material with real mass, and a single such particle can carry a
-        # stress three orders of magnitude above the rest: run 66 came out with an ECM p99 of 392 against
-        # 2-8 in every stable run, which renders as a few blazing pixels and a black field behind them.
+        # stress orders of magnitude above the rest, which renders as a few blazing pixels against a
+        # black field and puts the colour scale of the whole run at the mercy of one particle.
         F = getattr(lvl, "F", None)
         if F is not None:
             F[slot] = torch.eye(F.shape[-1], device=dev, dtype=F.dtype)
@@ -1848,32 +1941,29 @@ MEMBRANE_ALIVE = None
 
 @register_operator("bm_crosslink", family="topology", set="particle", kind="rewire")
 class BasementMembraneCrosslink(Rewire):
-    """Form new crosslinks between nodes that have come within range. Registered `rewire`, because it is.
+    """Form new crosslinks between nodes that have drifted within range of one another.
 
-    WHAT IT IS FOR, AND WHAT IT IS NOT. The bond list was built once and thereafter extended only for
-    newly secreted nodes, so two nodes drifting within range of one another never formed a crosslink.
-    That is a real gap in the model and this closes it.
+    basement_membrane -> basement_membrane: reads pos, extends the bond list.
 
-    IT IS NOT, HOWEVER, WHY THE SHEET HAS HOLES, and the measurement that suggested it was misread. At
-    the end of a run 29% of pairs inside the cutoff had no bond -- but the bonding rule only ever
-    considers each node's `max_neighbours` nearest, and nodes have about 7.1 neighbours within the
-    cutoff against a cap of 6. So 15% of close pairs were never candidates at all: the cap working as
-    designed, not a topology that had frozen. Switching this operator on moves the unbonded fraction
-    18% -> 16%, d/hex 0.472 -> 0.472 and the largest gap 1.41 -> 1.42. It is correct and it is not the
-    fix.
+        a bond forms between i and j when   L_ij < cutoff
+        and neither already holds `max_neighbours` bonds
 
-    (The other half of that observation stands: there were MORE bonds than close pairs, 144k against
-    123k, so a substantial part of the network is held by history rather than proximity -- bonds survive
-    until 35% strain whatever the distance.)
+    The bond list is otherwise built once and extended only for newly secreted nodes, so two
+    existing nodes coming within range would never crosslink. That is a real gap in the model, and
+    this closes it.
 
-    AND IT IS THE BIOLOGY. Peroxidasin crosslinks collagen IV continuously; a network that only ever
-    loses crosslinks is not remodelling, it is decaying. Fragmentation and repair are the two directions
-    of one process and this is the missing half of it.
+    IT IS NOT WHY A SHEET HAS HOLES, and it is worth saying so, because the measurement that
+    suggests it is easy to misread. A large fraction of pairs inside the cutoff have no bond -- but
+    the bonding rule only ever considers each node's nearest `max_neighbours`, and a node typically
+    has more neighbours within the cutoff than that cap allows. Most of those unbonded close pairs
+    were never candidates: the cap working as designed, not a topology that had frozen. Switching
+    this operator on moves the unbonded fraction, the spacing and the largest gap by almost
+    nothing. It is correct, and it is not the fix.
 
-    KIND. Bond breaking is already `rewire`; forming them is the same kind of change and gets the same
-    kind, so both directions of the edge set are registered rather than one hiding inside a force
-    operator. The pairs are published for `bm_bond` to wire in, which keeps that operator
-    the single owner of the bond arrays -- the same split secretion uses.
+    The kind is `rewire`, because forming a bond changes the relation and nothing else.
+
+    Reference: Plexus (this work); crosslinking of a basement-membrane network within a contact
+    radius.
     """
     EMIT = None
     SUPPORTED_DIMS = [3]
@@ -1932,12 +2022,13 @@ class BasementMembraneCrosslink(Rewire):
     render={"color_by": "node_type", "arrows": None},
 )
 class IntegrinParticle:
-    """A material point of an integrin fibre: the stock MPM continuum state (F, C, mass, mu, la, p_vol).
+    """A material point of an integrin fibre, carrying the stock MPM continuum state: the
+    deformation gradient F, the affine velocity C, mass, the Lame parameters mu and lambda, and the
+    rest volume p_vol.
 
-    REGISTERED BECAUSE THE ENTITY IS RESOLVED BY SET NAME, and an unregistered name falls back to a bare
-    pos/vel schema -- the run then dies inside `mpm_strain` with `'Level' object has no attribute 'F'`,
-    which reads like a bug in the MPM operator and is a missing three-line class. `membrane_ops` records
-    the same lesson one file over; this is the second time it has been learned.
+    Registered because the entity is resolved BY SET NAME. An unregistered name falls back silently
+    to a bare position/velocity schema, and the run then dies inside `mpm_strain` on a missing F --
+    which reads like a bug in the MPM operator and is a missing three-line class.
     """
 
     provision = MPMParticle.provision
@@ -1967,7 +2058,17 @@ def _radius(M, u):
 
 @register_operator("integrin_seed", family="seed", set="particle", kind="seed")
 class IntegrinSeed(Structural):
-    """Lay the fibres down once: `layers` particles per fibre, from the surface outward by `length`."""
+    """Lay the integrin fibres down once: `layers` particles per fibre, running outward from the
+    epithelial surface.
+
+    integrin -> integrin: writes every position at the opening of the trajectory.
+
+        x_(a,l) = c + u_a (S R(theta_a, phi_a) + l * length / layers),   l = 0 .. layers-1
+
+    `length` is the fibre's full extent in world units and `layers` how many material points
+    discretise it, so length/layers is the particle spacing along the fibre. l = 0 is the CELL end,
+    which `integrin_track` prescribes, and the outermost layer is the tip that binds the membrane.
+    """
 
     EMIT = None
     # kind "structural" -> "seed", 24 August. This operator establishes x_0 -- it lays the
@@ -2035,16 +2136,25 @@ class IntegrinSeed(Structural):
 
 @register_operator("integrin_track", family="mechanics", set="particle", kind="structural")
 class IntegrinTrack(Structural):
-    """Ride the fibres' cell ends on the epithelial surface -- prescribed, one row of particles.
+    """Ride the fibres' cell ends on the epithelial surface: a prescribed constraint on one row
+    of particles, rather than on the grid.
 
-    THIS IS THE CONSTRAINT `mpm_boundary` SHOULD HAVE BEEN. That operator overwrote the velocity
-    of every grid NODE inside the tissue, which smears the condition over the B-spline stencil and
-    produces a standoff of ~1.5 cells set by the stencil width rather than by anything physical. Here the
-    prescription touches `n_fibres` PARTICLES, and the sheet feels them only through ordinary MPM
-    contact: local constraint, global consequence.
+    integrin -> integrin: reads the recorded surface, writes the position and velocity of the
+    innermost particle of each fibre.
 
-    The epithelium is a replay in pass 2 and cannot be an MPM body, so the cell end has to be prescribed
-    rather than solved. The reaction it would feel is discarded, exactly as `ecm_from_cell` discards it.
+        x_(a,0) = c + u_a S R(theta_a, phi_a, t)
+        v_(a,0) = (x_(a,0)(t) - x_(a,0)(t-1)) / dt
+
+    This is the constraint a grid boundary condition should have been. Overwriting the velocity of
+    every grid NODE inside the tissue smears the condition over the B-spline stencil and produces a
+    standoff of about one and a half cells, set by the stencil width rather than by anything
+    physical. Here the prescription touches `n_fibres` PARTICLES and the sheet feels them only
+    through ordinary MPM contact: a local constraint with a global consequence.
+
+    The epithelium is a recording and cannot be an MPM body, so the cell end has to be prescribed
+    rather than solved, and the reaction it would feel is discarded.
+
+    Reference: Plexus (this work); the surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386.
     """
 
     EMIT = None
@@ -2106,21 +2216,28 @@ class IntegrinTrack(Structural):
 
 @register_operator("integrin_pull", family="mechanics", set="particle", kind="lateral")
 class IntegrinPull(Lateral):
-    """The force the fibre's OUTER end exerts on the membrane patch it binds -- and the reaction.
+    """The force the fibre's OUTER end exerts on the membrane patch it binds -- and the equal and
+    opposite reaction on the fibre.
 
-    WHY THE GRID IS NOT ENOUGH, MEASURED. A fibre reaches the sheet through the grid node they share,
-    whose velocity is the MASS-WEIGHTED mean of what is in the cell. At the end of the run the surface
-    shell is ~2,600 cells: 45,000 sheet particles is 17 per cell against 4,000 prescribed fibre ends at
-    1.5, so the puller carries ~9% of the mass it is trying to move -- and 144 duly dragged the sheet a
-    third of the way and tore it (fine coverage 0.471 against 0.948). Grid contact is a good model for
-    two bodies pressing on each other and a poor one for a molecule holding onto one.
+    integrin -> (integrin, basement_membrane): reads both positions, emits an acceleration on each.
 
-    So the last link is explicit: each fibre is BOUND at seeding to the membrane particle nearest its
-    tip, and thereafter exerts `k*(x_fibre - x_membrane)` on it, with the equal and opposite force on
-    the fibre. Both are returned as `mpm_acceleration`, so both still go through the grid solve and both
-    bodies' `F` sees the load -- this adds a relation, it does not bypass the mechanics. The standoff is
-    then the fibre's rest length as a material property, since the fibre's own elasticity is what sets
-    where its tip sits, and rupture is one comparison on a quantity the fibre already carries.
+        f = k (x_tip - x_membrane)          on the membrane particle
+        -f                                  on the fibre tip
+
+    k is the bond stiffness in inverse time squared. Each fibre is BOUND at seeding to the membrane
+    particle nearest its tip, and holds that particular one thereafter.
+
+    THE GRID IS NOT ENOUGH FOR THIS, and the reason is a mass ratio. A fibre reaches the sheet
+    through the grid node they share, whose velocity is the MASS-WEIGHTED mean of everything in that
+    cell -- and there are far more sheet particles per cell than prescribed fibre ends, so the
+    puller carries a small fraction of the mass it is trying to move. Grid contact is a good model
+    for two bodies pressing on each other and a poor one for a molecule holding onto one.
+
+    Both forces are returned as `mpm_acceleration`, so both still pass through the grid solve and
+    both bodies' deformation gradients see the load. This adds a relation; it does not bypass the
+    mechanics.
+
+    Reference: Plexus (this work); integrin-mediated attachment of a cell to its basement membrane.
     """
 
     EMIT = "mpm_acceleration"
