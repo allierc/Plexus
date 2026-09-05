@@ -1318,10 +1318,6 @@ class CellReactBrusselator(Lateral):
         return {self.at: torch.stack([da, dh], dim=1) * occ}
 
 
-
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/shape_chem_ops.py` -- #!/usr/bin/env python
-# ==========================================================================================================
 F_CEIL = 0.11
 
 
@@ -1721,9 +1717,6 @@ if __name__ == "__main__":
     raise SystemExit(1 if fails else 0)
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/shape_probe_ops.py` -- A measurement, as an operator: per-cell shape descriptors published on the mesh.
-# ==========================================================================================================
 # `_np` is defined identically in shape_chem_ops.py above; the duplicate from shape_probe_ops.py is dropped.
 
 

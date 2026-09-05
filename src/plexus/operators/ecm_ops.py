@@ -23,9 +23,6 @@ from plexus.models.registry import register_entity, register_operator
 from plexus.models.state import spatial_schema
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/ecm_ops.py` -- ecm_ops -- an extracellular matrix the growing cell ball has to push its way into.
-# ==========================================================================================================
 STRESS_HISTORY: list = []
 BALL_RADIUS: list = []
 
@@ -719,9 +716,6 @@ class CellExclude3D(Structural):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/block_ops.py` -- block_ops -- the two blocks as an ELASTIC MATERIAL rather than a rigid surface.
-# ==========================================================================================================
 BLOCK_STRESS: list = []
 BLOCK_RAW: list = []            # the un-banded scalar -- see `ecm_ops.STRESS_RAW`
 

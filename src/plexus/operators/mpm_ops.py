@@ -46,9 +46,6 @@ import json
 from plexus.models.base import Seed
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mpm_grid.py` -- mpm_grid -- the Eulerian background grid FIELD + the shared transfer kernel for the
-# ==========================================================================================================
 @functools.lru_cache(maxsize=None)
 def _perm_index(device, perm) -> torch.Tensor:
     """A constant column permutation as a DEVICE tensor, built once. See `_polar_higham`."""
@@ -200,9 +197,6 @@ def sub_dt(H, fallback):
     return float(sd if sd is not None else fallback)
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mpm_scatter.py` -- mpm_scatter (was p2g) (particle -> mpm_grid): the MLS-MPM particle-to-grid scatter.
-# ==========================================================================================================
 def _polar_higham(F, iters=6):
     """Orthogonal polar factor R of F = R S, by Newton's iteration  R <- (R + R^-T)/2.
 
@@ -591,9 +585,6 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mpm_grid_update.py` -- mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve.
-# ==========================================================================================================
 @register_operator("mpm_grid_update", family="mpm", set="field", kind="field")
 class MPMGridUpdate(FieldUpdate):
     EMIT = None                                 # field->field grid solve: writes grid velocity in place; returns {} — no integrable delta
@@ -1167,9 +1158,6 @@ class MPMGridUpdateNoSync(MPMGridUpdate):
         return torch.stack([vx, vy], dim=-1).view(nx * ny, 2)
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mpm_gather.py` -- mpm_gather (was g2p) (mpm_grid -> particle): the MLS-MPM grid-to-particle gather + advection.
-# ==========================================================================================================
 @register_operator("mpm_gather", "g2p", family="mpm", set="particle", kind="exchange")
 class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
     EMIT = None                                    # advects pos/vel inside the MPM substep (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
@@ -1298,9 +1286,6 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mpm_strain.py` -- mpm_strain (particle -> particle): the MLS-MPM deformation-gradient + material update.
-# ==========================================================================================================
 @register_operator("mpm_strain", family="mpm", set="particle", kind="lateral")
 class MPMStrain(Lateral):
     EMIT = None                 # particle->particle: updates F + material in place; returns {} — no delta
@@ -1597,9 +1582,6 @@ class MPMViscosity(Lateral):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mpm_anchor.py` -- mpm_anchor -- a substrate/boundary rest-anchor body force for MLS-MPM particles.
-# ==========================================================================================================
 @register_operator("mpm_anchor", family="mechanics", set="particle", kind="lateral")
 class MPMAnchor(Lateral):
     EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
@@ -1675,9 +1657,6 @@ class MPMAnchor(Lateral):
         return {self.at: acc}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mpm_spin.py` -- mpm_spin -- drive an MLS-MPM body toward slow solid-body rotation (a body force).
-# ==========================================================================================================
 @register_operator("mpm_spin", family="mechanics", set="particle", kind="lateral")
 class MPMSpin(Lateral):
     EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
@@ -1717,9 +1696,6 @@ class MPMSpin(Lateral):
         return {self.at: acc}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/material_map.py` -- material_map -- a static image FIELD read from a TIFF, plus `apply_material_map`,
-# ==========================================================================================================
 @register_field("image", frame="image")
 class ImageField(Field):
     """A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1].
@@ -1835,9 +1811,6 @@ class ApplyMaterialMap(Exchange):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mpm.py` -- mls_mpm_mechanics -- a FENCED TRANSITIONAL operator wrapping the MLS-MPM solver.
-# ==========================================================================================================
 _OFFSETS = torch.tensor([[i, j] for i in range(3) for j in range(3)], dtype=torch.float32)
 
 
@@ -3585,7 +3558,6 @@ class MPMGatherLoop27(MPMGather):
 # MOVED HERE FROM `agent_ops.py`, 4 September: both laws turn an activation field into something
 # the MPM substep consumes -- a body accel (`active_force`) or an active stress (`active_stress`).
 # Neither one touches an agent set, and `mpm_scatter` is the only reader of what they emit.
-# FROM `discovery_okuda/ops/active_force.py` -- active_force -- the FORCE constitutive law: an activation field -> per-particle MPM body force.
 # ==========================================================================================================
 @register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle", kind="exchange")
 class ActiveForce(Exchange):                     # (alias `pulse_to_contraction` for one migration cycle)
@@ -3669,9 +3641,6 @@ class ActiveForceDirectional(ActiveForce):
         return self.amplitude * a[:, None] * d
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/active_stress.py` -- active_stress -- the STRESS constitutive law: an activation field -> per-particle active stress.
-# ==========================================================================================================
 @register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange")
 class ActiveStress(Exchange):                    # (alias `pulse_to_active_stress` for one migration cycle)
     EMIT = None                         # stress is consumed by the MPM substep, not integrated
@@ -3732,7 +3701,6 @@ class ActiveStress(Exchange):                    # (alias `pulse_to_active_stres
 # label-image sibling it defines, and beside the material it writes. Every other `kind="seed"`
 # operator already lives with its own domain module (`ecm_seed` in ecm_ops, `seed_mesh` in
 # vertex_ops, `neural_seed` in neural.py); there is no central seed module and this follows suit.
-# FROM `discovery_okuda/ops/segmentation_seed.py` -- segmentation_seed -- a measured instance segmentation becomes the CELL level of the hierarchy.
 # ==========================================================================================================
 @register_field("label_image", frame="label_image")
 class LabelImageField(Field):

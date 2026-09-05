@@ -39,9 +39,6 @@ from plexus.models.state import spatial_schema
 from plexus.models.base import Lateral, Structural
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/membrane_ops.py` -- membrane_ops -- the BASEMENT MEMBRANE: a thin crosslinked sheet, outside the epithelium.
-# ==========================================================================================================
 BOND_TRACE: list = []
 # (frame, |dp| total, radial dp, n nodes): what the matrix and membrane push back on the tissue
 BOUNDARY_REACTION: list = []
@@ -1927,9 +1924,6 @@ class BasementMembraneCrosslink(Rewire):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/integrin_ops.py` -- integrin_ops -- the integrin as MPM MATERIAL rather than as a force with a target.
-# ==========================================================================================================
 @register_entity(
     # `spatial_schema`, not the legacy 2D dict -- see `basement_membrane_particle` above.
     # `receptor` is the biological name; the long one stays first and stays valid.

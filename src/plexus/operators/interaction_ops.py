@@ -34,9 +34,6 @@ except Exception:
     HAVE_WARP = False
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/attraction_repulsion.py` -- Analytic attraction-repulsion: a smooth, per-type pairwise interaction law.
-# ==========================================================================================================
 @register_operator("attraction_repulsion", family="interaction", set="particle", kind="lateral")
 class AttractionRepulsion(Lateral):
     EMIT = "velocity"             # emits a velocity (overdamped law)
@@ -90,9 +87,6 @@ class AttractionRepulsion(Lateral):
         return {self.at: dpos}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/squared_law.py` -- squared_law -- the inverse-square law between particles: electrostatics (Coulomb) OR gravity (Newton).
-# ==========================================================================================================
 def _inv_square_sum(pos, src, soft2):
     """All-pairs inverse-square PULL at each particle: pull_i = Σ_j src_j (r_j-r_i)/denom,
     denom = (|r_j-r_i|^2 + soft2)^(3/2). This is a per-particle VECTOR (the summed inverse-square
@@ -223,9 +217,6 @@ class SquaredLaw(Lateral):
         return {self.at: acc}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/cohesion.py` -- cohesion -- a boids steering rule (Lateral, second-derivative).
-# ==========================================================================================================
 @register_operator("cohesion", family="interaction", set="particle", kind="lateral")
 class Cohesion(Lateral):
     EMIT = "acceleration"
@@ -253,9 +244,6 @@ class Cohesion(Lateral):
         return {self.at: acc}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/separation.py` -- separation -- a boids steering rule (Lateral, second-derivative).
-# ==========================================================================================================
 @register_operator("separation", family="interaction", set="particle", kind="lateral")
 class Separation(Lateral):
     EMIT = "acceleration"
@@ -287,9 +275,6 @@ class Separation(Lateral):
         return {self.at: acc}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/velocity_align.py` -- velocity_align (was alignment) -- Vicsek-style neighbour velocity alignment (the NOMINAL model);
-# ==========================================================================================================
 @register_operator("velocity_align", "alignment", family="interaction", set="particle", kind="lateral")
 class VelocityAlign(Lateral):                    # (alias `alignment`, one migration cycle)
     EMIT = "acceleration"            # emits an acceleration
@@ -349,9 +334,6 @@ class VelocityAlign(Lateral):                    # (alias `alignment`, one migra
         return {self.at: acc}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/stillinger_weber.py` -- Stillinger--Weber interaction: a two-body well + a THREE-BODY angular penalty.
-# ==========================================================================================================
 _A, _B, _P = 7.049556277, 0.6022245584, 4.0
 
 
@@ -441,9 +423,6 @@ class StillingerWeber(Lateral):
         return {self.at: acc}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/graph.py` -- Relation-building (rewire) operators: construct a Level's `edge_index`.
-# ==========================================================================================================
 @register_operator("radius_graph", family="topology", set="particle", kind="rewire")
 class RadiusGraph(Rewire):
     """Set `Level.edge_index` to all live pairs within `radius` (optionally beyond

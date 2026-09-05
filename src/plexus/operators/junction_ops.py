@@ -22,9 +22,6 @@ from plexus.models.base import Lateral, Structural
 from plexus.operators.vertex_ops import face_geometry_3d
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/junction_ops.py` -- junction_ops -- myosin as a per-JUNCTION state, and the one operator that makes it survive topology.
-# ==========================================================================================================
 MYOSIN_TRACE: list = []
 
 
@@ -457,9 +454,6 @@ class JunctionMyosinSync(Rewire):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/medioapical_ops.py` -- medioapical_ops -- the SECOND myosin pool, and what having two of them fixes.
-# ==========================================================================================================
 POOL_TRACE: list = []
 
 

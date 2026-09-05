@@ -26,9 +26,6 @@ from plexus.models.base import Structural
 from plexus.models.registry import register_entity, register_operator
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mesh_contact_ops.py` -- mesh_contact_ops -- the 03 interface, generalised from a flat patch to the spheroid's own mesh.
-# ==========================================================================================================
 CONTACT_HISTORY: list = []          # per frame: the dict of scalars below
 VERTEX_FORCE: list = []             # per frame: the reaction on the tissue, one row per vertex
 PRESSURE_MAP: list = []             # per frame: that reaction as a pressure on a (theta, phi) grid
@@ -724,9 +721,6 @@ def selftest(surface="sphere", dev="cuda:0", n=40000, n_brute=400, **kw):
     return ok
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/bm_sense_ops.py` -- #!/usr/bin/env python
-# ==========================================================================================================
 SENSE_TRACE: list = []
 
 
@@ -808,9 +802,6 @@ class BMSense3D(Structural):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/plate_ops.py` -- plate_ops -- two rigid solid blocks, top and bottom, that the growing tissue cannot get past.
-# ==========================================================================================================
 PLATE_CONTACT: list = []
 
 
@@ -1296,9 +1287,6 @@ class SurfaceDrive(Structural):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/surface_ops.py` -- surface -- the epithelial surface as a LEVEL, instead of a lookup table.
-# ==========================================================================================================
 @register_entity("surface")            # BY SET NAME. Registering this as "surface_element"
 class SurfaceElement:  # while the set is called "surface" means the provision never runs, and the
     # operator dies on a missing `u` buffer -- the same trap the membrane set fell into.
@@ -1415,9 +1403,6 @@ class SurfaceTrack(Structural):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/load_ops.py` -- load_ops -- the other half of the coupling: the matrix pushing back on the cells.
-# ==========================================================================================================
 LOAD_TRACE: list = []
 
 
