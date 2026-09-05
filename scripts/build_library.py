@@ -203,14 +203,14 @@ operators:
 $$
 `law: coulomb` uses signed charge $s=q$ with a like-repel sign and the receiver's own $q_i$;
 `law: gravity` uses $s=m$, always attracts, and the receiver factor is $1$ (equivalence
-principle). $\varepsilon$ is Plummer softening; `all_pairs` sums over every pair ($O(N^2)$,
-`compile`d) rather than a `radius_graph`.""",
+principle). $\varepsilon$ is Plummer softening; `all_pairs` sums over every pair ($O(N^2)$)
+rather than over a `radius_graph`.""",
         spec="""sets:
   star: {n: 25000, spawn: disk, spawn_radius: 1.5,
          vel_init: {mode: circular_orbit, spin: 0.9, central_mass: 0.5},
          types: {s: {fraction: 1.0, mass: 0.00004}}}
 operators:
-  - {op: squared_law, at: star, law: gravity, softening: 0.08, all_pairs: true, compile: true}
+  - {op: squared_law, at: star, law: gravity, softening: 0.08, all_pairs: true}
 schedule: [squared_law]""",
         gallery=("inverse_square.mp4", "`law: gravity`, all-pairs, softened &mdash; a rotating "
                  "disc of stars collapses under its own gravity into spiral structure."),

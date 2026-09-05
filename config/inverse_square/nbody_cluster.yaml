@@ -6,7 +6,7 @@
 # collapse into a bound, orbiting cluster read gradually rather than flashing past. Run for
 # 16,000 frames (4x the first pass) because at 4,000 the cluster had only just formed: what it
 # DOES once bound -- whether it stays a cluster, spins up a bar, or evaporates -- is after that.
-# all-pairs O(N^2) force is fused with torch.compile (`implementation: compile`) so N=10000 is cheap.
+# all-pairs O(N^2) force over N=10000 stars: 1e8 interactions a step, which the GPU absorbs.
 general: {name: nbody_cluster, seed: 17, n_frames: 16000, dt: 0.0006, boundary: free, world: [4.0, 4.0]}
 sets:
   star:

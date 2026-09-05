@@ -1,24 +1,41 @@
-"""The 3D vertex model, as one module: seed, geometry, mechanics, growth, division, death, T1.
+"""The 3D vertex model: an epithelium as a closed surface of polygonal cells, where the degrees
+of freedom are the VERTICES and everything a cell does is a consequence of where they sit.
 
-    seed_mesh (alias mesh_seed)  build the closed spherical half-edge surface, once, at frame 0
-    cell_mechanics               the vertex-model shape energy -- `default` (3D) and `monolayer`
-    cell_divide                  a septum through a face -> two daughters   (default/doubler/timer)
-    cell_die                     shrink to a triangle, then extrude
-    edge_flip                    the T1 / reversible network reconnection
-    topo_record                  one recorded frame of topology per tick
+The state is a closed half-edge mesh. A cell is a FACE, a junction an EDGE, and the mechanics an
+energy over faces and edges whose gradient moves the vertices. Because the representation is a
+mesh rather than a lattice, the topology can change -- a cell divides by inserting a septum, dies
+by contracting to nothing, and neighbours exchange by flipping an edge -- and every one of those
+is an operator here rather than a special case in a solver.
 
-THE THREE FILES THAT BECAME THIS ONE were `mesh_ops.py` (the operators), `t1_ops.py` (the T1, which
-imported `mesh_ops` for the shared carry and the clock helper) and `monolayer_ops.py` (the second
-implementation of the `cell_mechanics` contract, which imported `mesh_ops` for `face_geometry_3d`).
-Every cross-import between them is now an ordinary reference inside one file, and the two
-implementations of `cell_mechanics` can finally be read one after the other.
+In the order they appear below:
 
-MODEL PROVENANCE. Okuda, S., Inoue, Y., Eiraku, M., Sasai, Y., Adachi, T. (2013)
-Biomech. Model. Mechanobiol. 12(4):627 -- the reversible network reconnection `edge_flip`
-implements; Okuda, S., Miura, T., Inoue, Y., Adachi, T., Eiraku, M. (2018) Sci. Rep. 8:2386;
-ancestor Honda, H., Tanemura, M., Nagai, T. (2004) J. Theor. Biol. 226(4):439. The shape energy is
-Farhadifar, R. et al. (2007) Curr. Biol. 17:2095. The mesh representation is Tyssue
-(github.com/DamCB/tyssue).
+    seed_mesh        seed        the closed half-edge surface, built once at frame 0
+    cell_mechanics   lateral     the shape energy, and the force that is its gradient
+    cell_divide      structural  a septum through a face: one cell becomes two
+    cell_die         structural  contract a cell to a point and remove it from the surface
+    topo_record      structural  one recorded frame of topology per tick, so it can be rendered
+    edge_flip        structural  the T1: a reversible neighbour exchange
+
+then the models -- different hypotheses in one slot -- and the implementations, which change only
+the arithmetic:
+
+    seed_mesh[apicobasal]     the same epithelium seeded WITH its thickness
+    cell_mechanics            models: monolayer, apicobasal, marinari
+                              implementations: warp (default), autograd, compile
+    cell_divide               models: doubler, timer
+    cell_die                  models: competition, smaller, dimmer, older, crowded, lonely,
+                              small, stalled, chem_low, prescribed, field
+
+Reference: Okuda, S., Inoue, Y., Eiraku, M., Sasai, Y. & Adachi, T. (2013). Reversible network
+reconnection model for simulating large deformation in dynamic tissue morphogenesis. Biomech.
+Model. Mechanobiol. 12(4):627-644 -- the reconnection `edge_flip` implements; Okuda, S., Miura,
+T., Inoue, Y., Adachi, T. & Eiraku, M. (2018). Combining Turing and 3D vertex models reproduces
+autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386; the ancestor is Honda, H.,
+Tanemura, M. & Nagai, T. (2004). A three-dimensional vertex dynamics cell model of space-filling
+polyhedra simulating cell division. J. Theor. Biol. 226(4):439-453. The shape energy is
+Farhadifar, R., Roper, J.-C., Aigouy, B., Eaton, S. & Julicher, F. (2007). The influence of cell
+mechanics, cell-cell interactions, and proliferation on epithelial packing. Curr. Biol.
+17:2095-2104. The mesh representation follows Tyssue.
 """
 from __future__ import annotations
 import numpy as np
@@ -105,6 +122,37 @@ def build_sphere_mesh(n, r=1.0, jitter=0.0, seed=0):
             es.append(int(rr[i])); et.append(int(rr[(i + 1) % k])); ef.append(f)
     return (sv.vertices.astype(np.float64), np.array(es, np.int64), np.array(et, np.int64),
             np.array(ef, np.int64), len(faces))
+
+
+def build_hexagon_mesh(n=1, r=1.0, jitter=0.0, seed=0):
+    """ONE regular hexagon as an open half-edge mesh: a single face, six vertices, CCW from +z.
+
+    THE ONLY SOLID IN THIS PROMOTION WHOSE SHAPE INDEX IS KNOWN ON PAPER, and that is its whole
+    reason for existing. A regular hexagonal prism of side a = 1 and height h = 1 has
+
+        A_cap = (3 sqrt3 / 2) a^2 = 2.598076      A_lat = 6 a h = 6
+        S     = 2 A_cap + A_lat = 3 sqrt3 + 6 = 11.196152
+        V     = A_cap h = 3 sqrt3 / 2 = 2.598076        V^(2/3) = 1.889882
+        s     = S / V^(2/3) = 5.924261377933605
+
+    and that ONE number is only reachable if the fan triangulation, the cap centroid convention,
+    both cap orientations and the two-triangle wall split are simultaneously right. It is gate row
+    AB-C2, and `build_disc_mesh` cannot produce it: its lattice lays equal x- and y-pitch with
+    alternate rows offset by half a step, so its Voronoi cells are hexagon-ISH and never regular.
+
+    A VALUE ON `shape:`, NOT A MODEL, by the vocabulary's own written test -- "a flat patch and a
+    closed shell are the same hypothesis about the tissue seeded into two different geometries". A
+    single regular cell is the third such geometry.
+
+    THE CIRCUMRADIUS IS THE SIDE, for a hexagon and only for a hexagon, so `radius: 1.0` gives side
+    1. `n` and `jitter` are accepted and ignored: the builders share one call signature, and a
+    jittered hexagon is not a hexagon.
+    """
+    th = np.arange(6) * (np.pi / 3.0)
+    verts = np.stack([r * np.cos(th), r * np.sin(th), np.zeros(6)], 1).astype(np.float64)
+    es = np.arange(6, dtype=np.int64)
+    et = (np.arange(6, dtype=np.int64) + 1) % 6
+    return verts, es, et, np.zeros(6, np.int64), 1
 
 
 def build_disc_mesh(n, r=1.0, jitter=0.0, seed=0):
@@ -308,17 +356,36 @@ def _engine_owns_clock(params, default=1):
 
 
 
-# CANONICAL NAME `seed_mesh`, ALIAS `mesh_seed`, and the alias is not politeness -- 324 of the 461
-# specs in `config/okuda/` say `op: seed_mesh` and 137 say `op: mesh_seed`, so whichever way this
-# reads, half the corpus fails to load. It fails LOUDLY (`ValueError: operator 'seed_mesh' not in
-# registry`) and it fails today: the campaign specs were migrated to the post-seed-refactor
-# `seed_<noun>` convention -- the one core already uses for `seed_from_segmentation` -- while the
+# CANONICAL NAME `seed_mesh`, ALIAS `mesh_seed`, and the alias is not politeness. Archived
+# specifications use both spellings in comparable numbers, so registering only one would make half
+# the corpus fail to load -- loudly, with `operator not in registry`, but fail. The canonical form
+# follows the `seed_<noun>` convention core already uses for `seed_from_segmentation`, while the
 # okuda classes kept the old spelling, so 325 specs, including every `r0*` the campaign has ever
 # written, could not be run at all. `seed_cell_chem` (320 specs) had the same break.
 @register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed")
 class SeedMesh3D(Structural):
-    """Frame-0: build a closed spherical half-edge mesh (spherical Voronoi), write the 3D vertex
-    positions, and stash the edge table + per-face targets (A0, P0) and the lumen target V0."""
+    """Build the surface the whole model lives on, once, at frame 0: a closed half-edge mesh whose
+    faces are the cells.
+
+    vertex -> vertex: writes every vertex position, and stashes the half-edge table and the
+    per-face targets on the mesh.
+
+    `n` cells are placed as a spherical Voronoi tessellation of `n` points on a sphere of radius R,
+    both in world units, so each face is a polygon and each vertex is shared by three of them.
+    `jitter` disorders the generating points, from 0 (a regular arrangement) to 1; a regular one is
+    not neutral, because the mechanics then inherits its symmetry.
+
+    It also writes the targets the energy is measured against: A0 and P0 per face -- the target
+    area and perimeter, in world units squared and world units -- and V0, the target lumen volume.
+    Those are what growth raises and what the mechanics tries to reach.
+
+    `shape` selects the geometry: `sphere` is the closed vesicle, `disc` an open flat patch. It is
+    a VALUE and not a model, because the hypothesis about the tissue is identical in both -- the
+    same energy, the same operators -- seeded into two different geometries. A disc has a rim whose
+    cells have fewer neighbours, so the run has to be read knowing the rim does not divide.
+
+    Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644.
+    """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["vesicle", "epithelial_shell", "spherical", "half_edge_mesh", "initial_condition"]
     REFERENCE = "Okuda, S. et al. (2013). Reversible network reconnection model for simulating large deformation in 3D tissues. Biomech. Model. Mechanobiol. 12:627-644; tyssue (DamCB)."
@@ -344,9 +411,15 @@ class SeedMesh3D(Structural):
         # is one. That is the point of seeding it -- a flat sheet is where the monolayer's normal
         # offset can be tuned with no curvature in the picture -- but it means the rim does not
         # divide, and the run has to be read knowing that.
+        #
+        # `hexagon` IS THE THIRD VALUE, added for gate row AB-C2: one regular hexagonal cell, the
+        # only solid in the apico-basal promotion whose shape index is known on paper. See
+        # `build_hexagon_mesh`. It is a value for the same reason `disc` is -- the same hypothesis
+        # about the tissue, seeded into a geometry chosen so a closed form is reachable.
         self.shape = str(params.get("shape", "sphere")).lower()
-        if self.shape not in ("sphere", "disc"):
-            raise ValueError(f"mesh_seed: shape must be 'sphere' or 'disc', got {self.shape!r}")
+        if self.shape not in ("sphere", "disc", "hexagon"):
+            raise ValueError(f"mesh_seed: shape must be 'sphere', 'disc' or 'hexagon', "
+                             f"got {self.shape!r}")
         # PARTITION THE TYPES BY POSITION, NOT AT RANDOM. `type_layout` on a SET is applied at build
         # (engine.py), over that set's own coordinates -- which a mesh cell does not have yet: the
         # cells do not exist until this operator runs, so the build-time split assigns every one of
@@ -375,7 +448,8 @@ class SeedMesh3D(Structural):
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device; dt = lvl.state.dtype
-        _build = build_sphere_mesh if self.shape == "sphere" else build_disc_mesh
+        _build = {"sphere": build_sphere_mesh, "disc": build_disc_mesh,
+                  "hexagon": build_hexagon_mesh}[self.shape]
         verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
         Nv = verts.shape[0]; Nbuf = lvl.state.shape[0]
         if Nv > Nbuf:
@@ -414,7 +488,7 @@ class SeedMesh3D(Structural):
         # declaration exists to end: anything that took a reference before the seed ran (the
         # recorder, a probe, the salvage) would keep writing into an orphan. So the seed writes
         # THROUGH the existing table when there is one, and only creates one for a spec that has
-        # not declared it yet (456 of the 458 okuda specs, at the time of writing).
+        # not declared it yet, which is nearly all of them.
         if self.type_layout.startswith("split_"):
             from plexus.engine import retype
             _ax = "xyz".index(self.type_layout[-1])
@@ -456,9 +530,7 @@ class SeedMesh3D(Structural):
                          v_ref=float(vf.median()) * self.a0_scale ** 1.5,   # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
                          #   morphogen growth caps v_eq at (4/3)v_ref, cells cycle in [2/3,4/3]v_ref centred on v_ref
                          R0=float(np.linalg.norm(verts - np.asarray(self.centre, verts.dtype),
-                                                axis=1).mean()) * self.a0_scale ** 0.5, verts0=verts,
-                         # RESERVOIR fixed sizes for the compiled mechanics (verts<=Nbuf; faces~V/2; half-edges~3V)
-                         Nv_max=Nbuf, nF_max=Nbuf // 2 + 64, Ebuf=4 * Nbuf)
+                                                axis=1).mean()) * self.a0_scale ** 0.5, verts0=verts)
         m = getattr(lvl, "_mesh", None)
         if isinstance(m, MeshTable):
             m.clear(); m.update(seeded)          # the engine's table, filled in place
@@ -580,7 +652,6 @@ class ShapeEnergy3D(Lateral):
     ClosedMonolayer), not a single global lumen term: it keeps every cell inflated and resists local
     buckling, so growth (ramping v_eq per cell) inflates the shell smoothly. Force = -grad E by one 3D
     autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity."""
-    COMPILE = False                  # `implementation: compile` -- see SquaredLaw.COMPILE
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["p0"]
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
@@ -630,11 +701,11 @@ class ShapeEnergy3D(Lateral):
         # model. The ENERGY is unchanged; only the descent is projected, so a flat sheet stays in
         # its plane by construction rather than by a restoring force fighting it.
         #
-        # A PENALTY CANNOT DO THIS JOB, measured: `plate_confine` at `gap_half: 0.02` left the sheet
-        # undulating with sd(z) = 0.20 -- ten times the declared gap and 43% of an edge length --
-        # because this loop takes `relax_iters` (30) free 3D steps and the penalty corrects once per
-        # frame afterwards. Raising its stiffness does not help; the run goes NaN at 6.0 and 30.0,
-        # since an explicit penalty is stability-limited exactly where it would start to bite.
+        # A PENALTY CANNOT DO THIS JOB. This loop takes `relax_iters` free 3D steps per frame and
+        # an external penalty corrects only once afterwards, so the sheet undulates by many times
+        # the declared gap in between. Raising the penalty stiffness does not help: an explicit
+        # penalty is stability-limited exactly where it would start to bite, and the run diverges
+        # before it becomes strong enough to hold the sheet flat.
         #
         # None (the default) leaves every existing run untouched.
         _pa = params.get("plane_axis", None)
@@ -642,18 +713,6 @@ class ShapeEnergy3D(Lateral):
         self.antiinv = float(params.get("antiinv", 0.0))
         # Lloyd-like tangential regularization (vertex-model analog of Turing's surface_lloyd): rounds cells
         self.smooth_iters = int(params.get("smooth_iters", 0)); self.smooth_w = float(params.get("smooth_w", 0.0))
-        # torch.compile the (autograd-differentiated) energy: ~2.4x on a FIXED mesh, but DIVISION changes
-        # nF every other frame -> torch.compile recompiles each time -> 20x SLOWER. So default OFF; only
-        # enable (compile=True) for fixed-topology runs (static RD, growth without division).
-        # torch.compile the energy via a fixed-size RESERVOIR (occ-masked padding so shapes never change
-        # under division). Measured: a CLEAR ~2.4x win only for FIXED-topology runs (buffer == live count
-        # -> no padding); for growing/dividing meshes the padding computes over the oversized buffer and
-        # the one-time compile cost only amortizes over very long runs, so it is net SLOWER. Hence
-        # OPT-IN (compile=True) -- use it for the static RD; the default is the fast live-only path.
-        from plexus.operators.interaction_ops import _reject_compile
-        _reject_compile(params, "cell_mechanics")
-        self.use_compile = self.COMPILE
-        self._efn = torch.compile(_shape_energy_core, dynamic=False) if self.use_compile else _shape_energy_core
 
     def _antiinv_scale(self, x, step, es, et, ef, nF, eocc, vf_ref, floor):
         """Straight-through per-vertex step scale (detached) that halves the move of any vertex whose
@@ -670,8 +729,6 @@ class ShapeEnergy3D(Lateral):
             scale = torch.where((badv > 0)[:, None], scale * 0.5, scale)
         return scale.detach()
 
-    GRAD_BACKEND = "warp"          # DISPATCH TAG, not a tunable: `implementation: autograd` flips it
-
     def _grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, vocc, twin_face=None,
               myo_e=None):
         """dE/d(pos), through the hand-written warp kernels when they apply, autograd otherwise.
@@ -687,22 +744,22 @@ class ShapeEnergy3D(Lateral):
 
         IT FALLS BACK RATHER THAN REFUSING, and says so once: on CPU, in float64, without warp
         installed, or when `K_bend` / `K_lumen` is on -- those two terms are not ported, and a term
-        silently dropped from a gradient is a different model, not a faster one. `implementation:
-        autograd` forces the old path outright, which is what `implementation: compile` wants.
+        silently dropped from a gradient is a different model, not a faster one. The fallback is the
+        ONLY way the autograd route is reached; there is no operator key that forces it, because
+        which route differentiates one and the same energy is a backend choice and not a model.
 
         NOT BIT-IDENTICAL, and neither is the thing it replaces. Both accumulate per-face sums with
         float32 atomics whose order is not fixed -- warp's `atomic_add` and torch's `index_add` --
         so two runs of the UNMODIFIED default already differ from each other.
         """
-        if self.GRAD_BACKEND == "warp":
-            # LOCAL AND LATE, and it stays that way after the merge: `try_shape_energy_grad` is
-            # defined at the BOTTOM of this file (merged from `vertex_warp.py`), below the class
-            # that calls it, so a module-level import would be a forward reference.
-            from plexus.operators.vertex_ops import try_shape_energy_grad
-            g = try_shape_energy_grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t,
-                                      eocc, vocc, twin_face, myo_e)
-            if g is not None:
-                return g
+        # LOCAL AND LATE, and it stays that way after the merge: `try_shape_energy_grad` is
+        # defined at the BOTTOM of this file (merged from `vertex_warp.py`), below the class
+        # that calls it, so a module-level import would be a forward reference.
+        from plexus.operators.vertex_ops import try_shape_energy_grad
+        g = try_shape_energy_grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t,
+                                  eocc, vocc, twin_face, myo_e)
+        if g is not None:
+            return g
         with torch.enable_grad():
             p = p.detach().requires_grad_(True)
             # THE RADIAL TERM'S ORIGIN, AND WHY IT HAS TO BE DECLARABLE. `K_R` penalises
@@ -718,9 +775,9 @@ class ShapeEnergy3D(Lateral):
                 p_e = p - self._centre.to(p.device, p.dtype)
             else:
                 p_e = p
-            E = self._efn(p_e, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
-                          self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc, self.K_bend,
-                          twin_face, self.K_lumen, myo_e, self.Gam_l)
+            E = _shape_energy_core(p_e, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
+                                   self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc,
+                                   self.K_bend, twin_face, self.K_lumen, myo_e, self.Gam_l)
             g = torch.autograd.grad(E, p)[0]
         return torch.nan_to_num(g)
 
@@ -777,44 +834,27 @@ class ShapeEnergy3D(Lateral):
         R0t = torch.as_tensor(float(m["R0"]), dtype=dt, device=dev)
         with torch.no_grad():
             cap = self.cap_frac * (x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-6)
-        if self.use_compile:
-            # RESERVOIR path: pad to fixed buffer sizes (dead slots masked by occ) -> compiled once
-            Nvm = int(m.get("Nv_max", Nv)); Fm = int(m.get("nF_max", nF)); Em = int(m.get("Ebuf", E))
-            z = torch.zeros
-            xp = z(Nvm, 3, device=dev, dtype=dt); xp[:Nv] = x0
-            esp = z(Em, dtype=torch.long, device=dev); esp[:E] = es
-            etp = z(Em, dtype=torch.long, device=dev); etp[:E] = et
-            efp = z(Em, dtype=torch.long, device=dev); efp[:E] = ef
-            eocc = z(Em, device=dev, dtype=dt); eocc[:E] = 1.0
-            vocc = z(Nvm, device=dev, dtype=dt); vocc[:Nv] = 1.0
-            A0p = z(Fm, device=dev, dtype=dt); A0p[:nF] = m["A0"]
-            P0p = z(Fm, device=dev, dtype=dt); P0p[:nF] = m["P0"]
-            V0fp = z(Fm, device=dev, dtype=dt); V0fp[:nF] = m["V0f"]
-            alivep = z(Fm, device=dev, dtype=dt); alivep[:nF] = m["alive"]
-            for _ in range(max(1, self.relax_iters)):
-                step = -(self.eta * self.mu) * self._grad(xp, esp, etp, efp, Fm, A0p, P0p, V0fp,
-                                                          alivep, R0t, eocc, vocc)
-                xp = xp + step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
-            x = xp[:Nv]
-        else:
-            # LIVE-ONLY path (default, fast): relax the live vertices, energy over live faces/edges
-            eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
-            twin = self._twin_faces(es, et, ef, Nv) if self.K_bend > 0 else None   # dihedral neighbour faces
-            x = x0.clone()
-            floor = None
-            if self.antiinv > 0:                                 # anti-inversion floor = frac of median live wedge vol
-                _, _, _, vf0 = face_geometry_3d(x, es, et, ef, nF, eocc)
-                floor = self.antiinv * (vf0[vf0 > 0].median() if (vf0 > 0).any() else vf0.new_tensor(1e-9)).clamp(min=1e-9)
-            for _ in range(max(1, self.relax_iters)):
-                step = -(self.eta * self.mu) * self._grad_myo(m, x, es, et, ef, nF, m["A0"], m["P0"],
-                                                          m["V0f"], m["alive"], R0t, eocc, vocc, twin)
-                step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
-                if floor is not None:                            # block any substep that drives a face toward inversion
-                    _, _, _, vf_cur = face_geometry_3d(x, es, et, ef, nF, eocc)
-                    step = step * self._antiinv_scale(x, step, es, et, ef, nF, eocc, vf_cur, floor)
-                if self.plane_axis is not None:                   # 2D vertex model: no motion off the sheet
-                    step[:, self.plane_axis] = 0.0
-                x = x + step
+        # Relax the LIVE vertices only: the energy is summed over the live faces and half-edges, so
+        # `eocc` and `vocc` are all-ones here and the occupancy masking inside `_shape_energy_core`
+        # is a no-op. (There is no padded-reservoir variant any more: whether the body below is
+        # traced by a fusing compiler is the engine's `compile:` decision, not this operator's.)
+        eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
+        twin = self._twin_faces(es, et, ef, Nv) if self.K_bend > 0 else None   # dihedral neighbour faces
+        x = x0.clone()
+        floor = None
+        if self.antiinv > 0:                                 # anti-inversion floor = frac of median live wedge vol
+            _, _, _, vf0 = face_geometry_3d(x, es, et, ef, nF, eocc)
+            floor = self.antiinv * (vf0[vf0 > 0].median() if (vf0 > 0).any() else vf0.new_tensor(1e-9)).clamp(min=1e-9)
+        for _ in range(max(1, self.relax_iters)):
+            step = -(self.eta * self.mu) * self._grad_myo(m, x, es, et, ef, nF, m["A0"], m["P0"],
+                                                      m["V0f"], m["alive"], R0t, eocc, vocc, twin)
+            step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+            if floor is not None:                            # block any substep that drives a face toward inversion
+                _, _, _, vf_cur = face_geometry_3d(x, es, et, ef, nF, eocc)
+                step = step * self._antiinv_scale(x, step, es, et, ef, nF, eocc, vf_cur, floor)
+            if self.plane_axis is not None:                   # 2D vertex model: no motion off the sheet
+                step[:, self.plane_axis] = 0.0
+            x = x + step
         if self.smooth_iters and self.smooth_w > 0:      # Lloyd-like tangential regularization -> rounder cells
             es, et = m["E_srce"], m["E_trgt"]
             ones = torch.ones(es.shape[0], device=x.device, dtype=x.dtype)
@@ -856,13 +896,11 @@ class ShapeEnergy3D(Lateral):
         return {self.at: v_full}
 
 
-# `vesicle_growth` (class VesicleGrowth) WAS HERE AND IS DELETED. Cedric, 8 August: "it is a
-# bummer to have two growth competing operators... simplicity needs erasing here."
-#
-# It duplicated `cell_grow` and CONTRADICTED it: both wrote the same mesh targets, this one
-# multiplicatively (V0f <- V0f * g^3), the other by assignment from its own snapshot
-# (V0f <- V0f_init * s^3). Scheduled together -- which the discovery loop did twice, r001_07
-# and r002_03 -- cell_grow ran second and overwrote this one every frame, silently.
+# There is ONE growth operator on this mesh, `cell_grow` in diffusion_reaction, and deliberately
+# so. A second one duplicated it and contradicted it: both wrote the same mesh targets, one
+# multiplicatively (V0f <- V0f * g^3) and the other by assignment from its own snapshot
+# (V0f <- V0f_init * s^3). Scheduled together, whichever ran second silently overwrote the first
+# every frame, so the growth rate a specification declared was not the one it got.
 #
 # Every call site is ported: uniform body-wide inflation is `cell_grow` with `rho = 1` and the
 # gate open (`a_sw = 0`). `max_scale` capped the LINEAR scale and `vth_frac` caps per-cell
@@ -871,14 +909,28 @@ class ShapeEnergy3D(Lateral):
 
 @register_operator("cell_divide", set="vertex", kind="structural", family="population")
 class Divide3D(Structural):
-    """In-surface cell division on the vesicle -- the sheet-division analog (tyssue
-    sheet_topology.cell_division) lifted to the closed sphere. A cell divides when its wedge volume
-    reaches `factor` x v_ref, THE SEED-TIME MEDIAN CELL VOLUME -- an absolute size checkpoint, the
-    default since 8 August; see `_trigger` for why, and `model: doubler` for the birth-relative
-    rule it replaced. It is split by an
-    edge-midpoint septum (divide_face_3d), which also splits the shared edges of its two neighbours so
-    the mesh stays closed (Euler=2). Each daughter inherits half the area & target volume and resets
-    its birth volume to half; cell_mechanics re-balances."""
+    """Cell division: a septum through a face, so one cell becomes two, and the surface gains a
+    cell without losing its closure.
+
+    vertex -> vertex: rebuilds the half-edge table, the vertex positions and every per-face array.
+
+        divide cell j when   v_j  >  factor * v_ref
+
+    v_j is the cell's current wedge volume and v_ref the SEED-TIME MEDIAN cell volume, both in
+    world units cubed, so `factor` is dimensionless -- how many times the size of a typical cell at
+    the start a cell must reach before it divides. That makes it an ABSOLUTE size checkpoint, and
+    absolute is the point: a cell that is born small must grow more than one born large before it
+    divides, which is what corrects size variance rather than perpetuating it.
+
+    The septum runs between the midpoints of two edges of the face, and the two neighbouring faces
+    that shared those edges are split as well, so the mesh stays a valid closed half-edge surface
+    with every vertex still of degree three. Every per-face array -- A0, P0, V0f, age, ndiv, and
+    anything an operator has registered for carry -- is reindexed through the new-to-old face map,
+    so no state is left pointing at a face that has moved.
+
+    Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644; the in-surface
+    division follows the sheet topology of Tyssue.
+    """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["division", "cell_division", "vesicle", "proliferation", "volume_doubling"]
     REFERENCE = "Hertwig, O. (1884) (long-axis division rule); tyssue cell_division (DamCB)."
@@ -1043,10 +1095,10 @@ class Divide3D(Structural):
         #                   x2 trigger, the jitter and min_cycle. v_ref drifts DOWN as cells
         #                   divide and shrink, so it fired earlier and earlier.
         #
-        # Measured before removal: okuda_route (vcap on) divided 7x faster than its growth rate;
-        # cellfix_B_new (vcap off) 1.2x. Two runs overran to 25,898 and 8,982 cells against
-        # Okuda's 4,000 while the rate written in the spec was masked twentyfold. Every previous
-        # run in this campaign measured a counter rather than a tissue.
+        # A volume cap on the division trigger decouples the division rate from the growth rate
+        # entirely: cells divide and shrink, so the trigger fires earlier and earlier and the
+        # tissue overruns its target cell count by a large factor while the rate written in the
+        # specification is masked. What such a run measures is the counter, not the tissue.
         ndone = 0
         daughter_mothers = []                                    # mother face index of each appended daughter (order)
         bud_axis = None; a_cells = None; orient_thr = None       # ORIENTED interface division: bud axis = centre->red tip
@@ -1223,32 +1275,30 @@ class Divide3D(Structural):
 
 @register_operator("cell_die", set="vertex", kind="structural", family="population")
 class Apoptosis3D(Structural):
-    """Cell elimination on the closed vesicle -- the DIE family, and the inverse of cell_divide.
+    """Cell elimination: the Die family, and the inverse of `cell_divide`. A marked cell contracts
+    its own ring to a point over several frames and is then removed from the surface.
 
-    Plexus2 lists eight elementary operator families and Die, "removal of biological entities", is
-    one of them. This vesicle had no implementation of it: growth inflates, division subdivides,
-    the purse-string measured inert and extrusion is the disqualified forcing term, so every
-    mechanism it owned deformed the sheet OUTWARD. Invagination is one of Okuda's three target
-    morphologies and nineteen rounds of search never produced one, because nothing in the
-    vocabulary could pull inward.
+    vertex -> vertex: shrinks the marked cells' target area and perimeter, then rebuilds the
+    half-edge table when a ring has contracted far enough.
 
-    DECOMPOSED INTO PRIMITIVES, NOT A BEHAVIOUR. Monier et al. (2015) show apoptotic force driving
-    fold formation in Drosophila, and the 2D `apoptosis` operator already renders that as three
-    steps rather than a monolith. The same three exist here and two were already written:
+        A0_j <- A0_j * (1 - 1/tau)          while the cell is dying
+        remove cell j when its ring has contracted to a triangle
 
-        1. the dying cell's target volume SHRINKS each tick   (this operator)
-        2. `edge_flip` sheds its neighbours, one short edge at a time, until it is a triangle
-        3. `face_collapse_3d` extrudes the triangle to a point and the sheet closes by force
-           balance in `cell_mechanics`
+    tau is the number of frames a cell takes to disappear. Extruding gradually rather than deleting
+    outright is what keeps the surface valid at every frame: a face removed in one step would leave
+    a hole its neighbours have no rule for closing.
 
-    So this operator does step 1 and asks for step 3; step 2 belongs to T1 and MUST be scheduled or
-    a marked cell shrinks forever without ever reaching three sides. That is not a hidden coupling,
-    it is the mechanism: a cell leaves an epithelium by losing neighbours.
+    It matters that this family exists at all. Growth inflates and division subdivides, so a vertex
+    model with no Die operator can only deform its sheet OUTWARD, and invagination -- one of the
+    canonical morphologies -- is unreachable however the other parameters are set.
 
-    WHY IT WAITS FOR A TRIANGLE. Collapsing a k-sided face merges k vertices into one and leaves a
-    vertex of degree k, which a trivalent sheet cannot represent -- a rosette. At k = 3 the count
-    is V-2, E-3, F-1 and the Euler characteristic is unchanged. `face_collapse_3d` refuses anything
-    else and validates closure before committing, so a refused collapse costs a frame, not a mesh.
+    The base contract carries no criterion of its own; every `model:` below differs ONLY in what
+    marks a cell for death, exactly as `cell_divide`'s models differ only in what triggers a
+    division.
+
+    Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644; live-cell
+    extrusion from an epithelium, Rosenblatt, J., Raff, M. C. & Cramer, L. P. (2001). Curr. Biol.
+    11:1847-1857.
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["apoptosis", "cell_elimination", "extrusion", "delamination", "die"]
@@ -1278,7 +1328,7 @@ class Apoptosis3D(Structural):
         # `mode:` BECAME THE `model:` AXIS, 4 September. Choosing what makes a cell die is the same
         # kind of choice as choosing what makes it divide, and `cell_divide._trigger`'s docstring
         # already says of its own: "THE ONLY THING A `model=` VARIANT OF cell_divide CHANGES". Two
-        # mechanisms for one question, in adjacent classes in this file. See AXES.md.
+        # mechanisms for one question, in adjacent classes in this file.
         #
         # TWO OF THE THIRTEEN COLLAPSED INTO VALUES rather than becoming models, because they were
         # never distinct hypotheses:
@@ -1291,7 +1341,7 @@ class Apoptosis3D(Structural):
                 "cell_die: `mode` is gone -- write `model:`. What makes a cell die is a hypothesis, "
                 "the same kind `cell_divide` carries on `model:`. `list`/`band`/`cone` are now "
                 "`model: prescribed` with `region:`, and `field_high`/`field_low` are "
-                "`model: field` with `compare: high|low`. See AXES.md.")
+                "`model: field` with `compare: high|low`.")
         _death = getattr(type(self), "DEATH", "competition")
         if _death == "prescribed":
             _death = str(params.get("region", "list"))
@@ -1918,9 +1968,9 @@ class Apoptosis3D(Structural):
         # engine applies them last. An operator that RENUMBERS the set in between leaves every one
         # of those deltas pointing at a different cell -- a large negative flux meant for one cell
         # lands on another that has almost no activator, and the concentration goes negative. That
-        # is exactly what was measured: the activator hit -0.1529 at frame 50 on every mode that
-        # killed anything, decaying afterwards as the scrambled deltas diffused away, while the
-        # no-death control never left 0.0000.
+        # is exactly what happens: the activator goes NEGATIVE on every model that kills anything,
+        # decaying afterwards as the scrambled deltas diffuse away, while a no-death control never
+        # leaves zero.
         #
         # `cell_divide` never hit it because appending is not renumbering: daughters go to indices
         # >= nF and every existing cell keeps its own. Removal is the first operation in this
@@ -1944,8 +1994,8 @@ class Apoptosis3D(Structural):
 class Apoptosis3DCompetition(Apoptosis3D):
     """`competition` MODEL of cell_die -- grows slower than its neighbours -- the Myc-style loser.
 
-    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
-    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide._trigger` is the only thing its models change.
     """
     DEATH = "competition"
 
@@ -1955,8 +2005,8 @@ class Apoptosis3DCompetition(Apoptosis3D):
 class Apoptosis3DSmaller(Apoptosis3D):
     """`smaller` MODEL of cell_die -- smaller than its neighbours: squeezed out by a fitter crowd.
 
-    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
-    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide._trigger` is the only thing its models change.
     """
     DEATH = "smaller"
 
@@ -1966,8 +2016,8 @@ class Apoptosis3DSmaller(Apoptosis3D):
 class Apoptosis3DDimmer(Apoptosis3D):
     """`dimmer` MODEL of cell_die -- less activator than its neighbours -- the LOCAL chemical loser.
 
-    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
-    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide._trigger` is the only thing its models change.
     """
     DEATH = "dimmer"
 
@@ -1977,8 +2027,8 @@ class Apoptosis3DDimmer(Apoptosis3D):
 class Apoptosis3DOlder(Apoptosis3D):
     """`older` MODEL of cell_die -- has gone longer without dividing than its neighbours.
 
-    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
-    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide._trigger` is the only thing its models change.
     """
     DEATH = "older"
 
@@ -1988,8 +2038,8 @@ class Apoptosis3DOlder(Apoptosis3D):
 class Apoptosis3DCrowded(Apoptosis3D):
     """`crowded` MODEL of cell_die -- has more neighbours than its neighbours do -- density-driven extrusion.
 
-    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
-    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide._trigger` is the only thing its models change.
     """
     DEATH = "crowded"
 
@@ -1999,8 +2049,8 @@ class Apoptosis3DCrowded(Apoptosis3D):
 class Apoptosis3DLonely(Apoptosis3D):
     """`lonely` MODEL of cell_die -- has fewer -- the tissue closes over a gap.
 
-    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
-    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide._trigger` is the only thing its models change.
     """
     DEATH = "lonely"
 
@@ -2010,8 +2060,8 @@ class Apoptosis3DLonely(Apoptosis3D):
 class Apoptosis3DSmall(Apoptosis3D):
     """`small` MODEL of cell_die -- below an ABSOLUTE volume threshold, not a relative one.
 
-    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
-    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide._trigger` is the only thing its models change.
     """
     DEATH = "small"
 
@@ -2021,8 +2071,8 @@ class Apoptosis3DSmall(Apoptosis3D):
 class Apoptosis3DStalled(Apoptosis3D):
     """`stalled` MODEL of cell_die -- below an absolute GROWTH-RATE threshold.
 
-    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
-    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide._trigger` is the only thing its models change.
     """
     DEATH = "stalled"
 
@@ -2032,8 +2082,8 @@ class Apoptosis3DStalled(Apoptosis3D):
 class Apoptosis3DChemLow(Apoptosis3D):
     """`chem_low` MODEL of cell_die -- below an absolute activator threshold -- dies BETWEEN the spots.
 
-    THE ONLY THING A `model=` VARIANT OF cell_die CHANGES is what marks a cell for death, exactly as
-    `cell_divide._trigger` is the only thing its models change. See AXES.md.
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide._trigger` is the only thing its models change.
     """
     DEATH = "chem_low"
 
@@ -2074,8 +2124,8 @@ class Apoptosis3DField(Apoptosis3D):
 @register_operator("cell_divide", model="doubler", set="vertex", kind="structural", family="population")
 class Divide3DDoubler(Divide3D):
     """Divide at `factor` x THIS CELL'S OWN BIRTH VOLUME -- the rule that was the default until
-    8 August, kept because it is the null the sizer has to beat and because every result in this
-    project's record up to round 4 was measured under it.
+    kept because it is the null the absolute-size rule has to beat, and because a large part of
+    this project's recorded results were measured under it.
 
     Under exponential growth this is a TIMER wearing a sizer's clothes: doubling from any birth
     volume takes the same time, so it never consults size in any way that could correct one. The
@@ -2112,8 +2162,19 @@ class Divide3DTimer(Divide3D):
 
 @register_operator("topo_record", set="vertex", kind="structural", family="harness")
 class TopoSnapshot3D(Structural):
-    """Record the current mesh (flat half-edge table + vertex count) each frame, so a growing/dividing
-    vesicle -- whose topology changes over time -- can be rendered frame by frame."""
+    """A measurement, as an operator: record the current mesh once per frame, so a vesicle whose
+    topology changes can be rendered frame by frame.
+
+    vertex -> vertex: reads the half-edge table and the vertex count, writes nothing; appends one
+    row per frame to the recording.
+
+    It is needed because the mesh is not fixed. A renderer handed only the final topology would
+    draw every earlier frame with faces that did not exist yet, and one handed only the first would
+    lose every division. What is recorded is the flat half-edge table, which is enough to
+    reconstruct the surface at that instant and nothing more.
+
+    Reference: none -- this is a recording, not a mechanism. Plexus (this work).
+    """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
     MECHANISM_TAGS = ["recording", "topology_history", "diagnostic"]
     REFERENCE = "Plexus (this work)."
@@ -2411,10 +2472,31 @@ def t1_flip_3d(rings, pos, e_uv, new_len=None, emap=None, vf=None, plane_axis=No
 # --------------------------------------------------------------------------------------------------
 @register_operator("edge_flip", set="vertex", kind="rewire", family="topology")
 class ReconnectT1_3D(Rewire):
-    """Surface T1 reconnection on the vesicle: flip every interior edge shorter than the threshold by a
-    local neighbour exchange, committing only valid flips. The 3D sibling of t1_transition -- explicit
-    intercalation on the closed half-edge shell, the ingredient a re-tessellated (spherical-Voronoi)
-    route cannot have. Keeps V,E,F (and Euler=2) fixed; only reconnects and repositions the two verts."""
+    """The T1 transition: a reversible neighbour exchange, and the ingredient that makes this a
+    dynamic vertex model rather than a repeatedly re-tessellated one.
+
+    vertex -> vertex: reads pos, flips short interior edges and repositions their two vertices.
+
+        flip edge e when   l_e  <  l_T1
+
+    l_T1 is the threshold length in world units. The edge is removed and reconnected across the
+    other diagonal of the two faces sharing it, so two cells that were neighbours cease to be and
+    two that were not become so. The two vertices are repositioned to give the new edge a length
+    just above the threshold, otherwise it would flip straight back.
+
+    It preserves the counts of vertices, edges and faces, and therefore the Euler characteristic:
+    nothing is created or destroyed, only reconnected. That is what distinguishes it from division
+    and death, and it is why a flip that would produce an invalid configuration is simply not
+    committed rather than repaired afterwards.
+
+    A route that re-tessellates the surface each frame cannot have this operator, because it never
+    represents the intermediate: intercalation is then an artefact of re-meshing rather than a
+    mechanism with a threshold anyone can set.
+
+    Reference: Okuda, S., Inoue, Y., Eiraku, M., Sasai, Y. & Adachi, T. (2013). Reversible network
+    reconnection model for simulating large deformation in dynamic tissue morphogenesis. Biomech.
+    Model. Mechanobiol. 12(4):627-644.
+    """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["T1_transition", "reversible_network_reconnection", "intercalation",
                       "neighbour_exchange", "vertex_model", "vesicle", "surface"]
@@ -2671,6 +2753,96 @@ def monolayer_geometry_3d(pos, es, et, ef, nF, h_cell, eocc=None):
     return v_f, s_f, A_ap, A_ba
 
 
+def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
+    """Per-cell TRUE polyhedron volume `v_f` and surface `s_f` from the DOUBLED degree-of-freedom set.
+
+    The twin of `monolayer_geometry_3d`, and the difference between them is the whole promotion.
+    There the cell's two surfaces are `pos +/- (h/2) n` -- a kinematic identity that ties them to the
+    mid-surface and to each other -- and the volume is `A_mid * h`, the flat-cell answer with the
+    `O((h/R)^2)` prism correction dropped. Here apical `= pos + sep` and basal `= pos - sep` with
+    `sep` a free per-vertex vector, and the volume is the volume OF THE POLYHEDRON:
+
+        V_f = (1/6) sum over the cell's triangles of (p-o) . ((q-o) x (r-o))     [divergence theorem]
+
+          apical cap    the ring on `a`, fanned from the cap's own centroid, outward winding
+          basal cap     the ring on `b`, REVERSED, because it faces the other way
+          lateral wall  one quad per ring edge, (a_s, b_s, b_t) + (a_s, b_t, a_t)
+
+    THE WINDING IS THE SAME AS `gate_measures._cell_polyhedron_volume`, term for term, and that is
+    deliberate: a gate row that disagreed with the energy would be measuring a different solid than
+    the one the tissue relaxed. The measure was written first and caught its own wall wound INWARD
+    -- a hexagonal prism of +2.598 reading -0.866, with the closure row still green, because an
+    inward-wound wall is still closed. Both now read (a_s, b_s, b_t), (a_s, b_t, a_t).
+
+    `o` IS THE CELL'S OWN MID-RING CENTROID, NOT THE WORLD ORIGIN. The volume of a closed surface is
+    origin-independent in exact arithmetic and this state is float32, so the choice is a numerical
+    one and it is the load-bearing kind: about the world origin every term is `O(R^3)` and they
+    cancel down to `O(h*A)`, losing three or four significant figures on a shell at R = 5. About the
+    cell's own centroid every term is already the size of the answer.
+
+    Returns (v_f, s_f, A_ap, A_ba). All differentiable in BOTH `pos` and `sep`.
+    """
+    dev, dt = pos.device, pos.dtype
+    ones_e = torch.ones(es.shape[0], device=dev, dtype=dt) if eocc is None else eocc
+    a, b = pos + sep, pos - sep
+    a_s, a_t, b_s, b_t = a[es], a[et], b[es], b[et]
+    z3 = lambda: torch.zeros(nF, 3, device=dev, dtype=dt)                        # noqa: E731
+    cnt = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, ones_e).clamp(min=1e-9)
+    cen = z3().index_add(0, ef, pos[es] * ones_e[:, None]) / cnt[:, None]        # mid-ring centroid
+    ca = z3().index_add(0, ef, a_s * ones_e[:, None]) / cnt[:, None]             # apical cap centroid
+    cb = z3().index_add(0, ef, b_s * ones_e[:, None]) / cnt[:, None]             # basal cap centroid
+    o = cen[ef]
+
+    def tri(p, q, r):
+        return torch.einsum("ij,ij->i", p - o, torch.cross(q - o, r - o, dim=-1)) * ones_e
+
+    v6 = torch.zeros(nF, device=dev, dtype=dt)
+    v6 = v6.index_add(0, ef, tri(ca[ef], a_s, a_t))                              # apical cap
+    v6 = v6.index_add(0, ef, tri(cb[ef], b_t, b_s))                              # basal cap, reversed
+    v6 = v6.index_add(0, ef, tri(a_s, b_s, b_t))                                 # wall, triangle 1
+    v6 = v6.index_add(0, ef, tri(a_s, b_t, a_t))                                 # wall, triangle 2
+    v_f = v6 / 6.0
+    # THE CAPS BY NEWELL, exactly as the monolayer does them, so that on a right prism the two
+    # surfaces are the same arithmetic and AB-C1 is an identity rather than a near miss.
+    Na = z3().index_add(0, ef, torch.cross(a_s, a_t, dim=-1) * ones_e[:, None]) * 0.5
+    Nb = z3().index_add(0, ef, torch.cross(b_s, b_t, dim=-1) * ones_e[:, None]) * 0.5
+    A_ap, A_ba = Na.norm(dim=-1), Nb.norm(dim=-1)
+    la = (0.5 * torch.cross(a_t - a_s, b_t - a_s, dim=-1).norm(dim=-1)
+          + 0.5 * torch.cross(b_t - a_s, b_s - a_s, dim=-1).norm(dim=-1)) * ones_e
+    A_lat = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, la)
+    return v_f, A_ap + A_ba + A_lat, A_ap, A_ba
+
+
+def _apicobasal_energy_core(pos, sep, es, et, ef, nF, V_eq, alive, k_v, kappa_s, Lam, K_R, R0,
+                            eocc, vocc, gamma=0.0):
+    """The monolayer's energy on the polyhedron: same functional, different geometry.
+
+        U = sum_j [ 1/2 k_v (V_j - V_eq_j)^2 + kappa_s S_j + 1/2 gamma P_j^2 ]
+            + Lam sum_e l_e + K_R sum_i (|x_i| - R0)^2
+
+    THE FUNCTIONAL IS UNCHANGED ON PURPOSE. The hypothesis under test is that a cell is a polyhedron
+    with two independent caps, not that it obeys some new constitutive law -- so every coefficient
+    keeps its meaning and a spec can be moved between the two `model:` values without retuning. If
+    this energy also changed form, a difference between the arms would have two possible causes and
+    would settle neither.
+
+    `P_j` and the line tension stay on the MID-SURFACE ring. The perimeter term is a cell-shape
+    regulariser standing in for the RNR remeshing, and `edge_flip` acts on the mid-surface ring, so
+    a regulariser written on a different ring than the one being rewired would fight it.
+    """
+    v_f, s_f, _, _ = apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc)
+    E = (0.5 * k_v * (v_f - V_eq) ** 2 * alive).sum() + kappa_s * (s_f * alive).sum()
+    if gamma != 0.0:
+        perim = torch.zeros(nF, device=pos.device, dtype=pos.dtype).index_add(
+            0, ef, (pos[et] - pos[es]).norm(dim=-1) * eocc)
+        E = E + 0.5 * gamma * (perim ** 2 * alive).sum()
+    if Lam != 0.0:
+        E = E + Lam * ((pos[et] - pos[es]).norm(dim=-1) * eocc).sum()
+    if K_R != 0.0:
+        E = E + K_R * (((pos.norm(dim=1) - R0) ** 2) * vocc).sum()
+    return E
+
+
 def _monolayer_energy_core(pos, es, et, ef, nF, h_cell, V_eq, alive, k_v, kappa_s, Lam, K_R, R0, eocc, vocc, gamma=0.0):
     """U = sum_j [ 1/2 k_v (v_j - v_eq_j)^2 + kappa_s s_j + 1/2 gamma P_j^2 ] + Lam*sum_e l_e + K_R*sum_i (|x_i|-R0)^2 .
     gamma is a cortical CONTRACTILITY (perimeter^2) that rounds cells and resists shear -- a cell-shape
@@ -2720,6 +2892,20 @@ class MonolayerShapeEnergy3D(Lateral):
         # REST STATE. "force_balance" makes the seeded vesicle an equilibrium; "volume_only" is the
         # original behaviour, kept so the collapse can be reproduced deliberately. See _rest_offset.
         self.rest_calibration = str(params.get("rest_calibration", "force_balance"))
+        # THE VOLUME TARGET'S SCALE, DECLARABLE INSTEAD OF INFERRED. `V_eq = mono_k * V0f` converts
+        # the wedge target `cell_grow` scales into this model's cell volume, and `mono_k` is
+        # normally calibrated once from the seeded mesh -- median rest volume over median wedge.
+        # That is right for a run and wrong for a CONTROLLED COMPARISON: two models that agree on
+        # the volume to float32 still calibrate to constants differing in the last bits, and at the
+        # seeded state `v - V_eq` is a difference of two nearly equal numbers, so those last bits
+        # are a large RELATIVE perturbation of the volume force exactly where it is smallest.
+        # Measured on gate_ab_flat: 3e-7 in `mono_k` opened the two arms to 1.1e-2 of an edge within
+        # one frame, decaying back to 1.2e-4 once the cells had left their targets. Declaring it
+        # holds the calibration fixed ACROSS arms, which is what makes AB-C1 a comparison of two
+        # energies rather than of two calibrations. Default None: every existing spec calibrates
+        # exactly as before.
+        _mk = params.get("mono_k", None)
+        self.mono_k = None if _mk is None else float(_mk)
         # THE SAME PLANAR CONSTRAINT THE DEFAULT IMPLEMENTATION TAKES. This class does not derive
         # from `ShapeEnergy3D` -- it is a different energy on the same contract -- so it parses
         # and applies `plane_axis` itself. Without this the key is accepted, ignored, and a flat
@@ -2822,8 +3008,11 @@ class MonolayerShapeEnergy3D(Lateral):
         # growth op's scaling of the wedge target V0f (cell_grow scales V0f per cell) -> reuse it.
         v_rest, _, _, _ = monolayer_geometry_3d(x0, es, et, ef, nF, h_cell, eocc)
         if "mono_k" not in m:
-            wedge = face_geometry_3d(x0, es, et, ef, nF, eocc)[3]
-            m["mono_k"] = float((v_rest.median() / wedge.median().clamp(min=1e-9)).item())
+            if self.mono_k is not None:
+                m["mono_k"] = self.mono_k                     # declared: see __init__
+            else:
+                wedge = face_geometry_3d(x0, es, et, ef, nF, eocc)[3]
+                m["mono_k"] = float((v_rest.median() / wedge.median().clamp(min=1e-9)).item())
         V_eq = (m["mono_k"] * m["V0f"]).clamp(min=1e-9)
         if self.rest_calibration == "force_balance":
             if "mono_delta" not in m:
@@ -2863,18 +3052,214 @@ class MonolayerShapeEnergy3D(Lateral):
         return {self.at: v_full}
 
 
-@register_operator("cell_mechanics", implementation="compile", set="vertex", kind="lateral",
+@register_operator("cell_mechanics", model="apicobasal", set="vertex", kind="lateral",
                    family="mechanics")
-class ShapeEnergy3DCompiled(ShapeEnergy3D):
-    """The shape energy through torch.compile over a fixed-size reservoir. A clear ~2.4x win ONLY
-    for fixed-topology runs; with division the padding computes over the oversized buffer and it is
-    net slower, which is why it is opt-in rather than the default.
+class ApicoBasalShapeEnergy3D(Lateral):
+    """R3 OF THE APICO-BASAL PROMOTION: the energy, written on the doubled degree-of-freedom set.
 
-    AUTOGRAD, NECESSARILY. This variant exists to compile the ENERGY and let autograd differentiate
-    the compiled graph; routing its gradient through the warp kernels would leave `torch.compile`
-    compiling something nothing calls."""
-    COMPILE = True
-    GRAD_BACKEND = "autograd"
+    `model:` AND NOT `implementation:`, by the axis test this repo writes down in the axis test. An
+    implementation computes the SAME equation differently; this is a different equation about a
+    different object. `cell_mechanics[model: monolayer]` says a cell's two surfaces are tied to its
+    mid-surface by `a_i, b_i = x_i +/- (H_i/2) n_i`, so apical and basal can never slide past each
+    other at any parameter value; this says they are free, and wedging, bottle cells and apical
+    constriction are what the difference is made of. `cell_mechanics[model: apicobasal]` sits beside
+    `monolayer` and `marinari` on the one contract.
+
+    THE FUNCTIONAL IS THE MONOLAYER'S, TERM FOR TERM -- see `_apicobasal_energy_core`. Only the
+    geometry the terms are evaluated on changes, which is what makes the promotion's first rung a
+    REDUCTION rather than a comparison of two tunings: on a flat patch with `sep` frozen at
+    (h0/2)n the polyhedron volume IS `A_mid * h`, so the two models must produce the same force.
+    That is AB-C1, and it is the row that says the doubling generalises the incumbent.
+
+    `sep_mu` IS A MOBILITY AND ZERO IS A LIMIT, NOT A MODE. The second degree-of-freedom group has
+    its own drag, and `sep_mu` is its mobility relative to the mid-surface's `mu`. At `sep_mu: 0` the
+    apico-basal separation is infinitely damped -- it cannot move, so the cell keeps the thickness it
+    was seeded with while the mid-surface relaxes under the polyhedral energy. THAT IS A PHYSICAL
+    LIMIT OF THIS MODEL, not a staging switch: it is the "thickness is set by the cell and defended
+    absolutely" case, and it is the case in which AB-C1 and AB-C5 are closed forms. R3 and R4 run at
+    0 because a closed form for the volume of a prism of KNOWN thickness is only a closed form while
+    the thickness is known; R5 raises it to 1 and the separation becomes a solver outcome.
+
+    WHAT IT DOES NOT DO. It does not own the apico-basal AXIS: nothing here normalises `sep` or
+    enforces its sign, because a normalisation of another operator's state is not a mechanism. The
+    cost of that decision is gate row AB-B1, which counts the vertices whose span has inverted, and
+    that cost is paid in the table rather than hidden in a clamp.
+    """
+    SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
+    INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos", "sep"]; WRITES = ["pos", "sep"]
+    MAPS = ["E_srce", "E_trgt", "E_face"]
+    MECHANISM_TAGS = ["vertex_model", "apicobasal", "cell_polyhedron", "cell_3d_volume",
+                      "surface_tension", "emergent_bending", "force_balance"]
+    REFERENCE = ("Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644 (3D vertex model "
+                 "with independent apical and basal surfaces); Okuda, S. et al. (2018). Sci. Rep. "
+                 "8:2386 (the monolayer reduction this generalises).")
+    PARAM_ROLES = {"k_v": "cell_volume_elasticity", "kappa_s": "surface_tension",
+                   "sep_mu": "apicobasal_mobility"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.sep_block = str(params.get("sep_block", "sep"))
+        self.k_v = float(params.get("k_v", 4.0)); self.kappa_s = float(params.get("kappa_s", 0.2))
+        self.gamma = float(params.get("gamma", 0.0))
+        self.Lambda = float(params.get("Lambda", 0.0)); self.K_R = float(params.get("K_R", 0.0))
+        self.mu = float(params.get("mu", 1.0)); self.dt = float(params.get("dt", 1.0))
+        self.relax_iters = int(params.get("relax_iters", 30)); self.eta = float(params.get("eta", 0.08))
+        self.cap_frac = float(params.get("cap_frac", 0.12))
+        self.sep_mu = float(params.get("sep_mu", 1.0))
+        self.rest_calibration = str(params.get("rest_calibration", "force_balance"))
+        _mk = params.get("mono_k", None)                  # see MonolayerShapeEnergy3D.__init__
+        self.mono_k = None if _mk is None else float(_mk)
+        _pa = params.get("plane_axis", None)
+        self.plane_axis = None if _pa is None else int(_pa)
+
+    # ---------------------------------------------------------------- gradients
+    def _grad(self, x, s, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc, want_sep):
+        """(dU/dx, dU/ds). ONE autograd pass over both, because they are one energy.
+
+        `want_sep` is False at `sep_mu: 0`, where the second gradient would be computed, multiplied
+        by zero and thrown away -- and it is not free: it doubles the graph the relaxation walks
+        thirty times a frame.
+        """
+        with torch.enable_grad():
+            x = x.detach().requires_grad_(True)
+            s = s.detach().requires_grad_(want_sep)
+            E = _apicobasal_energy_core(x, s, es, et, ef, nF, V_eq, alive, self.k_v, self.kappa_s,
+                                        self.Lambda, self.K_R, R0t, eocc, vocc, self.gamma)
+            if want_sep:
+                gx, gs = torch.autograd.grad(E, (x, s))
+                return torch.nan_to_num(gx), torch.nan_to_num(gs)
+            gx = torch.autograd.grad(E, x)[0]
+        return torch.nan_to_num(gx), None
+
+    def _rest_offset(self, x0, s0, es, et, ef, nF, V_eq0, alive, R0t, eocc, vocc):
+        """The constant added to every cell's target volume so the SEEDED SHELL IS AT REST.
+
+        THE SAME SOLVE THE MONOLAYER DOES, on this geometry -- see `MonolayerShapeEnergy3D._rest_offset`
+        for why it exists at all (only the volume term can push outward; calibrating `V_eq` to the
+        rest volume balances it against nothing and a freshly seeded ball collapses under its own
+        tension, radius 5.00 -> 1.80 in 20 frames), why the correction is a CONSTANT and not a factor,
+        why it is solved rather than typed in, and why it iterates. Repeated here rather than
+        inherited because the gradient is this energy's, and a shared solve that called the wrong
+        `_grad` would calibrate one model against the other's rest state.
+
+        `sep` IS HELD FIXED THROUGHOUT THE SOLVE, at every `sep_mu`. The question the offset answers
+        is which target volume puts the MID-SURFACE at radius R; letting the thickness relax inside
+        the calibration would answer it with a different tissue than the one that then runs.
+        """
+        R_target = x0.norm(dim=1).mean().clamp(min=1e-9)
+        delta = torch.zeros((), dtype=x0.dtype, device=x0.device)
+        x = x0.clone()
+        for _ in range(8):
+            V_eq = (V_eq0 + delta).clamp(min=1e-9)
+            u = x / x.norm(dim=1, keepdim=True).clamp(min=1e-9)
+            g0, _ = self._grad(x, s0, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc, False)
+            with torch.enable_grad():
+                xg = x.detach().requires_grad_(True)
+                vf, _, _, _ = apicobasal_geometry_3d(xg, s0, es, et, ef, nF, eocc)
+                gV = torch.autograd.grad((vf * alive).sum(), xg)[0]
+            den = self.k_v * (u * torch.nan_to_num(gV)).sum()
+            if not torch.isfinite(den) or den.abs() < 1e-12:
+                break
+            step = ((u * g0).sum() / den).detach()
+            if not torch.isfinite(step):
+                break
+            delta = delta + step
+            V_eq = (V_eq0 + delta).clamp(min=1e-9)
+            with torch.no_grad():
+                cap = self.cap_frac * (x[et] - x[es]).norm(dim=-1).mean().clamp(min=1e-6)
+            for _ in range(max(1, self.relax_iters)):
+                gx, _ = self._grad(x, s0, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc, False)
+                st = -(self.eta * self.mu) * gx
+                x = x + st * torch.clamp(cap / (st.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+            x = x * (R_target / x.norm(dim=1).mean().clamp(min=1e-9))
+        return delta.detach()
+
+    # ---------------------------------------------------------------- forward
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); pos_full = lvl.get("pos"); v_full = torch.zeros_like(pos_full)
+        m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {self.at: v_full}
+        if self.sep_block not in lvl.state_schema:
+            raise ValueError(
+                f"cell_mechanics[apicobasal] needs a `{self.sep_block}` block on the {self.at!r} "
+                f"set -- seed it with `{{op: seed_mesh, implementation: apicobasal}}`. Without it "
+                f"there is no second surface and the run would be the mid-surface model wearing "
+                f"this operator's name.")
+        Nv = int(m["Nv"]); nF = int(m["nF"]); es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]
+        E = es.shape[0]; dev, dt = pos_full.device, pos_full.dtype
+        x0 = pos_full[:Nv].detach().clone()
+        s0 = lvl.get(self.sep_block)[:Nv].detach().clone()
+        eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
+        R0t = torch.as_tensor(float(m["R0"]), dtype=dt, device=dev)
+        # PUBLISHED FOR THE RENDERER, and it is now a MEASUREMENT rather than a declared constant:
+        # the monolayer writes its `h0` here because its thickness is one, and this model's is a
+        # per-vertex vector. The cross section wants one number, so it gets the mean cell thickness
+        # |a - b| = 2|sep|, which is what `h0` meant on the other model.
+        m["mono_h"] = float(2.0 * s0.norm(dim=1).mean())
+        # THE SAME V_eq THE MONOLAYER GETS, and that is what makes AB-C1 a controlled comparison:
+        # both arms calibrate the wedge target `V0f` -- the quantity `cell_grow` scales -- against
+        # their own rest volume, and on a flat patch those rest volumes are the same number.
+        v_rest, _, _, _ = apicobasal_geometry_3d(x0, s0, es, et, ef, nF, eocc)
+        if "mono_k" not in m:
+            if self.mono_k is not None:
+                m["mono_k"] = self.mono_k                     # declared: see the monolayer's __init__
+            else:
+                wedge = face_geometry_3d(x0, es, et, ef, nF, eocc)[3]
+                m["mono_k"] = float((v_rest.median() / wedge.median().clamp(min=1e-9)).item())
+        V_eq = (m["mono_k"] * m["V0f"]).clamp(min=1e-9)
+        if self.rest_calibration == "force_balance":
+            if "mono_delta" not in m:
+                m["mono_delta"] = self._rest_offset(x0, s0, es, et, ef, nF, V_eq, m["alive"],
+                                                    R0t, eocc, vocc)
+            V_eq = (V_eq + m["mono_delta"]).clamp(min=1e-9)
+        with torch.no_grad():
+            cap = self.cap_frac * (x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-6)
+            # THE SEPARATION'S CAP IS IN THE SEPARATION'S OWN UNIT -- a fraction of the mean cell
+            # HALF-thickness, not of the mean junction length. A cap borrowed from the mid-surface
+            # would be several times the whole thickness on a thin epithelium, which is not a cap.
+            cap_s = self.cap_frac * s0.norm(dim=1).mean().clamp(min=1e-6)
+        m["mech"] = dict(K_A=0.0, K_P=0.0, K_V=self.k_v, K_R=self.K_R, Lambda=self.Lambda,
+                         Gamma=self.gamma, eta=self.eta, cap_frac=self.cap_frac,
+                         plane_axis=self.plane_axis)
+        move_sep = self.sep_mu != 0.0
+        x = x0.clone(); s = s0.clone()
+        for _ in range(max(1, self.relax_iters)):
+            gx, gs = self._grad(x, s, es, et, ef, nF, V_eq, m["alive"], R0t, eocc, vocc, move_sep)
+            step = -(self.eta * self.mu) * gx
+            step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+            if self.plane_axis is not None:
+                step[:, self.plane_axis] = 0.0
+            x = x + step
+            if move_sep:
+                ds = -(self.eta * self.mu * self.sep_mu) * gs
+                ds = ds * torch.clamp(cap_s / (ds.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+                s = s + ds
+        # THE DIVISOR IS `general.dt`, NOT A DECLARED ONE -- the same by-construction fix both other
+        # implementations of this contract carry: the engine multiplies an emitted velocity by
+        # `general.dt`, so the two must cancel or the relaxation rate is silently rescaled.
+        _dt = float(getattr(H, "dt", self.dt) or self.dt)
+        if "dt" in self.params and abs(float(self.params["dt"]) - _dt) > 1e-12 * max(_dt, 1.0) \
+                and not getattr(self, "_dt_warned", False):
+            self._dt_warned = True
+            from plexus.paths import warn
+            warn(f"[warn] cell_mechanics[apicobasal]: `dt: {self.params['dt']}` is IGNORED -- the "
+                 f"divisor is general.dt ({_dt}).")
+        v_full[:Nv] = (x - x0) / max(_dt, 1e-9)
+        if mask is not None:
+            v_full = v_full * mask[:, None].float()
+        out = {self.at: v_full}
+        if move_sep:
+            # THE SECOND DELTA, ROUTED BY `(set, block)` -- what R1(a) was built for. Without that
+            # key the engine folds every delta for a set into its COORDINATE block, so a separation
+            # velocity would be added to `pos` and the tissue would translate instead of thicken.
+            vs = torch.zeros_like(pos_full)
+            vs[:Nv] = (s - s0) / max(_dt, 1e-9)
+            if mask is not None:
+                vs = vs * mask[:, None].float()
+            out[(self.at, self.sep_block)] = vs
+        return out
 
 
 @register_operator("cell_mechanics", model="marinari", set="vertex", kind="lateral",
@@ -3204,24 +3589,12 @@ def try_shape_energy_grad(op, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, 
 @register_operator("cell_mechanics", implementation="warp", set="vertex", kind="lateral",
                    family="mechanics")
 class ShapeEnergy3DWarp(ShapeEnergy3D):
-    """`cell_mechanics` with the shape-energy gradient in warp -- WHICH IS NOW THE DEFAULT.
+    """`cell_mechanics` with the shape-energy gradient in warp -- WHICH IS THE DEFAULT.
 
-    Kept as a name a spec can still write, so `implementation: warp` stays legible and archived
-    specs that ask for it keep working; it selects the same behaviour the bare operator has. The
-    opposite direction is the one that does something now: `implementation: autograd`.
+    Kept only as a name a spec can still write, so archived specs that say `implementation: warp`
+    keep loading; it selects exactly the behaviour the bare operator has. Which route computes the
+    derivative is a backend choice, not a model, so there is no longer an `autograd` variant to
+    select in the other direction -- `_grad` uses the warp kernels wherever they apply and falls
+    back to `torch.autograd` where they do not, saying so once.
     """
     MECHANISM_TAGS = ShapeEnergy3D.MECHANISM_TAGS + ["warp"]
-    GRAD_BACKEND = "warp"
-
-
-@register_operator("cell_mechanics", implementation="autograd", set="vertex", kind="lateral",
-                   family="mechanics")
-class ShapeEnergy3DAutograd(ShapeEnergy3D):
-    """`cell_mechanics` with the gradient taken by `torch.autograd` -- the pre-warp default.
-
-    THE WAY BACK, and it is on the implementation axis because that is what the axis is for: same
-    energy, same model, a different route to its derivative. Worth having as a declared thing rather
-    than an environment variable, because the two are not bit-identical (float32 atomics, in both
-    directions) and a run that needs to be compared against the archive should be able to say so.
-    """
-    GRAD_BACKEND = "autograd"
