@@ -1,3 +1,10 @@
+> **RETIRED, AND KEPT ONLY FOR ITS NUMBERS.** The 22 sweep specs this guide describes, their run
+> directories and the montage were all removed from `config/tissue/` and `graphs_data/tissue/`
+> between sessions. Every measurement below is still valid -- each came from a run that existed --
+> but **nothing here can be regenerated without rebuilding the specs**, and the montage it points at
+> is gone. Rebuild them by copying `ab_02_reduction_apicobasal.yaml` and overriding one
+> `cell_mechanics` key per variant, then `tools/tissue_montage.py ab_02_reduction_apicobasal`.
+
 # `cell_mechanics[model: apicobasal]`, one parameter at a time
 
 22 variants of `ab_02_reduction_apicobasal`, each changing exactly ONE key of the operator and nothing
