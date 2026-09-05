@@ -376,8 +376,8 @@ class CellRDSeed(Structural):
 class CellRDSeedNoise(CellRDSeed):
     """`noise` MODEL of seed_cell_chem -- the homogeneous steady state plus NOISE -- patterning from fluctuation alone, the strictest test that the pattern is emergent.
 
-    Geometry: no geometry. That is not a footnote: a seed reading no geometry may be moved ahead of
-    `cell_geometry` into a `seed:` section, and one reading `cen` may not. See AXES.md.
+    Geometry: none. That is not a footnote -- a seed reading no geometry may be scheduled ahead of
+    `cell_geometry`, and one reading the cell centroids may not.
     """
     NUCLEATION = "noise"
 
@@ -387,8 +387,8 @@ class CellRDSeedNoise(CellRDSeed):
 class CellRDSeedPatch(CellRDSeed):
     """`patch` MODEL of seed_cell_chem -- a LOCALIZED activation source, placed by hand -- a bud/tube driver.
 
-    Geometry: reads `cen`. That is not a footnote: a seed reading no geometry may be moved ahead of
-    `cell_geometry` into a `seed:` section, and one reading `cen` may not. See AXES.md.
+    Geometry: reads the cell centroids. That is not a footnote -- a seed reading no geometry may be
+    scheduled ahead of `cell_geometry`, and one reading the centroids may not.
     """
     NUCLEATION = "patch"
 
@@ -398,8 +398,8 @@ class CellRDSeedPatch(CellRDSeed):
 class CellRDSeedCones(CellRDSeed):
     """`cones` MODEL of seed_cell_chem -- N FIXED radial activation cones (Okuda Fig 5's multi-tube) -- the strongest hand in the answer, and the honest place to declare it.
 
-    Geometry: reads `cen`. That is not a footnote: a seed reading no geometry may be moved ahead of
-    `cell_geometry` into a `seed:` section, and one reading `cen` may not. See AXES.md.
+    Geometry: reads the cell centroids. That is not a footnote -- a seed reading no geometry may be
+    scheduled ahead of `cell_geometry`, and one reading the centroids may not.
     """
     NUCLEATION = "cones"
 
@@ -409,8 +409,8 @@ class CellRDSeedCones(CellRDSeed):
 class CellRDSeedSimplex(CellRDSeed):
     """`simplex` MODEL of seed_cell_chem -- three species normalised to a simplex -- the May-Leonard initial condition for cyclic competition.
 
-    Geometry: no geometry. That is not a footnote: a seed reading no geometry may be moved ahead of
-    `cell_geometry` into a `seed:` section, and one reading `cen` may not. See AXES.md.
+    Geometry: none. That is not a footnote -- a seed reading no geometry may be scheduled ahead of
+    `cell_geometry`, and one reading the cell centroids may not.
     """
     NUCLEATION = "simplex"
 
@@ -862,10 +862,9 @@ class CellReactGiererMeinhardt(Lateral):
         return {self.at: self.rate * torch.stack([da, dh], dim=1) * occ}
 
 
-# `cell_grow`, AND THE OLD NAME IS GONE RATHER THAN ALIASED. Cedric, 8 August: "I always found
-# cell_grow misleading -- is it morphogen, is it growth?" and then, on the alias:
-# "I'm not a fan of alias and backward compatibility, this makes everything intricated and not
-# readable. I prefer modifying prior spec files. Simplicity needs erasing here."
+# `cell_grow`, AND THE OLD NAME IS GONE RATHER THAN ALIASED. An alias makes two names for one
+# thing and leaves a reader unable to tell which a specification meant; prior specifications are
+# migrated instead.
 #
 # It is growth. It does not produce a morphogen, it READS one and uses it as a per-cell rate: the
 # morphogen is a GATE on this operator, and the composition space already declares that gate as an
@@ -1019,10 +1018,9 @@ class Grow3D(Structural):
             amax = float(a.max()) if a.numel() else 0.0
             thr = self.a_sw * amax if amax > self.a_live else float("inf")   # inf -> Hill term 0
         hillv = a ** self.hill / (thr ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
-        # A SECOND MORPHOGEN THAT STOPS GROWTH. Cedric, 11 August: "make variants where the blue
-        # morphogen stops cell growth, so that we see the blue and only red spots growing."
+        # A SECOND MORPHOGEN THAT STOPS GROWTH, so that only the activator-high spots grow.
         #
-        # Every growth law this campaign has run is purely ACTIVATING: `rate * (rho + hill(a))`, so
+        # The growth law above is purely ACTIVATING: `rate * (rho + hill(a))`, so
         # the only thing a morphogen can do is make a cell grow FASTER, and the slowest a cell can
         # grow is the rho baseline -- which is why six rounds produced broad lobes and never a
         # finger. A bulge sharpens into a finger when the tissue grows at the tip AND STOPS at the
@@ -1063,9 +1061,9 @@ class Grow3D(Structural):
         m["V0f"] = m["V0f_init"] * (s ** 3)
         m["V0"] = float(m["V0f"].sum())
         # THE SHELL RADIUS MUST GROW WITH THE CELLS. cell_mechanics carries a radial spring,
-        #     E += K_R * sum_i (|x_i| - R0)^2                 (mesh_ops.py:85)
-        # and R0 is set once at seeding (:217). `cell_grow` rescales it (:409); this operator
-        # never did. So with K_R = 0.4 the mechanics pinned the shell at the seed radius while the
+        #     E += K_R * sum_i (|x_i| - R0)^2
+        # and R0 is set once at seeding. An operator that grows the cells without rescaling R0
+        # leaves the mechanics pinning the shell at the SEED radius while the
         # cells' target volumes grew sixteenfold, and the sheet had nowhere to put the extra area
         # but through itself. Measured on mini_grow_divide_bigger: rays cast from the tissue
         # centroid cross the surface exactly once at frame 384 (100% of them) and 13 times at
@@ -1273,11 +1271,10 @@ class InterfaceLineTension3D(Lateral):
         a = clvl.state[:nF, h0].detach().to(dev)
         # `a_sw` IS A FRACTION OF THE FIELD'S OWN MAXIMUM, NOT AN ABSOLUTE VALUE.
         #
-        # It used to be `a > self.a_sw` with a_sw declared (0.2, 6.0) and defaulted to 0.5, while
-        # the activator's own ceiling is whatever the chemistry produces -- measured across 78
-        # campaign runs, act_max_final has a MEDIAN OF 0.000 and a maximum of 1.541. So the entire
-        # declared range sat above the field, `red.sum()` was 0, and the operator returned {} on
-        # every one of 800 scheduled frames. The acted-ledger recorded `rd_interface_tension: 0`
+        # An ABSOLUTE threshold cannot work here, because the activator's own ceiling is whatever
+        # the chemistry produces and that varies by orders of magnitude between parameter sets. A
+        # threshold declared above the field selects nothing, the operator returns an empty delta
+        # on every scheduled frame, and the ledger records
         # and the Analyst reported it "inert" for two rounds without being able to say why. Nine
         # edits, 10% of a campaign, on an operator that could not fire at any legal setting.
         #
@@ -1847,7 +1844,8 @@ if __name__ == "__main__":
     raise SystemExit(1 if fails else 0)
 
 
-# `_np` is defined identically in shape_chem_ops.py above; the duplicate from shape_probe_ops.py is dropped.
+# `_np` is defined once, above, and shared by both the shape-to-chemistry and the shape-probe
+# operators.
 
 
 class _ShapeProbeBase(Lateral):

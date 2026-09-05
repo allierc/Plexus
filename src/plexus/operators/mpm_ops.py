@@ -110,16 +110,15 @@ def stencil_offsets(dim: int, device="cpu") -> torch.Tensor:
     MPM_3D offset ordering: idx//9, (idx%9)//3, idx%3)."""
     # MEMOISED. Built from a python list, this is a PAGEABLE HOST->DEVICE COPY -- a host sync in
     # eager, and outright illegal inside a CUDA stream capture. It depends only on (dim, device)
-    # and is called four times per substep, so it was rebuilding a constant 27x3 table 90 times a
-    # frame. Measured at 19 ms of a 156 ms frame, by leaving THIS ONE call unmemoised with every
-    # other host sync already gone -- which is the only way to measure it, because removing syncs
-    # is all-or-nothing: any single survivor drains the launch queue and hides the rest.
+    # and is called four times per substep, so unmemoised it rebuilds a constant 27x3 table on
+    # every one of them -- worth a noticeable fraction of a frame. Removing host syncs is
+    # all-or-nothing: any single survivor drains the launch queue and hides the cost of the rest.
     # The returned tensor is SHARED and must be treated as read-only; today every caller only
     # reads it (`offsets.long()`, arithmetic) and none mutates it in place.
     return _stencil_cached(int(dim), str(device))
 
 
-# 2D stencil kept as a module constant for back-compat (p2g/g2p now build per-dim)
+# The 2D stencil as a module constant; the scatter and gather build theirs per dimension.
 _OFFSETS = stencil_offsets(2)
 
 
@@ -138,11 +137,10 @@ class MPMGrid(Field):
     positions into [2*dx, box[k] - 2*dx] with `box` correct and `dx` wrong, which crushes a 0.1 m
     cube into a 0.058 m slab on the first substep.
 
-    `n_grid` now means CELLS ACROSS AXIS 1. The two readings coincide when world_size[1] == 1.0,
-    and they always did here: of the 1,744 specs under config/, 152 are MPM, 94 declare
-    `general.world` and ALL 94 are exactly [1.0, 1.0, 1.0]; the other 58 are 2D and omit it, which
-    schema.py defaults to [1.0, 1.0]. So every existing spec keeps the identical dx and the
-    identical node count, and no spec sets `width` on this field.
+    `n_grid` means CELLS ACROSS AXIS 1, not cells per unit length. The two readings coincide when
+    the world is one unit across on that axis, which is the default, so a specification that does
+    not declare a world gets the same dx and the same node count either way. They diverge exactly
+    where it matters: on a box that is not one unit across.
 
     inv_dx IS NOT 1.0/dx. `1.0 / (1.0 / n) != float(n)` for 640 of the first 4,096 integers -- the
     first offender is n = 49 -- so the reciprocal round-trip is exact only by luck at the n_grid
@@ -1180,8 +1178,8 @@ class MPMGridUpdate(FieldUpdate):
                     # `gy = -g, gz = 0` in 3D as well as in 2D. This line used to read -z in 3D, so
                     # on every 3D spec buoyancy pushed at RIGHT ANGLES to the weight it is supposed
                     # to oppose -- a bubble drifting sideways rather than rising. One shipped spec
-                    # is affected (config/cell/cell_one.yaml, buoyancy 4.0, no explicit direction; deleted 2026-09-04),
-                    # and it was wrong before this change, not after. `buoyancy_dir` overrides.
+                    # would push at right angles to the weight it opposes. `buoyancy_dir`
+                    # overrides the default axis for a specification that needs another.
                     _v[1] = -1.0
                 self._dir_cache = torch.tensor(_v, device=dev, dtype=gv.dtype)
                 self._dir_key = _key
@@ -1740,14 +1738,14 @@ class MPMAnchor(Lateral):
         if "mode" in params:
             raise ValueError(
                 "mpm_anchor: `mode` is now `applies_to` (boundary | substrate). It is a value, not "
-                "a model -- the spring and the rest state are the same either way. See AXES.md.")
+                "a model -- the spring and the rest state are the same either way.")
         self.applies_to = str(params.get("applies_to", "boundary"))
         self.ring = params.get("ring", None)                  # None -> derived (a length)
         # WHICH CONFIGURATION IS "REST"? Until now it was whenever the operator first ran, which is
         # frame 0 for an ungated operator and therefore looked like a choice. It is not: gate this
         # operator with `after_frame` and the rest state silently becomes whatever the run had
         # drifted to by then. For a merge-then-separate sequence that is exactly wrong -- the anchor
-        # would hold the MERGED drop rather than pull back to the two it started as.
+        # would hold the merged drop rather than pull back to the two it started as.
         # `anchor_frame` names the frame whose positions are the rest state, and the operator
         # captures them there even when its force is switched on later.
         self.anchor_frame = params.get("anchor_frame", None)
@@ -2336,7 +2334,7 @@ class MLSMPMMechanics(Exchange):
 
 
 # ==========================================================================================================
-# MERGED FROM `mpm_warp.py` on 2026-09-04 -- the four MPM operators in warp -- `mpm_scatter`, `mpm_gather`, `mpm_grid_update`, `mpm_strain`.
+# The four MPM operators in Warp: `mpm_scatter`, `mpm_gather`, `mpm_grid_update`, `mpm_strain`.
 #
 # THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE. A contract's `default` is whichever
 # variant registers FIRST, so appending the backends after the torch bodies is not a style choice: put
@@ -2528,10 +2526,10 @@ class MPMScatterWarp(MPMScatter):
 
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate",
                       "fused_kernel"]
-    # 3D ONLY, DECLARED. Inherited from MPMScatter this said [2, 3], so `contract.capabilities()`
-    # reported the fused kernel as able to run 2D -- it cannot, `forward` raises -- and any
-    # capability-driven dispatch built on that table would have routed every 2D spec into a kernel
-    # that refuses them. 58 of the 78 specs in config/material are 2D (`general.dim` defaults to 2).
+    # 3D ONLY, DECLARED. Inherited unchanged this would say [2, 3], so `contract.capabilities()`
+    # would report the fused kernel as able to run 2D -- it cannot, `forward` raises -- and any
+    # capability-driven dispatch built on that table would route a 2D specification into a kernel
+    # that refuses it. Most specifications are 2D, `general.dim` defaulting to 2.
     SUPPORTED_DIMS = [3]
     DIFFERENTIABLE = False
 
@@ -3216,7 +3214,7 @@ class MPMGridUpdateWarp(MPMGridUpdate):
 
 
 # ==========================================================================================================
-# MERGED FROM `mpm_triton.py` on 2026-09-04 -- `mpm_scatter` in triton -- one fused kernel, and a colour-ordered variant.
+# `mpm_scatter` in Triton: one fused kernel, and an atomic-free colour-ordered variant.
 #
 # THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE. A contract's `default` is whichever
 # variant registers FIRST, so appending the backends after the torch bodies is not a style choice: put
@@ -3628,7 +3626,8 @@ class MPMScatterTritonColour(MPMScatterTriton):
 
 
 # ==========================================================================================================
-# MERGED FROM `mpm_loop.py` on 2026-09-04 -- `mpm_gather[torch_loop27]` -- the 27-stencil loop, kept as the readable reference.
+# `mpm_gather[torch_loop27]`: the 27-stencil loop, kept as the readable reference and the
+# low-memory path.
 #
 # THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE. A contract's `default` is whichever
 # variant registers FIRST, so appending the backends after the torch bodies is not a style choice: put
@@ -3806,7 +3805,7 @@ class ActiveForce(Exchange):
             raise ValueError(
                 "active_force: `mode` is gone. `inward`/`outward` are now `along:` (a value on this "
                 "model -- the sign of the gradient), and `directional` is now "
-                "`model: directional` (a different rule: a prescribed direction field). See AXES.md.")
+                "`model: directional` (a different rule: a prescribed direction field).")
         self.along = str(params.get("along", "inward"))
         if self.along not in ("inward", "outward"):
             raise ValueError(f"active_force: along must be inward|outward, got {self.along!r}")

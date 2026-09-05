@@ -746,10 +746,10 @@ class JunctionMyosinTwoPool(Structural):
         # split: N_an + N_nb = n*(l_an + l_nb) = n*l_ab = N_ab, to the accuracy with which the
         # inserted vertex lies on the parent edge.
         # A NEWBORN JUNCTION IS A FRACTION OF WHAT A MATURE ONE HERE WOULD CARRY, not an absolute
-        # number. `myo_new` used to be a bare density, and because the tissue's mean line density runs
-        # 1.07 -> 1.97 -> 1.48 over the run, `myo_new = 1.0` set a new junction to 51% of its
-        # neighbours at frame 100 and 93% at frame 0 -- a visible, meaningless dimming that had nothing
-        # to do with the parameter's intent.
+        # number. As a bare density it would mean nothing stable: the tissue's mean line density
+        # drifts by about a factor of two over a run, so a fixed absolute value sets a new junction
+        # to an arbitrary and time-varying fraction of what its neighbours hold -- a visible dimming
+        # that has nothing to do with the parameter's intent.
         # n* IS A TWO-SIDED QUANTITY, and getting that wrong is worth a factor of two. A junction is
         # fed by BOTH cells it separates, so setting dN/dt = 0 gives n* = tau_jun * k_ex * (rho_f +
         # rho_g), not tau_jun * k_ex * rho_f. The one-sided version put a newborn junction at half the
@@ -761,10 +761,10 @@ class JunctionMyosinTwoPool(Structural):
         ef_l = m["E_face"][live].long()
         n_star = (self.tau_jun * (z.clone().index_add(0, inv, nsp[ef_l]))[inv]
                   if nsp is not None else torch.ones_like(length))
-        # A FLAG AND NOT A REPLACEMENT, because the absolute reading is the one every cache written
-        # before 10 August was built with, and a silent change of meaning under an unchanged cache key
-        # is how an archived run stops being reproducible without anything failing. `False` reproduces
-        # those bit-for-bit; `True` is the corrected default and is what enters the cache key.
+        # A FLAG AND NOT A REPLACEMENT, because the absolute reading is what every existing cache
+        # was built with, and a silent change of meaning under an unchanged cache key is how an
+        # archived run stops being reproducible without anything failing. `False` reproduces those
+        # bit-for-bit; `True` is the corrected reading, and it enters the cache key.
         new_val = (self.myo_new * n_star if self.new_rel
                    else torch.full_like(length, self.myo_new))
         n_e, _ = _lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_,

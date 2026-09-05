@@ -645,7 +645,7 @@ class ShapeEnergy3D(Lateral):
     CENTRE-BASED (contacts are generated dynamically from cell CENTRE positions, a Voronoi
     construction). This operator is passive -- force = -grad E, overdamped, no active term -- and
     the degrees of freedom ARE the vertices of a half-edge mesh, which is the true-vertex lineage
-    (DamCB/tyssue, Okuda) and is exactly the contrast `ops_2d.py` draws. Borrowing the name imports
+    (Tyssue, Okuda). Borrowing the name imports
     a claim of self-propulsion the code does not make.
 
     K_V is a PER-CELL volume elasticity on each cell's wedge volume v_f (Turing_vertex Eq.3 / tyssue
@@ -752,9 +752,8 @@ class ShapeEnergy3D(Lateral):
         float32 atomics whose order is not fixed -- warp's `atomic_add` and torch's `index_add` --
         so two runs of the UNMODIFIED default already differ from each other.
         """
-        # LOCAL AND LATE, and it stays that way after the merge: `try_shape_energy_grad` is
-        # defined at the BOTTOM of this file (merged from `vertex_warp.py`), below the class
-        # that calls it, so a module-level import would be a forward reference.
+        # LOCAL AND LATE: `try_shape_energy_grad` is defined at the BOTTOM of this file, below the
+        # class that calls it, so a module-level import would be a forward reference.
         from plexus.operators.vertex_ops import try_shape_energy_grad
         g = try_shape_energy_grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t,
                                   eocc, vocc, twin_face, myo_e)
@@ -982,11 +981,10 @@ class Divide3D(Structural):
         # right for a closed vesicle, where a septum midpoint left at the chord would dimple the
         # surface inward at every division. It is a SPHERE assumption, and on a flat sheet it is
         # simply wrong: |p| is measured from the world origin, so it lifts the midpoints off the
-        # plane. Measured on a flat-disc sheet spec (`mesh_mpm_step1_sheet_flat`, DELETED with the
-        # rest of the sheet ladder on 2026-09-04 -- the number is kept here because the spec is not),
-        # it was the entire residual out-of-plane drift once the solver itself was constrained --
-        # sd(z) growing to 5.4% of an edge purely from division, on a sheet whose mechanics could
-        # no longer leave the plane.
+        # plane. On a flat disc it is the entire residual out-of-plane drift once the solver
+        # itself is constrained: the sheet acquires an out-of-plane spread of several percent of an
+        # edge length purely from division, even though its mechanics can no longer leave the
+        # plane at all.
         self.project = bool(params.get("project", True))
 
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
@@ -1009,10 +1007,10 @@ class Divide3D(Structural):
     def _fresh_djit(self, rng, n=1):
         """Fresh per-cell division-threshold multiplier. Gaussian CV (cycle_cv) when set -> desynchronised
         cell cycles; otherwise the legacy uniform +/-reset_noise jitter. Clamped so thresholds stay sane."""
-        # `reset_noise` REMOVED 6 August. It was the legacy jitter, read only on the `cycle_cv == 0`
-        # branch, and every parent this campaign has run sets cycle_cv > 0 -- so the battery
-        # measured it DEAD (a same-seed edit moved the trajectory by exactly zero) and the search
-        # could not reach it anyway. Two ways of doing one thing, one of them unreachable.
+        # There is ONE way to desynchronise the cycle, `cycle_cv`. A second jitter parameter read
+        # only on the `cycle_cv == 0` branch is unreachable whenever cycle_cv is set, so a search
+        # editing it would measure exactly zero change and record that as evidence about the
+        # mechanism rather than about the parameter being dead.
         if self.cycle_cv > 0:
             v = np.clip(1.0 + self.cycle_cv * rng.standard_normal(n), 0.4, 1.8)
         else:
@@ -1136,12 +1134,11 @@ class Divide3D(Structural):
             if len(pos) + 2 > buf:
                 # THE VERTEX BUFFER IS FULL. Counted and reported, never silent.
                 #
-                # This `break` used to be the whole story: division simply stopped and nothing
-                # said why. `wk_pressure_pos_s0` grew 150 -> 1778 cells by frame 323 of 900 and
-                # then added ZERO for the remaining 575 frames, because 1778 is exactly the
-                # (V+4)/2 cap of a buffer sized for a 150-cell start. Two thirds of that run
-                # measured a full array, every specimen check passed it, and the only thing that
-                # ever noticed was Cedric watching the green stop two seconds into the movie.
+                # A bare `break` would be the whole story: division simply stops and nothing says
+                # why. A buffer sized for the seed cell count caps the tissue at (V+4)/2 cells, and
+                # a run that reaches it adds ZERO cells for every remaining frame. Such a run
+                # measures a full array rather than a tissue, and every numerical check still
+                # passes it -- the cell count is simply constant, which is a legal trajectory.
                 #
                 # A run truncated by its own reservoir is not evidence about growth, and the
                 # difference between "the tissue stopped dividing" and "the tissue was not
@@ -1321,14 +1318,13 @@ class Apoptosis3D(Structural):
         # parameters an operator declares, so a non-numeric default is what every composition the
         # Proposer builds will actually run. `list` with no `cells` can never fire -- injecting it
         # would have handed the search an operator that is inert by construction, which is the
-        # failure this project has now paid for three times. `competition` needs no chemistry (so
-        # it is live on the b_none bases too), is the canonical cell-competition hypothesis, and
-        # measured 69 deaths on r020_03 with protr 1.549 vs the parent's 1.596 and no premise
-        # broken. Every existing spec sets `mode` explicitly, so nothing else moves.
-        # `mode:` BECAME THE `model:` AXIS, 4 September. Choosing what makes a cell die is the same
-        # kind of choice as choosing what makes it divide, and `cell_divide._trigger`'s docstring
-        # already says of its own: "THE ONLY THING A `model=` VARIANT OF cell_divide CHANGES". Two
-        # mechanisms for one question, in adjacent classes in this file.
+        # failure worth guarding against. `competition` is the default because it needs no
+        # chemistry, so it is available on every base, and it is the canonical cell-competition
+        # hypothesis.
+        #
+        # What makes a cell die is on the `model:` AXIS, not a `mode:` setting. It is the same kind
+        # of choice as what makes a cell divide, and `cell_divide` puts that on the model axis --
+        # two mechanisms for one question, in adjacent classes in this file.
         #
         # TWO OF THE THIRTEEN COLLAPSED INTO VALUES rather than becoming models, because they were
         # never distinct hypotheses:
@@ -1368,11 +1364,11 @@ class Apoptosis3D(Structural):
         self.n_bands = int(params.get("n_bands", 1))              # >1 -> that many latitude rings
         self.small_frac = float(params.get("small_frac", 0.35))   # (small) die below this x v_ref
         # THE THRESHOLD IS PER MODE, because the quantities have different dynamic ranges and one
-        # number cannot serve them. Measured on r010_12 at a shared 0.5: `dimmer` removed ~212
-        # cells by frame 480 and `competition`, `stalled`, `smaller` and `older` removed NONE.
-        # The activator spans 0 to its maximum across a spot boundary, so a factor-of-two cut sees
-        # it easily; volume, age and growth vary by roughly +-30% between neighbours, so demanding
-        # HALF the neighbour mean asks for a cell that essentially cannot exist in a healthy sheet.
+        # number cannot serve them. The activator spans zero to its maximum across a spot
+        # boundary, so a factor-of-two cut on it selects cells easily. Volume, age and growth vary
+        # by a few tens of percent between neighbours, so the same factor-of-two cut on those asks
+        # for a cell that essentially cannot exist in a healthy sheet, and the model then kills
+        # nothing while appearing to be under test.
         # A silent rule is not a conservative rule -- it is an untested one, which this project has
         # now paid for three times (rd_interface_tension twice, chem_low once).
         _STALL_DEFAULT = {"dimmer": 0.5, "competition": 0.7, "older": 0.7,
@@ -1609,14 +1605,12 @@ class Apoptosis3D(Structural):
             return set(np.where(vv < self.small_frac * v_ref)[0].tolist())
         if self.mode == "stalled":
             # CELL COMPETITION: a cell that is not growing while its neighbours are gets removed.
-            # Cedric, 9 August: "the apoptosis is working but not what triggers it -- would it be
-            # possible to kill cells that do not grow?"
             #
             # RELATIVE, WHICH IS THE WHOLE POINT. `chem_low` marks every cell below a fraction of
-            # the activator's maximum, so when the pattern weakens it marks the TISSUE: measured on
-            # r019_02_apop_low, every cell shrank to 21.6% of its volume, act_max went to zero, and
-            # not one cell was ever extruded, because death needs a cell squeezed to a triangle by
-            # neighbours that are not shrinking too. A threshold against the population's own
+            # the activator's maximum, so when the pattern weakens it marks the WHOLE TISSUE:
+            # every cell shrinks, the activator maximum goes to zero, and not one cell is ever
+            # extruded -- because death needs a cell squeezed to a triangle by neighbours that are
+            # NOT shrinking too. A threshold against the population's own
             # median cannot do that: it always names a minority, by construction.
             #
             # V0f/Vbirth is growth since birth and `age` is time since birth. Both are already
@@ -1818,12 +1812,12 @@ class Apoptosis3D(Structural):
         # perimeter its area no longer supports, which is a shape-index error, not a size one.
         m["P0"] = torch.as_tensor(self.p0 * np.sqrt(np.maximum(A0, 1e-9)), dtype=dt, device=dev)
         # 2. EXTRUDE the ones that are now triangles AND small enough.
-        # A DYING CELL'S CONTENTS GO SOMEWHERE. Cedric, 9 August: "a rule should enforce that the
-        # sum of activity in the dying cell's vicinity does not change much by construction."
+        # A DYING CELL'S CONTENTS GO SOMEWHERE: the sum of activity in the dying cell's vicinity
+        # should not change much, by construction.
         #
-        # Until now they did not: the row was dropped from the cell state and its activator and
-        # inhibitor left the tissue. That is a discontinuity in a conserved quantity, injected at
-        # every death, and nothing in the model accounted for it -- a cell is extruded and its
+        # Simply dropping the row from the cell state takes its activator and inhibitor out of the
+        # tissue with it. That is a discontinuity in a conserved quantity, injected at every death
+        # and accounted for nowhere -- a cell is extruded and its
         # chemistry is simply gone. Real extrusion hands the contents to the neighbours that close
         # over the gap.
         #
@@ -1855,14 +1849,10 @@ class Apoptosis3D(Structural):
             for nbrs, amt in _bequest:
                 # DO NOT POUR INTO A CELL THAT IS ITSELF VANISHING. The divisor is the recipient's
                 # volume, and a cell that is MARKED but cannot reach a triangle shrinks to the
-                # 1e-9 floor and stays there -- so a bequest of ~0.04 divided by 1e-9 injects ~1e7
-                # concentration in one step, and a few of those compound. Measured before this
-                # guard, on r020_00_ctrl + `smaller`: act_min -1.04e10.
-                #
-                # This was my own code, added on 9 August to enforce Cedric's rule that "the sum of
-                # activity in the dying cell's vicinity should not change much by construction" --
-                # and it turned a conservation law into an amplifier by dividing by a number the
-                # model allows to reach zero.
+                # 1e-9 floor and stays there -- so a bequest divided by that floor injects a
+                # concentration many orders of magnitude too large in one step, and a few of those
+                # compound. Without this guard the conservation rule above becomes an AMPLIFIER,
+                # by dividing by a number the model allows to reach zero.
                 live = [g for g in nbrs if float(V0f[g]) >= crit]
                 if not live:
                     # every neighbour is on its way out too: the material leaves with the cell,
@@ -2232,9 +2222,9 @@ class TopoSnapshot3D(Structural):
             # CUMULATIVE DEATHS, for the same reason div_blocked is here: cell_die counts
             # every extrusion on the mesh and nothing carried it into the history, so the only
             # visible trace of a death was the cell COUNT -- which cannot distinguish "nothing
-            # died" from "deaths were masked by divisions". Measured on r019_02_apop_small: cells
-            # went 2000 -> 3089 with death running, and on r019_02_apop_low they held at 2000 with
-            # death running and nothing dying. Both read identically from the count alone.
+            # died" from "deaths were masked by divisions". A run whose count grows and a run
+            # whose count holds can both have death running, and the count alone cannot say which
+            # is which.
             n_apop=int(m.get("n_apop") or 0),
             # WHICH CELLS ARE MARKED TO DIE, recorded for the same reason `age` is: a renderer
             # cannot colour a state that only existed inside one frame's forward pass. Without it
@@ -2600,9 +2590,9 @@ class ReconnectT1_3D(Rewire):
             #
             # It stayed hidden because a flip only drops a face when a cell is ALREADY a triangle,
             # which needs something to have shrunk it -- so nothing reached this branch until
-            # apoptosis existed. Then it blew up immediately and enormously: `smaller` on r020_00
-            # reported act_min -1.04e10 with division and death running in the same tick, where
-            # the same operator on a NON-growing tissue held act_min at exactly 0.0000.
+            # apoptosis existed. It then fails immediately and enormously -- the activator goes
+            # many orders of magnitude negative when division and death run in the same tick,
+            # where the same operator on a non-growing tissue holds it at exactly zero.
             # edge_flip declares no `cell_set`, so the cell level is looked up by name and
             # a model without one simply skips this -- H.level raises rather than returning None.
             # ONE ENGINE CALL, for the same reason `cell_die` makes it: state, occupancy, the
@@ -3057,7 +3047,7 @@ class MonolayerShapeEnergy3D(Lateral):
 class ApicoBasalShapeEnergy3D(Lateral):
     """R3 OF THE APICO-BASAL PROMOTION: the energy, written on the doubled degree-of-freedom set.
 
-    `model:` AND NOT `implementation:`, by the axis test this repo writes down in the axis test. An
+    `model:` AND NOT `implementation:`, by the axis test. An
     implementation computes the SAME equation differently; this is a different equation about a
     different object. `cell_mechanics[model: monolayer]` says a cell's two surfaces are tied to its
     mid-surface by `a_i, b_i = x_i +/- (H_i/2) n_i`, so apical and basal can never slide past each
@@ -3348,16 +3338,14 @@ class ShapeEnergy3DMarinari(ShapeEnergy3D):
         return super().forward(H, mask)
 
 
-# ==========================================================================================================
-# MERGED FROM `vertex_warp.py` on 2026-09-04. `cell_mechanics` now has all six of its variants in one
-# file -- default, autograd, compile, warp, marinari, monolayer -- which is precisely the case
-# OKUDA_PROMOTION.md gives for modules over one-file-per-operator: "they are one contract, and reading
-# them side by side is how anyone can tell which one a spec is getting."
+# ----------------------------------------------------------------------------------------------
+# Every variant of `cell_mechanics` lives in this file -- they are one contract, and reading them
+# side by side is how anyone can tell which one a specification is getting.
 #
-# `HAVE_WARP` AND `_wp_launch` STILL COME FROM `mpm_ops`, and that is a smell worth naming rather than
-# hiding: the warp launch helper is shared infrastructure that happens to live in an MPM module, so a
-# vertex operator imports from an MPM one to get it. The dependency is not new -- `vertex_warp.py`
-# imported it from `mpm_warp.py` -- and moving it is a separate change with its own blast radius.
+# `HAVE_WARP` and `_wp_launch` come from `mpm_ops`, and that is a smell worth naming rather than
+# hiding: the Warp launch helper is shared infrastructure that happens to live in an MPM module, so
+# a vertex operator imports from an MPM one to get it. Moving it is a separate change with its own
+# blast radius.
 #
 # NVIDIA Warp gradient for the vertex-model shape energy: `cell_mechanics[implementation: warp]`.
 # ==========================================================================================================
@@ -3554,10 +3542,9 @@ def try_shape_energy_grad(op, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, 
         # would claim reproducibility it does not have. That is the one outcome the flag exists to
         # prevent, so the warp path steps aside whenever it is set.
         #
-        # This is also what makes the promotion comparisons work. `tools/promotion_identical.py`
-        # exports the flag on BOTH sides, and side A is an okuda commit that predates this file, so
-        # without this the whole G/BASE/MINISITE corpus would compare a warp gradient against an
-        # autograd one and no row could be bit-identical again.
+        # It is also what makes a bit-identity comparison against an older commit possible at all:
+        # with the flag set on both sides, both take the autograd path, where otherwise one side
+        # would compare a Warp gradient against an autograd one and no row could match.
         why = "PLEXUS_STRICT_DETERMINISM is set, and wp.atomic_add is outside torch's guarantee"
     elif not HAVE_WARP:
         why = "warp is not installed"
