@@ -1,17 +1,29 @@
-"""The extracellular matrix as MPM material, and the stiff blocks that confine it.
+"""The extracellular matrix as MPM (material point method) material, and the stiff blocks that
+confine it.
 
-    ecm_seed        the box MINUS a cavity, as aligned fibres, once at frame 0
-    ecm_stress      |J-1| (or the deviatoric / von Mises variant), banded, so the front is visible
-    ecm_from_cell   the epithelium's surface as a moving boundary -- `replay` and `sphere`
-    cell_exclude    the hard backstop: no matrix particle inside the lumen
-    block_seed      two slabs beyond a free gap, as a SECOND MPM set ~130x stiffer
-    block_stress    the block's own strain, at its own full scale
+The matrix is a continuum the growing tissue has to push its way into. Every operator here acts
+on a set of MPM particles, and the tissue enters as a prescribed moving BOUNDARY rather than as
+a second body -- so these describe how an epithelium loads a matrix, not how the two negotiate.
 
-`ecm_seed` AND `block_seed` ARE NOT REDUNDANT and are not merged: one fills the complement of a
-cavity with aligned fibres, the other fills two slabs with a jittered lattice. Same family, same
-module, different geometry. `ecm_stress` and `block_stress` ARE the same body and are marked for
-merging -- see OKUDA_PROMOTION.md; what keeps them apart today is a MODULE-LEVEL history list per
-set, and moving that onto the Level is what lets one operator serve both.
+In the order they appear below:
+
+    ecm_seed        seed       the box MINUS a cavity, as aligned fibres, once at frame 0
+    ecm_from_cell   lateral    the tissue surface as a moving boundary the particles feel
+    ecm_stress      lateral    |J - 1|, banded, so the stress front is visible in a movie
+    cell_exclude    structural the hard backstop: no matrix particle inside the lumen
+    mpm_block       entity     a material point of a solid block
+    block_seed      seed       two slabs beyond a free gap, as a second and much stiffer set
+    block_stress    lateral    the block's own strain, at its own full scale
+
+then the two implementations of `ecm_from_cell`, which differ in where the surface comes from:
+
+    ecm_from_cell[sphere]   a prescribed ball of radius r(t): a stand-in with a known answer
+    ecm_from_cell[replay]   a recorded epithelium's own apical surface, frame by frame
+
+`ecm_seed` and `block_seed` are not redundant: one fills the complement of a cavity with aligned
+fibres, the other fills two slabs with a jittered lattice. Same family, same module, different
+geometry. `ecm_stress` and `block_stress` ARE the same body, kept apart only by a module-level
+history list per set; moving that onto the Level is what would let one operator serve both.
 """
 from __future__ import annotations
 import math
@@ -26,40 +38,51 @@ from plexus.models.state import spatial_schema
 STRESS_HISTORY: list = []
 BALL_RADIUS: list = []
 
-# THE RAW SCALAR, NOT ONLY THE BAND. Banding at SIMULATION time makes the colour scale a property of
-# the run: `stress_scale` is baked into 8 levels, everything above it is clipped to the top band, and
-# changing your mind about the palette costs 400 frames of MPM. Runs 47/48 made the cost concrete --
-# the scale that resolved the front beautifully at frame 200 left 76% of the matrix saturated at frame
-# 400, and no re-render could recover the gradient because the numbers were gone. Kept as float16
-# (0.1% of a particle's trajectory) so the renderer bands it, and a LUT or a scale becomes a re-render.
+# The raw scalar, not only the band. Banding at SIMULATION time would make the colour scale a
+# property of the run: `stress_scale` baked into 8 levels, everything above it clipped to the top
+# band, and changing the palette costing a full re-simulation. A scale that resolves the front
+# early in a run leaves most of the matrix saturated late in it, and once the numbers are banded
+# no re-render can recover the gradient. Kept as float16, about 0.1% of a particle's trajectory,
+# so that the renderer bands it and a new palette or scale costs only a re-render.
 STRESS_RAW: list = []
 
-# THE REACTION THE TISSUE NEVER FELT. `ecm_from_cell` computes the force the tissue puts on the matrix
-# and, by Newton's third law, that force has an equal and opposite partner on the tissue -- which a
-# REPLAY has nowhere to put, because pass 1 finished before pass 2 began. Recording it here is what
-# makes the second half of the coupling possible: `ecm_load` reads this map in a LATER tissue pass
-# and pushes back with it. One row per frame, as an equirectangular map of pressure by direction.
+# The reaction the tissue never felt. `ecm_from_cell` computes the force the tissue puts on the
+# matrix, and by Newton's third law that force has an equal and opposite partner on the tissue --
+# which a REPLAY has nowhere to put, its tissue pass having finished before the matrix pass began.
+# Recording it here is what makes the second half of the coupling possible: `ecm_load` reads this
+# map in a later tissue pass and pushes back with it. One row per frame, as an equirectangular map
+# of pressure by direction.
 PRESSURE_HISTORY: list = []
 
 
 # --------------------------------------------------------------------------- seeding
-# CANONICAL `ecm_seed`, ALIAS `seed_ecm` -- the same split that killed `seed_mesh`, in the other
-# direction. The rename landed in f5a09a30 and 50 of the archived `log/okuda_ECM/*/spec.yaml` still
-# say `seed_ecm`, so EVERY ONE of them failed to load with `operator 'seed_ecm' not in registry` --
-# the entire 02, 04 and 05 gate series, unrunnable and therefore uncomparable. A rename that leaves
-# the corpus behind is a rename that deletes the corpus.
+# Canonical `ecm_seed`, alias `seed_ecm`. Both spellings stay registered because archived
+# specifications use each of them, and a rename that leaves the corpus behind is a rename that
+# deletes the corpus.
 @register_operator("ecm_seed", "seed_ecm", family="seed", set="particle", kind="seed")
 class ECMSeed(Structural):
-    """Lay the matrix out ONCE, at frame 0: the box minus a cavity, as fibres.
+    """Lay the matrix out once, at frame 0: the box minus a cavity, filled with aligned fibres.
 
-    A structural operator rather than a set provision because the stock provision seeds a block
-    or a ball, and the matrix is neither -- it is the COMPLEMENT of a shape. Writing it as an
-    operator also means the cavity is a parameter of the experiment, visible in the spec beside
-    the stiffness it is being tested against, rather than a number buried in a seeder.
+    particle -> particle: rewrites every position in the set, and the per-particle material, at
+    the opening of the trajectory.
 
-    The particles are not deleted from the cavity, they are never placed there: `ecm_seed`
-    rewrites every position in the set. A cut-out would leave the discarded particles occupying
-    memory and mass, and an MPM particle with zero occupancy still costs a scatter.
+    The occupied region is the box minus a cylindrical cavity of radius `cavity_r` and half-height
+    `cavity_h`, both in world units -- the space the tissue will grow into. Within it, particles
+    are laid down as `n_fibres` segments of length `fibre_len`, also in world units, whose
+    directions are biased by `align`: 0 is isotropic and 1 fully aligned, so `align` is the
+    dimensionless order parameter of the fibre network the tissue must push through.
+
+    A structural operator rather than a set provision, because the stock provision seeds a block
+    or a ball and the matrix is neither -- it is the COMPLEMENT of a shape. Writing it as an
+    operator also puts the cavity in the specification, beside the stiffness it is being tested
+    against, rather than in a seeder.
+
+    Particles are never PLACED in the cavity rather than deleted from it. A cut-out would leave
+    the discarded particles occupying memory and mass, and an MPM particle with zero occupancy
+    still costs a scatter every substep.
+
+    Reference: Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for
+    history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196 (MPM).
     """
     EMIT = None                       # rewrites positions in place at frame 0; no integrable delta
     SUPPORTED_DIMS = [3]
@@ -68,7 +91,8 @@ class ECMSeed(Structural):
     PARAM_ROLES = {"cavity_r": "cavity_radius", "cavity_h": "cavity_half_height",
                    "fibre_len": "fibre_length", "n_fibres": "fibre_count",
                    "align": "fibre_alignment_strength"}
-    REFERENCE = "Sulsky, D. et al. (1994) Comput. Methods Appl. Mech. Eng. 118:179 (MPM)."
+    REFERENCE = ("Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for "
+                 "history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -317,23 +341,38 @@ class ECMSeed(Structural):
 @register_operator("ecm_from_cell", family="mechanics", set="particle", kind="lateral",
                    implementation="sphere")
 class CellToECMSphere(Lateral):
-    """The growing cell ball, as a moving boundary the matrix particles feel.
+    """The growing cell ball as a moving boundary the matrix feels, with the ball prescribed
+    rather than simulated: a sphere of radius r(t).
 
-    IMPLEMENTATION `sphere` IS A STAND-IN, AND IS LABELLED ONE. The real cell ball is a Tyssue
-    vertex mesh with its own energy minimisation; this is a prescribed sphere of radius r(t),
-    which reproduces the loading the matrix sees without needing the mesh. It exists so the
-    matrix, the cavity, the fibres, the stable substep and the rendering can all be settled
-    against something whose answer is known -- a sphere of radius r(t) pushes exactly as hard as
-    r(t) says -- before any of it is trusted with a mesh whose answer is not known.
+    particle -> particle: reads pos, emits an external acceleration the MPM substep consumes.
 
-    Swapping in the mesh is then `implementation: vertex_mesh` on this same operator, which is
-    the point of registering it as an implementation rather than as a second operator: the spec
-    changes by one word and everything else is already certified.
+        r(t) = min(r0 + v t, r_max)
+        d_i  = r(t) - |x_i - c|                      penetration depth, positive when inside
+        a_i  = k d_i (x_i - c)/|x_i - c|  -  c_d v_i     only where d_i > 0
 
-    THE FORCE IS A ONE-SIDED PENALTY on penetration depth, applied only to particles the ball has
-    actually reached. Not a spring to a rest position: the matrix must be free to be pushed and
-    STAY pushed, because permanent displacement is the observable -- an elastic matrix that
+    r0 is the initial radius, v is `growth` in world units per unit time and r_max the final
+    radius, all in world units. k is the contact stiffness in inverse time squared, so k d is an
+    acceleration; c_d is `damp`, a contact damping in inverse time that bleeds the energy a pure
+    penalty would ring with.
+
+    The force is a ONE-SIDED penalty on penetration depth, applied only where the ball has
+    actually reached. It is not a spring to a rest position: the matrix must be free to be pushed
+    and to STAY pushed, because permanent displacement is the observable -- an elastic matrix that
     springs back tells you the ball was there, not what it did.
+
+    This implementation is a stand-in and is labelled one. The real cell ball is a vertex mesh
+    with its own energy minimisation; a prescribed sphere reproduces the loading the matrix sees
+    without needing it, so the cavity, the fibres, the stable substep and the rendering can all be
+    settled against something whose answer is known -- a sphere of radius r(t) pushes exactly as
+    hard as r(t) says -- before any of it is trusted with a mesh whose answer is not. Swapping in
+    the mesh is then one word on the same operator.
+
+    Reference: Okuda, S. et al. (2018). Sci. Rep. 8:2386 (the vesicle this stands in for). The
+    penalty on penetration depth is the normal half of the particle-to-surface contact of Chen,
+    Z., Qiu, X., Zhang, X. & Lian, Y. (2015). An improved coupling of finite element method with
+    material point method. Comput. Methods Appl. Mech. Engrg. 293:1-19 -- with the surface
+    analytic and PRESCRIBED, so unlike that scheme no reaction is returned to it and momentum is
+    not conserved across the interface. `mesh_contact` is the two-way form.
     """
     EMIT = "mpm_acceleration"       # consumed by the substep as a_ext, like mpm_anchor
     SUPPORTED_DIMS = [3]
@@ -404,31 +443,40 @@ class CellToECMSphere(Lateral):
 # --------------------------------------------------------------------------- what you can see
 @register_operator("ecm_stress", family="hierarchy", set="particle", kind="lateral")
 class ECMStress(Lateral):
-    """Colour the matrix by how hard it is being squeezed, so the stress is the thing you watch.
+    """A measurement, as an operator: colour the matrix by how hard it is being squeezed, so the
+    stress front is the thing a movie shows rather than the positions.
 
-    THE POINT OF THE WHOLE EXPERIMENT IS A PROPAGATION, and a propagation is invisible in a movie
-    of positions. The fibres near the ball move a little, the ones behind them move less, and by
-    eye that reads as "the middle wiggled" -- when what is actually happening is a stress front
-    travelling outward through the material, which is the mechanics the matrix was added to show.
+    particle -> particle: reads the deformation gradient F, writes a colour band on node_type.
 
-    The scalar is |J - 1|, J = det F: the LOCAL VOLUME CHANGE. Compression reads positive,
-    extension reads positive, unstrained material reads zero. Chosen over a von Mises invariant
-    because it needs no material constants -- so the colour means the same thing across a sweep
-    in which stiffness is exactly what varies, and two runs at different Young's modulus can be
-    put side by side without the palette having quietly changed meaning between them.
+        s_i    = |det F_i - 1|                       the local volume change
+        band_i = floor(K min(s_i / S, 1))            an integer in [0, K)
 
-    IT IS BANDED INTO INTEGERS, not written as a float, because this renderer's `color_by` is a
-    PALETTE INDEX -- `pal[nt % len(pal)]` -- and not a continuous map. So the set declares K types
-    carrying identical material and different colours, and this writes the band. The material is
-    untouched by construction: every type is the same material, so the index is decoration and
-    cannot change the physics it is drawing.
+    det F is the ratio of a particle's current volume to its rest volume, so s is dimensionless
+    and reads zero for unstrained material, positive for both compression and extension. S is
+    `scale`, the strain at which the palette saturates, and K is `bands`.
+
+    A propagation is invisible in a movie of positions: the fibres near the ball move a little,
+    the ones behind them less, and by eye that reads as the middle wiggling, when what is
+    happening is a stress front travelling outward. |det F - 1| is chosen over a von Mises
+    invariant because it needs no material constants, so the colour means the same thing across a
+    sweep in which stiffness is exactly what varies.
+
+    It is banded into integers rather than written as a float because the renderer's `color_by` is
+    a palette INDEX and not a continuous map. The set declares K types carrying identical material
+    and different colours, so the index is decoration and cannot change the physics it draws.
+
+    Reference: the deformation gradient is that of Hu, Y. et al. (2018). A moving least squares
+    material point method with displacement discontinuity and two-way rigid body coupling. ACM
+    Trans. Graph. 37(4):150.
     """
     EMIT = None                     # writes a colour channel in place; no integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []
     MECHANISM_TAGS = ["diagnostic", "strain_visualisation"]
     PARAM_ROLES = {"scale": "strain_full_scale", "bands": "colour_bands"}
-    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM)."
+    REFERENCE = ("Hu, Y. et al. (2018). A moving least squares material point method with "
+                 "displacement discontinuity and two-way rigid body coupling. ACM Trans. Graph. "
+                 "37(4):150.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -514,32 +562,38 @@ class ECMStress(Lateral):
 @register_operator("ecm_from_cell", family="mechanics", set="particle", kind="lateral",
                    implementation="replay")
 class CellToECMReplay(Lateral):
-    """The REAL tissue's recorded surface, pushing the matrix.
+    """The same contact, against a real epithelium's recorded surface instead of a sphere.
 
-    `implementation: sphere` is a prescribed ball and knows nothing about cells. This one replays
-    an actual cellfix_B_new run: 200 epithelial cells growing and dividing to 3,170 under their own
-    vertex mechanics, at their own scale, with their own parameters -- none of it rescaled, because
-    rescaling was measured to break it (see `tissue.py`).
+    particle -> particle: reads pos and a recorded surface, emits an external acceleration.
 
-    THE SURFACE IS AN ANGULAR RADIUS MAP OF THE APICAL VERTICES. Each frame carries R(theta, phi),
-    the distance to the furthest apical vertex in that direction (`tissue.apical_map`; it used to be
-    the furthest cell CENTROID, which sampled the same surface with half the points). A particle's
-    own direction gives its bin, and one comparison decides whether the tissue has reached it --
-    O(1) per particle rather than a point-in-mesh test against four thousand faces, which is what
-    makes 110,000 particles affordable per frame. It assumes the vesicle is STAR-SHAPED.
-    cellfix_B_new is; P11 is the premise that reports when a tissue stops being, and a run that
-    trips it has left this operator's domain of validity.
+        d_i = S R(theta_i, phi_i) - |x_i - c|        penetration depth
+        a_i = k d_i (x_i - c)/|x_i - c|                 only where d_i > 0
 
-    THE MAP IS CENTROID-REFERENCED, SO `centre` PINS THE TISSUE AT THE BOX CENTRE and the vesicle's
-    own translational drift is dropped. That is deliberate: the drift is a few percent of the radius
-    and would otherwise slide the tissue off the cavity it was seeded into, turning a symmetric
-    loading experiment into an accidental one-sided one. What the matrix sees is the tissue's SHAPE
-    and GROWTH, not its wandering.
+    R(theta, phi) is an angular radius map: per frame, the distance from the tissue centroid to
+    the furthest apical vertex in that direction. S is `scale`, a dimensionless rescaling of the
+    recorded surface, and k the contact stiffness in inverse time squared.
 
-    THE COUPLING IS ONE-WAY HERE, and the reason is scale, not modelling. The reaction force is
-    computed and returned by the `sphere` implementation for a live tissue; a replay has no live
-    tissue to return it to -- pass 1 finished before pass 2 began. So this shows how a growing
-    epithelium LOADS a matrix, and does not show the matrix shaping the epithelium back.
+    A particle's own direction gives its bin, and one comparison decides whether the tissue has
+    reached it -- O(1) per particle rather than a point-in-mesh test against thousands of faces,
+    which is what makes hundreds of thousands of particles affordable per frame. The price is an
+    assumption: the vesicle must be STAR-SHAPED about its centroid, and a run in which it stops
+    being has left this operator's domain of validity.
+
+    The map is centroid-referenced, so `centre` pins the tissue at the box centre and the
+    vesicle's own translational drift is dropped. That is deliberate. The drift is a few percent
+    of the radius, and it would otherwise slide the tissue off the cavity it was seeded into,
+    turning a symmetric loading experiment into an accidentally one-sided one. What the matrix
+    sees is the tissue's shape and growth, not its wandering.
+
+    The coupling is one-way, and the reason is bookkeeping rather than modelling: a replay has no
+    live tissue for the reaction to be returned to, its tissue pass having already finished. So
+    this shows how a growing epithelium LOADS a matrix, and does not show the matrix shaping the
+    epithelium back. The reaction is recorded in PRESSURE_HISTORY for a later pass to apply.
+
+    Reference: Okuda, S. et al. (2018). Sci. Rep. 8:2386 (the tissue being replayed). The contact
+    is the penalty half of Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg. 293:1-19,
+    against a RECORDED surface, so it is one-way by construction; `mesh_contact` returns the
+    reaction to the vertices and is the operator to use where the tissue must feel the matrix.
     """
     EMIT = "mpm_acceleration"
     SUPPORTED_DIMS = [3]
@@ -618,32 +672,40 @@ class CellToECMReplay(Lateral):
 
 @register_operator("cell_exclude", family="boundary", set="particle", kind="structural")
 class CellExclude3D(Structural):
-    """No matrix particle may be INSIDE the tissue. A hard non-penetration constraint.
+    """A hard non-penetration backstop: no matrix particle may end a frame inside the tissue.
 
-    THE DEFECT THIS FIXES, WHICH WAS VISIBLE IN THE MOVIES. Matrix particles ended up inside the
-    epithelium -- bright dots in the lumen, where there is no matrix. `ecm_from_cell` is a PENALTY: it
-    pushes a particle out with a force proportional to how far in it already is, so penetration is not
-    prevented, it is punished after the fact, and three things let it lose:
+    particle -> particle: reads pos and the recorded surface, writes pos and vel in place.
 
-      * `mpm_scatter` CLAMPS the external acceleration at `a_max` (200 by default). The penalty is
-        k * depth, so past depth = a_max/k the force stops growing no matter how deep the particle is,
-        and at k = 900 that ceiling is reached at depth 0.22. A clamp is the right thing for stability
-        and the wrong thing for a constraint.
-      * the tissue surface SWEEPS. It is a replay: it advances every frame whether or not the matrix
-        has got out of the way, so a particle only has to be out-accelerated once to be left behind.
-      * the surface is an angular map, smoothed. Where the smoothing cuts a bump, particles sit inside
-        the true mesh while the map says they are outside it.
+        R_i = S R(theta_i, phi_i) (1 + skin)
+        x_i <- c + R_i u_i          and     v_i <- v_i - min(v_i . u_i, 0) u_i
 
-    So the penalty is kept -- it is what generates the stress the movie is about -- and this operator
-    is added after it as a BACKSTOP: any particle still inside gets projected onto the surface, with a
-    thin skin, and its inward radial velocity is removed so it does not simply re-enter next substep.
-    Same device as `plate_confine` uses for the blocks, and for the same reason: a boundary that
-    must not be crossed is a projection, not a force.
+    u_i is the unit direction from the tissue centre to the particle. Any particle found inside is
+    projected out onto the surface with a thin skin, `skin` being that clearance as a fraction of
+    the local radius, and its INWARD radial velocity is removed so it does not simply re-enter on
+    the next substep.
 
-    IT IS RIGID, AND THAT IS HONEST HERE ONLY BECAUSE THE COUPLING IS ONE-WAY. The tissue's shape is
-    prescribed by pass 1, so nothing is being decided by letting the tissue win every contact -- it was
-    always going to win. In a two-way run (`ecm_load`) this operator would be taking a side, and the
-    projection would have to become a shared correction.
+    It exists because `ecm_from_cell` is a penalty, which punishes penetration after the fact
+    rather than preventing it, and three things let a penalty lose. The MPM scatter CLAMPS the
+    external acceleration, so past a depth of a_max/k the restoring force stops growing no matter
+    how deep the particle is -- the right behaviour for stability and the wrong one for a
+    constraint. The tissue surface sweeps, advancing every frame whether or not the matrix has got
+    out of the way, so a particle only has to be out-accelerated once to be left behind. And the
+    surface is a smoothed angular map, so where the smoothing cuts a bump, particles sit inside
+    the true mesh while the map says they are outside it.
+
+    The penalty is kept, because it is what generates the stress being measured; this runs after
+    it. A boundary that must not be crossed is a projection, not a force.
+
+    It is RIGID, which is honest here only because the coupling is one-way: the tissue's shape is
+    prescribed, so nothing is decided by letting it win every contact -- it was always going to.
+    In a two-way run this operator would be taking a side, and the projection would have to become
+    a correction shared between the two bodies.
+
+    Reference: Plexus (this work); the surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386. It
+    backs up the penalty contact of Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg.
+    293:1-19, whose own reported weakness is exactly this one -- penetration through a severely
+    deformed contact surface. Forbidding it outright rather than projecting afterwards is BFEMP:
+    Li, X., Fang, Y., Li, M. & Jiang, C. (2022). Comput. Methods Appl. Mech. Engrg. 390:114350.
     """
     EMIT = None
     SUPPORTED_DIMS = [3]
@@ -722,31 +784,46 @@ BLOCK_RAW: list = []            # the un-banded scalar -- see `ecm_ops.STRESS_RA
 
 # --------------------------------------------------------------------------- the entity
 @register_entity(
-    # `spatial_schema` (a `dim -> StateSchema` callable), NOT the legacy `{"pos": (0, 2),
-    # "vel": (2, 4)}` dict this used to carry. The registry is now consulted by
-    # `engine._resolve_schema`, and this set runs in 3D specs -- an honoured 2D dict would
-    # have truncated its state. See `models/entities.py` for the full contract.
+    # `spatial_schema` is a `dim -> StateSchema` callable, not a fixed dict: this set runs in 3D
+    # specifications, and a hard-coded 2D schema would silently truncate its state.
     "mpm_block", depth=0,
     state_schema=spatial_schema,
     render={"color_by": "node_type", "arrows": None},
 )
 class MPMBlock:
-    """A material point of a solid block. Identical continuum state to the matrix's `mpm_particle`
-    (F, C, mass, Lame mu/la, p_vol); the stock provision allocates it.
+    """A material point of a solid block: identical continuum state to the matrix's
+    `mpm_particle` -- the deformation gradient F, the affine velocity C, mass, the Lame parameters
+    mu and lambda, and the rest volume p_vol. The stock provision allocates it.
 
-    THE ENTITY IS RESOLVED BY SET NAME, which is the thing that has to be known and is easy to miss:
-    `_entity_meta` looks the SET's name up in the entity registry and falls back to a bare pos/vel
-    schema for anything unregistered. So a set called `mpm_block` with every MPM operator pointed at it
-    still has no `F`, and the run dies in `mpm_strain` with `'Level' object has no attribute 'F'` --
-    which reads like a bug in the operator and is a missing registration. `prototype/eye`'s
-    `MuscleParticle` is the same three lines for the same reason.
+    It exists as a separate registration because the entity is resolved BY SET NAME: the registry
+    is looked up under the set's own name and falls back to a bare position/velocity schema for
+    anything unregistered. A set called `mpm_block` with every MPM operator pointed at it would
+    otherwise have no F, and the run would die in `mpm_strain` with a missing attribute -- which
+    reads like a bug in the operator and is a missing registration.
     """
     provision = MPMParticle.provision
 
 
 @register_operator("block_seed", family="seed", set="particle", kind="seed")
 class BlockSeed(Structural):
-    """Fill the two slabs beyond `gap_half` with particles, once, at frame 0."""
+    """Fill the two slabs beyond a free gap with particles, once, at frame 0: the rigid walls the
+    matrix and the tissue are confined between.
+
+    particle -> particle: rewrites every position in the set at the opening of the trajectory.
+
+        occupied = { x : |x_a - c_a| > g }           a = the confined axis
+
+    g is `gap_half`, the half-width of the free gap in world units, and c the domain centre. The
+    slabs run from there to the box wall, less `margin`. The particles are a jittered lattice
+    rather than fibres, because a block is isotropic where the matrix is not.
+
+    The block is a SECOND MPM set with its own Lame parameters, typically two orders of magnitude
+    stiffer than the matrix, which is what lets it act as a wall while still being a continuum
+    that deforms measurably under load.
+
+    Reference: Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for
+    history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196 (MPM).
+    """
 
     EMIT = None
     SUPPORTED_DIMS = [3]
@@ -754,7 +831,8 @@ class BlockSeed(Structural):
     MECHANISM_TAGS = ["solid_obstacle", "material_seeding"]
     PARAM_ROLES = {"gap_half": "free_half_gap", "axis": "confined_axis",
                    "centre": "domain_centre", "margin": "wall_clearance"}
-    REFERENCE = "Sulsky, D. et al. (1994) Comput. Methods Appl. Mech. Eng. 118:179 (MPM)."
+    REFERENCE = ("Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). A particle method for "
+                 "history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -822,14 +900,30 @@ class BlockSeed(Structural):
 
 @register_operator("block_stress", family="hierarchy", set="particle", kind="lateral")
 class BlockStress(Lateral):
-    """The block's own |J-1|, banded, recorded per frame -- so its deformation is visible."""
+    """The block's own local volume change, banded, so its deformation is visible at its own
+    scale rather than at the matrix's.
+
+    particle -> particle: reads F, writes a colour band on node_type. Same body as `ecm_stress`:
+
+        s_i    = |det F_i - 1|
+        band_i = floor(K min(s_i / S, 1))
+
+    Separate from `ecm_stress` only because `scale` must differ: a block two orders of magnitude
+    stiffer strains two orders of magnitude less under the same load, so sharing a full-scale S
+    would leave it uniformly in the zero band.
+
+    Reference: the deformation gradient is that of Hu, Y. et al. (2018). ACM Trans. Graph.
+    37(4):150 (MLS-MPM).
+    """
 
     EMIT = None
     SUPPORTED_DIMS = [3]
     REQUIRES_PARAMS = []
     MECHANISM_TAGS = ["diagnostic", "strain_visualisation"]
     PARAM_ROLES = {"scale": "strain_full_scale", "bands": "colour_bands"}
-    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM)."
+    REFERENCE = ("Hu, Y. et al. (2018). A moving least squares material point method with "
+                 "displacement discontinuity and two-way rigid body coupling. ACM Trans. Graph. "
+                 "37(4):150.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
