@@ -384,6 +384,178 @@ def reservoir_fraction(T, **kw):
     return [T.nV(t) / float(buf) for t in range(T.n_rows())]
 
 
+# ============================================================================== apico-basal
+# THE FOUR ROWS OF R2, and all four exist only because R1(d) gave the facade `vertex_block`. Every
+# one reads `sep` -- the apico-basal HALF separation, so apical = pos + sep and basal = pos - sep --
+# which is a per-VERTEX state block cropped by nV, not a per-cell one cropped by nF.
+
+
+def _sep(T, t, name="sep"):
+    """The separation at row t, or None. One place, because four measures need it and a second
+    spelling of "which block holds the separation" is a second thing to keep in step."""
+    return T.vertex_block(name, t)
+
+
+def _vertex_normals_np(pos, es, et, ef, nF, nV):
+    """Outward unit normal per vertex: the normalised sum of incident face area vectors.
+
+    THE SAME CONSTRUCTION `monolayer_shells` USES, in numpy because a measure reads a saved run and
+    never has torch tensors. It is a reader, not a second definition of the model's geometry: if the
+    two ever disagree the gate is measuring something the run did not do, which is why AB-B1 tests
+    the SIGN against this normal and never the magnitude against it.
+    """
+    cr = np.cross(pos[es], pos[et])
+    Nf = np.zeros((nF, 3)); np.add.at(Nf, ef, cr); Nf *= 0.5
+    vn = np.zeros((nV, 3)); np.add.at(vn, es, Nf[ef])
+    return vn / np.maximum(np.linalg.norm(vn, axis=1, keepdims=True), 1e-12)
+
+
+def _cell_polyhedron_volume(a, b, es, et, ef, nF, origin):
+    """Signed volume of each cell's polyhedron about `origin[f]`, by the divergence theorem.
+
+    V_f = (1/6) * sum over the cell's triangles of (p-o) . ((q-o) x (r-o)), over the closed surface
+
+        apical cap   the ring on `a`, fanned from the cap's own centroid, outward winding
+        basal cap    the ring on `b`, REVERSED, because it faces the other way
+        lateral wall one quad per ring edge (a_s, a_t, b_t, b_s), split into two triangles
+
+    which is exactly the surface `cell_geometry[implementation: polyhedral]` will integrate at R7 --
+    so a disagreement between this and that is a disagreement about the same object, not about two
+    conventions.
+    """
+    o = origin[ef]                                             # [E, 3] the owning cell's origin
+    ca = np.zeros((nF, 3)); cb = np.zeros((nF, 3)); cnt = np.zeros(nF)
+    np.add.at(ca, ef, a[es]); np.add.at(cb, ef, b[es]); np.add.at(cnt, ef, 1.0)
+    k = np.maximum(cnt, 1.0)[:, None]
+    ca /= k; cb /= k                                           # cap centroids, per cell
+    vol = np.zeros(nF)
+
+    def acc(p, q, r):
+        np.add.at(vol, ef, np.einsum("ij,ij->i", p - o, np.cross(q - o, r - o)))
+
+    A0, A1, B0, B1 = a[es], a[et], b[es], b[et]
+    acc(ca[ef], A0, A1)                                        # apical cap, outward
+    acc(cb[ef], B1, B0)                                        # basal cap, reversed
+    # THE LATERAL WALL, WOUND OUTWARD. Written (a_s, a_t, b_t) first, which is the order the quad
+    # reads in, and that is INWARD: for a ring CCW seen from outside, (a_t - a_s) is tangential and
+    # (b_t - a_s) points basally, and their cross product faces into the cell. The closure test did
+    # not catch it -- an inward-wound wall is still CLOSED, so the two origins still agreed exactly
+    # -- it only showed up against a hexagonal prism of known volume, which came back -0.866 for a
+    # cell of +2.598. Consistency is not correctness, which is why this function is checked against
+    # an analytic solid and not only against itself.
+    acc(A0, B0, B1)                                            # lateral quad, triangle 1
+    acc(A0, B1, A1)                                            # lateral quad, triangle 2
+    return vol / 6.0
+
+
+def apicobasal_span_invalid_count(T, name="sep", **kw):
+    """AB-B1 -- ring-referenced vertices whose apico-basal span is non-finite or points INWARD.
+
+    THE POLARITY AXIS IS DERIVED AND NOTHING ENFORCES ITS SIGN. `sep/|sep|` is the cell's
+    apical-basal direction and no operator owns it: the design declines to write a `cell_polarity`
+    operator, because a normalisation of another operator's state is not a mechanism, and the cost of
+    that decision is exactly this row. A shell that inverts through itself keeps a perfectly
+    plausible energy while apical and basal have swapped.
+
+    OUTWARD IS TESTED AGAINST THE MID-SURFACE NORMAL, NOT THE RADIUS. A radial test only works on a
+    star-shaped shell about the origin and would score every buckle as a failure -- which is the
+    shape this promotion exists to produce.
+
+    ONLY RING-REFERENCED VERTICES COUNT, and that mask is load-bearing rather than tidy: `cell_die`
+    rewrites `nF` and never `Nv`, so a vertex orphaned by an extrusion keeps a stale span that no
+    face reads and no reader should score.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        if sep is None:
+            out.append(float("nan")); continue
+        es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        pos = T.pos(t); nF = T.nF(t); nV = pos.shape[0]
+        n = _vertex_normals_np(pos, es, et, ef, nF, nV)
+        used = np.zeros(nV, bool); used[es] = True
+        bad = ~np.isfinite(sep).all(axis=1)
+        inward = (sep * n).sum(axis=1) <= 0.0
+        out.append(float(np.count_nonzero((bad | inward) & used)))
+    return out
+
+
+def apicobasal_span_recorded_fraction(T, name="sep", **kw):
+    """AB-B7 -- 1.0 on a row that carries a finite, non-zero span; 0.0 otherwise.
+
+    THE ROW THAT SAYS THE APICOBASAL PATH ACTUALLY RAN. `run_gates` never reads a gate's
+    `operators_exercised:` key -- preflight reads id, arms, measures and the per-row keys only -- so
+    a gate can NAME a variant and prove nothing about which one it got. A quantity the operator
+    itself writes is the only evidence, and it is free: `sep` reaches the trajectory through the
+    generic per-set recording path.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        ok = (sep is not None and np.isfinite(sep).all()
+              and float(np.linalg.norm(sep, axis=1).max(initial=0.0)) > 0.0)
+        out.append(1.0 if ok else 0.0)
+    return out
+
+
+def polyhedron_volume_closure(T, name="sep", **kw):
+    """AB-B2 -- is each cell's polyhedron CLOSED? Two origins, one volume.
+
+    A closed oriented surface encloses the same volume from ANY origin; an unclosed one, or one with
+    a face wound the wrong way, does not. So the entire apico-basal geometry -- both caps, one
+    lateral quad per ring edge, the fan triangulation and the orientation convention -- is exercised
+    by a single number: the relative discrepancy between the volume taken about the cell's own
+    centroid and the volume taken about the world origin.
+
+    It is the only row that would catch a lateral quad wound the wrong way, which is the failure the
+    maintained C++ reference needs an explicit `polygonDirections_` array to avoid. Returns the WORST
+    cell per row, relative to that cell's own volume.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        if sep is None:
+            out.append(float("nan")); continue
+        es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        pos = T.pos(t); nF = T.nF(t)
+        a, b = pos + sep, pos - sep
+        cen = np.zeros((nF, 3)); cnt = np.zeros(nF)
+        np.add.at(cen, ef, pos[es]); np.add.at(cnt, ef, 1.0)
+        cen /= np.maximum(cnt, 1.0)[:, None]
+        v_o = _cell_polyhedron_volume(a, b, es, et, ef, nF, np.zeros((nF, 3)))
+        v_c = _cell_polyhedron_volume(a, b, es, et, ef, nF, cen)
+        d = np.abs(v_o - v_c) / np.maximum(np.abs(v_c), 1e-12)
+        out.append(float(np.nanmax(d)) if d.size else 0.0)
+    return out
+
+
+def cap_area_ratio(T, name="sep", **kw):
+    """AB-C3 -- the mean apical:basal cap-area ratio.
+
+    On a spherical shell of radius R and thickness h the caps scale with their own radii, so the
+    closed form is ((R + h/2) / (R - h/2))^2 -- 1.1736111 at R = 5, h = 0.4. It is a CONTROL at R2,
+    where `sep` is frozen at (h0/2)n and the caps are therefore exactly what `monolayer_shells`
+    would build; it becomes a result at R5, when `sep` is integrated and the ratio is solved rather
+    than constructed. Both rows exist so that the difference between them is visible.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        if sep is None:
+            out.append(float("nan")); continue
+        es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        pos = T.pos(t); nF = T.nF(t)
+        a, b = pos + sep, pos - sep
+        # Newell area of each cap ring: |1/2 sum (p x q)| over the directed ring edges
+        Aa = np.zeros((nF, 3)); Ab = np.zeros((nF, 3))
+        np.add.at(Aa, ef, np.cross(a[es], a[et]))
+        np.add.at(Ab, ef, np.cross(b[es], b[et]))
+        na = np.linalg.norm(Aa, axis=1); nb = np.linalg.norm(Ab, axis=1)
+        r = na / np.maximum(nb, 1e-12)
+        out.append(float(np.nanmean(r)) if r.size else float("nan"))
+    return out
+
+
 def euler_closed(T, **kw):
     return [T.nV(t) - _n_edges(T, t) + T.nF(t) for t in range(T.n_rows())]
 
@@ -942,6 +1114,10 @@ MEASURES = {
     "cell_count_delta": cell_count_delta,
     "vertex_count": vertex_count,
     "occ_vs_mesh": occ_vs_mesh,
+    "cap_area_ratio": cap_area_ratio,
+    "polyhedron_volume_closure": polyhedron_volume_closure,
+    "apicobasal_span_recorded_fraction": apicobasal_span_recorded_fraction,
+    "apicobasal_span_invalid_count": apicobasal_span_invalid_count,
     "renumber_did_not_act": renumber_did_not_act,
     "topology_ledger": topology_ledger,
     "nonfinite_count": nonfinite_count,
