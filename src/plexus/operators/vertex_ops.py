@@ -1201,6 +1201,41 @@ class Divide3D(Structural):
         _, _, _, vf = face_geometry_3d(torch.as_tensor(pos_np), torch.as_tensor(es),
                                        torch.as_tensor(et), torch.as_tensor(ef), nF)
         vf = vf.numpy()                                          # per-cell CURRENT wedge volume
+        # THE TRIGGER HAS TO READ THE VOLUME THE MODEL DEFENDS. `vf` above is the origin-referenced
+        # WEDGE volume -- the cone from the world origin out to the cell's mid-surface ring -- and
+        # on a mid-surface model that IS the cell, which is why every rule on this contract was
+        # written against it. Under `cell_mechanics[model: apicobasal]` it is not: the cell is a
+        # polyhedron and its volume carries the THICKNESS, which the wedge cannot see.
+        #
+        # MEASURED ON gate_ab_population, 401 frames, and it is the whole failure of that rung. With
+        # `sep` free the tissue answered `cell_grow` by getting THICKER rather than wider: median
+        # thickness 0.544 -> 1.253 and median polyhedron volume 0.786 -> 1.694, so every cell more
+        # than doubled -- while the wedge volume the trigger reads FELL, 2.32 -> 2.07, because the
+        # mid-surface did not expand. Not one cell divided in 401 frames. A sizer that cannot see
+        # the axis the tissue grew along is not a sizer.
+        #
+        # `v_ref` MOVES WITH IT OR THE COMPARISON IS MEANINGLESS. It is a seed-time median in wedge
+        # units, and `factor * v_ref` against a polyhedron volume would be two different quantities
+        # either side of an inequality. So the polyhedron reference is taken once, at the first call
+        # that sees a separation, and cached beside it.
+        # `sep` LIVES ON THE LEVEL, NOT ON THE MESH TABLE, and that is deliberate -- the apico-basal
+        # design put it there so it never touches FACE_RECORD or `snapshot()` and cannot trip the
+        # recorded-arrays rule. So it is read through `lvl.state_schema`, not through `m`.
+        _s = lvl.get("sep") if "sep" in getattr(lvl, "state_schema", {}) else None
+        if _s is not None:
+            _s = _s.detach() if hasattr(_s, "detach") else torch.as_tensor(_s)
+            _Nv = int(m["Nv"])
+            if int(_s.shape[0]) >= _Nv:
+                _vp, _, _, _ = apicobasal_geometry_3d(
+                    torch.as_tensor(pos_np, dtype=torch.float32)[:_Nv],
+                    _s[:_Nv].to(torch.float32).cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
+                    m["E_face"].cpu(), nF)
+                vf = _vp.numpy().astype(np.float64)
+                if "v_ref_poly" not in m:
+                    m["v_ref_poly"] = float(np.median(vf))
+                    print(f"[cell_divide] this run carries a separation, so the trigger reads the "
+                          f"POLYHEDRON volume; reference {m['v_ref_poly']:.4f} "
+                          f"(the wedge reference is {float(m.get('v_ref', 1.0)):.4f})", flush=True)
         rings = rings_from_flat_3d(es, et, ef, nF)
         pos = [p for p in pos_np]
         A0 = m["A0"].detach().cpu().numpy().tolist()
@@ -1223,7 +1258,9 @@ class Divide3D(Structural):
         ndiv = m.get("ndiv")
         ndiv = ([0] * nF) if (ndiv is None or ndiv.shape[0] != nF) else ndiv.detach().cpu().numpy().tolist()
         # volume-primary + bounded duration: divide if (2x volume AND old enough) OR (past max cycle length)
-        v_ref = float(m.get("v_ref", 1.0))                       # SEED-TIME MEDIAN cell volume
+        # THE REFERENCE IN THE SAME UNITS AS `vf` ABOVE -- polyhedron where the run has a
+        # separation, wedge where it does not. Mixing them is the defect the block above exists for.
+        v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))  # SEED-TIME MEDIAN cell volume
         # A MODEL MAY ANSWER FROM THE TABLE INSTEAD OF FROM THE FOUR SCALARS. `_trigger` sees
         # (v_now, v_birth, jit, age, v_ref) and that is the right interface for every rule that
         # reads size or time -- but `model: cycle` reads a PHASE another operator owns, which is not
