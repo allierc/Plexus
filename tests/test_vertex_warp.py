@@ -24,7 +24,12 @@ import torch
 
 from plexus.operators.vertex_ops import _shape_energy_core, build_sphere_mesh
 
-warp_mod = pytest.importorskip("plexus.operators.vertex_warp")
+# `vertex_warp.py` WAS MERGED INTO `vertex_ops.py` on 2026-09-04, and this line is why the merge
+# needed checking rather than trusting. `pytest.importorskip` at module level skips the WHOLE FILE as
+# a single line, so pointing it at a module that no longer exists did not fail -- it quietly stopped
+# collecting all twelve tests in this file and the suite reported "1 skipped" and stayed green.
+# A count that drops from 121 to 109 is the only thing that showed it.
+warp_mod = pytest.importorskip("plexus.operators.vertex_ops")
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available() or not warp_mod.HAVE_WARP,
                                 reason="the warp gradient is CUDA-only")
 

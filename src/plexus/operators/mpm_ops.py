@@ -2188,3 +2188,1389 @@ class MLSMPMMechanics(Exchange):
         if Jp is not None:
             p.Jp = Jp
         return {}
+
+
+# ==========================================================================================================
+# MERGED FROM `mpm_warp.py` on 2026-09-04 -- the four MPM operators in warp -- `mpm_scatter`, `mpm_gather`, `mpm_grid_update`, `mpm_strain`.
+#
+# THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE. A contract's `default` is whichever
+# variant registers FIRST, so appending the backends after the torch bodies is not a style choice: put
+# a warp registration above `MPMScatter` and `mpm_scatter[default]` silently becomes the warp kernel,
+# and since R1(c) the contract's `.signature` is the default's too. The registry snapshot in this
+# commit's message is the check that it did not happen.
+# ==========================================================================================================
+try:
+    import warp as wp
+    wp.init()
+    HAVE_WARP = True
+except Exception:
+    HAVE_WARP = False
+
+
+def _wp_launch(kernel, dim, dev, inputs):
+    """`wp.launch` ON PYTORCH'S CURRENT STREAM.
+
+    THIS IS NOT A DETAIL. Warp launches on its OWN default stream for the device unless told
+    otherwise, and PyTorch captures a CUDA graph on ITS current stream. Launched on a different
+    stream, the warp kernels are simply NOT RECORDED into the graph: they run once, eagerly, while
+    the capture is being taken, and never again on any replay. The visible symptom is a simulation
+    that advances exactly one frame and then freezes -- `material_3d_ball_drop` sat at its seeded
+    mean height for all 640 frames, with the engine cheerfully reporting "substep captured as a
+    CUDA graph (4 operators, 21 replays/frame)".
+
+    Nothing caught it because `tools/mpm_warp_gate.py` sets `capture: false` on every spec it runs,
+    so the captured warp path had never once been compared against anything.
+    """
+    import torch as _t
+    # `sync_enter=False`: ScopedStream's default is to make the new stream WAIT on the old one via
+    # an event, and recording a cross-stream wait is itself illegal inside a capture -- it turned
+    # the silent freeze into `cudaErrorStreamCaptureInvalidated`. There is nothing to synchronise
+    # anyway: we are asking warp to launch on the very stream torch is already using.
+    with wp.ScopedStream(wp.stream_from_torch(_t.cuda.current_stream(dev)),
+                         sync_enter=False, sync_exit=False):
+        wp.launch(kernel, dim=dim, device=f"cuda:{dev.index or 0}", inputs=inputs)
+
+
+if HAVE_WARP:
+
+    @wp.func
+    def polar_R(F: wp.mat33, iters: int) -> wp.mat33:
+        """Orthogonal polar factor by Newton: R <- (R + R^-T) / 2.
+
+        The same iteration `mpm_ops._polar_higham` runs, and the same one the Triton kernel spells
+        out as cofactor cross-products. Here `wp.inverse` and `wp.transpose` are builtins, so the
+        loop body is the formula rather than a transcription of it.
+        """
+        R = F
+        for _ in range(iters):
+            d = wp.determinant(R)
+            if wp.abs(d) < 1.0e-12:                 # a collapsed particle gets a finite, meaningless
+                return R                            # rotation rather than taking the run down
+            R = 0.5 * (R + wp.transpose(wp.inverse(R)))
+        return R
+
+    @wp.kernel
+    def p2g_atomic(STATE: wp.array2d(dtype=float), pa: int, va: int,
+                   C: wp.array(dtype=wp.mat33), F: wp.array(dtype=wp.mat33),
+                   MASS: wp.array(dtype=float), MU: wp.array(dtype=float),
+                   LA: wp.array(dtype=float), PVOL: wp.array(dtype=float),
+                   AEXT: wp.array(dtype=wp.vec3), JP: wp.array(dtype=float),
+                   SNW: wp.array(dtype=float), LIQ: wp.array(dtype=float),
+                   OCC: wp.array(dtype=float), TURG: wp.array(dtype=float),
+                   ACT: wp.array(dtype=wp.mat33),
+                   GM: wp.array(dtype=float), GMV: wp.array(dtype=wp.vec3),
+                   GC: wp.array(dtype=float),
+                   ngx: int, ngy: int, ngz: int,
+                   dx: float, dt: float, drag: float, iters: int,
+                   has_snw: int, has_liq: int, has_turg: int, has_act: int):
+        p = wp.tid()
+        inv_dx = 1.0 / dx
+        # DORMANT PARTICLES CONTRIBUTE NOTHING. The default masks the scatter weights by occupancy
+        # (`weight * (occ > 0)`); this kernel had no `occ` at all, so a growth reservoir waiting to
+        # be spawned was depositing mass and momentum into the grid the whole time it waited.
+        if OCC[p] <= 0.0:
+            return
+
+        # READ STRAIGHT OUT OF `p.state`. `p.get("pos")` is a NON-CONTIGUOUS column slice, so
+        # `.contiguous()` allocated a fresh temporary on every call -- see the note on
+        # MPMScatterWarp.forward for why that was fatal under CUDA-graph capture. Indexing the
+        # state here costs nothing and removes 2 x N x 3 x 4 B of copy traffic per substep.
+        x = wp.vec3(STATE[p, pa + 0], STATE[p, pa + 1], STATE[p, pa + 2])
+        v0 = wp.vec3(STATE[p, va + 0], STATE[p, va + 1], STATE[p, va + 2])
+        v = v0 + dt * (AEXT[p] - drag * v0)         # body force + Stokes drag, as the torch op does
+        mass = MASS[p]
+        Fp = F[p]
+        Cp = C[p]
+
+        J = wp.determinant(Fp)
+        R = polar_R(Fp, iters)
+        # SNOW HARDENS AS IT PACKS, and this kernel did not know it. `mpm_strain` accumulates the
+        # plastic volume ratio Jp, and the DEFAULT scatter scales both Lame parameters by
+        # exp(10(1-Jp)) -- Jp<1 (packed) stiffens, Jp>1 softens (mpm_ops.py:322). Omitting it left
+        # snow with its virgin stiffness no matter how compacted it got, so a snow block compressed
+        # without limit into a flat pancake instead of holding a packed shape.
+        #
+        # THE GATE COULD NOT SEE IT: over its 20 frames Jp barely leaves 1, so h ~ 1 and the two
+        # implementations agreed to 2.1e-07 on the centre of mass. The divergence needs hundreds of
+        # frames of sustained plastic flow to appear, which is the length a SCENE runs and not the
+        # length a gate ran.
+        mu_p = MU[p]
+        la_p = LA[p]
+        if has_snw == 1 and SNW[p] > 0.0:
+            h = wp.exp(wp.clamp(10.0 * (1.0 - JP[p]), -6.0, 6.0))
+            mu_p = mu_p * h
+            la_p = la_p * h
+        # fixed-corotated Kirchhoff stress: 2 mu (F - R) F^T + I la J (J - 1)
+        S = 2.0 * mu_p * ((Fp - R) * wp.transpose(Fp)) + wp.identity(n=3, dtype=float) * (
+            la_p * J * (J - 1.0))
+        # THE TWO OPTIONAL STRESS TERMS the default adds and this kernel dropped. `active_stress`
+        # is written by pulse_to_active_stress; `turgor` by mpm_turgor, and its sign is the one
+        # that makes a cell a cell -- tau is Kirchhoff (positive = tension) and a fluid at pressure
+        # P has sigma = -P.I, so a POSITIVE turgor SUBTRACTS and pushes the material outward.
+        if has_act == 1:
+            S = S + ACT[p]
+        if has_turg == 1:
+            S = S - wp.identity(n=3, dtype=float) * TURG[p]
+        S = S * ((-dt * 4.0 * inv_dx * inv_dx) * PVOL[p])
+        affine = S + Cp * mass
+
+        base = wp.vec3(wp.floor(x[0] * inv_dx - 0.5),
+                       wp.floor(x[1] * inv_dx - 0.5),
+                       wp.floor(x[2] * inv_dx - 0.5))
+        fx = wp.vec3(x[0] * inv_dx - base[0], x[1] * inv_dx - base[1], x[2] * inv_dx - base[2])
+
+        for i in range(3):
+            wi = float(0.0)
+            if i == 0:
+                wi = 0.5 * (1.5 - fx[0]) * (1.5 - fx[0])
+            elif i == 1:
+                wi = 0.75 - (fx[0] - 1.0) * (fx[0] - 1.0)
+            else:
+                wi = 0.5 * (fx[0] - 0.5) * (fx[0] - 0.5)
+            for j in range(3):
+                wj = float(0.0)
+                if j == 0:
+                    wj = 0.5 * (1.5 - fx[1]) * (1.5 - fx[1])
+                elif j == 1:
+                    wj = 0.75 - (fx[1] - 1.0) * (fx[1] - 1.0)
+                else:
+                    wj = 0.5 * (fx[1] - 0.5) * (fx[1] - 0.5)
+                for k in range(3):
+                    wk = float(0.0)
+                    if k == 0:
+                        wk = 0.5 * (1.5 - fx[2]) * (1.5 - fx[2])
+                    elif k == 1:
+                        wk = 0.75 - (fx[2] - 1.0) * (fx[2] - 1.0)
+                    else:
+                        wk = 0.5 * (fx[2] - 0.5) * (fx[2] - 0.5)
+                    w = wi * wj * wk
+                    # THREE COUNTS, AS THE GATHER ALREADY TAKES. This kernel clamped and flattened
+                    # with ONE `ng` while `g2p` used ngx/ngy/ngz, so on any non-cubic box the
+                    # scatter wrote to different nodes than the gather read -- silently, since a
+                    # cubic box makes the two identical and every MPM spec until now was cubic.
+                    # `MPMGrid` has derived per-axis counts since the world-box change (P0); this is
+                    # the half of the pair that never caught up.
+                    gi = wp.clamp(int(base[0]) + i, 0, ngx - 1)
+                    gj = wp.clamp(int(base[1]) + j, 0, ngy - 1)
+                    gk = wp.clamp(int(base[2]) + k, 0, ngz - 1)
+                    idx = (gi * ngy + gj) * ngz + gk
+                    dpos = wp.vec3((float(i) - fx[0]) * dx,
+                                   (float(j) - fx[1]) * dx,
+                                   (float(k) - fx[2]) * dx)
+                    mom = mass * v + affine * dpos
+                    wp.atomic_add(GM, idx, w * mass)
+                    wp.atomic_add(GMV, idx, w * mom)
+                    # LIQUID COLOUR, the field the CSF surface tension is computed from. Without
+                    # it `mpm_grid_update` finds gc all zero, its `_c_csf` predicate is False, and
+                    # the ENTIRE surface-tension branch is skipped -- so `surface_tension: 60.0`
+                    # in a spec did exactly nothing on any run using this implementation.
+                    if has_liq == 1:
+                        wp.atomic_add(GC, idx, w * mass * LIQ[p])
+
+
+@register_operator("mpm_scatter", implementation="warp", family="mpm",
+                   set="particle", kind="exchange")
+class MPMScatterWarp(MPMScatter):
+    """The scatter as one Warp kernel, global atomics. See the module docstring."""
+
+    MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate",
+                      "fused_kernel"]
+    # 3D ONLY, DECLARED. Inherited from MPMScatter this said [2, 3], so `contract.capabilities()`
+    # reported the fused kernel as able to run 2D -- it cannot, `forward` raises -- and any
+    # capability-driven dispatch built on that table would have routed every 2D spec into a kernel
+    # that refuses them. 58 of the 78 specs in config/material are 2D (`general.dim` defaults to 2).
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+
+    def forward(self, H, mask=None):
+        if not HAVE_WARP:
+            raise RuntimeError("mpm_scatter[warp] needs warp-lang; none importable")
+        from plexus.operators.mpm_ops import sub_dt
+        p = H.level(self.at); g = H.field(self.to); dev = p.state.device
+        D = p.F.shape[-1]
+        if D != 3 or str(dev) == "cpu":
+            raise RuntimeError(f"mpm_scatter[warp] is 3D CUDA only (got dim={D}, dev={dev})")
+        dt = sub_dt(H, self.dt_sub)
+
+        # NOT `pa`/`va`: `pa` is rebound to H.part_accel eleven lines down, which silently turned
+        # the pos column offset into a tensor.
+        p_off, _ = p.state_schema["pos"]; v_off, _ = p.state_schema["vel"]
+        pn = getattr(p, "parent_name", None)
+        if pn is not None:
+            ac = torch.nan_to_num(H.delta(pn), posinf=self.a_max, neginf=-self.a_max
+                                  ).clamp(-self.a_max, self.a_max)
+            a_ext = ac[p.parent]
+        else:
+            a_ext = torch.zeros(p.n, D, device=dev)
+        pa = getattr(H, "part_accel", None)
+        if pa is not None:
+            a_ext = a_ext + pa
+        from plexus.operators.mpm_ops import _hand_body_force_to_grid
+        a_ext = a_ext + torch.nan_to_num(H.delta(p.name))
+        # SAME SPLIT AS THE TORCH SCATTER. This is the path the material specs actually run
+        # (`implementation: warp` on mpm_scatter), so leaving it out would mean `body_force: grid`
+        # silently did nothing on every spec that asked for it.
+        a_ext = _hand_body_force_to_grid(self, H, a_ext, dev, D).contiguous()
+
+        # run-constant, and it must be cached: `bool(t.any())` is a sync and a sync inside a
+        # CUDA-graph capture is illegal.
+        from plexus.operators.mpm_ops import _const_any
+        _has_snw = _const_any(self, "_c_snow", getattr(p, "is_snow", None))
+        _has_liq = _const_any(self, "_c_liquid", getattr(p, "is_liquid", None))
+        if getattr(self, "_sbuf", None) is None:
+            z = torch.zeros(p.n, device=dev)
+            def _mf(t):
+                return t.float().contiguous() if t is not None else z
+            self._sbuf = (_mf(getattr(p, "is_snow", None)), _mf(getattr(p, "is_liquid", None)),
+                          torch.ones(p.n, device=dev) if getattr(p, "occ", None) is None else None,
+                          z)
+        _snw, _liq, _occ1, _z = self._sbuf
+        _occ = _occ1 if _occ1 is not None else p.occ.contiguous()
+        # OPTIONAL SIDE CHANNELS, re-read every call because they are written by OTHER operators
+        # within the same tick (mpm_turgor, pulse_to_active_stress) and are not run-constant.
+        _turg = getattr(p, "turgor", None)
+        _has_turg = _turg is not None
+        _turg = _turg.contiguous() if _has_turg else _z
+        _act = getattr(H, "active_stress", None)
+        # THE SAME ADDITIVE-STRESS SLOT CARRIES BOTH. The kernel takes one mat33 per particle, so
+        # active stress and the viscous stress from `mpm_viscosity` are summed here rather than
+        # given separate inputs -- they enter the momentum identically and the kernel cannot tell
+        # them apart. Summing in torch also keeps the kernel signature (and its cached compile)
+        # unchanged, which is why `mpm_viscosity` needs no warp kernel of its own.
+        _xtr = getattr(H, "extra_stress", None)
+        if _xtr is not None:
+            _act = _xtr if _act is None else (_act + _xtr)
+        _has_act = _act is not None
+        _act = _act.contiguous() if _has_act else torch.zeros(p.n, 3, 3, device=dev)
+
+        gm, gmv = g.m, g.mv
+        if getattr(self, "_zeroes_grid", True):
+            gm.zero_(); gmv.zero_(); g.c.zero_()
+
+        # ZERO-COPY. `wp.from_torch` wraps the same device memory, so the grid the kernel writes IS
+        # the field the rest of the substep reads -- no staging, and the in-place discipline the
+        # capture guard depends on is preserved.
+        wdev = f"cuda:{dev.index or 0}"
+        n = int(p.n)
+        _wp_launch(
+            p2g_atomic, n, dev,
+            [wp.from_torch(p.state), int(p_off), int(v_off),
+                    wp.from_torch(p.C.contiguous(), dtype=wp.mat33),
+                    wp.from_torch(p.F.contiguous(), dtype=wp.mat33),
+                    wp.from_torch(p.mass.contiguous()), wp.from_torch(p.mu.contiguous()),
+                    wp.from_torch(p.la.contiguous()), wp.from_torch(p.p_vol.contiguous()),
+                    wp.from_torch(a_ext, dtype=wp.vec3),
+                    wp.from_torch(p.Jp.contiguous()), wp.from_torch(_snw),
+                    wp.from_torch(_liq), wp.from_torch(_occ), wp.from_torch(_turg),
+                    wp.from_torch(_act, dtype=wp.mat33),
+                    wp.from_torch(gm), wp.from_torch(gmv.view(-1, 3), dtype=wp.vec3),
+                    wp.from_torch(g.c),
+                    int(g.nx), int(g.ny), int(g.nz),
+                    float(g.dx), float(dt), float(self.drag), int(self.polar_iters),
+                    int(_has_snw), int(_has_liq), int(_has_turg), int(_has_act)])
+        return {}
+
+
+# ==========================================================================================================
+# G2P -- `mpm_gather[implementation: warp]`
+#
+# THE SCATTER WAS 64% OF THE FRAME AND IS NOW ~21%; PROFILED AFTER THAT, THE GATHER IS 60.5%.
+# It is also by far the easier kernel: grid -> particle is a pure READ. Each particle reads the
+# velocity of its 27 neighbouring nodes and forms two weighted sums (the new velocity, and the
+# affine matrix C). Nothing is shared, nothing collides, there are no atomics and no sort. The
+# PyTorch version is slow for one reason only: it materialises [N, 27, 3] and [N, 27, 3, 3]
+# intermediates through global memory, and never needs to.
+# ==========================================================================================================
+if HAVE_WARP:
+
+    @wp.kernel
+    def g2p(STATE: wp.array2d(dtype=float),
+            C: wp.array(dtype=wp.mat33), GV: wp.array(dtype=wp.vec3),
+            OCC: wp.array(dtype=float), LIQ: wp.array(dtype=float),
+            NEAR: wp.array(dtype=float),
+            pa: int, va: int, ngx: int, ngy: int, ngz: int, dx: float, dt: float,
+            wall_damp: float, wall_contact: float, vmax: float,
+            bx: float, by: float, bz: float, has_liq: int, per_impact: int):
+        p = wp.tid()
+        inv_dx = 1.0 / dx
+        x = wp.vec3(STATE[p, pa + 0], STATE[p, pa + 1], STATE[p, pa + 2])   # no copy; see p2g
+        base = wp.vec3(wp.floor(x[0] * inv_dx - 0.5),
+                       wp.floor(x[1] * inv_dx - 0.5),
+                       wp.floor(x[2] * inv_dx - 0.5))
+        fx = wp.vec3(x[0] * inv_dx - base[0], x[1] * inv_dx - base[1], x[2] * inv_dx - base[2])
+
+        newv = wp.vec3(0.0, 0.0, 0.0)
+        newC = wp.mat33(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        for i in range(3):
+            wi = float(0.0)
+            if i == 0:
+                wi = 0.5 * (1.5 - fx[0]) * (1.5 - fx[0])
+            elif i == 1:
+                wi = 0.75 - (fx[0] - 1.0) * (fx[0] - 1.0)
+            else:
+                wi = 0.5 * (fx[0] - 0.5) * (fx[0] - 0.5)
+            for j in range(3):
+                wj = float(0.0)
+                if j == 0:
+                    wj = 0.5 * (1.5 - fx[1]) * (1.5 - fx[1])
+                elif j == 1:
+                    wj = 0.75 - (fx[1] - 1.0) * (fx[1] - 1.0)
+                else:
+                    wj = 0.5 * (fx[1] - 0.5) * (fx[1] - 0.5)
+                for k in range(3):
+                    wk = float(0.0)
+                    if k == 0:
+                        wk = 0.5 * (1.5 - fx[2]) * (1.5 - fx[2])
+                    elif k == 1:
+                        wk = 0.75 - (fx[2] - 1.0) * (fx[2] - 1.0)
+                    else:
+                        wk = 0.5 * (fx[2] - 0.5) * (fx[2] - 0.5)
+                    w = wi * wj * wk
+                    # row-major over `g.shape`, EXACTLY as `bspline` flattens it: axis 0 spans the
+                    # world width and carries `nx`, axes 1-2 span [0,1] and carry `ny`.
+                    gi = wp.clamp(int(base[0]) + i, 0, ngx - 1)
+                    gj = wp.clamp(int(base[1]) + j, 0, ngy - 1)
+                    gk = wp.clamp(int(base[2]) + k, 0, ngz - 1)
+                    gv = GV[(gi * ngy + gj) * ngz + gk]
+                    dpos = wp.vec3(float(i) - fx[0], float(j) - fx[1], float(k) - fx[2])
+                    newv = newv + w * gv
+                    newC = newC + (4.0 * inv_dx * w) * wp.outer(gv, dpos)
+
+        # inelastic wall contact for SOLIDS: a liquid is handled by the asymmetric grid wall
+        # friction instead, so pinning it here would stop it draining.
+        if wall_damp != 1.0:
+            near = (x[0] < wall_contact or x[0] > bx - wall_contact or
+                    x[1] < wall_contact or x[1] > by - wall_contact or
+                    x[2] < wall_contact or x[2] > bz - wall_contact)
+            if has_liq == 1 and LIQ[p] > 0.0:
+                near = False
+            hit = near
+            if per_impact == 1:
+                # RISING EDGE ONLY -- see the long note in mpm_ops.MPMGather.forward. One impact
+                # must cost one multiplication, not one per substep spent in the contact layer,
+                # or the coefficient's meaning moves with the grid resolution.
+                hit = near and (NEAR[p] < 0.5)
+                if near:
+                    NEAR[p] = 1.0
+                else:
+                    NEAR[p] = 0.0
+            if hit:
+                newv = newv * wall_damp
+
+        sp = wp.length(newv)
+        if sp > vmax:
+            newv = newv * (vmax / sp)
+        xn = x + dt * newv
+        xn = wp.vec3(wp.clamp(xn[0], 2.0 * dx, bx - 2.0 * dx),
+                     wp.clamp(xn[1], 2.0 * dx, by - 2.0 * dx),
+                     wp.clamp(xn[2], 2.0 * dx, bz - 2.0 * dx))
+
+        if OCC[p] <= 0.0:                      # DORMANT particles are frozen, not advected
+            return
+        STATE[p, pa + 0] = xn[0]; STATE[p, pa + 1] = xn[1]; STATE[p, pa + 2] = xn[2]
+        STATE[p, va + 0] = newv[0]; STATE[p, va + 1] = newv[1]; STATE[p, va + 2] = newv[2]
+        C[p] = newC
+
+
+@register_operator("mpm_gather", implementation="warp", family="mpm",
+                   set="particle", kind="exchange")
+class MPMGatherWarp(MPMGather):
+    """G2P as one Warp kernel. Pure reads: no atomics, no sort, nothing shared."""
+
+    MECHANISM_TAGS = ["grid_to_particle", "advection", "fused_kernel"]
+    SUPPORTED_DIMS = [3]                       # see MPMScatterWarp: inherited [2, 3] was a lie
+    DIFFERENTIABLE = False
+
+    def forward(self, H, mask=None):
+        if not HAVE_WARP:
+            raise RuntimeError("mpm_gather[warp] needs warp-lang")
+        from plexus.operators.mpm_ops import sub_dt
+        p = H.level(self.at); g = H.field(self.frm); dev = p.state.device
+        D = p.F.shape[-1]
+        if D != 3 or str(dev) == "cpu" or bool(getattr(H, "periodic", False)):
+            raise RuntimeError("mpm_gather[warp] is 3D, non-periodic, CUDA only")
+        dt = sub_dt(H, self.dt_sub)
+        if getattr(self, "_box", None) is None:
+            self._box = [float(b) for b in
+                         getattr(H, "world_size", torch.tensor([g.width, 1.0]))][:D]
+        bx, by, bz = self._box
+        pa, _pb = p.state_schema["pos"]; va, _vb = p.state_schema["vel"]
+        occ = getattr(p, "occ", None)
+        if occ is None:
+            occ = torch.ones(p.n, device=dev)
+        liq = getattr(p, "is_liquid", None)
+        has_liq = 1 if liq is not None else 0
+        liqf = (liq.float().contiguous() if liq is not None
+                else torch.zeros(p.n, device=dev))
+        vmax = min(self.vmax, 0.4 * float(g.dx) / float(dt))
+        # PERSISTENT contact-edge state for `wall_damp_mode: per_impact`. float, not bool, because
+        # warp arrays of bool are awkward to alias from torch; written in place so a captured graph
+        # keeps the address. Allocated once, on the first call, which is before capture installs.
+        if getattr(self, "_near", None) is None:
+            self._near = torch.zeros(p.n, device=dev)
+        _near = self._near
+        wdev = f"cuda:{dev.index or 0}"
+        _wp_launch(g2p, int(p.n), dev,
+                  [wp.from_torch(p.state),
+                          wp.from_torch(p.C, dtype=wp.mat33),
+                          wp.from_torch(g.v.view(-1, 3), dtype=wp.vec3),
+                          wp.from_torch(occ), wp.from_torch(liqf), wp.from_torch(_near),
+                          int(pa), int(va), int(g.shape[0]), int(g.shape[1]), int(g.shape[2]),
+                          float(g.dx), float(dt),
+                          float(self.wall_damp), float(self._contact_band(g)), float(vmax),
+                          float(bx), float(by), float(bz), int(has_liq),
+                          int(self.wall_damp_mode == "per_impact")])
+        return {}
+
+
+# ==========================================================================================================
+# F UPDATE -- `mpm_strain[implementation: warp]`
+#
+# With the scatter and the gather fused, this and `mpm_grid_update` are the whole remaining frame.
+# It is the easier of the two and the larger lever at scale: `mpm_strain` is O(particles) while
+# `mpm_grid_update` is O(cells), so the grid solve's cost is FLAT as the particle count grows and
+# this one's is not.
+#
+# ALL FOUR BRANCHES: elastic, liquid, viscoelastic, snow. The last two need a 3x3 SVD and were
+# refused at first, on the grounds that torch returns singular values DESCENDING while `wp.svd3`
+# made no such promise -- and the snow branch's proper-rotation fix indexes the LAST singular value
+# specifically, so the order changes the answer. MEASURED over 20,000 deformation-gradient-like
+# matrices rather than assumed:
+#
+#   sigma descending          100.0% of cases          -- matches torch
+#   det(U), det(V)            +1.000 ALWAYS            -- torch gives +-1
+#   |sigma| vs torch          1.9e-06 near identity, 1.0e-04 on pathological input
+#
+# The second row is the surprise and it makes the port SIMPLER than the default, not riskier:
+# `wp.svd3` already returns proper rotations with a SIGNED sigma, which is exactly the state the
+# default reaches by hand through `negU`/`negV`. Reconstruction error is larger than torch's
+# (6.2e-03 worst case against 4.9e-06) but that lives in U and V -- a valid alternative
+# factorisation where sigma are near-degenerate -- and the material branches use only sigma, which
+# agrees to 1.9e-06 in the regime snow occupies (|F - I| < 0.05, since snow clamps sigma into a
+# window 0.0325 wide).
+#
+# TWO KERNELS, NOT ONE WITH FLAGS. `strain_elastic` is the common path and carrying the SVD in it
+# would cost register pressure on every spec to serve the two that need it.
+# ==========================================================================================================
+if HAVE_WARP:
+
+    @wp.kernel
+    def strain_elastic(C: wp.array(dtype=wp.mat33), F: wp.array(dtype=wp.mat33),
+                       LIQ: wp.array(dtype=float), OCC: wp.array(dtype=float),
+                       dt: float, has_liq: int):
+        p = wp.tid()
+        # DORMANT PARTICLES DO NOT DEFORM. The default writes `where(live, F_new, F_old)`; leaving
+        # early leaves F[p] untouched, which is the same thing and skips the work.
+        if OCC[p] <= 0.0:
+            return
+        Fp = (wp.identity(n=3, dtype=float) + dt * C[p]) * F[p]
+        if has_liq == 1 and LIQ[p] > 0.0:
+            # LIQUID: drop shape memory, keep volume. J is taken from the UPDATED F, as the default
+            # does -- computing it before the (I + dt C) step would reset to last substep's volume.
+            J = wp.determinant(Fp)
+            Jl = wp.pow(wp.max(J, 1.0e-6), 1.0 / 3.0)
+            Fp = wp.identity(n=3, dtype=float) * Jl
+        F[p] = Fp
+
+
+    @wp.kernel
+    def strain_full(C: wp.array(dtype=wp.mat33), F: wp.array(dtype=wp.mat33),
+                    LIQ: wp.array(dtype=float), VIS: wp.array(dtype=float),
+                    SNW: wp.array(dtype=float), TAU: wp.array(dtype=float),
+                    JP: wp.array(dtype=float), OCC: wp.array(dtype=float),
+                    dt: float, has_liq: int, has_vis: int, has_snw: int):
+        p = wp.tid()
+        if OCC[p] <= 0.0:
+            return
+        I3 = wp.identity(n=3, dtype=float)
+        Fp = (I3 + dt * C[p]) * F[p]
+
+        if has_liq == 1 and LIQ[p] > 0.0:                     # LIQUID: drop shape memory
+            Jl = wp.pow(wp.max(wp.determinant(Fp), 1.0e-6), 1.0 / 3.0)
+            Fp = I3 * Jl
+
+        if has_vis == 1 and VIS[p] > 0.0:                     # VISCOELASTIC: partial shape reset
+            U = wp.mat33(); sg = wp.vec3(); V = wp.mat33()
+            wp.svd3(Fp, U, sg, V)
+            Jl = wp.pow(wp.max(sg[0] * sg[1] * sg[2], 1.0e-6), 1.0 / 3.0)
+            a = wp.exp(-dt / wp.max(TAU[p], 1.0e-6))          # memory kept: a->1 elastic, a->0 liquid
+            sg = wp.vec3(Jl + (sg[0] - Jl) * a, Jl + (sg[1] - Jl) * a, Jl + (sg[2] - Jl) * a)
+            Fp = (U * wp.diag(sg)) * wp.transpose(V)
+
+        if has_snw == 1 and SNW[p] > 0.0:                     # SNOW: clamp stretches, harden via Jp
+            U = wp.mat33(); sg = wp.vec3(); V = wp.mat33()
+            # NO SIGN FIX NEEDED. The default computes one because torch can return det(U) = -1;
+            # `wp.svd3` returns proper rotations already, with the sign carried in sigma -- the same
+            # state, reached by the library instead of by hand.
+            wp.svd3(Fp, U, sg, V)
+            lo = 1.0 - 2.5e-2
+            hi = 1.0 + 7.5e-3
+            sc = wp.vec3(wp.clamp(sg[0], lo, hi), wp.clamp(sg[1], lo, hi), wp.clamp(sg[2], lo, hi))
+            Fp = (U * wp.diag(sc)) * wp.transpose(V)
+            ratio = (sg[0] * sg[1] * sg[2]) / wp.max(sc[0] * sc[1] * sc[2], 1.0e-6)
+            JP[p] = wp.clamp(JP[p] * ratio, 0.6, 20.0)
+
+        F[p] = Fp
+
+
+@register_operator("mpm_strain", implementation="warp", family="mpm",
+                   set="particle", kind="lateral")
+class MPMStrainWarp(MPMStrain):
+    """The deformation-gradient update as one Warp kernel. Elastic + liquid; see the module note."""
+
+    MECHANISM_TAGS = ["elastic_strain", "plastic_flow", "incompressible_volume", "fused_kernel"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    # Tells the engine's capture-refusal list that this implementation's snow/viscoelastic branches
+    # are NOT the uncapturable cuSOLVER-plus-boolean-mask pair the default's are.
+    CAPTURABLE_MATERIAL_BRANCHES = True
+
+    def forward(self, H, mask=None):
+        if not HAVE_WARP:
+            raise RuntimeError("mpm_strain[warp] needs warp-lang")
+        from plexus.operators.mpm_ops import sub_dt
+        p = H.level(self.at); dev = p.state.device
+        D = p.F.shape[-1]
+        if D != 3 or str(dev) == "cpu":
+            raise RuntimeError(f"mpm_strain[warp] is 3D CUDA only (got dim={D}, dev={dev})")
+        # CACHED, and it MUST be. `bool(m.any())` is a device->host sync, and a sync inside a
+        # CUDA-graph capture is illegal -- `cudaErrorStreamCaptureUnsupported`, which took down
+        # every 3D spec the moment this operator was used, because `capture` defaults to True
+        # (engine.py:1586). The predicate is run-constant: which particles are snow or
+        # viscoelastic is fixed at seeding. `_const_any` is the codebase's existing answer to
+        # exactly this and is what the default bodies use.
+        from plexus.operators.mpm_ops import _const_any
+        has_vis = _const_any(self, "_c_is_visco", getattr(p, "is_visco", None))
+        has_snw = _const_any(self, "_c_is_snow", getattr(p, "is_snow", None))
+        dt = sub_dt(H, self.dt_sub)
+        liq = getattr(p, "is_liquid", None)
+        has_liq = 1 if liq is not None else 0
+        if getattr(self, "_side", None) is None:      # ALL run-constant; built once, not per substep
+            z = torch.zeros(p.n, device=dev)
+            def _f(t):
+                return t.float().contiguous() if t is not None else z
+            self._side = (_f(liq), _f(getattr(p, "is_visco", None)), _f(getattr(p, "is_snow", None)),
+                          (p.visco_tau.contiguous() if getattr(p, "visco_tau", None) is not None
+                           else torch.ones(p.n, device=dev)),
+                          torch.ones(p.n, device=dev) if getattr(p, "occ", None) is None else None)
+        liqf, visf, snwf, tau, occ1 = self._side
+        occ = occ1 if occ1 is not None else p.occ.contiguous()
+        wdev = f"cuda:{dev.index or 0}"
+        if not (has_vis or has_snw):                  # the common path, no SVD in the kernel at all
+            _wp_launch(strain_elastic, int(p.n), dev,
+                      [wp.from_torch(p.C, dtype=wp.mat33), wp.from_torch(p.F, dtype=wp.mat33),
+                              wp.from_torch(liqf), wp.from_torch(occ), float(dt), int(has_liq)])
+        else:
+            _wp_launch(strain_full, int(p.n), dev,
+                      [wp.from_torch(p.C, dtype=wp.mat33), wp.from_torch(p.F, dtype=wp.mat33),
+                              wp.from_torch(liqf), wp.from_torch(visf), wp.from_torch(snwf),
+                              wp.from_torch(tau), wp.from_torch(p.Jp.contiguous()),
+                              wp.from_torch(occ), float(dt), int(has_liq),
+                              int(bool(has_vis)), int(bool(has_snw))])
+        return {}
+
+
+# ==========================================================================================================
+# GRID SOLVE -- `mpm_grid_update[implementation: warp]`
+#
+# WHY. With the aggregate's deterministic index_add removed, `mpm_grid_update` is the LARGEST
+# remaining item in the warp frame -- 42.7% of si_waterfall (24.2 ms of 56.6), against the scatter's
+# 40.2% and the gather's 4.8%. It is also the one whose cost has nothing to do with the physics it
+# computes. Two separate inefficiencies stack:
+#
+#   IT VISITS EVERY CELL, AND ALMOST NONE OF THEM HOLD ANYTHING. Grid nodes carrying mass are
+#   3.3-4.0% of si_waterfall's 884,736 and 2.5-2.6% of the 5M scene's 7,077,888 -- so ~96% of the
+#   work is on empty space. (A sparse grid is the fix for that one; this is not it.)
+#
+#   IT VISITS EACH CELL ~40 TIMES. The torch form is a chain of whole-grid tensor ops: twelve
+#   `torch.roll`s per substep for `grad` and `kappa` alone, each one a full 3.5 MB copy in and
+#   3.5 MB out, plus the elementwise chain and the boundary slabs. Measured ~450 MB of traffic per
+#   call for a grid whose entire state is 14 MB, at ~240 GB/s of an A6000's 768 -- so it is not even
+#   bandwidth-bound, it is kernel-count-bound.
+#
+# This fixes the SECOND one only, and does it in the cheapest way available: the same arithmetic in
+# two warp kernels instead of forty torch ones. No data structure changes, nothing to rebuild, and
+# capture still works.
+#
+# TWO KERNELS, NOT ONE, AND THE REASON IS THE CURVATURE. `kappa = -div(n)` needs the unit normal at
+# the six face neighbours, and each of those needs `grad(c)` at that neighbour, i.e. `c` two cells
+# out. One pass would make every thread evaluate the gradient seven times over a 25-point stencil.
+# Splitting after `grad` costs one [n_cells, 3] scratch buffer (10.6 MB at 96^3) and leaves each
+# thread reading seven gradients it did not compute. `nrm` is NOT stored: it is `grad/(|grad|+eps)`,
+# recovered in the second kernel from the gradients it is already reading.
+#
+# WHAT IT REFUSES, LOUDLY. A fused kernel that quietly skipped a term would be far worse than no
+# fused kernel, so every feature outside the 3D non-periodic normalised-CSF path raises rather than
+# being ignored: 2D, periodic, `csf_smooth > 0`, the legacy unnormalised colour (`csf_rho == 0`,
+# whose interface test is a reduction over the whole grid), and the plate BC. Those specs keep the
+# default implementation, which is why this is an `implementation:` and not a rewrite.
+#
+# NOT BIT-IDENTICAL to `default`: same operations in the same order per cell, but float addition is
+# not associative across a different lowering. `tools/mpm_grid_gate.py` measures the difference
+# against the torch operator on real state rather than asserting it.
+# ==========================================================================================================
+if HAVE_WARP:
+
+    @wp.kernel
+    def grid_colour_grad(gc: wp.array(dtype=wp.float32),
+                         grad: wp.array(dtype=wp.vec3),
+                         nx: int, ny: int, nz: int,
+                         inv_cell_mass: float, half_inv_dx: float):
+        """grad(c) by central differences, with `torch.roll`'s WRAPAROUND at the box faces.
+
+        The torch form uses `torch.roll`, which is periodic even on a non-periodic run, so a cell on
+        the -x face differences against the +x face. That is arguably wrong and it is what every
+        existing run did; reproducing it is the point of an alternative implementation.
+        """
+        t = wp.tid()
+        k = t % nz
+        j = (t // nz) % ny
+        i = t // (nz * ny)
+        ip = (i + 1) % nx
+        im = (i - 1 + nx) % nx
+        jp = (j + 1) % ny
+        jm = (j - 1 + ny) % ny
+        kp = (k + 1) % nz
+        km = (k - 1 + nz) % nz
+        # `c` is formed BEFORE the difference, as the torch code forms the whole `c` field first.
+        gx = (gc[(ip * ny + j) * nz + k] * inv_cell_mass
+              - gc[(im * ny + j) * nz + k] * inv_cell_mass) * half_inv_dx
+        gy = (gc[(i * ny + jp) * nz + k] * inv_cell_mass
+              - gc[(i * ny + jm) * nz + k] * inv_cell_mass) * half_inv_dx
+        gz = (gc[(i * ny + j) * nz + kp] * inv_cell_mass
+              - gc[(i * ny + j) * nz + km] * inv_cell_mass) * half_inv_dx
+        grad[t] = wp.vec3(gx, gy, gz)
+
+    @wp.func
+    def _unit(g: wp.vec3, eps: float) -> wp.vec3:
+        """n = grad / (|grad| + eps) -- the CSF normal, with the same additive regularisation the
+        torch path uses. NOT `wp.normalize`, which divides by |g| alone and blows up in the bulk."""
+        m = wp.sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) + eps
+        return wp.vec3(g[0] / m, g[1] / m, g[2] / m)
+
+    @wp.kernel
+    def grid_solve(gm: wp.array(dtype=wp.float32),
+                   gmv: wp.array(dtype=wp.vec3),
+                   gc: wp.array(dtype=wp.float32),
+                   grad: wp.array(dtype=wp.vec3),
+                   walls: wp.array(dtype=wp.uint8),
+                   bf: wp.array(dtype=wp.vec3),
+                   gv: wp.array(dtype=wp.vec3),
+                   nx: int, ny: int, nz: int,
+                   dt: float, half_inv_dx: float, cell_vol: float,
+                   mass_floor: float, csf_floor: float,
+                   surf: float, inv_cell_mass: float, band: float, gain: float, eps: float,
+                   full_mass: float, wd: float,
+                   buoy: float, rho_ref: float, bdir: wp.vec3,
+                   has_bf: int, has_csf: int, has_walls: int, has_buoy: int):
+        t = wp.tid()
+        k = t % nz
+        j = (t // nz) % ny
+        i = t // (nz * ny)
+
+        m = gm[t]
+        mv = gmv[t]
+        mc = wp.max(m, mass_floor)
+        v = wp.vec3(mv[0] / mc, mv[1] / mc, mv[2] / mc)
+
+        if has_bf == 1:                                  # `body_force: grid` handover from the scatter
+            a = bf[t]
+            v = wp.vec3(v[0] + dt * a[0], v[1] + dt * a[1], v[2] + dt * a[2])
+
+        if has_csf == 1:
+            ip = (i + 1) % nx
+            im = (i - 1 + nx) % nx
+            jp = (j + 1) % ny
+            jm = (j - 1 + ny) % ny
+            kp = (k + 1) % nz
+            km = (k - 1 + nz) % nz
+            nxp = _unit(grad[(ip * ny + j) * nz + k], eps)
+            nxm = _unit(grad[(im * ny + j) * nz + k], eps)
+            nyp = _unit(grad[(i * ny + jp) * nz + k], eps)
+            nym = _unit(grad[(i * ny + jm) * nz + k], eps)
+            nzp = _unit(grad[(i * ny + j) * nz + kp], eps)
+            nzm = _unit(grad[(i * ny + j) * nz + km], eps)
+            # kappa = -div(n), summed left to right exactly as the torch generator expression is.
+            kap = -(((nxp[0] - nxm[0]) * half_inv_dx + (nyp[1] - nym[1]) * half_inv_dx)
+                    + (nzp[2] - nzm[2]) * half_inv_dx)
+            c = gc[t] * inv_cell_mass
+            fm = float(0.0)
+            if c > band and c < 1.0 - band and m > band * full_mass:
+                fm = gain
+            inv_m = cell_vol / wp.max(m, csf_floor)
+            gr = grad[t]
+            v = wp.vec3(v[0] + dt * (surf * kap * gr[0] * fm) * inv_m,
+                        v[1] + dt * (surf * kap * gr[1] * fm) * inv_m,
+                        v[2] + dt * (surf * kap * gr[2] * fm) * inv_m)
+
+        # REFLECTIVE BOX WALLS, IN THE TORCH ORDER, WHICH IS NOT SYMMETRIC AND MATTERS.
+        # The torch loop writes axis k's clamped component back before damping the OTHER components
+        # on that axis's slabs, and axis 1 then reads a y-velocity axis 0 may already have damped.
+        # Keeping `v` in registers and walking k in the same order reproduces that exactly. Note the
+        # slabs are asymmetric -- `idx < 3` is three cells, `idx > n - 3` is two -- because the torch
+        # test is strict at the top; this is behaviour, not a bug being fixed here.
+        lo0 = i < 3
+        hi0 = i > nx - 3
+        lo1 = j < 3
+        hi1 = j > ny - 3
+        lo2 = k < 3
+        hi2 = k > nz - 3
+        vx = v[0]
+        vy = v[1]
+        vz = v[2]
+        if lo0:
+            vx = wp.max(vx, 0.0)
+        if hi0:
+            vx = wp.min(vx, 0.0)
+        if wd != 1.0 and (lo0 or hi0):
+            vy = vy * wd
+            vz = vz * wd
+        if lo1:
+            vy = wp.max(vy, 0.0)
+        if hi1:
+            vy = wp.min(vy, 0.0)
+        if wd != 1.0 and (lo1 or hi1):
+            vx = vx * wd
+            vz = vz * wd
+        if lo2:
+            vz = wp.max(vz, 0.0)
+        if hi2:
+            vz = wp.min(vz, 0.0)
+        if wd != 1.0 and (lo2 or hi2):
+            vx = vx * wd
+            vy = vy * wd
+        v = wp.vec3(vx, vy, vz)
+
+        if has_walls == 1 and walls[t] != wp.uint8(0):   # no-slip inside a solid obstacle
+            v = wp.vec3(0.0, 0.0, 0.0)
+
+        if has_buoy == 1:
+            rho = m / cell_vol
+            f = float(0.0)
+            if rho > 1.0e-9:
+                f = (rho - rho_ref) / wp.max(rho, 1.0e-9)
+            v = wp.vec3(v[0] + dt * buoy * f * bdir[0],
+                        v[1] + dt * buoy * f * bdir[1],
+                        v[2] + dt * buoy * f * bdir[2])
+
+        gv[t] = v
+
+
+@register_operator("mpm_grid_update", implementation="warp", family="mpm",
+                   set="field", kind="field")
+class MPMGridUpdateWarp(MPMGridUpdate):
+    """The 3D grid solve -- mass normalisation, CSF surface tension, box walls, obstacles,
+    buoyancy -- as two Warp kernels instead of ~40 whole-grid torch ops."""
+
+    MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions", "fused_kernel"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+
+    def forward(self, H, mask=None):
+        if not HAVE_WARP:
+            raise RuntimeError("mpm_grid_update[warp] needs warp-lang")
+        from plexus.operators.mpm_ops import sub_dt
+        g = H.field(self.at); dev = g.m.device
+        D = g.dim
+        if D != 3 or str(dev) == "cpu" or bool(getattr(H, "periodic", False)):
+            raise RuntimeError("mpm_grid_update[warp] is 3D, non-periodic, CUDA only")
+        if self.csf_smooth:
+            raise RuntimeError("mpm_grid_update[warp] does not implement csf_smooth "
+                               "(it needs a third pass); drop `implementation: warp`")
+        if self.plate_axis is not None:
+            raise RuntimeError("mpm_grid_update[warp] does not implement the plate BC; "
+                               "drop `implementation: warp`")
+        if self.surface_tension > 0.0 and self.csf_rho <= 0.0:
+            raise RuntimeError("mpm_grid_update[warp] does not implement the LEGACY unnormalised "
+                               "colour (csf_rho unset): its interface test is a reduction over the "
+                               "whole grid. Set csf_rho, or drop `implementation: warp`")
+        dt = sub_dt(H, self.dt_sub)
+        dx = float(g.dx); inv_dx = float(g.inv_dx)
+        cell_vol = dx ** 3
+        n = int(g.m.numel())
+        nx, ny, nz = g.shape
+
+        # CACHED ONCE, at a stable address so a captured graph keeps reading the buffer the run
+        # keeps writing. `grad` is scratch between the two kernels and never leaves this operator.
+        if getattr(self, "_grad", None) is None or self._grad.shape[0] != n:
+            self._grad = torch.zeros(n, 3, device=dev)
+            self._zero3 = torch.zeros(1, 3, device=dev)
+        # RESOLVED ONCE. `bool(mask.any())` is a device->host sync: run per substep it drains the
+        # launch queue 13 times a frame, and inside a CUDA-graph capture it is illegal outright.
+        # The obstacle set is a run constant (`_walls3d` itself caches on the grid shape), so the
+        # flag is settled on the first call and read from an int thereafter.
+        if getattr(self, "_wall_u8", None) is None or self._wall_u8.numel() != n:
+            walls = self._walls3d(H, g, dev)
+            self._wall_u8 = walls.to(torch.uint8).contiguous()
+            self._has_walls = 1 if bool(self._wall_u8.any()) else 0
+        has_walls = self._has_walls
+
+        if getattr(self, "_c_csf", None) is None:
+            self._c_csf = bool(self.surface_tension > 0.0 and bool((g.c > 0).any()))
+        has_csf = 1 if self._c_csf else 0
+        inv_cell_mass = 1.0 / (self.csf_rho * cell_vol) if self.csf_rho > 0.0 else 1.0
+        gain = 1.0 / max(1.0 - 2.0 * self.csf_band, 1e-6) if self.csf_band > 0 else 1.0
+        if self.csf_band <= 0.0 and has_csf:
+            raise RuntimeError("mpm_grid_update[warp] needs csf_band > 0 when surface tension is "
+                               "on: the band-free interface test is a global reduction")
+
+        _bf = getattr(H, "_mpm_body_accel", None)
+        bf = _bf if _bf is not None else self._zero3
+        buoy_dir = [0.0, -1.0, 0.0]
+        if self.buoy_dir is not None:
+            for _i, _x in enumerate(self.buoy_dir[:3]):
+                buoy_dir[_i] = float(_x)
+
+        if has_csf:
+            _wp_launch(grid_colour_grad, n, dev,
+                       [wp.from_torch(g.c.contiguous()),
+                        wp.from_torch(self._grad, dtype=wp.vec3),
+                        int(nx), int(ny), int(nz),
+                        float(inv_cell_mass), float(0.5 * inv_dx)])
+        _wp_launch(grid_solve, n, dev,
+                   [wp.from_torch(g.m.contiguous()),
+                    wp.from_torch(g.mv.view(-1, 3), dtype=wp.vec3),
+                    wp.from_torch(g.c.contiguous()),
+                    wp.from_torch(self._grad, dtype=wp.vec3),
+                    wp.from_torch(self._wall_u8),
+                    wp.from_torch(bf.view(-1, 3), dtype=wp.vec3),
+                    wp.from_torch(g.v.view(-1, 3), dtype=wp.vec3),
+                    int(nx), int(ny), int(nz),
+                    float(dt), float(0.5 * inv_dx), float(cell_vol),
+                    float(self._const("mass_floor", g)), float(self._const("csf_mass_floor", g)),
+                    float(self.surface_tension), float(inv_cell_mass),
+                    float(self.csf_band), float(gain), float(self._const("csf_eps", g)),
+                    float(self.csf_rho * cell_vol), float(self.wall_damp),
+                    float(self.buoyancy), float(self.rho_ref),
+                    wp.vec3(buoy_dir[0], buoy_dir[1], buoy_dir[2]),
+                    int(_bf is not None), int(has_csf), int(has_walls),
+                    int(self.buoyancy != 0.0)])
+        return {}
+
+
+# ==========================================================================================================
+# MERGED FROM `mpm_triton.py` on 2026-09-04 -- `mpm_scatter` in triton -- one fused kernel, and a colour-ordered variant.
+#
+# THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE. A contract's `default` is whichever
+# variant registers FIRST, so appending the backends after the torch bodies is not a style choice: put
+# a warp registration above `MPMScatter` and `mpm_scatter[default]` silently becomes the warp kernel,
+# and since R1(c) the contract's `.signature` is the default's too. The registry snapshot in this
+# commit's message is the check that it did not happen.
+# ==========================================================================================================
+try:
+    import triton
+    import triton.language as tl
+    HAVE_TRITON = True
+except Exception:                                        # no triton -> the operator refuses at build
+    HAVE_TRITON = False
+
+
+if HAVE_TRITON:
+
+    @triton.jit
+    def _p2g(X, V, C, F, MASS, MU, LA, PVOL, AEXT, GM, GMV, GC, LIQ,
+             N, NG: tl.constexpr, DX: tl.constexpr, DT: tl.constexpr,
+             DRAG: tl.constexpr, ITERS: tl.constexpr, HAS_LIQ: tl.constexpr,
+             BLOCK: tl.constexpr):
+        """One program handles BLOCK particles: strain -> stress -> weights -> scatter."""
+        pid = tl.program_id(0)
+        off = pid * BLOCK + tl.arange(0, BLOCK)
+        m = off < N
+        inv_dx = 1.0 / DX
+
+        x0 = tl.load(X + off * 3 + 0, mask=m, other=0.0)
+        x1 = tl.load(X + off * 3 + 1, mask=m, other=0.0)
+        x2 = tl.load(X + off * 3 + 2, mask=m, other=0.0)
+        v0 = tl.load(V + off * 3 + 0, mask=m, other=0.0)
+        v1 = tl.load(V + off * 3 + 1, mask=m, other=0.0)
+        v2 = tl.load(V + off * 3 + 2, mask=m, other=0.0)
+        a0 = tl.load(AEXT + off * 3 + 0, mask=m, other=0.0)
+        a1 = tl.load(AEXT + off * 3 + 1, mask=m, other=0.0)
+        a2 = tl.load(AEXT + off * 3 + 2, mask=m, other=0.0)
+        mass = tl.load(MASS + off, mask=m, other=0.0)
+        mu = tl.load(MU + off, mask=m, other=0.0)
+        la = tl.load(LA + off, mask=m, other=0.0)
+        pv = tl.load(PVOL + off, mask=m, other=0.0)
+        # LIQUID COLOUR, the field the CSF surface tension is computed from -- `w * mass * liquid`,
+        # the same deposit the torch and warp scatters make. Without it `mpm_grid_update` finds gc
+        # all zero, its `_c_csf` predicate is False, and the ENTIRE surface-tension branch is
+        # skipped: `surface_tension: 0.64` measured spread_r90 0.17831 and level_p95 0.61445,
+        # identical to SEVEN FIGURES to the same run at sigma = 0. HAS_LIQ is constexpr so a
+        # non-liquid spec compiles the loads and the atomic away entirely.
+        liq = tl.load(LIQ + off, mask=m, other=0.0) if HAS_LIQ else 0.0
+
+        # body force + Stokes drag, as the torch operator does before the scatter
+        v0 = v0 + DT * (a0 - DRAG * v0)
+        v1 = v1 + DT * (a1 - DRAG * v1)
+        v2 = v2 + DT * (a2 - DRAG * v2)
+
+        c00 = tl.load(C + off * 9 + 0, mask=m, other=0.0); c01 = tl.load(C + off * 9 + 1, mask=m, other=0.0)
+        c02 = tl.load(C + off * 9 + 2, mask=m, other=0.0); c10 = tl.load(C + off * 9 + 3, mask=m, other=0.0)
+        c11 = tl.load(C + off * 9 + 4, mask=m, other=0.0); c12 = tl.load(C + off * 9 + 5, mask=m, other=0.0)
+        c20 = tl.load(C + off * 9 + 6, mask=m, other=0.0); c21 = tl.load(C + off * 9 + 7, mask=m, other=0.0)
+        c22 = tl.load(C + off * 9 + 8, mask=m, other=0.0)
+        f00 = tl.load(F + off * 9 + 0, mask=m, other=1.0); f01 = tl.load(F + off * 9 + 1, mask=m, other=0.0)
+        f02 = tl.load(F + off * 9 + 2, mask=m, other=0.0); f10 = tl.load(F + off * 9 + 3, mask=m, other=0.0)
+        f11 = tl.load(F + off * 9 + 4, mask=m, other=1.0); f12 = tl.load(F + off * 9 + 5, mask=m, other=0.0)
+        f20 = tl.load(F + off * 9 + 6, mask=m, other=0.0); f21 = tl.load(F + off * 9 + 7, mask=m, other=0.0)
+        f22 = tl.load(F + off * 9 + 8, mask=m, other=1.0)
+
+        # F IS READ, NEVER WRITTEN. An earlier draft folded `F <- (I + dt C) F` in here, on the
+        # grounds that the updated F never leaves a register. It is wrong twice over. Mechanically:
+        # `mpm_strain` is scheduled separately in every spec, so F was advanced TWICE per substep --
+        # caught by comparing against the default, which agreed on grid mass to eleven digits and
+        # disagreed on F by 3.3e-04. And contractually: `implementation` means the same biology
+        # computed differently, and the deformation-gradient update is a DIFFERENT MECHANISM with
+        # its own operator. Fusing across that boundary would make this a new operator wearing the
+        # scatter's name. It costs one extra elementwise kernel per substep, which is 8% of the
+        # frame against atomics at 99.8%.
+        J = (f00 * (f11 * f22 - f12 * f21) - f01 * (f10 * f22 - f12 * f20)
+             + f02 * (f10 * f21 - f11 * f20))
+
+        # --- polar factor R by Newton on the cofactor form (the `higham` path) ---
+        r00, r01, r02 = f00, f01, f02
+        r10, r11, r12 = f10, f11, f12
+        r20, r21, r22 = f20, f21, f22
+        for _ in tl.static_range(ITERS):
+            # cofactor columns: c_k = r_{k+1} x r_{k+2}  (column cross products)
+            k00 = r11 * r22 - r12 * r21; k10 = r12 * r20 - r10 * r22; k20 = r10 * r21 - r11 * r20
+            k01 = r21 * r02 - r22 * r01; k11 = r22 * r00 - r20 * r02; k21 = r20 * r01 - r21 * r00
+            k02 = r01 * r12 - r02 * r11; k12 = r02 * r10 - r00 * r12; k22 = r00 * r11 - r01 * r10
+            d = r00 * k00 + r01 * k10 + r02 * k20
+            d = tl.where(tl.abs(d) < 1e-12, 1e-12, d)
+            r00 = 0.5 * (r00 + k00 / d); r01 = 0.5 * (r01 + k01 / d); r02 = 0.5 * (r02 + k02 / d)
+            r10 = 0.5 * (r10 + k10 / d); r11 = 0.5 * (r11 + k11 / d); r12 = 0.5 * (r12 + k12 / d)
+            r20 = 0.5 * (r20 + k20 / d); r21 = 0.5 * (r21 + k21 / d); r22 = 0.5 * (r22 + k22 / d)
+
+        # --- fixed-corotated Kirchhoff stress: 2 mu (F - R) F^T + I la J (J-1) ---
+        d00 = f00 - r00; d01 = f01 - r01; d02 = f02 - r02
+        d10 = f10 - r10; d11 = f11 - r11; d12 = f12 - r12
+        d20 = f20 - r20; d21 = f21 - r21; d22 = f22 - r22
+        two_mu = 2.0 * mu
+        p = la * J * (J - 1.0)
+        s00 = two_mu * (d00 * f00 + d01 * f01 + d02 * f02) + p
+        s01 = two_mu * (d00 * f10 + d01 * f11 + d02 * f12)
+        s02 = two_mu * (d00 * f20 + d01 * f21 + d02 * f22)
+        s10 = two_mu * (d10 * f00 + d11 * f01 + d12 * f02)
+        s11 = two_mu * (d10 * f10 + d11 * f11 + d12 * f12) + p
+        s12 = two_mu * (d10 * f20 + d11 * f21 + d12 * f22)
+        s20 = two_mu * (d20 * f00 + d21 * f01 + d22 * f02)
+        s21 = two_mu * (d20 * f10 + d21 * f11 + d22 * f12)
+        s22 = two_mu * (d20 * f20 + d21 * f21 + d22 * f22) + p
+        k = (-DT * 4.0 * inv_dx * inv_dx) * pv
+        # affine = stress_scaled + mass * C
+        q00 = k * s00 + mass * c00; q01 = k * s01 + mass * c01; q02 = k * s02 + mass * c02
+        q10 = k * s10 + mass * c10; q11 = k * s11 + mass * c11; q12 = k * s12 + mass * c12
+        q20 = k * s20 + mass * c20; q21 = k * s21 + mass * c21; q22 = k * s22 + mass * c22
+
+        # --- quadratic B-spline base cell and fractional offset ---
+        b0 = tl.floor(x0 * inv_dx - 0.5); b1 = tl.floor(x1 * inv_dx - 0.5); b2 = tl.floor(x2 * inv_dx - 0.5)
+        fx0 = x0 * inv_dx - b0; fx1 = x1 * inv_dx - b1; fx2 = x2 * inv_dx - b2
+
+        for i in tl.static_range(3):
+            wi = tl.where(i == 0, 0.5 * (1.5 - fx0) * (1.5 - fx0),
+                 tl.where(i == 1, 0.75 - (fx0 - 1.0) * (fx0 - 1.0),
+                          0.5 * (fx0 - 0.5) * (fx0 - 0.5)))
+            for j in tl.static_range(3):
+                wj = tl.where(j == 0, 0.5 * (1.5 - fx1) * (1.5 - fx1),
+                     tl.where(j == 1, 0.75 - (fx1 - 1.0) * (fx1 - 1.0),
+                              0.5 * (fx1 - 0.5) * (fx1 - 0.5)))
+                for kk in tl.static_range(3):
+                    wk = tl.where(kk == 0, 0.5 * (1.5 - fx2) * (1.5 - fx2),
+                         tl.where(kk == 1, 0.75 - (fx2 - 1.0) * (fx2 - 1.0),
+                                  0.5 * (fx2 - 0.5) * (fx2 - 0.5)))
+                    w = wi * wj * wk
+                    gi = tl.minimum(tl.maximum(b0 + i, 0.0), NG - 1.0)
+                    gj = tl.minimum(tl.maximum(b1 + j, 0.0), NG - 1.0)
+                    gk = tl.minimum(tl.maximum(b2 + kk, 0.0), NG - 1.0)
+                    idx = ((gi * NG + gj) * NG + gk).to(tl.int32)
+                    dp0 = (i - fx0) * DX; dp1 = (j - fx1) * DX; dp2 = (kk - fx2) * DX
+                    mom0 = mass * v0 + (q00 * dp0 + q01 * dp1 + q02 * dp2)
+                    mom1 = mass * v1 + (q10 * dp0 + q11 * dp1 + q12 * dp2)
+                    mom2 = mass * v2 + (q20 * dp0 + q21 * dp1 + q22 * dp2)
+                    tl.atomic_add(GM + idx, w * mass, mask=m)
+                    tl.atomic_add(GMV + idx * 3 + 0, w * mom0, mask=m)
+                    tl.atomic_add(GMV + idx * 3 + 1, w * mom1, mask=m)
+                    tl.atomic_add(GMV + idx * 3 + 2, w * mom2, mask=m)
+                    if HAS_LIQ:
+                        tl.atomic_add(GC + idx, w * mass * liq, mask=m)
+
+
+@register_operator("mpm_scatter", implementation="triton", family="mpm",
+                   set="particle", kind="exchange")
+class MPMScatterTriton(MPMScatter):
+    """The scatter as ONE fused Triton kernel. See the module docstring for what it costs.
+
+    Subclasses the default so every knob, contract and default it declares stays exactly as it is:
+    what changes is how the delta is computed, which is what the `implementation` axis is for.
+    """
+
+    MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate",
+                      "fused_kernel"]
+    SUPPORTED_DIMS = [3]                       # 3D-only kernel; inherited [2, 3] was a lie
+    DIFFERENTIABLE = False                  # atomics; no backward
+    BLOCK = 128
+
+    def forward(self, H, mask=None):
+        if not HAVE_TRITON:
+            raise RuntimeError("mpm_scatter[triton] needs triton; none importable")
+        from plexus.operators.mpm_ops import sub_dt
+        p = H.level(self.at); g = H.field(self.to); dev = p.state.device
+        D = p.F.shape[-1]
+        if D != 3 or str(dev) == "cpu":
+            raise RuntimeError(f"mpm_scatter[triton] is 3D CUDA only (got dim={D}, dev={dev})")
+        dt = sub_dt(H, self.dt_sub)
+
+        X, V = p.get("pos"), p.get("vel")
+        pn = getattr(p, "parent_name", None)
+        if pn is not None:
+            a_cell = H.delta(pn)
+            a_cell = torch.nan_to_num(a_cell, posinf=self.a_max, neginf=-self.a_max
+                                      ).clamp(-self.a_max, self.a_max)
+            a_ext = a_cell[p.parent]
+        else:
+            a_ext = torch.zeros(p.n, D, device=dev)
+        pa = getattr(H, "part_accel", None)
+        if pa is not None:
+            a_ext = a_ext + pa
+        a_ext = a_ext + torch.nan_to_num(H.delta(p.name))
+
+        gm, gmv = g.m, g.mv
+        if getattr(self, "_zeroes_grid", True):
+            gm.zero_(); gmv.zero_(); g.c.zero_()
+
+        n = int(p.n)
+        grid = (triton.cdiv(n, self.BLOCK),)
+        from plexus.operators.mpm_ops import _const_any
+        liquid = getattr(p, "is_liquid", None)
+        has_liq = bool(_const_any(self, "_c_liquid", liquid))
+        liq = (liquid.to(p.mass.dtype).contiguous() if has_liq
+               else torch.empty(0, device=dev, dtype=p.mass.dtype))
+        _p2g[grid](X.contiguous(), V.contiguous(), p.C.contiguous(), p.F,
+                   p.mass.contiguous(), p.mu.contiguous(), p.la.contiguous(),
+                   p.p_vol.contiguous(), a_ext.contiguous(), gm, gmv, g.c, liq,
+                   n, NG=int(g.nx), DX=float(g.dx), DT=float(dt), DRAG=float(self.drag),
+                   ITERS=int(self.polar_iters), HAS_LIQ=has_liq, BLOCK=self.BLOCK)
+        return {}
+
+
+# ==========================================================================================================
+# COLOURED, ATOMIC-FREE P2G -- `mpm_scatter[implementation: triton_colour]`
+#
+# THE ATOMICS ARE THE WALL, measured: for 1M particles the loads and index arithmetic cost 0.027 ms
+# and the 108 global atomics cost 12.7 ms -- 99.8% of the kernel -- and it is SUPERLINEAR in the
+# atomic count (27 atomics 0.46 ms, 108 atomics 12.7 ms), because the three momentum components hit
+# consecutive addresses at the same node and warps serialise on them. No amount of further fusion
+# touches that.
+#
+# THE FIX IS TO MAKE THE CONFLICTS IMPOSSIBLE RATHER THAN TO SERIALISE THEM. A particle in base cell
+# c writes nodes c, c+1, c+2 on each axis. Two cells whose indices differ by >= 3 on ANY axis
+# therefore have disjoint node stencils. Colour the cells by (cx%3, cy%3, cz%3) -- 27 colours -- and
+# every cell within a colour is conflict-free with every other, so the scatter becomes a plain
+# load-add-store. Twenty-seven launches per substep instead of one, each touching 1/27 of the cells.
+#
+# WHY NOT THE NODE-CENTRIC GATHER, which also removes atomics. A gather has every particle read by
+# each of the 27 nodes it touches: 27x read amplification, and a ragged inner loop per node that
+# vectorises badly. Colouring reads each particle ONCE. The cost is that the sort has to exist.
+#
+# THE SORT IS CHEAP AND CAPTURE-SAFE. Particles move at most 0.4 dx per substep (the CFL cap), so
+# the binning is stable; `torch.sort` and a `bincount` with an explicit `minlength` both have static
+# output shapes, so nothing here blocks a CUDA-graph capture.
+# ==========================================================================================================
+if HAVE_TRITON:
+
+    @triton.jit
+    def _p2g_colour(XS, VS, CS, FS, MASSS, MUS, LAS, PVOLS, AEXTS,
+                    CELL_OFF, CELL_ID, GM, GMV, GC, LIQS, NCOL,
+                    NG: tl.constexpr, DX: tl.constexpr, DT: tl.constexpr,
+                    DRAG: tl.constexpr, ITERS: tl.constexpr, HAS_LIQ: tl.constexpr):
+        """One program = one CELL. The 27-node stencil is the VECTOR dimension.
+
+        THE FIRST VERSION PUT THE NODE LOOP OUTSIDE THE PARTICLE LOOP, which recomputed the polar
+        decomposition and the stress once per node -- 27x the constitutive work per particle -- and
+        came out 2x SLOWER than the PyTorch operator it was meant to beat (646 ms/frame against
+        330). Here the particle loop is outer and its 27 weights are a `tl.arange` vector, so the
+        stress is computed ONCE and the scatter is a 27-wide vector accumulate into registers,
+        written to the grid once at the end.
+        """
+        pid = tl.program_id(0)
+        if pid >= NCOL:
+            return
+        cell = tl.load(CELL_ID + pid)
+        lo = tl.load(CELL_OFF + cell)
+        hi = tl.load(CELL_OFF + cell + 1)
+        inv_dx = 1.0 / DX
+        ci = cell // (NG * NG); cj = (cell // NG) % NG; ck = cell % NG
+
+        n = tl.arange(0, 32)                      # 27 stencil slots, padded to a power of two
+        act = n < 27
+        si = n // 9; sj = (n // 3) % 3; sk = n % 3
+        gi = tl.minimum(tl.maximum(ci + si, 0), NG - 1)
+        gj = tl.minimum(tl.maximum(cj + sj, 0), NG - 1)
+        gk = tl.minimum(tl.maximum(ck + sk, 0), NG - 1)
+        idx = (gi * NG + gj) * NG + gk
+        fi = si.to(tl.float32); fj = sj.to(tl.float32); fk = sk.to(tl.float32)
+
+        am = tl.zeros([32], dtype=tl.float32)
+        a0 = tl.zeros([32], dtype=tl.float32)
+        a1 = tl.zeros([32], dtype=tl.float32)
+        a2 = tl.zeros([32], dtype=tl.float32)
+        ac = tl.zeros([32], dtype=tl.float32)      # liquid colour, for the CSF surface tension
+
+        for q in tl.range(lo, hi):
+            x0 = tl.load(XS + q*3+0); x1 = tl.load(XS + q*3+1); x2 = tl.load(XS + q*3+2)
+            b0 = tl.floor(x0*inv_dx-0.5); b1 = tl.floor(x1*inv_dx-0.5); b2 = tl.floor(x2*inv_dx-0.5)
+            fx0 = x0*inv_dx-b0; fx1 = x1*inv_dx-b1; fx2 = x2*inv_dx-b2
+            mass = tl.load(MASSS + q)
+            v0 = tl.load(VS + q*3+0); v1 = tl.load(VS + q*3+1); v2 = tl.load(VS + q*3+2)
+            e0 = tl.load(AEXTS + q*3+0); e1 = tl.load(AEXTS + q*3+1); e2 = tl.load(AEXTS + q*3+2)
+            v0 = v0 + DT*(e0 - DRAG*v0); v1 = v1 + DT*(e1 - DRAG*v1); v2 = v2 + DT*(e2 - DRAG*v2)
+            mu = tl.load(MUS + q); la = tl.load(LAS + q); pv = tl.load(PVOLS + q)
+            f00 = tl.load(FS + q*9+0); f01 = tl.load(FS + q*9+1); f02 = tl.load(FS + q*9+2)
+            f10 = tl.load(FS + q*9+3); f11 = tl.load(FS + q*9+4); f12 = tl.load(FS + q*9+5)
+            f20 = tl.load(FS + q*9+6); f21 = tl.load(FS + q*9+7); f22 = tl.load(FS + q*9+8)
+            c00 = tl.load(CS + q*9+0); c01 = tl.load(CS + q*9+1); c02 = tl.load(CS + q*9+2)
+            c10 = tl.load(CS + q*9+3); c11 = tl.load(CS + q*9+4); c12 = tl.load(CS + q*9+5)
+            c20 = tl.load(CS + q*9+6); c21 = tl.load(CS + q*9+7); c22 = tl.load(CS + q*9+8)
+            J = f00*(f11*f22-f12*f21) - f01*(f10*f22-f12*f20) + f02*(f10*f21-f11*f20)
+            r00 = f00; r01 = f01; r02 = f02
+            r10 = f10; r11 = f11; r12 = f12
+            r20 = f20; r21 = f21; r22 = f22
+            for _ in tl.static_range(ITERS):
+                k00 = r11*r22-r12*r21; k10 = r12*r20-r10*r22; k20 = r10*r21-r11*r20
+                k01 = r21*r02-r22*r01; k11 = r22*r00-r20*r02; k21 = r20*r01-r21*r00
+                k02 = r01*r12-r02*r11; k12 = r02*r10-r00*r12; k22 = r00*r11-r01*r10
+                d = r00*k00 + r01*k10 + r02*k20
+                d = tl.where(tl.abs(d) < 1e-12, 1e-12, d)
+                r00 = 0.5*(r00+k00/d); r01 = 0.5*(r01+k01/d); r02 = 0.5*(r02+k02/d)
+                r10 = 0.5*(r10+k10/d); r11 = 0.5*(r11+k11/d); r12 = 0.5*(r12+k12/d)
+                r20 = 0.5*(r20+k20/d); r21 = 0.5*(r21+k21/d); r22 = 0.5*(r22+k22/d)
+            two_mu = 2.0*mu; pp = la*J*(J-1.0); kk = (-DT*4.0*inv_dx*inv_dx)*pv
+            d00 = f00-r00; d01 = f01-r01; d02 = f02-r02
+            d10 = f10-r10; d11 = f11-r11; d12 = f12-r12
+            d20 = f20-r20; d21 = f21-r21; d22 = f22-r22
+            q00 = kk*(two_mu*(d00*f00+d01*f01+d02*f02)+pp) + mass*c00
+            q01 = kk*(two_mu*(d00*f10+d01*f11+d02*f12))    + mass*c01
+            q02 = kk*(two_mu*(d00*f20+d01*f21+d02*f22))    + mass*c02
+            q10 = kk*(two_mu*(d10*f00+d11*f01+d12*f02))    + mass*c10
+            q11 = kk*(two_mu*(d10*f10+d11*f11+d12*f12)+pp) + mass*c11
+            q12 = kk*(two_mu*(d10*f20+d11*f21+d12*f22))    + mass*c12
+            q20 = kk*(two_mu*(d20*f00+d21*f01+d22*f02))    + mass*c20
+            q21 = kk*(two_mu*(d20*f10+d21*f11+d22*f12))    + mass*c21
+            q22 = kk*(two_mu*(d20*f20+d21*f21+d22*f22)+pp) + mass*c22
+            # the 27 weights, as vectors
+            wi = tl.where(si == 0, 0.5*(1.5-fx0)*(1.5-fx0),
+                 tl.where(si == 1, 0.75-(fx0-1.0)*(fx0-1.0), 0.5*(fx0-0.5)*(fx0-0.5)))
+            wj = tl.where(sj == 0, 0.5*(1.5-fx1)*(1.5-fx1),
+                 tl.where(sj == 1, 0.75-(fx1-1.0)*(fx1-1.0), 0.5*(fx1-0.5)*(fx1-0.5)))
+            wk = tl.where(sk == 0, 0.5*(1.5-fx2)*(1.5-fx2),
+                 tl.where(sk == 1, 0.75-(fx2-1.0)*(fx2-1.0), 0.5*(fx2-0.5)*(fx2-0.5)))
+            w = tl.where(act, wi*wj*wk, 0.0)
+            dp0 = (fi-fx0)*DX; dp1 = (fj-fx1)*DX; dp2 = (fk-fx2)*DX
+            am += w*mass
+            a0 += w*(mass*v0 + (q00*dp0+q01*dp1+q02*dp2))
+            a1 += w*(mass*v1 + (q10*dp0+q11*dp1+q12*dp2))
+            a2 += w*(mass*v2 + (q20*dp0+q21*dp1+q22*dp2))
+            if HAS_LIQ:
+                ac += w*mass*tl.load(LIQS + q)
+
+        # CONFLICT-FREE: no other cell of this colour writes these nodes, so plain read-add-write.
+        tl.store(GM + idx, tl.load(GM + idx, mask=act, other=0.0) + am, mask=act)
+        tl.store(GMV + idx*3+0, tl.load(GMV + idx*3+0, mask=act, other=0.0) + a0, mask=act)
+        tl.store(GMV + idx*3+1, tl.load(GMV + idx*3+1, mask=act, other=0.0) + a1, mask=act)
+        tl.store(GMV + idx*3+2, tl.load(GMV + idx*3+2, mask=act, other=0.0) + a2, mask=act)
+        if HAS_LIQ:
+            tl.store(GC + idx, tl.load(GC + idx, mask=act, other=0.0) + ac, mask=act)
+
+
+@register_operator("mpm_scatter", implementation="triton_colour", family="mpm",
+                   set="particle", kind="exchange")
+class MPMScatterTritonColour(MPMScatterTriton):
+    """Atomic-free P2G by 27-colour cell partition. See the block comment above."""
+
+    MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress", "shared_grid_accumulate",
+                      "fused_kernel", "coloured_partition"]
+
+    def forward(self, H, mask=None):
+        from plexus.operators.mpm_ops import sub_dt
+        p = H.level(self.at); g = H.field(self.to); dev = p.state.device
+        D = p.F.shape[-1]
+        if D != 3 or str(dev) == "cpu":
+            raise RuntimeError("mpm_scatter[triton_colour] is 3D CUDA only")
+        dt = sub_dt(H, self.dt_sub)
+        NG = int(g.nx); inv_dx = 1.0 / float(g.dx)
+
+        X, V = p.get("pos"), p.get("vel")
+        pn = getattr(p, "parent_name", None)
+        if pn is not None:
+            ac = torch.nan_to_num(H.delta(pn), posinf=self.a_max, neginf=-self.a_max
+                                  ).clamp(-self.a_max, self.a_max)
+            a_ext = ac[p.parent]
+        else:
+            a_ext = torch.zeros(p.n, D, device=dev)
+        pa = getattr(H, "part_accel", None)
+        if pa is not None:
+            a_ext = a_ext + pa
+        a_ext = a_ext + torch.nan_to_num(H.delta(p.name))
+
+        # --- bin by base cell, sort, build the CSR -------------------------------
+        b = torch.floor(X * inv_dx - 0.5).clamp_(0, NG - 1).long()
+        cell = (b[:, 0] * NG + b[:, 1]) * NG + b[:, 2]
+        order = torch.argsort(cell)
+        cs = cell[order]
+        counts = torch.bincount(cs, minlength=NG ** 3)
+        off = torch.zeros(NG ** 3 + 1, dtype=torch.long, device=dev)
+        torch.cumsum(counts, 0, out=off[1:])
+        nz = (counts > 0).nonzero(as_tuple=True)[0]                # cells that hold particles
+
+        XS = X[order].contiguous(); VS = V[order].contiguous()
+        CS = p.C[order].contiguous(); FS = p.F[order].contiguous()
+        MS = p.mass[order].contiguous(); MU = p.mu[order].contiguous()
+        LA = p.la[order].contiguous(); PV = p.p_vol[order].contiguous()
+        AE = a_ext[order].contiguous()
+        from plexus.operators.mpm_ops import _const_any
+        liquid = getattr(p, "is_liquid", None)
+        has_liq = bool(_const_any(self, "_c_liquid", liquid))
+        LQ = (liquid.to(p.mass.dtype)[order].contiguous() if has_liq
+              else torch.empty(0, device=dev, dtype=p.mass.dtype))
+
+        gm, gmv = g.m, g.mv
+        if getattr(self, "_zeroes_grid", True):
+            gm.zero_(); gmv.zero_(); g.c.zero_()
+
+        ci = nz // (NG * NG); cj = (nz // NG) % NG; ck = nz % NG
+        colour = (ci % 3) * 9 + (cj % 3) * 3 + (ck % 3)
+        for col in range(27):
+            ids = nz[colour == col]
+            n = int(ids.numel())
+            if n == 0:
+                continue
+            _p2g_colour[(n,)](XS, VS, CS, FS, MS, MU, LA, PV, AE, off, ids.contiguous(),
+                              gm, gmv, g.c, LQ, n, NG=NG, DX=float(g.dx), DT=float(dt),
+                              DRAG=float(self.drag), ITERS=int(self.polar_iters),
+                              HAS_LIQ=has_liq)
+        return {}
+
+
+# ==========================================================================================================
+# MERGED FROM `mpm_loop.py` on 2026-09-04 -- `mpm_gather[torch_loop27]` -- the 27-stencil loop, kept as the readable reference.
+#
+# THE DEFAULTS ARE REGISTERED ABOVE THIS LINE AND MUST STAY THERE. A contract's `default` is whichever
+# variant registers FIRST, so appending the backends after the torch bodies is not a style choice: put
+# a warp registration above `MPMScatter` and `mpm_scatter[default]` silently becomes the warp kernel,
+# and since R1(c) the contract's `.signature` is the default's too. The registry snapshot in this
+# commit's message is the check that it did not happen.
+# ==========================================================================================================
+@register_operator("mpm_gather", implementation="torch_loop27", family="mpm",
+                   set="particle", kind="exchange")
+class MPMGatherLoop27(MPMGather):
+    """G2P by 27 sequential passes over the stencil instead of one batched reduction."""
+
+    MECHANISM_TAGS = ["grid_to_particle", "advection", "low_memory"]
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = True          # every op is an autograd-tracked torch op, unlike the warp path
+    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM G2P)."
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at); g = H.field(self.frm); dev = p.state.device
+        dt = sub_dt(H, self.dt_sub)
+        inv_dx, dx = g.inv_dx, g.dx
+        D = p.F.shape[-1]
+        if D != 3:
+            raise ValueError("mpm_gather[torch_loop27] is 3D only; drop `implementation` for 2D")
+        periodic = bool(getattr(H, "periodic", False))
+        if getattr(self, "_box", None) is None:
+            self._box = [float(b) for b in
+                         getattr(H, "world_size", torch.tensor([g.width, 1.0]))][:D]
+        box = self._box
+        X, V = p.get("pos"), p.get("vel")
+        N = X.shape[0]
+        shape = g.shape
+
+        # ---- stencil setup, once per call rather than once per offset ----------------------
+        # THE INDEX ARITHMETIC IS HOISTED because doing it inside the loop is what makes a
+        # 27-iteration python loop expensive: `((base0+i).clamp()*ny + (base1+j).clamp())*nz + ...`
+        # is nine kernels per offset, 243 for the stencil. Precomputing the three shifted-and-
+        # clamped index vectors per axis, pre-scaled by that axis's stride, leaves ONE add per
+        # offset -- 9 kernels of setup against 216 saved.
+        base = (X * inv_dx - 0.5).floor().long()                     # [N, D]
+        fx = X * inv_dx - base.float()                               # [N, D]
+        w = torch.stack([0.5 * (1.5 - fx) ** 2,
+                         0.75 - (fx - 1) ** 2,
+                         0.5 * (fx - 0.5) ** 2], dim=1)              # [N, 3, D]  (same as bspline)
+        stride = [shape[1] * shape[2], shape[2], 1]
+        rows = []
+        for k in range(3):
+            axis = []
+            for s in range(3):
+                gk = base[:, k] + s
+                gk = gk % shape[k] if periodic else gk.clamp(0, shape[k] - 1)
+                axis.append(gk * stride[k])
+            rows.append(axis)
+
+        new_V = torch.zeros(N, D, device=dev, dtype=X.dtype)
+        new_C = torch.zeros(N, D, D, device=dev, dtype=X.dtype)
+        gv_flat = g.v
+        # `offs[s] - fx` is ONE broadcast subtract; building the same vector with
+        # `torch.stack([i - fx[:, 0], ...])` is four kernels, 108 over the stencil. The table is
+        # memoised per (dim, device) -- rebuilding it from a python list is a pageable host->device
+        # copy, which is a sync in eager and outright illegal inside a stream capture.
+        offs = stencil_offsets(D, dev)                               # [27, D] float, row-major
+        # PARTIAL WEIGHTS AND PARTIAL INDICES ARE SHARED DOWN THE TREE. The 27 offsets form a 3x3x3
+        # product, so `w_i * w_j` and `row_i + row_j` are each computed 9 times instead of 27, and
+        # `bspline`'s own left-to-right product order `((1 * w_i) * w_j) * w_k` is preserved exactly
+        # -- multiplying by 1 is exact, so the per-offset weight is bit-identical to the batched one.
+        for i in range(3):
+            for j in range(3):
+                wij = w[:, i, 0] * w[:, j, 1]
+                rij = rows[0][i] + rows[1][j]
+                for k in range(3):
+                    wt = wij * w[:, k, 2]                            # [N]
+                    gv = gv_flat[rij + rows[2][k]]                   # [N, D]
+                    gvw = gv * wt[:, None]                           # [N, D]
+                    new_V += gvw
+                    # dpos = offset - fx, the quantity the batched form calls `dpos_grid` and
+                    # builds for all 27 offsets at once as [N, 27, D]. Row-major: s = 9i + 3j + k.
+                    dpos = offs[9 * i + 3 * j + k] - fx              # [N, D]
+                    new_C.addcmul_(gvw[:, :, None], dpos[:, None, :])
+        new_C = 4 * inv_dx * new_C          # scaled AFTER the sum, as the batched form scales it
+
+        # ---- everything below is the batched operator's tail, unchanged ---------------------
+        new_V = torch.nan_to_num(new_V)
+        if self.wall_damp != 1.0 and not periodic:
+            cb = self._contact_band(g)
+            near = torch.zeros(N, dtype=torch.bool, device=dev)
+            for k in range(D):
+                near = near | (X[:, k] < cb) | (X[:, k] > box[k] - cb)
+            liquid = getattr(p, "is_liquid", None)
+            if liquid is not None:
+                near = near & ~liquid
+            if self.wall_damp_mode == "per_impact":
+                prev = getattr(p, "_wall_near", None)
+                if prev is None:
+                    p.register_buffer("_wall_near",
+                                      torch.zeros(N, dtype=torch.bool, device=dev))
+                    prev = p._wall_near
+                near, _keep = near & ~prev, near
+                prev.copy_(_keep)
+            new_V = torch.where(near[:, None], new_V * self.wall_damp, new_V)
+        sp = new_V.norm(dim=1, keepdim=True).clamp(min=1e-9)
+        vmax = min(self.vmax, 0.4 * dx / dt)
+        new_V = new_V * (sp.clamp(max=vmax) / sp)
+        new_C = torch.nan_to_num(new_C)
+        Xn = torch.nan_to_num(X + dt * new_V, nan=0.5)
+        if periodic:
+            Xn = torch.stack([torch.remainder(Xn[:, k], box[k]) for k in range(D)], dim=1)
+        else:
+            Xn = torch.stack([Xn[:, k].clamp(2 * dx, box[k] - 2 * dx) for k in range(D)], dim=1)
+        occ = getattr(p, "occ", None)
+        if occ is not None:
+            live = occ > 0
+            Xn = torch.where(live[:, None], Xn, X)
+            new_V = torch.where(live[:, None], new_V, V)
+            new_C = torch.where(live[:, None, None], new_C, p.C)
+        pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
+        p.state[:, pa:pb] = Xn
+        p.state[:, va:vb] = new_V
+        p.C.copy_(new_C)
+        return {}
