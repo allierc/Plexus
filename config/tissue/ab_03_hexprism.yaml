@@ -1,0 +1,74 @@
+general:
+  name: ab_03_hexprism
+  seed: 0
+  n_frames: 8
+  dt: 1.0
+  record_cap: 12
+  boundary: free
+  dim: 3
+  world:
+  - 4.0
+  - 4.0
+  - 4.0
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  surface_opacity: 1.0
+  surface_color: '#cfd8e3'
+  fps: 30
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    walls: 48
+sets:
+  vertex:
+    n: 64
+    mesh: half_edge
+    cell_set: cell
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  cell:
+    n: 16
+    state:
+      area:
+        width: 1
+      cen:
+        width: 3
+fields: {}
+seed:
+- op: seed_mesh
+  implementation: apicobasal
+  at: vertex
+  cell_set: cell
+  shape: hexagon
+  n_cells: 1
+  jitter: 0.0
+  p0: 3.5
+  seed: 0
+  h0: 1.0
+  radius: 1.0
+operators:
+- op: cell_geometry
+  at: cell
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- topo_record

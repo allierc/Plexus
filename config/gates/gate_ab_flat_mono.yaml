@@ -1,0 +1,68 @@
+general:
+  name: gate_ab_flat_mono
+  seed: 0
+  n_frames: 20
+  dt: 1.0
+  record_cap: 24
+  boundary: free
+  dim: 3
+  world: [50.0, 50.0, 50.0]
+
+plotting:
+  renderer: vtk_mesh
+  background: black
+
+sets:
+  vertex:
+    n: 1024
+    mesh: half_edge
+    cell_set: cell
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      sep: {width: 3, integration: first_order}
+  cell:
+    n: 256
+    state:
+      area: {width: 1}
+      cen:  {width: 3}
+
+fields: {}
+
+seed:
+  - {op: seed_mesh, implementation: apicobasal, at: vertex, cell_set: cell,
+     shape: disc, n_cells: 60, radius: 5.0, centre: [0.0, 0.0, 1.0],
+     jitter: 0.15, p0: 3.5, seed: 0, h0: 0.4}
+
+operators:
+  - {op: cell_geometry, at: cell}
+  - {op: cell_mechanics, model: monolayer, at: vertex,
+     k_v: 4.0, kappa_s: 0.2, gamma: 0.0, Lambda: 0.0, K_R: 0.0, h0: 0.4,
+     mu: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.12,
+     mono_k: 1.2, plane_axis: 2, rest_calibration: volume_only}
+  - {op: topo_record, at: vertex, every: 1}
+
+schedule: [cell_geometry, cell_mechanics, topo_record]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a 2D mesh of hexagonal cells that remains structurally static throughout
+      the sequence. There is no visible movement, deformation, or change in the geometry of the cells
+      over the 21 frames. The spatial arrangement of the mesh is constant, maintaining its overall shape
+      and connectivity. The only change is the progression of the frame counter in the top left corner
+      of the image.
+    objects: The scene contains a cluster of 48 hexagonal cells arranged in a flat, interconnected mesh.
+      The cells are light gray in color and are set against a solid black background. Each cell is connected
+      to its neighbors at the edges, forming a continuous honeycomb-like lattice. The size of the individual
+      cells is uniform, creating a consistent and repeating geometric pattern.
+  movie_kburns:
+    description: The simulation shows a cluster of hexagonal cells undergoing a continuous deformation
+      and rotation. The overall shape of the mesh shifts and twists as the individual cells adjust their
+      relative positions. The orientation of the cluster changes significantly from the first frame to
+      the last. The movement appears fluid, suggesting a dynamic physical or geometric transformation
+      of the mesh.
+    objects: The scene contains a single mesh composed of numerous interconnected hexagonal cells. The
+      cells are arranged in a dense, honeycomb-like tiling pattern. The color of the mesh is a uniform
+      light gray against a solid black background. The size of the individual cells remains relatively
+      constant while the overall cluster maintains a compact, irregular shape.

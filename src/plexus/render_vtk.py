@@ -198,6 +198,19 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
     # render never finishes -- it is the same defect `gate_measures._Lazy` exists for, and it was
     # here too.
     pos = z[f"{set_name}__pos"]
+    # THE APICAL SURFACE, WHEN THE RUN HAS ONE. `mesh_of`'s docstring calls what it builds "the
+    # apical shell", and on a mid-surface run that is a figure of speech: there is one surface and
+    # it is the only thing there is to draw. `cell_mechanics[model: apicobasal]` makes it literal --
+    # apical = pos + sep, basal = pos - sep, with `sep` a free per-vertex vector -- and drawing the
+    # MID-surface for such a run reproduces, one level up, the exact defect recorded in
+    # `live_movie._mono_shell_frame`: the picture is identical whether the separation moved or not,
+    # so the one thing the model adds is the one thing that cannot be seen, and the run is
+    # unfalsifiable by eye.
+    #
+    # `pos + sep` AND NOT THE MID-SURFACE, deliberately, and not an average of the two: an average
+    # is a surface the model does not have. A run with no `sep` column is untouched, so every
+    # existing mesh render is byte-identical.
+    _sep = z[f"{set_name}__sep"] if f"{set_name}__sep" in z.files else None
     nF, Nv = z[f"{set_name}__mesh_nF"], z[f"{set_name}__mesh_Nv"]
     off, foff = z[f"{set_name}__mesh_offsets"], z[f"{set_name}__mesh_face_offsets"]
     E = {c: z[f"{set_name}__mesh_E_{c}"] for c in ("srce", "trgt", "face")}
@@ -233,7 +246,12 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
         # away. `act` stays what it was -- the scalar the range and the metrics are taken from --
         # and the extra element is what `mesh_of` colours from when the spec declares a LUT.
         rows = None if chem is None else np.asarray(chem[t][:int(nF[t])], float)
-        out.append((np.asarray(pos[t][:int(Nv[t])], float), mt, act, rows))
+        _p = np.asarray(pos[t][:int(Nv[t])], float)
+        if _sep is not None:
+            _s = np.asarray(_sep[t][:int(Nv[t])], float)
+            if _s.shape == _p.shape and np.isfinite(_s).all():
+                _p = _p + _s
+        out.append((_p, mt, act, rows))
     return out
 
 

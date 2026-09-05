@@ -535,7 +535,14 @@ class LiveMovie:
             # a spherical shell sliced through its middle came out as a tall ellipse beside a 3D
             # view showing a sphere. A panel `h` of the height must be h/aspect of the width.
             _csh = float((style or {}).get("cross_section_height", 0.26))
-            ch = pv.Chart2D(size=(_csh / self.aspect, _csh), loc=(0.015, 0.645))
+            # `cross_section.loc` -- WHERE THE PANEL SITS, in window fractions from the BOTTOM left,
+            # because the default corner is not always free. The run's own title block is drawn in
+            # the top left and a tall panel meets it; a taller `cross_section_height` makes that
+            # worse, since the panel grows upward from `loc`. Declared rather than nudged in code so
+            # a spec that needs the panel elsewhere says so, and every spec that does not is
+            # unchanged at the (0.015, 0.645) this has always used.
+            _csl = (style or {}).get("cross_section", {}).get("loc") or (0.015, 0.645)
+            ch = pv.Chart2D(size=(_csh / self.aspect, _csh), loc=(float(_csl[0]), float(_csl[1])))
             ch.background_color = (0, 0, 0, 0.55)
             ch.border_color = "#9a9a9a"
             names = "xyz"
@@ -1530,6 +1537,43 @@ class LiveMovie:
             nF = int(m["nF"])
             P = np.asarray(pd.points, np.float64)
             _as = lambda v: _t.as_tensor(np.asarray(v), dtype=_t.long)                # noqa: E731
+
+            # THE APICO-BASAL RUN DRAWS ITS OWN SEPARATION, AND WITHOUT THIS BRANCH IT CANNOT.
+            # `monolayer_shells` below is the mid-surface model's KINEMATIC IDENTITY,
+            # a, b = x +/- (h/2) n, with ONE scalar thickness for the whole tissue -- which is
+            # precisely what `cell_mechanics[model: apicobasal]` exists to remove. The operator
+            # still publishes `mono_h`, but as a MEAN over vertices, so a section built from it
+            # would draw a uniform shell over a tissue whose whole claim is that the shell is not
+            # uniform: a wedged cell, a bottle cell and a flat one would all look identical, and
+            # the run would be unfalsifiable by eye. The comment further down says exactly this
+            # about the monolayer against a mid-surface run; the same trap returns one level up.
+            #
+            # `sep` IS A VECTOR AND NOT A THICKNESS, so it is handed back as the pair the caller
+            # already interpolates -- a unit direction and a length -- with n = sep/|sep| and
+            # hv = 2|sep|. That reproduces apical = pos + sep and basal = pos - sep exactly, per
+            # vertex, rather than approximating them along the mid-surface normal. Vertices with no
+            # span (an orphan left by an extrusion) fall back to the vertex normal so the section
+            # stays drawable; they are the ones `apicobasal_span_zero_fraction` grades.
+            _sep = None
+            for _b in ("sep",):
+                try:
+                    _v = lvl.get(_b)
+                except Exception:                                        # noqa: BLE001
+                    _v = None
+                if _v is not None and int(_v.shape[0]) >= P.shape[0]:
+                    _sep = _np_(_v)[:P.shape[0]].astype(np.float64)
+                    break
+            if _sep is not None and np.isfinite(_sep).all() and np.abs(_sep).max() > 0.0:
+                _, _, nmid, _hv0 = monolayer_shells(_t.as_tensor(P, dtype=_t.float32),
+                                                    _as(es), _as(et), _as(ef), nF,
+                                                    _t.ones(nF, dtype=_t.float32))
+                nmid = nmid.numpy().astype(np.float64)
+                L = np.linalg.norm(_sep, axis=1)
+                ok = L > 1e-12
+                n = np.where(ok[:, None], _sep / np.maximum(L, 1e-12)[:, None], nmid)
+                hv = 2.0 * L * float(sc)
+                return (P, n, hv, es.astype(np.int64), et.astype(np.int64))
+
             h = _t.full((nF,), float(np.asarray(_h).ravel()[0]) * float(sc), dtype=_t.float32)
             _, _, n, hv = monolayer_shells(_t.as_tensor(P, dtype=_t.float32),
                                            _as(es), _as(et), _as(ef), nF, h)
@@ -1668,7 +1712,19 @@ class LiveMovie:
             self._cs_series = []
             fld = str(self.style.get("color_field", "") or "")
             val = self._field(H, lvl)[0] if fld else None
-            if val is not None:
+            # `cross_section.points: false` -- DO NOT SCATTER THE DRAWN SET'S PARTICLES IN THE
+            # SECTION. On a MESH run those particles are the mesh's own vertices, which on this
+            # promotion are the MID-SURFACE -- so a section that already draws apical, basal and
+            # the walls gets the mid-surface back a second time, as a dotted line down the middle
+            # of the band, after `cross_section.mid: false` removed the curve. Cedric found it in
+            # exactly that order: first the parallel white ring, then the blue dashes behind it.
+            #
+            # It is a key rather than a rule because on a PARTICLE run the scatter is the section:
+            # an MPM slab has nothing else in it, and every existing cross_section spec is one of
+            # those. Default true, so none of them moves.
+            if (self.style or {}).get("cross_section", {}).get("points", True) is False:
+                pass                                  # neither branch: no scatter at all
+            elif val is not None:
                 import matplotlib.pyplot as _plt
                 v = val.detach()
                 v = (v[live] if live is not None else v)[keep].float().cpu().numpy()
@@ -1728,8 +1784,29 @@ class LiveMovie:
                     _th = np.arctan2(_v - _v.mean(), _u - _u.mean())
                     _o = np.argsort(_th)
                     _o = np.append(_o, _o[0])
+                    # `cross_section.mid: false` -- DO NOT DRAW THE MID-SURFACE AT ALL, and on an
+                    # apico-basal run that is the honest default to reach for. `pos` is not a
+                    # membrane: the design defines apical = pos + sep and basal = pos - sep, so
+                    # `pos` is IDENTICALLY the midpoint of the two caps (measured on
+                    # gate_ab_curved: max |pos - (apical+basal)/2| = 0.000e+00 over every vertex).
+                    # It can never be anywhere else and it carries no information the other two
+                    # curves do not already have -- that redundancy IS the change of variables.
+                    # Drawn between them it reads as a third surface the cell does not have, which
+                    # is what Cedric queried on sight.
+                    #
+                    # IT IS NOT ALWAYS MERELY BOOKKEEPING, which is why this is a key and not a
+                    # deletion: `gamma` and `Lambda` act on the mid-surface RING and `K_R` on
+                    # |pos|, so on a spec that sets any of them the curve is where a real force
+                    # lives and belongs in the picture. On a spec with all three at zero it is a
+                    # parameterisation and nothing more.
+                    #
+                    # `cross_section.mid_color` dims it instead of removing it; the default is
+                    # `mesh_color`, so every section that has no shells is unchanged.
+                    if (self.style or {}).get("cross_section", {}).get("mid", True) is False:
+                        continue
+                    _midc = ((self.style or {}).get("cross_section", {}).get("mid_color") or _mc)
                     self._cs_mesh_series.append(
-                        self.cs.line(_u[_o], _v[_o], color=_mc, width=2.0))
+                        self.cs.line(_u[_o], _v[_o], color=_midc, width=2.0))
                 except Exception:                        # noqa: BLE001 -- the section is not the run
                     pass
             # THE THICKNESS, WHERE THE THICKNESS IS THE POINT.
@@ -1811,7 +1888,22 @@ class LiveMovie:
                                 _ba[_cl, a], _ba[_cl, b], color=_cb, width=2.0))
                             _n = int((self.style or {}).get("cross_section", {}).get("walls", 0))
                             if _n > 0:
-                                _wc = (self.style or {}).get("mesh_color", "#e6dcc0")
+                                # THE WALLS GET THEIR OWN COLOUR, BECAUSE THE SECTION DRAWS THREE
+                                # OBJECTS AND USED TO HAVE TWO COLOURS FOR THEM. The mid-surface
+                                # slice above is drawn in `mesh_color` and the walls were too, so a
+                                # reader saw a red curve, a blue curve, a white curve BETWEEN them
+                                # and white ticks ACROSS them, with the ring and the ticks claiming
+                                # to be the same thing. They are not: the ring is `pos`, the
+                                # incumbent's only surface, and the ticks are `2|sep|`, which is
+                                # what this promotion added. Cedric read the picture and asked
+                                # whether the parallel white ring was a bug -- it is not, it is the
+                                # mid-surface, and the colouring is what made that a question.
+                                #
+                                # Grey rather than another hue: red and blue are already spoken for
+                                # by apical and basal, which are two distinct SOURCES, and a third
+                                # saturated colour would imply a third surface of the same kind.
+                                _wc = ((self.style or {}).get("cross_section", {}).get("wall_color")
+                                       or "#8a8a8a")
                                 for _k in np.unique(np.linspace(0, len(_o) - 1,
                                                                 min(_n, len(_o))).astype(int)):
                                     self._cs_mesh_series.append(self.cs.line(

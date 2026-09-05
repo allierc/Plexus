@@ -2792,11 +2792,32 @@ def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
     v6 = v6.index_add(0, ef, tri(a_s, b_s, b_t))                                 # wall, triangle 1
     v6 = v6.index_add(0, ef, tri(a_s, b_t, a_t))                                 # wall, triangle 2
     v_f = v6 / 6.0
-    # THE CAPS BY NEWELL, exactly as the monolayer does them, so that on a right prism the two
-    # surfaces are the same arithmetic and AB-C1 is an identity rather than a near miss.
-    Na = z3().index_add(0, ef, torch.cross(a_s, a_t, dim=-1) * ones_e[:, None]) * 0.5
-    Nb = z3().index_add(0, ef, torch.cross(b_s, b_t, dim=-1) * ones_e[:, None]) * 0.5
-    A_ap, A_ba = Na.norm(dim=-1), Nb.norm(dim=-1)
+    # THE CAP'S AREA IS MEASURED ON THE SURFACE ITS VOLUME IS MEASURED ON -- the SAME centroid fan,
+    # summed as true triangle areas. It used to be the Newell magnitude ||1/2 sum a_s x a_t||, chosen
+    # so that on a right prism the caps were the same arithmetic as the monolayer's and AB-C1 was an
+    # identity rather than a near miss. IT BOUGHT THAT IDENTITY WITH A NULL SPACE, and the null space
+    # is the whole failure mode of the free separation.
+    #
+    # The Newell magnitude is the area of the ring's PLANAR PROJECTION, so a crumpled cap and a flat
+    # one of the same outline measure the SAME, and the area is stationary to first order when one
+    # vertex moves normal to the cap. The volume, meanwhile, was already the fan -- so the energy was
+    # pricing one surface and enclosing another. With nothing but the lateral wall resisting, `sep`
+    # relaxes downhill into a checkerboard: measured on `gate_ab_thickshell` extended to 80 frames
+    # at sep_mu 1, neighbouring vertices anti-correlate across an edge (Pearson r -0.42 by frame 20),
+    # the thickness varies five times more WITHIN a cell's ring (cv 1.19) than between cells (0.24),
+    # the median thickness collapses 1.428 -> 0.237 while a tail reaches 7.47, and spans start
+    # inverting at frame 40. Quartering the step to eta 0.02 over 120 iterations reproduces it and
+    # collapses slightly faster, so it is this energy's own descent direction and not the stepping.
+    #
+    # THE IDENTITIES SURVIVE, WHICH IS WHY THIS IS A FIX AND NOT A CHANGE OF MODEL. For a planar
+    # convex ring fanned from its own centroid the triangle areas sum to the polygon area exactly, so
+    # AB-C1 (flat patch, caps exactly planar) and AB-C2 (regular hexagonal prism) are unchanged to
+    # the last bit. What moves is any curved shell, where the ring is not planar and the cap's true
+    # area is the larger of the two -- which is the case the null space lived in.
+    A_ap = torch.zeros(nF, device=dev, dtype=dt).index_add(
+        0, ef, 0.5 * torch.cross(a_s - ca[ef], a_t - ca[ef], dim=-1).norm(dim=-1) * ones_e)
+    A_ba = torch.zeros(nF, device=dev, dtype=dt).index_add(
+        0, ef, 0.5 * torch.cross(b_s - cb[ef], b_t - cb[ef], dim=-1).norm(dim=-1) * ones_e)
     la = (0.5 * torch.cross(a_t - a_s, b_t - a_s, dim=-1).norm(dim=-1)
           + 0.5 * torch.cross(b_t - a_s, b_s - a_s, dim=-1).norm(dim=-1)) * ones_e
     A_lat = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, la)
@@ -2804,7 +2825,7 @@ def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
 
 
 def _apicobasal_energy_core(pos, sep, es, et, ef, nF, V_eq, alive, k_v, kappa_s, Lam, K_R, R0,
-                            eocc, vocc, gamma=0.0):
+                            eocc, vocc, gamma=0.0, surface="apical"):
     """The monolayer's energy on the polyhedron: same functional, different geometry.
 
         U = sum_j [ 1/2 k_v (V_j - V_eq_j)^2 + kappa_s S_j + 1/2 gamma P_j^2 ]
@@ -2816,20 +2837,42 @@ def _apicobasal_energy_core(pos, sep, es, et, ef, nF, V_eq, alive, k_v, kappa_s,
     this energy also changed form, a difference between the arms would have two possible causes and
     would settle neither.
 
-    `P_j` and the line tension stay on the MID-SURFACE ring. The perimeter term is a cell-shape
-    regulariser standing in for the RNR remeshing, and `edge_flip` acts on the mid-surface ring, so
-    a regulariser written on a different ring than the one being rewired would fight it.
+    `surface:` -- WHICH RING THE PERIMETER, THE LINE TENSION AND THE RADIAL SPRING ACT ON, and the
+    default is `apical` BECAUSE THE MID-SURFACE IS NOT A MEMBRANE. `pos` is a coordinate choice, not
+    an object: the design sets apical = pos + sep and basal = pos - sep, so `pos` is IDENTICALLY the
+    midpoint of the two caps (measured on gate_ab_curved: max |pos - (apical+basal)/2| = 0.000e+00
+    over every vertex) and carries no information the caps do not. It is kept as the coordinate
+    block for compatibility -- it is the surface the incumbent `monolayer` model integrates, which
+    is what makes the R3 reduction a bit-level identity rather than a comparison -- and that is a
+    statement about the SOLVER, not about the cell.
+
+    So writing `P_j`, the line tension and the radial spring on it put three forces on the average
+    of two membranes, which is an object no epithelium has: a junctional belt in this model ran
+    along a surface that is not there. `surface: apical` puts them on a real one. `mid` is kept as
+    a value so a run made before this change can be reproduced exactly, and `basal` because which
+    surface a belt is on is a claim about the tissue and belongs in the spec.
+
+    WHAT THIS DOES AND DOES NOT MOVE. On a FLAT patch with a uniform frozen `sep` the apical ring is
+    the mid ring translated by one constant vector, so every edge length and every perimeter is
+    unchanged and AB-C1 stays exact to the bit. On a curved shell the apical ring is larger by the
+    offset, so any spec with a non-zero `gamma` or `Lambda` moves -- which is the point: it was
+    being evaluated in the wrong place. `K_R` is a declared suppression either way
+    (`graphs_data/mesh_mpm/README.md`) and every apicobasal gate runs it at 0.
+
+    The volume and the total surface `S_j` are untouched: they are properties of the whole
+    polyhedron and were never mid-surface quantities.
     """
     v_f, s_f, _, _ = apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc)
     E = (0.5 * k_v * (v_f - V_eq) ** 2 * alive).sum() + kappa_s * (s_f * alive).sum()
+    ring = {"apical": pos + sep, "basal": pos - sep, "mid": pos}[surface]
     if gamma != 0.0:
         perim = torch.zeros(nF, device=pos.device, dtype=pos.dtype).index_add(
-            0, ef, (pos[et] - pos[es]).norm(dim=-1) * eocc)
+            0, ef, (ring[et] - ring[es]).norm(dim=-1) * eocc)
         E = E + 0.5 * gamma * (perim ** 2 * alive).sum()
     if Lam != 0.0:
-        E = E + Lam * ((pos[et] - pos[es]).norm(dim=-1) * eocc).sum()
+        E = E + Lam * ((ring[et] - ring[es]).norm(dim=-1) * eocc).sum()
     if K_R != 0.0:
-        E = E + K_R * (((pos.norm(dim=1) - R0) ** 2) * vocc).sum()
+        E = E + K_R * (((ring.norm(dim=1) - R0) ** 2) * vocc).sum()
     return E
 
 
@@ -3084,7 +3127,8 @@ class ApicoBasalShapeEnergy3D(Lateral):
                  "with independent apical and basal surfaces); Okuda, S. et al. (2018). Sci. Rep. "
                  "8:2386 (the monolayer reduction this generalises).")
     PARAM_ROLES = {"k_v": "cell_volume_elasticity", "kappa_s": "surface_tension",
-                   "sep_mu": "apicobasal_mobility"}
+                   "sep_mu": "apicobasal_mobility",
+                   "surface": "which surface the ring terms act on"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -3097,6 +3141,13 @@ class ApicoBasalShapeEnergy3D(Lateral):
         self.relax_iters = int(params.get("relax_iters", 30)); self.eta = float(params.get("eta", 0.08))
         self.cap_frac = float(params.get("cap_frac", 0.12))
         self.sep_mu = float(params.get("sep_mu", 1.0))
+        # WHICH SURFACE THE RING TERMS ACT ON -- see `_apicobasal_energy_core`. `apical` by default,
+        # because the mid-surface is a coordinate choice and not a membrane, so a perimeter, a line
+        # tension or a radial spring written on it is a force on the average of two surfaces.
+        self.surface = str(params.get("surface", "apical")).lower()
+        if self.surface not in ("apical", "basal", "mid"):
+            raise ValueError(f"cell_mechanics[apicobasal]: surface must be apical|basal|mid, "
+                             f"got {self.surface!r}")
         self.rest_calibration = str(params.get("rest_calibration", "force_balance"))
         _mk = params.get("mono_k", None)                  # see MonolayerShapeEnergy3D.__init__
         self.mono_k = None if _mk is None else float(_mk)
@@ -3115,7 +3166,8 @@ class ApicoBasalShapeEnergy3D(Lateral):
             x = x.detach().requires_grad_(True)
             s = s.detach().requires_grad_(want_sep)
             E = _apicobasal_energy_core(x, s, es, et, ef, nF, V_eq, alive, self.k_v, self.kappa_s,
-                                        self.Lambda, self.K_R, R0t, eocc, vocc, self.gamma)
+                                        self.Lambda, self.K_R, R0t, eocc, vocc, self.gamma,
+                                        self.surface)
             if want_sep:
                 gx, gs = torch.autograd.grad(E, (x, s))
                 return torch.nan_to_num(gx), torch.nan_to_num(gs)

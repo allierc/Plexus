@@ -1,0 +1,299 @@
+general:
+  name: gate_ab_thickshell
+  seed: 0
+  n_frames: 20
+  dt: 1.0
+  record_cap: 24
+  boundary: free
+  dim: 3
+  world: [50.0, 50.0, 50.0]
+  units:
+    length_um: 10.0
+
+plotting:
+  renderer: vtk_mesh
+  background: black
+
+sets:
+  vertex:
+    n: 16384
+    mesh: half_edge
+    cell_set: cell
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      sep: {width: 3, integration: first_order}
+  cell:
+    n: 4096
+    state:
+      area: {width: 1}
+      cen:  {width: 3}
+
+fields: {}
+
+seed:
+  - {op: seed_mesh, implementation: apicobasal, at: vertex, cell_set: cell,
+     n_cells: 1280, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, h0: 1.8}
+
+operators:
+  - {op: cell_geometry, at: cell}
+  - {op: cell_mechanics, model: apicobasal, at: vertex,
+     k_v: 4.0, kappa_s: 0.2, gamma: 0.0, Lambda: 0.0, K_R: 0.0,
+     mu: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.12, sep_mu: 1.0}
+  - {op: topo_record, at: vertex, every: 1}
+
+schedule: [cell_geometry, cell_mechanics, topo_record]
+
+_gate:
+  id: "ab_thickshell"
+  question: >
+    With the apico-basal separation unfrozen for the first time -- a mobility rather than a declared
+    constant -- does a thick-walled shell keep the apical:basal cap geometry the closed form predicts
+    for the thickness and radius it ACTUALLY HAS, and does it stay a tissue of cells while doing it?
+  operators_exercised: [seed_mesh, cell_geometry, cell_mechanics, topo_record]
+
+  arms:
+    self: gate_ab_thickshell
+
+  measures:
+
+    - name: cap_geometry_matches_the_shell_it_is_on
+      tier: closed_form
+      basis: analytic
+      fn: cap_area_ratio_vs_measured_geometry
+      reduce: last
+      assert: {within: [1.0, 0.02]}
+      unit: "measured apical:basal cap-area ratio divided by ((R+h/2)/(R-h/2))^2 for the measured h and R (dimensionless)"
+      why: >
+        AB-C4, AND IT IS THE ROW THAT DISTINGUISHES A CONSTRUCTION FROM A RESULT. AB-C3 asserts the
+        cap ratio itself and is green at R2, but there `sep` is frozen at (h0/2)n, so the caps are
+        identically what `monolayer_shells` builds and the row re-measures the offset formula while
+        appearing to test the solver. Here `sep_mu: 1.0` and the separation is integrated: the
+        thickness is whatever the energy chose. The two inputs to the closed form come from two
+        different places -- h is the median measured span 2|sep| over the vertices, R is the shell's
+        own mean vertex radius -- so agreeing with ((R + h/2)/(R - h/2))^2 is a statement about the
+        solution.
+
+        THE BAND IS INHERITED FROM AB-C3 UNMODIFIED, +/- 0.02, and it is not a loose one on this
+        specimen. The shell is thick on purpose: at the last frame h = 1.08 against R = 5.94, so the
+        closed form is 1.4391 -- a 44% apical-over-basal excess, not a few percent. A model that got
+        the curvature wrong and simply offset both caps equally would score 1/1.4391 = 0.695, fifteen
+        band-widths outside. What passes is a solved thickness that still lands where a spherical
+        shell of that thickness must.
+
+        THE STATISTIC OVER CELLS IS THE MEDIAN AND THAT IS A CORRECTION TO WHAT THE MEASURE FIRST
+        DID. An apical:basal ratio is unbounded as its denominator vanishes, and once `sep` is free
+        a minority of cells wedge to a basal point, the worst reaching 97.5 while the tissue's own
+        ratio is 1.43. On this row the mean over cells is 2.6874 and the median 1.4298, against the
+        closed form's 1.4391 -- the mean describes the tail, the median the shell. The tail is not
+        thereby discarded: it is graded two rows down, which is the difference between a reducer
+        choice and a hidden one.
+
+        `reduce: last` IS INHERITED FROM THE DECLARED TABLE AND IS NOT THE KINDEST FRAME. The
+        quotient is 0.9903 on the first recorded row, dips to 0.8742 at frame 6 and returns to
+        0.9936 by frame 20, and that excursion is the same event as the wedging two rows down --
+        the tail is fattest at frames 3-6 and decays after. The dip is graded in its own right by
+        the row immediately below rather than left for a reader to find.
+
+    - name: cap_geometry_holds_through_the_whole_run
+      tier: closed_form
+      basis: analytic
+      status: known_red
+      fn: cap_area_ratio_vs_measured_geometry
+      reduce: min
+      assert: {within: [1.0, 0.02]}
+      unit: "the same quotient at its worst frame rather than its last (dimensionless)"
+      why: >
+        THE SAME COMPARISON AS THE ROW ABOVE AT ITS WORST FRAME, DECLARED RED SO THE EXCURSION IS IN
+        THE TABLE INSTEAD OF IN A FOOTNOTE. It reads 0.8742 at frame 6 against the same +/- 0.02. The
+        shell does not fail the closed form at the end of the run -- it fails it in the middle, while
+        the wedging transient is at its peak, and the two rows are measuring one event: the fraction
+        of cells that have lost their basal cap rises from 0.0023 to 0.0781 over frames 0-3 and
+        decays to 0.0297 by frame 20, and this quotient tracks it inverted.
+
+        IT IS NOT WIDENED TO 0.13, WHICH IS WHAT IT WOULD TAKE. A band that admitted the excursion
+        would also admit a shell whose caps were 13% off the geometry it actually has, and AB-C4
+        exists to exclude exactly that. Kept at the inherited +/- 0.02 so that a change which damps
+        the transient -- a smaller `eta`, a cap-area term, a slower `sep_mu` -- turns it green and
+        says so: `run_gates` flips a `known_red` row to TURNED_GREEN and exits 4.
+
+    - name: the_separation_actually_moved
+      tier: bookkeeping
+      basis: identity
+      fn: cell_thickness_fold
+      reduce: last
+      assert: {lt: 0.95}
+      unit: "median cell thickness 2|sep| at the last frame over its value at the first (dimensionless)"
+      why: >
+        WHAT STOPS EVERY ROW ABOVE AND BELOW BEING VACUOUS. Change one key of this spec -- `sep_mu`
+        from 1.0 to 0.0 -- and the separation is frozen, the caps are again exactly what
+        `monolayer_shells` builds, the closed-form row re-measures the seed and passes, and nothing
+        from the outside can tell: `run_gates` reads a gate's rows, never its `operators_exercised:`.
+        AB-B7 says a span was RECORDED; this row says it was INTEGRATED, and only one rung in the
+        ladder can make that claim for the first time.
+
+        THE DIRECTION IS A PREDICTION AND THE BOUND IS ITS SIZE. The cell's energy is
+        (1/2) k_v (V - V_eq)^2 + kappa_s S; `_rest_offset` calibrates V_eq with `sep` HELD FIXED, so
+        it balances the mid-surface and nothing else, and the derivative of the energy with respect
+        to thickness at the seeded state is kappa_s P -- the surface tension times the cell's
+        perimeter -- which is strictly positive with no target area to push back. So the thickness
+        can only go down, and `lt` rather than `ne` is what says the run agreed with the sign the
+        functional predicts. 0.95 rather than 1.0 because a fold of 0.999 would be a tissue that did
+        not move, and the whole point of the row is that it did: measured, 0.7555.
+
+        THE DENOMINATOR IS THE FIRST RECORDED ROW AND NOT THE SEEDED `h0`, WHICH UNDERSTATES THE
+        MOVEMENT RATHER THAN FLATTERING IT. `engine.py` records row 0 as the state after ONE pass,
+        so the thickness has already fallen from the seeded 1.8 to 1.4280 before the series starts,
+        and it reaches 1.0789 by frame 20. Against the seed that is a fold of 0.599; the row grades
+        0.7555, the part of it the recorded trajectory can actually show. Stated in terms of row 0
+        because that is the only reference a measure reading a trajectory has -- `h0` is a spec
+        constant the trajectory does not carry.
+
+    - name: basal_cap_collapse_is_a_tail_not_the_tissue
+      tier: bookkeeping
+      basis: identity
+      fn: basal_cap_collapse_fraction
+      reduce: max
+      assert: {le: 0.10}
+      unit: "fraction of live cells whose basal cap is under a tenth of their own apical cap (dimensionless)"
+      why: >
+        THE PHENOMENON THE FREE SEPARATION PRODUCES ON ITS OWN, DECLARED RATHER THAN ABSORBED BY A
+        REDUCER. With `sep` integrated, a minority of cells wedge until their inner cap is nearly a
+        point: at the last frame 38 of 1280, with an apical cap of 0.55 against a basal cap of
+        0.026, at ordinary thickness and ordinary ring valence. Nothing about them is degenerate --
+        the span-sign row is 0, every entry is finite -- so these are bottle cells, formed under a
+        linear surface tension on a curved sheet with NO MYOSIN ANYWHERE IN THE SPEC. They are also
+        what forced AB-C4's median, and a gate that changed a reducer to survive a phenomenon
+        without ever naming the phenomenon would be the dishonest version of this rung.
+
+        IT IS A TRANSIENT, WHICH IS THE FACT `reduce: last` WOULD HAVE HIDDEN. The fraction rises
+        from 0.0023 on the first recorded row to a peak of 0.0781 -- 100 of 1280 cells -- at frame
+        3, then decays monotonically to 0.0297 by frame 20. `reduce: max` grades the peak, because a
+        row that reported only the end would say 0.03 about a run that reached 0.08, and the peak is
+        also where AB-C4's quotient makes its 0.8742 excursion. The two are one event seen twice.
+
+        THE BOUND IS A CLAIM AND NOT THE MEASURED VALUE, AND THE MARGIN IS THIN -- 0.0781 against
+        0.10, a factor of 1.28 and not a comfortable one. 0.10 says the wedging is a TAIL, that the
+        shell rows around it are measuring a shell; a tissue in which a tenth of cells had lost
+        their basal surface would not be a monolayer with a few bottle cells but a different object,
+        and AB-C4's median would then describe something that no longer exists. The bound was
+        declared before this run at a round tenth and is left where it is, but it should be read as
+        a row that is nearly red rather than as a comfortable pass: a longer run, a coarser mesh or
+        a larger `sep_mu` could take the peak past it, and if one does, the answer is to explain the
+        wedging, not to move the bound.
+
+        IT IS BOOKKEEPING AND NOT A MEASUREMENT, deliberately. The functional predicts wedging on a
+        curved sheet; nothing here has been set against a measured bottle-cell fraction in a real
+        epithelium, and tiering it as a measurement would be a claim about cells that this row has
+        not earned.
+
+    - name: cell_shape_index
+      tier: measurement
+      basis: literature
+      fn: cell_shape_index
+      reduce: mean
+      assert: {interval: [5.4, 8.0]}
+      unit: "S / V^(2/3) per cell, averaged over live cells (dimensionless)"
+      why: >
+        AB-M3, AND IT IS THE FIRST RUNG AT WHICH IT MEANS ANYTHING, because the surface and the
+        volume in it are now both solved rather than one of them being h0 times the other. Measured
+        epithelial cells have Q = A^3/V^2 of order 300, i.e. s = 6.69, well above the published 3D
+        rigidity transition; the lower bound of this band IS that transition (5.31 mean field, 5.39
+        bulk simulation, 5.41 for the 3D Voronoi model) and the upper is a floppiness ceiling. A
+        TISSUE EQUILIBRATING NEAR 5.3 IS REPRODUCING A KELVIN FOAM AND NO EXISTING CORE ROW WOULD
+        NOTICE -- that is the row's whole purpose. Dimensionless and scale-free, so unlike a
+        micrometre band it cannot be satisfied by a choice of `length_um`.
+
+    - name: mean_cell_diameter_um
+      tier: measurement
+      basis: literature
+      fn: mean_cell_diameter_um
+      reduce: last
+      assert: {interval: [5.0, 15.0]}
+      unit: "um"
+      why: >
+        AB-M2, `gate_00_spheroid`'s published band REUSED UNMODIFIED -- widening an inherited row is
+        a threshold moved to fit, and this row exists partly to be the one that could not be. It is
+        free evidence: the measure fans over `E_face`, which still enumerates one ring per cell, so
+        it also confirms that doubling the degree-of-freedom set left the cell-to-ring correspondence
+        where it was.
+
+        `length_um: 10.0` IS INHERITED, NOT FITTED, AND THE ROW IS WEAK FOR EXACTLY THAT REASON. The
+        constant comes from `gate_00_spheroid`'s `log/okuda_ECM/0u_units/units.json` -- one tissue
+        length unit is 10 um -- on the same mesh family with the same seeding and the same radius
+        convention, and this spec declares no second length row to hold it in place. So a band in
+        micrometres here is satisfiable by a choice of scale in a way `cell_shape_index` above is
+        not, and it is recorded as literature-basis rather than pretended to be more. `time_s` is
+        deliberately absent: nothing in this spec divides or dies, so a row that quoted a duration
+        would be quoting a unit it has not earned.
+
+    - name: apicobasal_span_invalid_count
+      tier: bookkeeping
+      basis: identity
+      fn: apicobasal_span_invalid_count
+      reduce: all
+      assert: {eq: 0}
+      unit: "ring-referenced vertices whose span is non-finite or points inward (sep . n <= 0)"
+      why: >
+        AB-B1, AND THIS IS THE RUNG IT WAS WRITTEN FOR. The design declines to write a
+        `cell_polarity` operator -- a normalisation of another operator's state is not a mechanism,
+        and the name is not free in any case (`prototype/embryo_vertex/sheet_ops.py` holds it with a
+        different kind) -- so NOTHING ENFORCES THE SIGN OF `sep`, and the cost of that decision is
+        paid in this row rather than hidden in a clamp. At R2 the row was green on a span that could
+        not move; here the separation is under a gradient with no constraint on its direction, and a
+        cell that inverted through itself would keep a perfectly plausible energy with apical and
+        basal swapped. Outward is tested against the mid-surface vertex normal and not against the
+        radius, because a radial test scores every buckle as a failure -- and a buckle is the shape
+        this promotion exists to produce.
+
+    - name: nonfinite_pos_or_sep
+      tier: bookkeeping
+      basis: identity
+      fn: nonfinite_count
+      args: {vblocks: [sep]}
+      reduce: all
+      assert: {eq: 0}
+      unit: "non-finite entries in the vertex positions and the apico-basal separation"
+      why: >
+        AB-B9 at the rung where it matters most: `sep` is now integrated by a gradient that
+        `_grad` passes through `nan_to_num`, so a blown-up separation LAUNDERS itself -- the run
+        continues, the last frame comes back finite, and every `reduce: last` row in this gate would
+        still pass over a trajectory that went to NaN in the middle. `reduce: all` is the row. The
+        okuda campaign already contains a run that went half-NaN from frame 889 and stamped itself
+        `valid_evidence: True`.
+
+    - name: apicobasal_span_recorded_fraction
+      tier: bookkeeping
+      basis: identity
+      fn: apicobasal_span_recorded_fraction
+      reduce: all
+      assert: {eq: 1.0}
+      unit: "fraction of recorded rows carrying a finite, non-zero span"
+      why: >
+        AB-B7, re-run here as on every apico-basal gate, because `run_gates` never reads
+        `operators_exercised:` and a gate can therefore NAME a variant and prove nothing about which
+        one it got. It is the weaker half of the pair: this row says a span was recorded,
+        `the_separation_actually_moved` says it was integrated. Both are needed -- a frozen span is
+        recorded too.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation begins with a smooth, spherical shell composed of a regular Voronoi-like
+      mesh. As time progresses, the surface begins to buckle and deform, losing its perfect sphericity.
+      The mesh cells become increasingly irregular and elongated as the surface develops sharp, jagged
+      protrusions. By the final frame, the sphere has transformed into a highly complex, spiky structure
+      with significant surface area expansion.
+    objects: The primary object is a single spherical shell composed of 1280 interconnected polygonal
+      cells. The surface is rendered in a light gray color with black lines defining the boundaries of
+      each cell. Initially, the cells are relatively uniform in size and shape, creating a smooth appearance.
+      Over time, the cells vary greatly in size and geometry, forming sharp, needle-like spikes that extend
+      outward from the main body.
+  movie_kburns:
+    description: The simulation shows a static 3D mesh structure that does not change over time. The geometry
+      remains perfectly still across all keyframes provided. There is no movement, deformation, or evolution
+      of the surface features. The scene represents a single state of a "thickshell" mesh.
+    objects: The object is a complex, spherical mesh composed of numerous irregular polygonal faces. It
+      features a jagged, spiky surface with sharp protrusions extending outward from the main body. The
+      mesh is rendered in a light gray or off-white color with black wireframe edges defining the facets.
+      The overall structure is large and occupies the majority of the frame against a solid black background.

@@ -1,0 +1,219 @@
+general:
+  name: gate_ab_curved
+  seed: 0
+  n_frames: 20
+  dt: 1.0
+  record_cap: 24
+  boundary: free
+  dim: 3
+  world: [50.0, 50.0, 50.0]
+
+plotting:
+  renderer: vtk_mesh
+  background: black
+
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: cell
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      sep: {width: 3, integration: first_order}
+  cell:
+    n: 1024
+    state:
+      area: {width: 1}
+      cen:  {width: 3}
+
+fields: {}
+
+seed:
+  - {op: seed_mesh, implementation: apicobasal, at: vertex, cell_set: cell,
+     n_cells: 320, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, h0: 0.4}
+
+operators:
+  - {op: cell_geometry, at: cell}
+  - {op: cell_mechanics, model: apicobasal, at: vertex,
+     k_v: 4.0, kappa_s: 0.2, gamma: 0.0, Lambda: 0.0, K_R: 0.0,
+     mu: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.12, sep_mu: 0.0}
+  - {op: topo_record, at: vertex, every: 1}
+
+schedule: [cell_geometry, cell_mechanics, topo_record]
+
+_gate:
+  id: "ab_curved"
+  question: >
+    On a curved shell, does the polyhedral volume converge on the prism correction the mid-surface
+    model drops -- V / (A_mid h) -> 1 + h^2 / (12 R^2) -- as the mesh is refined?
+  operators_exercised: [seed_mesh, cell_geometry, cell_mechanics, topo_record]
+
+  arms:
+    coarse: gate_ab_curved_coarse
+    fine:   gate_ab_curved
+
+  measures:
+
+    - name: prism_correction_converges
+      tier: closed_form
+      basis: analytic
+      fn: prism_volume_excess_convergence
+      arms: [coarse, fine]
+      reduce: first
+      assert: {ge: 2.0}
+      unit: "factor by which the residual against h^2/(12 R^2) falls when the cell count quadruples, on the first recorded row (dimensionless)"
+      why: >
+        AB-C5, AND IT ASSERTS CONVERGENCE RATHER THAN A VALUE, DELIBERATELY. Integrating a shell of
+        thickness h across a mid-surface of radius R gives V / (A_mid h) = 1 + h^2/(12 R^2), which is
+        5.333e-4 at R = 5, h = 0.4 -- and that is exactly the term `cell_mechanics[model: monolayer]`
+        drops when it writes v_f = |N_f| * h_cell. So this is the quantity the promotion added to the
+        volume, and nothing else.
+
+        BUT h^2/(12 R^2) IS A CONTINUUM IDENTITY AND A_mid IS A PLANAR NEWELL POLYGON inscribed in a
+        curved cap. At a few hundred cells the polygon-vs-cap discretisation error dominates 5.333e-4
+        by an order of magnitude AND CARRIES THE OPPOSITE SIGN, so a fixed tolerance on the excess
+        would be a mesh number wearing the phenomenon's clothes -- the one thing the threshold rule
+        forbids. Measured in float64 on the seeded shells before this gate was written, the excess
+        is 5.333e-4 - 2.50/n almost exactly: -3.077e-2 at 80 cells, -7.281e-3 at 320, -1.436e-3 at
+        1280, giving a fitted numerator of 2.50, 2.50 and 2.52. The residual therefore falls by 4
+        per quadrupling, and the row demands 2.
+
+        THE TWO ARMS ARE 80 AND 320 CELLS -- a quadrupling -- and differ in nothing else: same
+        radius, same h0, same energy, same K_R = 0. h and R are MEASURED on each arm's own graded
+        row rather than read from its spec, because the shell moves and a spec constant would be the
+        radius it was seeded at, not the radius it has.
+
+        THE ROW IS GRADED ON THE FIRST RECORDED ROW (`reduce: first`), AND THAT IS A CORRECTION TO
+        WHAT APICOBASAL_PROMOTION.md DECLARED -- the same correction, for the same reason, as AB-C3's
+        reducer moving from `mean` to `first` at R2. A convergence claim is a statement about the
+        DISCRETISATION of one surface, so it is a comparison at all only while the two arms are two
+        meshes OF THE SAME SPHERE. Note that the first row is NOT the seed: `engine.py` records row 0
+        as the state AFTER one pass, deliberately and with its reasons in the comment there, so this
+        row grades a shell that has had one frame of relaxation. On that row the two arms are still
+        the same sphere -- asphericity 0.0064 and 0.0011, graded below -- and the row reads 3.971,
+        which is also what the same quantity measures on the seed itself in float64: the predicted
+        factor of four, confirmed independently at 3.994 for a 320 -> 1280 quadrupling. Twenty frames of
+        relaxation do not test that premise, they destroy it: the 80-cell arm stops being a sphere
+        (its vertex radii spread from 4.93-5.10 to 3.09-8.23, `shell_asphericity` 0.0064 -> 0.1972)
+        while `h^2/(12 R^2)` goes on being evaluated at a mean radius that no longer describes the
+        body, and the ratio falls to 1.633.
+
+        REFINING DOES NOT RESCUE THE RELAXED COMPARISON, AND THAT MEASUREMENT IS WHAT SETTLES WHICH
+        ROW TO GRADE -- the alternative repair was tried before this one was chosen. A 1280-cell arm
+        (this spec with n_cells: 1280, vertex n: 16384, cell n: 4096) is still spherical at frame 20,
+        asphericity 0.0038, and its excess still swings from -1.41e-3 to +1.14e-2, putting the
+        320 -> 1280 ratio at 0.705. The cause is not curvature and not the volume formula: `cell_
+        mechanics` takes a FIXED 30 gradient iterations per frame at a fixed eta, so a finer mesh --
+        shorter edges, the same step -- is further along its own relaxation after twenty frames than
+        a coarser one. At frame 20 the arms are three different surfaces, not one surface at three
+        resolutions. The two rows below say which rows this gate is entitled to grade, and the row
+        after them keeps the relaxed number in the table.
+
+    - name: convergence_survives_the_relaxation
+      tier: closed_form
+      basis: analytic
+      status: known_red
+      fn: prism_volume_excess_convergence
+      arms: [coarse, fine]
+      reduce: last
+      assert: {ge: 2.0}
+      unit: "the same residual ratio at the last frame, after twenty frames of relaxation (dimensionless)"
+      why: >
+        THE SAME COMPARISON AS THE ROW ABOVE ON THE RELAXED SHELL, DECLARED RED SO THE NUMBER IS IN
+        THE TABLE INSTEAD OF IN A FOOTNOTE. It reads 1.633 against the same ge 2.0. What it fails is
+        not the volume formula -- the row above establishes second-order convergence twice over, at
+        3.971 and 3.994 -- but the premise that two arms relaxed for the same number of FRAMES are
+        the same surface at two resolutions. They are not: `cell_mechanics` takes a fixed 30 gradient
+        iterations at a fixed eta per frame, so the two arms travel different distances along their
+        own relaxations, and the 80-cell arm additionally leaves sphericity altogether (asphericity
+        0.1972 at frame 20, against 0.0104 for the 320-cell arm).
+
+        IT IS KEPT AT ge 2.0, NOT WIDENED, BECAUSE IT IS THE ROW THAT WOULD NOTICE THE FIX. Relaxing
+        each arm to a converged state rather than a fixed iteration count -- or an `eta` scaled by
+        edge length -- should restore the comparison, and `run_gates` flips a `known_red` row to
+        TURNED_GREEN and exits 4 the moment it passes, so that change announces itself. A tolerance
+        widened to admit 1.633 would instead admit no convergence at all: a ratio of 1 is a residual
+        that did not fall.
+
+    - name: coarse_arm_is_a_sphere_where_it_is_graded
+      tier: bookkeeping
+      basis: identity
+      fn: shell_asphericity
+      arm: coarse
+      reduce: first
+      assert: {le: 0.01}
+      unit: "standard deviation of the mid-surface vertex radius over its mean, on the graded row (dimensionless)"
+      why: >
+        THE GUARD THAT MAKES THE CONVERGENCE ROW'S `reduce: first` CHECKABLE RATHER THAN ASSERTED,
+        and it exists because the arithmetic it guards cannot fail loudly. `h^2/(12 R^2)` is the
+        continuum identity for a SPHERE of radius R, and the measure obtains R from `_shell_R`, the
+        mean vertex radius -- a number that is returned whatever the body is. On this arm at frame 20
+        the vertex radii run 3.09 to 8.23 about a mean of 5.05, and the closed form is still
+        evaluated, still returns 5.2e-4 and is still subtracted; nothing in the row says the shell
+        stopped being the thing the formula is about. This row says it. Seeded it reads 0.0064, and
+        0.01 is the bound at which the mean radius still describes the body to one percent.
+
+    - name: fine_arm_is_a_sphere_where_it_is_graded
+      tier: bookkeeping
+      basis: identity
+      fn: shell_asphericity
+      arm: fine
+      reduce: first
+      assert: {le: 0.01}
+      unit: "standard deviation of the mid-surface vertex radius over its mean, on the graded row (dimensionless)"
+      why: >
+        The same guard on the other arm, declared separately rather than as a max over the two,
+        because a convergence row is a comparison and it is the WORSE-CONDITIONED arm that decides
+        whether the comparison was legitimate -- a single combined number would let the fine arm's
+        0.0011 hide the coarse arm's value, which is the one that moves. Both are stated so both can
+        be read.
+
+    - name: apicobasal_span_recorded_fraction
+      tier: bookkeeping
+      basis: identity
+      fn: apicobasal_span_recorded_fraction
+      reduce: all
+      assert: {eq: 1.0}
+      unit: "fraction of recorded rows carrying a finite, non-zero span"
+      why: >
+        AB-B7, re-run here for the reason it is re-run on every apico-basal gate: `run_gates` never
+        reads `operators_exercised:`, so a gate can NAME a variant and prove nothing about which one
+        it got. The convergence row above would read the same on a trajectory with no separation at
+        all -- it would simply be NaN -- and this is the row that says the polyhedral path ran.
+
+    - name: nonfinite_pos_or_sep
+      tier: bookkeeping
+      basis: identity
+      fn: nonfinite_count
+      args: {vblocks: [sep]}
+      reduce: all
+      assert: {eq: 0}
+      unit: "non-finite entries in the vertex positions and the apico-basal separation"
+      why: >
+        AB-B9 on the curved arm. Per frame and not last frame, because `cell_mechanics` passes its
+        gradient through `nan_to_num`: a relaxation that blows up mid-run launders itself, the last
+        frame comes back finite, and every `reduce: last` row in this gate would still pass over a
+        trajectory that was half NaN.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a static spherical mesh composed of 320 cells. The geometry of the
+      cells remains constant throughout the entire sequence of frames. There is no visible movement, deformation,
+      or evolution of the mesh over time. The lighting and shading on the sphere also remain perfectly
+      stationary across all frames.
+    objects: The scene contains a single large sphere composed of a Voronoi-like tessellation. The cells
+      are primarily hexagonal in shape, with some pentagonal cells to accommodate the spherical curvature.
+      The mesh is rendered in a light gray or off-white color with thin black outlines defining the cell
+      boundaries. The sphere is centered in a black void, occupying a significant portion of the frame.
+  movie_kburns:
+    description: The video shows a static 3D mesh of a sphere with a hexagonal tiling pattern. There is
+      no movement or evolution of particles, agents, or fields over the sequence of frames. The lighting
+      and shading on the surface remain constant throughout the duration. The mesh structure is perfectly
+      stationary in all provided keyframes.
+    objects: The scene contains a single spherical mesh object centered in the frame. The surface is composed
+      of a network of interconnected polygons, primarily hexagons with some pentagons to accommodate the
+      curvature. The mesh is rendered in a light gray color with dark gray outlines defining the edges
+      of each cell. The sphere occupies a significant portion of the frame, appearing as a large, uniform
+      geometric structure.
