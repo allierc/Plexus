@@ -969,7 +969,25 @@ def cell_height_to_width(T, name="sep", **kw):
 
 
 def euler_closed(T, **kw):
-    return [T.nV(t) - _n_edges(T, t) + T.nF(t) for t in range(T.n_rows())]
+    """V - E + F of the mid-surface, over the vertices and half-edges the LIVE faces reference.
+
+    COUNTED OVER THE RING-REFERENCED VERTICES, NOT OVER `Nv`, and that is not tidiness. `cell_die`
+    rewrites `nF` and never `Nv` -- AB-B1's docstring records the same fact for a different reason
+    -- so an extruded cell leaves its merged vertices in the buffer, referenced by nothing. Each
+    `face_collapse_3d` merges three vertices into one and orphans two, and a raw `Nv` counts them:
+    measured on gate_ab_population, 26 extrusions left 52 orphans and the characteristic read
+    2 + 2*26 = 54 on a surface that was closed the whole time. The row would have reported a
+    torn mesh at every death, which is the one event it most needs to be right about.
+
+    The half-edges are filtered the same way, for the same reason.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        es, _et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        nF = T.nF(t)
+        live = ef < nF
+        out.append(int(np.unique(es[live]).size) - int(live.sum()) // 2 + int(nF))
+    return out
 
 
 def valence_fraction(T, valence=3, **kw):

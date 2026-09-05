@@ -2025,6 +2025,35 @@ class Apoptosis3D(Structural):
                 A0[f] = max(A0[f] * (1.0 - self.shrink) ** (2.0 / 3.0), 1e-9)
         m["V0f"] = torch.as_tensor(V0f, dtype=dt, device=dev)
         m["A0"] = torch.as_tensor(A0, dtype=dt, device=dev)
+        # THE SHRINK HAS TO SURVIVE `cell_grow`, AND WRITING `V0f` ALONE DOES NOT. `cell_grow`
+        # recomputes the target wholesale every frame -- `m["V0f"] = m["V0f_init"] * s**3` -- from
+        # the cell's own growth scale, so a shrink written only to `V0f` is DISCARDED on the next
+        # tick, not merely outpaced by it. `cell_die` runs every 4 frames and `cell_grow` every 1,
+        # so three ticks in four erase it and the fourth is erased immediately after.
+        #
+        # MEASURED on gate_ab_population, 401 frames: 52 cells marked, `V0f` never reaching the
+        # `critical_frac * v_ref` the collapse requires, and ZERO extrusions -- while the row that
+        # exists to catch a vacuous population rung reported exactly that.
+        #
+        # IT NEVER SHOWED IN THE OKUDA DEATH SPECS because they gate growth on chemistry (`rho:
+        # 0.1`), so a marked cell in a low-activator region grows at a tenth of the rate and the
+        # shrink still wins. A spec with uniform growth (`rho: 1.0`) is the case that exposes it,
+        # and this promotion's population rung is the first to run one.
+        #
+        # So the shrink is applied to the quantity `cell_grow` DERIVES from. The growth scale
+        # itself is left alone: it is the cell's clock, and a dying cell has not stopped ageing,
+        # it has stopped being big.
+        for _k, _p in (("V0f_init", 1.0), ("A0_init", 2.0 / 3.0), ("P0_init", 1.0 / 3.0)):
+            _a = m.get(_k)
+            if _a is None:
+                continue                     # no `cell_grow` in this schedule: nothing to survive
+            _v = _a.detach().cpu().numpy().astype(np.float64)
+            if len(_v) < nF:
+                continue
+            for f in marked:
+                if f < nF:
+                    _v[f] = max(_v[f] * (1.0 - self.shrink) ** _p, 1e-9)
+            m[_k] = torch.as_tensor(_v, dtype=dt, device=dev)
         # P0 FOLLOWS A0, as it does everywhere else in this file: the target perimeter of a cell
         # with target area A is p0*sqrt(A). Leaving it behind would make the shrinking cell chase a
         # perimeter its area no longer supports, which is a shape-index error, not a size one.

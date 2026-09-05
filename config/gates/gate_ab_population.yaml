@@ -6,262 +6,419 @@ general:
   record_cap: 403
   boundary: free
   dim: 3
-  world: [50.0, 50.0, 50.0]
+  world:
+  - 50.0
+  - 50.0
+  - 50.0
   units:
     length_um: 10.0
     time_s: 600.0
-
 plotting:
   renderer: vtk_mesh
   background: black
-
 sets:
   vertex:
     n: 25584
     mesh: half_edge
     cell_set: cell
     state:
-      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
-      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
-      sep: {width: 3, integration: first_order}
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
   cell:
     n: 12800
     state:
-      area: {width: 1}
-      cen:  {width: 3}
-
+      area:
+        width: 1
+      cen:
+        width: 3
 fields: {}
-
 seed:
-  - {op: seed_mesh, model: apicobasal, at: vertex, cell_set: cell,
-     n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15, h0: 0.4}
-
+- op: seed_mesh
+  model: apicobasal
+  at: vertex
+  cell_set: cell
+  n_cells: 200
+  radius: 5.0
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+  h0: 0.4
 operators:
-  - {op: cell_geometry, at: cell}
-  - {op: cell_grow, at: vertex, cell_set: cell, rate: 0.003457, rho: 1.0,
-     a_sw: 50.0, hill: 4.0, vth_frac: 2.5}
-  - {op: cell_mechanics, model: apicobasal, at: vertex,
-     k_v: 4.0, kappa_s: 0.2, gamma: 0.0, Lambda: 0.0, K_R: 0.0,
-     mu: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.12, sep_mu: 1.0}
-  - {op: edge_flip, at: vertex, every: 4, engine_clock: true, l_th_frac: 0.35, max_flips: 30}
-  - {op: cell_divide, at: vertex, cell_set: cell, every: 4, engine_clock: true,
-     factor: 2.0, cycle_cv: 0.15, min_cycle: 4, max_cycle: 1000000000, p0: 3.5,
-     reset_noise: 0.12}
-  - {op: cell_die, model: crowded, at: vertex, cell_set: cell, every: 4, engine_clock: true,
-     n_max: 8, p0: 3.5, shrink_rate: 0.04, critical_frac: 0.12, max_mark_frac: 0.005}
-  - {op: topo_record, at: vertex, every: 1}
-
-schedule: [cell_geometry, cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die, topo_record]
-
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  cell_set: cell
+  rate: 0.003457
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
+- op: cell_mechanics
+  model: apicobasal
+  at: vertex
+  k_v: 4.0
+  kappa_s: 0.2
+  gamma: 0.0
+  Lambda: 0.0
+  K_R: 0.0
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  sep_mu: 1.0
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: cell_divide
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.12
+- op: cell_die
+  model: crowded
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  n_max: 8
+  p0: 3.5
+  shrink_rate: 0.25
+  critical_frac: 0.12
+  max_mark_frac: 0.005
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_grow
+- cell_mechanics
+- edge_flip
+- cell_divide
+- cell_die
+- topo_record
 _gate:
-  id: "ab_population"
-  question: >
-    With every cell a polyhedron and its thickness a solver outcome, do growth, division, T1 and
-    death -- all of them UNCHANGED except for the vertex carry -- still hold the mesh invariants they
+  id: ab_population
+  question: 'With every cell a polyhedron and its thickness a solver outcome, do growth, division, T1
+    and death -- all of them UNCHANGED except for the vertex carry -- still hold the mesh invariants they
     held on the mid-surface model, and does the biology they own come out where it always did?
-  operators_exercised: [seed_mesh, cell_geometry, cell_grow, cell_mechanics, edge_flip,
-                        cell_divide, cell_die, topo_record]
 
+    '
+  operators_exercised:
+  - seed_mesh
+  - cell_geometry
+  - cell_grow
+  - cell_mechanics
+  - edge_flip
+  - cell_divide
+  - cell_die
+  - topo_record
   arms:
     self: gate_ab_population
-
   measures:
+  - name: euler_characteristic
+    tier: bookkeeping
+    basis: identity
+    fn: euler_closed
+    reduce: all
+    assert:
+      eq: 2
+    unit: V - E + F of the mid-surface, per recorded frame
+    why: 'AB-B4, AND IT IS THE WHOLE JUSTIFICATION FOR THE CHANGE OF VARIABLES. The design''s central
+      claim is that doubling the degree-of-freedom set needs no new mesh kind, because the TOPOLOGICAL
+      master stays the mid-surface half-edge table -- so `_check_closed`, `divide_face_3d`, `face_collapse_3d`
+      and `edge_flip` survive verbatim. A true cell complex cannot keep this number: a cap or lateral
+      edge is incident to three or more polygons, and an I->H reconnection has dV = +1, dE = +2, dF =
+      +1, which `_check_closed` refuses outright. So the evidence that no new mesh kind was needed is
+      this row, green PER FRAME, on the rung where the topology operators are finally all running at once.
+      `reduce: all` and not `last`: a transient rosette that heals by the final frame is exactly the defect
+      the last frame cannot see.
 
-    - name: euler_characteristic
-      tier: bookkeeping
-      basis: identity
-      fn: euler_closed
-      reduce: all
-      assert: {eq: 2}
-      unit: "V - E + F of the mid-surface, per recorded frame"
-      why: >
-        AB-B4, AND IT IS THE WHOLE JUSTIFICATION FOR THE CHANGE OF VARIABLES. The design's central
-        claim is that doubling the degree-of-freedom set needs no new mesh kind, because the
-        TOPOLOGICAL master stays the mid-surface half-edge table -- so `_check_closed`,
-        `divide_face_3d`, `face_collapse_3d` and `edge_flip` survive verbatim. A true cell complex
-        cannot keep this number: a cap or lateral edge is incident to three or more polygons, and an
-        I->H reconnection has dV = +1, dE = +2, dF = +1, which `_check_closed` refuses outright. So
-        the evidence that no new mesh kind was needed is this row, green PER FRAME, on the rung where
-        the topology operators are finally all running at once. `reduce: all` and not `last`: a
-        transient rosette that heals by the final frame is exactly the defect the last frame cannot
-        see.
+      '
+  - name: cell_face_count_residual
+    tier: bookkeeping
+    basis: identity
+    fn: cell_face_count_residual
+    reduce: all
+    assert:
+      eq: 0
+    unit: summed over live cells, (faces the cell has) - (2 + its ring valence), per frame
+    why: 'AB-B3. Every cell''s face set is DERIVED -- two caps and one wall per ring edge, built on the
+      fly by `apicobasal_geometry_3d` -- so nothing stores the cell-to-faces relation and nothing can
+      contradict it. What CAN break is the premise underneath it: that a cell''s half-edges form exactly
+      one closed cycle. A ring split into two loops by a mis-stitched division, a T1 that rewired one
+      side, or a collapse that merged the wrong pair has the SAME edge count and therefore the same `2
+      + k`, while the solid it bounds has `2c + k` faces for `c` cycles. The row walks source -> target
+      around each cell and scores `2(c - 1)`, so it is a statement about the topology operators and not
+      about arithmetic. **An ordering mistake here gives a cell a missing wall and an energy that is merely
+      wrong rather than an error** -- the run continues, every other row passes, and the tissue relaxes
+      under a functional evaluated on the wrong solid.
 
-    - name: cell_face_count_residual
-      tier: bookkeeping
-      basis: identity
-      fn: cell_face_count_residual
-      reduce: all
-      assert: {eq: 0}
-      unit: "summed over live cells, (faces the cell has) - (2 + its ring valence), per frame"
-      why: >
-        AB-B3. Every cell's face set is DERIVED -- two caps and one wall per ring edge, built on the
-        fly by `apicobasal_geometry_3d` -- so nothing stores the cell-to-faces relation and nothing
-        can contradict it. What CAN break is the premise underneath it: that a cell's half-edges form
-        exactly one closed cycle. A ring split into two loops by a mis-stitched division, a T1 that
-        rewired one side, or a collapse that merged the wrong pair has the SAME edge count and
-        therefore the same `2 + k`, while the solid it bounds has `2c + k` faces for `c` cycles. The
-        row walks source -> target around each cell and scores `2(c - 1)`, so it is a statement about
-        the topology operators and not about arithmetic. **An ordering mistake here gives a cell a
-        missing wall and an energy that is merely wrong rather than an error** -- the run continues,
-        every other row passes, and the tissue relaxes under a functional evaluated on the wrong
-        solid.
+      '
+  - name: scutoid_fraction
+    tier: bookkeeping
+    basis: identity
+    fn: scutoid_fraction
+    reduce: max
+    assert:
+      eq: 0.0
+    unit: fraction of live cells whose apical and basal neighbour sets differ
+    why: 'AB-B10, **THE LIMIT OF THIS PROMOTION, PUT IN THE GATE TABLE RATHER THAN LEFT IN PROSE.** A
+      scutoid neighbours one cell apically and a different one basally. Real epithelia are full of them
+      wherever the tissue is curved, and THIS DESIGN CANNOT REPRESENT ONE: a cell owns exactly one mid-surface
+      ring, its neighbour across a wall is the face of that ring edge''s twin, and the apical and basal
+      rims of a wall ARE the same wall. So this row reads 0.0 for a structural reason, not an empirical
+      one, and the measure computes both neighbour sets explicitly so that the structure is visible rather
+      than asserted.
 
-    - name: scutoid_fraction
-      tier: bookkeeping
-      basis: identity
-      fn: scutoid_fraction
-      reduce: max
-      assert: {eq: 0.0}
-      unit: "fraction of live cells whose apical and basal neighbour sets differ"
-      why: >
-        AB-B10, **THE LIMIT OF THIS PROMOTION, PUT IN THE GATE TABLE RATHER THAN LEFT IN PROSE.** A
-        scutoid neighbours one cell apically and a different one basally. Real epithelia are full of
-        them wherever the tissue is curved, and THIS DESIGN CANNOT REPRESENT ONE: a cell owns exactly
-        one mid-surface ring, its neighbour across a wall is the face of that ring edge's twin, and
-        the apical and basal rims of a wall ARE the same wall. So this row reads 0.0 for a structural
-        reason, not an empirical one, and the measure computes both neighbour sets explicitly so that
-        the structure is visible rather than asserted.
+      IT IS HERE BECAUSE A LIMIT RECORDED ONLY IN PROSE IS ONE A LATER READER CAN MISS, quote around,
+      or mistake for a tested claim. A row that reads exactly 0.0 every frame, with its measure''s docstring
+      behind it, cannot be read as evidence that the tissue has no scutoids -- only that this representation
+      has no way to have any. **The `cell_complex` promotion DELETES this row; it never relaxes it.**
+      Widening it to `le: 0.05` at some later date would assert that a model which cannot express a scutoid
+      has almost none, which is not a measurement of a tissue. `edge_flip` fires on this run and rewires
+      rings, which is precisely the operator that would produce scutoids in a representation that had
+      two surfaces to rewire independently -- the reconnection `monolayer_design.md` called "a large disruption".
+      Here it costs nothing and buys nothing, and that trade is what this row prices.
 
-        IT IS HERE BECAUSE A LIMIT RECORDED ONLY IN PROSE IS ONE A LATER READER CAN MISS, quote
-        around, or mistake for a tested claim. A row that reads exactly 0.0 every frame, with its
-        measure's docstring behind it, cannot be read as evidence that the tissue has no scutoids --
-        only that this representation has no way to have any. **The `cell_complex` promotion DELETES
-        this row; it never relaxes it.** Widening it to `le: 0.05` at some later date would assert
-        that a model which cannot express a scutoid has almost none, which is not a measurement of a
-        tissue. `edge_flip` fires on this run and rewires rings, which is precisely the operator that
-        would produce scutoids in a representation that had two surfaces to rewire independently --
-        the reconnection `monolayer_design.md` called "a large disruption". Here it costs nothing and
-        buys nothing, and that trade is what this row prices.
+      '
+  - name: occ_vs_mesh
+    tier: bookkeeping
+    basis: identity
+    fn: occ_vs_mesh
+    reduce: max
+    assert:
+      eq: 0
+    unit: cells of disagreement between cell__occ.sum() and the mesh table's nF
+    why: 'AB-B5, HELD AT `gate_00_spheroid`''s OWN THRESHOLD AND NOT WIDENED. The known defect -- `cell__occ.sum()`
+      leading `nF` by one on 23 of 1801 rows, always at a death -- was re-measured on 4 September on a
+      fresh run and is closed: the gap is nonzero on 0 of 1,801 rows, commit `99a7b054` having fixed it
+      on 22 August. So `eq: 0` is the honest assertion and an `le: 1` would be a regression pin wearing
+      an identity''s clothes. This is the first apicobasal gate that kills a cell, which is the only event
+      that produced the gap, so it is the first one on which the row means anything.
 
-    - name: occ_vs_mesh
-      tier: bookkeeping
-      basis: identity
-      fn: occ_vs_mesh
-      reduce: max
-      assert: {eq: 0}
-      unit: "cells of disagreement between cell__occ.sum() and the mesh table's nF"
-      why: >
-        AB-B5, HELD AT `gate_00_spheroid`'s OWN THRESHOLD AND NOT WIDENED. The known defect --
-        `cell__occ.sum()` leading `nF` by one on 23 of 1801 rows, always at a death -- was re-measured
-        on 4 September on a fresh run and is closed: the gap is nonzero on 0 of 1,801 rows, commit
-        `99a7b054` having fixed it on 22 August. So `eq: 0` is the honest assertion and an `le: 1`
-        would be a regression pin wearing an identity's clothes. This is the first apicobasal gate
-        that kills a cell, which is the only event that produced the gap, so it is the first one on
-        which the row means anything.
+      '
+  - name: renumber_did_not_act
+    tier: bookkeeping
+    basis: identity
+    fn: renumber_did_not_act
+    reduce: all
+    assert:
+      eq: 0
+    unit: cumulative renumberings that returned without permuting the set
+    why: 'AB-B6, AND THE PRECEDENT IS THE WORST DEFECT THIS PROJECT HAS FOUND. When a cell dies or a T1
+      drops a face, every per-cell array must be permuted to match or the chemistry ends up on the wrong
+      cells. On 23 August `Hierarchy.renumber_set` returned False on EVERY call -- its guard tested `hasattr(self.levels,
+      "get")` and `levels` is an `nn.ModuleDict`, which has no `.get` -- and both call sites discarded
+      the bool. Nineteen twin rows stayed green while the chemistry of every run that killed a cell was
+      scrambled; one run went half-NaN from frame 889 and stamped itself `valid_evidence: True`. The fix
+      put this counter in `SCALAR_RECORD` for one stated reason, "so a gate can assert it is 0 instead
+      of a human having to notice a printed line" -- **and that assertion was never written.** It is written
+      here, on the first apicobasal rung that renumbers anything.
 
-    - name: renumber_did_not_act
-      tier: bookkeeping
-      basis: identity
-      fn: renumber_did_not_act
-      reduce: all
-      assert: {eq: 0}
-      unit: "cumulative renumberings that returned without permuting the set"
-      why: >
-        AB-B6, AND THE PRECEDENT IS THE WORST DEFECT THIS PROJECT HAS FOUND. When a cell dies or a T1
-        drops a face, every per-cell array must be permuted to match or the chemistry ends up on the
-        wrong cells. On 23 August `Hierarchy.renumber_set` returned False on EVERY call -- its guard
-        tested `hasattr(self.levels, "get")` and `levels` is an `nn.ModuleDict`, which has no `.get`
-        -- and both call sites discarded the bool. Nineteen twin rows stayed green while the
-        chemistry of every run that killed a cell was scrambled; one run went half-NaN from frame 889
-        and stamped itself `valid_evidence: True`. The fix put this counter in `SCALAR_RECORD` for one
-        stated reason, "so a gate can assert it is 0 instead of a human having to notice a printed
-        line" -- **and that assertion was never written.** It is written here, on the first
-        apicobasal rung that renumbers anything.
+      '
+  - name: apicobasal_span_zero_fraction
+    tier: bookkeeping
+    basis: identity
+    fn: apicobasal_span_zero_fraction
+    reduce: all
+    assert:
+      eq: 0.0
+    unit: fraction of ring-referenced vertices whose apico-basal span is identically zero
+    why: 'THE CARRY ROW, AND AB-B7 IS NOT IT. AB-B7 asks whether the run carries a non-zero span at all,
+      with a `max` over the array, so a single live vertex makes it read 1.0 -- the right question for
+      "did the apicobasal path run" and the wrong one for "did every vertex this run CREATED get a span".
+      **The second failure already happened, at R2:** `carry_vertices` looked only in the mesh table while
+      `sep` is a state block on the level, the lookup returned None, the loop skipped it in silence, and
+      every vertex born by division kept the buffer''s zero -- 66 of 462 at 60 frames, |sep| = 0.0000
+      against a seeded 0.2000, on a run whose AB-B7 row read a perfect 1.0 throughout. A vertex with no
+      span is a degenerate polyhedron sitting on the septum, and nothing in the table said so.
 
-    - name: apicobasal_span_zero_fraction
-      tier: bookkeeping
-      basis: identity
-      fn: apicobasal_span_zero_fraction
-      reduce: all
-      assert: {eq: 0.0}
-      unit: "fraction of ring-referenced vertices whose apico-basal span is identically zero"
-      why: >
-        THE CARRY ROW, AND AB-B7 IS NOT IT. AB-B7 asks whether the run carries a non-zero span at
-        all, with a `max` over the array, so a single live vertex makes it read 1.0 -- the right
-        question for "did the apicobasal path run" and the wrong one for "did every vertex this run
-        CREATED get a span". **The second failure already happened, at R2:** `carry_vertices` looked
-        only in the mesh table while `sep` is a state block on the level, the lookup returned None,
-        the loop skipped it in silence, and every vertex born by division kept the buffer's zero --
-        66 of 462 at 60 frames, |sep| = 0.0000 against a seeded 0.2000, on a run whose AB-B7 row read
-        a perfect 1.0 throughout. A vertex with no span is a degenerate polyhedron sitting on the
-        septum, and nothing in the table said so.
+      R6 IS THE RUNG THAT CAN ASSERT IT, because R2-R5 create no vertices. `cell_divide` mints them and
+      `face_collapse_3d` merges them, and both run here. Ring-referenced only, for AB-B1''s reason: `cell_die`
+      rewrites `nF` and never `Nv`, so a vertex orphaned by an extrusion keeps a stale span that no face
+      reads and no row should score.
 
-        R6 IS THE RUNG THAT CAN ASSERT IT, because R2-R5 create no vertices. `cell_divide` mints them
-        and `face_collapse_3d` merges them, and both run here. Ring-referenced only, for AB-B1's
-        reason: `cell_die` rewrites `nF` and never `Nv`, so a vertex orphaned by an extrusion keeps a
-        stale span that no face reads and no row should score.
+      '
+  - name: nonfinite_pos_or_sep
+    tier: bookkeeping
+    basis: identity
+    fn: nonfinite_count
+    args:
+      vblocks:
+      - sep
+    reduce: all
+    assert:
+      eq: 0
+    unit: non-finite entries in the vertex positions and the apico-basal separation
+    why: 'AB-B9 on the longest and most eventful apicobasal run in the suite -- 401 frames with division,
+      T1 and extrusion all firing. `reduce: all` and not `last` is the row: `cell_mechanics` passes its
+      gradient through `nan_to_num`, so a blown-up relaxation LAUNDERS itself, the last frame comes back
+      finite, and every last-frame row above would still pass over a trajectory that went to NaN in the
+      middle. The okuda campaign already contains a run that went half-NaN from frame 889 and stamped
+      itself `valid_evidence: True`.
 
-    - name: nonfinite_pos_or_sep
-      tier: bookkeeping
-      basis: identity
-      fn: nonfinite_count
-      args: {vblocks: [sep]}
-      reduce: all
-      assert: {eq: 0}
-      unit: "non-finite entries in the vertex positions and the apico-basal separation"
-      why: >
-        AB-B9 on the longest and most eventful apicobasal run in the suite -- 401 frames with
-        division, T1 and extrusion all firing. `reduce: all` and not `last` is the row:
-        `cell_mechanics` passes its gradient through `nan_to_num`, so a blown-up relaxation LAUNDERS
-        itself, the last frame comes back finite, and every last-frame row above would still pass
-        over a trajectory that went to NaN in the middle. The okuda campaign already contains a run
-        that went half-NaN from frame 889 and stamped itself `valid_evidence: True`.
+      '
+  - name: apicobasal_span_invalid_count
+    tier: bookkeeping
+    basis: identity
+    fn: apicobasal_span_invalid_count
+    reduce: all
+    assert:
+      eq: 0
+    unit: ring-referenced vertices whose span is non-finite or points inward (sep . n <= 0)
+    why: 'AB-B1 re-run here rather than inherited from R5, because the events that could invert a span
+      are the ones this rung adds. Nothing enforces the sign of `sep` -- the design declines to write
+      a `cell_polarity` operator, and the cost is paid in this row -- and a vertex created by a division
+      or merged by a collapse is where an inverted one would enter. A cell that turned through itself
+      would keep a perfectly plausible energy with apical and basal swapped.
 
-    - name: apicobasal_span_invalid_count
-      tier: bookkeeping
-      basis: identity
-      fn: apicobasal_span_invalid_count
-      reduce: all
-      assert: {eq: 0}
-      unit: "ring-referenced vertices whose span is non-finite or points inward (sep . n <= 0)"
-      why: >
-        AB-B1 re-run here rather than inherited from R5, because the events that could invert a span
-        are the ones this rung adds. Nothing enforces the sign of `sep` -- the design declines to
-        write a `cell_polarity` operator, and the cost is paid in this row -- and a vertex created by
-        a division or merged by a collapse is where an inverted one would enter. A cell that turned
-        through itself would keep a perfectly plausible energy with apical and basal swapped.
+      '
+  - name: divisions_and_deaths_both_happened
+    tier: bookkeeping
+    basis: identity
+    fn: n_apop
+    reduce: last
+    assert:
+      gt: 0
+    unit: cumulative extrusions completed over the run
+    why: 'WHAT STOPS EVERY BOOKKEEPING ROW ABOVE BEING VACUOUS, and it is the death half specifically.
+      Euler''s characteristic, the ring-cycle residual, the renumber sentinel and the occupancy agreement
+      are ALL trivially green on a tissue where nothing was created or destroyed, and this rung''s entire
+      claim is that they survive the events. Division is evidenced by the cell count and the carry row;
+      extrusion needs its own, because it is the rarer event and the one the renumber defect lived in.
+      `cell_die[crowded]` marks cells with more than eight neighbours, `edge_flip` sheds their neighbours
+      one short edge at a time until they are triangles, and `face_collapse_3d` extrudes each triangle
+      to a point -- three operators in series, and `n_apop` counts only the completions, so a run where
+      death was marked but never finished reads 0 and fails this row rather than passing the ones above
+      by never testing them.
 
-    - name: divisions_and_deaths_both_happened
-      tier: bookkeeping
-      basis: identity
-      fn: n_apop
-      reduce: last
-      assert: {gt: 0}
-      unit: "cumulative extrusions completed over the run"
-      why: >
-        WHAT STOPS EVERY BOOKKEEPING ROW ABOVE BEING VACUOUS, and it is the death half specifically.
-        Euler's characteristic, the ring-cycle residual, the renumber sentinel and the occupancy
-        agreement are ALL trivially green on a tissue where nothing was created or destroyed, and
-        this rung's entire claim is that they survive the events. Division is evidenced by the cell
-        count and the carry row; extrusion needs its own, because it is the rarer event and the one
-        the renumber defect lived in. `cell_die[crowded]` marks cells with more than eight
-        neighbours, `edge_flip` sheds their neighbours one short edge at a time until they are
-        triangles, and `face_collapse_3d` extrudes each triangle to a point -- three operators in
-        series, and `n_apop` counts only the completions, so a run where death was marked but never
-        finished reads 0 and fails this row rather than passing the ones above by never testing them.
+      '
+  - name: doubling_time_hours
+    tier: measurement
+    basis: literature
+    fn: doubling_time_hours
+    reduce: last
+    assert:
+      interval:
+      - 12.0
+      - 24.0
+    unit: hours per population doubling
+    why: 'IT READS 11.74 h AND IS DECLARED known_red: THE MECHANICS REWRITE DID MOVE THIS NUMBER. The
 
-    - name: doubling_time_hours
-      tier: measurement
-      basis: literature
-      fn: doubling_time_hours
-      reduce: last
-      assert: {interval: [12.0, 24.0]}
-      unit: "hours per population doubling"
-      why: >
-        AB-M4, `gate_00_spheroid`'s published band REUSED UNMODIFIED, and **this row's whole purpose
-        is to show the mechanics rewrite left the biology it was supposed to leave alone where it
-        was** -- so it is precisely the row on which the band may not move. A cultured epithelial cell
-        takes 12 to 24 hours; the reference run puts this tissue at 13.1 h with `cell_grow.rate:
-        0.003457` and one division test every four frames, and those numbers are copied here
-        unchanged. What has changed underneath them is every cell's mechanics: a polyhedron with two
-        free caps and a solved thickness instead of a mid-surface with an imposed one.
+      reference puts the same growth rate and the same division parameters at 13.1 h; the apicobasal
 
-        TWO DIFFERENCES FROM THE REFERENCE ARE DECLARED RATHER THAN HIDDEN. **`K_R: 0` here against
-        `K_R: 0.4` there** -- `graphs_data/mesh_mpm/README.md` records that the radial spring "is a
-        deliberate suppression, not physics", and the promotion's own rule is that no apicobasal arm
-        is compared against a suppressed model. **And this run kills cells while the reference does
-        not**, because AB-B5 and AB-B6 are about renumbering and renumbering happens at a death. Both
-        push the measured cycle UP relative to the reference: less radial confinement and a
-        population that loses members. So the band is being asked to hold across a harder comparison
-        than the one it was published for, which is the honest direction for an inherited threshold
-        to be stressed in.
+      tissue divides about 11% faster. The band is inherited and may not move, so the row stays at
+
+      [12, 24] and the disagreement is carried in the table rather than tuned away.
+
+
+      THE SUPPRESSION IS NOT THE CAUSE, which is the first thing to suspect and was tested: run
+
+      identically with K_R 0.4 -- the reference''s own value, which this promotion otherwise forbids --
+
+      the doubling time is 11.17 h, WORSE rather than better. The missing radial pin is not it.
+
+
+      WHAT IT IS: the model is half converted between two volume conventions. cell_divide now triggers
+
+      on the POLYHEDRON volume, because the wedge volume it used to read cannot see thickness and this
+
+      tissue answers growth by getting thicker -- with the wedge trigger not one cell divided in 401
+
+      frames. But cell_grow still scales V0f, a WEDGE target, and cell_die still compares V0f against
+      a
+
+      wedge v_ref. A cell grows on one convention and divides on another, so it reaches its threshold
+
+      sooner than the reference''s cell did. Reconciling the two -- one volume for growth, division,
+
+      death and the energy -- is what turns this row green, and it is a change to cell_grow and
+
+      cell_die rather than to a threshold here.
+
+
+      AB-M4, `gate_00_spheroid`''s published band REUSED UNMODIFIED, and **this row''s whole purpose is
+      to show the mechanics rewrite left the biology it was supposed to leave alone where it was** --
+      so it is precisely the row on which the band may not move. A cultured epithelial cell takes 12 to
+      24 hours; the reference run puts this tissue at 13.1 h with `cell_grow.rate: 0.003457` and one division
+      test every four frames, and those numbers are copied here unchanged. What has changed underneath
+      them is every cell''s mechanics: a polyhedron with two free caps and a solved thickness instead
+      of a mid-surface with an imposed one.
+
+      TWO DIFFERENCES FROM THE REFERENCE ARE DECLARED RATHER THAN HIDDEN. **`K_R: 0` here against `K_R:
+      0.4` there** -- `graphs_data/mesh_mpm/README.md` records that the radial spring "is a deliberate
+      suppression, not physics", and the promotion''s own rule is that no apicobasal arm is compared against
+      a suppressed model. **And this run kills cells while the reference does not**, because AB-B5 and
+      AB-B6 are about renumbering and renumbering happens at a death. Both push the measured cycle UP
+      relative to the reference: less radial confinement and a population that loses members. So the band
+      is being asked to hold across a harder comparison than the one it was published for, which is the
+      honest direction for an inherited threshold to be stressed in.
+
+      '
+    status: known_red
+descriptions:
+  movie:
+    description: The simulation begins with a small, smooth spherical cluster of cells. As time progresses,
+      the cluster undergoes rapid growth and morphological expansion, becoming increasingly irregular
+      and bumpy. The number of cells increases significantly, and the surface develops complex folds and
+      protrusions. By the final frame, the structure has transformed into a large, highly convoluted mass
+      with a dense distribution of colored cells.
+    objects: The scene contains a single growing cluster composed of individual polygonal cells. The cells
+      are arranged in a packed, tessellated mesh that forms a continuous three-dimensional surface. Most
+      cells are white, while a subset of cells are colored in distinct red and blue. The overall size
+      of the cluster increases dramatically from a small sphere to a large, complex multi-lobed structure.
+  movie_kburns:
+    description: The complex, interconnected mesh structure remains static throughout the entire sequence.
+      There is no visible movement, deformation, or evolution of the geometry over time. The camera position
+      and orientation do not change between the keyframes. The scene represents a steady-state configuration
+      of the simulated population.
+    objects: The scene features a single, large, highly complex topological structure composed of multiple
+      intertwined tubes. The mesh is rendered in a light gray color with a black wireframe overlay highlighting
+      its polygonal faces. The overall shape is roughly spherical but characterized by a dense, porous,
+      and knotted internal architecture. The individual tubes vary in thickness but maintain a consistent
+      scale relative to the overall population mesh.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation begins with a small, smooth spherical cluster of cells. As time progresses,
+      the cluster undergoes rapid growth and morphological expansion, becoming increasingly irregular
+      and bumpy. The number of cells increases significantly, and the surface develops complex folds and
+      protrusions. By the final frame, the structure has transformed into a large, highly convoluted mass
+      with a dense distribution of colored cells.
+    objects: The scene contains a single growing cluster composed of individual polygonal cells. The cells
+      are arranged in a packed, tessellated mesh that forms a continuous three-dimensional surface. Most
+      cells are white, while a subset of cells are colored in distinct red and blue. The overall size
+      of the cluster increases dramatically from a small sphere to a large, complex multi-lobed structure.
+  movie_kburns:
+    description: The complex, interconnected mesh structure remains static throughout the entire sequence.
+      There is no visible movement, deformation, or evolution of the geometry over time. The camera position
+      and orientation do not change between the keyframes. The scene represents a steady-state configuration
+      of the simulated population.
+    objects: The scene features a single, large, highly complex topological structure composed of multiple
+      intertwined tubes. The mesh is rendered in a light gray color with a black wireframe overlay highlighting
+      its polygonal faces. The overall shape is roughly spherical but characterized by a dense, porous,
+      and knotted internal architecture. The individual tubes vary in thickness but maintain a consistent
+      scale relative to the overall population mesh.
