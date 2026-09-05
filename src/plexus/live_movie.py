@@ -1406,12 +1406,55 @@ class LiveMovie:
         a naive "compare with the previous frame" draws mothers on every frame and daughters on
         almost none. It takes a face count from far enough back to cover the same window.
         """
-        if not bool((self.style or {}).get("mesh_mark_division", True)):
-            return None
+        import matplotlib.colors as _mc
+        st = self.style or {}
+        nF = int(m["nF"])
+        base = np.tile((np.asarray(_mc.to_rgb(st.get("mesh_color", "#e6dcc0"))) * 255)
+                       .astype(np.uint8), (nF, 1))
+
+        # `mesh_color_by: phase` -- PAINT THE CELL CYCLE, AND DO IT BEFORE ANYTHING ELSE CAN FAIL.
+        # This block used to sit AFTER the division marks inside one `try`, and that is why it drew
+        # nothing on any run that divided: `_marks` reads a face count that has just changed, and
+        # anything it raises aborts the whole block, leaving the PREVIOUS frame's colours on the
+        # actor. A six-frame run with no divisions painted phases correctly and a forty-frame run
+        # with them painted mother-blue, from the same code and the same spec. Two independent
+        # encodings must not share a failure.
+        #
+        # THE COLOURS ARE THE TEXTBOOK ONES -- G1 blue, S green, G2 amber, M red. Every cell-biology
+        # figure uses them, so a reader already has the mapping; a private ramp would ask them to
+        # learn a second one, and a phase is a name rather than a position on a scale.
+        if str(st.get("mesh_color_by", "") or "").lower() == "phase":
+            ph = m.get("phase")
+            if ph is None:
+                if not getattr(self, "_phase_warned", False):
+                    self._phase_warned = True
+                    print("[live-movie] mesh_color_by: phase, but the mesh carries no `phase` "
+                          "column -- is `cell_cycle` in the schedule?", flush=True)
+            else:
+                p = (ph.detach().cpu().numpy() if hasattr(ph, "detach") else np.asarray(ph))
+                p = np.asarray(p, np.float64).ravel()
+                # PADDED, NOT TRUNCATED-AND-HOPED. A boolean mask shorter than the array it indexes
+                # raises, and this function's outer guard turns that into a silently uncoloured
+                # frame -- so the one length that must never surprise it is made safe here.
+                p = np.resize(p, nF) if p.size != nF else p
+                pal = st.get("phase_colors") or ["#3b57c0", "#2e9e4f", "#e8b024", "#e03b2f"]
+                q = np.clip(np.rint(p).astype(int), 0, len(pal) - 1)
+                for k, c in enumerate(pal):
+                    sel = q == k
+                    if sel.any():
+                        base[sel] = (np.asarray(_mc.to_rgb(c)) * 255).astype(np.uint8)
+                pd.cell_data["rgb"] = base
+                return base
+
+        # `mesh_mark_division: false` -- DRAW NO MOTHER/DAUGHTER MARKS. It used to return None here,
+        # which is not "no marks" but "no colouring at all": the caller then drew the tissue in one
+        # flat colour and any other per-cell encoding was lost with it. Now it returns the base, so
+        # turning the marks off leaves everything else standing.
+        if not bool(st.get("mesh_mark_division", True)):
+            pd.cell_data["rgb"] = base
+            return base
         try:
             from plexus.render_vtk import _marks
-            import matplotlib.colors as _mc
-            nF = int(m["nF"])
             self._nF_hist = (getattr(self, "_nF_hist", []) + [nF])[-8:]
             prev = self._nF_hist[0] if len(self._nF_hist) > 1 else None
             # NUMPY, BECAUSE `_marks` IS NUMPY. On the REPLAY path the columns come out of an npz
@@ -1423,37 +1466,7 @@ class LiveMovie:
                   for k, v in m.items() if k in ("age", "ndiv", "apop", "inhib")}
             mt["nF"] = nF
             mother, daughter, kills, _sup = _marks(mt, np.arange(nF), nF, prev_nF=prev)
-            st = self.style or {}
-            rgb = np.tile((np.asarray(_mc.to_rgb(st.get("mesh_color", "#e6dcc0"))) * 255)
-                          .astype(np.uint8), (nF, 1))
-            # `mesh_color_by: phase` -- PAINT THE CELL CYCLE, WHICH IS THE ONLY WAY TO SEE IT. A
-            # tissue running `cell_cycle` and one running a plain timer produce the same growing
-            # ball; the phases are per-cell state and nothing in the geometry shows them, so a run
-            # whose whole subject is the cycle draws as a uniform sheet unless the colour carries it.
-            #
-            # IT REPLACES THE DIVISION MARKS RATHER THAN LAYERING OVER THEM, because M IS the
-            # division mark: a cell in M is one about to divide, and drawing a mother-blue over a
-            # phase-red would be two encodings of one event competing for the same cell. Choose one.
-            #
-            # THE FOUR COLOURS ARE CATEGORICAL AND THEY ARE THE TEXTBOOK ONES. A first version
-            # used an ordered cool-to-warm ramp on the argument that G1 -> S -> G2 -> M is a
-            # progression, and that was the wrong call: the cycle is drawn in every cell-biology
-            # figure with G1 blue, S green, G2 amber and M red, so a reader already HAS the mapping
-            # and a private ramp asks them to learn a second one. A phase is also a name, not a
-            # position on a scale -- nothing is "between" S and G2 -- and an ordered ramp implies an
-            # interpolation the state does not have.
-            _by = str(st.get("mesh_color_by", "") or "").lower()
-            _ph = m.get("phase")
-            if _by == "phase" and _ph is not None:
-                _p = (_ph.detach().cpu().numpy() if hasattr(_ph, "detach") else np.asarray(_ph))
-                _p = np.asarray(_p, np.float64).ravel()[:nF]
-                _pal = st.get("phase_colors") or ["#3b57c0", "#2e9e4f", "#e8b024", "#e03b2f"]
-                for _k, _c in enumerate(_pal[:4]):
-                    _sel = np.rint(_p) == _k
-                    if _sel.any():
-                        rgb[_sel] = (np.asarray(_mc.to_rgb(_c)) * 255).astype(np.uint8)
-                pd.cell_data["rgb"] = rgb
-                return rgb
+            rgb = base
             for msk, key, dflt in ((mother, "mesh_mother_color", "#4a86c8"),
                                    (daughter, "mesh_daughter_color", "#d9534f"),
                                    (kills, "mesh_apop_color", "#e8c33a")):
@@ -2321,8 +2334,21 @@ class _ReplayLevel:
             # one is a per-face array and the other per-half-edge, and reading either with the
             # other's offsets gives a mask that is the right dtype and the wrong length.
             self._fo = np.asarray(z[f"{name}__mesh_face_offsets"])
+            # EVERY RECORDED FACE COLUMN, NOT A LITERAL FOUR. This was
+            # `("age", "ndiv", "apop", "inhib")`, so a per-face quantity added to `FACE_RECORD`
+            # later was written to the trajectory and never read back: the LIVE frames carried it
+            # and the REPLAY -- which is what writes movie.mp4 and 3d.png -- did not. `cell_cycle`'s
+            # `phase` hit exactly that, and the symptom is the confusing one: the run coloured
+            # itself correctly frame by frame and the finished movie came out uniform, because two
+            # passes were reading different meshes.
+            #
+            # It is the same defect this file already records one level down -- "the core recorded
+            # NEITHER the dying-cell flag NOR the growth inhibitor, ever" -- and it recurred because
+            # the fix there added names to a list instead of removing the list. `FACE_RECORD` is the
+            # one place that says what a face column is; asking it cannot drift.
+            from plexus.models.mesh import MeshTable as _MT
             self._face_cols = {k: np.asarray(z[f"{name}__mesh_{k}"])
-                               for k in ("age", "ndiv", "apop", "inhib")
+                               for k in _MT.FACE_RECORD
                                if f"{name}__mesh_{k}" in z.files}
             # AND THE PER-ROW SCALARS, which are one number a frame rather than a column, so they
             # need no offsets at all. Omitting them is how the monolayer's thickness reached the
