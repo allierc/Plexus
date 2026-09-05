@@ -73,6 +73,12 @@ class Traj:
     def half_edges(self, t): raise NotImplementedError   # (E_srce, E_trgt, E_face) for row t
     def face_col(self, name, t): raise NotImplementedError   # [nF] or None
     def state(self, block, t): raise NotImplementedError     # [nF, width] or None
+    # PER-VERTEX, AND SEPARATE FROM `state` ON PURPOSE. `state` reads the CELL set and crops to nF;
+    # a per-vertex block is a different array of a different length -- on gate_00's last row, 13,824
+    # vertices against 6,914 cells -- so reusing `state` would return the first 6,914 rows of a
+    # 13,824-row array, which is not a subset of anything and would look like data. Added for the
+    # apico-basal separation `sep`, which is the first per-vertex block that is not `pos`.
+    def vertex_block(self, name, t): return None             # [nV, width] or None
     def occ(self, set_name, t): raise NotImplementedError    # [buffer] bool
     def scalar(self, name, t): return None                   # an operator's own counter, or None
     def edge_col(self, name, t): return None                 # per-HALF-EDGE state, or None
@@ -124,6 +130,13 @@ class CoreTraj(Traj):
         if self.c is None or k not in self.z.files:
             return None
         return np.asarray(self.z[k][t][: self.nF(t)], float)
+
+    def vertex_block(self, name, t):
+        k = f"{self.s}__{name}"
+        if k not in self.z.files:
+            return None
+        a = np.asarray(self.z[k][t][: self.nV(t)], float)
+        return a[:, None] if a.ndim == 1 else a
 
     def occ(self, set_name, t):
         k = f"{set_name}__occ"
@@ -464,6 +477,26 @@ def scalar_col(T, name, **kw):
         v = T.scalar(name, t)
         out.append(0.0 if v is None else float(v))
     return out
+
+
+def renumber_did_not_act(T, **kw):
+    """`renumber_failed`, cumulative -- THE SENTINEL THAT WAS INSTALLED AND NEVER WIRED UP.
+
+    When a cell dies or a T1 drops a face the cells are renumbered, and every per-cell array must be
+    permuted to match or the chemistry ends up on the wrong cells. `Hierarchy.renumber_set` does
+    that and returns False if it could not. On 23 August it returned False on EVERY call -- its
+    guard tested `hasattr(self.levels, "get")` and `levels` is an `nn.ModuleDict`, which has no
+    `.get` -- and both call sites discarded the bool. Nineteen twin rows stayed green while the
+    chemistry of every run that killed a cell was scrambled; one run went half-NaN from frame 889
+    and stamped itself `valid_evidence: True`.
+
+    The fix put this counter in `MeshTable.SCALAR_RECORD` for one stated reason: "so a gate can
+    assert it is 0 instead of a human having to notice a printed line". THAT ASSERTION WAS NEVER
+    WRITTEN. The counter has been recorded, and unread, ever since: `MEASURES` exposes four thin
+    wrappers over `scalar_col` and `scalar_col` itself is not in the table, so a row naming it fails
+    preflight. This is the fifth wrapper.
+    """
+    return scalar_col(T, "renumber_failed")
 
 
 def t1_total(T, **kw):
@@ -909,6 +942,7 @@ MEASURES = {
     "cell_count_delta": cell_count_delta,
     "vertex_count": vertex_count,
     "occ_vs_mesh": occ_vs_mesh,
+    "renumber_did_not_act": renumber_did_not_act,
     "topology_ledger": topology_ledger,
     "nonfinite_count": nonfinite_count,
     "reservoir_fraction": reservoir_fraction,
