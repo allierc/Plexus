@@ -37,6 +37,21 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # overrides, and `Plexus_Main` sets it to the path it has already checked, so the directory the
 # caller tested is the directory this loads.
 GEMMA = os.environ.get("GEMMA_DIR", os.path.join(_REPO, "VLLM", "gemma-4-12B-it"))
+def _free_gb(i: int):
+    """Free memory on CUDA device `i`, in GB, or None if the device cannot be queried.
+
+    QUERYING A DEVICE CAN FAIL, and not only because the index is out of range. On a GPU in
+    `Exclusive_Process` compute mode a second process cannot create a context while the first
+    holds one, and `cudaMemGetInfo` is the call that reports it -- as
+    `cudaErrorDevicesUnavailable`, from a machine where nothing is actually wrong. Returning None
+    lets the caller say so instead of dying inside a memory query.
+    """
+    try:
+        return torch.cuda.mem_get_info(i)[0] / 2 ** 30
+    except Exception:
+        return None
+
+
 def _pick_device():
     """The card with the most FREE memory, not card zero.
 
@@ -47,13 +62,7 @@ def _pick_device():
     """
     if not torch.cuda.is_available():
         return "cpu"
-    free = []
-    for i in range(torch.cuda.device_count()):
-        try:
-            f, _ = torch.cuda.mem_get_info(i)
-        except Exception:
-            f = 0
-        free.append((f, i))
+    free = [(_free_gb(i) or 0.0, i) for i in range(torch.cuda.device_count())]
     return f"cuda:{max(free)[1]}"
 
 
@@ -192,19 +201,40 @@ def main():
     dev = args.device or DEV
     if dev.startswith("cuda"):
         i = int(dev.split(":")[1]) if ":" in dev else 0
-        gb = torch.cuda.mem_get_info(i)[0] / 2**30
-        print(f"[load] {GEMMA} on {dev} ({gb:.1f} GB free) ...", flush=True)
-        if gb < 24.0:
-            alt = _pick_device()
-            if alt != dev and alt.startswith("cuda") and \
-                    torch.cuda.mem_get_info(int(alt.split(":")[1]))[0] / 2**30 > gb:
-                print(f"[load] {dev} has only {gb:.1f} GB free and this model needs about 22 -- "
-                      f"using {alt} instead", flush=True)
-                dev = alt
+        gb = _free_gb(i)
+        if gb is None:
+            print(f"[load] {dev} cannot be queried for free memory -- loading anyway; "
+                  f"see the note below if this fails", flush=True)
+        else:
+            print(f"[load] {GEMMA} on {dev} ({gb:.1f} GB free) ...", flush=True)
+            if gb < 24.0:
+                alt = _pick_device()
+                alt_gb = _free_gb(int(alt.split(":")[1])) if alt.startswith("cuda") else None
+                if alt != dev and alt_gb is not None and alt_gb > gb:
+                    print(f"[load] {dev} has only {gb:.1f} GB free and this model needs about 22 "
+                          f"-- using {alt} instead", flush=True)
+                    dev = alt
     else:
         print(f"[load] {GEMMA} on {dev} ...", flush=True)
-    proc = AutoProcessor.from_pretrained(GEMMA)
-    model = AutoModelForMultimodalLM.from_pretrained(GEMMA, dtype="bfloat16", device_map=dev)
+    try:
+        proc = AutoProcessor.from_pretrained(GEMMA)
+        model = AutoModelForMultimodalLM.from_pretrained(GEMMA, dtype="bfloat16", device_map=dev)
+    except Exception as e:
+        # A CUDA ERROR HERE IS USUALLY NOT ABOUT THIS SCRIPT. The commonest cause on a cluster is
+        # a GPU in `Exclusive_Process` compute mode: the parent that ran the simulation still
+        # holds the only context the device will grant, so this second process cannot get one --
+        # `cudaErrorDevicesUnavailable`, from a node where nothing is broken. Say so, and say what
+        # to check, rather than leaving a CUDA traceback to be read as a captioner bug.
+        print(f"[describe] COULD NOT LOAD THE MODEL: {type(e).__name__}: {str(e)[:200]}",
+              flush=True)
+        if "unavailable" in str(e).lower() or "busy" in str(e).lower():
+            print("[describe] this reads as an exclusive-mode GPU. Check with:\n"
+                  "    nvidia-smi --query-gpu=index,compute_mode,memory.used --format=csv\n"
+                  "  If compute_mode is Exclusive_Process, a SECOND process cannot open the card "
+                  "while\n  the run that produced these movies is still alive. Caption afterwards "
+                  "instead:\n"
+                  "    python VLLM/describe_video.py --root <graphs_data> --append", flush=True)
+        raise SystemExit(1)
 
     records = []
     spec_updates: dict[str, dict] = {}                             # spec.yaml -> {movie_stem: {...}}
