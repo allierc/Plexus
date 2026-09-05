@@ -1,50 +1,63 @@
-"""neural -- a continuous-time recurrent circuit, decomposed into Plexus operators.
+"""A continuous-time recurrent circuit, decomposed into Plexus operators.
 
-THE MECHANISM. A population of neurons, each carrying a graded membrane state `x_i`, coupled
-through a connectivity matrix `W`. Every neuron belongs to a TYPE, and the type is what fixes
-the parameters of its update equation -- neurons of different types integrate, saturate and
-transmit differently. An external field may modulate how strongly a neuron hears the network.
+A population of neurons, each carrying a graded membrane state x_i, coupled through a
+connectivity matrix W. Every neuron belongs to a TYPE, and the type fixes the parameters of its
+update equation -- neurons of different types integrate, saturate and transmit differently. An
+external field may modulate how strongly a neuron hears the network.
 
-    dx_i/dt  =  -x_i / tau_i  +  s_i phi(x_i)  +  g_i Omega_i(t) SUM_j W_ij psi_ij(x_j)  +  eta_i(t)
-                |________________________|        |_________________________________|
-                  the LOCAL UPDATE  phi              the PAIRWISE SIGNALLING  psi
+    dx_i/dt = -x_i/tau_i + s_i phi(x_i) + g_i Omega_i(t) sum_j W_ij psi_ij(x_j) + eta_i(t)
+              |_______________________|   |___________________________________|
+                the LOCAL UPDATE phi          the PAIRWISE SIGNALLING psi
 
-Reference: Allier et al., "Graph neural networks uncover structure and function underlying the
-activity of neural assemblies", eqn. `simulation` and `simulation3`; forward implementations in
-`NeuralGraph/src/NeuralGraph/generators/PDE_N{2,4,5}.py`.
+In the order they appear below:
 
-WHY TWO OPERATORS AND NOT ONE. The two braces are different biological mechanisms, they are
-separately parameterised, and the literature varies them independently -- the same local update
-is used with a shared transfer function, with a neuron-specific one, and with a pairwise one.
-Plexus sums operator deltas (`Delta = SUM_i Delta_i`), and both terms enter the voltage
-derivative additively, so the split costs nothing numerically and buys the ability to swap the
-synaptic hypothesis without re-registering the membrane equation. The pre-existing `signal`
-operator (`field_ops.py`) is the same biology FUSED into one class with a scalar tau, a scalar
-bias and no types; it stays registered and unchanged.
+    neuron_update       lateral    phi: the leak, the drive and the self-coupling
+    neuron_signal       lateral    psi: what a neuron hears from the network, through W
+    neuron_field_input  exchange   Omega: an external field sampled onto the neurons
+    neural_seed         seed       x_0 from a frozen connectome region
 
-WHERE EACH SYMBOL LIVES, and every one of them is an existing Plexus primitive:
+then the three models of `neuron_signal`, which are different claims about the synapse rather
+than different ways of computing one:
 
-    x_i            the `voltage` block of the `neuron` set  (`models/entities.py`)
-    tau, s, g, ... the set's per-type parameter table `p`   -> `lvl.type_params[lvl.node_type]`
-    W_ij           the `w` block of the `synapse` EDGE-SET, reached along `pre`/`post`
-    Omega_i(t)     a `Field`, sampled onto the neuron's `omega` block by an `exchange`
+    neuron_signal[shared]         one transfer function for every connection
+    neuron_signal[type_pre]       the SENDER's type sets the scale and threshold
+    neuron_signal[type_pairwise]  the RECEIVER's sets the gain, the sender adds a linear term
+
+The two braces are two operators because they are different biological mechanisms, separately
+parameterised, and the literature varies them independently -- the same local update appears
+with a shared transfer function, with a neuron-specific one, and with a pairwise one. Plexus
+sums operator deltas and both terms enter the voltage derivative additively, so the split costs
+nothing numerically and buys the ability to swap the synaptic hypothesis without re-registering
+the membrane equation. The `signal` operator in field_ops is the same biology fused into one
+class with a scalar tau, a scalar bias and no types.
+
+Where each symbol lives, all of them existing Plexus primitives:
+
+    x_i            the `voltage` block of the `neuron` set
+    tau, s, g, ... the set's per-type parameter table `p` -> lvl.type_params[lvl.node_type]
+    W_ij           the `w` block of the `synapse` edge set, reached along `pre` / `post`
+    Omega_i(t)     a Field, sampled onto the neuron's `omega` block by an exchange
     eta_i(t)       a noise parameter of the local update (see `neuron_update.noise`)
 
-THE PARAMETER VECTOR IS SHARED BY THE FAMILY, declared once per neuron type as `p:` in the
-spec's `types:` block, and indexed exactly as the reference indexes `self.p[neuron_type]`:
+The parameter vector is shared by the whole family, declared once per neuron type as `p:` in
+the specification's `types:` block:
 
     p = [a, b, g, s, w, h]
 
-    a   decay          the leak, 1/tau. The paper writes -x/tau; a = 1/tau.
-    b   offset         a constant drive. The paper has none; b = 0 recovers it.
-    g   gain           how strongly this neuron hears the aggregated message.
-    s   self-coupling  the strength of phi's own feedback, s*tanh(x).
-    w   width          the scale INSIDE psi. The paper's gamma.
-    h   threshold      the offset INSIDE psi. The paper's per-type baseline.
+    a   decay          the leak, in inverse time. The paper writes -x/tau, so a = 1/tau.
+    b   offset         a constant drive, in the units of x. The paper has none; b = 0 recovers it.
+    g   gain           dimensionless: how strongly this neuron hears the aggregated message.
+    s   self-coupling  the strength of phi's own feedback s tanh(x), in inverse time.
+    w   width          the scale INSIDE psi, in the units of x. The paper's gamma.
+    h   threshold      the offset INSIDE psi, in the units of x. The paper's per-type baseline.
 
-A set with no `types:` falls back to one row read off the operator line (`a:`, `g:`, ...) with
-`a=1, b=0, g=1, s=0, w=1, h=0` -- a plain leaky integrator with tanh coupling -- so a typeless
-smoke spec is expressible. Types are the intended case; the fallback is not the interesting one.
+A set with no `types:` falls back to one row read off the operator line, with
+a = 1, b = 0, g = 1, s = 0, w = 1, h = 0 -- a plain leaky integrator with tanh coupling -- so a
+typeless smoke specification is expressible. Types are the intended case.
+
+Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
+the activity of neural assemblies. Equations (simulation) and (simulation3); forward
+implementations in the NeuralGraph generators PDE_N2, PDE_N4 and PDE_N5.
 """
 from __future__ import annotations
 
@@ -64,8 +77,8 @@ from plexus.operators.field_ops import _ACT
 # --------------------------------------------------------------------------- #
 #  the per-type parameter table
 # --------------------------------------------------------------------------- #
-# ORDER IS PART OF THE CONTRACT. A spec writes `p: [a, b, g, s, w, h]` per type and both
-# operators slice the same columns, so a reordering here silently re-means every spec.
+# The order is part of the contract: a specification writes `p: [a, b, g, s, w, h]` per type
+# and both operators slice the same columns, so reordering here silently re-means every one.
 P_NAMES = ("a", "b", "g", "s", "w", "h")
 P_DEFAULTS = (1.0, 0.0, 1.0, 0.0, 1.0, 0.0)
 P_WIDTH = len(P_NAMES)
@@ -98,17 +111,27 @@ def _type_params(lvl, params) -> torch.Tensor:
 @register_operator("neuron_update", family="signalling", set="neuron", kind="lateral",
                    model="leaky_tanh")
 class NeuronUpdate(Lateral):
-    """phi: a neuron's own dynamics, with no reference to any other neuron.
+    """phi, the local update: a neuron's own dynamics, with no reference to any other neuron.
+    A leaky integrator plus a self-coupling term.
 
-        dx_i/dt  +=  -a_i x_i  +  b_i  +  s_i tanh(x_i)   [ +  eta_i ]
+    neuron -> neuron: reads the membrane state, emits its derivative. No relation is traversed.
 
-    A leaky integrator with a self-coupling term. `s` is what takes the circuit through the
-    transition studied in the reference: at s = 0 each neuron relaxes to b/a, and as s grows
-    the isolated neuron acquires its own bistability before any coupling is added.
+        dx_i/dt += -a_i x_i + b_i + s_i tanh(x_i) + eta_i
 
-    KIND IS `lateral` AND IT TRAVERSES NO MAP. Lateral means "within a set"; a per-member law
-    with an empty relation is the degenerate case of that, not a different kind. `MAPS = []`
-    says so in the signature, which is where a reader should be able to see it.
+    a_i is the leak in inverse time, so 1/a_i is the membrane time constant; b_i is a constant
+    drive in the units of x; s_i is the self-coupling strength, also in inverse time. eta_i is
+    `noise`. All three come from the neuron's own row of the type table.
+
+    s is what takes the circuit through the transition studied in the reference: at s = 0 each
+    neuron relaxes to the fixed point b/a, and as s grows past a the isolated neuron acquires
+    its own bistability before any coupling is added at all.
+
+    The kind is `lateral` and it traverses no map. Lateral means within a set, and a per-member
+    law with an empty relation is the degenerate case of that rather than a different kind;
+    `MAPS = []` says so in the signature, which is where a reader should be able to see it.
+
+    Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
+    the activity of neural assemblies, eqn. (simulation); the NeuralGraph PDE_N4 generator.
     """
 
     EMIT = "velocity"                  # first-order voltage ODE; the engine integrates `voltage`
@@ -129,9 +152,9 @@ class NeuronUpdate(Lateral):
         "a": "leak_rate_inverse_tau", "b": "constant_drive", "s": "self_coupling_strength",
         "noise": "process_noise_sd_per_step", "block": "membrane_state_block",
     }
-    REFERENCE = ("Allier et al., 'Graph neural networks uncover structure and function "
-                 "underlying the activity of neural assemblies', eqn. (simulation); "
-                 "NeuralGraph/generators/PDE_N4.py:81 (-a*u + b + s*tanh(u)).")
+    REFERENCE = ("Allier, C. et al. Graph neural networks uncover structure and function "
+                 "underlying the activity of neural assemblies, eqn. (simulation); the "
+                 "NeuralGraph PDE_N4 generator.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -146,12 +169,10 @@ class NeuronUpdate(Lateral):
         a, b, s = p[:, 0:1], p[:, 1:2], p[:, 3:4]
         dx = -a * x + b + s * torch.tanh(x)
         if self.noise > 0.0:
-            # THE NOISE IS A PER-STEP DISPLACEMENT, NOT A RATE, and dividing by dt is what makes
-            # that true. The reference adds it AFTER the Euler step and unscaled --
-            # `x += dt*du + sigma*randn` (graph_data_generator.py:770) -- whereas Plexus
-            # integrates whatever an operator returns as `x += dt*delta`. Returning sigma/dt
-            # makes the two identical: the dt cancels. Same manoeuvre, and same reason, as
-            # `jax_morph_neural_ode` returning `(y_end - g0)/dt`.
+            # The noise is a per-step DISPLACEMENT, not a rate, and dividing by dt is what
+            # makes that true. The reference adds it after the Euler step and unscaled,
+            # `x += dt*du + sigma*randn`, where Plexus integrates whatever an operator returns
+            # as `x += dt*delta`. Returning sigma/dt makes the two identical: the dt cancels.
             dt = float(getattr(H.config, "dt", 1.0)) or 1.0
             dx = dx + (self.noise / dt) * torch.randn(
                 x.shape, generator=getattr(H, "rng", None), device=x.device, dtype=x.dtype)
@@ -165,23 +186,31 @@ class NeuronUpdate(Lateral):
 #  psi -- the pairwise signalling, through W
 # --------------------------------------------------------------------------- #
 class _NeuronSignal(Lateral):
-    """psi: what a neuron hears from the network.
+    """psi, the pairwise signalling: what a neuron hears from the network, through W.
 
-        dx_i/dt  +=  g_i Omega_i SUM_{e: post(e)=i} W_e psi(x_{pre(e)})
+    (neuron, synapse) -> neuron: gathers the presynaptic state along `pre`, weights it by the
+    synapse, aggregates along `post`, emits the neuron's derivative.
 
-    The three registered MODELS below differ ONLY in `psi`, and they are models rather than
-    implementations because they are different claims about the synapse, not different ways of
-    computing one: `shared` says every connection applies the same transfer function,
-    `type_pre` says the SENDER's type sets its scale, `type_pairwise` says the RECEIVER's does
-    and adds a term linear in the sender's state. There is no operating point at which the
-    three agree, so swapping one for another is an experiment.
+        dx_i/dt += g_i Omega_i sum_{e : post(e) = i} W_e psi(x_pre(e))
 
-    THE MAPS ARE TRAVERSED THROUGH THE LANGUAGE. `H.gather(edge_set, "pre", block)` lifts the
+    g_i is the coupling gain, dimensionless, from the receiving neuron's own type row: how
+    strongly this neuron hears the network at all. Omega_i is the external modulation, 1 when
+    no field block is named. W_e is the fixed weight of synapse e, whose sign makes it
+    excitatory or inhibitory. psi is the synaptic transfer function, and it is what the three
+    models below disagree about.
+
+    Those three are MODELS, not implementations, because they are different claims about the
+    synapse rather than different ways of computing one, and there is no operating point at
+    which they agree -- so swapping one for another is an experiment, not a control.
+
+    The maps are traversed through the language: `H.gather(edge_set, "pre", block)` lifts the
     presynaptic state onto the edges and `H.scatter_along(edge_set, "post", ...)` sums the
-    per-edge messages onto the postsynaptic neuron -- the incidence maps named in the typed
-    signature, not raw index arithmetic. The per-TYPE parameters are a different object: they
-    are not state, so they are indexed off the table directly with the same `pre`/`post`
-    buffers.
+    per-edge messages onto the postsynaptic neuron, rather than raw index arithmetic. The
+    per-type parameters are a different object -- they are not state -- so they are indexed off
+    the table directly with the same pre/post buffers.
+
+    Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
+    the activity of neural assemblies, eqn. (simulation).
     """
 
     EMIT = "velocity"
@@ -201,8 +230,8 @@ class _NeuronSignal(Lateral):
         "activation": "transfer_nonlinearity", "field": "external_modulation_block",
         "block": "membrane_state_block",
     }
-    REFERENCE = ("Allier et al., 'Graph neural networks uncover structure and function "
-                 "underlying the activity of neural assemblies', eqn. (simulation).")
+    REFERENCE = ("Allier, C. et al. Graph neural networks uncover structure and function "
+                 "underlying the activity of neural assemblies, eqn. (simulation).")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -211,11 +240,11 @@ class _NeuronSignal(Lateral):
         self.edge_set = params["edge_set"]
         self.weight_block = params.get("weight", "w")
         self.act = _ACT[params.get("activation", "tanh")]
-        # THE MODULATION IS OPT-IN AND DEFAULTS TO ABSENT, not to a block full of zeros. Naming
-        # a block here means "multiply the message by it"; naming none means Omega = 1, which is
-        # the reference's own convention for an unmodulated neuron. A spec that names `omega`
-        # must schedule `neuron_field_input` BEFORE this operator, since the block is written
-        # each tick and starts at zero.
+        # The modulation is opt-in and defaults to ABSENT, not to a block full of zeros. Naming
+        # a block here means "multiply the message by it"; naming none means Omega = 1, the
+        # reference's convention for an unmodulated neuron. A specification naming `omega` must
+        # schedule `neuron_field_input` before this operator: the block is written each tick and
+        # starts at zero.
         self.field_block = params.get("field", None)
 
     def psi(self, x_pre, p_pre, p_post):
@@ -241,11 +270,13 @@ class _NeuronSignal(Lateral):
 @register_operator("neuron_signal", family="signalling", set="neuron", kind="lateral",
                    model="shared")
 class NeuronSignalShared(_NeuronSignal):
-    """psi(x_j) = phi(x_j) -- one transfer function for every connection in the network.
+    """One transfer function for every connection in the network:
 
-    The reference's first experiment (Fig. 2): the neurons differ in their update functions
-    but speak a common language. Corresponds to `PDE_N2.py`, whose message is
-    `W @ phi(u)` with no per-type term inside phi.
+        psi(x_j) = phi(x_j)
+
+    The claim is that neurons differ in how they integrate but speak a common language. This is
+    the reference's first experiment, and the NeuralGraph PDE_N2 generator, whose message is
+    W @ phi(u) with no per-type term inside phi.
     """
 
     def psi(self, x_pre, p_pre, p_post):
@@ -255,11 +286,13 @@ class NeuronSignalShared(_NeuronSignal):
 @register_operator("neuron_signal", family="signalling", set="neuron", kind="lateral",
                    model="type_pre")
 class NeuronSignalTypePre(_NeuronSignal):
-    """psi_j(x_j) = phi((x_j - h_j) / w_j) -- the SENDER's type sets the scale and threshold.
+    """The sender's type sets both the scale and the threshold:
 
-    A claim about the presynaptic terminal: how a neuron's state is converted into a signal is
-    a property of the neuron sending it. Corresponds to `PDE_N4.py:95`,
-    `W[i,j] * phi((u_j - h_j) / w_j)`.
+        psi_j(x_j) = phi((x_j - h_j) / w_j)
+
+    h_j and w_j are the threshold and width from the SENDING neuron's type row, both in the
+    units of x. The claim is about the presynaptic terminal: how a neuron's state is converted
+    into a signal is a property of the neuron sending it. The NeuralGraph PDE_N4 generator.
     """
 
     def psi(self, x_pre, p_pre, p_post):
@@ -269,17 +302,19 @@ class NeuronSignalTypePre(_NeuronSignal):
 @register_operator("neuron_signal", family="signalling", set="neuron", kind="lateral",
                    model="type_pairwise")
 class NeuronSignalTypePairwise(_NeuronSignal):
-    """psi_ij(x_j) = phi((x_j - h_j) / w_i) - x_j log(w_j) / 50.
+    """The receiver sets the gain, the sender adds a term linear in its own state:
 
-    A claim about the synapse rather than about either neuron: the RECEIVER's type sets the
-    gain (`w_i`, the paper's gamma_i) while the sender contributes both its threshold and a
-    term linear in its own state (the paper's -theta_j x_j, with theta_j = log(w_j)/50). This
-    is the reference's eqn. (simulation3) and `PDE_N5.py:94`, and it is the form under which
-    the pairwise transfer functions were recovered.
+        psi_ij(x_j) = phi((x_j - h_j) / w_i) - x_j log(w_j) / 50
 
-    THE ASYMMETRY IS DELIBERATE AND IS THE MODEL. `w` is read off the POST-synaptic row and
-    `h`/`log w` off the PRE-synaptic one; making both pre would silently turn this into
-    `type_pre` with an extra term.
+    w_i is the width from the RECEIVING neuron's type row -- the paper's gamma_i -- while h_j
+    and w_j come from the SENDER's. The second term is the paper's -theta_j x_j with
+    theta_j = log(w_j)/50, so the sender's width enters twice, once as a threshold scale and
+    once as a linear leak on the message. This is eqn. (simulation3) and the NeuralGraph PDE_N5
+    generator, and it is the form under which the pairwise transfer functions were recovered.
+
+    The asymmetry is deliberate and IS the model: w off the post-synaptic row, h and log w off
+    the pre-synaptic one. Making both pre would silently turn this into `type_pre` with an
+    extra term.
     """
 
     def psi(self, x_pre, p_pre, p_post):
@@ -292,18 +327,30 @@ class NeuronSignalTypePairwise(_NeuronSignal):
 # --------------------------------------------------------------------------- #
 @register_operator("neuron_field_input", family="signalling", set="neuron", kind="exchange")
 class NeuronFieldInput(Exchange):
-    """field -> neuron: sample Omega at each neuron's position and write it to a state block.
+    """Omega, the external modulation: sample a field at each neuron's position and write the
+    value into a state block, for `neuron_signal` to multiply its message by.
 
-    WHY THIS IS AN OPERATOR AND NOT A TERM INSIDE `neuron_signal`. Omega MULTIPLIES the
-    aggregated message, and Plexus operators only ever SUM their deltas -- so a modulation
-    cannot be a delta of its own. It is written to a `none`-integrated block, and
-    `neuron_signal` reads it. The consequence is that the dependency is explicit in the
-    schedule (`neuron_field_input` before `neuron_signal`), which is what a Schedule is for.
+    field -> neuron: reads pos, writes the `block:` state block in place.
 
-    `MAY_MUTATE_INTEGRATED_STATE = True` is required, and not because this writes integrated
-    state -- it does not. The engine's frame-0 purity guard clones and compares the WHOLE
-    `state` tensor, and `omega` lives in it; a derived readout has to opt out of that check the
-    same way `aggregate`'s centroid does.
+        Omega_i = gain * F(x_i) + offset
+
+    F is the `from:` field, read bilinearly at the neuron's position on channel `channel`;
+    gain and offset rescale it into whatever range the modulation is meant to span. Both are
+    tunable, so an inverse loop can fit them.
+
+    This is an operator and not a term inside `neuron_signal` because Omega MULTIPLIES the
+    aggregated message, and Plexus operators only ever sum their deltas -- a modulation cannot
+    be a delta of its own. It is written to an unintegrated block that `neuron_signal` reads,
+    which makes the dependency explicit in the schedule: `neuron_field_input` before
+    `neuron_signal`. That ordering is what a Schedule is for.
+
+    `MAY_MUTATE_INTEGRATED_STATE = True` is required, though this writes no integrated state.
+    The engine's frame-0 purity guard clones and compares the whole `state` tensor and `omega`
+    lives in it, so a derived readout has to opt out of that check the same way `aggregate`'s
+    centroid does.
+
+    Reference: Allier, C. et al., eqn. (simulation2): a time-dependent scalar field Omega_i(t)
+    scaling the aggregated message.
     """
 
     EMIT = None                        # writes a block in place; returns {} -- no integrable delta
@@ -319,15 +366,14 @@ class NeuronFieldInput(Exchange):
     MECHANISM_TAGS = ["external_input", "neuromodulation", "field_sampling"]
     PARAM_ROLES = {"block": "target_state_block", "channel": "field_channel",
                    "gain": "field_scale", "offset": "field_baseline"}
-    REFERENCE = ("Allier et al., eqn. (simulation2): a time-dependent scalar field Omega_i(t) "
-                 "scaling the aggregated message.")
+    REFERENCE = ("Allier, C. et al., eqn. (simulation2): a time-dependent scalar field "
+                 "Omega_i(t) scaling the aggregated message.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "neuron")
-        # the engine injects the spec's `from:` under the key "from" (schema.py holds it on
-        # `OpSpec.frm`; engine.py re-adds it when instantiating), which is how `sense` and
-        # `chemotax` name their source field too.
+        # The engine injects the specification's `from:` under the key "from", which is how
+        # `sense` and `chemotax` name their source field too.
         self.field = params.get("from") or params.get("field")
         self.block = params.get("block", "omega")
         self.channel = int(params.get("channel", 0))
@@ -345,9 +391,8 @@ class NeuronFieldInput(Exchange):
             keep = lvl.get(self.block).squeeze(-1)
             val = torch.where(mask, val, keep)
         c0, c1 = lvl.state_schema[self.block]
-        # CLONE-AND-REASSIGN, not an in-place slice write: `state` is a registered buffer that a
-        # grad-enabled rollout may have on the tape, and an in-place write into it would break
-        # autograd. This is the idiom `Hierarchy.renumber_set` already uses.
+        # Clone and reassign rather than writing into a slice: `state` is a registered buffer a
+        # grad-enabled rollout may have on the tape, and an in-place write would break autograd.
         st = lvl.state.clone()
         st[:, c0:c1] = val[:, None]
         lvl.state = st
@@ -359,30 +404,42 @@ class NeuronFieldInput(Exchange):
 # --------------------------------------------------------------------------- #
 @register_operator("neural_seed", family="seed", set="neuron", kind="seed")
 class NeuralSeed(Seed):
-    """Establish x_0 for a neuron set from a frozen NeuPrint REGION MANIFEST.
+    """Establish x_0 for a neuron set from a frozen connectome region manifest: real somata at
+    their real positions, rather than points scattered in a box.
 
-    It writes three things and nothing else: each neuron's POSITION (its soma, mapped from
-    dataset voxels into the world box), its INITIAL VOLTAGE, and the connectome PROVENANCE
-    (body id, cell-type id) as per-node buffers.
+    neuron -> neuron: reads a file, writes pos, voltage and neurite_dir, once, at the opening
+    of the trajectory.
 
-    IT DOES NOT QUERY ANYTHING. The region was selected once, offline, by
-    `plexus.io.neuprint`, which bisected a cube until it held about the requested number of
-    neurons and wrote down which ones they were. A seed that re-ran the selection would make
-    the identity of the neurons a function of the server's contents on the day the spec was
-    run, so two runs of one spec could be two different circuits. What the spec names is a
-    manifest; what the manifest names is a dataset, a query, a cube and a list of body ids.
+        x_i = (xyz_i - bounds_lo) / side          the cube becomes the unit box
+        v_i = v0_mean + v0_sd z_i,  z_i ~ N(0, 1)
 
-    THE MAPPING INTO THE WORLD BOX IS AFFINE AND ISOTROPIC: `(xyz - bounds_lo) / side`, so the
-    cube becomes the unit box and a distance ratio is preserved. `side_um` in the manifest is
-    therefore exactly the `general.units.length_um` a spec should declare -- the world box IS
-    the cube, and that is the one number that makes a micrometre statement about this run
-    possible at all.
+    xyz_i is the soma position in NANOMETRES and side the cube's edge in the same units; the
+    mapping is affine and isotropic, so every distance ratio is preserved. Nanometres and not
+    voxels: on an anisotropic dataset a voxel cube is a cuboid, and placing neurons from voxel
+    coordinates would stretch the region along one axis. v0_sd is a spread in the units of x,
+    and it is nonzero by default so that v = 0 is not a fixed point the whole population sits
+    at. It also writes the connectome provenance -- body id, cell type id -- as per-node
+    buffers rather than state, because an identity is not a quantity and nothing integrates it.
 
-    ORDER MATTERS AND IS CHECKED. The manifest's row order is the neuron index order, and it
-    is the same order `plexus.io.connectome` used to build `edge_index`. A mismatch in count
-    between the manifest and the set is refused rather than truncated, because silently
-    seeding the first N of a different region is indistinguishable, in the output, from
-    seeding the right one.
+    It queries nothing. The region was selected once, offline, by `plexus.io.neuprint`, which
+    bisected a cube until it held about the requested number of neurons and recorded which ones
+    they were. A seed that re-ran the selection would make the identity of the neurons a
+    function of the server's contents on the day the specification ran, so two runs of one
+    specification could be two different circuits. What the specification names is a manifest;
+    what the manifest names is a dataset, a query, a cube and a list of body ids.
+
+    Because the world box IS the cube, `side_um` in the manifest is exactly the
+    `general.units.length_um` a specification should declare -- the one number that makes any
+    micrometre statement about the run possible. It is checked, not assumed.
+
+    Order matters and is also checked. The manifest's row order is the neuron index order, and
+    the same order `plexus.io.connectome` used to build `edge_index`. A count mismatch between
+    the manifest and the set is refused rather than truncated: silently seeding the first N of a
+    different region is indistinguishable, in the output, from seeding the right one.
+
+    Reference: region frozen by plexus.io.neuprint from a NeuPrint server; hemibrain connectome
+    from Scheffer, L. K. et al. (2020). A connectome and analysis of the adult Drosophila
+    central brain. eLife 9:e57443.
     """
 
     EMIT = None                        # writes x_0 directly; returns {}
@@ -398,8 +455,9 @@ class NeuralSeed(Seed):
     MECHANISM_TAGS = ["connectome", "anatomy", "initial_condition", "neuprint"]
     PARAM_ROLES = {"region": "frozen_region_manifest_dir", "v0_sd": "initial_voltage_spread",
                    "v0_mean": "initial_voltage_mean"}
-    REFERENCE = ("Region frozen by plexus.io.neuprint from a NeuPrint server "
-                 "(Scheffer et al. 2020, hemibrain; https://neuprint.janelia.org).")
+    REFERENCE = ("Region frozen by plexus.io.neuprint from a NeuPrint server; hemibrain "
+                 "connectome from Scheffer, L. K. et al. (2020). A connectome and analysis of "
+                 "the adult Drosophila central brain. eLife 9:e57443.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -409,9 +467,9 @@ class NeuralSeed(Seed):
         self.v0_sd = float(params.get("v0_sd", 0.5))   # a spread, so v = 0 is not a fixed point
 
     def _load(self):
-        # `region_path` owns the convention (a bare name -> graphs_data/neural_regions/<name>),
-        # so the importer that WRITES a region and the seed that READS it cannot disagree about
-        # where one lives -- which they did, once, and the seed looked in the output tree.
+        # `region_path` owns the convention -- a bare name resolves to
+        # graphs_data/neural_regions/<name> -- so the importer that writes a region and the seed
+        # that reads it cannot disagree about where one lives.
         from plexus.io.neuprint import region_path
         root = region_path(self.region)
         man = json.load(open(os.path.join(root, "manifest.json")))
@@ -421,9 +479,9 @@ class NeuralSeed(Seed):
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         root, man, z = self._load()
-        # NANOMETRES, not voxels: on an anisotropic dataset (fish2 is 16/16/15 nm) a voxel
-        # cube is a cuboid, so the importer crops in nm and stores both. Placing neurons from
-        # `xyz_vox` would stretch the region along z by 6.7% with nothing to show for it.
+        # Nanometres, not voxels: on an anisotropic dataset a voxel cube is a cuboid, so the
+        # importer crops in nm and stores both. Placing neurons from `xyz_vox` would stretch the
+        # region along the thin axis by the anisotropy ratio, with nothing to show for it.
         xyz = np.asarray(z["xyz_nm"], np.float64)
         lo = np.asarray(z["bounds_lo_nm"], np.float64)
         side = float(z["bounds_side_nm"])
@@ -457,12 +515,11 @@ class NeuralSeed(Seed):
         lvl.cell_type_names = [str(t) for t in np.asarray(z["type_names"], dtype=object)]
         lvl.region_manifest = man
         r = man["region"]
-        # THE REGION'S PHYSICAL SIZE HAS TO LAND SOMEWHERE, and both places matter.
+        # The region's physical size lands in two places, and both matter.
         H.region = r                                # (1) on the Hierarchy, so every downstream
-        #                                                 consumer -- the volume metadata, the
-        #                                                 Well adapter, a plot axis -- reads the
-        #                                                 same number instead of re-deriving it.
-        self._check_units(H, r)                     # (2) against the spec's own declaration.
+        #                                                 consumer reads the same number rather
+        #                                                 than re-deriving it.
+        self._check_units(H, r)                     # (2) checked against the spec's declaration.
         print(f"[neural_seed] {n} neurons from {man['source']['dataset']} -- cube of "
               f"{r['side_um']:.3f} um at {np.round(lo).astype(int).tolist()} nm, "
               f"{len(lvl.cell_type_names)} cell types"
@@ -472,21 +529,19 @@ class NeuralSeed(Seed):
 
     @staticmethod
     def _check_units(H, r):
-        """The world box IS the cube, so `general.units.length_um` MUST equal the manifest's
+        """The world box IS the cube, so `general.units.length_um` must equal the manifest's
         `side_um`. Checked, not assumed.
 
-        WHY THIS IS NOT PEDANTRY. `length_um` is the one number that converts every result of
-        this run into micrometres, and a spec carries it as a literal -- copied by hand from a
-        manifest, at some point in the past. Re-run the importer with a different `--target`
-        and the cube changes size while the literal does not, and from then on every distance
-        the run reports is wrong by that ratio with nothing to show for it. The paper's own
-        example of this failure is a membrane that turned out to be 24x too thick once the box
-        was calibrated. So: if the spec declares units, they are compared against the region
-        the seed actually loaded, and a mismatch stops the run.
+        `length_um` is the one number converting every result of this run into micrometres, and
+        a specification carries it as a literal copied by hand from a manifest at some point in
+        the past. Re-run the importer with a different target and the cube changes size while
+        the literal does not; from then on every distance the run reports is wrong by that
+        ratio, with nothing in the output to show for it. So a declared unit is compared against
+        the region actually loaded, and a mismatch stops the run.
 
-        An UNDECLARED unit block is not an error -- a dimensionless mechanism study is a legal
-        and honest state -- but it is worth saying what the number WOULD have been, because
-        the manifest knows and the reader is one line away from being able to use it.
+        An undeclared unit block is not an error -- a dimensionless mechanism study is a legal
+        and honest state -- but it is worth printing what the number would have been, because
+        the manifest knows it and the reader is one line away from being able to use it.
         """
         u = getattr(getattr(H, "config", None), "units", None)
         side = float(r["side_um"])
