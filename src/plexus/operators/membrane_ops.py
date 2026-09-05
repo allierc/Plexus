@@ -321,11 +321,10 @@ class BasementMembraneSeed(Structural):
             idx = alive.nonzero(as_tuple=True)[0][-extra:]
             alive[idx] = False
         if n0 < n:
-            # PARKED OUTSIDE THE BOX, MASSLESS. It used to be parked at the tissue CENTRE, which is
-            # fine for a spring membrane -- MPM never touched it -- and is not fine for a continuum one.
-            # Measured: the same 3,333 live particles track the surface to R = 0.1145 with no reserve
-            # behind them, and sit frozen at 0.0876 with one, so the dormant particles were reaching the
-            # live sheet through the shared grid. Massless is not inert: `mpm_scatter` still deposits the
+            # PARKED OUTSIDE THE BOX, MASSLESS. Parking the reserve at the tissue CENTRE is fine
+            # for a spring membrane, which MPM never touches, and wrong for a continuum one: the
+            # dormant particles then reach the live sheet through the shared grid and freeze it.
+            # Massless is not inert either: `mpm_scatter` still deposits the
             # stress term, which carries p_vol and not m.
             #
             # Outside the box does not mean off the grid -- `bspline` clamps out-of-range indices to the
@@ -787,10 +786,10 @@ class BasementMembraneBondBreak(Structural):
             alive &= ~broke
         self._k += 1
         # COMPUTED PERIODICALLY, BUT ALSO CARRIED FORWARD -- and that second half is the whole point.
-        # `frac` used to be NaN on every frame that was not a multiple of `components_every`, and every
-        # analysis reads the LAST row, which with 403 frames and a period of 40 is never a multiple. So
-        # `lcc_end` came back NaN in all 27 race runs and was silently dropped from every conclusion,
-        # while the note asserted that connectivity, not bond count, was what we reported. A metric that
+        # Computing it only on the frames that are multiples of `components_every` and leaving the
+        # rest NaN would make the LAST row -- which is what an analysis reads -- NaN unless the
+        # frame count happens to be a multiple of the period. The connectivity would then be
+        # silently dropped from every conclusion that claimed to rest on it. A metric that
         # is NaN wherever it is read is not a metric.
         _last = self._k >= int(getattr(H, "n_frames", 0) or 0) - 1
         if self.components_every > 0 and (self._k % self.components_every == 0 or _last):
@@ -1719,10 +1718,10 @@ class BasementMembraneSecrete(Structural):
 
         # BONDS ARE ONLY NEEDED BY `parent`, which weights sites by the load on each particle's own
         # crosslinks. `uniform` and `gaps` never look at them -- so returning early when there is no
-        # network disabled secretion for the entire continuum membrane, silently. Runs 92 and 93 came
-        # back identical to every digit with n_alive frozen at its seeded 3,333, which is what a rate
-        # parameter looks like when nothing reads it: the sheet then sat at R = 0.0875 while the tissue
-        # grew past it, leaving the membrane INSIDE the spheroid.
+        # network would disable secretion for the entire continuum membrane, silently. The live
+        # particle count then stays frozen at its seeded value, which is what a rate parameter looks
+        # like when nothing reads it: the sheet holds its radius while the tissue grows past it,
+        # leaving the membrane INSIDE the spheroid.
         bonds = getattr(H, "membrane_bonds", None)
         if bonds is None and self.deposit not in ("uniform", "gaps"):
             return {}
@@ -1844,9 +1843,9 @@ class BasementMembraneSecrete(Structural):
         m = getattr(lvl, "mass", None)
         if m is not None:
             m[slot] = m[src]
-        # NEWLY SECRETED MATERIAL IS UNSTRAINED, and this is not a detail. A parked particle used to be
-        # marked dormant by mass alone, which does NOT stop it scattering (the stress term is weighted by
-        # p_vol, not m) -- and `mpm_gather` still hands it a velocity every frame while
+        # NEWLY SECRETED MATERIAL IS UNSTRAINED, and this is not a detail. Marking a parked particle
+        # dormant by mass alone does NOT stop it scattering, the stress term being weighted by
+        # p_vol rather than m -- and `mpm_gather` still hands it a velocity every frame while
         # `mpm_strain` still integrates its deformation gradient from it. Sitting at the tissue centre for
         # hundreds of frames, F drifts arbitrarily far from identity. Activating it then promotes that
         # accumulated garbage into real material with real mass, and a single such particle can carry a
@@ -2071,8 +2070,8 @@ class IntegrinSeed(Structural):
     """
 
     EMIT = None
-    # kind "structural" -> "seed", 24 August. This operator establishes x_0 -- it lays the
-    # fibres down once and `forward` returns {} thereafter -- and every other `*_seed` in the
+    # kind="seed", not "structural". This operator establishes x_0 -- it lays the fibres down once
+    # and `forward` returns {} thereafter -- and every other `*_seed` in the
     # registry (bm_seed, ecm_seed, block_seed, mesh_seed, adhesion_seed, cell_chem_seed,
     # neural_seed) is already kind="seed". Registering it as a dynamics kind made it the one
     # operator tripping the family/kind invariant, so `[warn] integrin_seed: family="seed"
