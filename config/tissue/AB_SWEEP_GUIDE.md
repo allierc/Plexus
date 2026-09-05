@@ -1,6 +1,6 @@
 # `cell_mechanics[model: apicobasal]`, one parameter at a time
 
-22 variants of `ab_02_flat_apicobasal`, each changing exactly ONE key of the operator and nothing
+22 variants of `ab_02_reduction_apicobasal`, each changing exactly ONE key of the operator and nothing
 else. Same seed, same 60-cell flat disc, same 20 frames. Movies in
 `graphs_data/tissue/ab_02_flat_apicobasal_<param>_<lo|hi>/movie.mp4`; final frames side by side in
 `graphs_data/tissue/ab_02_flat_apicobasal_montage.png`.

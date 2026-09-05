@@ -1,9 +1,9 @@
 general:
-  name: ab_05_thickshell_free
+  name: ab_07_divide_uniform_volume
   seed: 0
-  n_frames: 80
+  n_frames: 480
   dt: 1.0
-  record_cap: 84
+  record_cap: 483
   boundary: free
   dim: 3
   world:
@@ -29,7 +29,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 15.0
+    span: 26.0
     walls: 64
     loc:
     - 0.015
@@ -43,13 +43,13 @@ plotting:
     xlabel: frame
     ylabel: cells
     ticks: 4
-  - quantity: area
+  - quantity: volume
     xlabel: frame
-    ylabel: cell area
+    ylabel: cell volume
     ticks: 4
 sets:
   vertex:
-    n: 16384
+    n: 25584
     mesh: half_edge
     cell_set: cell
     state:
@@ -67,7 +67,7 @@ sets:
         width: 3
         integration: first_order
   cell:
-    n: 4096
+    n: 12800
     state:
       area:
         width: 1
@@ -85,9 +85,20 @@ seed:
   p0: 3.5
   seed: 0
   h0: 1.8
+  vseed_cv: 0.0
+  age_seed: 60.0
 operators:
 - op: cell_geometry
   at: cell
+- op: cell_grow
+  model: timer
+  at: vertex
+  cell_set: cell
+  cycle_frames: 120.0
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
 - op: cell_mechanics
   model: apicobasal
   at: vertex
@@ -101,10 +112,30 @@ operators:
   eta: 0.08
   cap_frac: 0.12
   sep_mu: 1.0
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: cell_divide
+  model: timer
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  cycle: 60.0
+  cycle_cv: 0.0
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
 - op: topo_record
   at: vertex
   every: 1
 schedule:
 - cell_geometry
+- cell_grow
 - cell_mechanics
+- edge_flip
+- cell_divide
 - topo_record

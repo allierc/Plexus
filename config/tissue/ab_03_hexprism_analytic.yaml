@@ -1,5 +1,5 @@
 general:
-  name: ab_03_hexprism
+  name: ab_03_hexprism_analytic
   seed: 0
   n_frames: 8
   dt: 1.0

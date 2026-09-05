@@ -1,5 +1,5 @@
 general:
-  name: ab_07_uniform_volume
+  name: ab_06_divide_sparse
   seed: 0
   n_frames: 480
   dt: 1.0
@@ -85,16 +85,14 @@ seed:
   p0: 3.5
   seed: 0
   h0: 1.8
-  vseed_cv: 0.0
-  age_seed: 60.0
+  vseed_cv: 0.5
 operators:
 - op: cell_geometry
   at: cell
 - op: cell_grow
-  model: timer
   at: vertex
   cell_set: cell
-  cycle_frames: 120.0
+  rate: 0.000963
   rho: 1.0
   a_sw: 50.0
   hill: 4.0
@@ -125,7 +123,7 @@ operators:
   every: 4
   engine_clock: true
   cycle: 60.0
-  cycle_cv: 0.0
+  cycle_cv: 0.4
   min_cycle: 4
   max_cycle: 1000000000
   p0: 3.5

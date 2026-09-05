@@ -1426,6 +1426,34 @@ class LiveMovie:
             st = self.style or {}
             rgb = np.tile((np.asarray(_mc.to_rgb(st.get("mesh_color", "#e6dcc0"))) * 255)
                           .astype(np.uint8), (nF, 1))
+            # `mesh_color_by: phase` -- PAINT THE CELL CYCLE, WHICH IS THE ONLY WAY TO SEE IT. A
+            # tissue running `cell_cycle` and one running a plain timer produce the same growing
+            # ball; the phases are per-cell state and nothing in the geometry shows them, so a run
+            # whose whole subject is the cycle draws as a uniform sheet unless the colour carries it.
+            #
+            # IT REPLACES THE DIVISION MARKS RATHER THAN LAYERING OVER THEM, because M IS the
+            # division mark: a cell in M is one about to divide, and drawing a mother-blue over a
+            # phase-red would be two encodings of one event competing for the same cell. Choose one.
+            #
+            # THE FOUR COLOURS ARE CATEGORICAL AND THEY ARE THE TEXTBOOK ONES. A first version
+            # used an ordered cool-to-warm ramp on the argument that G1 -> S -> G2 -> M is a
+            # progression, and that was the wrong call: the cycle is drawn in every cell-biology
+            # figure with G1 blue, S green, G2 amber and M red, so a reader already HAS the mapping
+            # and a private ramp asks them to learn a second one. A phase is also a name, not a
+            # position on a scale -- nothing is "between" S and G2 -- and an ordered ramp implies an
+            # interpolation the state does not have.
+            _by = str(st.get("mesh_color_by", "") or "").lower()
+            _ph = m.get("phase")
+            if _by == "phase" and _ph is not None:
+                _p = (_ph.detach().cpu().numpy() if hasattr(_ph, "detach") else np.asarray(_ph))
+                _p = np.asarray(_p, np.float64).ravel()[:nF]
+                _pal = st.get("phase_colors") or ["#3b57c0", "#2e9e4f", "#e8b024", "#e03b2f"]
+                for _k, _c in enumerate(_pal[:4]):
+                    _sel = np.rint(_p) == _k
+                    if _sel.any():
+                        rgb[_sel] = (np.asarray(_mc.to_rgb(_c)) * 255).astype(np.uint8)
+                pd.cell_data["rgb"] = rgb
+                return rgb
             for msk, key, dflt in ((mother, "mesh_mother_color", "#4a86c8"),
                                    (daughter, "mesh_daughter_color", "#d9534f"),
                                    (kills, "mesh_apop_color", "#e8c33a")):
