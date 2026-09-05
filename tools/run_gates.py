@@ -201,6 +201,48 @@ def run_one(path, cfg, device="cuda:0", force=False):
 
 
 # ---------------------------------------------------------------------------------- grading
+def _frozen_drift(gid, cfg):
+    """Has this gate's `_gate:` block moved since it was frozen? -> None, or what changed.
+
+    Returns `{"frozen":, "now":, "rows": [...]}`. `rows` names the measures whose assertion, tier,
+    basis, unit or fn differ from the frozen copy -- a hash says only THAT something moved, and the
+    first question anyone asks is WHICH row. The frozen file already stores the graded rows, so the
+    answer is on disk and needs no re-run.
+    """
+    ref = os.path.join(LOG, gid, "reference", "reference.json")
+    if not os.path.exists(ref):
+        return None                                # never frozen: nothing to be inconsistent with
+    try:
+        d = json.load(open(ref))
+    except Exception:
+        return None
+    frozen = d.get("gate_sha1")
+    now = _sha1(cfg["_gate"])
+    if not frozen or frozen == now:
+        return None
+    was = {r.get("name"): r for r in (d.get("rows") or []) if isinstance(r, dict)}
+    # THE SPEC SAYS `assert:` AND THE GRADED ROW SAYS `assertion:`, and that rename is why the first
+    # version of this named no rows at all: it compared `m["assertion"]` against a spec measure that
+    # has no such key, the `k in m` guard swallowed it, and every drift reported an empty list. A
+    # hash that says "something moved" without saying WHAT is the least useful half of this check.
+    KEYS = (("assertion", "assert"), ("tier", "tier"), ("basis", "basis"),
+            ("unit", "unit"), ("fn", "fn"), ("reduce", "reduce"), ("args", "args"))
+    changed = []
+    for m in (cfg["_gate"].get("measures") or []):
+        nm = m.get("name")
+        old = was.get(nm)
+        if old is None:
+            changed.append(f"{nm} (new)")
+            continue
+        for row_key, spec_key in KEYS:
+            if row_key in old and spec_key in m and old[row_key] != m[spec_key]:
+                changed.append(f"{nm}.{spec_key}")
+                break
+    changed += [f"{nm} (removed)" for nm in was
+                if nm not in {m.get("name") for m in (cfg["_gate"].get("measures") or [])}]
+    return dict(frozen=frozen, now=now, rows=changed)
+
+
 def _convert(val, fn, cfg):
     """Simulation units -> the row's physical unit, through the spec's `units:` block."""
     if fn not in GM.PHYSICAL:
@@ -220,6 +262,21 @@ def _convert(val, fn, cfg):
             raise KeyError("a stress row needs `force_nN` as well as `length_um`; the spec declares "
                            "only one of them, so the number has no Pa to be quoted in")
         k = float(U.stress_Pa)
+    elif kind == "volume":
+        # L^3. Derived like every other one -- `plexus.units.Units.volume_um3` is the single place
+        # that arithmetic lives, and a gate must not re-do it in its own head.
+        from plexus.units import parse as _parse_units
+        k = float(_parse_units(u).volume_um3)
+    elif kind == "tension":
+        # FORCE / LENGTH -- the 2D modulus a membrane actually has, quoted in mN/m because that is
+        # the unit a measured cortical tension comes in. It needs BOTH base scales, exactly as a
+        # stress does, and says so rather than inventing a force scale.
+        from plexus.units import parse as _parse_units
+        U = _parse_units(u)
+        if U.tension_N_per_m is None:
+            raise KeyError("a tension row needs `force_nN` as well as `length_um`; the spec declares "
+                           "only one of them, so the number has no N/m to be quoted in")
+        k = 1.0e3 * float(U.tension_N_per_m)                 # N/m -> mN/m
     else:
         raise KeyError(kind)
     return [x * k for x in val] if isinstance(val, list) else val * k
@@ -433,6 +490,25 @@ def main():
                                           capture_output=True, text=True).stdout.strip(),
                     device=a.device, strict_determinism=True, wall_s=round(wall, 1),
                     trajectory=os.path.relpath(d, ROOT))
+        # THE READ-BACK THIS FILE'S HEADER HAS PROMISED SINCE JUNE, and which did not exist:
+        # `gate_sha1` appeared three times in this file -- computed, written, printed -- and NEVER
+        # compared. So "every later grading re-hashes and refuses to grade if the block has moved"
+        # was an aspiration, and the honour system the header says we escaped was the one we were on.
+        #
+        # THE HASH COVERS THE WHOLE `_gate:` BLOCK, prose included, so editing a `why:` re-freezes
+        # exactly as moving a threshold does. That is the right trade -- it is what makes tampering
+        # visible -- but it means a re-freeze is a deliberate act, and `--freeze-reference` is how
+        # you say so.
+        drift = _frozen_drift(gid, cfg)
+        if drift and not a.freeze_reference:
+            print(f"  REFUSING TO GRADE: the `_gate:` block has moved since it was frozen "
+                  f"({drift['frozen']} -> {drift['now']}).")
+            if drift["rows"]:
+                print(f"    rows that changed: {', '.join(drift['rows'])}")
+            print("    A threshold chosen after seeing the number is not a threshold. Re-freeze "
+                  "deliberately with --freeze-reference, or restore the block.")
+            worst = max(worst, 3)
+            continue
         rows, n_fail, n_block, n_turned = grade(path, cfg, d)
         doc = write_table(gid, cfg, rows, meta)
         for r in rows:
