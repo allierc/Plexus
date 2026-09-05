@@ -596,7 +596,11 @@ def render_operator_page(name: str, cls) -> str:
     kind = getattr(cls, "KIND", None)
     level = getattr(cls, "SET", None) or getattr(cls, "LEVEL", None)   # plexus2: operators act on a SET
     pred = getattr(cls, "PREDICTION", None)
-    doc = inspect.getdoc(inspect.getmodule(cls)) or inspect.getdoc(cls) or ""
+    # THE OPERATOR'S OWN DOCSTRING FIRST. Every registered class now carries one -- the
+    # mechanism, its equation, and its symbols -- so the module docstring is only a fallback for
+    # a class that has none. Reading the module first gives every operator in a module the SAME
+    # one-line summary, which is the module's blurb and not the operator's.
+    doc = inspect.getdoc(cls) or inspect.getdoc(inspect.getmodule(cls)) or ""
     e = ENRICH.get(name, {})
     klabel, ksym, kgloss = KIND_INFO.get(kind, (kind, "", ""))
 
@@ -759,7 +763,7 @@ def render_operator_page(name: str, cls) -> str:
 def render_field_page(name: str, cls) -> str:
     frame = getattr(cls, "FRAME", None)
     couples = getattr(cls, "COUPLES_TO", None)
-    doc = inspect.getdoc(inspect.getmodule(cls)) or inspect.getdoc(cls) or ""
+    doc = inspect.getdoc(cls) or inspect.getdoc(inspect.getmodule(cls)) or ""
     purpose = first_sentence(doc)
     body = clean_prose("\n".join(doc.split("\n")[1:]).strip())
     out = ["---", f'title: "{name}"']
@@ -861,8 +865,8 @@ def render_operators() -> str:
                        "How state moves &mdash; grouped by family, in the visual language of the operator algebra")
     out.append("Each operator belongs to one of the elementary **families** of the "
                "[operator algebra](language.qmd) &mdash; Lateral, Aggregate, Broadcast, Exchange, "
-               "Field, Rewire, Structural (Divide and Die) and Seed; the logo marks the kind "
-               "also exposes a **field** self-dynamics kind (a field&rsquo;s own update).")
+               "Field, Rewire, Structural (Divide and Die) and Seed; the logo marks which. The "
+               "runtime also exposes a **field** kind, a field&rsquo;s own self-update.")
     out.append("")
     for kind in KIND_ORDER:
         members = sorted(nm for nm, c in ops.items() if getattr(c, "KIND", None) == kind)
@@ -877,7 +881,7 @@ def render_operators() -> str:
         out.append('::: {.op-grid}')
         for nm in members:
             c = ops[nm]
-            sub = first_sentence(inspect.getdoc(inspect.getmodule(c)) or inspect.getdoc(c) or "") \
+            sub = first_sentence(inspect.getdoc(c) or inspect.getdoc(inspect.getmodule(c)) or "") \
                 or f"{kind} @ {getattr(c, 'LEVEL', '')}"
             out.append(card(nm, c, kind_icon(kind), sub))
         out.append(":::")
@@ -906,7 +910,7 @@ def render_fields() -> str:
     out.append('::: {.op-grid}')
     for nm in sorted(fields):
         c = fields[nm]
-        out.append(card(nm, c, "field", first_sentence(inspect.getdoc(inspect.getmodule(c)) or inspect.getdoc(c) or "")))
+        out.append(card(nm, c, "field", first_sentence(inspect.getdoc(c) or inspect.getdoc(inspect.getmodule(c)) or "")))
     out.append(":::")
     out.append("")
     return "\n".join(out)
