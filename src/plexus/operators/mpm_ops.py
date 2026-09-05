@@ -10,6 +10,9 @@
     mpm_spin            a prescribed angular velocity
     apply_material_map  a per-particle material assignment from a map
     mls_mpm_mechanics   the FENCED transitional oracle: the whole cycle in one operator
+    active_force        an activation field -> a per-particle body force
+    active_stress       an activation field -> a per-particle active stress tensor
+    seed_from_segmentation  a measured instance segmentation -> the particles and their material
 
 THE ORACLE IS STILL HERE AND IS STILL FENCED. `mls_mpm_mechanics` does in one operator what the
 four above do in four, and it exists so the decomposition can be checked against something. It is
@@ -39,6 +42,8 @@ import os
 from plexus.models.base import Field, Exchange
 from plexus.models.registry import register_field, register_operator
 from plexus.paths import graphs_data_path
+import json
+from plexus.models.base import Seed
 
 
 # ==========================================================================================================
@@ -3573,4 +3578,344 @@ class MPMGatherLoop27(MPMGather):
         p.state[:, pa:pb] = Xn
         p.state[:, va:vb] = new_V
         p.C.copy_(new_C)
+        return {}
+
+
+# ==========================================================================================================
+# MOVED HERE FROM `agent_ops.py`, 4 September: both laws turn an activation field into something
+# the MPM substep consumes -- a body accel (`active_force`) or an active stress (`active_stress`).
+# Neither one touches an agent set, and `mpm_scatter` is the only reader of what they emit.
+# FROM `discovery_okuda/ops/active_force.py` -- active_force -- the FORCE constitutive law: an activation field -> per-particle MPM body force.
+# ==========================================================================================================
+@register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle", kind="exchange")
+class ActiveForce(Exchange):                     # (alias `pulse_to_contraction` for one migration cycle)
+    EMIT = "mpm_acceleration"           # a body accel the MPM substep consumes as a_ext, not engine-integrated
+    SUPPORTED_DIMS = [2]                 # 2D — reads a 2-vector activation gradient / direction field
+    REQUIRES_PARAMS = ["from"]                # the activation field to read
+    MECHANISM_TAGS = ["active_contraction", "field_gradient_force", "directed_active_stress"]
+    PARAM_ROLES = {"amplitude": "contraction_strength", "mode": "gradient_or_directional"}
+    REFERENCE = "Marchetti, M. C. et al. (2013). Hydrodynamics of soft active matter. Rev. Mod. Phys. 85:1143-1189."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("from")
+        self.amplitude = float(params.get("amplitude", 50.0))
+        self.channel = int(params.get("channel", 0))
+        # `mode:` SPLIT ONTO ITS TWO REAL AXES, 4 September. It carried three words doing two
+        # different jobs: `inward`/`outward` chose a SIGN on one rule, `directional` chose a
+        # DIFFERENT RULE. One key, two axes, and nothing in the registry could tell them apart.
+        # `along:` is the value; `model: directional` is the hypothesis. See AXES.md.
+        if "mode" in params:
+            raise ValueError(
+                "active_force: `mode` is gone. `inward`/`outward` are now `along:` (a value on this "
+                "model -- the sign of the gradient), and `directional` is now "
+                "`model: directional` (a different rule: a prescribed direction field). See AXES.md.")
+        self.along = str(params.get("along", "inward"))
+        if self.along not in ("inward", "outward"):
+            raise ValueError(f"active_force: along must be inward|outward, got {self.along!r}")
+        self.sign = 1.0 if self.along == "inward" else -1.0
+        self.at = params.get("_at", "particle")
+
+    def _accel(self, H, lvl, pos, fld):
+        """THE HYPOTHESIS, and the only thing a `model=` variant of active_force changes.
+
+        Default: the contraction follows the ACTIVATION GRADIENT -- direction = +/- grad(a), with
+        `along:` choosing the sign. `inward` pulls up the gradient, toward higher activation.
+        """
+        grad = fld.grad_at(pos, self.channel, periodic=getattr(H, "periodic", False))   # [N, 2]
+        return self.sign * self.amplitude * grad                          # inward for sign>0
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        fld = H.fields[self.field_name]
+        acc = self._accel(H, lvl, pos, fld)
+        acc = acc * lvl.occ[:, None]
+        if mask is not None:
+            acc = acc * mask[:, None].float()
+        # return a per-particle force delta; the engine sums it (with drag's) into
+        # H.delta(mpm_particle), which p2g consumes as the MPM body force. EMIT=None,
+        # so the engine never integrates the particle set (g2p owns advection).
+        return {self.at: acc}
+
+
+@register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle",
+                   kind="exchange", model="directional")
+class ActiveForceDirectional(ActiveForce):
+    """`directional` MODEL of active_force -- the contraction follows a PRESCRIBED DIRECTION FIELD.
+
+    A DIFFERENT HYPOTHESIS, NOT A DIFFERENT SIGN, which is why it is a `model:` and the old
+    `mode: inward|outward|directional` could not say so. The default reads the activation's GRADIENT
+    and lets the field decide where to push; this one reads the activation only for HOW MUCH and
+    takes WHERE from a separate unit-vector field -- the active-stress orientation map. On a uniform
+    activation the default produces no force at all and this one produces its full magnitude, so
+    they are not two ways of computing one thing.
+
+        F_i = amplitude * a(x_i) * d(x_i)
+
+    It also READS A SECOND FIELD, which the typed signature now records per variant (R1(c)).
+    """
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.direction_from = params.get("direction_from")
+        if self.direction_from is None:
+            raise ValueError("active_force[model: directional] needs `direction_from:` "
+                             "(a vector_grid field giving the contraction direction)")
+
+    def _accel(self, H, lvl, pos, fld):
+        a = fld.sample(pos, self.channel)                                 # [N] activation: HOW MUCH
+        d = H.fields[self.direction_from].sample(pos)                     # [N, 2] direction: WHERE
+        d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
+        return self.amplitude * a[:, None] * d
+
+
+# ==========================================================================================================
+# FROM `discovery_okuda/ops/active_stress.py` -- active_stress -- the STRESS constitutive law: an activation field -> per-particle active stress.
+# ==========================================================================================================
+@register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange")
+class ActiveStress(Exchange):                    # (alias `pulse_to_active_stress` for one migration cycle)
+    EMIT = None                         # stress is consumed by the MPM substep, not integrated
+    SUPPORTED_DIMS = [2]                 # 2D — contraction axis n and n n^T are 2-vectors / 2x2
+    REQUIRES_PARAMS = ["from", "direction_from"]
+    MECHANISM_TAGS = ["active_contraction", "active_stress_tensor", "directed_active_stress"]
+    PARAM_ROLES = {"amplitude": "active_stress_gain", "direction_from": "contraction_axis_field"}
+    REFERENCE = "Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101; Marchetti, M. C. et al. (2013). Rev. Mod. Phys. 85:1143."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("from")
+        self.amplitude = float(params.get("amplitude", 50.0))
+        self.channel = int(params.get("channel", 0))
+        self.direction_from = params.get("direction_from")
+        if self.direction_from is None:
+            raise ValueError("active_stress needs `direction_from:` "
+                             "(a vector_grid field giving the contraction axis n)")
+        self.at = params.get("_at", "particle")
+        # FRANK-STARLING (length-dependent tension, NHS/Niederer form): scale contraction by local fibre
+        # stretch lambda -> T *= 1 + stretch_activation*(lambda-1). 0 = OFF (byte-identical). Real cardiomyocytes
+        # contract HARDER when stretched; a stretch-REGULATED size lever (bigger loops without the runaway
+        # overshoot of raw amplitude/gain), aimed at the size<->direction frontier.
+        self.stretch_activation = float(params.get("stretch_activation", 0.0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        fld = H.fields[self.field_name]
+
+        a = fld.sample(pos, self.channel)                                         # [N] activation a(x)
+        n = H.fields[self.direction_from].sample(pos)                             # [N, 2] contraction axis
+        n = n / n.norm(dim=1, keepdim=True).clamp(min=1e-9)                        # unit
+        gate = (a * lvl.occ).clamp(min=0.0)                                       # only inactive=0 particles off
+        gain = getattr(lvl, "gain", None)                                         # optional per-particle gain map
+        if gain is not None:                                                      # (apply_material_map target=gain)
+            gate = gate * gain                                                    # spatially-structured contraction gain
+        if mask is not None:
+            gate = gate * mask.float()
+        if self.stretch_activation != 0.0:                                        # FRANK-STARLING length-dependent tension
+            F = getattr(lvl, "F", None)                                           # per-particle deformation gradient [N,2,2]
+            if F is not None:
+                lam = torch.bmm(F, n[:, :, None]).squeeze(-1).norm(dim=1).clamp(min=1e-6)   # fibre stretch lambda = |F n|
+                gate = gate * (1.0 + self.stretch_activation * (lam - 1.0)).clamp(min=0.0)  # T *= 1+beta*(lambda-1)
+        nn = n[:, :, None] * n[:, None, :]                                        # [N, 2, 2]  n n^T
+        # Active TENSION along the fibre axis n (cardiac convention sigma_a = +T n n^T): added to the
+        # elastic stress it SHORTENS the tissue along n. (The p2g scaling carries the MPM sign; this
+        # sign is fixed empirically so axis n => contraction ALONG n, see active_stress_test.)
+        sigma = (self.amplitude * gate)[:, None, None] * nn                        # +A a n n^T
+        # side-channel for p2g (same idiom as H.part_accel); overwritten each frame, read every substep.
+        H.active_stress = sigma
+        return {}                                                                 # no body-force delta
+
+
+# ==========================================================================================================
+# MOVED HERE FROM `agent_ops.py`, 4 September: it seeds MPM PARTICLES -- their positions inside a
+# measured mask and their per-cell Lame parameters -- so it belongs beside `ImageField`, whose
+# label-image sibling it defines, and beside the material it writes. Every other `kind="seed"`
+# operator already lives with its own domain module (`ecm_seed` in ecm_ops, `seed_mesh` in
+# vertex_ops, `neural_seed` in neural.py); there is no central seed module and this follows suit.
+# FROM `discovery_okuda/ops/segmentation_seed.py` -- segmentation_seed -- a measured instance segmentation becomes the CELL level of the hierarchy.
+# ==========================================================================================================
+@register_field("label_image", frame="label_image")
+class LabelImageField(Field):
+    """An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.
+
+    The one job it has that `image` cannot do: return the id that is actually there. Bilinear
+    weights between label 7 and label 12 are a number that means nothing and points at a cell that
+    may not exist, so `sample_label` indexes rather than interpolates.
+    """
+
+    def __init__(self, name, source=None, res=None, width=1.0, device="cpu", **kw):
+        super().__init__(name)
+        if source is None:
+            raise ValueError(f"label_image field {name!r} needs a `source:` (path to a label .tif)")
+        import tifffile
+        path = source if os.path.isabs(source) else graphs_data_path(source)
+        img = tifffile.imread(path)
+        if img.ndim == 3:
+            img = img[..., 0]
+        img = img[::-1, :].copy()                       # image-top -> domain-top, as ImageField
+        v = torch.tensor(img.astype("int64"), device=device).permute(1, 0).contiguous()
+        self.C = 1
+        self.nx, self.ny = int(v.shape[0]), int(v.shape[1])
+        self.width = float(width)
+        self.R = self.nx / self.width
+        self.register_buffer("grid", v[None])           # [1, nx, ny] int64 labels
+        self.n_labels = int(v.max())
+
+    def sample_label(self, pos):
+        """[N,2] world positions -> [N] integer label, nearest neighbour."""
+        x = pos[:, 0].clamp(0, self.width - 1e-6) / self.width * self.nx
+        y = pos[:, 1].clamp(0, self.width - 1e-6) / self.width * self.ny
+        gx = x.long().clamp(0, self.nx - 1)
+        gy = y.long().clamp(0, self.ny - 1)
+        return self.grid[0][gx, gy]
+
+
+@register_operator("seed_from_segmentation", family="seed", set="particle", kind="seed")
+class SeedFromSegmentation(Seed):
+    """Populate tissue -> cell -> particle from a measured instance segmentation. Runs once.
+
+    Was `kind="exchange"` (an `Exchange` subclass reusing the field-sampling machinery for
+    its numerics) with a `family="seed"` tag that already said what it actually was; the
+    mismatch let it masquerade as ordinary dynamics and skip the seed lifecycle guarantees
+    (never scheduled, runs once, before frame 0) -- exactly the case `Seed` exists to rule
+    out. The numerics (reading a field, scattering onto particles) are unchanged; only the
+    lifecycle classification is corrected.
+    """
+
+    EMIT = None
+    # It establishes the configuration -- where the cells are and which particles belong to
+    # them -- and writes the state buffer directly to do it. The engine's integration
+    # invariant forbids that for a dynamics operator, correctly; a Seed is exempted because
+    # establishing x_0 IS writing the state buffer (see base.Seed).
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = ["from"]
+    SUPPORTED_DIMS = [2]
+    MECHANISM_TAGS = ["instance_segmentation", "cell_identity", "heterogeneous_material"]
+    PARAM_ROLES = {"youngs_min": "param_lo", "youngs_max": "param_hi",
+                   "from": "label_field", "cell_set": "middle_level"}
+    REFERENCE = "instance segmentation measured from the beat; see prototype/cardio_cells"
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("from")
+        self.at = params.get("_at", "mpm_particle")
+        self.cell_set = params.get("cell_set", "cell")
+        self.y_lo = float(params.get("youngs_min", 40.0))
+        self.y_hi = float(params.get("youngs_max", 220.0))
+        self.props = params.get("props")               # optional measured per-cell json
+        self.jitter = float(params.get("jitter", 0.0))
+        self._done = False
+
+    def _cell_values(self, n_cells, device):
+        """Per-cell Young's modulus: from the MEASURED beat when a props file is given, else a
+        deterministic spread so the tissue is heterogeneous but reproducible.
+
+        Measured is the interesting case. A cell that moved little in the recording is either stiff
+        or weakly contractile; mapping amplitude to stiffness INVERSELY is one hypothesis about
+        which, it is stated here rather than hidden, and the alternative (amplitude -> contraction
+        gain) is the same one line the other way round.
+        """
+        if self.props:
+            path = self.props if os.path.isabs(self.props) else graphs_data_path(self.props)
+            if os.path.exists(path):
+                d = json.load(open(path))
+                amp = torch.tensor([d.get(str(k), {}).get("amp", float("nan"))
+                                    for k in range(1, n_cells + 1)], device=device)
+                good = torch.isfinite(amp)
+                if good.any():
+                    a = amp.clone()
+                    a[~good] = a[good].median()
+                    lo, hi = torch.quantile(a, 0.05), torch.quantile(a, 0.95)
+                    u = ((a - lo) / (hi - lo + 1e-9)).clamp(0, 1)
+                    return self.y_lo + (1.0 - u) * (self.y_hi - self.y_lo), "measured beat amplitude"
+        g = torch.Generator(device="cpu").manual_seed(12345)
+        u = torch.rand(n_cells, generator=g).to(device)
+        return self.y_lo + u * (self.y_hi - self.y_lo), "deterministic spread (no props file)"
+
+    def forward(self, H, mask=None):
+        if self._done:
+            return {}
+        self._done = True
+        lvl = H.level(self.at)
+        fld = H.fields[self.field_name]
+        dev = lvl.state.device
+        px0, px1 = lvl.state_schema["pos"]
+        n_cells = int(fld.n_labels)
+
+        # ---- where each label lives, in world coordinates ---------------------------------
+        gridl = fld.grid[0]                                     # [nx,ny] int64
+        nx, ny = gridl.shape
+        gx, gy = torch.meshgrid(torch.arange(nx, device=dev), torch.arange(ny, device=dev),
+                                indexing="ij")
+        flat = gridl.reshape(-1)
+        wx = (gx.reshape(-1).double() + 0.5) / nx * fld.width
+        wy = (gy.reshape(-1).double() + 0.5) / ny * fld.width
+        inside = flat > 0
+        lab_in, wx_in, wy_in = flat[inside], wx[inside], wy[inside]
+        cnt = torch.bincount(lab_in, minlength=n_cells + 1).clamp(min=1)
+        cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+        cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+
+        # ---- the CELL level moves onto its own segmented cell -----------------------------
+        moved_cells = 0
+        if self.cell_set in H.levels:
+            cl = H.level(self.cell_set)
+            cx0, cx1 = cl.state_schema["pos"]
+            m = min(cl.n, n_cells)
+            st = cl.state.clone()
+            st[:m, cx0] = cx[1:m + 1].float()
+            st[:m, cx0 + 1] = cy[1:m + 1].float()
+            cl.state = st
+            moved_cells = m
+            if cl.n != n_cells:
+                print(f"  [seed_from_segmentation] the {self.cell_set!r} set has {cl.n} entities "
+                      f"and the map has {n_cells} cells -- seeding {m}. Declare "
+                      f"per_parent: {n_cells} to use all of them.", flush=True)
+
+        # ---- each particle is placed INSIDE its own cell's mask ---------------------------
+        # ordering by label makes the members of one cell contiguous, so a particle can be given a
+        # pixel of its OWN cell by index arithmetic instead of a python loop over 472 cells
+        order = torch.argsort(lab_in)
+        lab_s, wx_s, wy_s = lab_in[order], wx_in[order], wy_in[order]
+        start = torch.cumsum(torch.bincount(lab_s, minlength=n_cells + 1), 0) - \
+            torch.bincount(lab_s, minlength=n_cells + 1)
+
+        pidx = lvl.parent if lvl.parent is not None else torch.zeros(lvl.n, dtype=torch.long,
+                                                                     device=dev)
+        pcell = (pidx % n_cells) + 1 if lvl.parent is not None else None
+        if pcell is None or moved_cells == 0:
+            # no declared cell level: assign each particle the label it already sits on
+            pos = lvl.state[:, px0:px1]
+            cid = fld.sample_label(pos)
+        else:
+            cid = pcell.clamp(1, n_cells)
+            g = torch.Generator(device="cpu").manual_seed(777)
+            u = torch.rand(lvl.n, generator=g).to(dev)
+            k = (start[cid] + (u * cnt[cid].float()).long().clamp(max=0 + cnt[cid] - 1))
+            k = k.clamp(0, lab_s.numel() - 1)
+            newpos = torch.stack([wx_s[k].float(), wy_s[k].float()], 1)
+            if self.jitter > 0:
+                newpos = newpos + (torch.rand_like(newpos) - 0.5) * self.jitter
+            st = lvl.state.clone(); st[:, px0:px1] = newpos; lvl.state = st
+
+        # ---- one material per cell, shared exactly by its particles -----------------------
+        yc, how = self._cell_values(n_cells, dev)
+        y_all = torch.cat([yc[:1], yc])                          # index 0 = background, unused
+        p_y = y_all[cid.clamp(0, n_cells)]
+        from plexus.models.entities import _lame
+        mu, la = _lame(p_y)
+        liquid = getattr(lvl, "is_liquid", None)
+        if liquid is not None:
+            mu = torch.where(liquid, torch.zeros_like(mu), mu)
+        lvl.mu, lvl.la = mu, la
+        for nm, val in (("youngs", p_y), ("cell_id", cid.float())):
+            if nm in getattr(lvl, "_buffers", {}):
+                setattr(lvl, nm, val)
+            else:
+                lvl.register_buffer(nm, val)
+
+        print(f"  [seed_from_segmentation] {n_cells} cells from {self.field_name!r}; "
+              f"{lvl.n} particles ({lvl.n / max(n_cells,1):.0f} per cell); "
+              f"youngs {float(yc.min()):.0f}-{float(yc.max()):.0f} from {how}; "
+              f"cell centres seeded: {moved_cells}", flush=True)
         return {}

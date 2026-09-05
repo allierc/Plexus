@@ -59,8 +59,6 @@ fields:
     frame: mpm_grid
     n_grid: 64
 operators:
-- op: aggregate
-  at: cell
 - op: ecm_seed
   at: mpm_particle
   centre:
@@ -112,7 +110,6 @@ operators:
   wall_contact: 0.04
   vmax: 1.0e9
 schedule:
-- aggregate
 - ecm_seed
 - gravity
 - ecm_stress

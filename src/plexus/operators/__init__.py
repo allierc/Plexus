@@ -18,7 +18,6 @@ other is how anyone can tell which one a spec is getting.
     encoding_ops         a learnable field written from its own coordinates
     interaction_ops      pairwise laws, and the relation they act over
     field_ops            a continuum bound to a set: deposit / diffuse / decay / sense
-    agent_ops            agents in a material: the two-way coupling, population, scale maps
     neural               a recurrent circuit: the seed that places a connectome region, the
                          local update, the signalling through W, and the field modulating it
     observation          NOT a mechanism: how the state is looked at (voxelize)
@@ -50,9 +49,6 @@ from . import field_ops             # noqa: F401  the grid field, deposit, diffu
 #                                                 chemotax, playback, pacemaker, activation_pulse, signal
 from . import mpm_ops               # noqa: F401  mpm_grid + p2g/grid_update/g2p/strain, anchor,
 #                                                 spin, apply_material_map, and the fenced oracle
-from . import agent_ops             # noqa: F401  agent_scatter/gather/remodel, agent_divide/grow,
-#                                                 polarity, active force+stress, aggregate/broadcast,
-#                                                 seed_from_segmentation
 from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cell_divide, cell_die,
 #                                                 edge_flip, topo_record
 from . import diffusion_reaction    # noqa: F401  seed_cell_chem, cell_chem_diffuse/react,
@@ -77,6 +73,6 @@ from . import observation           # noqa: F401  voxelize -- a REPRESENTATION, 
 # models.registry only, so there is no cycle back into this package.
 from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
-__all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops", "agent_ops",
+__all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
            "contact_ops", "neural", "observation", "continuous_engine"]

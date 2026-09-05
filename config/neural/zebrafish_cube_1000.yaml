@@ -101,11 +101,6 @@ operators:
     model: type_pairwise
     edge_set: synapse
     activation: tanh
-  - op: aggregate
-    at: assembly
-    child: neuron
-    block: voltage
-    into: activity
   - op: voxelize
     at: neuron
     to: neural_activity
@@ -127,7 +122,6 @@ operators:
 schedule:
   - neuron_update
   - neuron_signal
-  - aggregate
   - voxelize
 
 plotting:

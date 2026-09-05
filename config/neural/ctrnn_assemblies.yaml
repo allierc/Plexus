@@ -335,18 +335,12 @@ operators:
 
   # the cross-scale readout: each assembly's `activity` is the mean voltage of its neurons,
   # reduced along the SAME `parent` containment map that gives a cell its centroid.
-  - op: aggregate
-    at: assembly
-    child: neuron
-    block: voltage
-    into: activity
 
 schedule:
   - activation_pulse
   - neuron_field_input
   - neuron_update
   - neuron_signal
-  - aggregate
 
 plotting:
   renderer: mpl2d
