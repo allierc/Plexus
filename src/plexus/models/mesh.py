@@ -115,7 +115,7 @@ class MeshTable(dict):
             a = a if torch.is_tensor(a) else torch.as_tensor(np.asarray(a), dtype=dt, device=dev)
             self[nm] = a.to(dev)[idx.clamp(max=max(a.shape[0] - 1, 0))].to(dt)
 
-    def carry_vertices(self, births, dt=None, dev=None, names=None):
+    def carry_vertices(self, births, dt=None, dev=None, names=None, level=None):
         """Give every vertex BORN this tick a value, by averaging its parents'.
 
         THE PER-VERTEX HALF OF `reindex_faces`, and it did not exist. Faces are permuted by a
@@ -139,6 +139,18 @@ class MeshTable(dict):
         ORDER MATTERS AND IS THE CALLER'S. `births` is applied in sequence, so a vertex that is
         itself a parent of a later birth contributes its NEW value -- which is what a collapse
         following a division in the same tick should see.
+
+        `level` -- AND A DECLARED NAME MAY LIVE THERE RATHER THAN IN THE TABLE, which the first
+        version of this missed and R2 walked straight into. A per-vertex quantity can be a MESH
+        COLUMN (`self[name]`) or a STATE BLOCK on the Level (`level.state[:, c0:c1]`), and the
+        apico-basal separation is the second kind -- deliberately, because a state block reaches the
+        trajectory through the generic per-set recording path and therefore does not touch
+        `FACE_RECORD`/`EDGE_RECORD`/`snapshot()` at all. Without this branch
+        `declare_vertex_carry(m, "sep")` succeeded, `self.get("sep")` returned None, the carry
+        skipped it silently, and every vertex born by division held the buffer's ZERO: measured on
+        `ab_sphere` at 60 frames, all 66 newly born vertices had |sep| = 0.0000 against a seeded
+        0.2000 -- a cell of zero height along the seam it had just grown, which is the exact failure
+        the carry was written to prevent.
         """
         if torch is None:
             raise RuntimeError("carry_vertices needs torch")
@@ -147,6 +159,10 @@ class MeshTable(dict):
             return
         for nm in want:
             a = self.get(nm)
+            sl = None
+            if a is None and level is not None and nm in getattr(level, "state_schema", ()):
+                sl = level.state_schema[nm]                # (c0, c1) into the level's state
+                a = level.state[:, sl[0]:sl[1]]
             if a is None:
                 continue
             a = a if torch.is_tensor(a) else torch.as_tensor(np.asarray(a), dtype=dt, device=dev)
@@ -160,7 +176,12 @@ class MeshTable(dict):
                     # take the run down.
                     continue
                 a[int(new_i)] = a[ps].mean(dim=0)
-            self[nm] = a.to(dt) if dt is not None else a
+            if sl is None:
+                self[nm] = a.to(dt) if dt is not None else a
+            else:
+                st = level.state.clone()
+                st[:, sl[0]:sl[1]] = a
+                level.state = st
 
     # ---------------------------------------------------------------- recording
     # THE PER-FACE NAMES A PICTURE NEEDS, and this list is why `snapshot` is not topology-only.
