@@ -34,9 +34,6 @@ from plexus.models.base import Lateral
 # (was `from mesh_ops import face_geometry_3d`) -- same module now
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/mesh_ops.py` -- mesh_ops -- the 3D (surface) vertex model: an epithelial VESICLE. A closed half-edge mesh on
-# ==========================================================================================================
 MYO_SKIPPED: list = []
 
 
@@ -2205,9 +2202,6 @@ def face_polygons_3d(pos_np, mesh):
     return polys, area, perim, shape
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/t1_ops.py` -- t1_ops -- surface T1 NEIGHBOUR-EXCHANGE (reversible network reconnection) on the closed
-# ==========================================================================================================
 def _vertex_faces(rings):
     """vertex -> set of faces incident to it (used to find the third face at u / at v)."""
     vf = {}
@@ -2609,9 +2603,6 @@ if __name__ == "__main__":
     print(f"SELF-TEST OK  ({ndone} flips, closed, euler=2, V/E/F unchanged)")
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/monolayer_ops.py` -- monolayer_ops -- lift the single mid-surface vesicle to a MONOLAYER SHELL (Okuda gap-analysis C#1).
-# ==========================================================================================================
 def apical_basal_shells(pos, es, et, ef, nF, h_cell):
     """Apical (outer) and basal (inner) vertex positions a_i, b_i = x_i +/- (H_i/2) n_i, for RENDERING
     the monolayer as two offset shells with a visible thickness. Same offset the energy uses."""

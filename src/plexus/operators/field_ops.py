@@ -31,9 +31,6 @@ import torch.nn.functional as F
 from plexus.models.base import Lateral
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/scalar_field.py` -- ScalarField -- a pure-state continuum: a C-channel scalar grid, NO behaviour.
-# ==========================================================================================================
 @register_field("grid", frame="grid")
 class ScalarField(Field):
     """A C-channel scalar field on a square-pixel grid over the box [0,W]x[0,1](x[0,1]).
@@ -80,9 +77,6 @@ class ScalarField(Field):
         return tuple(out)
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/deposit.py` -- deposit -- set -> field. Each agent adds to the field at its own pixel.
-# ==========================================================================================================
 @register_operator("deposit", family="fields", set="cell", kind="exchange")
 class Deposit(Exchange):
     """object -> field. Writes `to:` field in place; returns {}."""
@@ -134,9 +128,6 @@ class Deposit(Exchange):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/diffuse.py` -- diffuse -- field -> field. One discrete diffusion step on a scalar field.
-# ==========================================================================================================
 @register_operator("diffuse", family="fields", set="field", kind="field",
                    implementation="finite_difference")
 class Diffuse(FieldUpdate):
@@ -214,9 +205,6 @@ class DiffuseSpectral(FieldUpdate):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/decay.py` -- decay -- field -> field. Linear evaporation of a scalar field.
-# ==========================================================================================================
 @register_operator("decay", family="fields", set="field", kind="field")
 class Decay(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
@@ -240,9 +228,6 @@ class Decay(FieldUpdate):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/sense.py` -- sense -- field -> set. Sample the field on a sensor fan around the heading, steer.
-# ==========================================================================================================
 _RING = 6                                                  # 3D sensors around the heading axis
 
 
@@ -381,9 +366,6 @@ class Sense(Exchange):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/chemotax.py` -- chemotax -- set <- field. Nodes follow (or flee) a field's gradient.
-# ==========================================================================================================
 @register_operator("chemotax", family="fields", set="particle", kind="exchange")
 class Chemotax(Exchange):
     EMIT = "velocity"                           # default routing; override in the spec with `emit: mpm_acceleration`
@@ -432,9 +414,6 @@ class Chemotax(Exchange):
         return {self.at: d}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/prescribed_field.py` -- PrescribedField -- a scalar field *prescribed* from external data (currently a
-# ==========================================================================================================
 @register_field("prescribed", frame="prescribed")
 class PrescribedField(Field):
     """A 1-channel scalar field whose grid is read from a video `[T, ny, nx]` (tif).
@@ -485,9 +464,6 @@ class Playback(FieldUpdate):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/pacemaker.py` -- pacemaker -- a clocked scalar SOURCE: a periodic activation signal p(t).
-# ==========================================================================================================
 @register_operator("pacemaker", family="fields", set="field", kind="field")
 class Pacemaker(FieldUpdate):
     EMIT = None                 # writes `H.signals[name]` scalar in place; returns {} — no integrable delta
@@ -517,9 +493,6 @@ class Pacemaker(FieldUpdate):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/activation_pulse.py` -- activation_pulse -- paint a clocked activation field. ONE operator, two timing modes,
-# ==========================================================================================================
 @register_operator("activation_pulse", family="fields", set="field", kind="field")
 class ActivationPulse(FieldUpdate):
     EMIT = None                       # writes a prescribed field; never engine-integrated
@@ -583,9 +556,6 @@ class ActivationPulse(FieldUpdate):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/signal.py` -- signal -- passive connectome signalling on a neuron set.
-# ==========================================================================================================
 _ACT = {
     "relu": torch.relu,
     "tanh": torch.tanh,

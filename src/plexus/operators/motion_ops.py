@@ -18,9 +18,6 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/drag.py` -- Drag -- viscous friction as a composable operator (not an integration knob).
-# ==========================================================================================================
 @register_operator("drag", family="motion", set="particle", kind="lateral")
 class Drag(Lateral):
     EMIT = "acceleration"            # emits an acceleration
@@ -49,9 +46,6 @@ class Drag(Lateral):
         return {self.at: acc}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/glide.py` -- glide -- set (lateral). Self-propulsion: glide along the heading at constant speed (overdamped, first-order; the heading-kinematic sibling of `cruise`).
-# ==========================================================================================================
 @register_operator("glide", family="motion", set="cell", kind="lateral")
 class Glide(Lateral):
     EMIT = "velocity"             # emits a velocity; the ENGINE integrates pos
@@ -80,9 +74,6 @@ class Glide(Lateral):
         return {self.at: vel * m[:, None]}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/sediment.py` -- sediment -- a per-agent constant directional drift (a first-order body force at
-# ==========================================================================================================
 @register_operator("sediment", family="motion", set="cell", kind="lateral")
 class Sediment(Lateral):
     EMIT = "velocity"                                # a velocity delta; the ENGINE integrates pos
@@ -111,9 +102,6 @@ class Sediment(Lateral):
         return {self.at: vel * m[:, None]}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/attractor_flow.py` -- attractor_flow -- ride a set along a strange-attractor vector field dx/dt = f(x).
-# ==========================================================================================================
 def _halvorsen(x, y, z, p):
     a = p.get("a", 1.4)
     return (-a * x - 4.0 * y - 4.0 * z - y * y,
@@ -244,9 +232,6 @@ class AttractorFlow(Lateral):
         return {self.at: vel}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/velocity_cruise.py` -- velocity_cruise (was cruise) -- Vicsek active-matter self-propulsion: drive the velocity toward a cruising speed (inertial, second-order; the velocity-dynamic sibling of `glide`).
-# ==========================================================================================================
 @register_operator("velocity_cruise", "cruise", family="motion", set="particle", kind="lateral")
 class VelocityCruise(Lateral):                   # (alias `cruise`, one migration cycle)
     EMIT = "acceleration"            # emits an acceleration
@@ -281,9 +266,6 @@ class VelocityCruise(Lateral):                   # (alias `cruise`, one migratio
         return {self.at: acc}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/bounce.py` -- bounce -- set. Reflect a self-propelled agent off the domain walls / obstacles.
-# ==========================================================================================================
 def _in_obstacles(x, y, obstacles):
     """Bool mask: is (x, y) inside any obstacle? rect=[x0,y0,x1,y1], disc=[cx,cy,r]."""
     hit = torch.zeros_like(x, dtype=torch.bool)
@@ -352,9 +334,6 @@ class Bounce(Lateral):
         return {}
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/gravity.py` -- gravity -- a uniform body force at the cell level.
-# ==========================================================================================================
 @register_operator("gravity", family="mechanics", set="cell", kind="lateral")
 class GravityOperator(Lateral):
     EMIT = "mpm_acceleration"                  # a body accel the MPM substep consumes as a_ext;
