@@ -242,6 +242,28 @@ L_k \;\xrightarrow{\ \text{Aggregate}\ }\; L_{k+1},
 L_{k+1} \;\xrightarrow{\ \text{Broadcast}\ }\; L_k .
 \]
 
+$\pi$ is a \emph{function}, and that is load-bearing rather than a formality. A
+function partitions the children into fibres $\pi^{-1}(p)$, and it is that
+partition which makes Aggregate well defined: every child is counted exactly
+once, so the sum conserves. Broadcast is its adjoint. A many-to-many relation
+would admit neither --- aggregating over one needs weights to avoid counting a
+shared child several times, and no weighting is canonical.
+
+\paragraph{Many-to-many relations need no new primitive.} Much biological
+structure is not a function. A vertex of an epithelial mesh belongs to three
+cells at once, so vertex $\to$ cell cannot be written as $\pi$. This does not
+call for a second kind of hierarchy: a relation $R \subseteq A \times B$ \emph{is}
+a set $R$ together with two functions $R \to A$ and $R \to B$, so a relation is
+represented by making it a set and both of its legs are ordinary containment
+maps. A synapse set with \code{pre} and \code{post} is exactly this --- a
+many-to-many relation between neurons, carried as a set of pairs --- and so is
+the half-edge table of a mesh, whose every half-edge has exactly one source
+vertex and exactly one face. Aggregating half-edge quantities onto faces (a
+cell's area, its perimeter) is $\sum_\pi$ along the second leg, and reading
+vertex positions at half-edges is $\pi^{*}$ along the first. The two cross-level
+families are therefore sufficient for structure that is not itself hierarchical,
+provided the relation is given the status of a set.
+
 Fields are level-specific in the same way. Exchange couples a set to a field at
 its own level, so a molecular concentration field, a cellular morphogen field and
 a tissue-scale mechanical grid coexist as distinct objects rather than being
