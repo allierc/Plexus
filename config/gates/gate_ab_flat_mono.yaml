@@ -30,7 +30,7 @@ sets:
 fields: {}
 
 seed:
-  - {op: seed_mesh, implementation: apicobasal, at: vertex, cell_set: cell,
+  - {op: seed_mesh, model: apicobasal, at: vertex, cell_set: cell,
      shape: disc, n_cells: 60, radius: 5.0, centre: [0.0, 0.0, 1.0],
      jitter: 0.15, p0: 3.5, seed: 0, h0: 0.4}
 

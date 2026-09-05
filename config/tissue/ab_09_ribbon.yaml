@@ -1,15 +1,15 @@
 general:
-  name: ab_04_curved_frozen
+  name: ab_09_ribbon
   seed: 0
-  n_frames: 20
+  n_frames: 80
   dt: 1.0
-  record_cap: 24
+  record_cap: 84
   boundary: free
   dim: 3
   world:
-  - 16.0
-  - 16.0
-  - 16.0
+  - 26.0
+  - 26.0
+  - 26.0
 plotting:
   renderer: vtk_points
   background: black
@@ -29,7 +29,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 13.0
+    span: 24.0
     walls: 64
     loc:
     - 0.015
@@ -49,7 +49,7 @@ plotting:
     ticks: 4
 sets:
   vertex:
-    n: 4096
+    n: 16384
     mesh: half_edge
     cell_set: cell
     state:
@@ -67,7 +67,7 @@ sets:
         width: 3
         integration: first_order
   cell:
-    n: 1024
+    n: 4096
     state:
       area:
         width: 1
@@ -79,12 +79,14 @@ seed:
   model: apicobasal
   at: vertex
   cell_set: cell
-  n_cells: 320
+  n_cells: 400
   radius: 5.0
   jitter: 0.18
   p0: 3.5
   seed: 0
-  h0: 0.4
+  h0: 0.6
+  shape: ribbon
+  width: 0.6
 operators:
 - op: cell_geometry
   at: cell
@@ -100,7 +102,7 @@ operators:
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
-  sep_mu: 0.0
+  sep_mu: 1.0
 - op: topo_record
   at: vertex
   every: 1

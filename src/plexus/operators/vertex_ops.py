@@ -216,6 +216,118 @@ def build_disc_mesh(n, r=1.0, jitter=0.0, seed=0):
             np.array(ef, np.int64), len(faces))
 
 
+def build_strip_mesh(n, r=1.0, jitter=0.0, seed=0, kind="plane", width=0.5, twist_R=None):
+    """A Voronoi patch on a RECTANGLE, mapped onto a surface: `plane`, `ribbon` or `moebius`.
+
+    One builder for three shapes because they are one construction. Cells are laid out in a
+    parameter rectangle `(u, v)` with `u` around the strip and `v` across it, tessellated there, and
+    only then placed in R^3 by the shape's own map:
+
+        plane     (u, v, 0)                                    -- flat, two free edges, one seam cut
+        ribbon    ((R cos t), (R sin t), v),        t = 2 pi u / L
+        moebius   ((R + v cos(t/2)) cos t, (R + v cos(t/2)) sin t, v sin(t/2))
+
+    THE PERIODIC KINDS ARE STITCHED, NOT CUT. A strip built by tessellating a rectangle and bending
+    it has a SEAM: the cells at u = 0 and u = L are neighbours in space and strangers in the
+    half-edge table, so `edge_flip` cannot pass the join and every measure that walks the ring reads
+    a boundary where the surface has none. So the point set is TILED -- copies at `u - L` and
+    `u + L` -- the Voronoi is taken over base plus ghosts, only cells whose SEED lies in the base
+    domain are kept, and vertices that land on the same point in R^3 are merged. The join is then
+    ordinary interior mesh.
+
+    `moebius` TILES WITH A FLIP, `v -> -v`, which is the whole content of the shape: going once
+    around returns you to the same place on the other side of the surface. **That makes it the one
+    seed in this repo on which "apical" is not globally definable** -- a Moebius band is
+    non-orientable, so a normal carried continuously around the strip comes back reversed, and any
+    model that assumes a consistent outward side has to fail somewhere. `apicobasal_span_invalid_count`
+    (gate row AB-B1) counts exactly that, so this shape is not decoration: it is the specimen on
+    which the apico-basal representation's own orientation assumption is falsifiable.
+
+    `width` is the strip's extent across, as a fraction of `r`. `twist_R` defaults to `r`.
+    """
+    from scipy.spatial import Voronoi
+    if kind not in ("plane", "ribbon", "moebius"):
+        raise ValueError(f"build_strip_mesh: kind must be plane|ribbon|moebius, got {kind!r}")
+    g = np.random.default_rng(seed)
+    R = float(r if twist_R is None else twist_R)
+    w = float(width) * float(r)
+    L = 2.0 * np.pi * R if kind != "plane" else 4.0 * float(r)
+    step = float(np.sqrt(max(L * w, 1e-12) / max(n, 1)))
+    nu = max(int(round(L / step)), 3)
+    if kind != "plane":
+        step = L / nu                                        # exact divisor, so the tiling matches
+    nv = max(int(round(w / step)), 2)
+    uu, vv = np.meshgrid((np.arange(nu) + 0.5) * step,
+                         (np.arange(nv + 1) - nv / 2.0) * step)
+    uu = uu + (np.arange(nv + 1)[:, None] % 2) * 0.5 * step   # alternate rows -> hexagonal
+    pts = np.stack([uu.ravel(), vv.ravel()], 1)
+    if jitter > 0:
+        pts = pts + jitter * step * (g.random(pts.shape) - 0.5)
+    base = pts.copy()
+    if kind == "plane":
+        # A COLLAR ON ALL FOUR SIDES, exactly as `build_disc_mesh` does: a Voronoi cell is bounded
+        # only when it is surrounded, so the cells that are KEPT need neighbours that are not.
+        ghosts = [base + [dx, dy] for dx in (-L, 0.0, L) for dy in (-w, 0.0, w)]
+    else:
+        # PERIODIC IN u, WITH THE MOEBIUS FLIP. `v -> -v` on the wrap is the half twist.
+        s = -1.0 if kind == "moebius" else 1.0
+        ghosts = [base,
+                  np.stack([base[:, 0] - L, s * base[:, 1]], 1),
+                  np.stack([base[:, 0] + L, s * base[:, 1]], 1),
+                  base + [0.0, w], base + [0.0, -w]]         # collar across, where edges are free
+    allp = np.concatenate(ghosts, 0)
+    vor = Voronoi(allp)
+    nb = len(base)
+    faces = []
+    for ip in range(len(allp)):
+        if kind == "plane":
+            if not (0.0 <= allp[ip, 0] <= L and -w / 2 <= allp[ip, 1] <= w / 2):
+                continue
+        elif ip >= nb:
+            continue                                         # keep only seeds of the base domain
+        reg = vor.regions[vor.point_region[ip]]
+        if not reg or -1 in reg:
+            continue
+        faces.append(np.asarray(reg, np.int64))
+    if not faces:
+        raise ValueError(f"build_strip_mesh: no bounded cell for kind={kind!r}, n={n}")
+
+    def to3d(P):
+        u, v = P[:, 0], P[:, 1]
+        if kind == "plane":
+            return np.stack([u - L / 2, v, np.zeros_like(u)], 1)
+        t = 2.0 * np.pi * u / L
+        if kind == "ribbon":
+            return np.stack([R * np.cos(t), R * np.sin(t), v], 1)
+        rad = R + v * np.cos(t / 2.0)
+        return np.stack([rad * np.cos(t), rad * np.sin(t), v * np.sin(t / 2.0)], 1)
+
+    used = np.unique(np.concatenate(faces))
+    P3 = to3d(vor.vertices[used])
+    # MERGE WHAT THE MAP BROUGHT TOGETHER. Two parameter vertices a period apart are ONE point on a
+    # ribbon; rounding to a fraction of the cell spacing identifies them without a neighbour search.
+    key = np.round(P3 / (step * 1e-3)).astype(np.int64)
+    _, first, inv = np.unique(key, axis=0, return_index=True, return_inverse=True)
+    verts = P3[first]
+    remap = -np.ones(len(vor.vertices), np.int64)
+    remap[used] = inv
+    es, et, ef = [], [], []
+    for f, reg in enumerate(faces):
+        rr = remap[reg]
+        rr = np.array([rr[i] for i in range(len(rr)) if rr[i] != rr[i - 1]], np.int64)
+        if len(rr) < 3:
+            continue
+        Q = vor.vertices[reg]
+        c = Q.mean(0)
+        if np.cross(Q[0] - c, Q[1] - c) < 0:                 # CCW in the PARAMETER plane
+            rr = rr[::-1]
+        for i in range(len(rr)):
+            es.append(int(rr[i])); et.append(int(rr[(i + 1) % len(rr)])); ef.append(f)
+    nF = int(max(ef) + 1) if ef else 0
+    return (verts, np.array(es, np.int64), np.array(et, np.int64),
+            np.array(ef, np.int64), nF)
+
+
 def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
     """Per-face 3D area (Newell area-vector magnitude), perimeter, centroid, and the PER-CELL wedge
     volume v_f = (1/3)(cen_f . N_f) -- the volume of the pyramid from the sphere centre to the face.
@@ -417,8 +529,14 @@ class SeedMesh3D(Structural):
         # `build_hexagon_mesh`. It is a value for the same reason `disc` is -- the same hypothesis
         # about the tissue, seeded into a geometry chosen so a closed form is reachable.
         self.shape = str(params.get("shape", "sphere")).lower()
-        if self.shape not in ("sphere", "disc", "hexagon"):
-            raise ValueError(f"mesh_seed: shape must be 'sphere', 'disc' or 'hexagon', "
+        # `plane`, `ribbon` and `moebius` are three more VALUES on the same axis, for the reason
+        # `disc` is one: the same hypothesis about the tissue, seeded into a different geometry.
+        # See `build_strip_mesh` -- and note that `moebius` is the one seed on which "apical" is not
+        # globally definable, which is what makes it a test rather than a picture.
+        self.strip_width = float(params.get("width", 0.5))
+        if self.shape not in ("sphere", "disc", "hexagon", "plane", "ribbon", "moebius"):
+            raise ValueError(f"mesh_seed: shape must be 'sphere', 'disc', 'hexagon', 'plane', "
+                             f"'ribbon' or 'moebius', "
                              f"got {self.shape!r}")
         # PARTITION THE TYPES BY POSITION, NOT AT RANDOM. `type_layout` on a SET is applied at build
         # (engine.py), over that set's own coordinates -- which a mesh cell does not have yet: the
@@ -464,9 +582,13 @@ class SeedMesh3D(Structural):
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device; dt = lvl.state.dtype
-        _build = {"sphere": build_sphere_mesh, "disc": build_disc_mesh,
-                  "hexagon": build_hexagon_mesh}[self.shape]
-        verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
+        if self.shape in ("plane", "ribbon", "moebius"):
+            verts, es, et, ef, nF = build_strip_mesh(self.n, self.R, self.jitter, self.seed,
+                                                     kind=self.shape, width=self.strip_width)
+        else:
+            _build = {"sphere": build_sphere_mesh, "disc": build_disc_mesh,
+                      "hexagon": build_hexagon_mesh}[self.shape]
+            verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
         Nv = verts.shape[0]; Nbuf = lvl.state.shape[0]
         if Nv > Nbuf:
             raise ValueError(f"sphere mesh has {Nv} vertices but buffer n={Nbuf}")
@@ -563,7 +685,7 @@ class SeedMesh3D(Structural):
 
 
 @register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed",
-                   implementation="apicobasal")
+                   model="apicobasal")
 class SeedMeshApicoBasal(SeedMesh3D):
     """`apicobasal` IMPLEMENTATION of seed_mesh -- the same epithelium, seeded WITH ITS THICKNESS.
 

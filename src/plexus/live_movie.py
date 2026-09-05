@@ -448,16 +448,33 @@ class LiveMovie:
                 # PLACED AGAINST THE SCENE'S OWN CORNER for the same reason the camera is: with a
                 # free boundary the box's origin is in the middle of the tissue, and the bar was
                 # drawn straight through it.
-                # `scale_bar_corner: left|right` -- WHICH END OF THAT EDGE. Left is where it has
-                # always been and stays the default; a scene whose subject sits low-left (a section
-                # panel in that corner, a tissue drifting into it) needs the other end, and moving
-                # it in code would move it for every run.
-                if str((self.style or {}).get("scale_bar_corner", "left")).lower() == "right":
-                    _b[_ax0] = float(self.hi[_ax0]); _a[_ax0] = float(self.hi[_ax0]) - _len
+                # `scale_bar_corner: left | right | right_face` -- WHICH EDGE OF THE BOX, AND WHICH
+                # END OF IT. `left` is where the bar has always been, along the first horizontal
+                # axis at the near-low corner, and stays the default so no existing run moves.
+                # `right` is the far end of that same edge. `right_face` runs the bar along the
+                # OTHER horizontal axis on the box's right-hand face, which is what a scene wants
+                # when the bottom edge is already busy -- the cross-section panel sits in the
+                # bottom-left corner of every apico-basal spec, and a bar on the front-bottom edge
+                # reads as part of it.
+                #
+                # `scale_bar_lift` -- HOW FAR OFF THE FLOOR, as a fraction of the vertical span.
+                # The bar sat exactly on `lo[up]`, which is the bottom edge of the wireframe box,
+                # so at any camera elevation it renders within a few pixels of the frame's lower
+                # border and its label can fall off it. 0 is the old position.
+                _corner = str((self.style or {}).get("scale_bar_corner", "left")).lower()
+                if _corner == "right_face":
+                    _run, _off = _other, _ax0            # along the other horizontal, on the far face
+                    _a[_run] = float(self.hi[_run]) - _len; _b[_run] = float(self.hi[_run])
+                    _a[_off] = _b[_off] = float(self.hi[_off]) + 0.04 * float(span[_off])
                 else:
-                    _a[_ax0] = float(self.lo[_ax0]); _b[_ax0] = float(self.lo[_ax0]) + _len
-                _a[_other] = _b[_other] = float(self.lo[_other]) - 0.04 * float(span[_other])
-                _a[self.up] = _b[self.up] = float(self.lo[self.up])
+                    _run, _off = _ax0, _other
+                    if _corner == "right":
+                        _b[_run] = float(self.hi[_run]); _a[_run] = float(self.hi[_run]) - _len
+                    else:
+                        _a[_run] = float(self.lo[_run]); _b[_run] = float(self.lo[_run]) + _len
+                    _a[_off] = _b[_off] = float(self.lo[_off]) - 0.04 * float(span[_off])
+                _lift = float((self.style or {}).get("scale_bar_lift", 0.0)) * float(span[self.up])
+                _a[self.up] = _b[self.up] = float(self.lo[self.up]) + _lift
                 self.p.add_mesh(pv.Line(_a, _b), color="white", line_width=4.0, lighting=False)
                 _v = _len_m
                 _lab = (f"{_v * 1e6:g} um" if _v < 1e-4 else f"{_v * 1e3:g} mm" if _v < 0.01

@@ -76,7 +76,7 @@ sets:
 fields: {}
 seed:
 - op: seed_mesh
-  implementation: apicobasal
+  model: apicobasal
   at: vertex
   cell_set: cell
   n_cells: 1280
