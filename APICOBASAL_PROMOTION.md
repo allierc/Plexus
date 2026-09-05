@@ -330,10 +330,31 @@ code**: re-measured on 4 September on a fresh `REP_r023_07_B` the gap is nonzero
 is the correction of three documents that described a repaired defect as live. *Proves: the full twin
 suite is still byte-identical, so none of this moved a number.*
 
-**R2 -- THE REPRESENTATION EXISTS, AND IT IS STILL.** `seed_mesh[apicobasal]` + the `sep` block; no
-mechanics on `sep`. Specs `gate_ab_sphere` (R=5, h0=0.4, closed, K_R=0) and `gate_ab_hexprism`.
-`record_cap > n_frames + 1`, so no per-tick row measures a strided difference. *Green: AB-B1, B2, B7,
-C3.*
+**R2 -- THE REPRESENTATION EXISTS, AND IT IS STILL. DONE 4 September.**
+`seed_mesh[implementation: apicobasal]` + the `sep` block, `config/gates/gate_ab_sphere.yaml` at
+R=5, h0=0.4, K_R=0: 60 frames of growth, division and T1 with NOTHING acting on `sep`. All four rows
+PASS -- span-invalid 0, span-recorded 1, closure 1.22e-14 against 1e-9, cap ratio 1.1896 against
+1.173611 +/- 0.02 -- reference frozen at `1dd8e86711ef245b`, roll-up 4 gates / 41 rows / all PASS.
+*Green: AB-B1, B2, B7, C3.*
+
+THREE CLAIMS IN THIS FILE THAT THE RUN OVERTURNED, recorded because each was written here in advance
+and was wrong:
+
+* **R1(b)'s carry did not reach `sep`.** `carry_vertices` looked only in the MESH TABLE, and `sep` is
+  a state block on the LEVEL -- chosen deliberately so it never touches FACE_RECORD/snapshot() and
+  cannot trip the recorded-arrays rule. The declaration succeeded, the lookup returned None, the loop
+  skipped it silently, and every vertex born by division kept the buffer's ZERO: 66 of 462 at 60
+  frames, |sep| = 0.0000 against a seeded 0.2000. The carry now takes the level too.
+* **`polyhedron_volume_closure` passes on an inside-out cell.** An inward-wound lateral wall is still
+  CLOSED, so both origins agreed to 1e-15 while a hexagonal prism measured -0.866 for a cell of
+  +2.598. Consistency is not correctness. The row keeps its place -- it is the only one that catches
+  a single wall wound the wrong way -- but it is now backed by analytic solids.
+* **AB-C3's reducer had to change from `mean` to `first`.** The shell grows, R rises, and the ratio
+  falls 1.1896 -> 1.1486 over 60 frames; a mean averages a closed form over radii it was never
+  evaluated at. THE BAND DID NOT MOVE: +/-0.02 was declared before the run and holds with 0.016 used.
+
+`gate_ab_hexprism` is deliberately NOT built. Its only row is AB-C2, which belongs to R3, and a spec
+sitting in `config/gates/` whose rows are all ungraded is a gate that cannot fail.
 
 **R3 -- THE ENERGY, FLAT, `sep` FROZEN.** `cell_mechanics[model: apicobasal]`. Two arms on the
 identical seed. *Green: AB-C1, C2, B9.*
