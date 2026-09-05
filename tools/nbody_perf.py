@@ -26,8 +26,8 @@ exists to make, and the particle counts are chosen so the torch path FAILS on tw
 out-of-memory row is a result, not a gap, and it is reported as one.
 
 WHAT IS TIMED. Frames `warmup+1 .. warmup+timed`, `cuda.synchronize()` at each end, no renderer
-(`out_path=None`), no recording. Process start, hierarchy build and the first-call compile are all
-outside the window. `--compile` rows pay a one-off torch.compile which `warmup` must cover.
+(`out_path=None`), no recording. Process start, hierarchy build and any first-call kernel
+compilation are all outside the window.
 """
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def _spec_path(name):
     return os.path.join(_root(), "config", FOLDER, f"{name}.yaml")
 
 
-def write_sweep(impls=("torch", "compile", "warp")):
+def write_sweep(impls=("torch", "warp")):
     """One spec per (size, implementation). The disc MASS is held fixed as N grows."""
     src = yaml.safe_load(open(_spec_path(BASE)))
     made = []
@@ -83,7 +83,6 @@ def write_sweep(impls=("torch", "compile", "warp")):
             for t in s["sets"]["star"]["types"].values():
                 t["mass"] = float(f"{m0:.6g}")
             op = [o for o in s["operators"] if o.get("op") == "squared_law"][0]
-            op["compile"] = (impl == "compile")
             if impl == "warp":
                 op["implementation"] = "warp"
             else:
@@ -165,7 +164,7 @@ def table():
     best = {}
     for r in rows:                                          # last row per (name, device) wins
         best[(r["name"], r["device"])] = r
-    impls = ["torch", "compile", "warp"]
+    impls = ["torch", "warp"]
     for dev in sorted({k[1] for k in best}):
         print(f"\n  {dev}")
         print(f"  {'stars':>9} " + "".join(f"{i:>26}" for i in impls))

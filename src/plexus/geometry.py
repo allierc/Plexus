@@ -50,25 +50,13 @@ def neighbour_mean(pos, occ, edge_index, periodic, world, msg_fn) -> torch.Tenso
 
 def _radius_block_mask(pos_i, pos_all, min2, max2, gi, jidx, periodic, world):
     """Per-block radius mask [B, N]: True where min2 < |pos_i - pos_all|^2 < max2 and j > i.
-    Pure tensors -> torch.compile fuses the diff/square/reduce/compare into ONE kernel (the
-    [B, N, D] diff never materialises); ~40x on GPU at active-matter sizes. The dynamic edge
-    extraction (`.nonzero()`) stays OUTSIDE, eager."""
+    Pure tensors, so a fusing backend can collapse the diff/square/reduce/compare into one
+    kernel and never materialise the [B, N, D] difference; whether that happens is the
+    engine's `compile:` decision, not this function's. The dynamic edge extraction
+    (`.nonzero()`) stays OUTSIDE, eager."""
     d = minimum_image(pos_i[:, None, :] - pos_all[None, :, :], periodic, world)
     dist2 = (d * d).sum(-1)                                  # [B, N]
     return (dist2 > min2) & (dist2 < max2) & (jidx > gi)     # radius rule + upper triangle
-
-
-_radius_block_mask_compiled = None
-
-
-def _get_radius_block_mask(compile: bool):
-    """The (optionally torch.compiled) block-mask kernel, compiled at most once."""
-    global _radius_block_mask_compiled
-    if not compile:
-        return _radius_block_mask
-    if _radius_block_mask_compiled is None:
-        _radius_block_mask_compiled = torch.compile(_radius_block_mask)
-    return _radius_block_mask_compiled
 
 
 def edges_radius_blockwise(
@@ -79,7 +67,6 @@ def edges_radius_blockwise(
     periodic: bool = False,
     world_width=1.0,
     block: int = 2048,
-    compile: bool = False,
 ) -> torch.Tensor:
     """Bidirectional edge_index [2, E] for live pairs with `r_min < dist < r_max`,
     built blockwise so the O(N^2) distance matrix is never materialised (scales to
@@ -98,12 +85,12 @@ def edges_radius_blockwise(
     min2, max2 = r_min * r_min, r_max * r_max
     jidx = torch.arange(N, device=device)[None, :]          # [1, N]
 
-    kernel = _get_radius_block_mask(compile)                # optional torch.compile of the O(N^2) distance+mask
     rows, cols = [], []
     for i0 in range(0, N, block):
         i1 = min(i0 + block, N)
         gi = torch.arange(i0, i1, device=device)[:, None]   # [B, 1] global i
-        m = kernel(pos[i0:i1], pos, min2, max2, gi, jidx, periodic, world_width)   # [B, N] radius+triangle mask
+        m = _radius_block_mask(pos[i0:i1], pos, min2, max2, gi, jidx,
+                               periodic, world_width)       # [B, N] radius+triangle mask
         ii, jj = m.nonzero(as_tuple=True)                   # dynamic edge extraction stays eager
         rows.append(ii + i0); cols.append(jj)
         del m

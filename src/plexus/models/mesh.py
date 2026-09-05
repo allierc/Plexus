@@ -51,7 +51,7 @@ RESERVED = ("E_srce", "E_trgt", "E_face", "nF", "Nv")
 # reload that produces fewer keys drops straight into the silent-zero paths (`age`/`ndiv` become
 # zeros on a length mismatch; `divjit` falls back to a fixed-seed draw).
 SEED_KEYS = RESERVED + ("A0", "P0", "alive", "divjit", "V0f", "Vbirth", "V0", "v_ref",
-                        "R0", "verts0", "Nv_max", "nF_max", "Ebuf")
+                        "R0", "verts0")
 
 MESH_KINDS = ("half_edge",)
 

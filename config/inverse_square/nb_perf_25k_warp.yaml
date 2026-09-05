@@ -44,7 +44,6 @@ operators:
   k: 1.0
   softening: 0.15
   all_pairs: true
-  compile: false
   implementation: warp
 schedule:
 - squared_law

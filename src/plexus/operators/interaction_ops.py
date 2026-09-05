@@ -16,7 +16,6 @@ In the order they appear below:
 
 then the alternative implementations, which change only the numerics:
 
-    squared_law[compile]  radius_graph[compile]   the same kernels through torch.compile
     squared_law[warp]     one Warp kernel: O(N^2) arithmetic, O(N) memory
     squared_law[mesh]     particle-mesh: deposit, FFT Poisson, gather -- O(N + M log M)
 """
@@ -128,8 +127,8 @@ def _inv_square_sum(pos, src, soft2):
     A per-particle vector, not a Plexus `Field` -- no grid is involved. The caller scales it by
     the signed strength and the receiver's coupling to get the acceleration. `src` folds in
     occupancy, so a dormant particle contributes nothing. Written per dimension, so only [N, N]
-    arrays appear and never an [N, N, D] one, and kept a free function so torch.compile can fuse
-    the reduction and materialise neither."""
+    arrays appear and never an [N, N, D] one, and kept a free function so a fusing backend can
+    collapse the reduction and materialise neither."""
     N, D = pos.shape
     r2 = torch.full((N, N), soft2, device=pos.device, dtype=pos.dtype)
     for k in range(D):
@@ -141,31 +140,6 @@ def _inv_square_sum(pos, src, soft2):
         dk = pos[:, k].unsqueeze(0) - pos[:, k].unsqueeze(1)
         pull[:, k] = (dk * inv_r3) @ src
     return pull
-
-
-_inv_square_sum_compiled = None
-
-
-def _reject_compile(params, op):
-    """Refuse `compile:` as a parameter. Which kernel runs is an implementation, not physics, so
-    it belongs on `implementation:`; accepting both would give a specification two unrelated ways
-    to choose a kernel, and silently ignoring it would lose the speedup the specification asked
-    for. Fail loudly instead."""
-    if "compile" in params:
-        raise ValueError(
-            f"{op}: `compile` is no longer an operator parameter -- which kernel runs is a backend "
-            f"choice and belongs on the same key as every other one. Write "
-            f"`implementation: compile` on the operator instead of `compile: true`.")
-
-
-def _get_inv_square_sum(compile):
-    """Return the (optionally torch.compiled) all-pairs inverse-square-sum kernel, compiling once."""
-    global _inv_square_sum_compiled
-    if not compile:
-        return _inv_square_sum
-    if _inv_square_sum_compiled is None:
-        _inv_square_sum_compiled = torch.compile(_inv_square_sum)
-    return _inv_square_sum_compiled
 
 
 @register_operator("squared_law", family="interaction", set="particle", kind="lateral")
@@ -214,7 +188,6 @@ class SquaredLaw(Lateral):
                    "softening": "Plummer softening length eps (0 = pure 1/r^3)",
                    "all_pairs": "sum over ALL pairs (O(N^2), long-range) vs the neighbour graph",
                    "clamp": "max |acceleration| (0 = unbounded)"}
-    COMPILE = False
     REFERENCE = ("Newton, I. (1687). Philosophiae Naturalis Principia Mathematica; "
                  "Coulomb, C.-A. (1785). Premier memoire sur l'electricite et le magnetisme. "
                  "Hist. Acad. R. Sci., 569-577; softening: Plummer, H. C. (1911). "
@@ -231,8 +204,6 @@ class SquaredLaw(Lateral):
                                        "charge" if self.law == "coulomb" else "mass"))
         self.soft = float(params.get("softening", 0.0))           # Plummer eps (0 = pure 1/r^3)
         self.all_pairs = bool(params.get("all_pairs", False))     # O(N^2) long-range vs neighbour graph
-        _reject_compile(params, "squared_law")
-        self.compile = self.COMPILE
         self.clamp = float(params.get("clamp", 0.0))              # optional cap on |a| (0 = off)
         # physical conventions bundled by `law`: (sign) like-repel vs attract; (receiver) whether the
         # receiver's own coupling charge scales its acceleration (Coulomb) or cancels (gravity).
@@ -255,7 +226,7 @@ class SquaredLaw(Lateral):
                 raise ValueError("squared_law all_pairs=True supports only open/free boundaries "
                                  "(no minimum-image over all pairs); use a neighbour graph if periodic.")
             src = s * occ                                          # dormant particles contribute nothing
-            pull = _get_inv_square_sum(self.compile)(pos, src, self.soft ** 2)
+            pull = _inv_square_sum(pos, src, self.soft ** 2)
             recv = s if self._recv_coupled else torch.ones(N, device=pos.device, dtype=pos.dtype)
             acc = (self.sign * self.k) * recv[:, None] * pull
         else:
@@ -472,8 +443,7 @@ class VelocityAlign(Lateral):
 _A, _B, _P = 7.049556277, 0.6022245584, 4.0
 
 
-@register_operator("stillinger_weber", set="particle", kind="lateral", family="interaction",
-                   implementation="autograd")
+@register_operator("stillinger_weber", set="particle", kind="lateral", family="interaction")
 class StillingerWeber(Lateral):
     """The Stillinger-Weber potential: a two-body well plus a three-body penalty on bond
     ANGLES. The angular term is the point -- it is what makes a liquid tetrahedral, and so
@@ -622,7 +592,6 @@ class RadiusGraph(Rewire):
     REQUIRES_PARAMS = ["radius"]
     MECHANISM_TAGS = ["radius_graph", "neighbor_search", "rewire"]
     PARAM_ROLES = {"min_radius": "inner_cutoff_radius", "block": "block_size"}
-    COMPILE = False                              # `implementation: compile` -- see SquaredLaw.COMPILE
     REFERENCE = "Plexus (this work); a cutoff neighbour list is standard practice."
 
     def __init__(self, params, device="cpu"):
@@ -630,8 +599,6 @@ class RadiusGraph(Rewire):
         self.r_max = float(params["radius"])
         self.r_min = float(params.get("min_radius", 0.0))
         self.block = int(params.get("block", 2048))
-        _reject_compile(params, "radius_graph")
-        self.compile = self.COMPILE
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
@@ -640,7 +607,7 @@ class RadiusGraph(Rewire):
             lvl.get("pos"), lvl.occ, self.r_min, self.r_max,
             periodic=getattr(H, "periodic", False),
             world_width=getattr(H, "world_size", getattr(H, "world_width", 1.0)),
-            block=self.block, compile=self.compile,
+            block=self.block,
         )
         return {}
 
@@ -648,27 +615,6 @@ class RadiusGraph(Rewire):
 # ==========================================================================================================
 #  implementations -- same biology, different numerics
 # ==========================================================================================================
-@register_operator("squared_law", implementation="compile", family="interaction",
-                   set="particle", kind="lateral")
-class SquaredLawCompiled(SquaredLaw):
-    """Same law, with the all-pairs reduction through torch.compile, which fuses it so the
-    [N, N] distance and 1/r^3 intermediates never materialise. Costs a compile on the first
-    call. The eager fallback still builds them, so the memory ceiling is unchanged -- the
-    `warp` implementation below is the one that removes it."""
-
-    COMPILE = True
-
-
-@register_operator("radius_graph", implementation="compile", family="topology",
-                   set="particle", kind="rewire")
-class RadiusGraphCompiled(RadiusGraph):
-    """Same relation, with the per-block distance-and-mask kernel through torch.compile: the
-    [block, N, D] difference is fused away, roughly 40x on GPU at active-matter sizes. Edge
-    extraction stays eager, since its output shape is data-dependent."""
-
-    COMPILE = True
-
-
 # `squared_law[implementation: warp]` -- the all-pairs inverse square without the [N, N] matrices.
 if HAVE_WARP:
 
