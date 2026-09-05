@@ -445,6 +445,22 @@ class SeedMesh3D(Structural):
             raise ValueError(f"mesh_seed: a0_scale must be > 0, got {self.a0_scale}")
         self.vseed_cv = float(params.get("vseed_cv", 0.0))       # STOCHASTIC VOLUME SEED: per-cell random cell-cycle
         #   phase at t=0 (spread of the initial division threshold) -> desynchronises the FIRST division wave
+        # `age_seed` -- THE OTHER WAY TO DESYNCHRONISE, AND THE ONLY ONE A CLOCK CAN USE. `vseed_cv`
+        # spreads the THRESHOLD (`divjit`), which is a phase only for a rule that reads size:
+        # `cell_divide[timer]` fires on `age >= cycle * jit` and every cell is seeded with age 0, so
+        # a clock-driven tissue divides in ONE frame however wide `vseed_cv` is -- measured on
+        # ab_06_population: 1279 of 1280 cells divided at frame 480 and on no other frame.
+        #
+        # AND SPREADING THE THRESHOLD IS THE WRONG KNOB WHEN THE CELLS MUST COME OUT THE SAME SIZE.
+        # Paired with `cell_grow[model: timer]`, which drives every cell to one target volume in
+        # `cycle_frames`, a cell that divides early divides SMALL: threshold noise buys sparseness
+        # by spending size uniformity. Spreading the initial AGE instead leaves every cell the same
+        # cycle length -- so they all reach the same size at division -- and merely offsets them in
+        # time. Uniform volumes and sparse division are then not in tension.
+        #
+        # In DIVISION-CALLS, the unit `cycle`, `min_cycle` and `max_cycle` use; set it to `cycle` to
+        # spread the population evenly over one generation. 0 (the default) seeds age 0 as before.
+        self.age_seed = float(params.get("age_seed", 0.0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device; dt = lvl.state.dtype
@@ -475,6 +491,12 @@ class SeedMesh3D(Structural):
             dj = np.clip(1.0 + self.vseed_cv * np.random.default_rng(self.seed + 101).standard_normal(nF), 0.4, 1.8)
         else:
             dj = np.ones(nF)                                     # all cells born in phase (synchronised)
+        # UNIFORM AND NOT GAUSSIAN, because this is a PHASE and a phase is uniform on its cycle: a
+        # tissue in steady state has as many cells just born as just about to divide. A Gaussian
+        # would pile the population at the middle of the cycle and still give a division wave, only
+        # a rounder one. See `age_seed` in __init__ for why the phase and not the threshold.
+        ag = (np.random.default_rng(self.seed + 202).random(nF) * self.age_seed
+              if self.age_seed > 0 else np.zeros(nF))
         # A `MeshTable`, WHICH IS A `dict` -- see `plexus.models.mesh`. Every reader is unchanged
         # by construction: the type still passes `isinstance(m, dict)` (which the D4 acted-ledger
         # tests, and whose failure would score every mesh-only operator as inert), still iterates,
@@ -516,6 +538,7 @@ class SeedMesh3D(Structural):
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
                          divjit=torch.as_tensor(dj, dtype=dt, device=dev),   # per-cell division-threshold multiplier
+                         age=torch.as_tensor(ag, dtype=dt, device=dev),      # per-cell cell-cycle PHASE at t=0
                          # THE VOLUME AND RADIUS TARGETS FOLLOW `a0_scale`, on the isotropic rescale
                          # it implies: a preferred AREA g times larger is a preferred LENGTH sqrt(g)
                          # larger, hence a volume g^1.5 larger. Leaving V0f at the seeded value would

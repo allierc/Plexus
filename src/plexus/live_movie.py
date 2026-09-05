@@ -448,7 +448,14 @@ class LiveMovie:
                 # PLACED AGAINST THE SCENE'S OWN CORNER for the same reason the camera is: with a
                 # free boundary the box's origin is in the middle of the tissue, and the bar was
                 # drawn straight through it.
-                _a[_ax0] = float(self.lo[_ax0]); _b[_ax0] = float(self.lo[_ax0]) + _len
+                # `scale_bar_corner: left|right` -- WHICH END OF THAT EDGE. Left is where it has
+                # always been and stays the default; a scene whose subject sits low-left (a section
+                # panel in that corner, a tissue drifting into it) needs the other end, and moving
+                # it in code would move it for every run.
+                if str((self.style or {}).get("scale_bar_corner", "left")).lower() == "right":
+                    _b[_ax0] = float(self.hi[_ax0]); _a[_ax0] = float(self.hi[_ax0]) - _len
+                else:
+                    _a[_ax0] = float(self.lo[_ax0]); _b[_ax0] = float(self.lo[_ax0]) + _len
                 _a[_other] = _b[_other] = float(self.lo[_other]) - 0.04 * float(span[_other])
                 _a[self.up] = _b[self.up] = float(self.lo[self.up])
                 self.p.add_mesh(pv.Line(_a, _b), color="white", line_width=4.0, lighting=False)
@@ -810,7 +817,7 @@ class LiveMovie:
     #     quantity: myosin    mean +- SD of the junctional myosin, per type -- the only one of
     #                         these that lives on an EDGE rather than on a face, so it is grouped by
     #                         the type of the cell each half-edge belongs to.
-    _CURVE_Q = ("cells", "area", "radius", "myosin")
+    _CURVE_Q = ("cells", "area", "volume", "radius", "myosin")
 
     def _curve_series(self, H, lvl, q, ntype):
         """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
@@ -861,6 +868,31 @@ class LiveMovie:
             pos = torch.as_tensor(lvl.get("pos")[:nv], dtype=torch.float64)
             a, _p, _c, _v = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], nF)
             a = a.numpy()
+            if q == "volume":
+                # THE VOLUME THE ENERGY DEFENDS, WHICH ON AN APICO-BASAL RUN IS NOT `_v`.
+                # `face_geometry_3d` returns the origin-referenced WEDGE volume -- the cone from
+                # the world origin out to the cell's mid-surface ring -- and that is the quantity
+                # `cell_grow` scales and `cell_divide` triggers on, but it is NOT the cell. It
+                # rises when the SHELL's radius rises, with the cell unchanged, which is how a
+                # tissue comes to divide without growing. `cell_mechanics[model: apicobasal]`
+                # defends the polyhedron: two caps and one wall per ring edge, by the divergence
+                # theorem, and that is what a plot labelled "cell volume" has to show.
+                #
+                # Falls back to the wedge when the run carries no `sep`, so a mid-surface spec
+                # asking for this curve still gets the only volume it has.
+                try:
+                    _sp = lvl.get("sep")
+                except Exception:                                # noqa: BLE001
+                    _sp = None
+                if _sp is not None and int(_sp.shape[0]) >= nv:
+                    from plexus.operators.vertex_ops import apicobasal_geometry_3d
+                    _s = torch.as_tensor(np.asarray(_sp[:nv].detach().cpu()
+                                                    if hasattr(_sp, "detach") else _sp[:nv]),
+                                         dtype=torch.float64)
+                    a = apicobasal_geometry_3d(pos, _s, m["E_srce"], m["E_trgt"],
+                                               m["E_face"], nF)[0].numpy()
+                else:
+                    a = _v.numpy()
             for j in range(nt):
                 sel = k == j
                 if sel.any():
@@ -946,7 +978,7 @@ class LiveMovie:
                 e = 10.0 ** np.floor(np.log10(abs(v)))
                 f = np.ceil(abs(v) / e) if (v > 0) == up else np.floor(abs(v) / e)
                 return float(np.sign(v) * max(f, 1.0) * e)
-            lo = 0.0 if (lo >= 0 or q in ("cells", "area", "myosin")) else _r1(lo, False)
+            lo = 0.0 if (lo >= 0 or q in ("cells", "area", "volume", "myosin")) else _r1(lo, False)
             # A ROUND STEP, NOT A ROUND TOP. Snapping only the top to one significant figure still
             # left the ticks between the ends to be whatever the count divided into: 0..8000 over
             # `ticks: 4` printed 0, 2667, 5333, 8000, and the two in the middle are the artefact of
