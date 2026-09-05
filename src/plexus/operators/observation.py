@@ -1,26 +1,30 @@
-"""observation -- turning a Plexus state into a REPRESENTATION of it.
+"""Observation: turning a Plexus state into a representation of it.
 
-NOTHING IN THIS MODULE IS A BIOLOGICAL MECHANISM, and that is the point of it having its own
-file. An operator here does not change what the system does; it changes how the system is
-LOOKED AT. The neurons remain the model; a voxel grid of their activity is a picture of the
-model, in the same sense that a microscope image is a picture of a tissue and not the tissue.
+Nothing in this module is a biological mechanism, which is why it has its own file. An
+operator here does not change what the system does; it changes how the system is looked at.
+The neurons remain the model, and a voxel grid of their activity is a picture of the model --
+in the same sense that a microscope image is a picture of a tissue and not the tissue.
 
     {x_i(t), r_i}_{i=1..N}          discrete entities carrying state
               |
-              |   voxelize          <- this module
+              |   voxelize
               v
        A(r, t)  on a regular grid   a continuous field, at a chosen resolution
 
-WHY THE FIELD AND NOT A STATE BLOCK. The rendered cube is not a second copy of the dynamical
-state: it is a projection of it, and the projection has its own parameters -- a kernel, a
-width, a normalisation, a resolution -- none of which are properties of any neuron. Putting
-it in `neuron.state` would make changing the render an edit to the model. As a `Field`
-attached to the containing set, the resolution can change, the kernel can change, or a
-different quantity can be rendered, and the mechanism is untouched.
+In the order they appear below:
 
-WHY A FAMILY OF `harness`. `OPERATOR_FAMILIES` says what an operator is FOR, and the honest
-answer here is "bookkeeping and scaffolding that is not biology". Inventing an `observation`
-family would grow a closed vocabulary for one module; `harness` already means this.
+    voxelize   exchange   set -> field: splat a per-element scalar onto a regular grid
+
+The result is a Field rather than a state block on the set, because it is a projection and not
+a second copy of the dynamical state. The projection has its own parameters -- a kernel, a
+width, a normalisation, a resolution -- and none of them is a property of any neuron. In
+`neuron.state`, changing the render would be an edit to the model; as a Field attached to the
+containing set, the resolution or the kernel or the rendered quantity can change and the
+mechanism is untouched.
+
+The family is `harness` for the same reason: `OPERATOR_FAMILIES` says what an operator is for,
+and the honest answer here is bookkeeping that is not biology. An `observation` family would
+grow a closed vocabulary for one module, where `harness` already means this.
 """
 from __future__ import annotations
 
@@ -32,29 +36,42 @@ from plexus.models.registry import register_operator
 
 @register_operator("voxelize", family="harness", set="neuron", kind="exchange")
 class Voxelize(Exchange):
-    """set -> field: splat a per-node scalar onto a regular grid, once per tick.
+    """Splat a per-element scalar onto a regular grid: the discrete set becomes a continuous
+    field that can be viewed, saved, or handed to a model that expects a volume.
 
-        A(v) = SUM_i K(|c_v - r_i|) x_i          kernel = "gaussian", normalize = "none"
-        A(v) = SUM_i K x_i / (eps + SUM_i K)     normalize = "density"
+    neuron -> field: reads pos and the `block:` state, writes the `to:` field in place.
 
-    THE TWO NORMALISATIONS ANSWER DIFFERENT QUESTIONS and the choice belongs in the record,
-    not in a default nobody reads. `none` is an activity DENSITY: it is bright where neurons
-    are dense as well as where they are active, it is defined everywhere, and it is zero far
-    from any neuron. `density` divides that by the local neuron density, giving a local MEAN
-    membrane potential -- independent of how many cells happen to be there, but ill-posed in
-    empty space, where `eps` is what decides the answer. Neither is more correct; a downstream
-    model trained on one is not trained on the other.
+        A(v) = sum_i K(|c_v - r_i|) x_i                     normalize: none
+        A(v) = sum_i K(|c_v - r_i|) x_i / (eps + sum_i K)   normalize: density
 
-    THE GRID IS REBUILT EVERY TICK, not accumulated. A splat that added into last tick's grid
-    would integrate the activity in time, and the result would look like a plausible field
-    while being a running sum -- the difference is invisible in a single frame.
+    c_v is the centre of voxel v and r_i the position of element i, both in world units; x_i is
+    the scalar being rendered, taken from the state block named by `block`. K is the splat
+    kernel: `gaussian`, exp(-|d|^2 / 2 sigma^2), or `nearest`, which deposits into the
+    containing voxel only. sigma is `radius`-independent and measured in VOXELS, not world
+    units, so it follows the field's resolution rather than the domain -- doubling `res` at
+    fixed sigma renders a proportionally finer kernel. The stencil is truncated at `radius`
+    voxels, defaulting to 3 sigma, which captures 99.7% of a Gaussian; a tighter cut is a
+    different kernel and is recorded as one rather than called an optimisation.
 
-    RESOLUTION IS THE FIELD'S, NOT THIS OPERATOR'S. The field declares `res:`; this operator
-    reads its shape. So changing 64 -> 128 is a one-line change to the field, and the record
-    of what was rendered stays in one place.
+    The two normalisations answer different questions, so the choice belongs in the record and
+    not in a default nobody reads. `none` is an activity DENSITY: bright where neurons are
+    dense as well as where they are active, defined everywhere, and zero far from any neuron.
+    `density` divides by the local neuron density, giving a local MEAN of the rendered quantity
+    -- independent of how many cells happen to be there, but ill-posed in empty space, where
+    `eps` is what decides the answer. Neither is more correct, and a downstream model trained
+    on one is not trained on the other.
+
+    The grid is rebuilt every tick, never accumulated. A splat adding into the previous tick's
+    grid would integrate the activity in time, and the result would look like a plausible field
+    while being a running sum -- a difference invisible in any single frame.
+
+    Resolution belongs to the field, not to this operator: the field declares `res:` and this
+    reads its shape, so 64 -> 128 is a one-line change in one place.
+
+    Reference: none -- this is a rendering, not a mechanism. Plexus (this work).
     """
 
-    EMIT = None                        # writes a Field in place; returns {} -- no integrable delta
+    EMIT = None                        # writes a Field in place, returns no delta
     INPUTS = ["neuron"]
     OUTPUTS = []                       # a field, not a set
     READS = ["pos", "voltage"]
@@ -67,7 +84,7 @@ class Voxelize(Exchange):
     PARAM_ROLES = {"block": "source_state_block", "sigma": "kernel_width_voxels",
                    "radius": "stencil_half_width_voxels", "normalize": "density_normalisation",
                    "kernel": "splat_kernel", "eps": "empty_space_regulariser"}
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = "Plexus (this work); a rendering, not a mechanism."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -77,9 +94,6 @@ class Voxelize(Exchange):
         self.channel = int(params.get("channel", 0))
         self.kernel = str(params.get("kernel", "gaussian"))
         self.sigma = float(params.get("sigma", 1.5))          # in VOXELS, so it follows `res`
-        # the stencil is truncated at `radius` voxels. 3 sigma captures 99.7% of a Gaussian; a
-        # tighter cut is a different kernel, and is recorded as such rather than called an
-        # optimisation.
         self.radius = int(params.get("radius", max(1, int(round(3 * self.sigma)))))
         self.normalize = str(params.get("normalize", "none"))
         self.eps = float(params.get("eps", 1e-6))
