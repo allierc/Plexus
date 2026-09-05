@@ -185,16 +185,20 @@ form the paper prescribes -- one name, one contract, several bodies.
   says it plainly -- magenta means "not a cell any more" and the final frame is solid magenta -- and
   a `no_nan` row of the kind gates 00, 02 and 04 carry would have failed it at frame 889. Nothing in
   the campaign's own reporting distinguishes this run from one that worked.
-* **`cell__occ.sum()` LEADS THE MESH'S `nF` BY ONE ON THE TICK A CELL IS EXTRUDED.** Measured on
-  `r023_07` (1,801 recorded rows, 15 operators, `cell_die[stalled]`): the gap is nonzero on 23 rows,
-  is always exactly 1, and always sits at a death; `vertex__occ.sum()` matches `Nv` on all 1,801. So
-  the cell set's occupancy and the mesh's face count are updated in a different ORDER when
-  `cell_die` extrudes, and for one tick a reader that trusts `occ` counts a cell the mesh has
-  already removed. Gate 00 carries exactly this check (`occupancy_matches_topology`) and passes it,
-  because gate 00 has no death operator and never reaches the path -- which is itself worth noting:
-  a green row on a spec that cannot exercise it is not evidence. FIXING IT MOVES `occ`, so it needs
-  its own commit and its own twin run, and until then every comparison crops by `nF` (okuda's own
-  definition, and the one the mesh is authoritative for).
+* **`cell__occ.sum()` LEADS THE MESH'S `nF` BY ONE ON THE TICK A CELL IS EXTRUDED -- CLOSED
+  4 SEPTEMBER, AND IT WAS ALREADY CLOSED WHEN THIS WAS WRITTEN.** The finding was: measured on
+  `r023_07` (1,801 rows, 15 operators, `cell_die[stalled]`), the gap is nonzero on 23 rows, always
+  exactly 1, always at a death, while `vertex__occ.sum()` matches `Nv` on all 1,801.
+  **RE-MEASURED ON A FRESH RUN OF THE SAME SPEC on 4 September** (`REP_r023_07_B`, from the R0 twin
+  suite, 1,801 rows, 71 face drops): the gap is nonzero on **0 rows**, and `occ_vs_mesh` reads 0.0.
+  The fix is `99a7b054` -- "promotion step 3: one renumber, in the engine, and the store both copies
+  forgot" -- which landed on **22 August**, AFTER the pristine pin `0da57dd0`. So the original
+  measurement was taken on output written before that commit, and the entry has described a
+  repaired defect ever since. The pristine side still carries it, which is why comparisons crop by
+  `nF` (okuda's own definition, and the one the mesh is authoritative for) -- that part stands.
+  The caveat that gate 00 passes `occupancy_matches_topology` without exercising it also stands: a
+  green row on a spec that cannot reach the path is not evidence, and the death rung is where that
+  row starts meaning something.
 * **`plexus.operators.<one-operator-module>` is imported by name from five prototype scripts** --
   `prototype/eye/muscle_ops.py`, three files under `prototype/cardio_cells/`, and
   `prototype/inverse_slime/operators.py` reach for `mpm_grid`, `deposit` and `diffuse`. That is why

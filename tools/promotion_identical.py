@@ -806,10 +806,13 @@ def _arrays(d, ticks=None):
         # "act_20: shape (2529,) vs (2530,)" while the two sides' `nF` was 2529 at every single
         # recorded tick.
         #
-        # THE ONE-CELL GAP IS REAL, THOUGH, and is now a gate row rather than a mystery: on the core
-        # side `cell__occ.sum()` leads `nF` by exactly one on 23 of 1801 rows, always at a death, and
-        # never by more. `vertex__occ.sum()` matches `Nv` on all 1801. So the cell set's occupancy
-        # and the mesh's face count are updated in a different order on the tick a cell is extruded.
+        # THE ONE-CELL GAP WAS REAL AND IS NOW FIXED, and the crop stays anyway. It was: on the core
+        # side `cell__occ.sum()` led `nF` by exactly one on 23 of 1801 rows, always at a death.
+        # Re-measured 4 September on a fresh `REP_r023_07_B` (same spec, 1801 rows, 71 face drops):
+        # nonzero on ZERO rows. `99a7b054` closed it on 22 August, after the pristine pin, so this
+        # comment described a repaired defect for two weeks. THE PRISTINE SIDE STILL HAS IT, which is
+        # exactly why the crop is by `nF` and not by `occ.sum()` -- the two sides must be cropped the
+        # same way, and only one of them is fixed.
         mnf = z["vertex__mesh_nF"] if "vertex__mesh_nF" in z.files else None
         mnv = z["vertex__mesh_Nv"] if "vertex__mesh_Nv" in z.files else None
         if vp is not None:
