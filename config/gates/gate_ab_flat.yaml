@@ -1,0 +1,225 @@
+general:
+  name: gate_ab_flat
+  seed: 0
+  n_frames: 20
+  dt: 1.0
+  record_cap: 24
+  boundary: free
+  dim: 3
+  world: [50.0, 50.0, 50.0]
+
+plotting:
+  renderer: vtk_mesh
+  background: black
+
+sets:
+  vertex:
+    n: 1024
+    mesh: half_edge
+    cell_set: cell
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      sep: {width: 3, integration: first_order}
+  cell:
+    n: 256
+    state:
+      area: {width: 1}
+      cen:  {width: 3}
+
+fields: {}
+
+seed:
+  - {op: seed_mesh, implementation: apicobasal, at: vertex, cell_set: cell,
+     shape: disc, n_cells: 60, radius: 5.0, centre: [0.0, 0.0, 1.0],
+     jitter: 0.15, p0: 3.5, seed: 0, h0: 0.4}
+
+operators:
+  - {op: cell_geometry, at: cell}
+  - {op: cell_mechanics, model: apicobasal, at: vertex,
+     k_v: 4.0, kappa_s: 0.2, gamma: 0.0, Lambda: 0.0, K_R: 0.0,
+     mu: 1.0, relax_iters: 30, eta: 0.08, cap_frac: 0.12,
+     mono_k: 1.2, plane_axis: 2, rest_calibration: volume_only, sep_mu: 0.0}
+  - {op: topo_record, at: vertex, every: 1}
+
+schedule: [cell_geometry, cell_mechanics, topo_record]
+
+_gate:
+  id: "ab_flat"
+  question: >
+    On a flat patch, with the apico-basal separation frozen at (h0/2)n, does the polyhedral energy
+    reduce to the mid-surface one it generalises -- the same tissue, moving the same way -- and does
+    the doubled degree-of-freedom set stay finite for every frame of it?
+  operators_exercised: [seed_mesh, cell_geometry, cell_mechanics, topo_record]
+
+  arms:
+    monolayer:  gate_ab_flat_mono
+    apicobasal: gate_ab_flat
+
+  measures:
+
+    - name: reduction_to_the_monolayer
+      tier: closed_form
+      basis: analytic
+      fn: pos_max_delta_rel
+      args: {until: 1}
+      arms: [monolayer, apicobasal]
+      reduce: max
+      assert: {le: 1.0e-4}
+      unit: "worst mid-surface displacement between the two models over the first frame, as a fraction of the mean junction length"
+      why: >
+        AB-C1, THE REDUCTION IDENTITY, and the most important row in the promotion. On a FLAT patch
+        every vertex normal is the same constant vector, so with `sep` frozen at (h0/2)n the two
+        caps are parallel planar copies of the mid-surface ring and the cell's polyhedron is a right
+        prism: its volume is EXACTLY A_mid * h0, which is the incumbent's `v_f = |N_f| * h_cell`,
+        and its surface is built by the same Newell caps and the same two-triangle wall split. Same
+        energy, therefore the same force, therefore the same STEP. The two arms differ in one key --
+        `model: monolayer` against `model: apicobasal` -- and in nothing else: the same seed, the
+        same schema, the same `sep`, which the monolayer arm carries and ignores. If this row fails,
+        the new geometry is wrong before any curvature is involved.
+
+        THE ROW IS GRADED OVER THE FIRST FRAME ONLY (`until: 1`), AND THAT IS A CORRECTION TO WHAT
+        APICOBASAL_PROMOTION.md DECLARED, MADE FOR A REASON THAT IS ITSELF A MEASUREMENT. The
+        identity is a statement about the FORCE: one energy, one gradient, one step. It is NOT a
+        statement that the two trajectories stay together over twenty frames, because that is a
+        property of the DYNAMICS -- of this patch under this relaxation -- and not of the two models.
+        Measured on this gate's own patch, restarted from a bit-identical state and with every energy
+        evaluation agreeing to one float32 ulp: the arms hold at 1 ulp for five gradient iterations
+        and then separate at about 1.3x per iteration, 4.2e-7 at five, 2.7e-6 at ten, 5.9e-4 at
+        thirty. A shrinking flat patch relaxing under surface tension is locally unstable in its
+        tangential modes, so a whole-run equality row asserts LYAPUNOV STABILITY and would fail a
+        correct implementation. Widening the bound instead would not fix it: the amplification is
+        exponential, so any tolerance that survives twenty frames also admits a wrong energy. The
+        whole-run divergence is not hidden by this window -- it is graded next to this row, as
+        `reduction_survives_the_whole_run`, `status: known_red`.
+
+        THE FIRST FRAME IS WHERE THE ROW HAS ITS DISCRIMINATING POWER, MEASURED AND NOT ASSUMED. On
+        frame one the identity reads 6.9e-7; the same comparison against a cell only 0.1% thicker
+        reads 1.0e-3, at 1% thicker 1.0e-2, at 10% thicker 1.06e-1. So the declared 1e-4 catches a
+        model wrong by better than 0.01% in thickness while sitting two orders above the float32
+        floor -- which is why the window moved and the THRESHOLD DID NOT.
+
+        `mono_k: 1.2` IS DECLARED ON BOTH ARMS, AND WITHOUT IT THIS ROW IS NOT A CONTROLLED
+        COMPARISON. `V_eq = mono_k * V0f` is normally calibrated per run from the seeded mesh, and
+        two models that agree on a cell's volume to float32 still land on constants differing in the
+        last bits. At the seeded state `v - V_eq` is a difference of two nearly equal numbers, so
+        those last bits are a LARGE relative perturbation of the volume force exactly where that
+        force is smallest. Measured on the first version of this gate: 3e-7 in `mono_k` opened the
+        arms to 1.1e-2 of an edge within one frame, then decayed back to 1.2e-4 as the cells left
+        their targets and the cancellation stopped mattering -- a burst-and-decay signature, not the
+        steady divergence a wrong energy gives. Declaring the constant holds the calibration fixed
+        across arms, so what remains is the difference between two energies.
+
+        THE BOUND IS A FRACTION OF AN EDGE AND NOT 1e-9 OF A SIM LENGTH, and that is a correction to
+        what APICOBASAL_PROMOTION.md declared. Plexus state is float32: on a patch with coordinates
+        of O(5) the smallest representable difference is already ~5e-7, so a raw 1e-9 could only be
+        met by two arms that were BIT-identical, which two different expressions for the same volume
+        will never be. The bound comes from the arithmetic on both sides of it. Measured before this
+        gate was written, on this mesh: the two energies' gradients differ by 1.4e-6 against a
+        gradient of magnitude 1.9, i.e. 7e-7 relative -- pure float32 rounding, and in float64 the
+        same comparison is 7e-13. That is what one step of the identity costs, and one step is what
+        this row grades. A genuinely different energy, by contrast, moves vertices by O(0.1) of an
+        edge on that same step. 1e-4 sits two orders above the noise and three below the thing it
+        has to exclude.
+
+    - name: reduction_survives_the_whole_run
+      tier: closed_form
+      basis: analytic
+      status: known_red
+      fn: pos_max_delta_rel
+      arms: [monolayer, apicobasal]
+      reduce: max
+      assert: {le: 1.0e-4}
+      unit: "worst mid-surface displacement between the two models over all twenty frames, as a fraction of the mean junction length"
+      why: >
+        THE SAME COMPARISON AS THE ROW ABOVE WITH THE WINDOW REMOVED, DECLARED RED SO THE
+        INSTABILITY IS IN THE TABLE INSTEAD OF IN A FOOTNOTE. It measures 1.4e-2 of an edge against
+        the same 1.0e-4, and the reason is not a defect in either energy: restarted from a
+        bit-identical state the two models hold at one float32 ulp for five gradient iterations and
+        then separate at about 1.3x per iteration -- 4.2e-7 at five, 2.7e-6 at ten, 5.9e-4 at thirty
+        -- so twenty frames of thirty iterations amplify the last-bit difference between two
+        expressions for the same volume into a visible one. A shrinking flat patch under surface
+        tension is locally unstable in its tangential modes, and two float32 evaluation orders are a
+        perturbation for that instability to grow. THIS ROW THEREFORE ASSERTS LYAPUNOV STABILITY OF
+        THE RELAXATION AND NOT THE REDUCTION OF THE MODEL, which is why it may not be the graded
+        form of AB-C1 and why the threshold is not widened to make it pass: at 1.3x per step any
+        bound that survives the run also admits an energy that is simply wrong.
+
+        IT IS KEPT, AND KEPT AT 1e-4, BECAUSE IT IS THE ONLY THING IN THE SUITE WATCHING FOR THE
+        AMPLIFICATION TO STOP. `run_gates` flips a `known_red` row to TURNED_GREEN and exits 4 the
+        moment it passes, so a later change that makes the relaxation contractive -- a smaller `eta`,
+        a stabilised tangential mode, a float64 state -- announces itself rather than going unnoticed
+        as a red row that quietly stopped being red. What it must NOT be read as is evidence about
+        the two energies: for that, read the row above, where the identity is graded on the step it
+        is an identity for.
+
+    - name: the_patch_actually_relaxed
+      tier: bookkeeping
+      basis: identity
+      fn: mean_junction_length_fold
+      reduce: last
+      assert: {lt: 1.0}
+      unit: "mean junction length at the last frame over its value at the first (dimensionless)"
+      why: >
+        A REDUCTION IDENTITY IS SATISFIED PERFECTLY BY TWO TISSUES THAT BOTH DID NOTHING. This row
+        is what stops the one above being vacuous. Strictly LESS than one, and that direction is a
+        prediction rather than an observation: the only terms acting are a surface tension, which
+        always pulls the surface in, and a volume target calibrated to the rest volume, which
+        therefore pushes neither way -- so on a patch held in its plane the only direction available
+        is inward. An `ne: 1.0` would be satisfied by a patch that exploded.
+
+    - name: nonfinite_pos_or_sep
+      tier: bookkeeping
+      basis: identity
+      fn: nonfinite_count
+      args: {vblocks: [sep]}
+      reduce: all
+      assert: {eq: 0}
+      unit: "non-finite entries in the vertex positions and the apico-basal separation"
+      why: >
+        AB-B9. A doubled degree-of-freedom set integrated by a NEW energy with no hand-written
+        gradient is exactly where a NaN enters. `reduce: all` and not `last` is the whole row:
+        `cell_mechanics` passes its gradient through `nan_to_num`, so a blown-up relaxation LAUNDERS
+        itself -- the run continues, the last frame is finite, and every last-frame row in the suite
+        still passes. The okuda campaign already contains a run that went half-NaN from frame 889
+        and stamped itself `valid_evidence: True`. `vblocks: [sep]` is what makes this row about the
+        promotion rather than about the incumbent: the default reads `pos` and the cell blocks only,
+        and `sep` is the array this rung put under a new force.
+
+    - name: apicobasal_span_recorded_fraction
+      tier: bookkeeping
+      basis: identity
+      fn: apicobasal_span_recorded_fraction
+      reduce: all
+      assert: {eq: 1.0}
+      unit: "fraction of recorded rows carrying a finite, non-zero span"
+      why: >
+        AB-B7, RE-RUN HERE RATHER THAN INHERITED, because `run_gates` never reads a gate's
+        `operators_exercised:` -- preflight reads id, arms, measures and the per-row keys only -- so
+        a gate can NAME a variant and prove nothing about which one it got. Without this row the
+        reduction identity above would be equally well satisfied by two monolayer arms, which is the
+        one way it could pass while proving nothing. It is not a new claim; it is the evidence that
+        this gate's own trajectory is the apico-basal one.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a 2D mesh of hexagonal cells undergoing a subtle deformation over
+      time. The cells appear to shift slightly in position and orientation as the frame count progresses.
+      There is a noticeable change in the curvature or "flatness" of the mesh as it evolves through the
+      sequence. By the final frame, the overall structure maintains its integrity while exhibiting a slight
+      geometric shift.
+    objects: The scene contains a single mesh composed of 48 individual hexagonal cells. These cells are
+      arranged in a contiguous, interlocking honeycomb pattern that forms a flat, irregular sheet. The
+      cells are colored in a light gray or off-white shade against a solid black background. Each cell
+      is of a uniform size, creating a consistent and repeating geometric texture across the entire mesh.
+  movie_kburns:
+    description: The simulation shows a flat mesh of hexagonal cells undergoing a continuous deformation.
+      The mesh appears to stretch and compress horizontally while maintaining its overall structural integrity.
+      The boundaries of the mesh shift slightly as the internal geometry adjusts to the applied forces.
+      The entire process occurs smoothly without any breaks or significant changes in the connectivity
+      of the cells.
+    objects: The scene contains a single flat mesh composed of numerous interconnected hexagonal cells.
+      The cells are arranged in a dense, honeycomb-like pattern that forms a roughly elliptical shape.
+      The mesh is colored in a light gray or off-white shade against a solid black background. Each individual
+      cell is small and uniform in size, contributing to a cohesive and continuous surface.

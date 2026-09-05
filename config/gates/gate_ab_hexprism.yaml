@@ -1,0 +1,116 @@
+general:
+  name: gate_ab_hexprism
+  seed: 0
+  n_frames: 4
+  dt: 1.0
+  record_cap: 8
+  boundary: free
+  dim: 3
+  world: [50.0, 50.0, 50.0]
+
+plotting:
+  renderer: vtk_mesh
+  background: black
+
+sets:
+  vertex:
+    n: 64
+    mesh: half_edge
+    cell_set: cell
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      sep: {width: 3, integration: first_order}
+  cell:
+    n: 8
+    state:
+      area: {width: 1}
+      cen:  {width: 3}
+
+fields: {}
+
+seed:
+  - {op: seed_mesh, implementation: apicobasal, at: vertex, cell_set: cell,
+     shape: hexagon, n_cells: 1, radius: 1.0, jitter: 0.0, p0: 3.5, seed: 0, h0: 1.0}
+
+operators:
+  - {op: cell_geometry, at: cell}
+  - {op: topo_record, at: vertex, every: 1}
+
+schedule: [cell_geometry, topo_record]
+
+_gate:
+  id: "ab_hexprism"
+  question: >
+    On the one solid in this promotion whose shape index is known on paper -- a regular hexagonal
+    prism of side 1 and height 1 -- does the apico-basal geometry return the number arithmetic says
+    it must, and does it report no prism-volume excess where a right prism has none?
+  operators_exercised: [seed_mesh, cell_geometry, topo_record]
+
+  measures:
+
+    - name: cell_shape_index_hexprism
+      tier: closed_form
+      basis: analytic
+      fn: cell_shape_index
+      reduce: mean
+      assert: {within: [5.924261, 1.0e-4]}
+      unit: "cell shape index S / V^(2/3) (dimensionless)"
+      why: >
+        AB-C2. Side a = 1, height h = 1, every term on paper: A_cap = (3 sqrt3 / 2) a^2 = 2.598076,
+        A_lat = 6 a h = 6, so S = 2 A_cap + A_lat = 3 sqrt3 + 6 = 11.196152; V = A_cap h =
+        3 sqrt3 / 2 = 2.598076 and V^(2/3) = 1.889882; s = 11.196152 / 1.889882 = 5.924261377933605.
+        ONE NUMBER THAT EXERCISES THE WHOLE GEOMETRY AT ONCE -- the fan triangulation, the cap
+        centroid convention, both cap orientations and the two-triangle wall split have to be right
+        simultaneously to reach it, which is the class of error that produced a hexagonal prism of
+        -0.866 for a cell of +2.598 at R2. `build_disc_mesh` cannot produce this solid: its lattice
+        lays equal x- and y-pitch with alternate rows offset by half a step, so its Voronoi cells are
+        hexagon-ISH and never regular. Hence one new value on `seed_mesh`'s `shape:` vocabulary,
+        which is a VALUE by that vocabulary's own written test -- the same hypothesis about the
+        tissue, seeded into a geometry chosen so a closed form is reachable. The tolerance is 1e-4
+        and not tighter because the state is float32; the quantity is O(6), so a single ulp is
+        ~5e-7 and thirty operations of cancellation are not.
+
+    - name: prism_volume_excess_right_prism
+      tier: bookkeeping
+      basis: identity
+      fn: prism_volume_excess
+      reduce: max
+      assert: {le: 1.0e-5}
+      unit: "fractional excess of the cell's volume over A_mid x h (dimensionless)"
+      why: >
+        AB-B8, AND IT IS A CONTROL RATHER THAN A CLAIM. `A_mid * h` is not an approximation invented
+        by this measure: it is exactly what the incumbent `cell_mechanics[model: monolayer]`
+        computes for a cell's volume, `v_f = |N_f| * h_cell`, with the O((h/R)^2) prism correction
+        dropped. A right prism HAS no such correction -- its volume is its cap area times its height
+        identically -- so on this solid the excess must be zero. If it is not, then the number
+        AB-C5 reads off a curved shell is the measure's own arithmetic wearing a physical name, and
+        nothing downstream of it means anything.
+
+        THE BOUND IS 1e-5 AND NOT `eq: 0.0`, and that is a correction to what
+        APICOBASAL_PROMOTION.md declared. Plexus state is float32 -- the buffers are
+        `torch.zeros(...)` and there is no dtype knob -- so two different expressions for the same
+        volume (a divergence-theorem sum over ten triangles, against a Newell area times a
+        thickness) can agree to about 1e-7 relative and never to zero. `eq: 0.0` was a threshold in
+        a precision this code does not have. In float64 the same solid measures 2.2e-16.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The video shows a single hexagonal cell that remains stationary throughout the sequence.
+      The cell maintains a constant shape and position in the center of the frame. There is no movement
+      or deformation of the geometry over the five frames. The only change is a slight shift in the brightness
+      of the cell's surface.
+    objects: The scene contains a single large hexagonal cell centered in a black void. The cell is composed
+      of two triangles joined at a common diagonal edge. Its color transitions from a light grey in the
+      first frame to a darker grey in the subsequent frames. The size of the hexagon remains constant
+      and occupies a significant portion of the horizontal space.
+  movie_kburns:
+    description: The video shows a 3D hexagonal prism mesh rotating in a 3D space. The mesh starts in
+      a front-facing orientation and rotates clockwise around its vertical axis. As it rotates, the perspective
+      of the hexagonal faces changes, revealing the depth of the prism. The rotation continues until the
+      mesh completes a significant portion of a full turn.
+    objects: The primary object is a single hexagonal prism mesh. It is a solid, three-dimensional geometric
+      shape with six rectangular side faces and two hexagonal bases. The mesh is colored in a light grey
+      or off-white shade against a solid black background. The size of the prism remains constant throughout
+      the duration of the simulation.
