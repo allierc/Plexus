@@ -1,5 +1,5 @@
 general:
-  name: ab_07_divide_uniform_volume
+  name: divide_uniform_volume
   seed: 0
   n_frames: 480
   dt: 1.0
