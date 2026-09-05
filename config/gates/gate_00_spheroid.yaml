@@ -357,3 +357,46 @@ _gate:
         2 x 17.97 x 10 um = 359 um. A cultured spheroid is 100-500 um before its core goes hypoxic
         and the model, which has no nutrient field, stops being about anything real. This row is the
         boundary of the model's own validity, stated in the unit that makes it checkable.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a spherical mesh structure that expands in size as the number of
+      cells increases over time. Initially, the sphere is composed of a few large, white polygonal cells.
+      As the frames progress, the cells undergo division, rapidly increasing in number and decreasing
+      in individual size. By the final frame, the sphere is densely packed with thousands of small cells,
+      many of which have changed color to red or blue.
+    objects: The primary object is a spherical mesh composed of interconnected polygonal cells. The cells
+      are primarily white, but some transition to red or blue as the simulation progresses. The size of
+      the individual cells decreases significantly as the total cell count grows from 200 to 6914. The
+      cells are arranged in a tessellated pattern that maintains a consistent spherical topology throughout
+      the sequence.
+  movie_kburns:
+    description: The video shows a static, unchanging mesh of a spheroid. There is no movement or evolution
+      of particles, agents, or fields over the time sequence. The geometry remains perfectly still throughout
+      the entire duration. The visual representation is a constant state of a Voronoi-like tessellation
+      on a spherical surface.
+    objects: The scene contains a single large spheroid mesh composed of numerous small polygonal cells.
+      These cells are arranged in a dense, interlocking Voronoi pattern across the entire surface of the
+      sphere. The mesh is rendered in a neutral grey color with black outlines defining the edges of each
+      polygon. The individual cells are uniform in size, creating a highly regular and symmetric texture.
+  vtk_evolve_mesh:
+    description: The simulation shows a spherical mesh structure that expands in size as the number of
+      cells increases over time. Initially, the sphere is small with a low cell count and very few green-colored
+      cells. As the frames progress, the sphere grows significantly larger and the number of cells multiplies
+      rapidly. By the final frame, the sphere is much larger and densely populated with a high concentration
+      of green cells distributed across its surface.
+    objects: The primary object is a spherical mesh composed of many interconnected polygonal cells. The
+      cells are primarily white or light gray, with a subset of cells colored green. The size of the sphere
+      increases progressively from the first frame to the last. The individual cells remain relatively
+      small and uniform in size, but their total number increases from 200 to 6914.
+  vtk_kburns_mesh:
+    description: The video shows a static mesh of a spheroid with a Voronoi-like cellular pattern. There
+      is no visible movement or evolution of the particles or fields over the sequence of frames. The
+      geometry remains perfectly still throughout the entire duration of the simulation. The image serves
+      as a baseline or a steady-state representation of the mesh structure.
+    objects: The scene contains a single large spheroid mesh composed of numerous small polygonal cells.
+      These cells are arranged in a dense, interlocking tessellation that covers the entire surface of
+      the sphere. The mesh is rendered in a light gray or off-white color with thin black outlines defining
+      the edges of each cell. The individual cells vary slightly in size and shape, creating a naturalistic,
+      organic appearance across the curved surface.
