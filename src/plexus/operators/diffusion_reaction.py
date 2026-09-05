@@ -1,25 +1,37 @@
 """Reaction-diffusion ON THE CELL GRAPH, and the two couplings between chemistry and shape.
 
-    seed_cell_chem (alias cell_chem_seed)  the initial morphogen field
-    cell_chem_diffuse                      graph_laplacian | interface_weighted
-    cell_chem_react                        gray_scott | brusselator | gierer_meinhardt
-    cell_neighbours                        the cell adjacency the Laplacian runs on
-    cell_geometry                          per-cell area / perimeter / centroid / volume
-    cell_grow                              default | balance | sizer | timer
-    cell_chem_from_shape                   shape -> chemistry: apical_area | curvature | pressure | tension
-    cell_shape_probe                       aspect | shape_index, published for a discriminator
-    interface_tension                      a purse-string line tension on the red/white interface
-    interface_push                         and the term that is NOT physics -- kept separate on purpose
-
-THE DIFFUSION IS NOT ON A GRID. The cells are the nodes, `cell_neighbours` is the graph, and the
-Laplacian is over shared faces -- so the domain grows and rewires as the tissue divides, which a
+The diffusion is not on a grid. The CELLS are the nodes, `cell_neighbours` is the graph, and the
+Laplacian runs over shared faces -- so the domain grows and rewires as the tissue divides, which a
 fixed lattice cannot do. That is why these are `set=cell` operators rather than `field` ones.
 
-INTERFACE_TENSION AND INTERFACE_PUSH ARE TWO OPERATORS AND MUST STAY TWO. They were one,
-`rd_interface_tension`, carrying `K_purse * sum l_e` (ordinary vertex-model physics) MINUS
-`K_extrude * sum a*r` (an energy that falls as red cells move outward -- it pays the tissue to
-produce the morphology the search was looking for). One name over both cost four campaign rounds of
-verdicts about a term that measured 0.0 in all 78 specs that ever carried it. See OKUDA_PROMOTION.md.
+In the order they appear below:
+
+    cell_geometry         aggregate  vertex mesh -> per-cell centroid, area, perimeter, volume
+    cell_neighbours       rewire     the cell adjacency the Laplacian runs on
+    seed_cell_chem        seed       the initial morphogen field
+    cell_chem_diffuse     lateral    morphogen exchange between neighbouring cells
+    cell_chem_react       lateral    the local reaction: the pattern-forming nonlinearity
+    cell_grow             structural morphogen -> growth: the chemistry-to-shape coupling
+    interface_tension     lateral    a purse-string line tension on the activator interface
+    interface_push        lateral    the term that is NOT physics, kept separate on purpose
+    cell_chem_from_shape  lateral    shape -> chemistry: the other half of the loop
+    cell_shape_probe      lateral    one shape scalar per cell, published for a discriminator
+
+then the models -- different hypotheses in one slot, not different arithmetic:
+
+    seed_cell_chem       scatter (default), noise, patch, cones, simplex
+    cell_chem_diffuse    graph_laplacian (default implementation), interface_weighted (a model)
+    cell_chem_react      gray_scott, brusselator, gierer_meinhardt, rock_paper_scissor,
+                         gray_scott_coupled
+    cell_grow            default, sizer, balance, timer
+    cell_chem_from_shape apical_area, curvature, pressure, tension
+    cell_shape_probe     shape_index, aspect
+
+`interface_tension` and `interface_push` are two operators and must stay two. Written as one, they
+carried a purse-string line tension -- ordinary vertex-model physics -- MINUS an energy that falls
+as activator-high cells move outward. The second term does not model a force: it pays the tissue to
+produce the morphology a search is looking for, so a run carrying it can only ever be a control.
+One name over both makes that impossible to see in a schedule.
 """
 from __future__ import annotations
 from collections import defaultdict
@@ -34,7 +46,7 @@ from plexus.operators.vertex_ops import face_geometry_3d
 def _chan(params, who, n_species=2):
     """The FIRST COLUMN of the contiguous species span this instance owns.
 
-    `chan` IS A COLUMN INDEX, NOT A SPECIES INDEX, and it reads like one. A reaction model occupies
+    `chan` is a COLUMN index, not a species index, though it reads like one. A reaction model occupies
     `n_species` ADJACENT columns of `chem` -- Gray-Scott two (a, u), May-Leonard three (u, v, w),
     a coupled pair of Gray-Scott systems four -- so the second two-species system starts at
     `chan: 2`, not `chan: 1`. `chan: 1` is the natural thing to write and would have put the second
@@ -87,9 +99,24 @@ def _emit(chem, chan, terms, rate, occ):
 
 @register_operator("cell_geometry", set="cell", kind="aggregate", family="hierarchy")
 class CellGeometry3D(Aggregate):
-    """AGGREGATE the 3D vertex mesh -> per-cell centroid + area (the cross-scale readout the RD needs:
-    the activator spot is seeded by centroid, and the pattern is rendered per cell). Reads the stashed
-    half-edge table on the vertex Level; writes cell.cen (+ cell.area) via scatter-add over half-edges."""
+    """Aggregate the 3D vertex mesh into per-cell scalars: the cross-scale readout the
+    reaction-diffusion runs on.
+
+    vertex -> cell: reads the half-edge table stashed on the vertex set and writes the cell set's
+    centroid `cen` and area, by scatter-add over half-edges.
+
+        cen_f = (1/n_f) sum_{e in f} x_srce(e)          the face centroid
+        A_f   = (1/2) | sum_{e in f} x_srce(e) x x_trgt(e) |
+
+    the second being the magnitude of the summed cross products around the face ring, which is
+    twice the area of a planar polygon in 3D and needs no projection onto a normal.
+
+    It is an Aggregate because it is a many-to-one map across the containment relation: many
+    vertices, one cell. Every operator here that speaks of a cell's position or size depends on it,
+    so it is scheduled first.
+
+    Reference: none -- a geometric readout, not a mechanism. Plexus (this work).
+    """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     INPUTS = ["vertex"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["area", "cen"]
     MECHANISM_TAGS = ["aggregate", "cell_geometry", "cross_scale"]
@@ -119,9 +146,19 @@ class CellGeometry3D(Aggregate):
 
 @register_operator("cell_neighbours", set="cell", kind="rewire", family="topology")
 class CellAdjacency(Rewire):
-    """Two cells are neighbours iff they share a mesh edge. Build that graph from the half-edge
-    table on the vertex Level and store it as `edge_index` on the cell Level -- the graph the
-    reaction-diffusion runs on. (Rebuilt each call so it tracks T1/division if they run.)"""
+    """The relation the reaction-diffusion runs on: two cells are neighbours if and only if
+    they share a mesh edge.
+
+    vertex -> cell: reads the half-edge table, writes the cell set's `edge_index`.
+
+        E = { (f, g) : some mesh edge is shared by face f and face g }
+
+    Rebuilt on every call, so it follows a T1 or a division the moment one happens -- which is the
+    whole reason the chemistry lives on this graph rather than on a fixed lattice. A grid cannot
+    grow or rewire; a tissue does both.
+
+    Reference: none -- the adjacency of a mesh, not a mechanism. Plexus (this work).
+    """
     SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False
     MECHANISM_TAGS = ["cell_neighbours", "neighbour_graph"]
     REFERENCE = "Plexus (this work)."
@@ -158,29 +195,33 @@ class CellAdjacency(Rewire):
 # spellings must resolve: 320 specs use the first and the rest use the second.
 @register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed")
 class CellRDSeed(Structural):
-    N_SPECIES = 2
-    """Gray-Scott initial condition on the cell set: substrate u=1 everywhere, activator a=0 except
-    a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u].
+    """The initial morphogen field on the cell set, written once at the opening of the trajectory.
+    The default `scatter` model is the Gray-Scott initial condition.
 
-    `mode: tip` WAS REMOVED, 6 August. It re-activated a fixed-size cap at the current outermost
-    cell EVERY FRAME, so the activation chased the advancing tip and forced a constant-diameter
-    extension. Two reasons it had to go, and the second is the one that matters:
+    cell -> cell: writes the `chem` block, once.
 
-      * it is a moving BOUNDARY CONDITION, not an initial condition. Where the activity sits is
-        then our answer rather than the simulation's, and the campaign's question -- does the
-        chemical pattern grip the shape? -- was being asked of a pattern pinned to the shape's own
-        outermost point. `corr_act_rad` was partly measuring the seeding rule against itself;
-      * re-applying it every frame overwrites BOTH chemistry channels, so no operator that writes
-        to `chem` can accumulate anything. `cell_chem_from_shape` writes to channel 1 and `tip` sets that
-        channel to exactly 1.0, which is why 8 same-seed `beta` edits across 13 rounds moved the
-        trajectory by exactly zero and were each recorded as a refuted hypothesis.
+        u_j = 1 everywhere,   a_j = 0 everywhere
+        except a central spot, where (a, u) = (0.5, 0.25)
 
-    AN UNKNOWN MODE NOW RAISES. It used to fall through to the `else`, which means deleting the
-    branch alone would have turned 265 archived `mode: tip` specs into SCATTER runs that still
-    load, still finish and describe a different mechanism. A spec that can no longer be run is a
-    correct outcome; a spec that quietly runs something else is the failure this whole phase is
-    about.
+    a is the activator and u the substrate, both dimensionless concentrations; chem = [a, u]. The
+    substrate starts full and the activator absent, so nothing happens anywhere except at the spot
+    -- which is what makes the pattern's origin a declared initial condition rather than an
+    accident of the numerics.
+
+    A SEED, NOT A BOUNDARY CONDITION, and the kind enforces it: the runtime confines every seed to
+    the opening frames. A rule re-applied every frame is a moving boundary condition, and it makes
+    the answer to "does the chemical pattern grip the shape?" a property of the rule rather than of
+    the simulation. It also overwrites both chemistry channels every tick, so no other operator
+    writing to `chem` -- `cell_chem_from_shape`, for one -- can accumulate anything at all, and its
+    parameters become inert while still appearing to be under test.
+
+    An unrecognised model raises rather than falling through to the default. A specification that
+    can no longer be run is a correct outcome; one that quietly runs something else is not.
+
+    Reference: Plexus (this work); cone seeding after Okuda, S. et al. (2018). Sci. Rep. 8:2386.
     """
+
+    N_SPECIES = 2
     SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["initial_condition", "gray_scott"]
     MODES = ("scatter", "noise", "patch", "cones", "simplex")
@@ -196,25 +237,22 @@ class CellRDSeed(Structural):
         # (`simplex`) the total the species are normalised to. 1.0 is the May-Leonard simplex.
         self.p0 = float(params.get("p0", 1.0))
         self.chan = _chan(params, type(self).__name__, self.n_species)
-        # `mode:` BECAME THE `model:` AXIS, 4 September. Five ways of writing x_0 are five claims
-        # about HOW PATTERNING NUCLEATES -- from random fluctuation, from a placed patch, from N
-        # fixed foci -- and seeding it in cones puts part of the campaign's answer in by hand. That
-        # is a hypothesis, and it belongs where the registry can see it. See AXES.md.
+        # How a pattern nucleates is on the `model:` axis, not a `mode:` setting. Five ways of
+        # writing x_0 are five claims about HOW PATTERNING NUCLEATES -- from random fluctuation,
+        # from a placed patch, from N fixed foci -- and seeding it in cones puts part of the answer
+        # in by hand. That is a hypothesis, and it belongs where the registry can see it.
         #
-        # AND IT UNBLOCKS THE SEED MIGRATION. The variants READ DIFFERENT THINGS: `scatter` and
-        # `noise` use no geometry whatever, while `patch` and `cones` read `cen`. On the `model:`
-        # axis each carries its own typed signature (R1(c)), so "may this seed move ahead of
-        # `cell_geometry` in the schedule?" is answerable FROM THE REGISTRY instead of from a
-        # hard-coded list inside a migration tool. 1,232 archived specs are blocked on exactly that
-        # question, and only the 15 `cones` ones actually need to say no.
+        # It also matters because the variants READ DIFFERENT THINGS: `scatter` and `noise` use no
+        # geometry at all, while `patch` and `cones` read the cell centroids. On the `model:` axis
+        # each carries its own typed signature, so "may this seed be scheduled ahead of
+        # `cell_geometry`?" is answerable from the registry rather than from a hard-coded list.
         if "mode" in params:
             raise ValueError(
                 "seed_cell_chem: `mode` is gone -- write `model:`. How a pattern nucleates is a "
                 "hypothesis, not a setting. "
-                + ("`tip` was removed on 6 August -- it re-seeded every frame, which makes it a "
-                   "moving boundary condition and annihilates every operator that writes to "
-                   "`chem`. Use `model: scatter`." if params.get("mode") == "tip" else "")
-                + " See AXES.md.")
+                + ("`tip` is gone: it re-seeded every frame, which makes it a moving boundary "
+                   "condition and annihilates every operator that writes to `chem`. Use "
+                   "`model: scatter`." if params.get("mode") == "tip" else ""))
         self.mode = getattr(type(self), "NUCLEATION", "scatter")
         self.seed_frac = float(params.get("seed_frac", 0.06))   # (scatter) fraction of strong activator seeds
         self.A = float(params.get("A", 1.0)); self.B = float(params.get("B", 3.0))   # (noise) steady state (A, B/A)
@@ -379,21 +417,34 @@ class CellRDSeedSimplex(CellRDSeed):
 
 @register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", implementation="graph_laplacian")
 class CellDiffuse(Lateral):
-    N_SPECIES = 2
-    """`graph_laplacian` implementation of cell_chem_diffuse: PURELY COMBINATORIAL diffusion of the two
-    morphogens between neighbouring cells (forked from Turing_vertex `graph_diffuse`). `norm=True` uses
-    the degree-normalised Laplacian (eigenvalues in [-2,0]) so an explicit step is stable at any cell
-    degree. First-order -> EMIT=velocity into chem.
+    """Morphogen exchange between neighbouring cells, as a purely combinatorial graph diffusion:
+    every neighbour counts the same, whatever the geometry between them.
 
-    CAVEAT (why the `interface_weighted` sibling exists): this forward reads ONLY `chem` and
-    `edge_index` -- no geometry at all. Two cells sharing a thin sliver exchange exactly as much as two
-    sharing a broad face, and a cell stretched to twice its volume dilutes as if it had not stretched,
-    so mesh DEFORMATION IS INVISIBLE to the chemistry (the pattern rides on the tissue like a decal).
-    That is the right numerics for a pure Turing-on-a-graph study and it is what every calibrated
-    round_* preset was tuned against, so it stays the contract DEFAULT; select
-    `implementation: interface_weighted` for the Okuda shape<->chemistry two-way coupling.
-    The name is not new: discovery/composition_space.py has always listed this impl as
-    "graph_laplacian" -- it was registered as the anonymous "default", so the two disagreed."""
+    cell -[cell adjacency]-> cell: reads chem and edge_index, emits d(chem)/dt.
+
+        dc_i/dt = D_s sum_{j ~ i} (c_j - c_i) / deg(i)        norm: true  (the default)
+        dc_i/dt = D_s sum_{j ~ i} (c_j - c_i)                 norm: false
+
+    c is the concentration of one species, dimensionless, and the sum runs over the cells sharing a
+    mesh edge with i. D_s is that species' diffusion coefficient, in inverse time, since the graph
+    carries no length. `chi` sets the RATIO between the two species' coefficients, which is the
+    Turing condition -- a pattern needs the inhibitor to spread faster than the activator, and chi
+    is where that claim lives. Dividing by the degree gives the normalised Laplacian, whose
+    eigenvalues lie in [-2, 0], so an explicit step stays stable at any cell degree; without it, a
+    cell with many neighbours can overshoot.
+
+    THE GEOMETRY IS INVISIBLE HERE, which is why the `interface_weighted` sibling exists. This
+    reads only `chem` and `edge_index`: two cells sharing a thin sliver exchange exactly as much as
+    two sharing a broad face, and a cell stretched to twice its volume dilutes as though it had not
+    stretched. The pattern therefore rides on the tissue like a decal. That is the right numerics
+    for a pure Turing-on-a-graph study, and it stays the contract default; `interface_weighted` is
+    the model to select where shape must feed back into chemistry.
+
+    Reference: Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). The
+    chemical basis of morphogenesis. Phil. Trans. R. Soc. B 237:37-72.
+    """
+
+    N_SPECIES = 2
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["chi"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = ["edge_index"]
@@ -503,8 +554,8 @@ class CellDiffuseInterfaceWeighted(Lateral):
         mesh-wide scalar that non-dimensionalises the finite-volume operator. It is what makes this a
         DROP-IN for `graph_laplacian`: on a mesh whose walls are all equal and whose volumes are all
         equal, kappa*S_i/v_i = 1 and the expression collapses ALGEBRAICALLY to mean_j(c_j) - c_i, the
-        degree-normalised graph Laplacian -- so d_a/d_h/chi keep the meaning every round_* preset
-        calibrated them with, and only the DEVIATION from uniformity acts. (It also means a uniform
+        degree-normalised graph Laplacian -- so d_a, d_h and chi keep the meaning they have in the
+        default implementation, and only the DEVIATION from uniformity acts. (It also means a uniform
         inflation of the whole vesicle is normalised away; global dilution under growth is already
         handled structurally by cell_grow's conserve_amount, so applying it here too would
         double-count it.)
@@ -600,11 +651,33 @@ class CellDiffuseInterfaceWeighted(Lateral):
 
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="gray_scott")
 class CellReactGrayScott(Lateral):
+    """Gray-Scott autocatalysis: an activator that makes more of itself by consuming a substrate
+    the system slowly replenishes. Pattern by substrate DEPLETION rather than by inhibition.
+
+    cell -> cell: reads chem, emits d(chem)/dt. No relation is traversed -- the reaction is local.
+
+        da/dt = r ( u a^2 - (F + k) a )        a = activator, and its own autocatalyst
+        du/dt = r ( -u a^2 + F (1 - u) )       u = substrate, fed toward 1
+
+    a and u are dimensionless concentrations. F is the feed rate, in inverse time: it both tops the
+    substrate back up toward 1 and removes activator. k is the extra kill rate on the activator, in
+    the same units, so the activator decays at F + k while the substrate is replenished at F -- and
+    the whole morphology of the model is set by where (F, k) sits in that two-dimensional plane.
+    r is `rate`, a dimensionless time rescaling of the whole reaction, so a pattern can be made to
+    develop in fewer frames; it must be raised together with the diffusion for the two to stay in
+    proportion.
+
+    The a^2 u term is cubic, which is what makes the model bistable: a small activator
+    perturbation dies, and a large enough one grows until it exhausts its local substrate and
+    splits. That is why Gray-Scott makes spots that replicate, where an activator-inhibitor model
+    makes a stationary peak.
+
+    Reference: Gray, P. & Scott, S. K. (1984). Autocatalytic reactions in the isothermal,
+    continuous stirred tank reactor. Chem. Eng. Sci. 39:1087-1097; Pearson, J. E. (1993). Complex
+    patterns in a simple system. Science 261:189-192 (the (F, k) morphology map).
+    """
+
     N_SPECIES = 2
-    """Gray-Scott autocatalysis on the cell set (forked from Turing_vertex `react`), chem = [a, u]:
-        da/dt =  u a^2 - (F + kk) a      (a = activator / autocatalyst)
-        du/dt = -u a^2 + F (1 - u)       (u = substrate)
-    `rate` time-scales the whole RD (pair it with `chi`) so the pattern develops in fewer frames."""
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["F", "kk"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
@@ -801,32 +874,48 @@ class CellReactGiererMeinhardt(Lateral):
 # unreadable -- `cell_grow` / `cell_divide` says what the schedule actually does.
 @register_operator("cell_grow", set="vertex", kind="structural", family="population")
 class Grow3D(Structural):
-    # READS one species' activator; the span it points into is two wide because a Gray-Scott
+    """Chemistry-to-shape: the morphogen decides where the tissue grows. Each cell's mechanical
+    TARGETS are raised, and the mechanics then inflates the cell by force balance.
+
+    cell -> vertex: reads the cell set's chem, writes the mesh's target area A0, perimeter P0,
+    volume V0f and radius R0. It moves no vertex itself -- it raises what the cells ASK for, and
+    `cell_mechanics` decides whether they get it.
+
+        g_j = rate ( rho + Hill(a_j) )
+        Hill(a) = a^n / (a^n + a_sw^n)
+        s_j <- s_j (1 + g_j)               the cumulative per-cell growth scale
+
+    rate is the growth rate in inverse frames. rho is the dimensionless baseline: the fraction of
+    the full rate a cell grows at with no activator present. a_sw is the activator concentration at
+    which the switch is half open, and n is `hill`, its dimensionless sharpness. The two regimes
+    are the ends of one operator:
+
+        rho = 1, a_sw = 0   uniform growth, every cell at the same rate
+        rho = 0, a_sw > 0   growth only where the activator is high: self-organised budding
+        in between          a baseline everywhere plus an activator-driven excess at the tips
+
+    `a_sw_rel` decides whether a_sw is an ABSOLUTE activator concentration or a fraction of the
+    field's own running maximum. Both are real mechanisms -- an absolute threshold is a receptor
+    with a fixed affinity, a relative one is a cell comparing itself with its neighbours -- and the
+    default is absolute. `a_live` is the floor below which the field counts as dead and the
+    relative gate refuses to open, so a collapsed activator cannot have its own noise rescaled into
+    a threshold crossing.
+
+    Reference: Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces
+    autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386.
+    """
+
+    # Reads one species' activator; the span it points into is two wide because a Gray-Scott
     # system is. It never writes chem, so this only has to name the right column.
     N_SPECIES = 2
-    """Cell growth on the vesicle: each cell's targets (A0 / P0 / v_eq) grow at a per-cell rate,
-    and the per-cell volume elasticity in cell_mechanics then inflates the cell by force balance.
-    This operator moves no vertex itself -- it raises what the cells ASK for, and the mechanics
-    decides whether they get it.
-
-    THE RATE IS `rate * (rho + Hill(activator))`, which is one operator covering both regimes:
-      rho = 1, a_sw = 0   uniform growth, every cell at the same rate (what `cell_grow` did)
-      rho = 0, a_sw > 0   growth only where the activator is high -> self-organised budding/coral
-      in between          a baseline everywhere plus an activator-driven excess at the tips
-    A cross-set coupling: reads cell.chem, writes the vertex mesh targets."""
-    # MAY_MUTATE_INTEGRATED_STATE was declared False and the operator mutates it anyway: the
-    # `conserve_amount` branch rescales cell.chem in place (c_j <- c_j * (v_old/v_new)) when the
-    # cell's target volume grows. The engine's integration invariant caught it and refused to run
-    # -- which is why the Turing x vertex (coral) movie on the site's front page could not be
-    # regenerated at all, while the plain grow+divide movie could. Plain has no RD, so the
-    # activator is identically zero and the branch is never reached; the tag only lies once
-    # chemistry is present, i.e. exactly in the composition the campaign is about.
-    #
-    # The DECLARATION is what was wrong, not the behaviour. The rescale is a change of variable
-    # forced by a volume change, not a dynamics delta -- the operator is registered
-    # kind="structural", which is precisely the category the invariant exempts -- and the comment
-    # at the branch records it as load-bearing (Okuda's intra-domain gradients come from it).
-    # Returning it as an integrated delta would change the physics; declaring it honestly does not.
+    # MAY_MUTATE_INTEGRATED_STATE is True because the `conserve_amount` branch rescales cell.chem
+    # in place, c_j <- c_j * (v_old/v_new), when the cell's target volume grows. That rescale is a
+    # change of VARIABLE forced by a volume change, not a dynamics delta -- returning it as an
+    # integrated delta would change the physics. The operator is registered kind="structural",
+    # which is the category the engine's integration invariant exempts, so declaring it honestly
+    # costs nothing. Note that the branch is only reached once chemistry is present: with no
+    # activator the rescale never runs, so a declaration of False would appear correct on every
+    # composition except the one that matters.
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["growth", "morphogen_driven", "budding", "cross_scale"]
     REFERENCE = "Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386."
@@ -1123,30 +1212,29 @@ class Grow3DTimer(Grow3D):
 
 @register_operator("interface_tension", set="vertex", kind="lateral", family="mechanics")
 class InterfaceLineTension3D(Lateral):
-    """A PURSE-STRING line tension on the RED/WHITE activator interface -- and NOTHING ELSE.
+    """A purse-string line tension on the activator interface -- and nothing else.
 
-    SPLIT FROM `rd_interface_tension` ON 10 AUGUST, and the split is the point. That operator carried
-    two terms under one name:
+    vertex -> vertex: reads pos and the cell set's chem, emits a velocity on the interface
+    vertices, which the engine integrates beside the shape energy.
 
-        E = K_purse * Sigma_iface l_e   -   K_extrude * Sigma_red a*r
-            [___ ordinary physics ___]       [_ the answer written into the objective _]
+        E   = K_purse sum_{e in interface} l_e
+        f_v = -dE/dx_v = -K_purse sum_{e ~ v} (x_v - x_other) / l_e
 
-    The first is a line tension on the interface ring: real vertex-model mechanics, the same kind of
-    term `cell_mechanics` already charges for, and how a purse-string actually works. The second is
-    an energy that FALLS as red cells move outward -- it does not model a force, it pays the tissue
-    to produce the morphology the campaign is searching for. A run carrying it can only be a control.
+    The interface is the set of mesh edges separating an activator-high cell from a low one, with
+    "high" meaning a > a_sw * a_max: a fraction of the field's own running maximum, because a
+    threshold relative to the field cannot fall outside the field. l_e is the edge length in world
+    units and K_purse the line tension, in force per unit length -- the same kind of term
+    `cell_mechanics` already charges for. Shortening the ring costs less energy, so the ring
+    closes, which is how a purse-string actually contracts.
 
-    ONE NAME OVER BOTH TERMS COST FOUR ROUNDS. `K_extrude` measured 0.0 in all 78 specs that have
-    ever carried this operator, so nothing the campaign ran was ever forced -- and the Grounder
-    still reported r028 as "the same extrude-forced star for a fourth round", on three runs
-    (`r028_00`, `03`, `06`) whose specs contain no such operator at all. `user_input.md` section 3
-    had already told it to retract exactly that verdict about `r017_07`. A reader who sees a
-    plausible name cannot check a term that is not in front of them, so the terms are now two
-    operators: this one, and `interface_push` below, which the loop vocabulary does not
-    contain. There is no longer a setting of anything in the search space that pushes.
+    It carries only that term. An energy falling as activator-high cells move outward would not
+    model a force; it would pay the tissue to produce the morphology a search is looking for. That
+    term exists under its own name as `interface_push`, which the search vocabulary does not
+    contain, so no setting of anything in the search space pushes.
 
-    Cross-set: reads cell.chem, forces on vertices; EMIT velocity (the engine integrates it beside
-    shape_energy). Bounded-Euler substeps of -grad E."""
+    Reference: Plexus (this work); purse-string apical constriction after Okuda, S. et al. (2018).
+    Sci. Rep. 8:2386.
+    """
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
@@ -1222,27 +1310,33 @@ class InterfaceLineTension3D(Lateral):
 
 @register_operator("interface_push", set="vertex", kind="lateral", family="mechanics")
 class ExtrusionForcing3D(Lateral):
-    """THE DISQUALIFIED TERM, ON ITS OWN AND UNDER ITS OWN NAME. A run carrying this is a control.
+    """The disqualified term, on its own and under its own name. A run carrying this is a control.
 
-    Split out of `rd_interface_tension` on 10 August. The energy is
+    vertex -> vertex: reads pos and the cell set's chem, emits an outward velocity on
+    activator-high cells.
 
-        E = - K_extrude * Sigma_red a * r
+        E   = -K_extrude sum_{activator-high j} a_j r_j
+        f_v = +K_extrude a_j u_v                       outward, along the radial direction
 
-    -- it FALLS as activator-high cells move outward, so the tissue is paid, per frame, to do the
-    thing the campaign is searching for. That is not a mechanism; it is the answer written into the
-    objective. Growth, division, adhesion and line tension are hypotheses about what cells DO. This
-    is a hypothesis about what the experimenter WANTS, and any protrusion it produces is evidence
-    about the term and not about the tissue.
+    a_j is the cell's activator concentration, dimensionless, and r_j the distance of its centroid
+    from the tissue centre in world units; K_extrude is a force per unit concentration. The energy
+    FALLS as activator-high cells move outward, so the tissue is paid, per frame, to do the thing a
+    search is looking for.
 
-    IT IS NOT IN THE LOOP VOCABULARY, deliberately -- `composition_space.OPERATORS` does not contain
-    it, so no `add_op` or `set_param` the Proposer can write will reach it. It exists so that the
-    forcing CAN be run when a control genuinely calls for one, and so that running it is an explicit
-    act that the record shows as such. Keeping it inside the tension operator made forcing a
-    parameter of a sound mechanism, which is how "extrude-forced" was reported for four rounds
-    across runs whose K_extrude was 0.0 -- in fact whose specs held no such operator at all.
+    That is not a mechanism. Growth, division, adhesion and line tension are hypotheses about what
+    cells DO; this is a hypothesis about what the experimenter WANTS, and any protrusion it
+    produces is evidence about the term rather than about the tissue.
 
-    Same gate as the tension operator: `red = a > a_sw * amax`, a fraction of the field's own
-    maximum, because a threshold relative to the field cannot be outside the field."""
+    It is deliberately absent from the search vocabulary, so no proposed edit can reach it. It
+    exists so the forcing CAN be run when a control genuinely calls for one, and so that running it
+    is an explicit act the record shows as such. Kept inside the tension operator, forcing would be
+    a parameter of a sound mechanism, and a reader seeing a plausible name cannot check a term that
+    is not in front of them.
+
+    Same gate as the tension operator: a > a_sw * a_max.
+
+    Reference: Plexus (this work) -- a forcing term retained only as an explicit control.
+    """
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
@@ -1291,12 +1385,28 @@ class ExtrusionForcing3D(Lateral):
 
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="brusselator")
 class CellReactBrusselator(Lateral):
-    """`brusselator` implementation of cell_chem_react (transposed verbatim from Turing_vertex fig4_coral),
-    chem = [a, h] (activator, inhibitor):
-        da/dt = gamma ( A - (B+1) a + a^2 h )
-        dh/dt = gamma ( B a - a^2 h )
-    Homogeneous steady state (a,h) = (A, B/A); Turing-unstable for B > 1 + A^2. Pair with the noise
-    seed (steady state + noise) and a fast-inhibitor diffusion ratio (d_h >> d_a) -> smooth coral."""
+    """The Brusselator: the textbook activator-inhibitor system, and the one whose Turing
+    condition is exactly solvable, so whether a pattern is possible can be checked before running.
+
+    cell -> cell: reads chem, emits d(chem)/dt. Local; no relation traversed. chem = [a, h].
+
+        da/dt = gamma ( A - (B + 1) a + a^2 h )      a = activator
+        dh/dt = gamma ( B a - a^2 h )                h = inhibitor
+
+    a and h are dimensionless concentrations. A is the constant feed of activator and B the rate at
+    which activator is converted into inhibitor, both in inverse time; gamma is a dimensionless
+    rescaling of the whole reaction. The homogeneous steady state is (a, h) = (A, B/A), and it is
+    Turing-unstable for B > 1 + A^2 -- so the two parameters say in advance whether a pattern is
+    possible at all, which is what makes this the right model to certify a diffusion operator
+    against.
+
+    Pair it with the `noise` seed, which starts exactly at that steady state and perturbs it, and
+    with a diffusion ratio putting the inhibitor well above the activator. Patterning then comes
+    from fluctuation alone, which is the strictest test that it is emergent.
+
+    Reference: Prigogine, I. & Lefever, R. (1968). Symmetry breaking instabilities in dissipative
+    systems II. J. Chem. Phys. 48:1695-1700.
+    """
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["gamma", "A", "B"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
@@ -1440,13 +1550,19 @@ class _ShapeToChemBase(Lateral):
 @register_operator("cell_chem_from_shape", set="cell", kind="lateral", family="fields",
                    model="curvature")
 class ShapeToChemCurvature(_ShapeToChemBase):
-    """The chemistry listens to CURVATURE -- the feedback Okuda's framing implies.
+    """The chemistry listens to CURVATURE: the tissue's shape telling its cells where they are.
 
-    Discrete mean curvature on the CELL graph: how far a cell's centroid sits from the mean of its
-    neighbours' centroids, projected on its own outward normal, divided by the squared spacing.
-    Positive where the sheet bulges outward, negative in a dimple, and ~1/R on a sphere of radius R.
-    A proxy rather than the cotangent-Laplacian curvature, which is why it is certified against
-    spheres of known radius in the self-test below rather than asserted.
+        H_j = 2 (mean_k(x_k) - x_j) . n_j / d_j^2
+
+    over the neighbours k of cell j, where x is a cell centroid, n_j the cell's own outward normal
+    and d_j the mean centroid spacing, all in world units. H is therefore in inverse world units:
+    positive where the sheet bulges outward, negative in a dimple, and about 1/R on a sphere of
+    radius R.
+
+    A proxy for the mean curvature rather than the cotangent-Laplacian form, which is why it is
+    certified against spheres of known radius in the self-test below rather than asserted.
+
+    Reference: Okuda, S. et al. (2018). Sci. Rep. 8:2386 (the shape-chemistry loop this closes).
     """
     MECHANISM_TAGS = _ShapeToChemBase.MECHANISM_TAGS + ["curvature_sensing"]
 
@@ -1483,14 +1599,20 @@ class ShapeToChemCurvature(_ShapeToChemBase):
 @register_operator("cell_chem_from_shape", set="cell", kind="lateral", family="fields",
                    model="tension")
 class ShapeToChemTension(_ShapeToChemBase):
-    """The chemistry listens to CORTICAL TENSION -- mechanotransduction.
+    """The chemistry listens to CORTICAL TENSION: mechanotransduction.
 
-    tension_j = 2 kP (P_j - P0_j) + Gamma P_j + Lambda, the same quantity analyze_forces.cell_mechanics
-    reports. This is the best-evidenced feedback in real epithelia: YAP/TAZ translocates to the
-    nucleus under tension and Piezo1 is a stretch-gated channel, so "tense cells signal differently"
-    is not a modelling convenience.
+        tension_j = 2 kP (P_j - P0_j) + Gamma P_j + Lambda
 
-    NEEDS the mechanical targets P0, which exist only once a mechanics operator has run.
+    the same quantity `cell_mechanics` charges for. P_j is the cell's perimeter and P0_j its
+    target, both in world units; kP is the perimeter elasticity, Gamma the contractility and
+    Lambda the line tension, so tension is a force. It is the best-evidenced feedback in real
+    epithelia -- YAP/TAZ translocates to the nucleus under tension and Piezo1 is a stretch-gated
+    channel -- so "tense cells signal differently" is not a modelling convenience.
+
+    Needs the mechanical target P0, which exists only once a mechanics operator has run.
+
+    Reference: Dupont, S. et al. (2011). Role of YAP/TAZ in mechanotransduction. Nature
+    474:179-183.
     """
     MECHANISM_TAGS = _ShapeToChemBase.MECHANISM_TAGS + ["mechanotransduction", "tension_sensing"]
 
@@ -1510,11 +1632,19 @@ class ShapeToChemTension(_ShapeToChemBase):
 @register_operator("cell_chem_from_shape", set="cell", kind="lateral", family="fields",
                    model="apical_area")
 class ShapeToChemApicalArea(_ShapeToChemBase):
-    """The chemistry listens to APICAL AREA -- crowding and density sensing.
+    """The chemistry listens to APICAL AREA: crowding and density sensing.
+
+        feature_j = A_j / A0_j        where a target area exists
+        feature_j = A_j               otherwise
+
+    A_j is the cell's apical area in world units squared and A0_j its target. Reporting the RATIO
+    where a target exists is what makes a uniformly grown tissue read as unstretched; an absolute
+    area would rise everywhere as the tissue grows and report growth as crowding.
 
     The most direct reading of "am I stretched or am I crowded", and the cheapest: no mechanical
-    targets required, only geometry. Reported relative to the cell's own target area A0 when that
-    exists, so a uniformly-scaled tissue reads as unstretched; absolute area otherwise.
+    targets are required, only geometry.
+
+    Reference: Okuda, S. et al. (2018). Sci. Rep. 8:2386 (the shape-chemistry loop this closes).
     """
     MECHANISM_TAGS = _ShapeToChemBase.MECHANISM_TAGS + ["crowding_sensing", "density_sensing"]
 
@@ -1533,11 +1663,15 @@ class ShapeToChemApicalArea(_ShapeToChemBase):
 class ShapeToChemPressure(_ShapeToChemBase):
     """The chemistry listens to VOLUME-ELASTIC PRESSURE.
 
-    pressure_j = 2 kV (V0_j - v_j): positive when a cell is BELOW its target volume, i.e. squeezed.
-    The quantity that would have flagged finding F004's compression phase in real time, had anything
-    been reading it.
+        pressure_j = 2 kV (V0_j - v_j)
 
-    NEEDS the mechanical targets V0f.
+    positive when a cell is BELOW its target volume, i.e. squeezed. v_j is the cell's volume and
+    V0_j its target, both in world units cubed, and kV the volume elasticity. It is the quantity
+    that says whether a tissue is in compression, which a movie of positions does not show.
+
+    Needs the mechanical target V0f.
+
+    Reference: Okuda, S. et al. (2018). Sci. Rep. 8:2386 (the shape-chemistry loop this closes).
     """
     MECHANISM_TAGS = _ShapeToChemBase.MECHANISM_TAGS + ["pressure_sensing", "compression_sensing"]
 
@@ -1620,14 +1754,10 @@ if __name__ == "__main__":
         "one extreme cell is clipped, not allowed to set the scale")
 
     # ----------------------------------------------------------------- everything above is CHECK 0
-    # It certifies the ARITHMETIC INSIDE the operator, and every line of it passes. It is also the
-    # whole reason `beta` spent 13 rounds and 25 GPU-runs contributing nothing: the operator whose
-    # curvature reads 1/R on spheres of known radius, whose bump is positive and whose dimple is
-    # negative, never reached the state at all. What used to stand here was
-    #
-    #     chk(True, "beta = 0 returns zeros by construction (see forward)")
-    #
-    # -- the single check about `forward`, hardcoded to pass. Below are the three that were missing.
+    # It certifies the ARITHMETIC INSIDE the operator, and every line of it passes -- which is
+    # exactly why it is not enough on its own. An operator whose curvature reads 1/R on spheres of
+    # known radius, whose bump is positive and whose dimple negative, can still never reach the
+    # state at all, and every check above would still be green. The three below test `forward`.
     import torch
 
     print("\n  CHECK 0b -- the null, actually executed rather than asserted:")
@@ -1766,7 +1896,19 @@ class _ShapeProbeBase(Lateral):
 @register_operator("cell_shape_probe", set="cell", kind="lateral", family="hierarchy",
                    model="shape_index")
 class ShapeIndexProbe(_ShapeProbeBase):
-    """P / sqrt(A) per cell -- the quantity the vertex model itself minimises towards `p0`."""
+    """The dimensionless shape index: what the vertex model itself minimises towards p0, and
+    the tissue's own order parameter for rigid against fluid.
+
+        q_j = P_j / sqrt(A_j)
+
+    P_j is the cell's perimeter and A_j its area, both in world units, so q is dimensionless and
+    reads about 3.72 for a regular hexagon. Below roughly 3.81 the tissue is rigid and above it
+    fluid -- the rigidity transition -- so this one number says which phase a simulated epithelium
+    is in.
+
+    Reference: Bi, D., Lopez, J. H., Schwarz, J. M. & Manning, M. L. (2015). A density-independent
+    rigidity transition in biological tissues. Nat. Phys. 11:1074-1079.
+    """
 
     def _measure(self, pos, m, es, et, ef, nF):
         pt = torch.as_tensor(pos)
@@ -1782,12 +1924,19 @@ class ShapeIndexProbe(_ShapeProbeBase):
 @register_operator("cell_shape_probe", set="cell", kind="lateral", family="hierarchy",
                    model="aspect")
 class AspectProbe(_ShapeProbeBase):
-    """Longest over shortest axis of the cell ring -- "thin and elongated" as a number.
+    """"Thin and elongated" as a number: the aspect ratio of the cell's own vertex ring.
 
-    THE EIGENVALUES ARE OF THE RING'S COVARIANCE IN 3D and the ratio is taken between the FIRST TWO,
-    not the first and the last. A cell on a curved shell is a nearly-flat patch, so its third
-    eigenvalue is the sheet's thickness and is small for every cell, elongated or not; using it
-    would report the whole tissue as extreme and rank nothing.
+        aspect_j = sqrt(lambda_1 / lambda_2)
+
+    lambda_1 >= lambda_2 >= lambda_3 are the eigenvalues of the covariance of the ring's vertex
+    positions in 3D, so the ratio is dimensionless and equals 1 for a circular cell.
+
+    The ratio is taken between the FIRST TWO eigenvalues, not the first and the last. A cell on a
+    curved shell is a nearly flat patch, so its third eigenvalue is the sheet's thickness and is
+    small for every cell, elongated or not; using it would report the whole tissue as extreme and
+    rank nothing.
+
+    Reference: none -- a shape descriptor, not a mechanism. Plexus (this work).
     """
 
     def _measure(self, pos, m, es, et, ef, nF):
