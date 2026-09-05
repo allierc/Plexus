@@ -1,0 +1,168 @@
+---
+title: "neuron_update"
+subtitle: "Phi, the local update: a neuron's own dynamics, with no reference to any other neuron."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: neuron`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Phi, the local update: a neuron's own dynamics, with no reference to any other neuron.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `neuron` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+A leaky integrator plus a self-coupling term.
+
+neuron -> neuron: reads the membrane state, emits its derivative. No relation is traversed.
+
+    dx_i/dt += -a_i x_i + b_i + s_i tanh(x_i) + eta_i
+
+a_i is the leak in inverse time, so 1/a_i is the membrane time constant; b_i is a constant
+drive in the units of x; s_i is the self-coupling strength, also in inverse time. eta_i is
+`noise`. All three come from the neuron's own row of the type table.
+
+s is what takes the circuit through the transition studied in the reference: at s = 0 each
+neuron relaxes to the fixed point b/a, and as s grows past a the isolated neuron acquires
+its own bistability before any coupling is added at all.
+
+The kind is `lateral` and it traverses no map. Lateral means within a set, and a per-member
+law with an empty relation is the degenerate case of that rather than a different kind;
+`MAPS = []` says so in the signature, which is where a reader should be able to see it.
+
+Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
+the activity of neural assemblies, eqn. (simulation); the NeuralGraph PDE_N4 generator.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `a` | leak_rate_inverse_tau | &ndash; |
+| `b` | constant_drive | &ndash; |
+| `s` | self_coupling_strength | &ndash; |
+| `noise` | process_noise_sd_per_step | 0.0 |
+| `block` | membrane_state_block | "voltage" |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: neuron_update, at: neuron}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`membrane_integration`]{.op-badge} [`leak`]{.op-badge} [`self_coupling`]{.op-badge} [`ctrnn`]{.op-badge} [`rate_model`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/neural.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neural.py) &mdash; the registered operator.
+
+```python
+@register_operator("neuron_update", family="signalling", set="neuron", kind="lateral",
+                   model="leaky_tanh")
+class NeuronUpdate(Lateral):
+    """phi, the local update: a neuron's own dynamics, with no reference to any other neuron.
+    A leaky integrator plus a self-coupling term.
+
+    neuron -> neuron: reads the membrane state, emits its derivative. No relation is traversed.
+
+        dx_i/dt += -a_i x_i + b_i + s_i tanh(x_i) + eta_i
+
+    a_i is the leak in inverse time, so 1/a_i is the membrane time constant; b_i is a constant
+    drive in the units of x; s_i is the self-coupling strength, also in inverse time. eta_i is
+    `noise`. All three come from the neuron's own row of the type table.
+
+    s is what takes the circuit through the transition studied in the reference: at s = 0 each
+    neuron relaxes to the fixed point b/a, and as s grows past a the isolated neuron acquires
+    its own bistability before any coupling is added at all.
+
+    The kind is `lateral` and it traverses no map. Lateral means within a set, and a per-member
+    law with an empty relation is the degenerate case of that rather than a different kind;
+    `MAPS = []` says so in the signature, which is where a reader should be able to see it.
+
+    Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
+    the activity of neural assemblies, eqn. (simulation); the NeuralGraph PDE_N4 generator.
+    """
+
+    EMIT = "velocity"                  # first-order voltage ODE; the engine integrates `voltage`
+    INPUTS = ["neuron"]
+    OUTPUTS = ["neuron"]
+    READS = ["voltage"]
+    WRITES = ["voltage"]
+    MAPS = []                          # no relation: each neuron's own state only
+    SUPPORTED_DIMS = [2, 3]            # acts on a scalar state; ignores the spatial dimension
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = []               # every knob has a default, or comes from the type table
+    # OPTIONAL, not REQUIRED: a typeless set falls back to the operator line. Declaring it here is
+    # what tells the validator that `p:` on a type is read by something -- without it the loader
+    # warns "property 'p' is read by no operator" on every neural spec.
+    OPTIONAL_TYPE_PROPS = ["p"]
+    MECHANISM_TAGS = ["membrane_integration", "leak", "self_coupling", "ctrnn", "rate_model"]
+    PARAM_ROLES = {
+        "a": "leak_rate_inverse_tau", "b": "constant_drive", "s": "self_coupling_strength",
+        "noise": "process_noise_sd_per_step", "block": "membrane_state_block",
+    }
+    REFERENCE = ("Allier, C. et al. Graph neural networks uncover structure and function "
+                 "underlying the activity of neural assemblies, eqn. (simulation); the "
+                 "NeuralGraph PDE_N4 generator.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "neuron")
+        self.block = params.get("block", "voltage")
+        self.noise = float(params.get("noise", 0.0))       # sd of eta_i PER STEP (see forward)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        x = lvl.get(self.block)                            # [N, 1]
+        p = _type_params(lvl, self.params)                 # [N, 6]
+        a, b, s = p[:, 0:1], p[:, 1:2], p[:, 3:4]
+        dx = -a * x + b + s * torch.tanh(x)
+        if self.noise > 0.0:
+            # The noise is a per-step DISPLACEMENT, not a rate, and dividing by dt is what
+            # makes that true. The reference adds it after the Euler step and unscaled,
+            # `x += dt*du + sigma*randn`, where Plexus integrates whatever an operator returns
+            # as `x += dt*delta`. Returning sigma/dt makes the two identical: the dt cancels.
+            dt = float(getattr(H.config, "dt", 1.0)) or 1.0
+            dx = dx + (self.noise / dt) * torch.randn(
+                x.shape, generator=getattr(H, "rng", None), device=x.device, dtype=x.dtype)
+        dx = dx * lvl.occ[:, None]                         # a dormant neuron does not move
+        if mask is not None:
+            dx = dx * mask[:, None].float()
+        return {self.at: dx}
+```

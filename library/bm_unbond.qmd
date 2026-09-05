@@ -1,0 +1,187 @@
+---
+title: "bm_unbond"
+subtitle: "Break over-strained crosslinks: fragmentation as an emergent and measurable event rather than a mechanism bolted onto the mechanics."
+---
+
+::: {.op-head}
+![](../figures/icons/rewire.png){.op-logo}
+
+[`rewire`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Break over-strained crosslinks: fragmentation as an emergent and measurable event rather than a mechanism bolted onto the mechanics.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{R}\!:E$ **Rewire**: rebuild the relation $E$ each tick.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+than a mechanism bolted onto the mechanics.
+
+basement_membrane -> basement_membrane: reads pos and the bond list, marks bonds dead.
+
+    bond e dies when   (L_e - rest_e) / rest_e  >  break_strain
+
+break_strain is dimensionless -- the fractional extension a crosslink survives. Checked every
+`every` frames rather than continuously, since bond failure is slow beside the mechanics.
+
+The kind is `rewire`, and that is not decoration: a broken crosslink changes the relation, which
+is exactly what a Rewire is for.
+
+What it reports is the thing that matters -- not how many bonds broke, but whether the sheet is
+still ONE PIECE. A membrane that has lost a third of its bonds and is still connected is not
+fragmented, so what is measured is the size of the largest connected component.
+
+Reference: Plexus (this work); failure of a crosslinked network at a critical extension.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `break_strain` | bond_failure_strain | 0.35 |
+| `every` | check_period | &ndash; |
+| `components_every` | &ndash; | 40 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: bm_unbond, at: particle}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`fragmentation`]{.op-badge} [`crosslink_failure`]{.op-badge} [`basement_membrane`]{.op-badge}  
+
+## Related operators
+
+Other **rewire** operators: [`radius_graph`](radius_graph.qmd), [`edge_flip`](edge_flip.qmd), [`cell_neighbours`](cell_neighbours.qmd), [`junction_sync`](junction_sync.qmd), [`adhesion_turnover`](adhesion_turnover.qmd), [`bm_crosslink`](bm_crosslink.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("bm_unbond", family="topology", set="particle", kind="rewire")
+class BasementMembraneBondBreak(Structural):
+    """Break over-strained crosslinks: fragmentation as an emergent and measurable event rather
+    than a mechanism bolted onto the mechanics.
+
+    basement_membrane -> basement_membrane: reads pos and the bond list, marks bonds dead.
+
+        bond e dies when   (L_e - rest_e) / rest_e  >  break_strain
+
+    break_strain is dimensionless -- the fractional extension a crosslink survives. Checked every
+    `every` frames rather than continuously, since bond failure is slow beside the mechanics.
+
+    The kind is `rewire`, and that is not decoration: a broken crosslink changes the relation, which
+    is exactly what a Rewire is for.
+
+    What it reports is the thing that matters -- not how many bonds broke, but whether the sheet is
+    still ONE PIECE. A membrane that has lost a third of its bonds and is still connected is not
+    fragmented, so what is measured is the size of the largest connected component.
+
+    Reference: Plexus (this work); failure of a crosslinked network at a critical extension.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["fragmentation", "crosslink_failure", "basement_membrane"]
+    PARAM_ROLES = {"break_strain": "bond_failure_strain", "every": "check_period"}
+    REFERENCE = "Plexus (this work); failure criterion in the spirit of discrete-element crosslink models."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.break_strain = float(params.get("break_strain", 0.35))
+        self.components_every = int(params.get("components_every", 40))
+        self._k = 0
+
+    def forward(self, H, mask=None):
+        b = getattr(H, "membrane_bonds", None)
+        if b is None:
+            return {}
+        i, j, rest, alive = b
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        L = (pos[j] - pos[i]).norm(dim=-1).clamp_min(1e-9)
+        strain = (L - rest) / rest
+        _lv = getattr(H, "membrane_alive", None)
+        self._n_live = int(_lv.sum()) if _lv is not None else pos.shape[0]
+        broke = alive & (strain > self.break_strain)
+        n_broke = int(broke.sum())
+        if n_broke:
+            alive &= ~broke
+        self._k += 1
+        # COMPUTED PERIODICALLY, BUT ALSO CARRIED FORWARD -- and that second half is the whole point.
+        # Computing it only on the frames that are multiples of `components_every` and leaving the
+        # rest NaN would make the LAST row -- which is what an analysis reads -- NaN unless the
+        # frame count happens to be a multiple of the period. The connectivity would then be
+        # silently dropped from every conclusion that claimed to rest on it. A metric that
+        # is NaN wherever it is read is not a metric.
+        _last = self._k >= int(getattr(H, "n_frames", 0) or 0) - 1
+        if self.components_every > 0 and (self._k % self.components_every == 0 or _last):
+            # NORMALISED BY THE LIVE SHEET, not by the whole set. Dividing by pos.shape[0] counted the
+            # unsecreted reserve as membrane that had failed to connect, so `lcc` simply tracked
+            # n0/N_total: 0.769 / 0.275 / 0.141 at reservoirs of 45k / 135k / 270k is 0.769 x 45/N, and
+            # says nothing about whether the sheet is in one piece.
+            _n = int(getattr(self, "_n_live", pos.shape[0])) or pos.shape[0]
+            self._frac = self._largest_component(i[alive], j[alive], pos.shape[0], denom=_n)
+        frac = getattr(self, "_frac", float("nan"))
+        # MEAN DEGREE, the quantity that says whether this is a sheet at all. Central-force rigidity
+        # percolation in 2D needs z of about 4, so a network below that is not a sheet at all --
+        # however many bonds it still has. Reporting z makes an under-connected network unmissable
+        # where a bond count alone reads as an intact sheet whose taut bonds happen to have broken.
+        n_live = int(getattr(self, "_n_live", pos.shape[0])) or pos.shape[0]
+        z = 2.0 * int(alive.sum()) / max(n_live, 1)
+        BOND_TRACE.append((int(alive.sum()), n_broke, float(strain[alive].abs().mean())
+                           if bool(alive.any()) else 0.0, frac, z))
+        return {}
+
+    @staticmethod
+    def _largest_component(i, j, n, iters=64, denom=None):
+        """Largest connected component as a fraction of the sheet, by label propagation.
+
+        Iterative rather than a union-find: it is a diagnostic run every 40 frames on the GPU where the
+        data already is, and 64 min-scatter sweeps reach the diameter of a shell mesh. Under-converged
+        would REPORT MORE components than exist, so the failure direction is conservative -- it cannot
+        make a fragmented sheet look intact.
+        """
+        if i.numel() == 0:
+            return 0.0 if n else float("nan")
+        lab = torch.arange(n, device=i.device)
+        for _ in range(iters):
+            prev = lab
+            lab = lab.clone().scatter_reduce_(0, i, lab[j], reduce="amin")
+            lab = lab.scatter_reduce_(0, j, lab[i], reduce="amin")
+            if torch.equal(lab, prev):
+                break
+        return float(torch.bincount(lab).max().item() / max(denom or n, 1))
+```

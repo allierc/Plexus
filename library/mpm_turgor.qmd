@@ -1,0 +1,184 @@
+---
+title: "mpm_turgor"
+subtitle: "Give a set an isotropic OUTWARD pressure -- turgor / excess osmotic pressure -- by writing a per-particle `turgor` buffer that `mpm_scatter` subtracts from the Kirchhoff stress."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Give a set an isotropic OUTWARD pressure -- turgor / excess osmotic pressure -- by writing a per-particle `turgor` buffer that `mpm_scatter` subtracts from the Kirchhoff stress.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `pressure`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+per-particle `turgor` buffer that `mpm_scatter` subtracts from the Kirchhoff stress.
+
+WHY THIS IS A MECHANISM AND NOT A TUNING KNOB. An MLS-MPM liquid has `mu = 0` by construction, so
+its whole constitutive law is `tau = la*J*(J-1)*I`: it resists departures from the volume it was
+BORN at, and nothing else. A cytosol built that way sits at `J = 1` forever -- it has no reason to
+press on anything -- so a membrane drawn around it carries zero tension and is a floppy bag that
+the interior drains out of. Real cells are not like that: the interior is held above the outside
+pressure by the solutes trapped in it, the cortex is in tension because of it, and the two are
+related by Laplace, `P = 2*gamma/R`. Turgor is the term that makes a membrane a membrane.
+
+WHY IT IS NOT SURFACE TENSION. `mpm_grid_update`'s CSF term (`surface_tension:`) minimises
+interface AREA -- `f = sigma * kappa * grad(c)` pulls a bulge in and pushes a dimple out. It can
+round a droplet up and it can hold one together, but its sign is inward everywhere the interface
+is convex, so it can never inflate a cell against a shell. The two are complementary, not
+alternatives: surface tension is the cortex pulling in, turgor is the cytosol pushing out, and a
+cell at rest is the balance of them.
+
+WHY IT IS A REST-VOLUME SHIFT AND THEREFORE SELF-LIMITING. Adding `-P.I` to `tau` moves the zero
+of the liquid's own equation of state: the material stops expanding at the `J*` that solves
+`la*J*(J-1) = P`, which for the small strains a cell runs at is `J* ~= 1 + P/la`. So `pressure` is
+NOT an unbounded body force that blows the cell up -- it names an inflated rest volume, and the
+liquid's bulk modulus is what holds it there. Sizing it is one division: to swell a cytosol by a
+fraction `eps` of ITS OWN INITIAL VOLUME, ask for `pressure ~= la*eps`, where
+`la = E*nu/((1+nu)(1-2nu))`, which at the shared `nu = 0.2` is `la = E/3.6`.
+
+THE UNITS ARE THE STRESS UNITS OF THE SPEC, the same ones `youngs` is in. The number that matters
+is the RATIO to two other pressures in the same run: the liquid's bulk modulus `la` (which sets
+how far it swells) and the hydrostatic head `rho*g*R` of the cell's own weight (which is what the
+turgor has to beat for the interior not to puddle in the bottom of the membrane).
+
+`mode: constant` (the default) holds `P` fixed -- the osmotic exchange across a real membrane is
+orders of magnitude slower than the mechanics, so over a run of this length the solute count, not
+the pressure, is what a van 't Hoff term would have to carry; that form is a strictly larger
+operator and is deliberately not built until something needs a cell to shrink in hypertonic
+medium.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `pressure` | isotropic_outward_pressure | **required** |
+| `mode` | pressure_law | &ndash; |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: mpm_turgor, at: particle, pressure: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`osmotic_pressure`]{.op-badge} [`turgor`]{.op-badge} [`volume_regulation`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("mpm_turgor", "osmotic_pressure", family="mpm", set="particle", kind="lateral")
+class MPMTurgor(Lateral):
+    """Give a set an isotropic OUTWARD pressure -- turgor / excess osmotic pressure -- by writing a
+    per-particle `turgor` buffer that `mpm_scatter` subtracts from the Kirchhoff stress.
+
+    WHY THIS IS A MECHANISM AND NOT A TUNING KNOB. An MLS-MPM liquid has `mu = 0` by construction, so
+    its whole constitutive law is `tau = la*J*(J-1)*I`: it resists departures from the volume it was
+    BORN at, and nothing else. A cytosol built that way sits at `J = 1` forever -- it has no reason to
+    press on anything -- so a membrane drawn around it carries zero tension and is a floppy bag that
+    the interior drains out of. Real cells are not like that: the interior is held above the outside
+    pressure by the solutes trapped in it, the cortex is in tension because of it, and the two are
+    related by Laplace, `P = 2*gamma/R`. Turgor is the term that makes a membrane a membrane.
+
+    WHY IT IS NOT SURFACE TENSION. `mpm_grid_update`'s CSF term (`surface_tension:`) minimises
+    interface AREA -- `f = sigma * kappa * grad(c)` pulls a bulge in and pushes a dimple out. It can
+    round a droplet up and it can hold one together, but its sign is inward everywhere the interface
+    is convex, so it can never inflate a cell against a shell. The two are complementary, not
+    alternatives: surface tension is the cortex pulling in, turgor is the cytosol pushing out, and a
+    cell at rest is the balance of them.
+
+    WHY IT IS A REST-VOLUME SHIFT AND THEREFORE SELF-LIMITING. Adding `-P.I` to `tau` moves the zero
+    of the liquid's own equation of state: the material stops expanding at the `J*` that solves
+    `la*J*(J-1) = P`, which for the small strains a cell runs at is `J* ~= 1 + P/la`. So `pressure` is
+    NOT an unbounded body force that blows the cell up -- it names an inflated rest volume, and the
+    liquid's bulk modulus is what holds it there. Sizing it is one division: to swell a cytosol by a
+    fraction `eps` of ITS OWN INITIAL VOLUME, ask for `pressure ~= la*eps`, where
+    `la = E*nu/((1+nu)(1-2nu))`, which at the shared `nu = 0.2` is `la = E/3.6`.
+
+    THE UNITS ARE THE STRESS UNITS OF THE SPEC, the same ones `youngs` is in. The number that matters
+    is the RATIO to two other pressures in the same run: the liquid's bulk modulus `la` (which sets
+    how far it swells) and the hydrostatic head `rho*g*R` of the cell's own weight (which is what the
+    turgor has to beat for the interior not to puddle in the bottom of the membrane).
+
+    `mode: constant` (the default) holds `P` fixed -- the osmotic exchange across a real membrane is
+    orders of magnitude slower than the mechanics, so over a run of this length the solute count, not
+    the pressure, is what a van 't Hoff term would have to carry; that form is a strictly larger
+    operator and is deliberately not built until something needs a cell to shrink in hypertonic
+    medium.
+    """
+
+    EMIT = None                 # particle->particle: writes the `turgor` buffer in place; no delta
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["pressure"]
+    MECHANISM_TAGS = ["osmotic_pressure", "turgor", "volume_regulation"]
+    PARAM_ROLES = {"pressure": "isotropic_outward_pressure", "mode": "pressure_law"}
+    REFERENCE = ("Stewart, M.P. et al. (2011). Nature 469:226-230 (hydrostatic pressure and the "
+                 "actomyosin cortex in mitotic rounding); Jiang, H. & Sun, S.X. (2013). Biophys. J. "
+                 "105:609-619 (cell volume and osmotic pressure).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.pressure = float(params["pressure"])           # excess of interior over exterior pressure
+        self.at = params.get("_at", "mpm_particle")
+        # There is no `mode:` here. A vocabulary with one member is not an axis, and a second
+        # turgor law would go on the `model:` axis where the registry can see it.
+        if "mode" in params:
+            raise ValueError(
+                "mpm_turgor: `mode` is gone -- it only ever accepted 'constant'. A second turgor "
+                "law would be `model:`, not a mode.")
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        P = torch.full((p.n,), self.pressure, device=p.state.device)
+        # DORMANT PARTICLES CARRY NO PRESSURE. `mpm_scatter` masks a reserve particle's weights to
+        # zero so it deposits nothing, but `store_stress` and any diagnostic reading `turgor` would
+        # otherwise report a pressurised particle that is not in the material yet.
+        occ = getattr(p, "occ", None)
+        if occ is not None:
+            P = P * (occ > 0).to(P.dtype)
+        if mask is not None:
+            P = P * mask.to(P.dtype)
+        if getattr(p, "turgor", None) is None or p.turgor.shape != P.shape:
+            p.register_buffer("turgor", P)
+        else:
+            p.turgor.copy_(P)
+        return {}
+```

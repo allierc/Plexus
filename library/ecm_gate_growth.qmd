@@ -1,0 +1,346 @@
+---
+title: "ecm_gate_growth"
+subtitle: "Mechanosensitive growth: the matrix's pressure slows the CELL CYCLE where it presses hardest, so the tissue grows into an anisotropic shape instead of being deformed into one."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Mechanosensitive growth: the matrix's pressure slows the CELL CYCLE where it presses hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; `load`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.
+
+vertex -> vertex: reads the per-cell growth scale and a recorded pressure map, rewrites that
+scale and the target area, perimeter, volume and radius derived from it.
+
+    s_f   <- s_prev (1 + gate_f (f - 1))         the same growth, gated
+
+P_f is the recorded pressure in the cell's own direction, normalised as in `ecm_load`, and
+p_half the pressure at which growth is slowed halfway, in those same normalised units. n is
+`hill`, the dimensionless sharpness of the switch. `floor` is the minimum growth fraction a
+fully pressed cell retains, and it matters: at floor 0 a cell in the most stressed direction
+stops dividing entirely and the tissue can only grow the other way, which produces a dramatic
+shape for a reason closer to a wall than to mechanosensing.
+
+Gating the RATE is stronger than applying a force. `ecm_load` pushes the vertices inward,
+which fights the growth every frame and is bounded by how hard one dares push before cells
+invert. A cell whose target volume grows more slowly reaches the division threshold later and
+divides less often, and that difference integrates over a whole trajectory -- so a few percent
+of pressure anisotropy becomes a visible shape anisotropy, which a force of the same size
+cannot produce.
+
+It is also the biology: proliferation under mechanical load is suppressed, not merely
+deformed.
+
+It intercepts growth without rewriting the growth operator. `cell_grow` keeps a per-cell
+cumulative scale and multiplies it each tick; this runs after it, remembers the scale left
+behind last frame, and reads the factor just applied as their ratio. Gating that ratio is
+exact and needs to know nothing about the growth law's own rate or its Hill function, so the
+two cannot drift out of step.
+
+Reference: Helmlinger, G., Netti, P. A., Lichtenbeld, H. C., Melder, R. J. & Jain, R. K.
+(1997). Solid stress inhibits the growth of multicellular tumor spheroids. Nat. Biotechnol.
+15:778-783; Montel, F. et al. (2011). Stress clamp experiments on multicellular tumor
+spheroids. Phys. Rev. Lett. 107:188102.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `load` | &ndash; | **required** |
+| `p_half` | half_suppression_pressure | "auto" |
+| `hill` | gate_sharpness | 4.0 |
+| `floor` | minimum_growth_fraction | 0.15 |
+| `smooth_frames` | &ndash; | 25 |
+| `smooth_phi_deg` | &ndash; | 360.0 |
+| `rel_half` | &ndash; | 1.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: ecm_gate_growth, at: vertex, load: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`mechanosensitive_growth`]{.op-badge} [`contact_inhibition`]{.op-badge} [`matrix_to_cell_feedback`]{.op-badge} [`anisotropic_growth`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd).
+
+## Source
+
+[`src/plexus/operators/contact_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/contact_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("ecm_gate_growth", family="population", set="vertex", kind="structural")
+class ECMGrowthGate3D(Structural):
+    """Mechanosensitive growth: the matrix's pressure slows the CELL CYCLE where it presses
+    hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.
+
+    vertex -> vertex: reads the per-cell growth scale and a recorded pressure map, rewrites that
+    scale and the target area, perimeter, volume and radius derived from it.
+
+        gate_f = floor + (1 - floor) / (1 + (P_f / p_half)^n)
+        f      = s_now / s_prev                      the factor growth just applied
+        s_f   <- s_prev (1 + gate_f (f - 1))         the same growth, gated
+
+    P_f is the recorded pressure in the cell's own direction, normalised as in `ecm_load`, and
+    p_half the pressure at which growth is slowed halfway, in those same normalised units. n is
+    `hill`, the dimensionless sharpness of the switch. `floor` is the minimum growth fraction a
+    fully pressed cell retains, and it matters: at floor 0 a cell in the most stressed direction
+    stops dividing entirely and the tissue can only grow the other way, which produces a dramatic
+    shape for a reason closer to a wall than to mechanosensing.
+
+    Gating the RATE is stronger than applying a force. `ecm_load` pushes the vertices inward,
+    which fights the growth every frame and is bounded by how hard one dares push before cells
+    invert. A cell whose target volume grows more slowly reaches the division threshold later and
+    divides less often, and that difference integrates over a whole trajectory -- so a few percent
+    of pressure anisotropy becomes a visible shape anisotropy, which a force of the same size
+    cannot produce.
+
+    It is also the biology: proliferation under mechanical load is suppressed, not merely
+    deformed.
+
+    It intercepts growth without rewriting the growth operator. `cell_grow` keeps a per-cell
+    cumulative scale and multiplies it each tick; this runs after it, remembers the scale left
+    behind last frame, and reads the factor just applied as their ratio. Gating that ratio is
+    exact and needs to know nothing about the growth law's own rate or its Hill function, so the
+    two cannot drift out of step.
+
+    Reference: Helmlinger, G., Netti, P. A., Lichtenbeld, H. C., Melder, R. J. & Jain, R. K.
+    (1997). Solid stress inhibits the growth of multicellular tumor spheroids. Nat. Biotechnol.
+    15:778-783; Montel, F. et al. (2011). Stress clamp experiments on multicellular tumor
+    spheroids. Phys. Rev. Lett. 107:188102.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["load"]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["mechanosensitive_growth", "contact_inhibition",
+                      "matrix_to_cell_feedback", "anisotropic_growth"]
+    PARAM_ROLES = {"p_half": "half_suppression_pressure", "hill": "gate_sharpness",
+                   "floor": "minimum_growth_fraction"}
+    REFERENCE = ("Helmlinger, G. et al. (1997). Solid stress inhibits the growth of "
+                 "multicellular tumor spheroids. Nat. Biotechnol. 15:778-783; Montel, F. et al. "
+                 "(2011). Stress clamp experiments on multicellular tumor spheroids. Phys. Rev. "
+                 "Lett. 107:188102.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        import numpy as np
+        self.at = params.get("_at", "vertex")
+        z = np.load(str(params["load"]))
+        P = np.asarray(z["pmap"], np.float32)
+
+        # SMOOTHED, AND THIS WAS THE LAST THING IN THE WAY. The recorded map is a CONTACT LEDGER, not a
+        # stress field: at frame 250 only 24% of its bins are nonzero, because 140,000 particles binned
+        # into 2,048 directions against a moving surface touch a different quarter of it every frame. A
+        # zero bin gates to 1.0 -- no suppression -- so three quarters of the polar cells were
+        # unsuppressed in any given frame and a different three quarters the next, which time-averages to
+        # a nearly UNIFORM weak suppression. That is why a 15x instantaneous directional contrast moved
+        # the aspect ratio by 3%: the contrast was real and it was not persistent for any given cell.
+        #
+        # The patchiness is a sampling artefact of the estimator, not a feature of the field, so it is
+        # averaged out: a running mean over `smooth_frames` and a box over `smooth_phi_deg` of longitude
+        # and one row of colatitude. `smooth_phi_deg = 360` makes the map AXISYMMETRIC, which is the
+        # right estimator when the matrix is (dense polar caps are), and is wrong the moment the
+        # experiment puts structure in longitude -- so it is a parameter and not a default of the code.
+        sf = int(params.get("smooth_frames", 25))
+        sp = float(params.get("smooth_phi_deg", 360.0))
+        if sf > 1 and P.shape[0] > sf:
+            k = np.ones(sf, np.float32) / sf
+            flat = P.reshape(P.shape[0], -1)
+            P = np.stack([np.convolve(flat[:, j], k, mode="same") for j in range(flat.shape[1])],
+                         axis=1).reshape(P.shape).astype(np.float32)
+        if sp >= 359.0:
+            P = np.repeat(P.mean(axis=2, keepdims=True), P.shape[2], axis=2)
+        elif sp > 0:
+            w = max(1, int(round(sp / 360.0 * P.shape[2])))
+            ker = np.ones(w, np.float32) / w
+            P = np.stack([[np.convolve(np.tile(P[t, i], 3), ker, mode="same")[P.shape[2]:2 * P.shape[2]]
+                           for i in range(P.shape[1])] for t in range(P.shape[0])]).astype(np.float32)
+        # one row of colatitude, clamped at the poles
+        P = (P + np.pad(P, ((0, 0), (1, 0), (0, 0)), mode="edge")[:, :-1]
+             + np.pad(P, ((0, 0), (0, 1), (0, 0)), mode="edge")[:, 1:]) / 3.0
+        # NORMALISED so `p_half` means the same thing whatever the matrix's stiffness was -- otherwise
+        # stiffening the matrix moves both the pressure and the gate's operating point and a stiffness
+        # sweep measures two things at once.
+        #
+        # BY THE p99 OF THE NONZERO MAP, NOT BY THE PEAK, and that was measured the hard way. The peak
+        # is ONE bin in ONE frame: on 49_aniso_i0_fibres it is 4.0e5 while the per-axis mean pressures
+        # are 1448-2176, so peak-normalisation put the whole run at press ~0.005 and `p_half = 0.25` left
+        # the gate at 1.000 -- an operator that ran 400 times and did nothing. Against the p99 (4.6e4)
+        # the same run spans mean 0.007 -> 0.159 with the loaded directions reaching p90 0.45, which is a
+        # range a Hill function can actually act on. Only bins that ever saw contact count: three
+        # quarters of the map is identically zero, and including it would drag the scale toward the
+        # tissue's own solid angle rather than the pressures it produced.
+        nz = P[P > 0]
+        self.pk = max(float(np.percentile(nz, 99)) if nz.size else 1.0, 1e-12)
+        self.P = torch.as_tensor(P / self.pk, dtype=torch.float32)
+        self.T = int(self.P.shape[0])
+        # SELF-CALIBRATING OPERATING POINT. `p_half` in units of the p99 was a hand-picked number and it
+        # put the gate on the wrong part of its own curve: a real map's typical pressures sit far below
+        # its p99, which is set by a few hot contact bins. With dense polar caps giving poles 7234 and
+        # equator 2631 -- a genuine 2.75x pattern -- both landed at 0.145 and 0.053 against p_half 0.10,
+        # i.e. on the flat foot of the Hill, for a rate difference of only 1.7x where the clean synthetic
+        # map gave 5x. `auto` puts the half-suppression point at the MEDIAN of the pressure the surface
+        # actually carries late in the run, so half the loaded tissue sits either side of it and the
+        # pattern falls across the steep part of the curve instead of under it.
+        # `relative` IS A DIFFERENT MECHANISM AND IS LABELLED ONE. The absolute gate is the physical
+        # reading -- a cell responds to the stress it carries -- and it has a timing problem that is the
+        # MATRIX's, not the gate's: the measured pressure only passes the half-point around frame 350 of
+        # 402, so a 15x directional rate difference arrives with 50 frames left to shape anything. In
+        # `relative` mode the reference is the current frame's own mean over loaded directions, so the
+        # gate reads the PATTERN and ignores the amplitude, and it acts from first contact. That is
+        # adaptive mechanosensing (cells habituating to ambient stress and responding to the excess),
+        # which is a real mechanism and a WEAKER claim than the absolute one -- it cannot be reported as
+        # "the matrix's stress shaped the tissue" without saying which mode produced it.
+        self.relative = str(params.get("p_half", "")).lower() == "relative"
+        ph = params.get("p_half", "auto")
+        if self.relative:
+            self.p_half = float(params.get("rel_half", 1.0))
+        elif isinstance(ph, str) and ph.lower() == "auto":
+            late = P[int(0.75 * P.shape[0]):]
+            lnz = late[late > 0]
+            self.p_half = float(np.median(lnz) / self.pk) if lnz.size else 0.10
+        else:
+            self.p_half = float(ph)
+        # SHARPER THAN 2, AND THAT IS A CLAIM ABOUT MECHANOSENSING, not a fitting knob. A linear-ish
+        # gate cannot turn a 2.75x stress pattern into a shape: it needs to be switch-like, which is what
+        # a Hill exponent of 4-6 is and what mechanotransduction actually looks like (a threshold, not a
+        # proportionality). Stated here because the alternative reading -- "the exponent was raised until
+        # the picture worked" -- is the one a reader should be able to rule out from the numbers above.
+        self.hill = float(params.get("hill", 4.0))
+        self.floor = float(params.get("floor", 0.15))
+        self._prev = None
+        self._frame, self._t, self._said = -1, 0, False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or "mg_scale" not in m:
+            return {}                      # growth has not run yet this run; nothing to gate
+        nF = int(m["nF"])
+        s_now = m["mg_scale"]
+        dev, dt_ = s_now.device, s_now.dtype
+        f = int(getattr(H, "frame", -1) or -1)
+        if f != self._frame:
+            self._frame = f
+            self._t = min(self.T - 1, max(0, f))
+
+        # PER-CELL DIRECTION -> PRESSURE BIN. Centroid-referenced, matching how the map was built.
+        pos = lvl.get("pos")
+        es, ef = m["E_srce"], m["E_face"]
+        live = ef < nF
+        e_s, e_f = es[live].long(), ef[live].long()
+        cnt = torch.zeros(nF, device=dev, dtype=dt_).index_add_(
+            0, e_f, torch.ones_like(e_f, dtype=dt_))
+        cen = torch.zeros(nF, 3, device=dev, dtype=dt_).index_add_(0, e_f, pos[e_s].to(dt_))
+        ok = cnt > 0
+        cen[ok] /= cnt[ok, None]
+        origin = cen[ok].mean(0) if ok.any() else torch.zeros(3, device=dev, dtype=dt_)
+        d = cen - origin
+        r = d.norm(dim=1).clamp_min(1e-9)
+        u = d / r[:, None]
+        M = self.P[self._t].to(dev, dt_)
+        nth, nph = M.shape
+        th = torch.acos(u[:, 2].clamp(-1, 1))
+        ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
+        press = M[(th / math.pi * nth).long().clamp(0, nth - 1),
+                  (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+        press = torch.where(ok, press, torch.zeros_like(press))
+        ref = self.p_half
+        if self.relative:
+            # THE CURRENT FRAME'S OWN MEAN OVER LOADED DIRECTIONS. Zero bins are excluded: three
+            # quarters of the map is untouched surface early on, and averaging that in would put the
+            # reference far below anything real and saturate the gate everywhere.
+            live = M[M > 0]
+            if live.numel() < 8:
+                return {}                      # nothing in contact yet: nothing to be relative to
+            ref = float(live.mean()) * self.p_half
+        gate = self.floor + (1.0 - self.floor) / (
+            1.0 + (press / max(ref, 1e-12)).clamp_min(0.0) ** self.hill)
+
+        # ---- GATE THE TARGET VOLUME, NOT `mg_scale` -------------------------------------------------
+        # THE TRAP THIS AVOIDS, MEASURED. `cell_grow` reallocates `mg_scale` to ONES and
+        # re-bases its A0_init/P0_init/V0f_init snapshots from the current values whenever `nF` changes
+        # -- and with `cell_divide` firing every 4 frames, nF changes on most frames. A gate that reads
+        # `s_now / s_prev` therefore saw a size change almost every frame, skipped its correction, and
+        # ran 400 times without altering anything: 5,933 cells against 5,968 ungated and the same final
+        # radius to two decimals. `V0f` is CONTINUOUS across that re-base (only its reference moves), so
+        # gating its increment works where gating the scale cannot.
+        V = m["V0f"]
+        prev = self._prev
+        if prev is None or prev.shape[0] != nF:
+            p2 = V.detach().clone()
+            if prev is not None:
+                k = min(prev.shape[0], nF)
+                p2[:k] = prev[:k]
+            prev = p2
+        dV = V - prev
+        # A DIVISION IS NOT GROWTH. A daughter's target volume is set by `cell_divide`, not by an
+        # increment, so its `dV` is a large jump in either direction; gating it would shrink or inflate a
+        # cell that had just been created. Growth is ~0.3% per frame, so anything past 20% is a topology
+        # event and is passed through untouched -- and re-based, so the next frame gates normally.
+        topo = dV.abs() > 0.2 * prev.clamp_min(1e-12)
+        Vg = torch.where(topo, V, prev + gate * dV)
+        q = (Vg / V.clamp_min(1e-12)).clamp(0.2, 1.0)      # how much of the wanted growth was allowed
+        m["V0f"] = V * q
+        m["V0"] = float(m["V0f"].sum())
+        # A0 ~ R^2 and P0 ~ R with R ~ V^(1/3), so one volume ratio sets all three consistently. Applied
+        # to the CURRENT values rather than to the *_init snapshots, which is what makes this survive the
+        # re-base above.
+        m["A0"] = m["A0"] * q.pow(2.0 / 3.0)
+        m["P0"] = m["P0"] * q.pow(1.0 / 3.0)
+        m["mg_scale"] = s_now * q.pow(1.0 / 3.0)
+        if "R0" in m:
+            m["R0"] = float((3.0 * max(m["V0"], 1e-12) / (4.0 * math.pi)) ** (1.0 / 3.0))
+        self._prev = m["V0f"].detach().clone()
+        LOAD_TRACE.append((int((gate < 0.99).sum()), float(gate.min()), float(press.mean())))
+        if not self._said:
+            print(f"[ecm_gate_growth] recorded matrix load, {self.T} frames, p99 {self.pk:.4g}; "
+                  f"p_half={self.p_half} hill={self.hill} floor={self.floor}; gate range "
+                  f"[{float(gate.min()):.3f}, {float(gate.max()):.3f}] over {nF} cells at frame {f}",
+                  flush=True)
+            self._said = True
+        return {}
+```

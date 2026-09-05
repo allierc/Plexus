@@ -1,0 +1,361 @@
+---
+title: "bm_seed"
+subtitle: "Lay the membrane down once, as a shell just OUTSIDE the epithelium's surface."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Lay the membrane down once, as a shell just OUTSIDE the epithelium's surface.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `surface`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+basement_membrane -> basement_membrane: writes every position at the opening of the trajectory.
+
+u_i is a quasi-uniformly distributed unit direction, R the recorded angular radius map of the
+epithelium -- the same one the contact operator reads, so the membrane starts exactly where the
+tissue is rather than at a guessed radius -- S the `scale`, and `offset` the standoff in world
+units.
+
+OUTSIDE, because the topology is a gland or acinus: the basal faces point outward, so the
+basement membrane is on the outer surface with the stroma beyond it. An embryo-like vesicle has
+apical out and would put the membrane inside. The two are not interchangeable, so the geometry
+is stated rather than assumed.
+
+A monolayer, not a slab: at a thickness of more than a few particle spacings the k-nearest
+crosslink search bonds through the sheet rather than across it, and the result resists bending
+like a solid instead of stretching like a membrane. The directions are jittered rather than
+laid on a regular lattice, because a lattice makes the crosslink network inherit its regularity
+and the strain field then shows the lattice instead of the mechanics.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `surface` | &ndash; | **required** |
+| `offset` | shell_offset_outward | 0.004 |
+| `thickness` | shell_thickness | 0.002 |
+| `jitter` | seed_lattice_disorder | 0.35 |
+| `scale` | surface_rescale | 1.0 |
+| `centre` | &ndash; | [0.5, 0.5, 0.5] |
+| `implementation` | &ndash; | "relaxed" |
+| `relax_iters` | &ndash; | 24 |
+| `reserve` | &ndash; | 0.0 |
+| `park` | &ndash; | (-0.25, -0.25, -0.25 |
+| `surface_set` | &ndash; | None |
+| `overdamped_gamma` | &ndash; | 0.0 |
+| `seed` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: bm_seed, at: particle, surface: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`basement_membrane`]{.op-badge} [`material_seeding`]{.op-badge} [`epithelial_polarity`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("bm_seed", family="seed", set="particle", kind="seed")
+class BasementMembraneSeed(Structural):
+    """Lay the membrane down once, as a shell just OUTSIDE the epithelium's surface.
+
+    basement_membrane -> basement_membrane: writes every position at the opening of the trajectory.
+
+        x_i = c + u_i (S R(theta_i, phi_i) + offset)
+
+    u_i is a quasi-uniformly distributed unit direction, R the recorded angular radius map of the
+    epithelium -- the same one the contact operator reads, so the membrane starts exactly where the
+    tissue is rather than at a guessed radius -- S the `scale`, and `offset` the standoff in world
+    units.
+
+    OUTSIDE, because the topology is a gland or acinus: the basal faces point outward, so the
+    basement membrane is on the outer surface with the stroma beyond it. An embryo-like vesicle has
+    apical out and would put the membrane inside. The two are not interchangeable, so the geometry
+    is stated rather than assumed.
+
+    A monolayer, not a slab: at a thickness of more than a few particle spacings the k-nearest
+    crosslink search bonds through the sheet rather than across it, and the result resists bending
+    like a solid instead of stretching like a membrane. The directions are jittered rather than
+    laid on a regular lattice, because a lattice makes the crosslink network inherit its regularity
+    and the strain field then shows the lattice instead of the mechanics.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["basement_membrane", "material_seeding", "epithelial_polarity"]
+    PARAM_ROLES = {"offset": "shell_offset_outward", "thickness": "shell_thickness",
+                   "jitter": "seed_lattice_disorder",
+                   "scale": "surface_rescale"}
+    REFERENCE = ("Topfer, U. et al. (2022) Development 149:dev200456 "
+                 "(collagen IV sets basement-membrane stiffness).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        import numpy as np
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        self.offset = float(params.get("offset", 0.004))     # sits just outside the apical surface
+        # A MONOLAYER, NOT A SLAB. At 0.010 the shell was ~5.7 particle spacings thick, so the k-nearest
+        # search found radial neighbours and built chains through the thickness instead of a connected
+        # sheet -- the seeded membrane came out with a largest component of 0.846, 15% of it already in
+        # pieces. A basement membrane IS a sheet; the thickness should be about one spacing.
+        self.thickness = float(params.get("thickness", 0.002))
+        self.jitter = float(params.get("jitter", 0.35))   # tangential noise, in units of local spacing
+        # MODEL vs IMPLEMENTATION. The model is "uniform areal density on a sphere". Fibonacci is one way
+        # to compute it and `relaxed` is another; they are not different models and the parameter is named
+        # so. Fibonacci is exactly uniform in density and badly non-uniform in ARRANGEMENT: consecutive
+        # indices land angularly adjacent, so the points queue into spiral arms about one spacing apart,
+        # which jitter at 0.35 of a spacing cannot erase. At 30k that is invisible; at the 3.3k a
+        # secreting run starts with, the sheet renders as a spiral and the eye reads structure that is
+        # not in the physics.
+        self.implementation = str(params.get("implementation", "relaxed")).lower()
+        self.relax_iters = int(params.get("relax_iters", 24))
+        # THE RESERVE IS NOT SPARE CAPACITY, IT IS UNSECRETED MEMBRANE. A sheet pinned at fixed angular
+        # positions on a surface whose radius triples must cover NINE TIMES the area with the particles
+        # it started with, so it can only slip or thin or tear. `reserve` is the fraction of the set held
+        # back at mass 0 for `bm_secrete` to lay down as the surface grows.
+        self.reserve = float(params.get("reserve", 0.0))
+        # where dormant particles wait: outside the box, not at the tissue centre (see `forward`)
+        self.park = [float(v) for v in params.get("park", (-0.25, -0.25, -0.25))]
+        self.surface_set = params.get("surface_set", None)
+        self.gamma = float(params.get("overdamped_gamma", 0.0))
+        self.seed = int(params.get("seed", 0))
+        z = np.load(str(params["surface"]))
+        self.smap0 = np.asarray(z["smap"], np.float32)[0] * self.scale
+        self._done = False
+
+    def forward(self, H, mask=None):
+        if self._done:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        n = pos.shape[0]
+        dev, dt_ = pos.device, pos.dtype
+        g = torch.Generator(device="cpu").manual_seed(self.seed)
+        M = torch.as_tensor(self.smap0, dtype=torch.float32)
+        nth, nph = M.shape
+
+        # A FIBONACCI SPHERE, not uniform (theta, phi) sampling: equirectangular sampling piles points at
+        # the poles, and a sheet with four times the areal density at its poles has four times the mass
+        # and stiffness there -- an anisotropy nobody asked for, in the axis these experiments measure.
+        # RELAX THE COUNT THAT WILL BE LAID DOWN, NOT THE WHOLE RESERVOIR. The relaxation used to run
+        # over all `n` particles and the sheet then took every k-th of them -- and a SUBSET of a blue
+        # noise set is not blue noise. Thinning randomises it straight back to Poisson:
+        #
+        #     relax 13.5k then keep 1 in 4     d/hex = 0.546   cv = 0.311
+        #     uniform random                   d/hex = 0.461   cv = 0.535
+        #     relax 3.4k directly              d/hex = 0.877   cv = 0.047
+        #
+        # So the seeded sheet was 8% better than random rather than packed, which is why holes are
+        # present at frame 0 and grow from there -- an initialisation defect, not a resolution one.
+        n_lay = n if self.reserve <= 0 else max(1, int(round(n / (1.0 + self.reserve))))
+        if self.implementation == "relaxed":
+            # BLUE NOISE BY REPULSION. Start from a uniform random sample -- which has the right density
+            # and no arms, but clumps and holes -- and let each point drift away from its nearest
+            # neighbours, renormalising to the sphere each step. That equalises SPACING without imposing
+            # an order on the points, which is exactly the property a spiral lacks.
+            gg = torch.Generator().manual_seed(self.seed)
+            # the laid-down set is relaxed on its own; the reserve is placed afterwards and does not
+            # participate, since it is parked at the centre until secreted
+            u = torch.randn(n_lay, 3, generator=gg)
+            u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            u = u.to(dev)
+            sp = math.sqrt(4.0 * math.pi / max(n_lay, 1))
+            kk = 7
+            for _ in range(self.relax_iters):
+                push = torch.zeros_like(u)
+                blk = 2048
+                for a0 in range(0, n_lay, blk):
+                    b0 = min(n_lay, a0 + blk)
+                    dd = 1.0 - (u[a0:b0] @ u.T).clamp(-1, 1)          # 1 - cos, monotone in angle
+                    dd[torch.arange(b0 - a0, device=dev), torch.arange(a0, b0, device=dev)] = 1e9
+                    nb = torch.topk(-dd, kk, dim=1).indices
+                    diff = u[a0:b0, None, :] - u[nb]                   # away from each neighbour
+                    dist = diff.norm(dim=-1).clamp_min(1e-9)
+                    w = (sp - dist).clamp_min(0.0) / sp                # only push if closer than target
+                    push[a0:b0] = (diff / dist[..., None] * w[..., None]).sum(1)
+                u = u + push * (0.35 * sp)
+                u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            # the reserve: random directions, parked at the centre anyway, so their arrangement is
+            # irrelevant until secretion places them beside a live node
+            if n_lay < n:
+                extra = torch.randn(n - n_lay, 3, generator=gg)
+                extra = extra / extra.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                u = torch.cat([u.cpu(), extra]).to(dev)
+            u = u.to(torch.float32).cpu()
+            print(f"[bm_seed] implementation=relaxed: {self.relax_iters} repulsion "
+                  f"iterations from a uniform random sample -- same density as Fibonacci, no spiral "
+                  f"arms", flush=True)
+        else:
+            i = torch.arange(n, dtype=torch.float64) + 0.5
+            ct = 1.0 - 2.0 * i / n
+            st = torch.sqrt((1.0 - ct * ct).clamp_min(0.0))
+            phi = (math.pi * (1.0 + 5.0 ** 0.5) * i) % (2 * math.pi)
+            u = torch.stack([st * torch.cos(phi), st * torch.sin(phi), ct], dim=1).to(torch.float32)
+
+        # ...BUT NOT A PERFECT ONE. A pure Fibonacci spiral is a crystal: the rendered sheet shows obvious
+        # lattice rows, and worse, the crosslink network inherits that regularity, so the strain field
+        # carries a smooth large-scale modulation that is a property of the lattice and not of the
+        # mechanics. (Measured on the un-jittered run: the end-state strain pattern is spatially organised
+        # at 6x the shuffled null, yet growth, local coordination and nearby fibre density together
+        # explain only 4% of it.) A real basement membrane is not crystalline. Displace each point
+        # tangentially by a fraction of the local spacing, which breaks the lattice without opening holes.
+        if self.jitter > 0.0 and self.implementation != "relaxed":
+            spacing = math.sqrt(4.0 * math.pi / max(n, 1))          # mean angular separation, radians
+            e1 = torch.stack([-u[:, 1], u[:, 0], torch.zeros_like(u[:, 0])], dim=1)
+            nrm = e1.norm(dim=1, keepdim=True)
+            e1 = torch.where(nrm > 1e-6, e1 / nrm.clamp_min(1e-12),
+                             torch.tensor([[1.0, 0.0, 0.0]]).expand_as(e1))
+            e2 = torch.cross(u, e1, dim=1)
+            d1 = torch.randn(n, generator=g) * (self.jitter * spacing)
+            d2 = torch.randn(n, generator=g) * (self.jitter * spacing)
+            u = u + e1 * d1[:, None] + e2 * d2[:, None]
+            u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+
+        th = torch.acos(u[:, 2].clamp(-1, 1))
+        ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
+        R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
+              (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+        c = torch.tensor(self.centre, dtype=torch.float32)
+        # SEEDED ON THE SURFACE LEVEL IF THERE IS ONE, and this is not a refinement -- it is the
+        # difference between a sheet that starts at rest and one that starts torn. The table lookup below
+        # takes R from whichever 32x64 cell a direction falls in; `surface_track` interpolates the same
+        # map smoothly. The two disagree by the quantisation error, ~0.0016 at the starting radius,
+        # against a bond rest length of 0.0021. Seed with one and anchor with the other and EVERY
+        # particle begins about a full bond length away from its anchor: the run does not crash, it
+        # returns 141 surviving bonds out of 100,801 and an ECM stress of 57,792.
+        sset = getattr(self, "surface_set", None)
+        if sset is not None:
+            sl = H.level(sset)
+            sp = sl.get("pos")
+            if sp.shape[0] != n:
+                raise RuntimeError(
+                    f"bm_seed: `surface_set` has {sp.shape[0]} elements against {n} "
+                    f"membrane particles; the 1:1 seeding needs them equal.")
+            su = sl.u if hasattr(sl, "u") else \
+                (sp - c.to(sp)) / (sp - c.to(sp)).norm(dim=1, keepdim=True).clamp_min(1e-12)
+            u = su.detach().cpu()
+            thick = (torch.rand(n, generator=g) - 0.5) * self.thickness
+            P = (sp.detach().cpu() + su.detach().cpu() * (self.offset + thick)[:, None])
+        else:
+            r = R + self.offset + (torch.rand(n, generator=g) - 0.5) * self.thickness
+            P = c + u * r[:, None]
+        # LOUD IF IT LANDS OUTSIDE THE BOX. The engine's wall boundary would silently clamp the shell
+        # onto the cube faces, and the only symptom would be a bond count of zero several operators
+        # later -- which reads as a bond bug rather than a units mistake.
+        if float(P.min()) < 0.0 or float(P.max()) > 1.0:
+            raise RuntimeError(
+                f"bm_seed: shell radius "
+                f"{float((P - c).norm(dim=1).mean()):.4g} puts particles outside "
+                f"the unit box (range {float(P.min()):.3g}..{float(P.max()):.3g}). `scale` is almost "
+                f"certainly wrong: the surface map is in TISSUE units and must be multiplied by the "
+                f"tissue-to-box scale, which only `combine.build` knows.")
+        lvl.get("pos")[:] = P.to(dev, dt_)
+        n0 = n if self.reserve <= 0 else max(1, int(round(n / (1.0 + self.reserve))))
+        alive = torch.zeros(n, dtype=torch.bool, device=dev)
+        # STRIDED, NOT THE FIRST n0. The Fibonacci lattice is generated with ct = 1 - 2i/n, so its index
+        # runs monotonically from the north pole to the south: `alive[:n0]` is a POLAR CAP, not a sparse
+        # shell. Taking the first n0 covers a POLAR CAP whose extent is n0/n of the sphere, and the
+        # sheet then grows downward as it secretes, which reads as the membrane migrating. Every
+        # k-th point of a Fibonacci spiral is itself a coarser Fibonacci spiral,
+        # so a stride gives a uniform sparse shell and the reserve fills in between.
+        if self.implementation == "relaxed":
+            # THE FIRST n0, because for `relaxed` those ARE the set that was relaxed -- the reserve
+            # after them is random and parked. Striding here would interleave the two and hand the sheet
+            # a mixture, undoing the packing the relaxation just produced.
+            alive[:n0] = True
+        else:
+            step = max(1, int(round(n / max(n0, 1))))
+            alive[::step] = True
+        if int(alive.sum()) > n0:                       # trim the overshoot from the far end
+            extra = int(alive.sum()) - n0
+            idx = alive.nonzero(as_tuple=True)[0][-extra:]
+            alive[idx] = False
+        if n0 < n:
+            # PARKED OUTSIDE THE BOX, MASSLESS. Parking the reserve at the tissue CENTRE is fine
+            # for a spring membrane, which MPM never touches, and wrong for a continuum one: the
+            # dormant particles then reach the live sheet through the shared grid and freeze it.
+            # Massless is not inert either: `mpm_scatter` still deposits the
+            # stress term, which carries p_vol and not m.
+            #
+            # Outside the box does not mean off the grid -- `bspline` clamps out-of-range indices to the
+            # boundary cells, so the reserve lands on one corner node. That is the point: the corner is
+            # ~0.87 from the tissue, far outside the surface band the boundary condition acts on, so
+            # whatever it deposits cannot reach the membrane.
+            lvl.get("pos")[~alive] = torch.tensor(self.park, device=dev, dtype=dt_)
+            m = getattr(lvl, "mass", None)
+            if m is None:
+                raise RuntimeError(
+                    "bm_seed: `reserve` needs a `mass` buffer to park the dormant "
+                    "particles massless, and this level has none. Without it the reserve would scatter "
+                    "into the grid from the tissue centre.")
+            self._mass0 = float(m.reshape(-1)[0])
+            m[~alive] = 0.0
+            # AND `occ`, WHICH IS THE FLAG THE MPM OPERATORS ACTUALLY CHECK. Mass 0 was this file's own
+            # convention for "dormant" and it is not the framework's: `mpm_scatter` masks its weights by
+            # occupancy, `mpm_gather` freezes occ==0 particles instead of advecting them, and Level
+            # already carries occ with a spawn/retire API. Mass alone does not stop a particle
+            # scattering, because the scatter's STRESS term is weighted by p_vol, not by m -- so a
+            # massless reserve parked at the tissue centre still deposits stress into the shared grid,
+            # right where the boundary condition is looking. That is what froze the live sheet.
+            oc = getattr(lvl, "occ", None)
+            if oc is not None:
+                oc[~alive] = 0.0
+        H.membrane_alive = alive
+        # Published so `surface_track` can pair element i with particle i without reproducing an RNG
+        # sequence. (Rebuilding the lattice does in fact reproduce it -- the jitter draws come first in
+        # both -- but a shared lattice that depends on two functions drawing in the same order is a
+        # coincidence, not an invariant.)
+        H.membrane_u0 = u.to(dev, dt_).clone()
+        self._done = True
+        print(f"[bm_seed] {n} particles on a shell at r_surface + {self.offset:.4g} "
+              f"(thickness {self.thickness:.4g}), Fibonacci + {self.jitter:.2g}-spacing jitter; "
+              f"{int(alive.sum())} laid down, {n - int(alive.sum())} held in reserve",
+              flush=True)
+        return {}
+```

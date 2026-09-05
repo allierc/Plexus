@@ -1,6 +1,6 @@
 ---
 title: "playback"
-subtitle: "A scalar field *prescribed* from external data (currently a"
+subtitle: "Advance a prescribed field to this tick's frame, looping when the video runs out."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A scalar field *prescribed* from external data (currently a"
 
 [`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
 
-A scalar field *prescribed* from external data (currently a
+Advance a prescribed field to this tick's frame, looping when the video runs out.
 :::
 
 ```{=html}
@@ -42,16 +42,15 @@ A scalar field *prescribed* from external data (currently a
 
 ## Mechanism
 
-video), plus the `playback` operator that advances it frame by frame.
+field -> field: reads the engine's frame counter, writes the field's grid in place.
 
-Some fields are not evolved by a PDE (diffuse/decay) but read from data: a recorded
-movie becomes a time-varying scalar field over the domain. The field is pure state
-(it holds the video buffer and the current grid); `playback` sets the grid to the
-current tick's frame (a field self-update, returns {}). A coupling operator such as
-`chemotaxis` then drives the particles from it -- the same set<->field Exchange the
-slime trail used, but the field is supplied rather than deposited.
+    c(x, t) = video[t mod T](x)
 
-This is the Plexus form of ParticleGraph's `node_value_map: video_bisons.tif`.
+T is the number of frames in the video. Looping means a specification longer than the
+recording repeats it, which is a claim that the process is periodic -- if it is not, the
+seam is an artefact the model will still respond to.
+
+Reference: none -- playback is bookkeeping, not a mechanism. Plexus (this work).
 
 $$
 \phi(\cdot,\,t) \;=\; V\big[\,t \bmod N_{\text{frames}}\,\big]
@@ -72,24 +71,34 @@ operators:
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`pacemaker`](pacemaker.qmd), [`activation_pulse`](activation_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`hash_encoding`](hash_encoding.qmd), [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`pacemaker`](pacemaker.qmd), [`activation_pulse`](activation_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 
-[`src/plexus/operators/prescribed_field.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/prescribed_field.py) &mdash; the registered operator.
+[`src/plexus/operators/field_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/field_ops.py) &mdash; the registered operator.
 
 ```python
-@register_operator("playback", family="fields", set="field", kind="field")
+@register_operator("playback", family="harness", set="field", kind="field")
 class Playback(FieldUpdate):
-    """field <- data: set the field grid to the current tick's video frame (looping).
-    Reads the engine's current frame from `H.frame`. Mutates the field, returns {}."""
+    """Advance a prescribed field to this tick's frame, looping when the video runs out.
+
+    field -> field: reads the engine's frame counter, writes the field's grid in place.
+
+        c(x, t) = video[t mod T](x)
+
+    T is the number of frames in the video. Looping means a specification longer than the
+    recording repeats it, which is a claim that the process is periodic -- if it is not, the
+    seam is an artefact the model will still respond to.
+
+    Reference: none -- playback is bookkeeping, not a mechanism. Plexus (this work).
+    """
 
     EMIT = None                 # field->field: writes the grid in place from the video; returns {} — no integrable delta
     SUPPORTED_DIMS = [2]        # 2D grid field playback
     REQUIRES_PARAMS = []        # no required params — `_at` (the field to advance) is engine-injected
     MECHANISM_TAGS = ["prescribed_field", "video_playback", "data_driven_field"]
     PARAM_ROLES = {}            # reads no tunable params (only the structural `_at`)
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = "Plexus (this work); playback of a measured field, not a mechanism."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

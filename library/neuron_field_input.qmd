@@ -1,0 +1,168 @@
+---
+title: "neuron_field_input"
+subtitle: "Omega, the external modulation: sample a field at each neuron's position and write the value into a state block, for `neuron_signal` to multiply its message by."
+---
+
+::: {.op-head}
+![](../figures/icons/exchange.png){.op-logo}
+
+[`exchange`]{.op-badge} [`acts on: neuron`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Omega, the external modulation: sample a field at each neuron's position and write the value into a state block, for `neuron_signal` to multiply its message by.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
+- **Acts on** &mdash; `neuron` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D.
+
+## Mechanism
+
+value into a state block, for `neuron_signal` to multiply its message by.
+
+field -> neuron: reads pos, writes the `block:` state block in place.
+
+F is the `from:` field, read bilinearly at the neuron's position on channel `channel`;
+gain and offset rescale it into whatever range the modulation is meant to span. Both are
+tunable, so an inverse loop can fit them.
+
+This is an operator and not a term inside `neuron_signal` because Omega MULTIPLIES the
+aggregated message, and Plexus operators only ever sum their deltas -- a modulation cannot
+be a delta of its own. It is written to an unintegrated block that `neuron_signal` reads,
+which makes the dependency explicit in the schedule: `neuron_field_input` before
+`neuron_signal`. That ordering is what a Schedule is for.
+
+`MAY_MUTATE_INTEGRATED_STATE = True` is required, though this writes no integrated state.
+The engine's frame-0 purity guard clones and compares the whole `state` tensor and `omega`
+lives in it, so a derived readout has to opt out of that check the same way `aggregate`'s
+centroid does.
+
+Reference: Allier, C. et al., eqn. (simulation2): a time-dependent scalar field Omega_i(t)
+scaling the aggregated message.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `block` | target_state_block | "omega" |
+| `channel` | field_channel | 0 |
+| `gain` | field_scale | &ndash; |
+| `offset` | field_baseline | &ndash; |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: neuron_field_input, at: neuron}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`external_input`]{.op-badge} [`neuromodulation`]{.op-badge} [`field_sampling`]{.op-badge}  
+
+## Related operators
+
+Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`mpm_scatter`](mpm_scatter.qmd), [`p2g`](p2g.qmd).
+
+## Source
+
+[`src/plexus/operators/neural.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/neural.py) &mdash; the registered operator.
+
+```python
+@register_operator("neuron_field_input", family="signalling", set="neuron", kind="exchange")
+class NeuronFieldInput(Exchange):
+    """Omega, the external modulation: sample a field at each neuron's position and write the
+    value into a state block, for `neuron_signal` to multiply its message by.
+
+    field -> neuron: reads pos, writes the `block:` state block in place.
+
+        Omega_i = gain * F(x_i) + offset
+
+    F is the `from:` field, read bilinearly at the neuron's position on channel `channel`;
+    gain and offset rescale it into whatever range the modulation is meant to span. Both are
+    tunable, so an inverse loop can fit them.
+
+    This is an operator and not a term inside `neuron_signal` because Omega MULTIPLIES the
+    aggregated message, and Plexus operators only ever sum their deltas -- a modulation cannot
+    be a delta of its own. It is written to an unintegrated block that `neuron_signal` reads,
+    which makes the dependency explicit in the schedule: `neuron_field_input` before
+    `neuron_signal`. That ordering is what a Schedule is for.
+
+    `MAY_MUTATE_INTEGRATED_STATE = True` is required, though this writes no integrated state.
+    The engine's frame-0 purity guard clones and compares the whole `state` tensor and `omega`
+    lives in it, so a derived readout has to opt out of that check the same way `aggregate`'s
+    centroid does.
+
+    Reference: Allier, C. et al., eqn. (simulation2): a time-dependent scalar field Omega_i(t)
+    scaling the aggregated message.
+    """
+
+    EMIT = None                        # writes a block in place; returns {} -- no integrable delta
+    INPUTS = ["neuron"]
+    OUTPUTS = ["neuron"]
+    READS = ["pos"]
+    WRITES = ["omega"]
+    MAPS = []                          # the set<->field coupling is positional, not a named map
+    SUPPORTED_DIMS = [2]               # `Field.sample` is a 2D bilinear grid read
+    DIFFERENTIABLE = True
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = []               # the field comes from the spec's `from:` line
+    MECHANISM_TAGS = ["external_input", "neuromodulation", "field_sampling"]
+    PARAM_ROLES = {"block": "target_state_block", "channel": "field_channel",
+                   "gain": "field_scale", "offset": "field_baseline"}
+    REFERENCE = ("Allier, C. et al., eqn. (simulation2): a time-dependent scalar field "
+                 "Omega_i(t) scaling the aggregated message.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "neuron")
+        # The engine injects the specification's `from:` under the key "from", which is how
+        # `sense` and `chemotax` name their source field too.
+        self.field = params.get("from") or params.get("field")
+        self.block = params.get("block", "omega")
+        self.channel = int(params.get("channel", 0))
+        self.gain = self.tunable(params.get("gain"), 1.0)
+        self.offset = self.tunable(params.get("offset"), 0.0)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        fld = H.field(self.field)
+        val = fld.sample(lvl.get("pos"), channel=self.channel)      # [N]
+        val = self.gain * val + self.offset
+        if mask is not None:
+            # unselected neurons keep whatever they had, rather than being zeroed -- a mask
+            # narrows who this operator acts on, it does not silence the rest.
+            keep = lvl.get(self.block).squeeze(-1)
+            val = torch.where(mask, val, keep)
+        c0, c1 = lvl.state_schema[self.block]
+        # Clone and reassign rather than writing into a slice: `state` is a registered buffer a
+        # grad-enabled rollout may have on the tape, and an in-place write would break autograd.
+        st = lvl.state.clone()
+        st[:, c0:c1] = val[:, None]
+        lvl.state = st
+        return {}
+```

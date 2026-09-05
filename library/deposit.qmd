@@ -1,6 +1,6 @@
 ---
 title: "deposit"
-subtitle: "Set -> field. Each agent adds to the field at its own pixel."
+subtitle: "Each element adds to the field at the voxel it stands on."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Set -> field. Each agent adds to the field at its own pixel."
 
 [`exchange`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Set -> field. Each agent adds to the field at its own pixel.
+Each element adds to the field at the voxel it stands on.
 :::
 
 ```{=html}
@@ -42,9 +42,24 @@ Set -> field. Each agent adds to the field at its own pixel.
 
 ## Mechanism
 
-The stigmergy write: agent i adds `amount*dt` to channel `node_type[i]` (its own
-species) at the pixel under its position, clamped to 1 (the shader's `min(1,...)`).
-This is the only place the agents imprint the trail they then sense.
+of stigmergy -- an ant laying pheromone, a slime mould laying trail.
+
+cell -> field: reads pos and node_type, writes the `to:` field in place.
+
+    g[t_i, pix(x_i)] <- g[t_i, pix(x_i)] + a dt,   then  g <- min(g, 1)
+
+a is `amount`, the deposition rate in field units per unit time, so the amount actually
+laid in one tick is a dt. t_i is the element's own type, which selects the channel: two
+species lay into two channels of the same field and `sense` can then weigh them
+differently. The write is nearest-voxel and additive, so co-located elements accumulate.
+
+The field saturates at 1 rather than growing without bound. That ceiling is part of the
+mechanism, not a guard: it is what makes an established trail stop getting more attractive
+and lets a second trail compete with it.
+
+Reference: Grasse, P.-P. (1959). La reconstruction du nid et les coordinations
+interindividuelles chez Bellicositermes natalensis et Cubitermes sp. (stigmergy).
+Insectes Sociaux 6:41-80.
 
 $$
 c_{s}\big(\mathrm{pix}(\mathbf x_i)\big) \;\leftarrow\;
@@ -74,35 +89,39 @@ operators:
 
 ## Related operators
 
-Other **exchange** operators: [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd).
+Other **exchange** operators: [`voxelize`](voxelize.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`mpm_scatter`](mpm_scatter.qmd), [`p2g`](p2g.qmd), [`mpm_gather`](mpm_gather.qmd).
 
 ## Source
 
-[`src/plexus/operators/deposit.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/deposit.py) &mdash; the registered operator.
+[`src/plexus/operators/field_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/field_ops.py) &mdash; the registered operator.
 
 ```python
-"""deposit -- set -> field. Each agent adds to the field at its own pixel.
-
-The stigmergy write: agent i adds `amount*dt` to channel `node_type[i]` (its own
-species) at the pixel under its position, clamped to 1 (the shader's `min(1,...)`).
-This is the only place the agents imprint the trail they then sense.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Exchange
-from plexus.models.registry import register_operator
-
-
 @register_operator("deposit", family="fields", set="cell", kind="exchange")
 class Deposit(Exchange):
-    """object -> field. Writes `to:` field in place; returns {}."""
+    """Deposition: each element adds to the field at the voxel it stands on. The write half
+    of stigmergy -- an ant laying pheromone, a slime mould laying trail.
 
-    EMIT = None                                # set->field: scatters onto the grid in place (stigmergy write); returns {} — no integrable delta
-    # typed signature (Plexus2 sec. 2.1): set -> field (Exchange). The true output is
-    # the `to:` field grid, not set state, so WRITES (set-state blocks) is empty and the
-    # field coupling is the "field" map.
+    cell -> field: reads pos and node_type, writes the `to:` field in place.
+
+        g[t_i, pix(x_i)] <- g[t_i, pix(x_i)] + a dt,   then  g <- min(g, 1)
+
+    a is `amount`, the deposition rate in field units per unit time, so the amount actually
+    laid in one tick is a dt. t_i is the element's own type, which selects the channel: two
+    species lay into two channels of the same field and `sense` can then weigh them
+    differently. The write is nearest-voxel and additive, so co-located elements accumulate.
+
+    The field saturates at 1 rather than growing without bound. That ceiling is part of the
+    mechanism, not a guard: it is what makes an established trail stop getting more attractive
+    and lets a second trail compete with it.
+
+    Reference: Grasse, P.-P. (1959). La reconstruction du nid et les coordinations
+    interindividuelles chez Bellicositermes natalensis et Cubitermes sp. (stigmergy).
+    Insectes Sociaux 6:41-80.
+    """
+
+    EMIT = None                                # writes the grid in place, returns no delta
+    # Typed signature: the output is the `to:` field grid, not set state, so OUTPUTS and
+    # WRITES are empty and the field coupling appears as the "field" map.
     INPUTS = ["cell"]
     OUTPUTS = []                               # writes the `to:` field, no set-state output
     READS = ["pos"]
@@ -112,7 +131,9 @@ class Deposit(Exchange):
     REQUIRES_PARAMS = ["to"]
     MECHANISM_TAGS = ["deposition", "stigmergy", "field_write"]
     PARAM_ROLES = {"amount": "deposit_rate"}
-    REFERENCE = "Grasse, P.-P. (1959). La reconstruction du nid et les coordinations interindividuelles (stigmergy). Insectes Sociaux 6:41-80."
+    REFERENCE = ("Grasse, P.-P. (1959). La reconstruction du nid et les coordinations "
+                 "interindividuelles chez Bellicositermes natalensis et Cubitermes sp. "
+                 "(stigmergy). Insectes Sociaux 6:41-80.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

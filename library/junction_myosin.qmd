@@ -1,0 +1,310 @@
+---
+title: "junction_myosin"
+subtitle: "Per-junction myosin, recruited by tension: a stretched junction recruits more, pulls harder, and so shrinks -- the positive mechanical feedback a constant line tension cannot express."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Per-junction myosin, recruited by tension: a stretched junction recruits more, pulls harder, and so shrinks -- the positive mechanical feedback a constant line tension cannot express.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+harder, and so shrinks -- the positive mechanical feedback a constant line tension cannot
+express. Survives T1, division and death by construction, being keyed by vertex pair.
+
+vertex -> vertex: reads pos and the keyed myosin store on the mesh, writes m["myo"] in place.
+Structural rather than lateral because it writes mesh state, not a per-vertex delta.
+
+l_e is the junction's current length and l_ref the reference it is measured against, both in
+world units; a is `activity`, the dimensionless global myosin level. The multiplier myo then
+scales the vertex model's line tension Lambda, so myo = 1 is the uninhibited baseline.
+
+`activity` is the myosin-inhibition knob, the in-silico blebbistatin, and it multiplies the
+SETPOINT rather than the tension directly -- so inhibition takes effect over tau, the way a
+drug does, rather than instantly.
+
+l_ref is the CURRENT mean live edge length, not a constant. A growing tissue triples in
+radius, so a fixed reference would eventually call every junction stretched and raise myosin
+everywhere for a reason that is growth rather than tension.
+
+Reference: Rauzi, M. et al. (2008). Nature and function of lateral tension during tissue
+elongation. Nat. Cell Biol. 10:1401-1410 (myosin on shrinking junctions);
+Fernandez-Gonzalez, R. et al. (2009). Myosin II dynamics are regulated by tension in
+intercalating cells. Dev. Cell 17:736-743 (tension-dependent recruitment).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `activity` | global_myosin_activity | 1.0 |
+| `tau` | recruitment_timescale | 20.0 |
+| `myo_new` | myosin_of_a_newborn_junction | 1.0 |
+| `beta` | tension_sensitivity | 1.0 |
+| `activity_from` | per-type cell property giving each junction its drive | &ndash; |
+| `keyed_on` | &ndash; | "length" |
+| `cell_set` | &ndash; | "cell" |
+| `destabilising` | &ndash; | True |
+| `lam` | &ndash; | 1.0 |
+| `k_perim` | &ndash; | 1.0 |
+| `gam` | &ndash; | 0.0 |
+| `inherit` | &ndash; | True |
+| `dt` | &ndash; | 1.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: junction_myosin, at: vertex}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`actomyosin_contraction`]{.op-badge} [`mechanosensitive_recruitment`]{.op-badge} [`junction_state`]{.op-badge} [`topology_persistent`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd), [`cell_exclude`](cell_exclude.qmd).
+
+## Source
+
+[`src/plexus/operators/junction_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/junction_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("junction_myosin", family="mechanics", set="vertex", kind="structural")
+class JunctionMyosin(Structural):
+    """Per-junction myosin, recruited by tension: a stretched junction recruits more, pulls
+    harder, and so shrinks -- the positive mechanical feedback a constant line tension cannot
+    express. Survives T1, division and death by construction, being keyed by vertex pair.
+
+    vertex -> vertex: reads pos and the keyed myosin store on the mesh, writes m["myo"] in place.
+    Structural rather than lateral because it writes mesh state, not a per-vertex delta.
+
+        myo_ss = a (l_e / l_ref)                the setpoint, rising with junction length
+        d myo  = (myo_ss - myo) dt / tau        first-order relaxation toward it
+
+    l_e is the junction's current length and l_ref the reference it is measured against, both in
+    world units; a is `activity`, the dimensionless global myosin level. The multiplier myo then
+    scales the vertex model's line tension Lambda, so myo = 1 is the uninhibited baseline.
+
+    `activity` is the myosin-inhibition knob, the in-silico blebbistatin, and it multiplies the
+    SETPOINT rather than the tension directly -- so inhibition takes effect over tau, the way a
+    drug does, rather than instantly.
+
+    l_ref is the CURRENT mean live edge length, not a constant. A growing tissue triples in
+    radius, so a fixed reference would eventually call every junction stretched and raise myosin
+    everywhere for a reason that is growth rather than tension.
+
+    Reference: Rauzi, M. et al. (2008). Nature and function of lateral tension during tissue
+    elongation. Nat. Cell Biol. 10:1401-1410 (myosin on shrinking junctions);
+    Fernandez-Gonzalez, R. et al. (2009). Myosin II dynamics are regulated by tension in
+    intercalating cells. Dev. Cell 17:736-743 (tension-dependent recruitment).
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = False        # writes m["myo"], not positions
+    MECHANISM_TAGS = ["actomyosin_contraction", "mechanosensitive_recruitment",
+                      "junction_state", "topology_persistent"]
+    PARAM_ROLES = {"activity": "global_myosin_activity", "tau": "recruitment_timescale",
+                   "myo_new": "myosin_of_a_newborn_junction", "beta": "tension_sensitivity",
+                   "activity_from": "per-type cell property giving each junction its drive"}
+    REFERENCE = ("Rauzi, M. et al. (2008). Nature and function of lateral tension during tissue "
+                 "elongation. Nat. Cell Biol. 10:1401-1410; Fernandez-Gonzalez, R. et al. (2009). "
+                 "Myosin II dynamics are regulated by tension in intercalating cells. Dev. Cell "
+                 "17:736-743.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.activity = float(params.get("activity", 1.0))
+        self.tau = float(params.get("tau", 20.0))
+        self.beta = float(params.get("beta", 1.0))
+        self.myo_new = float(params.get("myo_new", 1.0))
+        # "length" reproduces every run up to 83 bit-for-bit; "tension" and "strain_rate" are the two
+        # the literature supports. `destabilising` flips the sign so high drive -> more myosin -> higher
+        # drive, which is the positive feedback that produces T1s rather than suppressing them.
+        self.keyed_on = str(params.get("keyed_on", "length")).lower()
+        # HETEROGENEITY, THROUGH THE TYPES. `activity` is one scalar over the whole tissue, so nothing
+        # in a spec could say "these cells contract harder" -- and two operator instances cannot say it
+        # either, because each rewrites the WHOLE keyed store every frame (`m["myo_keys"] = key`), so
+        # the second would erase the first. `mask` does not help: the selector is per NODE of `at:`,
+        # i.e. per vertex, while myosin lives per junction.
+        #
+        # `activity_from: <prop>` names a PER-TYPE property of the cell set, which is how every other
+        # heterogeneous spec in this corpus says the same thing (`types: {t0: {fraction, p}, ...}`).
+        # Each half-edge takes the value of the cell that owns it, and the junction takes the MEAN of
+        # its two -- a junctional belt is fed from the cortices on both sides, and averaging is the
+        # only choice symmetric in them, which matters because the store keeps ONE value per
+        # undirected edge and would otherwise depend on which half-edge was written last.
+        self.act_prop = params.get("activity_from")
+        self.cell_set = params.get("cell_set", "cell")
+        self.destabilising = bool(params.get("destabilising", True))
+        self._prev_len = None
+        self.lam = float(params.get("lam", 1.0))          # Lambda, for the tension expression
+        self.k_perim = float(params.get("k_perim", 1.0))
+        self.gam = float(params.get("gam", 0.0))
+        self.inherit = bool(params.get("inherit", True))
+        self.dt = float(params.get("dt", 1.0))
+        # THE STORE IS ON THE MESH (`myo_keys` / `myo_vals` / `myo_vseen`), not here. See the module
+        # docstring: state of an edge-set has to be reachable by any operator scheduled after a
+        # topology change, and an operator attribute is reachable by exactly one.
+        self._said = False
+
+    def _edge_tension(self, m, length, myo, live, ef, dev, dt_):
+        return edge_tension(m, length, myo, ef, self.lam, self.k_perim, self.gam, dev, dt_)
+
+    def _edge_strain_rate(self, key, length):
+        """d ln(l_e)/dt, matched to the PREVIOUS frame by the same vertex-pair key the myosin uses.
+
+        Cheaper than tension and closer to Gustafson et al. 2022, whose recruitment variable is strain
+        rate. Keyed rather than positional because cell_divide and edge_flip permute the half-edge
+        arrays every frame -- comparing arrays by index would silently difference unrelated junctions.
+        """
+        cur = torch.stack([key, length])
+        if self._prev_len is None:
+            self._prev_len = cur
+            return torch.zeros_like(length)
+        pk, pl = self._prev_len
+        order = torch.argsort(pk)
+        ks, vs = pk[order], pl[order]
+        idx = torch.searchsorted(ks, key).clamp(max=max(ks.numel() - 1, 0))
+        hit = (ks.numel() > 0) & (ks[idx] == key)
+        prev = torch.where(hit, vs[idx], length)
+        self._prev_len = cur
+        return torch.log(length.clamp_min(1e-9) / prev.clamp_min(1e-9))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        pos = lvl.get("pos")
+        ef = m["E_face"]
+        nF = int(m["nF"])
+        dev, dt_ = pos.device, pos.dtype
+        es, live, vi, vj, stride, key, length = _live_edges(m, pos)
+        if not bool(live.any()):
+            return {}
+        l_ref = length.mean().clamp_min(1e-9)
+
+        # ---- look each live junction up by its identity ------------------------------------------
+        myo, n_new = _lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_)
+
+        # ---- recruitment ------------------------------------------------------------------------
+        # ---- WHAT THE FEEDBACK IS KEYED TO ------------------------------------------------------
+        # `length` was the original choice and it is the wrong variable, in two separate ways.
+        #
+        #   WRONG VARIABLE. Edge tension in this energy is Lambda*m_e + sum_f 2 K_P (P_f - P_f^0); length
+        #   does not appear in it, so a long edge is not necessarily a taut one. The docstring used to
+        #   assert "setpoint rises with junction length, i.e. with tension", which is an identification,
+        #   not a derivation, and it is false here.
+        #
+        #   WRONG SIGN. Keyed to length the feedback is longer -> more myosin -> shorter: a STABILISER
+        #   that homogenises junction lengths. The measured relationship runs the other way -- Bertet
+        #   et al. 2004 find myosin enriched in DISASSEMBLING junctions, Fernandez-Gonzalez et al. 2009
+        #   find more myosin on linked edges "regardless of edge length" -- and the resulting feedback is
+        #   POSITIVE, a mechanical instability that generates T1s. The modelling literature keys on
+        #   tension or strain rate and never on length; Sknepnek et al. 2023 say so verbatim.
+        #
+        # And keyed to length the operator is not even independent evidence for itself: in the tau -> 0
+        # limit (the biologically correct one, myosin FRAP t1/2 ~ 6 s) substituting the setpoint gives
+        # Lambda*a*sum[(1-beta) l_e + beta l_e^2/<l>], i.e. a line tension plus a HARMONIC EDGE SPRING of
+        # zero rest length. Lowering the coefficient of variation of edge lengths is what such a spring
+        # does by definition, so "beta lowers CV at constant radius" is a tautology and cannot
+        # discriminate a right law from a wrong one. The T1 rate can, and the two signs move it oppositely.
+        if self.keyed_on == "tension":
+            drive = self._edge_tension(m, length, myo, live, ef[live].long(), dev, dt_)
+        elif self.keyed_on == "strain_rate":
+            drive = self._edge_strain_rate(key, length)
+        else:
+            drive = length
+        d_ref = drive.mean().clamp_min(1e-9) if self.keyed_on != "strain_rate" else torch.ones((), device=dev, dtype=dt_)
+        # SIGN. Getting this backwards silently converts the experiment into its own control, so it is
+        # written out rather than inferred:
+        #   length-keyed, +   longer -> more myosin -> shorter.  Negative feedback ON LENGTH: homogenises.
+        #   tension-keyed, +  tauter -> more myosin -> tauter.   POSITIVE feedback ON TENSION: this is the
+        #                     germband-extension instability, and it should RAISE the T1 rate.
+        #   tension-keyed, -  tension homeostasis, the stabilising variant, kept as the contrast.
+        # So the destabilising choice is +1, not -1. I had it as -1 on the first pass, which would have
+        # made every "tension" run a stabiliser and the whole 84-91 comparison vacuous.
+        sgn = 1.0 if self.destabilising else -1.0
+        act = self.activity
+        if self.act_prop:
+            cl = H.level(self.cell_set)
+            a_cell = getattr(cl, self.act_prop, None)
+            if a_cell is None:
+                raise ValueError(
+                    f"junction_myosin activity_from={self.act_prop!r}: set {self.cell_set!r} has no "
+                    f"per-node buffer of that name -- declare it as a per-type scalar under "
+                    f"`sets.{self.cell_set}.types`.")
+            a_he = a_cell[ef[live].long()].to(dt_)          # per half-edge, from the cell that owns it
+            uk, inv = torch.unique(key, return_inverse=True)
+            tot = torch.zeros(int(uk.numel()), device=dev, dtype=dt_).index_add_(0, inv, a_he)
+            cnt = torch.zeros(int(uk.numel()), device=dev, dtype=dt_).index_add_(
+                0, inv, torch.ones_like(a_he))
+            act = self.activity * (tot / cnt.clamp_min(1.0))[inv]
+        ss = act * (1.0 + sgn * self.beta * (drive / d_ref - 1.0)).clamp_min(0.0)
+        myo = myo + (ss - myo) * (self.dt / max(self.tau, 1e-9))
+        myo = myo.clamp(0.0, 5.0)
+
+        # ---- store back, keyed. Junctions that no longer exist are simply not written, so a T1 or a
+        # death drops them without anyone having to notice.
+        m["myo_keys"], m["myo_vals"] = key.detach().clone(), myo.detach().clone()
+        # which vertices existed this frame, so next frame can tell an inserted vertex from an old one
+        vs_seen = torch.zeros(stride, dtype=torch.bool, device=dev)
+        vs_seen[vi] = True; vs_seen[vj] = True
+        m["myo_vseen"] = vs_seen
+        # the per-half-edge array the mechanics reads: full length, 1.0 on dead slots so a masked-out
+        # half-edge contributes its usual tension if anything ever reads it unmasked
+        m["myo"] = _scatter_full(es, live, myo, dev, dt_)
+        MYOSIN_TRACE.append((int(live.sum()), float(myo.mean()), float(myo.min()),
+                             float(myo.max()), n_new))
+        if not self._said:
+            if self.act_prop:
+                _u = torch.unique(act)
+                print(f"[junction_myosin] activity_from={self.act_prop!r} on set {self.cell_set!r}: "
+                      f"{int(_u.numel())} distinct drives across {int(live.sum()):,} junctions, "
+                      f"{[round(float(v), 3) for v in _u[:6]]}"
+                      f"{' ...' if _u.numel() > 6 else ''} (a boundary junction gets the mean of its "
+                      f"two cells)", flush=True)
+            print(f"[junction_myosin] {int(live.sum())} live junctions, activity={self.activity}, "
+                  f"tau={self.tau}, myo_new={self.myo_new}; keyed by vertex pair so T1 / division / "
+                  f"death need no edits", flush=True)
+            self._said = True
+        return {}
+```

@@ -1,6 +1,6 @@
 ---
 title: "squared_law"
-subtitle: "The inverse-square law between particles: electrostatics (Coulomb) OR gravity (Newton)."
+subtitle: "The inverse-square law between particles: Newtonian gravity between masses, or Coulomb electrostatics between signed charges, as one contract with two conventions."
 ---
 
 ::: {.op-head}
@@ -42,41 +42,33 @@ The inverse-square law between particles &mdash; one operator, two regimes selec
 
 ## Mechanism
 
-ONE Lateral, second-derivative operator (EMIT=acceleration) for every pairwise
-inverse-square interaction. Coulomb and Newtonian gravity share the *same contract*
--- an add-aggregated force a_i = Σ_j (strength) (r_j - r_i) / |r_j - r_i|^3 that the
-engine integrates as an acceleration -- and differ only in options, so they are the
-same operator, not two:
+Coulomb electrostatics between signed charges, as one contract with two conventions.
 
-                           signed `charge`; LIKE charges repel, OPPOSITE attract.
-                           Receiver carries its own charge q_i (inertial mass = 1).
-                           `mass`-weighted, ALWAYS attractive, softened. The receiver
-                           factor is 1 (equivalence principle: acceleration is
+particle -[all pairs, or the neighbour relation]-> particle: reads pos and one per-type
+source property (mass or charge), emits an acceleration.
 
-The two knobs behind `law` are physical, not cosmetic: (sign) like-repel vs.
-attract, and (receiver) whether the receiver's own coupling charge scales its
-acceleration -- q_i for Coulomb (charge != inertial mass), 1 for gravity (charge =
-inertial mass, so it cancels). `coupling` names the per-type source property (`charge`
-or `mass`, defaulted by `law`); the engine broadcasts it to a per-particle buffer.
+q_j is the source property of the neighbour -- mass for gravity, signed charge for Coulomb
+-- and c_i the receiver's coupling to it. The two laws differ only in s and c_i:
 
-Two ranges, orthogonal to `law`:
-    all_pairs=False (default)  sum over the neighbour graph `Level.edge_index` left by a
-                               `rewire` op (radius_graph); O(E), a screened/short-range
-                               interaction (plasma). Coulomb's default.
-                               (gravity has no screening). `compile` fuses the [N,N]
-                               reduction with torch.compile (~23x, so N~5e4 fits ~0.01 GB;
-                               the r2/inv_r3 matrices never materialise).
+    law: gravity   s = +1,  c_i = 1     the receiver's own mass cancels (equivalence
+                                        principle), so every body falls the same way
+    law: coulomb   s = -1,  c_i = q_i   the receiver's own charge scales its acceleration,
+                                        and the sign makes like charges repel
 
-`softening` eps>0 replaces 1/r^3 with 1/(r^2+eps^2)^(3/2) (Plummer softening) so close
-pairs stay finite without a neighbour cutoff. eps=0 recovers pure 1/r^3 (the radius
-graph's `min_radius`, or the diagonal guard in the all-pairs kernel, keeps it finite).
+k is the strength constant (Newton's G, or the Coulomb constant) in whatever units the
+specification is written in; eps is the Plummer softening length, in world units, which
+caps the force a near-coincident pair can exert -- eps = 0 gives the bare 1/r^2. `clamp`
+is a further cap on the magnitude of a_i itself, a stability device rather than physics.
 
-Dimension-generic (SUPPORTED_DIMS [2,3]) -- the law reads D = pos.shape[-1].
+`all_pairs: true` sums over every pair, which is what a long-range law means and costs
+O(N^2); it requires open boundaries, since there is no minimum image over all pairs.
+`all_pairs: false` sums only over the neighbour relation, turning the same law into a
+screened short-range one whose cutoff is the rewire's radius.
 
-Provenance:
-  * Coulomb branch ported from ParticleGraph `PDE_E` (electrostatic inverse-square).
-  * gravity branch ported from Philip Mocz, "Create Your Own N-body Simulation (With
-    Python)" (2020), vendored at papers/nbody-python/ (MIT) -- his softened `getAcc`.
+Reference: Newton, I. (1687). Philosophiae Naturalis Principia Mathematica (the
+inverse-square law of gravitation); Coulomb, C.-A. (1785). Premier memoire sur
+l'electricite et le magnetisme. Hist. Acad. R. Sci., 569-577. Plummer softening:
+Plummer, H. C. (1911). Mon. Not. R. Astron. Soc. 71:460-470.
 
 $$
 \ddot{\mathbf x}_i \;=\; \mathrm{sign}\,k\;r_i\!\!\sum_{j}\, s_j\,
@@ -84,8 +76,8 @@ $$
 $$
 `law: coulomb` uses signed charge $s=q$ with a like-repel sign and the receiver's own $q_i$;
 `law: gravity` uses $s=m$, always attracts, and the receiver factor is $1$ (equivalence
-principle). $\varepsilon$ is Plummer softening; `all_pairs` sums over every pair ($O(N^2)$,
-`compile`d) rather than a `radius_graph`.
+principle). $\varepsilon$ is Plummer softening; `all_pairs` sums over every pair ($O(N^2)$)
+rather than over a `radius_graph`.
 
 ## Parameters
 
@@ -96,7 +88,6 @@ principle). $\varepsilon$ is Plummer softening; `all_pairs` sums over every pair
 | `coupling` | per-type source property (charge|mass) | &ndash; |
 | `softening` | Plummer softening length eps (0 = pure 1/r^3) | 0.0 |
 | `all_pairs` | sum over ALL pairs (O(N^2), long-range) vs the neighbour graph | False |
-| `compile` | torch.compile the all-pairs kernel (big N) | False |
 | `clamp` | max |acceleration| (0 = unbounded) | 0.0 |
 
 ## Minimal spec
@@ -107,7 +98,7 @@ sets:
          vel_init: {mode: circular_orbit, spin: 0.9, central_mass: 0.5},
          types: {s: {fraction: 1.0, mass: 0.00004}}}
 operators:
-  - {op: squared_law, at: star, law: gravity, softening: 0.08, all_pairs: true, compile: true}
+  - {op: squared_law, at: star, law: gravity, softening: 0.08, all_pairs: true}
 schedule: [squared_law]
 ```
 
@@ -130,97 +121,44 @@ schedule: [squared_law]
 
 ## Source
 
-[`src/plexus/operators/squared_law.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/squared_law.py) &mdash; the registered operator.
+[`src/plexus/operators/interaction_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/interaction_ops.py) &mdash; the registered operator.
 
 ```python
-"""squared_law -- the inverse-square law between particles: electrostatics (Coulomb) OR gravity (Newton).
-
-ONE Lateral, second-derivative operator (EMIT=acceleration) for every pairwise
-inverse-square interaction. Coulomb and Newtonian gravity share the *same contract*
--- an add-aggregated force a_i = Σ_j (strength) (r_j - r_i) / |r_j - r_i|^3 that the
-engine integrates as an acceleration -- and differ only in options, so they are the
-same operator, not two:
-
-    law=coulomb (default)  a_i = Σ_j  -k q_i q_j (r_j-r_i) / |r_j-r_i|^3
-                           signed `charge`; LIKE charges repel, OPPOSITE attract.
-                           Receiver carries its own charge q_i (inertial mass = 1).
-    law=gravity            a_i = Σ_j  +k m_j (r_j-r_i) / (|r_j-r_i|^2 + eps^2)^(3/2)
-                           `mass`-weighted, ALWAYS attractive, softened. The receiver
-                           factor is 1 (equivalence principle: acceleration is
-                           independent of the test mass, m_i/m_i = 1).
-
-The two knobs behind `law` are physical, not cosmetic: (sign) like-repel vs.
-attract, and (receiver) whether the receiver's own coupling charge scales its
-acceleration -- q_i for Coulomb (charge != inertial mass), 1 for gravity (charge =
-inertial mass, so it cancels). `coupling` names the per-type source property (`charge`
-or `mass`, defaulted by `law`); the engine broadcasts it to a per-particle buffer.
-
-Two ranges, orthogonal to `law`:
-    all_pairs=False (default)  sum over the neighbour graph `Level.edge_index` left by a
-                               `rewire` op (radius_graph); O(E), a screened/short-range
-                               interaction (plasma). Coulomb's default.
-    all_pairs=True             sum over ALL pairs; O(N^2), long-range with no cutoff
-                               (gravity has no screening). `compile` fuses the [N,N]
-                               reduction with torch.compile (~23x, so N~5e4 fits ~0.01 GB;
-                               the r2/inv_r3 matrices never materialise).
-
-`softening` eps>0 replaces 1/r^3 with 1/(r^2+eps^2)^(3/2) (Plummer softening) so close
-pairs stay finite without a neighbour cutoff. eps=0 recovers pure 1/r^3 (the radius
-graph's `min_radius`, or the diagonal guard in the all-pairs kernel, keeps it finite).
-
-Dimension-generic (SUPPORTED_DIMS [2,3]) -- the law reads D = pos.shape[-1].
-
-Provenance:
-  * Coulomb branch ported from ParticleGraph `PDE_E` (electrostatic inverse-square).
-  * gravity branch ported from Philip Mocz, "Create Your Own N-body Simulation (With
-    Python)" (2020), vendored at papers/nbody-python/ (MIT) -- his softened `getAcc`.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-from plexus.geometry import minimum_image
-
-
-def _inv_square_sum(pos, src, soft2):
-    """All-pairs inverse-square PULL at each particle: pull_i = Σ_j src_j (r_j-r_i)/denom,
-    denom = (|r_j-r_i|^2 + soft2)^(3/2). This is a per-particle VECTOR (the summed inverse-square
-    interaction), NOT a Plexus `Field` (grid entity) -- no grid is involved; the caller scales it
-    by the signed strength and the receiver's coupling to get the acceleration. Per-dimension so
-    only [N,N] matrices appear; a free function so torch.compile can FUSE the reduction (the [N,N]
-    r2/inv_r3 never materialise). `src` folds in occupancy (dormant = 0). (Mocz getAcc generalised
-    to any source charge.)"""
-    N, D = pos.shape
-    r2 = torch.full((N, N), soft2, device=pos.device, dtype=pos.dtype)
-    for k in range(D):
-        dk = pos[:, k].unsqueeze(0) - pos[:, k].unsqueeze(1)       # dk[i,j] = pos[j]-pos[i]
-        r2 = r2 + dk * dk
-    inv_r3 = r2.clamp(min=1e-12).pow(-1.5)                          # diagonal dk=0 -> 0 contribution
-    pull = torch.empty(N, D, device=pos.device, dtype=pos.dtype)
-    for k in range(D):
-        dk = pos[:, k].unsqueeze(0) - pos[:, k].unsqueeze(1)
-        pull[:, k] = (dk * inv_r3) @ src
-    return pull
-
-
-_inv_square_sum_compiled = None
-
-
-def _get_inv_square_sum(compile):
-    """Return the (optionally torch.compiled) all-pairs inverse-square-sum kernel, compiling once."""
-    global _inv_square_sum_compiled
-    if not compile:
-        return _inv_square_sum
-    if _inv_square_sum_compiled is None:
-        _inv_square_sum_compiled = torch.compile(_inv_square_sum)
-    return _inv_square_sum_compiled
-
-
 @register_operator("squared_law", family="interaction", set="particle", kind="lateral")
 class SquaredLaw(Lateral):
-    EMIT = "acceleration"                        # emits an acceleration (charges/masses have inertia)
+    """The inverse-square law between particles: Newtonian gravity between masses, or
+    Coulomb electrostatics between signed charges, as one contract with two conventions.
+
+    particle -[all pairs, or the neighbour relation]-> particle: reads pos and one per-type
+    source property (mass or charge), emits an acceleration.
+
+        a_i = s k c_i  sum_j  q_j (x_j - x_i) / (|x_j - x_i|^2 + eps^2)^(3/2)
+
+    q_j is the source property of the neighbour -- mass for gravity, signed charge for Coulomb
+    -- and c_i the receiver's coupling to it. The two laws differ only in s and c_i:
+
+        law: gravity   s = +1,  c_i = 1     the receiver's own mass cancels (equivalence
+                                            principle), so every body falls the same way
+        law: coulomb   s = -1,  c_i = q_i   the receiver's own charge scales its acceleration,
+                                            and the sign makes like charges repel
+
+    k is the strength constant (Newton's G, or the Coulomb constant) in whatever units the
+    specification is written in; eps is the Plummer softening length, in world units, which
+    caps the force a near-coincident pair can exert -- eps = 0 gives the bare 1/r^2. `clamp`
+    is a further cap on the magnitude of a_i itself, a stability device rather than physics.
+
+    `all_pairs: true` sums over every pair, which is what a long-range law means and costs
+    O(N^2); it requires open boundaries, since there is no minimum image over all pairs.
+    `all_pairs: false` sums only over the neighbour relation, turning the same law into a
+    screened short-range one whose cutoff is the rewire's radius.
+
+    Reference: Newton, I. (1687). Philosophiae Naturalis Principia Mathematica (the
+    inverse-square law of gravitation); Coulomb, C.-A. (1785). Premier memoire sur
+    l'electricite et le magnetisme. Hist. Acad. R. Sci., 569-577. Plummer softening:
+    Plummer, H. C. (1911). Mon. Not. R. Astron. Soc. 71:460-470.
+    """
+
+    EMIT = "acceleration"                        # second-order: masses and charges have inertia
     SUPPORTED_DIMS = [2, 3]                       # dimension-generic (reads D = pos.shape[-1])
     REQUIRES_PARAMS = []                          # no required params — all knobs optional (defaults in __init__)
     OPTIONAL_TYPE_PROPS = ["charge", "mass"]     # reads ONE (self.coupling), chosen by `law`
@@ -231,9 +169,11 @@ class SquaredLaw(Lateral):
                    "coupling": "per-type source property (charge|mass)",
                    "softening": "Plummer softening length eps (0 = pure 1/r^3)",
                    "all_pairs": "sum over ALL pairs (O(N^2), long-range) vs the neighbour graph",
-                   "compile": "torch.compile the all-pairs kernel (big N)",
                    "clamp": "max |acceleration| (0 = unbounded)"}
-    REFERENCE = "Newton, I. (1687). Principia (inverse-square law); Coulomb, C.-A. (1785)."
+    REFERENCE = ("Newton, I. (1687). Philosophiae Naturalis Principia Mathematica; "
+                 "Coulomb, C.-A. (1785). Premier memoire sur l'electricite et le magnetisme. "
+                 "Hist. Acad. R. Sci., 569-577; softening: Plummer, H. C. (1911). "
+                 "Mon. Not. R. Astron. Soc. 71:460-470.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -246,7 +186,6 @@ class SquaredLaw(Lateral):
                                        "charge" if self.law == "coulomb" else "mass"))
         self.soft = float(params.get("softening", 0.0))           # Plummer eps (0 = pure 1/r^3)
         self.all_pairs = bool(params.get("all_pairs", False))     # O(N^2) long-range vs neighbour graph
-        self.compile = bool(params.get("compile", False))         # torch.compile the all-pairs kernel
         self.clamp = float(params.get("clamp", 0.0))              # optional cap on |a| (0 = off)
         # physical conventions bundled by `law`: (sign) like-repel vs attract; (receiver) whether the
         # receiver's own coupling charge scales its acceleration (Coulomb) or cancels (gravity).
@@ -269,7 +208,7 @@ class SquaredLaw(Lateral):
                 raise ValueError("squared_law all_pairs=True supports only open/free boundaries "
                                  "(no minimum-image over all pairs); use a neighbour graph if periodic.")
             src = s * occ                                          # dormant particles contribute nothing
-            pull = _get_inv_square_sum(self.compile)(pos, src, self.soft ** 2)
+            pull = _inv_square_sum(pos, src, self.soft ** 2)
             recv = s if self._recv_coupled else torch.ones(N, device=pos.device, dtype=pos.dtype)
             acc = (self.sign * self.k) * recv[:, None] * pull
         else:
@@ -282,7 +221,8 @@ class SquaredLaw(Lateral):
                               getattr(H, "world_size", getattr(H, "world_width", 1.0)))   # j - i  [E, D]
             r = d.norm(dim=-1).clamp(min=1e-6)                    # |d| (off zero via the graph's min_radius)
             if self.law == "coulomb" and self.soft == 0.0:
-                # exact legacy Coulomb path -- byte-identical to the pre-merge squared_law
+                # unsoftened Coulomb written out directly: the same expression as the general
+                # branch below, spelled so the arithmetic is bit-for-bit the original one.
                 coef = -self.k * s[i] * s[j] / (r ** 3) * occ[j]
             else:
                 inv = (r * r + self.soft ** 2).pow(-1.5) if self.soft > 0 else r.pow(-3)

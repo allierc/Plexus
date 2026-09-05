@@ -1,6 +1,6 @@
 ---
 title: "pulse_to_contraction"
-subtitle: "The FORCE constitutive law: an activation field -> per-particle MPM body force."
+subtitle: "Active contraction as a BODY FORCE: an activation field becomes a per-particle acceleration pointing along the field's own gradient."
 ---
 
 ::: {.op-head}
@@ -42,23 +42,24 @@ The force half of an active-matter actuator: it reads an activation field $a(\ma
 
 ## Mechanism
 
-(Renamed from `pulse_to_contraction`, kept as a transitional alias: the operator names the
-MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
+acceleration pointing along the field's own gradient.
 
-Reads the activation field a(x,t) (the `from:` field) and converts its gradient into
-a per-particle body force, RETURNED as a particle delta. The engine sums it (with any
-`drag` delta) into H.delta(mpm_particle), which the MLS-MPM `p2g` scatter consumes
-as the body force (`p2g`: a_ext += H.delta(particle)) -- the per-particle counterpart
-of the parent-delta path that carries `gravity`. For a Gaussian activation bump grad(a)
-points toward the centre, so
+field -> particle: reads the activation field at each particle's position, emits an external
+acceleration the MPM substep consumes as a_ext.
 
-contracts (mode: inward) or expands (mode: outward) the sheet. It owns only the
-mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`activation_pulse`).
+c is the activation field, dimensionless, and A is `amplitude`, converting a field gradient
+into an acceleration. s is the sign chosen by `along`: `inward` contracts toward high
+activation and `outward` pushes away from it. Because the force follows the GRADIENT, a
+UNIFORM activation produces no force at all -- which is the model's central claim, that what
+drives motion is the spatial variation of activity rather than its level.
 
-`kind=exchange` (field -> set); `EMIT=None`, so the engine never integrates the
-particle set (g2p owns advection) -- the force enters mechanics only through the MPM
-substep. The engine's `zero_delta` resets the delta each outer tick, and the substep
-loop reads that constant body force on each of its iterations.
+This is the force constitutive law. `active_stress` is the other one: it turns the same
+activation into a stress the grid solve transmits, which is the mechanically correct route for
+a contractile continuum. A body force is the cruder claim -- that activity pushes on the
+material directly -- and the two are different hypotheses, not two ways of computing one.
+
+Reference: Marchetti, M. C. et al. (2013). Hydrodynamics of soft active matter. Rev. Mod. Phys.
+85:1143-1189.
 
 $$
 \mathbf F_i \;=\;
@@ -76,8 +77,9 @@ mode a unit vector-field $\mathbf d$ sets the orientation and $a$ sets the magni
 |---|---|---|
 | `from` | &ndash; | **required** |
 | `amplitude` | contraction_strength | 50.0 |
-| `mode` | gradient_or_directional | "inward" |
+| `mode` | gradient_or_directional | &ndash; |
 | `channel` | &ndash; | 0 |
+| `along` | &ndash; | "inward" |
 
 ## Minimal spec
 
@@ -131,41 +133,34 @@ pacemaker → pulse_stimulus → pulse_to_contraction → mpm_drag → [mpm_stra
 
 ## Source
 
-[`src/plexus/operators/active_force.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/active_force.py) &mdash; the registered operator.
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
 
 ```python
-"""active_force -- the FORCE constitutive law: an activation field -> per-particle MPM body force.
-
-(Renamed from `pulse_to_contraction`, kept as a transitional alias: the operator names the
-MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
-
-Reads the activation field a(x,t) (the `from:` field) and converts its gradient into
-a per-particle body force, RETURNED as a particle delta. The engine sums it (with any
-`drag` delta) into H.delta(mpm_particle), which the MLS-MPM `p2g` scatter consumes
-as the body force (`p2g`: a_ext += H.delta(particle)) -- the per-particle counterpart
-of the parent-delta path that carries `gravity`. For a Gaussian activation bump grad(a)
-points toward the centre, so
-
-    F_i = sign * amplitude * grad(a)(x_i)          sign = +1 (inward) / -1 (outward)
-
-contracts (mode: inward) or expands (mode: outward) the sheet. It owns only the
-mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`activation_pulse`).
-
-`kind=exchange` (field -> set); `EMIT=None`, so the engine never integrates the
-particle set (g2p owns advection) -- the force enters mechanics only through the MPM
-substep. The engine's `zero_delta` resets the delta each outer tick, and the substep
-loop reads that constant body force on each of its iterations.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Exchange
-from plexus.models.registry import register_operator
-
-
 @register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle", kind="exchange")
-class ActiveForce(Exchange):                     # (alias `pulse_to_contraction` for one migration cycle)
+class ActiveForce(Exchange):                    
+    """Active contraction as a BODY FORCE: an activation field becomes a per-particle
+    acceleration pointing along the field's own gradient.
+
+    field -> particle: reads the activation field at each particle's position, emits an external
+    acceleration the MPM substep consumes as a_ext.
+
+        a_p = s * A * grad c(x_p)
+
+    c is the activation field, dimensionless, and A is `amplitude`, converting a field gradient
+    into an acceleration. s is the sign chosen by `along`: `inward` contracts toward high
+    activation and `outward` pushes away from it. Because the force follows the GRADIENT, a
+    UNIFORM activation produces no force at all -- which is the model's central claim, that what
+    drives motion is the spatial variation of activity rather than its level.
+
+    This is the force constitutive law. `active_stress` is the other one: it turns the same
+    activation into a stress the grid solve transmits, which is the mechanically correct route for
+    a contractile continuum. A body force is the cruder claim -- that activity pushes on the
+    material directly -- and the two are different hypotheses, not two ways of computing one.
+
+    Reference: Marchetti, M. C. et al. (2013). Hydrodynamics of soft active matter. Rev. Mod. Phys.
+    85:1143-1189.
+    """
+
     EMIT = "mpm_acceleration"           # a body accel the MPM substep consumes as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2]                 # 2D — reads a 2-vector activation gradient / direction field
     REQUIRES_PARAMS = ["from"]                # the activation field to read
@@ -178,33 +173,35 @@ class ActiveForce(Exchange):                     # (alias `pulse_to_contraction`
         self.field_name = params.get("from")
         self.amplitude = float(params.get("amplitude", 50.0))
         self.channel = int(params.get("channel", 0))
-        self.mode = str(params.get("mode", "inward"))
-        # gradient modes (inward/outward): direction = +/- grad(activation). directional:
-        # direction = a unit-vector field, magnitude = the (uniform) activation value.
-        self.sign = {"inward": 1.0, "outward": -1.0}.get(self.mode, 1.0)
-        self.direction_from = params.get("direction_from")
-        if self.mode == "directional" and self.direction_from is None:
-            raise ValueError("active_force mode: directional needs `direction_from:` "
-                             "(a vector_grid field giving the contraction direction)")
+        # `mode:` carried three words doing two different jobs: `inward`/`outward` chose a SIGN
+        # on one rule, while `directional` chose a DIFFERENT RULE. One key over two axes, and
+        # nothing in the registry could tell them apart. `along:` is the value; `model:
+        # directional` is the hypothesis.
+        if "mode" in params:
+            raise ValueError(
+                "active_force: `mode` is gone. `inward`/`outward` are now `along:` (a value on this "
+                "model -- the sign of the gradient), and `directional` is now "
+                "`model: directional` (a different rule: a prescribed direction field).")
+        self.along = str(params.get("along", "inward"))
+        if self.along not in ("inward", "outward"):
+            raise ValueError(f"active_force: along must be inward|outward, got {self.along!r}")
+        self.sign = 1.0 if self.along == "inward" else -1.0
         self.at = params.get("_at", "particle")
+
+    def _accel(self, H, lvl, pos, fld):
+        """THE HYPOTHESIS, and the only thing a `model=` variant of active_force changes.
+
+        Default: the contraction follows the ACTIVATION GRADIENT -- direction = +/- grad(a), with
+        `along:` choosing the sign. `inward` pulls up the gradient, toward higher activation.
+        """
+        grad = fld.grad_at(pos, self.channel, periodic=getattr(H, "periodic", False))   # [N, 2]
+        return self.sign * self.amplitude * grad                          # inward for sign>0
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         pos = lvl.get("pos")
         fld = H.fields[self.field_name]
-
-        if self.mode == "directional":
-            # F_i = amplitude * a(x_i) * d(x_i): uniform activation sets WHEN/how much,
-            # the vector field sets WHERE to push (the active-stress orientation map).
-            a = fld.sample(pos, self.channel)                             # [N] activation
-            d = H.fields[self.direction_from].sample(pos)                 # [N, 2] direction
-            d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
-            acc = self.amplitude * a[:, None] * d
-        else:
-            # gradient mode: direction = +/- grad(activation), sampled at each particle.
-            grad = fld.grad_at(pos, self.channel, periodic=getattr(H, "periodic", False))  # [N, 2]
-            acc = self.sign * self.amplitude * grad                       # inward for sign>0
-
+        acc = self._accel(H, lvl, pos, fld)
         acc = acc * lvl.occ[:, None]
         if mask is not None:
             acc = acc * mask[:, None].float()

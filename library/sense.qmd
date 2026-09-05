@@ -1,6 +1,6 @@
 ---
 title: "sense"
-subtitle: "Field -> set. Sample the field on a sensor fan around the heading, steer."
+subtitle: "Trail following: read the field on a fan of sensors around the heading and turn toward the strongest."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Field -> set. Sample the field on a sensor fan around the heading, st
 
 [`exchange`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Field -> set. Sample the field on a sensor fan around the heading, steer.
+Trail following: read the field on a fan of sensors around the heading and turn toward the strongest.
 :::
 
 ```{=html}
@@ -42,25 +42,32 @@ Field -> set. Sample the field on a sensor fan around the heading, steer.
 
 ## Mechanism
 
-The Physarum/Jones sensing rule, written once for any dimension (the dimension
-contract). Each agent reads the field at a CENTRE sensor along its heading plus a
-fan of sensors tilted by `sensor_angle` around it, then steers toward the strongest:
-if the centre wins it goes straight, otherwise it rotates its heading toward the
-winning sensor by a random amount up to `turn_speed`.
+the strongest. The read half of stigmergy, and the steering rule of the Physarum model.
 
-The only dimensional specialisation is how the tilted sensor directions are
-generated around the heading -- everything else (the windowed species-weighted
-read, the steer, the occupancy mask) is identical:
+cell -> cell: reads pos, heading and the field named by `from:`, writes heading in place.
 
-* 2D: the plane perpendicular to the heading is a line, so the fan is the two
-  sensors ahead-left / ahead-right (K = 2 ring + centre = 3 sensors, Lague's fan).
-* 3D: the perpendicular plane is 2D, so the fan is a RING of `_RING` sensors around
-  the heading cone (K = _RING + centre = 7 sensors).
+Each element places one sensor straight ahead and K to the side -- in 2D the two at
++/- sensor_angle, in 3D a ring of six around the heading axis -- each at distance
+sensor_dist, in world units, from the element:
 
-`heading` is a unit VECTOR [N, D] in every dimension. Replaces the old scalar-angle
-2D `sense` and the `sense_3d` cone counterpart with one operator. Reads per-agent
-sensor parameters the engine broadcast from `types`. Mutates `cell.heading` in
-place; returns {}.
+n_i is the unit heading, alpha_i the per-type `sensor_angle` (given in degrees and
+converted here), d_i the per-type `sensor_dist`, and r a unit vector perpendicular to n_i.
+Each sensor returns the weighted sum of the field over a window of half-width
+`sensor_size` voxels: weight +1 on the element's own channel and `cross` on every other,
+so cross = -1 means another species' trail repels as strongly as its own attracts, and
+cross = +1 means the species are indistinguishable.
+
+If the centre sensor reads at least as much as the best side sensor the heading is kept.
+Otherwise the heading rotates toward the winning direction by
+
+    theta_i = turn_speed_i * ((1 - eta) + eta u),   u ~ uniform[0, 1]
+
+where turn_speed is the per-type maximum turn per tick in radians and eta is `noise`, in
+[0, 1]: eta = 0 always turns the full amount and is deterministic; eta = 1 turns a uniform
+random fraction of it, the stochastic Physarum rule.
+
+Reference: Jones, J. (2010). Characteristics of pattern formation and evolution in
+approximations of Physarum transport networks. Artificial Life 16:127-153.
 
 $$
 S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
@@ -95,121 +102,54 @@ operators:
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd).
+Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qmd), [`chemotax`](chemotax.qmd), [`mpm_scatter`](mpm_scatter.qmd), [`p2g`](p2g.qmd), [`mpm_gather`](mpm_gather.qmd).
 
 ## Source
 
-[`src/plexus/operators/sense.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/sense.py) &mdash; the registered operator.
+[`src/plexus/operators/field_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/field_ops.py) &mdash; the registered operator.
 
 ```python
-"""sense -- field -> set. Sample the field on a sensor fan around the heading, steer.
-
-The Physarum/Jones sensing rule, written once for any dimension (the dimension
-contract). Each agent reads the field at a CENTRE sensor along its heading plus a
-fan of sensors tilted by `sensor_angle` around it, then steers toward the strongest:
-if the centre wins it goes straight, otherwise it rotates its heading toward the
-winning sensor by a random amount up to `turn_speed`.
-
-The only dimensional specialisation is how the tilted sensor directions are
-generated around the heading -- everything else (the windowed species-weighted
-read, the steer, the occupancy mask) is identical:
-
-* 2D: the plane perpendicular to the heading is a line, so the fan is the two
-  sensors ahead-left / ahead-right (K = 2 ring + centre = 3 sensors, Lague's fan).
-* 3D: the perpendicular plane is 2D, so the fan is a RING of `_RING` sensors around
-  the heading cone (K = _RING + centre = 7 sensors).
-
-`heading` is a unit VECTOR [N, D] in every dimension. Replaces the old scalar-angle
-2D `sense` and the `sense_3d` cone counterpart with one operator. Reads per-agent
-sensor parameters the engine broadcast from `types`. Mutates `cell.heading` in
-place; returns {}.
-"""
-from __future__ import annotations
-
-import math
-import torch
-
-from plexus.models.base import Exchange
-from plexus.models.registry import register_operator
-
-_RING = 6                                                  # 3D sensors around the heading axis
-
-
-def _perp_basis(h):
-    """D-1 orthonormal unit vectors spanning the plane perpendicular to each heading
-    h [N, D]. In 2D the perpendicular is unique; in 3D we build two (robust to h ~
-    +/-z by falling back to a different reference there)."""
-    D = h.shape[1]
-    if D == 2:
-        return [torch.stack([-h[:, 1], h[:, 0]], dim=1)]   # the unique perpendicular
-    ref = h.new_tensor([0.0, 0.0, 1.0]).expand_as(h)
-    u = torch.cross(h, ref, dim=1)
-    small = u.norm(dim=1) < 1e-4                            # h nearly parallel to z
-    ref2 = h.new_tensor([0.0, 1.0, 0.0]).expand_as(h)
-    u = torch.where(small[:, None], torch.cross(h, ref2, dim=1), u)
-    u = u / u.norm(dim=1, keepdim=True).clamp(min=1e-9)
-    v = torch.cross(h, u, dim=1)                            # (h, u, v) orthonormal
-    return [u, v]
-
-
-def _ring_dirs(h, ca, sa):
-    """The tilted sensor directions around the heading: `cos(ang)*h + sin(ang)*r` for
-    each unit r in the perpendicular plane. 2D -> {ahead-left, ahead-right}; 3D -> a
-    ring of `_RING` directions. Returns a list of [N, D] unit vectors."""
-    D = h.shape[1]
-    basis = _perp_basis(h)
-    if D == 2:
-        rs = [basis[0], -basis[0]]                         # left / right
-    else:
-        u, v = basis
-        rs = [math.cos(2.0 * math.pi * k / _RING) * u + math.sin(2.0 * math.pi * k / _RING) * v
-              for k in range(_RING)]
-    return [ca * h + sa * r for r in rs]
-
-
-def _read(fld, centers, weights, ssz):
-    """Windowed, species-weighted trail read at a BATCH of sensors (field -> [N, S]).
-
-    Sums dot(weights, grid[:, *window]) over a (2k+1)^D voxel window around each of the
-    S sensor centres [N, S, D]; per-agent `ssz` masks offsets outside that agent's own
-    window (the 2D `sensor_size` semantics, generalised to N-D). Vectorised over BOTH
-    the S sensors and the (2k+1)^D window voxels -- one gather, no Python voxel/sensor
-    loop (was 27 gathers per tick in 2D: 3 sensors x 9 voxels)."""
-    N, S, D = centers.shape
-    dev = centers.device
-    g = fld.grid                                           # [C, *shape]
-    shape = fld.shape
-    per = getattr(fld, "periodic", False)                  # torus field: wrap the window across the seam
-    ssz = ssz if torch.is_tensor(ssz) else centers.new_full((N,), float(ssz))
-    ks = int(ssz.max().item())
-
-    flat = centers.reshape(N * S, D)
-    gidx = torch.stack(fld.pix(*[flat[:, k] for k in range(D)]), dim=-1).reshape(N, S, D)   # [N, S, D]
-    rng = torch.arange(-ks, ks + 1, device=dev)
-    offs = torch.stack(torch.meshgrid(*([rng] * D), indexing="ij"), dim=-1).reshape(-1, D)  # [W, D] window
-    W = offs.shape[0]
-
-    # per-axis wrapped/clamped voxel index for the whole [N, S, W] window (D=2/3, not a hot loop)
-    axes = []
-    for k in range(D):
-        col = gidx[:, :, None, k] + offs[None, None, :, k]                 # [N, S, W]
-        axes.append(torch.remainder(col, shape[k]) if per else col.clamp(0, shape[k] - 1))
-    vals = g[(slice(None),) + tuple(axes)].permute(1, 2, 3, 0)             # [N, S, W, C]
-
-    inwin = (offs.abs()[None, :, :] <= ssz[:, None, None]).all(-1)         # [N, W] offset inside agent window
-    contrib = (weights[:, None, None, :] * vals).sum(-1)                   # [N, S, W]
-    return (contrib * inwin[:, None, :].float()).sum(-1)                   # [N, S]
-
-
-@register_operator("sense", family="fields", set="cell", kind="exchange")
+@register_operator("sense", family="signalling", set="cell", kind="exchange")
 class Sense(Exchange):
-    EMIT = None                                 # writes `heading` in place (steering); returns {} — not an integrable delta
+    """Trail following: read the field on a fan of sensors around the heading and turn toward
+    the strongest. The read half of stigmergy, and the steering rule of the Physarum model.
+
+    cell -> cell: reads pos, heading and the field named by `from:`, writes heading in place.
+
+    Each element places one sensor straight ahead and K to the side -- in 2D the two at
+    +/- sensor_angle, in 3D a ring of six around the heading axis -- each at distance
+    sensor_dist, in world units, from the element:
+
+        x_sensor = x_i + d_i (cos(alpha_i) n_i + sin(alpha_i) r)
+
+    n_i is the unit heading, alpha_i the per-type `sensor_angle` (given in degrees and
+    converted here), d_i the per-type `sensor_dist`, and r a unit vector perpendicular to n_i.
+    Each sensor returns the weighted sum of the field over a window of half-width
+    `sensor_size` voxels: weight +1 on the element's own channel and `cross` on every other,
+    so cross = -1 means another species' trail repels as strongly as its own attracts, and
+    cross = +1 means the species are indistinguishable.
+
+    If the centre sensor reads at least as much as the best side sensor the heading is kept.
+    Otherwise the heading rotates toward the winning direction by
+
+        theta_i = turn_speed_i * ((1 - eta) + eta u),   u ~ uniform[0, 1]
+
+    where turn_speed is the per-type maximum turn per tick in radians and eta is `noise`, in
+    [0, 1]: eta = 0 always turns the full amount and is deterministic; eta = 1 turns a uniform
+    random fraction of it, the stochastic Physarum rule.
+
+    Reference: Jones, J. (2010). Characteristics of pattern formation and evolution in
+    approximations of Physarum transport networks. Artificial Life 16:127-153.
+    """
+
+    EMIT = None                                 # writes heading in place, returns no delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
     REQUIRES_PARAMS = ["from"]
     REQUIRES_TYPE_PROPS = ["turn_speed", "sensor_angle", "sensor_dist", "sensor_size"]
     MECHANISM_TAGS = ["trail_following", "stigmergy", "physarum_sensing"]
     PARAM_ROLES = {"cross": "inter_species_coupling_sign", "noise": "steer_noise"}
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = ("Jones, J. (2010). Characteristics of pattern formation and evolution in "
+                 "approximations of Physarum transport networks. Artificial Life 16:127-153.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -250,9 +190,9 @@ class Sense(Exchange):
         target = stacked[torch.arange(N, device=dev), best_idx]        # [N, D]
         straight = centre >= best_val                      # centre wins -> keep heading
 
-        # turn magnitude toward the winning sensor. `noise` knob (default 0) blends a
-        # deterministic full turn (frac=1 -> theta=turn_speed) with the stochastic
-        # Physarum turn (frac ~ uniform[0,1]); noise=1 reproduces the old `rand*ts`.
+        # Turn magnitude toward the winning sensor: `noise` blends a deterministic full turn
+        # (frac = 1, theta = turn_speed) with the stochastic Physarum turn (frac uniform on
+        # [0, 1]). Default 0, i.e. deterministic.
         if self.noise > 0.0:
             frac = (1.0 - self.noise) + self.noise * torch.rand(N, generator=H.rng, device=dev)
         else:

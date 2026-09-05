@@ -1,6 +1,6 @@
 ---
 title: "image"
-subtitle: "A static image FIELD read from a TIFF, plus `apply_material_map`,"
+subtitle: "A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1]."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A static image FIELD read from a TIFF, plus `apply_material_map`,"
 
 [`field`]{.op-badge} [`frame: image`]{.op-badge}
 
-A static image FIELD read from a TIFF, plus `apply_material_map`,
+A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1].
 :::
 
 ```{=html}
@@ -39,26 +39,13 @@ A static image FIELD read from a TIFF, plus `apply_material_map`,
 
 ## Description
 
-the field -> set operator that writes per-particle MATERIAL parameters from it.
-
-This is the Plexus way to give a tissue a heterogeneous, image-defined material: an
-image (TIFF/PNG) becomes a scalar field over the domain (`image` field), and
-`apply_material_map` samples it at each particle and turns the intensity into a
-per-particle parameter -- Young's modulus E_i -> Lame mu_i, la_i (target: youngs), or
-any named per-particle buffer (e.g. a future per-particle contraction `gain`). It is
-NOT a force: it sets the material the MLS-MPM stress law (mpm_strain / p2g) then reads,
-so a stiffness map breaks the contraction's symmetry WITHOUT changing MPM physics.
-
-    fields:  {stiffness_map: {frame: image, source: material/map.tif}}
-    ops:     {op: apply_material_map, at: mpm_particle, from: stiffness_map,
-              target: youngs, min: 20, max: 200}
-
-Anisotropy (E_x != E_y, fibre angle) would need a tensor map + an anisotropic stress
-law -- a later step; this does the scalar case the current fixed-corotated MPM supports.
+A STATIC map (no dynamics): it holds only its grid `[1, nx, ny]` and the
+world<->pixel geometry, sampled by `apply_material_map`. Same orientation
+convention as `PrescribedField` (flip vertical so image-top maps to domain-top).
 
 ## Source
 
-[`src/plexus/operators/material_map.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/material_map.py)
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py)
 
 ```python
 @register_field("image", frame="image")

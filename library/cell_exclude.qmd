@@ -1,0 +1,212 @@
+---
+title: "cell_exclude"
+subtitle: "A hard non-penetration backstop: no matrix particle may end a frame inside the tissue."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+A hard non-penetration backstop: no matrix particle may end a frame inside the tissue.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `surface`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+particle -> particle: reads pos and the recorded surface, writes pos and vel in place.
+
+    x_i <- c + R_i u_i          and     v_i <- v_i - min(v_i . u_i, 0) u_i
+
+u_i is the unit direction from the tissue centre to the particle. Any particle found inside is
+projected out onto the surface with a thin skin, `skin` being that clearance as a fraction of
+the local radius, and its INWARD radial velocity is removed so it does not simply re-enter on
+the next substep.
+
+It exists because `ecm_from_cell` is a penalty, which punishes penetration after the fact
+rather than preventing it, and three things let a penalty lose. The MPM scatter CLAMPS the
+external acceleration, so past a depth of a_max/k the restoring force stops growing no matter
+how deep the particle is -- the right behaviour for stability and the wrong one for a
+constraint. The tissue surface sweeps, advancing every frame whether or not the matrix has got
+out of the way, so a particle only has to be out-accelerated once to be left behind. And the
+surface is a smoothed angular map, so where the smoothing cuts a bump, particles sit inside
+the true mesh while the map says they are outside it.
+
+The penalty is kept, because it is what generates the stress being measured; this runs after
+it. A boundary that must not be crossed is a projection, not a force.
+
+It is RIGID, which is honest here only because the coupling is one-way: the tissue's shape is
+prescribed, so nothing is decided by letting it win every contact -- it was always going to.
+In a two-way run this operator would be taking a side, and the projection would have to become
+a correction shared between the two bodies.
+
+Reference: Plexus (this work); the surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386. It
+backs up the penalty contact of Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg.
+293:1-19, whose own reported weakness is exactly this one -- penetration through a severely
+deformed contact surface. Forbidding it outright rather than projecting afterwards is BFEMP:
+Li, X., Fang, Y., Li, M. & Jiang, C. (2022). Comput. Methods Appl. Mech. Engrg. 390:114350.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `surface` | &ndash; | **required** |
+| `skin` | projection_skin_fraction | 0.004 |
+| `scale` | surface_rescale | 1.0 |
+| `centre` | &ndash; | [0.5, 0.5, 0.5] |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: cell_exclude, at: particle, surface: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`non_penetration`]{.op-badge} [`rigid_contact`]{.op-badge} [`moving_boundary`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd).
+
+## Source
+
+[`src/plexus/operators/ecm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/ecm_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("cell_exclude", family="boundary", set="particle", kind="structural")
+class CellExclude3D(Structural):
+    """A hard non-penetration backstop: no matrix particle may end a frame inside the tissue.
+
+    particle -> particle: reads pos and the recorded surface, writes pos and vel in place.
+
+        R_i = S R(theta_i, phi_i) (1 + skin)
+        x_i <- c + R_i u_i          and     v_i <- v_i - min(v_i . u_i, 0) u_i
+
+    u_i is the unit direction from the tissue centre to the particle. Any particle found inside is
+    projected out onto the surface with a thin skin, `skin` being that clearance as a fraction of
+    the local radius, and its INWARD radial velocity is removed so it does not simply re-enter on
+    the next substep.
+
+    It exists because `ecm_from_cell` is a penalty, which punishes penetration after the fact
+    rather than preventing it, and three things let a penalty lose. The MPM scatter CLAMPS the
+    external acceleration, so past a depth of a_max/k the restoring force stops growing no matter
+    how deep the particle is -- the right behaviour for stability and the wrong one for a
+    constraint. The tissue surface sweeps, advancing every frame whether or not the matrix has got
+    out of the way, so a particle only has to be out-accelerated once to be left behind. And the
+    surface is a smoothed angular map, so where the smoothing cuts a bump, particles sit inside
+    the true mesh while the map says they are outside it.
+
+    The penalty is kept, because it is what generates the stress being measured; this runs after
+    it. A boundary that must not be crossed is a projection, not a force.
+
+    It is RIGID, which is honest here only because the coupling is one-way: the tissue's shape is
+    prescribed, so nothing is decided by letting it win every contact -- it was always going to.
+    In a two-way run this operator would be taking a side, and the projection would have to become
+    a correction shared between the two bodies.
+
+    Reference: Plexus (this work); the surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386. It
+    backs up the penalty contact of Chen, Z. et al. (2015). Comput. Methods Appl. Mech. Engrg.
+    293:1-19, whose own reported weakness is exactly this one -- penetration through a severely
+    deformed contact surface. Forbidding it outright rather than projecting afterwards is BFEMP:
+    Li, X., Fang, Y., Li, M. & Jiang, C. (2022). Comput. Methods Appl. Mech. Engrg. 390:114350.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["non_penetration", "rigid_contact", "moving_boundary"]
+    PARAM_ROLES = {"skin": "projection_skin_fraction", "scale": "surface_rescale"}
+    REFERENCE = ("Plexus (this work); the surface is Okuda, S. et al. (2018) Sci. Rep. 8:2386. It "
+                 "backs up the penalty contact of Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015) "
+                 "Comput. Methods Appl. Mech. Engrg. 293:1-19, doi:10.1016/j.cma.2015.04.005, "
+                 "whose own reported weakness is exactly this one -- penetration through a "
+                 "severely deformed contact surface. Forbidding it outright instead of projecting "
+                 "afterwards is BFEMP (Li, X., Fang, Y., Li, M. & Jiang, C. (2022) CMAME 390:114350, "
+                 "doi:10.1016/j.cma.2021.114350), at the cost of an implicit solve.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        import numpy as _np
+        self.at = params.get("_at", "mpm_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        self.skin = float(params.get("skin", 0.004))
+        z = _np.load(str(params["surface"]))
+        self.smap = torch.as_tensor(z["smap"], dtype=torch.float32) * self.scale
+        self.T = int(self.smap.shape[0])
+        self._frame, self._t, self._n = -1, 0, 0
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        f = int(getattr(H, "frame", -1) or -1)
+        if f != self._frame:
+            self._frame = f
+            self._t = min(self.T - 1, max(0, f))
+        M = self.smap[self._t].to(dev, dt_)
+        nth, nph = M.shape
+
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        d = pos - c
+        r = d.norm(dim=1).clamp_min(1e-9)
+        u = d / r[:, None]
+        th = torch.acos(u[:, 2].clamp(-1, 1))
+        ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
+        R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
+              (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+        inside = r < R
+        # A MASSLESS PARTICLE IS NOT MATERIAL. `bm_secrete` parks its unsecreted reserve
+        # at the centre with mass 0; without this line the projection would fire on every dormant
+        # particle and paste the entire reserve onto the surface as a second, fake sheet.
+        m = getattr(lvl, "mass", None)
+        if m is not None and m.shape[0] == inside.shape[0]:
+            inside = inside & (m > 0)
+        n_in = int(inside.sum())
+        if n_in:
+            # ONTO THE SURFACE PLUS A SKIN. Exactly onto it would leave the particle at depth 0, where
+            # the penalty is also 0, so the next substep's own motion puts it straight back in.
+            target = R * (1.0 + self.skin)
+            pos[inside] = c + u[inside] * target[inside][:, None]
+            if "vel" in lvl.state_schema:
+                v = lvl.get("vel")
+                vr = (v * u).sum(1)                       # radial component, inward is negative
+                v[inside] = v[inside] - torch.minimum(
+                    vr[inside], torch.zeros_like(vr[inside]))[:, None] * u[inside]
+        if f <= 1 or (n_in and n_in > self._n * 4 + 50):
+            print(f"[cell_exclude] frame {f}: {n_in} particle(s) projected out of the tissue",
+                  flush=True)
+        self._n = n_in
+        return {}
+```

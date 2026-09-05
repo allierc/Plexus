@@ -1,0 +1,184 @@
+---
+title: "cell_chem_diffuse"
+subtitle: "Morphogen exchange between neighbouring cells, as a purely combinatorial graph diffusion: every neighbour counts the same, whatever the geometry between them."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Morphogen exchange between neighbouring cells, as a purely combinatorial graph diffusion: every neighbour counts the same, whatever the geometry between them.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `cell` (the set the operator acts on).
+- **Reads** &mdash; `chi`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+every neighbour counts the same, whatever the geometry between them.
+
+cell -[cell adjacency]-> cell: reads chem and edge_index, emits d(chem)/dt.
+
+    dc_i/dt = D_s sum_{j ~ i} (c_j - c_i) / deg(i)        norm: true  (the default)
+    dc_i/dt = D_s sum_{j ~ i} (c_j - c_i)                 norm: false
+
+c is the concentration of one species, dimensionless, and the sum runs over the cells sharing a
+mesh edge with i. D_s is that species' diffusion coefficient, in inverse time, since the graph
+carries no length. `chi` sets the RATIO between the two species' coefficients, which is the
+Turing condition -- a pattern needs the inhibitor to spread faster than the activator, and chi
+is where that claim lives. Dividing by the degree gives the normalised Laplacian, whose
+eigenvalues lie in [-2, 0], so an explicit step stays stable at any cell degree; without it, a
+cell with many neighbours can overshoot.
+
+THE GEOMETRY IS INVISIBLE HERE, which is why the `interface_weighted` sibling exists. This
+reads only `chem` and `edge_index`: two cells sharing a thin sliver exchange exactly as much as
+two sharing a broad face, and a cell stretched to twice its volume dilutes as though it had not
+stretched. The pattern therefore rides on the tissue like a decal. That is the right numerics
+for a pure Turing-on-a-graph study, and it stays the contract default; `interface_weighted` is
+the model to select where shape must feed back into chemistry.
+
+Reference: Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). The
+chemical basis of morphogenesis. Phil. Trans. R. Soc. B 237:37-72.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `chi` | spatial_scale | **required** |
+| `d_a` | activator_diffusivity | &ndash; |
+| `d_h` | substrate_diffusivity | &ndash; |
+| `norm` | &ndash; | True |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: cell_chem_diffuse, at: cell, chi: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`diffusion`]{.op-badge} [`graph_laplacian`]{.op-badge} [`turing`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/diffusion_reaction.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/diffusion_reaction.py) &mdash; the registered operator.
+
+```python
+@register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", implementation="graph_laplacian")
+class CellDiffuse(Lateral):
+    """Morphogen exchange between neighbouring cells, as a purely combinatorial graph diffusion:
+    every neighbour counts the same, whatever the geometry between them.
+
+    cell -[cell adjacency]-> cell: reads chem and edge_index, emits d(chem)/dt.
+
+        dc_i/dt = D_s sum_{j ~ i} (c_j - c_i) / deg(i)        norm: true  (the default)
+        dc_i/dt = D_s sum_{j ~ i} (c_j - c_i)                 norm: false
+
+    c is the concentration of one species, dimensionless, and the sum runs over the cells sharing a
+    mesh edge with i. D_s is that species' diffusion coefficient, in inverse time, since the graph
+    carries no length. `chi` sets the RATIO between the two species' coefficients, which is the
+    Turing condition -- a pattern needs the inhibitor to spread faster than the activator, and chi
+    is where that claim lives. Dividing by the degree gives the normalised Laplacian, whose
+    eigenvalues lie in [-2, 0], so an explicit step stays stable at any cell degree; without it, a
+    cell with many neighbours can overshoot.
+
+    THE GEOMETRY IS INVISIBLE HERE, which is why the `interface_weighted` sibling exists. This
+    reads only `chem` and `edge_index`: two cells sharing a thin sliver exchange exactly as much as
+    two sharing a broad face, and a cell stretched to twice its volume dilutes as though it had not
+    stretched. The pattern therefore rides on the tissue like a decal. That is the right numerics
+    for a pure Turing-on-a-graph study, and it stays the contract default; `interface_weighted` is
+    the model to select where shape must feed back into chemistry.
+
+    Reference: Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). The
+    chemical basis of morphogenesis. Phil. Trans. R. Soc. B 237:37-72.
+    """
+
+    N_SPECIES = 2
+    SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["chi"]
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = ["edge_index"]
+    MECHANISM_TAGS = ["diffusion", "graph_laplacian", "turing"]
+    REFERENCE = "Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72."
+    PARAM_ROLES = {"d_a": "activator_diffusivity", "d_h": "substrate_diffusivity", "chi": "spatial_scale"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        # A DIFFUSIVITY PER SPECIES, because two is not the only width. `d_a`/`d_h` name the roles
+        # of the two Gray-Scott species and cannot express three (May-Leonard) or four (a coupled
+        # pair), and FitzHugh-Nagumo needs one of them to be exactly ZERO -- only `u` diffuses
+        # there, `v` has no Laplacian at all. `d: [..]` is the general spelling and its LENGTH
+        # declares the span; `d_a`/`d_h` remain the two-species one and every archived spec keeps
+        # working unchanged.
+        _d = params.get("d")
+        if _d is not None:
+            self.d = [float(x) for x in _d]
+        elif "d_a" in params and "d_h" in params:
+            self.d = [float(params["d_a"]), float(params["d_h"])]
+        else:
+            raise ValueError(f"{type(self).__name__}: needs either `d: [..]` (one diffusivity per "
+                             f"species) or both `d_a` and `d_h` (the two-species spelling).")
+        self.d_a, self.d_h = self.d[0], (self.d[1] if len(self.d) > 1 else self.d[0])
+        self.N_SPECIES = len(self.d)          # instance attribute: shadows the class default of 2
+        self.chi = float(params["chi"])
+        self.norm = bool(params.get("norm", True))
+        # WHICH SPECIES THIS INSTANCE OWNS: 0 is the first pair (chem columns 0,1) and is the
+        # default, so every existing spec is unchanged. A second RD system lives at chan 2.
+        self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
+
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        ei = getattr(lvl, "edge_index", None)
+        if ei is None or ei.numel() == 0:
+            return {self.at: torch.zeros_like(chem)}
+        i, j = ei[0], ei[1]; N = chem.shape[0]
+        agg = torch.zeros_like(chem).index_add_(0, i, chem[j])
+        deg = torch.zeros(N, device=chem.device, dtype=chem.dtype).index_add_(0, i, torch.ones_like(i, dtype=chem.dtype))
+        lap = (agg / deg.clamp(min=1)[:, None] - chem) if self.norm else (agg - deg[:, None] * chem)
+        # A PER-COLUMN COEFFICIENT, so a second SPECIES can live in the same `chem` buffer at its
+        # own columns. This was `tensor([d_a, d_h])` -- exactly two entries -- which both assumed a
+        # width-2 chem and diffused whatever happened to be in those two columns. With `chan` the
+        # operator says WHICH pair it owns, and writes zeros everywhere else, so two instances at
+        # chan 0 and chan 2 are two independent reaction-diffusion systems that cannot leak into
+        # one another through the diffusion step.
+        _span(chem, self.chan, len(self.d), type(self).__name__)      # bounds, loudly
+        coef = torch.zeros(chem.shape[1], device=chem.device, dtype=chem.dtype)
+        for _k, _dk in enumerate(self.d):
+            coef[self.chan + _k] = _dk * self.chi
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: (coef[None, :] * lap) * occ}
+```

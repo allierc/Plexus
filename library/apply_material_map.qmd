@@ -1,6 +1,6 @@
 ---
 title: "apply_material_map"
-subtitle: "A static image FIELD read from a TIFF, plus `apply_material_map`,"
+subtitle: "Field -> set: sample the map at each particle and write a per-particle material parameter."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A static image FIELD read from a TIFF, plus `apply_material_map`,"
 
 [`exchange`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-A static image FIELD read from a TIFF, plus `apply_material_map`,
+Field -> set: sample the map at each particle and write a per-particle material parameter.
 :::
 
 ```{=html}
@@ -42,22 +42,9 @@ A static image FIELD read from a TIFF, plus `apply_material_map`,
 
 ## Mechanism
 
-the field -> set operator that writes per-particle MATERIAL parameters from it.
-
-This is the Plexus way to give a tissue a heterogeneous, image-defined material: an
-image (TIFF/PNG) becomes a scalar field over the domain (`image` field), and
-`apply_material_map` samples it at each particle and turns the intensity into a
-per-particle parameter -- Young's modulus E_i -> Lame mu_i, la_i (target: youngs), or
-any named per-particle buffer (e.g. a future per-particle contraction `gain`). It is
-NOT a force: it sets the material the MLS-MPM stress law (mpm_strain / p2g) then reads,
-so a stiffness map breaks the contraction's symmetry WITHOUT changing MPM physics.
-
-    fields:  {stiffness_map: {frame: image, source: material/map.tif}}
-    ops:     {op: apply_material_map, at: mpm_particle, from: stiffness_map,
-              target: youngs, min: 20, max: 200}
-
-Anisotropy (E_x != E_y, fibre angle) would need a tensor map + an anisotropic stress
-law -- a later step; this does the scalar case the current fixed-corotated MPM supports.
+parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the
+Lame buffers mu/la (the MPM stress law reads them); any other `target` is written as
+a per-particle buffer of that name. Mutates per-particle buffers, returns {}.
 
 $$
 E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
@@ -90,11 +77,11 @@ operators:
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd).
+Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`mpm_scatter`](mpm_scatter.qmd), [`p2g`](p2g.qmd).
 
 ## Source
 
-[`src/plexus/operators/material_map.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/material_map.py) &mdash; the registered operator.
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
 
 ```python
 @register_operator("apply_material_map", family="mpm", set="particle", kind="exchange")

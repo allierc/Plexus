@@ -1,6 +1,6 @@
 ---
 title: "mpm_grid_update"
-subtitle: "Mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve."
+subtitle: "The grid solve: the second step of the MLS-MPM cycle, and the only place the whole system is coupled."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve."
 
 [`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve.
+The grid solve: the second step of the MLS-MPM cycle, and the only place the whole system is coupled.
 :::
 
 ```{=html}
@@ -42,16 +42,34 @@ Mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve.
 
 ## Mechanism
 
-Grid velocity v = momentum / mass, plus the continuum surface force (CSF) from the
-liquid colour field and the boundary conditions: reflective domain walls, obstacle
-friction, and the interior wall mask (rasterized once from `general: obstacles:`).
-A pure field -> field operator; returns {}. Step 3 of the decomposed MLS-MPM
-(oracle: `mls_mpm_mechanics`).
+is coupled. Momentum becomes velocity, body forces are added, and the walls are imposed.
 
-Dimension-generic: the 2D path (CSF surface tension, obstacle walls, interior mask)
-is kept verbatim and bit-identical. The 3D path applies reflective walls + tangential
-`wall_damp` friction on all D box faces (the "particles falling in a box" boundary of
-MPM_pytorch's MPM_3D); CSF / rasterized obstacles are 2D-only.
+mpm_grid -> mpm_grid: reads and writes the grid field in place. No set is involved.
+
+    v_n += dt g                             the body force
+    v_n = boundary(v_n, x_n)                walls, plates, obstacles
+
+The division by nodal mass is what makes MPM a grid method: contact, incompressibility and
+long-range force transmission all happen here, because this is the only step at which
+particles that never touch can influence each other.
+
+`mass_floor` guards that division, and it is a physical quantity rather than an epsilon: it is
+a mass, so it must scale with the per-particle mass of the run. Fixed too high it binds at the
+nodes where mass is LOWEST -- which is the interface -- and there it silently attenuates
+exactly the terms that act at an interface. Left to None it is derived from dx and the density.
+
+`surface_tension` adds the continuum surface force: a colour field is scattered by
+`mpm_scatter`, mollified over `csf_smooth` passes, and its gradient gives an interface normal
+whose divergence is the curvature, so the force is sigma kappa n concentrated in a band
+`csf_band` wide. The colour must be normalised by rho dx^D to be a volume fraction; unnormalised
+it carries the density and the resulting sigma is wrong by that factor.
+
+`wall_damp` is the restitution at a wall: 1 is perfectly elastic and 0 fully inelastic. The
+plate parameters close a gap between two rigid walls linearly between two frames, which is a
+compression assay.
+
+Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994).
+Comput. Methods Appl. Mech. Eng. 118:179-196.
 
 $$
 \mathbf v_g = \frac{\mathbf p_g}{m_g},
@@ -70,7 +88,21 @@ mask. A pure field $\to$ field solve. Step 3 of the MLS-MPM decomposition.
 |---|---|---|
 | `dt_sub` | substep_timestep | 2e-4 |
 | `surface_tension` | interface_cohesion | 0.0 |
+| `plate_gap_half` | free_half_gap | 0.0 |
+| `plate_gap_half_end` | final_free_half_gap | None |
+| `plate_close_from` | frame_closing_starts | 0 |
+| `plate_close_to` | frame_closing_ends | 0 |
+| `plate_axis` | confined_axis | None |
+| `plate_centre` | gap_centre_on_axis | 0.5 |
 | `wall_damp` | wall_restitution | 1.0 |
+| `csf_rho` | liquid_reference_density | 0.0 |
+| `csf_band` | interface_fraction_band | 0.0 |
+| `csf_smooth` | colour_mollify_passes | 0 |
+| `mass_floor` | &ndash; | None |
+| `csf_mass_floor` | &ndash; | None |
+| `csf_eps` | &ndash; | None |
+| `buoyancy` | &ndash; | 0.0 |
+| `rho_ref` | &ndash; | 1.0 |
 
 ## Minimal spec
 
@@ -85,43 +117,57 @@ operators:
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`activation_pulse`](activation_pulse.qmd).
+Other **field** operators: [`hash_encoding`](hash_encoding.qmd), [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`activation_pulse`](activation_pulse.qmd).
 
 ## Source
 
-[`src/plexus/operators/mpm_grid_update.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_grid_update.py) &mdash; the registered operator.
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
 
 ```python
-"""mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve.
-
-Grid velocity v = momentum / mass, plus the continuum surface force (CSF) from the
-liquid colour field and the boundary conditions: reflective domain walls, obstacle
-friction, and the interior wall mask (rasterized once from `general: obstacles:`).
-A pure field -> field operator; returns {}. Step 3 of the decomposed MLS-MPM
-(oracle: `mls_mpm_mechanics`).
-
-Dimension-generic: the 2D path (CSF surface tension, obstacle walls, interior mask)
-is kept verbatim and bit-identical. The 3D path applies reflective walls + tangential
-`wall_damp` friction on all D box faces (the "particles falling in a box" boundary of
-MPM_pytorch's MPM_3D); CSF / rasterized obstacles are 2D-only.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import FieldUpdate
-from plexus.models.registry import register_operator
-from plexus.operators.mpm_grid import sub_dt
-
-
 @register_operator("mpm_grid_update", family="mpm", set="field", kind="field")
 class MPMGridUpdate(FieldUpdate):
+    """The grid solve: the second step of the MLS-MPM cycle, and the only place the whole system
+    is coupled. Momentum becomes velocity, body forces are added, and the walls are imposed.
+
+    mpm_grid -> mpm_grid: reads and writes the grid field in place. No set is involved.
+
+        v_n = (mv)_n / m_n                      where m_n > mass_floor, else 0
+        v_n += dt g                             the body force
+        v_n = boundary(v_n, x_n)                walls, plates, obstacles
+
+    The division by nodal mass is what makes MPM a grid method: contact, incompressibility and
+    long-range force transmission all happen here, because this is the only step at which
+    particles that never touch can influence each other.
+
+    `mass_floor` guards that division, and it is a physical quantity rather than an epsilon: it is
+    a mass, so it must scale with the per-particle mass of the run. Fixed too high it binds at the
+    nodes where mass is LOWEST -- which is the interface -- and there it silently attenuates
+    exactly the terms that act at an interface. Left to None it is derived from dx and the density.
+
+    `surface_tension` adds the continuum surface force: a colour field is scattered by
+    `mpm_scatter`, mollified over `csf_smooth` passes, and its gradient gives an interface normal
+    whose divergence is the curvature, so the force is sigma kappa n concentrated in a band
+    `csf_band` wide. The colour must be normalised by rho dx^D to be a volume fraction; unnormalised
+    it carries the density and the resulting sigma is wrong by that factor.
+
+    `wall_damp` is the restitution at a wall: 1 is perfectly elastic and 0 fully inelastic. The
+    plate parameters close a gap between two rigid walls linearly between two frames, which is a
+    compression assay.
+
+    Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994).
+    Comput. Methods Appl. Mech. Eng. 118:179-196.
+    """
+
     EMIT = None                                 # field->field grid solve: writes grid velocity in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []                        # no required params — all optional (grid from `at:`, engine-injected)
     MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions"]
     PARAM_ROLES = {"dt_sub": "substep_timestep", "surface_tension": "interface_cohesion",
-                   "wall_damp": "wall_restitution"}
+                   "plate_gap_half": "free_half_gap", "plate_gap_half_end": "final_free_half_gap",
+                   "plate_close_from": "frame_closing_starts", "plate_close_to": "frame_closing_ends",
+                   "plate_axis": "confined_axis", "plate_centre": "gap_centre_on_axis",
+                   "wall_damp": "wall_restitution", "csf_rho": "liquid_reference_density",
+                   "csf_band": "interface_fraction_band", "csf_smooth": "colour_mollify_passes"}
     REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994)."
 
     def __init__(self, params, device="cpu"):
@@ -129,9 +175,198 @@ class MPMGridUpdate(FieldUpdate):
         self.at = params.get("_at", "mpm_grid")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.surface_tension = float(params.get("surface_tension", 0.0))
+        self.mass_floor = params.get("mass_floor", None)      # None -> derived from dx, rho
+        # THE SAME DEFECT, AND HERE IT IS WORSE. The surface-tension term converts a nodal force
+        # to an acceleration by dividing by nodal mass, and a FIXED floor on that division is a
+        # mass -- so it must scale with the per-particle mass of the run, which falls as the
+        # particle count rises. A floor left at a fixed epsilon binds on a large fraction of
+        # occupied nodes in a fine run and attenuates the term there by an order of magnitude.
+        # Surface tension acts AT THE INTERFACE, which is exactly where nodal mass is lowest, so
+        # the floor weakens it precisely where it is supposed to work, and progressively worse the
+        # more particles a specification uses. Setting `csf_rho` makes this floor inert.
+        self.csf_mass_floor = params.get("csf_mass_floor", None)   # None -> derived
+        # WHAT "COLOUR = 1" MEANS -- WHICH THIS BLOCK NEVER KNEW, AND THE REASON THE PARAGRAPH ABOVE
+        # IS TREATING A SYMPTOM. `mpm_scatter` deposits `weight * mass * is_liquid`, so `gc` is a
+        # liquid MASS PER NODE in absolute units, not the dimensionless volume fraction (0 in air,
+        # 1 in liquid) that Brackbill's f = sigma * kappa * grad(c) is written for. On an all-liquid
+        # spec the "colour" is bitwise the mass field: max |gc - gm| / gm over occupied nodes is
+        # 2.7e-7 on material_3d_water_drop and 2.5e-7 on material_3d_water_dam_20m.
+        #
+        # Setting `csf_rho` to the liquid's density divides it by the mass of one FULL liquid cell,
+        # rho * dx^D, and that single division is the repair. MEASURED COST OF NOT DOING IT: the
+        # delivered acceleration is short by exactly 1/(rho * dx^D) -- 8.887e5 at n_grid 96 against
+        # the predicted 96^3 = 884,736 (0.4%), and 7.356e6 at 192 against 192^3 = 7.078e6 (3.9%).
+        # So `surface_tension` is not a tension: it is a tension divided by a cell mass, and its
+        # PHYSICAL MEANING CHANGES WITH `n_grid`. `surface_tension: 60` on the dam at 192^3 is a
+        # physical sigma of 8.5e-6 against rho*g*R^2 = 0.092 for its 0.076-half-width blocks --
+        # BOND NUMBER 10,900, gravity beating capillarity by four orders of magnitude. That is the
+        # whole content of "sigma 0 -> 150 moves the centre of mass by 0.0001 of the box".
+        #
+        # DEFAULT 0.0 KEEPS THE OLD PATH BIT-IDENTICAL, because the branch is a static Python `if`
+        # and `range(0)` emits no ops, so CUDA-graph capture is unchanged. A spec that sets it MUST
+        # re-fit its own sigma -- sigma_new = sigma_old * rho * dx^D for parity, or from a Bond
+        # number for physics: rho*g*L^2 gives Bond 1 (0.64 on the drop at 96^3, 0.092 on the dam).
+        self.csf_rho = float(params.get("csf_rho", 0.0))
+        # THE INTERFACE TEST NEEDS THE SAME REFERENCE, and for want of it selects the bulk.
+        # `gmag > 0.02 * gmag.max()` is a percentile of a running maximum with no absolute scale,
+        # and the P2G shot noise at 8 particles per cell gives the BULK a |grad c| of the same order
+        # as the interface's, so a 2% cut admits everything: measured 98.1% OF OCCUPIED NODES on
+        # material_3d_water_drop and 97.7% on material_3d_water_dam_20m. It is an occupancy mask
+        # wearing an interface's name. An absolute band on the volume fraction cuts it to 21.7% and
+        # 25.8% of occupied at `csf_band: 0.2`.
+        #
+        # THE UPPER BOUND IS THE LOAD-BEARING HALF. At sigma 0.64 (Bond 1) on the drop, the band
+        # 0.2 < c < 0.8 gives spread r90 0.311 with gm_max 2.2e-6 against one full cell's 1.1e-6 --
+        # clean -- while `c > 0.1` with NO upper bound, which is what the relative threshold
+        # effectively does, implodes to r90 0.0006 on 422 surviving occupied nodes. The bulk noise
+        # force is harmless today only because everything is 1e6 too small; it detonates the moment
+        # the gain is right, so the two parameters have to move together.
+        self.csf_band = float(params.get("csf_band", 0.0))
+        # MOLLIFY BEFORE THE SECOND DERIVATIVE -- worth little at 96^3 and a lot at 192^3. Band-median
+        # kappa on a B-spline-splatted sphere with real 8-ppc shot noise, as a fraction of the exact
+        # 2/R: normalised colour reads 1.07 unsmoothed / 1.02 with two passes at 96^3, and 1.27 /
+        # 1.06 at 192^3. The SHIPPED raw colour reads 0.70 at 96^3 and 0.08 at 192^3, because
+        # noise-driven |div n| grows as alpha/dx while the true curvature stays at 2/R. It does not
+        # change the trajectory (r90 0.302 unsmoothed vs 0.306 smoothed at Bond 1) and it leaks
+        # colour into empty cells, which is why the band below carries an explicit mass clause.
+        self.csf_smooth = int(params.get("csf_smooth", 0))
+        self.csf_eps = params.get("csf_eps", None)                 # None -> derived (a 1/length)
+        # A BAND WITHOUT A REFERENCE DENSITY IS A SILENT OFF-SWITCH: `c` would still be a mass, of
+        # order rho*dx^D ~ 1e-6, so `c > 0.2` is false everywhere, the mask is empty and the term
+        # vanishes without a word. Refuse the combination rather than run it.
+        # SAY SO, LOUDLY, RATHER THAN LET A MEANINGLESS NUMBER THROUGH. A spec that asks for surface
+        # tension without a reference density gets the legacy path, which is what keeps old runs
+        # reproducible -- but nothing about the yaml says the number is a tension divided by a cell
+        # mass, and nothing warns that it will mean something different if `n_grid` is touched.
+        if self.surface_tension > 0.0 and self.csf_rho <= 0.0:
+            import warnings
+            warnings.warn(
+                f"mpm_grid_update: surface_tension={self.surface_tension:g} is being applied to an "
+                f"UNNORMALISED colour field (csf_rho unset), so it is a tension divided by the mass "
+                f"of one cell, rho*dx^D. It is ~1/(rho*dx^D) too small in physical units and its "
+                f"meaning CHANGES WITH n_grid. Set csf_rho to the liquid's density and csf_band "
+                f"(0.2) and re-fit sigma from a Bond number: sigma = rho*g*L^2 / Bond.",
+                RuntimeWarning, stacklevel=2)
+        if self.csf_band > 0.0 and self.csf_rho <= 0.0:
+            raise ValueError(
+                "mpm_grid_update: csf_band needs csf_rho -- the band is a test on the liquid "
+                "VOLUME FRACTION, and without csf_rho the colour is still a mass (~rho*dx^D), so "
+                "the band would select nothing and surface tension would be silently disabled. "
+                "Set csf_rho to the liquid's density.")
+        # BUOYANCY, IN THE SAME PLACE AND FOR THE SAME REASON AS SURFACE TENSION: it depends on the
+        # LOCAL DENSITY, and only the grid knows what a particle is displacing.
+        #
+        # IT CANNOT BE A PER-PARTICLE FORCE HERE, and that was measured rather than assumed. The
+        # `gravity` operator emits an ACCELERATION the substep consumes as `a_ext`, so every
+        # particle receives the same `a` and mass cancels out of the grid velocity entirely. A
+        # one-cell run with two liquid species at densities 0.6 and 1.8, mixed, gave a light-heavy
+        # separation of -0.0020 over 1,200 frames -- zero, and faintly the wrong sign. Nothing
+        # sorts under a uniform acceleration.
+        #
+        # THE FORM IS ARCHIMEDES ON THE NODE. With rho = m_node / dx^D, a node heavier than the
+        # reference falls and a node lighter than it rises:
+        #     dv = dt * g * (rho - rho_ref) / rho
+        # so a node AT the reference density feels nothing, which is what makes this buoyancy and
+        # not a second gravity. `rho_ref` is the fluid the body is displacing -- for a mixture, its
+        # mean density -- and leaving it at 0 reduces the term to plain gravity, so the default is
+        # off (`buoyancy: 0`) and no existing run changes.
+        self.buoyancy = float(params.get("buoyancy", 0.0))
+        self.rho_ref = float(params.get("rho_ref", 1.0))
+        _bd = params.get("buoyancy_dir")
+        self.buoy_dir = [float(x) for x in _bd] if _bd else None
         self.wall_damp = float(params.get("wall_damp", 1.0))
+        # A MOVING PLATEN, AS A GRID VELOCITY BOUNDARY CONDITION.
+        #
+        # WHY IT CANNOT BE A POSITION PROJECTION, which is what `plate_confine` does and what the
+        # first squash experiment used. In MPM the stress a material carries comes from its
+        # deformation gradient F, and `mpm_strain` updates F from the VELOCITY GRADIENT read off
+        # the grid. Teleporting a particle's position never enters that path: the constitutive
+        # model is never told it has been compressed, so no stress builds, nothing pushes back,
+        # and nothing bulges sideways. The body's height falls, its equatorial radius does not
+        # move and its volume falls with the height. That is a CROP, not a squash: matter
+        # displaced along the plate normal and never returned laterally.
+        #
+        # Imposed here instead, in the same place and the same way as the reflective domain walls:
+        # clamp the normal grid velocity of every node beyond the plate to the PLATE'S OWN
+        # velocity. Compression then enters the velocity field, F contracts in z, the elastic
+        # model generates stress, and the lateral bulge and volume conservation come out of the
+        # physics rather than being hoped for.
+        #
+        # A MOVING PLATEN, IMPOSED ON THE GRID. `plate_confine` projects particle POSITIONS after
+        # the substep block, and a projection is invisible to the constitutive model: stress comes
+        # from F, F is updated from the velocity gradient, and teleporting a particle changes
+        # neither. The body is then cropped rather than squashed -- its height falls, its
+        # equatorial radius does not move, and its volume falls with its height.
+        #
+        # A rigid obstacle cannot fix it either: `_walls3d` zeroes grid velocity inside a solid,
+        # which stops material entering but cannot expel what is already there. A plate has to
+        # CARRY a velocity, so the nodes it covers move at the plate's speed, the field near it is
+        # compressive, F contracts along the axis, and the elastic response pushes material out
+        # sideways. That is the difference between squashing and clipping.
+        self.plate_axis = params.get("plate_axis", None)
+        self.plate_axis = None if self.plate_axis is None else int(self.plate_axis)
+        self.plate_centre = float(params.get("plate_centre", 0.5))
+        self.plate_gap_half = float(params.get("plate_gap_half", 0.0) or 0.0)
+        _pge = params.get("plate_gap_half_end", None)
+        self.plate_gap_half_end = None if _pge is None else float(_pge)
+        self.plate_close_from = int(params.get("plate_close_from", 0))
+        self.plate_close_to = int(params.get("plate_close_to", 0))
         self._wall_key = None; self._wall_cache = None
         self._wall3d_key = None; self._wall3d_cache = None
+
+    def _plate_bc(self, H, g, gv, dev, dt):
+        """Two rigid plates closing along `plate_axis`, as a velocity condition on the grid.
+
+        Frictionless and one-sided, the standard MPM rigid-body collision: a node the plate has
+        reached may not move further into it, and is carried at the plate's own speed. Everything
+        else -- the compression, the lateral bulge, the volume -- follows from the solve rather
+        than being imposed.
+        """
+        ax = self.plate_axis
+        gap, v_plate = self.plate_state(H)
+        shape = g.shape
+        idx = (torch.arange(shape[ax], device=dev) + 0.5) * g.dx
+        shp = [1] * g.dim
+        shp[ax] = shape[ax]
+        coord = (idx - self.plate_centre).view(shp)                  # signed distance from the centre
+
+        gvv = gv.view(*shape, g.dim)
+        c = gvv[..., ax]
+        # Top plate moves at -|v|, bottom at +|v|; a covered node is clamped so it cannot outrun
+        # the plate outward. Clamping rather than assigning leaves material free to move INWARD
+        # faster than the plate, which is what being squeezed out from between them looks like.
+        top = coord >= gap
+        bot = coord <= -gap
+        c = torch.where(top, c.clamp(max=-abs(v_plate)), c)
+        c = torch.where(bot, c.clamp(min=abs(v_plate)), c)
+        gvv[..., ax] = c
+        return gvv.view(g.n_cells, g.dim)
+
+    def plate_state(self, H):
+        """(current half-gap, plate closing speed in world units per second)."""
+        g0, g1 = self.plate_gap_half, self.plate_gap_half_end
+        if g1 is None or self.plate_close_to <= self.plate_close_from:
+            return g0, 0.0
+        span = self.plate_close_to - self.plate_close_from
+        # THE FRAME IS READ AS A TENSOR, and that is not a stylistic choice. A captured CUDA graph
+        # bakes python constants in at capture time, so a gap computed from `int(H.frame)` freezes
+        # at whatever it was on the capture tick: the plates would sit still for the whole run and
+        # nothing would say so -- the same silent shape as the `H.micro` recompile defect.
+        # `H.frame_t` is a device scalar the engine fills in place each tick, OUTSIDE the graph,
+        # so the kernels read the current value on every replay. Everything downstream of `u` is
+        # therefore a tensor op; `torch.where` rather than a python branch for the same reason.
+        fr = getattr(H, "frame_t", None)
+        if fr is None:                                  # engine too old / called outside run()
+            fr = torch.as_tensor(float(getattr(H, "frame", 0)))
+        u = ((fr.double() - self.plate_close_from) / span).clamp(0.0, 1.0)
+        gap = g0 + u * (g1 - g0)
+        # Per FRAME in the schedule, per SECOND on the grid: the grid solve advances by a substep
+        # dt, so the closing rate has to be divided by the frame's own dt to become a velocity.
+        # Zero once the plates have arrived, or they keep pushing on a gap that no longer changes.
+        dt_frame = float(getattr(H, "dt", 0.0) or 0.0) or 1.0
+        rate = ((g1 - g0) / span) / dt_frame
+        v = torch.where(u < 1.0, torch.full_like(u, rate), torch.zeros_like(u))
+        return gap, v
 
     def _walls3d(self, H, g, dev):
         """Rasterize 3D obstacles onto the grid (cached). Formats: a box
@@ -179,46 +414,120 @@ class MPMGridUpdate(FieldUpdate):
         self._wall_key = key; self._wall_cache = walls
         return walls
 
+    def _wall_bc_2d(self, gv, nx, ny, dev, wd):
+        """Reflective domain walls, 2D. EXTRACTED VERBATIM so `default` is unchanged, and made a
+        method so an implementation can replace THIS and nothing else.
+
+        It is 8 of the 113 aten calls a 2D grid solve issues and 66% of a 2D frame, because
+        `gv[lox, :, 0] = ...` is boolean-mask indexing: it lowers to `index_put_`, which goes
+        through `nonzero`, which SYNCHRONISES. Eight of those per call at 18 substeps is ~144
+        pipeline drains a frame. The 3D branch expresses the identical condition with `torch.where`
+        on broadcast masks and has none -- see `mpm_grid_update[implementation: nosync]`.
+        """
+        gv = gv.view(nx, ny, 2)
+        ix = torch.arange(nx, device=dev); iy = torch.arange(ny, device=dev); bnd = 3
+        lox, hix = ix < bnd, ix > nx - bnd
+        loy, hiy = iy < bnd, iy > ny - bnd
+        gv[lox, :, 0] = gv[lox, :, 0].clamp(min=0); gv[hix, :, 0] = gv[hix, :, 0].clamp(max=0)
+        gv[:, loy, 1] = gv[:, loy, 1].clamp(min=0); gv[:, hiy, 1] = gv[:, hiy, 1].clamp(max=0)
+        if wd != 1.0:
+            gl = gv[lox, :, 1]; gv[lox, :, 1] = torch.where(gl > 0, gl * wd, gl)
+            gh = gv[hix, :, 1]; gv[hix, :, 1] = torch.where(gh > 0, gh * wd, gh)
+            gv[:, loy, 0] = gv[:, loy, 0] * wd
+            gv[:, hiy, 0] = gv[:, hiy, 0] * wd
+        return gv.view(nx * ny, 2)
+
+    def _const(self, name, g):
+        """A declared value wins; otherwise the constant is derived from THIS grid's cell size and
+        the liquid's own density. `csf_rho` is that density when it is given (it is, by definition,
+        the divisor that turns deposited mass into a volume fraction); `rho_ref` otherwise, whose
+        default 1.0 is exactly the reference these numbers were chosen against."""
+        v = getattr(self, name)
+        if v is not None:
+            return float(v)
+        rho = self.csf_rho if self.csf_rho > 0.0 else self.rho_ref
+        return _scale_constant(name, float(g.dx), rho)
+
     def forward(self, H, mask=None):
         g = H.field(self.at); dev = g.m.device
         dt = sub_dt(H, self.dt_sub)
+        _mass_floor = self._const("mass_floor", g)
+        _csf_floor = self._const("csf_mass_floor", g)
+        _csf_eps = self._const("csf_eps", g)
         nx, ny, inv_dx, dx = g.nx, g.ny, g.inv_dx, g.dx
         D = g.dim
         periodic = bool(getattr(H, "periodic", False))
         wd = self.wall_damp
         gm, gmv, gc = g.m, g.mv, g.c
-        gv = gmv / gm.clamp(min=1e-10)[:, None]
+        # THE MASS FLOOR IS ABSOLUTE AND THE PARTICLE MASS IS NOT. `p_vol = body_volume /
+        # per_parent`, so per-particle mass falls as 1/N: 1.5e-08 at 945k particles, 1.4e-09 at
+        # 10M, 1.4e-10 at 100M. A node carrying one particle at a typical tail weight of the
+        # B-spline holds 1.05e-09 at 945k -- comfortably above the floor -- and 9.9e-11 at 10M,
+        # BELOW it. Once the floor binds, `gmv / 1e-10` is smaller than the true `gmv / gm`, so an
+        # isolated particle's gathered velocity is scaled DOWN every substep and it can never
+        # accelerate under gravity. It hangs in mid-air, which is what a 10M run showed: 21,826
+        # particles suspended up to y = 0.60 above a bulk surface at y = 0.115, descending 0.13 in
+        # 3.6 s where free fall at g = 16 would be 104.
+        #
+        # Kept as a PARAMETER at its historical value so no existing run changes; a spec whose
+        # particle mass has outgrown it sets `mass_floor` smaller.
+        gv = gmv / gm.clamp(min=_mass_floor)[:, None]
+        # THE BODY FORCE, IF mpm_scatter HANDED IT OVER (`body_force: grid`). Applied here and not
+        # in the scatter because this is after the division by nodal mass: as a pure addition to a
+        # velocity it carries no mass factor, so `gm.clamp` cannot attenuate it and a node holding
+        # one lone particle receives exactly the same `dt * a` as a node in the bulk. That is the
+        # canonical MLS-MPM ordering (Hu et al. 2018; Taichi mpm88/mpm99 apply gravity immediately
+        # after `grid_v = (1/grid_m) * grid_v` and before the wall conditions, which is the order
+        # kept here). Absent the handover the attribute is None and this is not even a tensor op.
+        _bf = getattr(H, "_mpm_body_accel", None)
+        if _bf is not None:
+            gv = gv + dt * _bf
 
         if D == 2:                                                  # --- 2D: verbatim (bit-identical) ---
             surf = self.surface_tension
-            if surf > 0.0 and bool((gc > 0).any()):                # CSF continuum surface force
-                c = gc.view(nx, ny)
+            # CACHED, not dropped. Unlike the material masks this one is not run-constant in
+            # PRINCIPLE -- gc is rebuilt every substep -- but it is settled by the first grid
+            # solve, which always runs after every scatter of the substep. Deleting the guard
+            # instead would turn gv into gv + 0.0 on a no-liquid spec and flip -0.0 to +0.0.
+            if getattr(self, "_c_csf", None) is None:
+                self._c_csf = bool(surf > 0.0 and bool((gc > 0).any()))
+            if self._c_csf:                                        # CSF continuum surface force
+                # SAME MISSING REFERENCE AS 3D, SAME REPAIR, and the 2D corpus is the reason it is
+                # opt-in rather than applied: material_two_drops_st runs g = 0, so its Bond number
+                # is ZERO and a tension 1/(rho*dx^2) = 36,864x too small is still the only force in
+                # the scene -- measured Rg 0.13406 -> 0.10341 and r90 0.19205 -> 0.14136 over 4000
+                # frames, against a sigma = 0 twin that does not move at all (Rg identical to five
+                # decimals for 601 frames). That demo is correct AS WRITTEN and must stay so.
+                # What the defect costs is scenes where gravity competes, and the resolution
+                # dependence: the same yaml number is a different physical tension at every n_grid.
+                if self.csf_rho > 0.0:
+                    c = (gc / (self.csf_rho * dx * dx)).view(nx, ny)   # liquid VOLUME FRACTION
+                else:
+                    c = gc.view(nx, ny)                                # legacy: raw liquid MASS
+                for _ in range(self.csf_smooth):        # separable [1/4,1/2,1/4]; no-op when 0
+                    for k in range(2):
+                        c = 0.25 * torch.roll(c, 1, k) + 0.5 * c + 0.25 * torch.roll(c, -1, k)
                 cx = (torch.roll(c, -1, 0) - torch.roll(c, 1, 0)) * (0.5 * inv_dx)
                 cy = (torch.roll(c, -1, 1) - torch.roll(c, 1, 1)) * (0.5 * inv_dx)
-                gmag = torch.sqrt(cx * cx + cy * cy); eps = 1e-6
+                gmag = torch.sqrt(cx * cx + cy * cy); eps = _csf_eps
                 nxg, nyg = cx / (gmag + eps), cy / (gmag + eps)
                 kappa = -((torch.roll(nxg, -1, 0) - torch.roll(nxg, 1, 0)) * (0.5 * inv_dx)
                           + (torch.roll(nyg, -1, 1) - torch.roll(nyg, 1, 1)) * (0.5 * inv_dx))
-                fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
+                _gain2 = 1.0 / max(1.0 - 2.0 * self.csf_band, 1e-6) if self.csf_band > 0 else 1.0
+                if self.csf_band > 0.0:
+                    _mfull = self.csf_rho * dx * dx
+                    fmask = ((c > self.csf_band) & (c < 1.0 - self.csf_band)
+                             & (gm.view(nx, ny) > self.csf_band * _mfull)).to(c.dtype) * _gain2
+                else:
+                    fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
                 stfx = (surf * kappa * cx * fmask).view(-1); stfy = (surf * kappa * cy * fmask).view(-1)
-                inv_m = (dx * dx) / gm.clamp(min=1e-8)
+                inv_m = (dx * dx) / gm.clamp(min=_csf_floor)
                 gv = gv + dt * torch.stack([stfx * inv_m, stfy * inv_m], dim=1)
 
-            if not periodic:                                        # reflective domain walls
-                gv = gv.view(nx, ny, 2)
-                ix = torch.arange(nx, device=dev); iy = torch.arange(ny, device=dev); bnd = 3
-                lox, hix = ix < bnd, ix > nx - bnd
-                loy, hiy = iy < bnd, iy > ny - bnd
-                gv[lox, :, 0] = gv[lox, :, 0].clamp(min=0); gv[hix, :, 0] = gv[hix, :, 0].clamp(max=0)
-                gv[:, loy, 1] = gv[:, loy, 1].clamp(min=0); gv[:, hiy, 1] = gv[:, hiy, 1].clamp(max=0)
-                if wd != 1.0:
-                    gl = gv[lox, :, 1]; gv[lox, :, 1] = torch.where(gl > 0, gl * wd, gl)
-                    gh = gv[hix, :, 1]; gv[hix, :, 1] = torch.where(gh > 0, gh * wd, gh)
-                    gv[:, loy, 0] = gv[:, loy, 0] * wd
-                    gv[:, hiy, 0] = gv[:, hiy, 0] * wd
-                gv = gv.view(nx * ny, 2)
+            if not periodic:
+                gv = self._wall_bc_2d(gv, nx, ny, dev, wd)
             walls = self._walls(H, g, dev)
-            if wd != 1.0 and walls.any():                          # friction in fluid cells touching obstacles
+            if wd != 1.0 and _const_any(self, "_c_walls2d", walls):  # friction in cells touching obstacles
                 w2 = walls.view(nx, ny)
                 near = (torch.roll(w2, 1, 0) | torch.roll(w2, -1, 0)
                         | torch.roll(w2, 1, 1) | torch.roll(w2, -1, 1)) & ~w2
@@ -227,7 +536,75 @@ class MPMGridUpdate(FieldUpdate):
                 gvv[..., 1] = torch.where(near & (gy_ > 0), gy_ * wd, gy_)
                 gv = gvv.view(nx * ny, 2)
             gv = torch.where(walls[:, None], torch.zeros_like(gv), gv)  # interior wall BC
-        else:                                                       # --- 3D: reflective box walls + friction ---
+        else:                                                       # --- 3D: CSF + reflective box walls ---
+            # SURFACE TENSION IN 3D. Until now this whole term lived inside the `D == 2` branch
+            # above, so `surface_tension: 60.0` in a `dim: 3` spec was read, stored, and never
+            # used. It cost a rung of the cell ladder: a liquid cytosol dropped onto the floor
+            # spread into a one-particle-thick puddle covering the entire domain, which reads as
+            # "the liquid is too soft" and is actually "there is no cohesion term at all". A liquid
+            # in MLS-MPM has mu = 0 by construction -- it resists volume change and nothing else --
+            # so surface tension is not a refinement on top of the constitutive model, it is the
+            # ONLY thing that makes a droplet a droplet.
+            #
+            # SAME CSF AS 2D, WRITTEN OVER D AXES. Brackbill's continuum surface force: the liquid
+            # colour `gc` deposited by the scatter is smooth across the interface, its gradient is
+            # the interface normal times the interface's sharpness, and the divergence of the unit
+            # normal is the curvature. f = sigma * kappa * grad(c) then pulls a bulge in and pushes
+            # a dimple out. The 2D code above is left untouched rather than generalised, because it
+            # is on the promotion path and must stay bit-identical.
+            surf = self.surface_tension
+            if getattr(self, "_c_csf", None) is None:
+                self._c_csf = bool(surf > 0.0 and bool((gc > 0).any()))
+            if self._c_csf:
+                if self.csf_rho > 0.0:
+                    c = (gc / (self.csf_rho * dx ** D)).view(*g.shape)   # liquid VOLUME FRACTION
+                else:
+                    c = gc.view(*g.shape)                                # legacy: raw liquid MASS
+                for _ in range(self.csf_smooth):        # separable [1/4,1/2,1/4]; no-op when 0
+                    for k in range(D):
+                        c = 0.25 * torch.roll(c, 1, k) + 0.5 * c + 0.25 * torch.roll(c, -1, k)
+                grad = [(torch.roll(c, -1, k) - torch.roll(c, 1, k)) * (0.5 * inv_dx)
+                        for k in range(D)]
+                gmag = torch.sqrt(sum(gk * gk for gk in grad))
+                eps = _csf_eps
+                nrm = [gk / (gmag + eps) for gk in grad]
+                kappa = -sum((torch.roll(nrm[k], -1, k) - torch.roll(nrm[k], 1, k)) * (0.5 * inv_dx)
+                             for k in range(D))
+                # ONLY WHERE THERE IS AN INTERFACE -- the comment was always right and the test never
+                # enforced it. `gmag > 0.02 * gmag.max()` selects 98.1% of OCCUPIED nodes on
+                # material_3d_water_drop; the band selects 21.7%. The mass clause is what makes
+                # `csf_mass_floor` inert rather than load-bearing: the lightest node admitted holds
+                # csf_band * rho * dx^D = 2.3e-7 at band 0.2 on the drop, 23x the 1e-8 floor, so
+                # masked nodes with gm == 0 go 2.6% -> 0.0% and floor-binding 16.6% -> 0.0%.
+                # THE BAND IS A GAIN, NOT ONLY A FILTER -- COMPENSATE FOR IT.
+                # The CSF force is f = sigma*kappa*grad(c), and the TOTAL impulse across an
+                # interface telescopes: int grad(c) dx = c_in - c_out. Restricting the force to
+                # `band < c < 1-band` therefore delivers exactly (1 - 2*band) OF THE TENSION,
+                # whatever the shape of the profile -- it is the fundamental theorem, not an
+                # approximation. The default band 0.2 was throwing away 40% of sigma by
+                # construction.
+                #
+                # MEASURED on a Young-Laplace ladder (a sphere in zero gravity compresses until
+                # K(1-J) = 2 sigma/R, so mean(J) = 1 - 2 sigma/(R K), nothing fitted), R = 10 mm,
+                # sigma 0.072, K 1e4, delivered fraction of the declared tension:
+                #     band 0.20 -> 0.472      band 0.10 -> 0.736
+                #     band 0.05 -> 0.887      band 0.02 -> 0.972
+                # against the predicted 0.60 / 0.80 / 0.90 / 0.96. The trend is the band's, and it
+                # goes to 1 as the band closes.
+                #
+                # Dividing by (1 - 2*band) restores the magnitude while keeping the band doing its
+                # real job, which is to keep the force OFF the bulk: the interface test was never
+                # about how much tension to apply, only about where.
+                _gain = 1.0 / max(1.0 - 2.0 * self.csf_band, 1e-6) if self.csf_band > 0 else 1.0
+                if self.csf_band > 0.0:
+                    _mfull = self.csf_rho * dx ** D
+                    fmask = ((c > self.csf_band) & (c < 1.0 - self.csf_band)
+                             & (gm.view(*g.shape) > self.csf_band * _mfull)).to(c.dtype) * _gain
+                else:
+                    fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
+                inv_m = (dx ** D) / gm.clamp(min=_csf_floor)   # force -> acceleration
+                gv = gv + dt * torch.stack(
+                    [(surf * kappa * grad[k] * fmask).view(-1) * inv_m for k in range(D)], dim=1)
             if not periodic:
                 shape = g.shape; bnd = 3
                 gv = gv.view(*shape, D)
@@ -248,9 +625,56 @@ class MPMGridUpdate(FieldUpdate):
                             cj = gv[..., j]
                             gv[..., j] = torch.where(slab, cj * wd, cj)
                 gv = gv.view(g.n_cells, D)
+            if self.plate_axis is not None and self.plate_gap_half > 0.0:
+                gv = self._plate_bc(H, g, gv, dev, dt)
             walls = self._walls3d(H, g, dev)                        # solid 3D obstacles (box / sphere)
-            if walls.any():
+            if _const_any(self, "_c_walls3d", walls):
                 gv = torch.where(walls[:, None], torch.zeros_like(gv), gv)   # no-slip: zero grid velocity inside
-        g.v = gv
+        # BUOYANCY IS NOT A DIMENSION BRANCH, and putting it here made it look like one. Inserted
+        # in 40e1d0c9 between `if D == 2:` and its `else:`, it STOLE THAT ELSE: the 3D wall code
+        # then ran whenever buoyancy was zero -- for a 2D spec too, where `_walls3d` unpacks
+        # `nx, ny, nz = g.shape` and dies -- and was SKIPPED whenever buoyancy was on, so every 3D
+        # buoyant run had no wall boundary condition at all. Both halves of that were invisible
+        # until a 2D spec was written without buoyancy. It now sits after the branch, in both
+        # dimensions, which is what a body force on the grid is.
+        if self.buoyancy != 0.0:
+            # rho at each node from the mass the particles deposited there. `gm` is a node mass and
+            # dx^D its volume, so this is a genuine density and the comparison with `rho_ref` is
+            # dimensionally honest rather than a tuned ratio.
+            _rho = gm / (dx ** D)
+            # BRANCH-FREE, BECAUSE A BOOLEAN-MASK ASSIGNMENT CANNOT BE CAPTURED. `_f[_act] = ...`
+            # compiles to index_put, which needs `nonzero`, which is a device->host sync -- and a
+            # sync inside a CUDA graph capture is `cudaErrorStreamCaptureUnsupported`, not a
+            # slowdown. Both 3D buoyancy scenes died on it at the first captured substep with
+            # "operation not permitted when stream is capturing". `torch.where` is the same
+            # arithmetic with no data-dependent control flow; the clamp keeps the empty-node
+            # division finite before the `where` discards it.
+            _safe = _rho.clamp(min=1e-9)
+            _f = torch.where(_rho > 1e-9, (_rho - self.rho_ref) / _safe,
+                             torch.zeros_like(_rho))            # empty nodes have no buoyancy
+            # BUILT ONCE, NOT PER SUBSTEP. Writing a python float into a device tensor --
+            # `_dir[1] = -1.0` -- is a host-to-device copy, and that is as uncapturable as the
+            # boolean mask above was: the same run died again, four lines further down, on the same
+            # `cudaErrorStreamCaptureUnsupported`. The direction is a run constant, so it is
+            # assembled on the host and moved once; the captured region only ever reads it.
+            _key = (D, str(dev), gv.dtype)
+            if getattr(self, "_dir_key", None) != _key:
+                _v = [0.0] * D
+                if self.buoy_dir is not None:
+                    for _i, _x in enumerate(self.buoy_dir[:D]):
+                        _v[_i] = float(_x)
+                else:
+                    # DOWN IS WHEREVER GRAVITY SAYS IT IS, and `gravity` says -y: it defaults to
+                    # `gy = -g, gz = 0` in 3D as well as in 2D. This line used to read -z in 3D, so
+                    # on every 3D spec buoyancy pushed at RIGHT ANGLES to the weight it is supposed
+                    # to oppose -- a bubble drifting sideways rather than rising. One shipped spec
+                    # would push at right angles to the weight it opposes. `buoyancy_dir`
+                    # overrides the default axis for a specification that needs another.
+                    _v[1] = -1.0
+                self._dir_cache = torch.tensor(_v, device=dev, dtype=gv.dtype)
+                self._dir_key = _key
+            _dir = self._dir_cache
+            gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
+        g.v.copy_(gv)                       # in place: a captured graph holds this address
         return {}
 ```

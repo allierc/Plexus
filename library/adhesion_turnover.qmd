@@ -1,0 +1,154 @@
+---
+title: "adhesion_turnover"
+subtitle: "Rupture over-loaded adhesions and re-form them elsewhere: focal adhesions turn over in minutes, and a sheet should not be held by a tether it earned hundreds of frames ago."
+---
+
+::: {.op-head}
+![](../figures/icons/rewire.png){.op-logo}
+
+[`rewire`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Rupture over-loaded adhesions and re-form them elsewhere: focal adhesions turn over in minutes, and a sheet should not be held by a tether it earned hundreds of frames ago.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{R}\!:E$ **Rewire**: rebuild the relation $E$ each tick.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+minutes, and a sheet should not be held by a tether it earned hundreds of frames ago.
+
+adhesion -> adhesion: reads both positions, rewrites which membrane patch each adhesion holds.
+
+    adhesion a lets go when   |x_a - x_bound(a)|  >  rupture
+    and re-binds to           argmin_i |x_i - x_a|      once re-formed
+
+`rupture` is an extension in world units, and `reform` the number of frames an adhesion spends
+unbound before it can bind again.
+
+The kind is `rewire` because what changes is the RELATION -- which membrane patch each adhesion
+holds -- and not any state on either set.
+
+Reference: Plexus (this work); focal-adhesion turnover on the timescale of minutes.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `rupture` | strain_at_which_an_adhesion_lets_go | 0.0 |
+| `tau` | frames_to_re-form | 0.0 |
+| `centre` | &ndash; | [0.5, 0.5, 0.5] |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: adhesion_turnover, at: particle}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`adhesion_turnover`]{.op-badge} [`bond_rupture`]{.op-badge} [`integrin`]{.op-badge}  
+
+## Related operators
+
+Other **rewire** operators: [`radius_graph`](radius_graph.qmd), [`edge_flip`](edge_flip.qmd), [`cell_neighbours`](cell_neighbours.qmd), [`junction_sync`](junction_sync.qmd), [`bm_unbond`](bm_unbond.qmd), [`bm_crosslink`](bm_crosslink.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("adhesion_turnover", family="topology", set="particle", kind="rewire")
+class AdhesionTurnover(Rewire):
+    """Rupture over-loaded adhesions and re-form them elsewhere: focal adhesions turn over in
+    minutes, and a sheet should not be held by a tether it earned hundreds of frames ago.
+
+    adhesion -> adhesion: reads both positions, rewrites which membrane patch each adhesion holds.
+
+        adhesion a lets go when   |x_a - x_bound(a)|  >  rupture
+        and re-binds to           argmin_i |x_i - x_a|      once re-formed
+
+    `rupture` is an extension in world units, and `reform` the number of frames an adhesion spends
+    unbound before it can bind again.
+
+    The kind is `rewire` because what changes is the RELATION -- which membrane patch each adhesion
+    holds -- and not any state on either set.
+
+    Reference: Plexus (this work); focal-adhesion turnover on the timescale of minutes.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MAY_MUTATE_INTEGRATED_STATE = True     # it commits the derived adhesion site
+    MECHANISM_TAGS = ["adhesion_turnover", "bond_rupture", "integrin"]
+    PARAM_ROLES = {"rupture": "strain_at_which_an_adhesion_lets_go", "tau": "frames_to_re-form"}
+    REFERENCE = "Walko, G. et al. (2015) Cell Tissue Res. 360:363."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.rupture = float(params.get("rupture", 0.0))     # 0 = permanent
+        self.tau = float(params.get("tau", 0.0))             # 0 = no re-formation
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self._said = False
+
+    def forward(self, H, mask=None):
+        idx = getattr(H, "adhesion_bound", None)
+        if idx is None:
+            return {}
+        # commit the derived site: this operator is structural, so it may write integrated state
+        site_ = getattr(H, "adhesion_site", None)
+        if site_ is not None:
+            H.level("adhesion").get("pos")[:] = site_
+        if self.rupture <= 0:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        c = torch.tensor(self.centre, device=pos.device, dtype=pos.dtype)
+        u = H.adhesion_dir
+        stretch = (site_ - pos[idx]).norm(dim=1)
+        broke = stretch > self.rupture
+        if bool(broke.any()):
+            # re-bind to whatever patch is beneath the adhesion NOW
+            mu = (pos - c); mu = mu / mu.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            sel = broke.nonzero(as_tuple=True)[0]
+            for a0 in range(0, sel.numel(), 4096):
+                b0 = min(sel.numel(), a0 + 4096)
+                idx[sel[a0:b0]] = (u[sel[a0:b0]] @ mu.T).argmax(dim=1)
+            H.adhesion_bound = idx
+        ADHESION_TRACE.append((int(getattr(H, "frame", 0) or 0), float(stretch.mean()),
+                               int(broke.sum())))
+        if not self._said:
+            print(f"[adhesion_turnover] rupture at {self.rupture:g}: {int(broke.sum())} adhesions "
+                  f"re-bound this frame", flush=True)
+            self._said = True
+        return {}
+```

@@ -1,0 +1,337 @@
+---
+title: "integrin_adhesion"
+subtitle: "Anchor the basement membrane to the epithelium, the way integrins do: each particle is pulled back toward the angular position it was seeded on, on a surface that is growing."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Anchor the basement membrane to the epithelium, the way integrins do: each particle is pulled back toward the angular position it was seeded on, on a surface that is growing.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `surface`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+pulled back toward the angular position it was seeded on, on a surface that is growing.
+
+basement_membrane -> basement_membrane: reads pos and vel and a recorded surface, emits an
+acceleration.
+
+u0_i is the direction the particle was SEEDED on, frozen -- recomputing it each frame would
+make the anchor follow the particle, which is not an anchor but a no-op that looks like one.
+k is the adhesion stiffness in inverse time squared and `damp` a damping in inverse time.
+
+Without this, the membrane touches the epithelium only through the shared MPM grid, which
+resists penetration and nothing else -- so the sheet SLIDES freely over the surface. A growing
+tissue then pushes it outward and its particles rearrange, relieving exactly the in-plane
+strain that fragmentation is about. Anchored, the geometry does the work: a particle pinned to
+a fixed angular position on a surface whose radius triples must accommodate an area growing as
+R^2, so its bonds stretch by about R. That is the loading a real basement membrane experiences
+under tissue growth, and the reason a growing epithelium must remodel its membrane rather than
+merely displace it.
+
+THE DASHPOT IS NOT A TUNING KNOB. The anchor MOVES, and an undamped spring does not track a
+moving target -- it oscillates about it with amplitude of order v/omega. When that amplitude is
+comparable to a bond rest length, every particle sits permanently above any sane failure strain
+and the whole crosslink network breaks. `damp` defaults to the critical value 2 sqrt(k), so the
+anchor is tracked rather than orbited: under-damped it oscillates, over-damped it lags, and a
+lagging anchor stretches the sheet, which is a different experiment.
+
+`k_compress` splits the spring: a fibre is easy to stretch and hard to squash, so a single
+stiffness both ways leaves the only thing keeping the sheet out of the epithelium as weak as
+the thing pulling it along. The split is applied RADIALLY, because that is the direction the
+fibre's length lives in; the tangential part of the offset is shear, which an integrin resists
+the same way whichever side the sheet is on.
+
+`tau_adh` lets the anchor direction itself creep toward the particle's current one over that
+many frames, which is adhesion turnover; `detach` unbinds a particle whose anchor offset
+exceeds a given length.
+
+Reference: Streuli, C. H. (2009). Integrins and cell-fate determination. Curr. Opin. Cell Biol.
+21:194-198; integrin alpha-6 beta-4 and dystroglycan bind laminin directly.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `surface` | &ndash; | **required** |
+| `k` | adhesion_stiffness | 2.0e4 |
+| `offset` | standoff_from_surface | 0.004 |
+| `detach` | adhesion_rupture_displacement | 0.0 |
+| `scale` | surface_rescale | 1.0 |
+| `centre` | &ndash; | [0.5, 0.5, 0.5] |
+| `fraction` | &ndash; | 1.0 |
+| `k_compress` | &ndash; | 0.0 |
+| `overdamped_gamma` | &ndash; | 0.0 |
+| `tau_adh` | &ndash; | 0.0 |
+| `surface_set` | &ndash; | None |
+| `damp` | &ndash; | 2.0 * math.sqrt(max(float(params.get("k", 2.0e4 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: integrin_adhesion, at: particle, surface: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`integrin_adhesion`]{.op-badge} [`focal_adhesion`]{.op-badge} [`basement_membrane`]{.op-badge} [`cell_matrix_anchoring`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/membrane_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("integrin_adhesion", family="mechanics", set="particle", kind="lateral")
+class IntegrinAdhesion(Lateral):
+    """Anchor the basement membrane to the epithelium, the way integrins do: each particle is
+    pulled back toward the angular position it was seeded on, on a surface that is growing.
+
+    basement_membrane -> basement_membrane: reads pos and vel and a recorded surface, emits an
+    acceleration.
+
+        anchor_i = c + u0_i (S R(theta_i, phi_i) + offset)
+        a_i      = k (anchor_i - x_i)  -  damp * v_i
+
+    u0_i is the direction the particle was SEEDED on, frozen -- recomputing it each frame would
+    make the anchor follow the particle, which is not an anchor but a no-op that looks like one.
+    k is the adhesion stiffness in inverse time squared and `damp` a damping in inverse time.
+
+    Without this, the membrane touches the epithelium only through the shared MPM grid, which
+    resists penetration and nothing else -- so the sheet SLIDES freely over the surface. A growing
+    tissue then pushes it outward and its particles rearrange, relieving exactly the in-plane
+    strain that fragmentation is about. Anchored, the geometry does the work: a particle pinned to
+    a fixed angular position on a surface whose radius triples must accommodate an area growing as
+    R^2, so its bonds stretch by about R. That is the loading a real basement membrane experiences
+    under tissue growth, and the reason a growing epithelium must remodel its membrane rather than
+    merely displace it.
+
+    THE DASHPOT IS NOT A TUNING KNOB. The anchor MOVES, and an undamped spring does not track a
+    moving target -- it oscillates about it with amplitude of order v/omega. When that amplitude is
+    comparable to a bond rest length, every particle sits permanently above any sane failure strain
+    and the whole crosslink network breaks. `damp` defaults to the critical value 2 sqrt(k), so the
+    anchor is tracked rather than orbited: under-damped it oscillates, over-damped it lags, and a
+    lagging anchor stretches the sheet, which is a different experiment.
+
+    `k_compress` splits the spring: a fibre is easy to stretch and hard to squash, so a single
+    stiffness both ways leaves the only thing keeping the sheet out of the epithelium as weak as
+    the thing pulling it along. The split is applied RADIALLY, because that is the direction the
+    fibre's length lives in; the tangential part of the offset is shear, which an integrin resists
+    the same way whichever side the sheet is on.
+
+    `tau_adh` lets the anchor direction itself creep toward the particle's current one over that
+    many frames, which is adhesion turnover; `detach` unbinds a particle whose anchor offset
+    exceeds a given length.
+
+    Reference: Streuli, C. H. (2009). Integrins and cell-fate determination. Curr. Opin. Cell Biol.
+    21:194-198; integrin alpha-6 beta-4 and dystroglycan bind laminin directly.
+    """
+
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["integrin_adhesion", "focal_adhesion", "basement_membrane",
+                      "cell_matrix_anchoring"]
+    PARAM_ROLES = {"k": "adhesion_stiffness", "offset": "standoff_from_surface",
+                   "detach": "adhesion_rupture_displacement", "scale": "surface_rescale"}
+    REFERENCE = ("Eschenbruch, J. et al. (2021) Cells 10:1979 (focal adhesions anchor into the "
+                 "collagen IV scaffold and transmit actomyosin force to the BM).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        import numpy as np
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        self.k = float(params.get("k", 2.0e4))
+        self.offset = float(params.get("offset", 0.004))
+        self.detach = float(params.get("detach", 0.0))       # 0 = permanent
+        # ADHESION IS PUNCTATE. Hemidesmosomes (integrin a6b4) are discrete plaques spaced along the
+        # basal surface, with the membrane spanning freely between them -- a tether on every particle is
+        # the approximation, not the biology. `fraction` < 1 anchors a random subset, so the sheet is
+        # held at points and its own elasticity bridges the gaps. That also removes the reason the sheet
+        # wore the surface map's texture: a dense stiff contact dictates every particle, while sparse
+        # anchors let the sheet drape. Measured on 114, the radius varied 5.2x more BETWEEN map bins
+        # than within one, and the between-bin spread was the map's own.
+        self.fraction = float(params.get("fraction", 1.0))
+        # 0 (default) = one stiffness both ways, which is every run to 130. > 0 makes the radial branch
+        # asymmetric: `k` while the fibre is stretched, `k_compress` while it is squashed.
+        self.k_compress = float(params.get("k_compress", 0.0))
+        self._anchor_mask = None
+        self.gamma = float(params.get("overdamped_gamma", 0.0))
+        # ADHESIONS TURN OVER. `u0` was frozen at seeding, which pins every node to one direction for the
+        # whole run -- and that is what defeats the relaxation meant to close gaps: material pushed into
+        # a hole is pulled straight back out by its own anchor. Real focal adhesions detach and re-form,
+        # so the anchor direction is allowed to follow the node on a timescale `tau_adh`. At 0 it is
+        # frozen, which reproduces every earlier run.
+        self.tau_adh = float(params.get("tau_adh", 0.0))
+        # BIND TO THE `surface` LEVEL IF ONE EXISTS, otherwise to the 32x64 table as before. Named
+        # rather than inferred, so a run either uses the Level or does not and the spec says which --
+        # the two differ in a way that shows up in the strain field and must not be silent.
+        self.surface_set = params.get("surface_set", None)
+        # critical by default: c = 2*sqrt(k). Under-damped oscillates about a moving anchor, over-damped
+        # lags it -- and a lagging anchor stretches the sheet, which is a different experiment.
+        self.damp = float(params.get("damp", 2.0 * math.sqrt(max(float(params.get("k", 2.0e4)), 1e-12))))
+        z = np.load(str(params["surface"]))
+        self.smap = torch.as_tensor(np.asarray(z["smap"], np.float32)) * self.scale
+        self.T = int(self.smap.shape[0])
+        self.u0 = None                                        # the seeded direction, kept
+        self._alive_prev = None
+        self.bound = None
+        self._frame, self._t, self._said = -1, 0, False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        f = int(getattr(H, "frame", -1) or -1)
+        if f != self._frame:
+            self._frame = f
+            self._t = min(self.T - 1, max(0, f))
+        if self.u0 is None:
+            # THE DIRECTION AT SEED TIME, frozen. Recomputing it each frame would make the anchor follow
+            # the particle, which is not an anchor -- it is a no-op that looks like one.
+            d0 = pos - c
+            self.u0 = (d0 / d0.norm(dim=1, keepdim=True).clamp_min(1e-9)).detach().clone()
+            self.bound = torch.ones(pos.shape[0], device=dev, dtype=torch.bool)
+            if self.fraction < 1.0:
+                g = torch.Generator(device="cpu").manual_seed(0)
+                keep = torch.rand(pos.shape[0], generator=g).to(dev) < self.fraction
+                self._anchor_mask = keep
+                print(f"[integrin_adhesion] punctate: {int(keep.sum())} of {pos.shape[0]} particles "
+                      f"anchored ({100*self.fraction:.0f}%), the sheet spans between them", flush=True)
+
+        # ---- AT SEED TIME MEANS AT *ITS* SEED TIME -------------------------------------------------
+        # A particle held in the unsecreted reserve is parked at the tissue CENTRE, where `pos - c` is
+        # zero and its "direction" is numerical noise. Freezing that at frame 0 and using it the moment
+        # the particle is secreted anchors it to an arbitrary point on the far side of the sphere: the
+        # spring yanks it across the tissue and drags its brand-new crosslinks past the break threshold.
+        # A newly secreted particle would then be yanked across the tissue and its brand-new
+        # crosslinks dragged past the break threshold, so secretion adds particles and almost no
+        # surviving bonds. A particle's direction must be frozen when IT is laid down, not when the
+        # array was.
+        alive = getattr(H, "membrane_alive", None)
+        if alive is not None:
+            if self._alive_prev is None:
+                self._alive_prev = alive.clone()
+            born = alive & (~self._alive_prev)
+            if bool(born.any()):
+                db = (pos[born] - c)
+                self.u0[born] = (db / db.norm(dim=1, keepdim=True).clamp_min(1e-9)).detach()
+            self._alive_prev = alive.clone()
+
+        M = self.smap[self._t].to(dev, dt_)
+        nth, nph = M.shape
+        u = self.u0
+        if self.surface_set is not None:
+            # ELEMENT i HOLDS PARTICLE i. `surface_track` lays its elements on the same Fibonacci
+            # lattice, with the same seed and jitter, that the membrane was seeded on, so the pairing is
+            # 1:1 by construction -- no search, no bins, and the anchor radius is a smooth interpolation
+            # of the recorded map rather than the value of whichever 32x64 cell the direction fell in.
+            sl = H.level(self.surface_set)
+            sp = sl.get("pos")
+            if sp.shape[0] != pos.shape[0]:
+                raise RuntimeError(
+                    f"integrin_adhesion: `surface_set` has {sp.shape[0]} elements against "
+                    f"{pos.shape[0]} membrane particles. The 1:1 binding requires the two sets to be "
+                    f"the same size and built on the same lattice; set `n` equal in the spec.")
+            su = sl.u if hasattr(sl, "u") else (sp - c) / (sp - c).norm(dim=1, keepdim=True).clamp_min(1e-12)
+            anchor = sp + su * self.offset
+        else:
+            th = torch.acos(u[:, 2].clamp(-1, 1))
+            ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
+            R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
+                  (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+            if self.tau_adh > 0:
+                # let the frozen direction creep toward where the node actually is
+                cur = (pos - c) / (pos - c).norm(dim=1, keepdim=True).clamp_min(1e-12)
+                self.u0 = self.u0 + (cur - self.u0) * (1.0 / self.tau_adh)
+                self.u0 = self.u0 / self.u0.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                u = self.u0
+            anchor = c + u * (R + self.offset)[:, None]
+        delta = anchor - pos
+        if self.detach > 0:
+            self.bound &= delta.norm(dim=1) < self.detach
+        # A DASHPOT, NOT JUST A SPRING -- and its absence destroyed the sheet. The anchor MOVES: the
+        # surface grows at ~5.4e-4 box units per frame, and an undamped spring does not track a moving
+        # target, it oscillates about it with amplitude of order v/omega, v being the surface's
+        # growth speed and omega = sqrt(k). When that amplitude approaches the bond rest length,
+        # every particle sits permanently above any sane failure strain and the entire crosslink
+        # network breaks; the freed particles, stiffer than the stroma, are then flung through it.
+        # Critical damping c = 2*sqrt(k) makes the particle track the anchor instead.
+        vel = lvl.get("vel") if "vel" in lvl.state_schema else None
+        acc = self.k * delta
+        # A FIBRE IS EASY TO STRETCH AND HARD TO SQUASH, and until now this spring was neither -- one
+        # stiffness both ways, so the only thing keeping the sheet out of the epithelium was the same
+        # weak constant that pulls it along. `k_compress` splits the two branches. The fibre is
+        # COMPRESSED when the particle sits inside its rest position, which is the case the standoff is
+        # about: 121 ends 0.0126 inside its anchor, i.e. every integrin in the run is squashed to a
+        # third of its 0.004 length and none of them objects.
+        #
+        # Radially, because that is the direction the length lives in: the tangential part of `delta`
+        # is shear, which an integrin resists in one way whether the sheet is in or out.
+        if self.k_compress > 0.0 and self.k_compress != self.k:
+            dr = (delta * u).sum(1, keepdim=True)        # > 0: anchor outside the particle -> compressed
+            radial = dr * u
+            kr = torch.where(dr > 0, torch.full_like(dr, self.k_compress),
+                             torch.full_like(dr, self.k))
+            acc = self.k * (delta - radial) + kr * radial
+        # THE DASHPOT IS AN INERTIAL FIX AND GOES AWAY OVERDAMPED. `damp` exists because an undamped
+        # spring does not track a moving anchor, it oscillates about it -- a problem that only arises
+        # because the sheet was given a mass. With gamma*x_dot = F there is no oscillation to damp, and
+        # subtracting damp*vel on top of dividing by gamma would be damping the damping.
+        if vel is not None and self.gamma <= 0:
+            acc = acc - self.damp * vel
+        if self.gamma > 0:
+            acc = acc / self.gamma
+        acc = acc * self.bound[:, None].to(dt_)
+        if self._anchor_mask is not None:            # punctate: only the anchored subset is tethered
+            acc = acc * self._anchor_mask[:, None].to(dt_)
+        # UNSECRETED MATERIAL IS NOT ADHERED TO ANYTHING. The reserve sits at the tissue centre; without
+        # this it is dragged out toward the surface by a spring it has not yet earned, arriving as a
+        # shell of particles that were never laid down.
+        if alive is not None and alive.shape[0] == acc.shape[0]:
+            acc = acc * alive[:, None].to(dt_)
+        if not self._said:
+            print(f"[integrin_adhesion] {int(self.bound.sum())} of {pos.shape[0]} particles anchored "
+                  f"to the surface in their own direction, k={self.k:g}, offset={self.offset:g}, "
+                  f"detach={'off' if self.detach <= 0 else self.detach}", flush=True)
+            self._said = True
+        return {lvl.name: acc}
+```

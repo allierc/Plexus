@@ -1,6 +1,6 @@
 ---
 title: "mpm_strain"
-subtitle: "Mpm_strain (particle -> particle): the MLS-MPM deformation-gradient + material update."
+subtitle: "The material update: the fourth step of the MLS-MPM cycle."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Mpm_strain (particle -> particle): the MLS-MPM deformation-gradient +
 
 [`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Mpm_strain (particle -> particle): the MLS-MPM deformation-gradient + material update.
+The material update: the fourth step of the MLS-MPM cycle.
 :::
 
 ```{=html}
@@ -42,15 +42,33 @@ Mpm_strain (particle -> particle): the MLS-MPM deformation-gradient + material u
 
 ## Mechanism
 
-F <- (I + dt C) F, then the per-material correction: liquid drops shape memory
-(F := J^(1/D) I, the volume-preserving isotropic reset), snow clamps the singular
-values of F and hardens via the plastic ratio Jp. Writes the aux buffers F / Jp in
-place; returns {}. Step 1 of the decomposed MLS-MPM (oracle: `mls_mpm_mechanics`).
+deformation gradient from the velocity gradient it just gathered, then applies its material law.
 
-Dimension-generic: F is D x D (D = pos dim). The 2D path is bit-identical (analytic
-det, sqrt(J) == J^(1/2) liquid reset); 3D uses `torch.linalg.det`, the cube-root
-liquid reset J^(1/3) (volume-correct, unlike a literal sqrt port), and the proper-
-rotation SVD sign fix from MPM_pytorch's MPM_3D for snow plasticity.
+particle -> particle: reads F and C, writes F and the derived material state in place.
+
+    F_p <- (I + dt C_p) F_p
+    J_p  = det F_p
+
+F is the deformation gradient, mapping a material line element from its rest configuration to
+its current one, so it is dimensionless and equals the identity for unstrained material. J is
+the ratio of current to rest volume. Everything a particle remembers about its history is in F,
+which is why the material laws are applied HERE and read by `mpm_scatter` as a stress.
+
+An ELASTIC particle keeps F entire. A LIQUID drops its SHAPE memory -- F is reset to an
+isotropic matrix carrying only J -- because a liquid has no rest shape to be strained from. A
+PLASTIC one has its singular values clipped to a yield band, so deformation beyond the band is
+forgotten rather than stored as stress.
+
+`liquid_volume` chooses how a liquid's volume is advanced, and the two are not equivalent.
+`det` carries J through F, i.e. multiplies it by det(I + dt C) each substep. `trace` integrates
+dJ/dt = J tr(C) directly. They agree to first order in dt, but the determinant form accumulates
+a bias that drains a resting column's pressure over time and gets WORSE as the mesh is refined
+-- the opposite of what a convergent scheme should do. `det` is the default because changing it
+changes the numbers of every existing MPM specification.
+
+Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D., Chen, Z. & Schreyer,
+H. L. (1994). A particle method for history-dependent materials. Comput. Methods Appl. Mech.
+Eng. 118:179-196.
 
 $$
 \mathbf F \;\leftarrow\; (\mathbf I + \Delta t\,\mathbf C)\,\mathbf F
@@ -65,6 +83,7 @@ $\mathbf F$ and hardens via the plastic ratio $J_p$. Step 1 of the MLS-MPM decom
 | parameter | role | default |
 |---|---|---|
 | `dt_sub` | MLS-MPM substep dt | 2e-4 |
+| `liquid_volume` | &ndash; | "det" |
 
 ## Minimal spec
 
@@ -79,36 +98,45 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
-[`src/plexus/operators/mpm_strain.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_strain.py) &mdash; the registered operator.
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
 
 ```python
-"""mpm_strain (particle -> particle): the MLS-MPM deformation-gradient + material update.
-
-F <- (I + dt C) F, then the per-material correction: liquid drops shape memory
-(F := J^(1/D) I, the volume-preserving isotropic reset), snow clamps the singular
-values of F and hardens via the plastic ratio Jp. Writes the aux buffers F / Jp in
-place; returns {}. Step 1 of the decomposed MLS-MPM (oracle: `mls_mpm_mechanics`).
-
-Dimension-generic: F is D x D (D = pos dim). The 2D path is bit-identical (analytic
-det, sqrt(J) == J^(1/2) liquid reset); 3D uses `torch.linalg.det`, the cube-root
-liquid reset J^(1/3) (volume-correct, unlike a literal sqrt port), and the proper-
-rotation SVD sign fix from MPM_pytorch's MPM_3D for snow plasticity.
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-from plexus.operators.mpm_grid import sub_dt
-
-
 @register_operator("mpm_strain", family="mpm", set="particle", kind="lateral")
 class MPMStrain(Lateral):
+    """The material update: the fourth step of the MLS-MPM cycle. Each particle advances its own
+    deformation gradient from the velocity gradient it just gathered, then applies its material law.
+
+    particle -> particle: reads F and C, writes F and the derived material state in place.
+
+        F_p <- (I + dt C_p) F_p
+        J_p  = det F_p
+
+    F is the deformation gradient, mapping a material line element from its rest configuration to
+    its current one, so it is dimensionless and equals the identity for unstrained material. J is
+    the ratio of current to rest volume. Everything a particle remembers about its history is in F,
+    which is why the material laws are applied HERE and read by `mpm_scatter` as a stress.
+
+    An ELASTIC particle keeps F entire. A LIQUID drops its SHAPE memory -- F is reset to an
+    isotropic matrix carrying only J -- because a liquid has no rest shape to be strained from. A
+    PLASTIC one has its singular values clipped to a yield band, so deformation beyond the band is
+    forgotten rather than stored as stress.
+
+    `liquid_volume` chooses how a liquid's volume is advanced, and the two are not equivalent.
+    `det` carries J through F, i.e. multiplies it by det(I + dt C) each substep. `trace` integrates
+    dJ/dt = J tr(C) directly. They agree to first order in dt, but the determinant form accumulates
+    a bias that drains a resting column's pressure over time and gets WORSE as the mesh is refined
+    -- the opposite of what a convergent scheme should do. `det` is the default because changing it
+    changes the numbers of every existing MPM specification.
+
+    Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D., Chen, Z. & Schreyer,
+    H. L. (1994). A particle method for history-dependent materials. Comput. Methods Appl. Mech.
+    Eng. 118:179-196.
+    """
+
     EMIT = None                 # particle->particle: updates F + material in place; returns {} — no delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []        # no required params — all knobs optional (defaults in __init__)
@@ -120,6 +148,15 @@ class MPMStrain(Lateral):
         super().__init__(params, device)
         self.at = params.get("_at", "mpm_particle")
         self.dt_sub = float(params.get("dt_sub", 2e-4))
+        # HOW A LIQUID'S VOLUME IS ADVANCED. `det` (the default) carries J through F exactly as
+        # every existing spec has; `trace` uses J *= 1 + dt*tr(C) instead. See the long note in
+        # forward() -- `det` loses a column's pressure at ~1.1%/s at rest and gets worse as the mesh
+        # is refined. It is OPT-IN because it changes the numbers of every existing MPM
+        # specification, and the default stays where it is until a gate says what the new ones are.
+        self.liquid_volume = str(params.get("liquid_volume", "det")).lower()
+        if self.liquid_volume not in ("det", "trace"):
+            raise ValueError(f"liquid_volume must be 'det' or 'trace', got "
+                             f"{self.liquid_volume!r}")
 
     def forward(self, H, mask=None):
         p = H.level(self.at); dev = p.state.device
@@ -133,12 +170,46 @@ class MPMStrain(Lateral):
         else:
             J = torch.linalg.det(F)
         liquid = getattr(p, "is_liquid", None)
-        if liquid is not None and liquid.any():                    # LIQUID: drop shape memory
+        if _const_any(self, "_c_liquid", liquid):                  # LIQUID: drop shape memory
+            if self.liquid_volume == "trace":
+                # A LIQUID AT REST BLEEDS ITS PRESSURE AWAY, and this is why.
+                #
+                # The liquid already drops SHAPE memory (F becomes isotropic below), so its whole
+                # state is the volume J -- and J is carried through F, i.e. multiplied by
+                # det(I + dt*C) every substep. The law it is discretising is dJ/dt = J*tr(C), whose
+                # exact step is J *= exp(dt*tr C). Those two agree to first order and NOT to second:
+                #
+                #     det(I + dt C)  = 1 + dt*trC + dt^2*(trC^2 - tr(C^2))/2 + dt^3*det C
+                #     exp(dt*trC)    = 1 + dt*trC + dt^2* trC^2            /2 + ...
+                #
+                # The difference is -dt^2*tr(C^2)/2, and tr(C^2) is a SUM OF SQUARES: it is positive
+                # whatever the sign of the noise, so it does not average out. Every substep multiplies
+                # J by slightly less than it should, and a column that is not moving at all loses its
+                # stored compression.
+                #
+                # MEASURED, on si_hydrostatic -- a 40 mm confined column whose free surface holds to
+                # 0.001 mm, i.e. mechanically dead still. The hydrostatic gradient dp/dd decays
+                # monotonically in TIME, -8.66% of rho*g at 0.33 s to -12.96% at 4.0 s: about
+                # 1.1% of the pressure per second, at rest.
+                #
+                # AND THE SCALING IDENTIFIES IT. Grid noise gives C ~ v_noise/dx and CFL gives
+                # dt ~ dx, so the accumulated bias over a fixed TIME goes as dt*tr(C^2) ~ v^2/dx --
+                # it gets WORSE as the mesh is refined. Measured -5.52% / -8.45% / -12.15% at
+                # n_grid 40 / 64 / 96, very nearly linear in 1/dx. It is also why `drag` HELPED
+                # (-8.44% with it, -12.11% without): drag suppresses exactly the v_noise that drives
+                # it. Wall contact was tested and is not involved (-8.44% vs -8.39% with it off).
+                #
+                # THE FIX, and it is what Taichi's mpm88/mpm99 do for water: advance the volume by
+                # its OWN first-order law, J *= 1 + dt*tr(C). That is no more accurate in dt than
+                # det(I + dt*C) -- both are first-order -- but it does not couple to the deviatoric
+                # part of C at all, so noise no longer has a preferred direction to push J in.
+                trC = p.C.diagonal(dim1=-2, dim2=-1).sum(-1)
+                J = torch.where(liquid, torch.linalg.det(p.F) * (1.0 + dt * trC), J)
             Jc = J.clamp(min=1e-6)
             Jl = torch.sqrt(Jc) if D == 2 else Jc.pow(1.0 / D)     # volume-preserving isotropic reset
             F = torch.where(liquid[:, None, None], eye * Jl[:, None, None], F)
         visco = getattr(p, "is_visco", None)
-        if visco is not None and visco.any():                      # VISCOELASTIC (Maxwell): PARTIAL shape reset
+        if _const_any(self, "_c_visco", visco):                    # VISCOELASTIC (Maxwell): PARTIAL shape reset
             vm = visco                                             # relax F toward isotropic with time-constant tau,
             Fv = F[vm]                                             # keeping VOLUME (J) -> stress builds then decays
             U, sig, Vh = torch.linalg.svd(Fv)                      # SVD: sig = principal stretches
@@ -148,7 +219,7 @@ class MPMStrain(Lateral):
             F = F.clone()
             F[vm] = U @ torch.diag_embed(sig) @ Vh
         snow = getattr(p, "is_snow", None)
-        if snow is not None and snow.any():                        # SNOW: clamp singular values, harden via Jp
+        if _const_any(self, "_c_snow", snow):                      # SNOW: clamp singular values, harden via Jp
             sm = snow; Fs = F[sm]
             if Fs.shape[0] > 0:
                 U, sig, Vh = torch.linalg.svd(Fs)
@@ -162,7 +233,16 @@ class MPMStrain(Lateral):
                 F = F.clone(); F[sm] = U @ torch.diag_embed(sig_c) @ Vh
                 ratio = sig.prod(-1) / sig_c.prod(-1).clamp(min=1e-6)
                 Jp = p.Jp.clone(); Jp[sm] = (Jp[sm] * ratio).clamp(0.6, 20.0)
-                p.Jp = Jp
-        p.F = F
+                p.Jp.copy_(Jp)
+        # DORMANT PARTICLES DO NOT DEFORM. `mpm_scatter` masks its weights by occupancy and
+        # `mpm_gather` freezes occ==0 rather than advecting it, but this operator integrated F for the
+        # reserve regardless -- so a particle waiting to be spawned accumulated an arbitrary deformation
+        # for as long as it waited, and was then promoted into real material carrying it. Byte-identical
+        # when every particle is live, which is every composition that has no reserve.
+        occ = getattr(p, "occ", None)
+        if occ is not None:
+            live = (occ > 0)[:, None, None]
+            F = torch.where(live, F, p.F)
+        p.F.copy_(F)                        # in place; every read of p.F above precedes it
         return {}
 ```

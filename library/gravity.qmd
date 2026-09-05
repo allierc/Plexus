@@ -1,6 +1,6 @@
 ---
 title: "gravity"
-subtitle: "A uniform body force at the cell level."
+subtitle: "A uniform body force: the same acceleration on every element, independent of its state."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A uniform body force at the cell level."
 
 [`lateral`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
 
-A uniform body force at the cell level.
+A uniform body force: the same acceleration on every element, independent of its state.
 :::
 
 ```{=html}
@@ -42,20 +42,21 @@ A uniform body force at the cell level.
 
 ## Mechanism
 
-Applies the same acceleration to every selected cell and RETURNS it as a delta
-`{cell: a}`. In an MPM scene the cell is a derived aggregate (its position is the
-centroid of its particles), so the engine does not integrate it; instead the
-`mls_mpm_mechanics` operator reads the cell's accumulated delta and feeds it into
-the substep as the external body force `a_ext`. So gravity is an ordinary operator
--- it does not touch `pos`/`vel`, it just contributes a force.
+cell -> cell: reads nothing, emits an acceleration the MPM substep consumes.
 
-The *bounce* of a dropped soft body is NOT a force here: it is the emergent elastic
-response when the body compresses against the reflective floor (grid velocity into a
-wall is clamped to zero, the fixed-corotated stress springs it back). Stiffer
-`youngs` -> livelier bounce; `drag` on the mpm operator sets how fast it decays.
+    a_i = (gx, gy, gz)
 
-Default direction is -y (down). Override `gx`/`gy` for an incline or sideways pull
-(e.g. a tilted-gravity slosh).
+The three components are in world units per time squared. `g` is a convenience setting
+gy = -g. The default direction is -y because in 2D that is the screen's vertical; in 3D the
+screen's vertical is z, as both mplot3d and VTK put z up, so a 3D specification wanting a
+fall that looks vertical writes `gy: 0.0, gz: -9.0`. gz defaults to 0, so a specification
+written before z existed keeps the -y fall it had.
+
+Emits `mpm_acceleration`, which the MPM substep consumes as an external body acceleration.
+It is deliberately NOT engine-integrated on the cell set: a cell here is a centroid read out
+from its material points, so integrating it directly would make it fall twice.
+
+Reference: Newton, I. (1687). Philosophiae Naturalis Principia Mathematica.
 
 $$
 \mathbf a_{\text{ext}} \;=\; \mathbf g \qquad (\text{default } \mathbf g=(0,-g_y))
@@ -70,6 +71,7 @@ reads it as the external body force rather than the engine integrating it.
 | `g` | gravity_magnitude | 10.0 |
 | `gx` | gravity_x | 0.0 |
 | `gy` | gravity_y | -self.g |
+| `gz` | gravity_z | 0.0 |
 
 ## Minimal spec
 
@@ -84,46 +86,39 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
-[`src/plexus/operators/gravity.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/gravity.py) &mdash; the registered operator.
+[`src/plexus/operators/motion_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/motion_ops.py) &mdash; the registered operator.
 
 ```python
-"""gravity -- a uniform body force at the cell level.
-
-Applies the same acceleration to every selected cell and RETURNS it as a delta
-`{cell: a}`. In an MPM scene the cell is a derived aggregate (its position is the
-centroid of its particles), so the engine does not integrate it; instead the
-`mls_mpm_mechanics` operator reads the cell's accumulated delta and feeds it into
-the substep as the external body force `a_ext`. So gravity is an ordinary operator
--- it does not touch `pos`/`vel`, it just contributes a force.
-
-The *bounce* of a dropped soft body is NOT a force here: it is the emergent elastic
-response when the body compresses against the reflective floor (grid velocity into a
-wall is clamped to zero, the fixed-corotated stress springs it back). Stiffer
-`youngs` -> livelier bounce; `drag` on the mpm operator sets how fast it decays.
-
-Default direction is -y (down). Override `gx`/`gy` for an incline or sideways pull
-(e.g. a tilted-gravity slosh).
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-
 @register_operator("gravity", family="mechanics", set="cell", kind="lateral")
 class GravityOperator(Lateral):
-    EMIT = "mpm_acceleration"                  # a body accel the MPM substep consumes as a_ext;
-    # NOT engine-integrated on the cell (the cell is a centroid readout), so `cell` never
-    # enters H.emit_order and the engine never advects it under gravity.
+    """A uniform body force: the same acceleration on every element, independent of its state.
+
+    cell -> cell: reads nothing, emits an acceleration the MPM substep consumes.
+
+        a_i = (gx, gy, gz)
+
+    The three components are in world units per time squared. `g` is a convenience setting
+    gy = -g. The default direction is -y because in 2D that is the screen's vertical; in 3D the
+    screen's vertical is z, as both mplot3d and VTK put z up, so a 3D specification wanting a
+    fall that looks vertical writes `gy: 0.0, gz: -9.0`. gz defaults to 0, so a specification
+    written before z existed keeps the -y fall it had.
+
+    Emits `mpm_acceleration`, which the MPM substep consumes as an external body acceleration.
+    It is deliberately NOT engine-integrated on the cell set: a cell here is a centroid read out
+    from its material points, so integrating it directly would make it fall twice.
+
+    Reference: Newton, I. (1687). Philosophiae Naturalis Principia Mathematica.
+    """
+
+    EMIT = "mpm_acceleration"                  # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]                           # uniform body force is dimension-generic
     REQUIRES_PARAMS = []                              # no required params — direction/magnitude optional (default -y down)
-    PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y"}
+    PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y",
+                   "gz": "gravity_z"}
     REFERENCE = "Newton, I. (1687). Philosophiae Naturalis Principia Mathematica."
     MECHANISM_TAGS = ["body_force", "uniform_acceleration"]
 
@@ -133,14 +128,17 @@ class GravityOperator(Lateral):
         self.g = float(params.get("g", 10.0))            # magnitude (world units / time^2)
         self.gx = float(params.get("gx", 0.0))           # x-component (default 0)
         self.gy = float(params.get("gy", -self.g))       # y-component (default -g: down)
+        self.gz = float(params.get("gz", 0.0))
 
     def forward(self, H, mask=None):
         cell = H.level(self.at)
         dev = cell.state.device
-        D = int(getattr(H, "dim", 2))                    # gravity is a D-vector; -y (axis 1) is "down"
+        D = int(getattr(H, "dim", 2))                    # gravity is a D-vector
         accel = torch.zeros(cell.n, D, device=dev)
         accel[:, 0] = self.gx
         accel[:, 1] = self.gy
+        if D > 2:
+            accel[:, 2] = self.gz
         if mask is not None:
             accel = accel * mask.float()[:, None]
         return {cell.name: accel}

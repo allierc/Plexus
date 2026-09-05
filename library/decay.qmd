@@ -1,6 +1,6 @@
 ---
 title: "decay"
-subtitle: "Field -> field. Linear evaporation of a scalar field."
+subtitle: "The field loses a fixed amount everywhere, floored at zero."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Field -> field. Linear evaporation of a scalar field."
 
 [`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Field -> field. Linear evaporation of a scalar field.
+The field loses a fixed amount everywhere, floored at zero.
 :::
 
 ```{=html}
@@ -42,9 +42,21 @@ Field -> field. Linear evaporation of a scalar field.
 
 ## Mechanism
 
-c <- max(0, c - k*dt). Without decay the deposited trail would only accumulate;
-decay is what lets unused filaments fade so the network coarsens (stigmergy).
-Writes the field in place; returns {}.
+deposited trail from being permanent, and so what sets how long the past is remembered.
+
+field -> field: acts on the field named by `at:`, writing its grid in place.
+
+    c <- max(c - r dt, 0)
+
+r is `rate`, in field units per unit time. Note the form: this is a CONSTANT amount removed
+per unit time, not exponential decay -- it is not dc/dt = -r c. A voxel at 0.2 and one at
+1.0 lose the same absolute amount each tick, so a faint trail vanishes proportionally much
+sooner than a strong one, and every voxel reaches exactly zero in finite time rather than
+approaching it. Combined with `deposit`'s ceiling of 1, the field's memory is at most
+1 / (r dt) ticks.
+
+Reference: none -- linear removal is a modelling choice here, not a published law. Plexus
+(this work).
 
 $$
 c \;\leftarrow\; \max\!\big(0,\; c - k\,\Delta t\big)
@@ -71,35 +83,39 @@ operators:
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`activation_pulse`](activation_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`hash_encoding`](hash_encoding.qmd), [`diffuse`](diffuse.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`activation_pulse`](activation_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 
-[`src/plexus/operators/decay.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/decay.py) &mdash; the registered operator.
+[`src/plexus/operators/field_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/field_ops.py) &mdash; the registered operator.
 
 ```python
-"""decay -- field -> field. Linear evaporation of a scalar field.
-
-c <- max(0, c - k*dt). Without decay the deposited trail would only accumulate;
-decay is what lets unused filaments fade so the network coarsens (stigmergy).
-Writes the field in place; returns {}.
-"""
-from __future__ import annotations
-
-from plexus.models.base import FieldUpdate
-from plexus.models.registry import register_operator
-
-
 @register_operator("decay", family="fields", set="field", kind="field")
 class Decay(FieldUpdate):
-    """field -> field: acts on the field named by `at:` (no set involved)."""
+    """Evaporation: the field loses a fixed amount everywhere, floored at zero. What stops a
+    deposited trail from being permanent, and so what sets how long the past is remembered.
 
-    EMIT = None                                # field->field: writes the grid in place (evaporation); returns {} — no integrable delta
+    field -> field: acts on the field named by `at:`, writing its grid in place.
+
+        c <- max(c - r dt, 0)
+
+    r is `rate`, in field units per unit time. Note the form: this is a CONSTANT amount removed
+    per unit time, not exponential decay -- it is not dc/dt = -r c. A voxel at 0.2 and one at
+    1.0 lose the same absolute amount each tick, so a faint trail vanishes proportionally much
+    sooner than a strong one, and every voxel reaches exactly zero in finite time rather than
+    approaching it. Combined with `deposit`'s ceiling of 1, the field's memory is at most
+    1 / (r dt) ticks.
+
+    Reference: none -- linear removal is a modelling choice here, not a published law. Plexus
+    (this work).
+    """
+
+    EMIT = None                                # writes the grid in place, returns no delta
     SUPPORTED_DIMS = [2, 3]                     # elementwise evaporation, dimension-agnostic
     REQUIRES_PARAMS = []                        # no required params — field target from `at:`; `rate` optional
     MECHANISM_TAGS = ["evaporation", "field_decay", "stigmergy"]
     PARAM_ROLES = {"rate": "evaporation_rate"}
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = "Plexus (this work); linear removal, not exponential decay."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

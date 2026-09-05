@@ -1,0 +1,282 @@
+---
+title: "seed_cell_chem"
+subtitle: "The initial morphogen field on the cell set, written once at the opening of the trajectory."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+The initial morphogen field on the cell set, written once at the opening of the trajectory.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `cell` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+The default `scatter` model is the Gray-Scott initial condition.
+
+cell -> cell: writes the `chem` block, once.
+
+    u_j = 1 everywhere,   a_j = 0 everywhere
+    except a central spot, where (a, u) = (0.5, 0.25)
+
+a is the activator and u the substrate, both dimensionless concentrations; chem = [a, u]. The
+substrate starts full and the activator absent, so nothing happens anywhere except at the spot
+-- which is what makes the pattern's origin a declared initial condition rather than an
+accident of the numerics.
+
+A SEED, NOT A BOUNDARY CONDITION, and the kind enforces it: the runtime confines every seed to
+the opening frames. A rule re-applied every frame is a moving boundary condition, and it makes
+the answer to "does the chemical pattern grip the shape?" a property of the rule rather than of
+the simulation. It also overwrites both chemistry channels every tick, so no other operator
+writing to `chem` -- `cell_chem_from_shape`, for one -- can accumulate anything at all, and its
+parameters become inert while still appearing to be under test.
+
+An unrecognised model raises rather than falling through to the default. A specification that
+can no longer be run is a correct outcome; one that quietly runs something else is not.
+
+Reference: Plexus (this work); cone seeding after Okuda, S. et al. (2018). Sci. Rep. 8:2386.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `vertex_set` | &ndash; | "vertex" |
+| `seed` | &ndash; | 0 |
+| `n_species` | &ndash; | self.N_SPECIES |
+| `p0` | &ndash; | 1.0 |
+| `seed_frac` | &ndash; | 0.06 |
+| `A` | &ndash; | 1.0 |
+| `B` | &ndash; | 3.0 |
+| `noise` | &ndash; | 0.04 |
+| `patch_z` | &ndash; | 0.6 |
+| `n_spots` | &ndash; | 5 |
+| `cone_deg` | &ndash; | 18.0 |
+| `seed_dir` | &ndash; | None |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: seed_cell_chem, at: cell}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`initial_condition`]{.op-badge} [`gray_scott`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd).
+
+## Source
+
+[`src/plexus/operators/diffusion_reaction.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/diffusion_reaction.py) &mdash; the registered operator.
+
+```python
+@register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed")
+class CellRDSeed(Structural):
+    """The initial morphogen field on the cell set, written once at the opening of the trajectory.
+    The default `scatter` model is the Gray-Scott initial condition.
+
+    cell -> cell: writes the `chem` block, once.
+
+        u_j = 1 everywhere,   a_j = 0 everywhere
+        except a central spot, where (a, u) = (0.5, 0.25)
+
+    a is the activator and u the substrate, both dimensionless concentrations; chem = [a, u]. The
+    substrate starts full and the activator absent, so nothing happens anywhere except at the spot
+    -- which is what makes the pattern's origin a declared initial condition rather than an
+    accident of the numerics.
+
+    A SEED, NOT A BOUNDARY CONDITION, and the kind enforces it: the runtime confines every seed to
+    the opening frames. A rule re-applied every frame is a moving boundary condition, and it makes
+    the answer to "does the chemical pattern grip the shape?" a property of the rule rather than of
+    the simulation. It also overwrites both chemistry channels every tick, so no other operator
+    writing to `chem` -- `cell_chem_from_shape`, for one -- can accumulate anything at all, and its
+    parameters become inert while still appearing to be under test.
+
+    An unrecognised model raises rather than falling through to the default. A specification that
+    can no longer be run is a correct outcome; one that quietly runs something else is not.
+
+    Reference: Plexus (this work); cone seeding after Okuda, S. et al. (2018). Sci. Rep. 8:2386.
+    """
+
+    N_SPECIES = 2
+    SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["initial_condition", "gray_scott"]
+    MODES = ("scatter", "noise", "patch", "cones", "simplex")
+    REFERENCE = "Plexus (this work); cone seeding after Okuda, S. et al. (2018). Sci. Rep. 8:2386."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell"); self.vat = params.get("vertex_set", "vertex")
+        self.seed = int(params.get("seed", 0))
+        # WHICH SPECIES THIS SEEDER FILLS: 0 (columns 0,1) by default; 2 for a second RD system.
+        # HOW MANY COLUMNS THIS SEEDER FILLS. Two unless told otherwise, so nothing archived moves.
+        self.n_species = int(params.get("n_species", self.N_SPECIES))
+        # (`simplex`) the total the species are normalised to. 1.0 is the May-Leonard simplex.
+        self.p0 = float(params.get("p0", 1.0))
+        self.chan = _chan(params, type(self).__name__, self.n_species)
+        # How a pattern nucleates is on the `model:` axis, not a `mode:` setting. Five ways of
+        # writing x_0 are five claims about HOW PATTERNING NUCLEATES -- from random fluctuation,
+        # from a placed patch, from N fixed foci -- and seeding it in cones puts part of the answer
+        # in by hand. That is a hypothesis, and it belongs where the registry can see it.
+        #
+        # It also matters because the variants READ DIFFERENT THINGS: `scatter` and `noise` use no
+        # geometry at all, while `patch` and `cones` read the cell centroids. On the `model:` axis
+        # each carries its own typed signature, so "may this seed be scheduled ahead of
+        # `cell_geometry`?" is answerable from the registry rather than from a hard-coded list.
+        if "mode" in params:
+            raise ValueError(
+                "seed_cell_chem: `mode` is gone -- write `model:`. How a pattern nucleates is a "
+                "hypothesis, not a setting. "
+                + ("`tip` is gone: it re-seeded every frame, which makes it a moving boundary "
+                   "condition and annihilates every operator that writes to `chem`. Use "
+                   "`model: scatter`." if params.get("mode") == "tip" else ""))
+        self.mode = getattr(type(self), "NUCLEATION", "scatter")
+        self.seed_frac = float(params.get("seed_frac", 0.06))   # (scatter) fraction of strong activator seeds
+        self.A = float(params.get("A", 1.0)); self.B = float(params.get("B", 3.0))   # (noise) steady state (A, B/A)
+        self.noise = float(params.get("noise", 0.04))
+        self.patch_z = float(params.get("patch_z", 0.6))        # (patch) activate cells with cen_z > patch_z x z_max
+        self.n_spots = int(params.get("n_spots", 5))            # (cones) number of fixed radial activation foci
+        self.cone_deg = float(params.get("cone_deg", 18.0))     # (cones) half-angle of each activation cone
+        self.seed_dir = params.get("seed_dir", None)            # (cones, n_spots=1) override the cone axis to a fixed
+        #   direction -> aim the tube where we want it (e.g. FRONT of the render camera at elev18/azim30 ~ (.82,.48,.31))
+
+    def _cone_dirs(self):
+        """`n_spots` spread unit directions on the sphere (Fibonacci) -> fixed radial tube axes (Fig 5). A given
+        `seed_dir` overrides the axis (used for n_spots=1 to point the single tube at the camera)."""
+        if self.seed_dir is not None and self.n_spots == 1:
+            v = np.asarray(self.seed_dir, float); return (v / (np.linalg.norm(v) + 1e-12))[None, :]
+        i = np.arange(self.n_spots) + 0.5
+        phi = np.arccos(1 - 2 * i / self.n_spots); theta = np.pi * (1 + 5 ** 0.5) * i
+        return np.stack([np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)], 1)
+
+    def forward(self, H, mask=None):
+        clvl = H.level(self.at)
+        # A MESH IS NOT REQUIRED, AND ASKING FOR ONE BY NAME WAS FATAL. This read
+        # `H.level(self.vat)` unconditionally, so a spec with no `vertex` set died on
+        # `KeyError: 'vertex'` -- and `SUPPORTED_DIMS` says [2, 3], so a flat 2D run is supposed to
+        # be legal. All this operator wants from the mesh is nF, THE NUMBER OF CELLS; `scatter` and
+        # `noise` use no geometry whatever, and `patch`/`cones` already guard on `"cen" in
+        # state_schema` and fall back to a uniform 0.02 without it. On a mesh-free set the cell
+        # level IS the population, so its own occupancy answers the only question being asked.
+        # `in` rather than `.get`: `H.levels` is an `nn.ModuleDict`, which has no `.get` -- the
+        # exact trap that silently disabled `renumber_set`.
+        vlvl = H.levels[self.vat] if self.vat in H.levels else None
+        m = getattr(vlvl, "_mesh", None) if vlvl is not None else None
+        if "chem" not in clvl.state_schema:
+            return {}
+        if m is not None:
+            nF = m["nF"]
+        else:
+            occ = getattr(clvl, "occ", None)
+            nF = int(occ.sum().item()) if occ is not None else int(clvl.state.shape[0])
+            if nF <= 0:
+                return {}
+        dev = clvl.state.device
+        g = torch.Generator(device="cpu"); g.manual_seed(self.seed)
+        if self.mode == "patch":                                # localized activation source (a bud/tube driver)
+            a = torch.full((nF,), 0.02, device=dev)
+            if "cen" in clvl.state_schema:
+                ci0, ci1 = clvl.state_schema["cen"]; zc = clvl.state[:nF, ci0 + 2]
+                a = torch.where(zc > self.patch_z * float(zc.max()), torch.ones(nF, device=dev), a)
+            u = torch.ones(nF, device=dev)
+        elif self.mode == "cones":                              # N FIXED radial activation cones (Fig 5 multi-tube):
+            a = torch.full((nF,), 0.02, device=dev)             # each cone's tip stays activated as it extends ->
+            if "cen" in clvl.state_schema:                      # N radial tubes. Re-seeded every frame (tracks tips).
+                ci0, ci1 = clvl.state_schema["cen"]; cen = clvl.state[:nF, ci0:ci0 + 3]
+                d = cen / (cen.norm(dim=1, keepdim=True) + 1e-9)
+                dirs = torch.as_tensor(self._cone_dirs(), dtype=cen.dtype, device=dev)
+                cosmax = (d @ dirs.T).max(dim=1).values
+                a = torch.where(cosmax > float(np.cos(np.radians(self.cone_deg))), torch.ones(nF, device=dev), a)
+            u = torch.ones(nF, device=dev)
+        elif self.mode == "simplex":
+            # A SYMMETRIC START FOR A COMPETITION MODEL. Every other mode here is a Gray-Scott
+            # initial condition: activator in column 0, SUBSTRATE = 1 in column 1. Feed that to
+            # May-Leonard, where column 1 is just the second competitor, and the run begins with
+            # v at 0.9 against u and w at 0.07 -- not a competition, a landslide. Measured: v
+            # dominates immediately, w cyclically beats v, and the field collapses to w = 1
+            # everywhere with zero spatial variance. No motif can emerge from that and none did.
+            #
+            # `simplex` gives all n species the same random field and then NORMALISES SO THEY SUM
+            # TO `p0`, which is what ParticleGraph's RD_RPS does (`init_mesh`, case 'RD_Mesh':
+            # `node_value = rand(n,3)` then `node_value[:,k] /= sum`). p0 = 1 is not a detail: the
+            # logistic factor is (1 - p - a*rival), so starting at p = 0.175 leaves (1-p) = 0.83 of
+            # net growth for EVERY species and the run spends itself climbing to the simplex
+            # instead of competing on it. The heteroclinic cycle that produces spirals lives AT
+            # p = 1, so an initial condition below it postpones the whole phenomenon.
+            a = None
+            u = None
+        elif self.mode == "noise":                              # Brusselator: homogeneous steady state + noise
+            a = (self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
+            u = (self.B / self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
+        else:                                                   # "scatter" -- and ONLY scatter. The mode is validated
+            # in __init__, so this branch can no longer be reached by a typo or by a mode that was
+            # deleted out from under an archived spec.
+            # (a central spot is 2D-disk logic -- on a sphere every cell is equidistant, so scatter/noise)
+            a = (0.04 * torch.rand(nF, generator=g)).to(dev)
+            u = torch.ones(nF, device=dev)
+            nucl = (torch.rand(nF, generator=g) < self.seed_frac).to(dev)
+            a = torch.where(nucl, torch.full_like(a, 0.5), a)
+            u = torch.where(nucl, torch.full_like(u, 0.25), u)
+        # SEEDED INTO THIS SPECIES' OWN COLUMNS. `chan` offsets from the schema's base, so a
+        # second seeder writes the second pair and leaves the first alone.
+        h0, h1 = clvl.state_schema["chem"]
+        base = h0 + self.chan
+        st = clvl.state.clone()
+        # SIMPLEX WRITES EVERY SPECIES AND RETURNS -- it has no activator/substrate pair to write,
+        # which is the whole point of it, so it must run BEFORE the `a`/`u` write rather than after.
+        if self.mode == "simplex":
+            _cols = [k for k in range(self.n_species) if h1 - base > k]
+            _r = torch.rand(nF, len(_cols), generator=g).to(dev)
+            _r = self.p0 * _r / _r.sum(dim=1, keepdim=True).clamp(min=1e-9)
+            for _i, _k in enumerate(_cols):
+                st[:nF, base + _k:base + _k + 1] = _r[:, _i:_i + 1]
+            clvl.state = st
+            return {}
+        st[:nF, base:base + 1] = a[:, None]
+        if h1 - base > 1:
+            st[:nF, base + 1:base + 2] = u[:, None]
+        # A SPAN WIDER THAN TWO gets the remaining species seeded the same way the first was, from
+        # the SAME generator, so a three-species start is three independent random fields rather
+        # than one field and two zeros -- two zeros is extinction, not a neutral start.
+        for _k in range(2, self.n_species):
+            if h1 - base > _k:
+                _v = (0.04 * torch.rand(nF, generator=g)).to(dev)
+                _nu = (torch.rand(nF, generator=g) < self.seed_frac).to(dev)
+                st[:nF, base + _k:base + _k + 1] = torch.where(
+                    _nu, torch.full_like(_v, 0.5), _v)[:, None]
+        clvl.state = st
+        return {}
+```

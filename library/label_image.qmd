@@ -1,0 +1,85 @@
+---
+title: "label_image"
+subtitle: "An integer instance map read from a TIFF. NOT normalised, NEVER interpolated."
+---
+
+::: {.op-head}
+![](../figures/icons/field.png){.op-logo}
+
+[`field`]{.op-badge} [`frame: label_image`]{.op-badge}
+
+An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Frame** &mdash; `label_image` (how the continuum is discretized).
+- **Couples to** &mdash; any set, via an `exchange` operator.
+- **Used by** &mdash; `exchange` operators (push / pull) and `field` self-dynamics.
+
+## Description
+
+The one job it has that `image` cannot do: return the id that is actually there. Bilinear
+weights between label 7 and label 12 are a number that means nothing and points at a cell that
+may not exist, so `sample_label` indexes rather than interpolates.
+
+## Source
+
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py)
+
+```python
+@register_field("label_image", frame="label_image")
+class LabelImageField(Field):
+    """An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.
+
+    The one job it has that `image` cannot do: return the id that is actually there. Bilinear
+    weights between label 7 and label 12 are a number that means nothing and points at a cell that
+    may not exist, so `sample_label` indexes rather than interpolates.
+    """
+
+    def __init__(self, name, source=None, res=None, width=1.0, device="cpu", **kw):
+        super().__init__(name)
+        if source is None:
+            raise ValueError(f"label_image field {name!r} needs a `source:` (path to a label .tif)")
+        import tifffile
+        path = source if os.path.isabs(source) else graphs_data_path(source)
+        img = tifffile.imread(path)
+        if img.ndim == 3:
+            img = img[..., 0]
+        img = img[::-1, :].copy()                       # image-top -> domain-top, as ImageField
+        v = torch.tensor(img.astype("int64"), device=device).permute(1, 0).contiguous()
+        self.C = 1
+        self.nx, self.ny = int(v.shape[0]), int(v.shape[1])
+        self.width = float(width)
+        self.R = self.nx / self.width
+        self.register_buffer("grid", v[None])           # [1, nx, ny] int64 labels
+        self.n_labels = int(v.max())
+
+    def sample_label(self, pos):
+        """[N,2] world positions -> [N] integer label, nearest neighbour."""
+        x = pos[:, 0].clamp(0, self.width - 1e-6) / self.width * self.nx
+        y = pos[:, 1].clamp(0, self.width - 1e-6) / self.width * self.ny
+        gx = x.long().clamp(0, self.nx - 1)
+        gy = y.long().clamp(0, self.ny - 1)
+        return self.grid[0][gx, gy]
+```

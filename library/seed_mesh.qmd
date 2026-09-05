@@ -1,0 +1,277 @@
+---
+title: "seed_mesh"
+subtitle: "Build the surface the whole model lives on, once, at frame 0: a closed half-edge mesh whose faces are the cells."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Build the surface the whole model lives on, once, at frame 0: a closed half-edge mesh whose faces are the cells.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+faces are the cells.
+
+vertex -> vertex: writes every vertex position, and stashes the half-edge table and the
+per-face targets on the mesh.
+
+`n` cells are placed as a spherical Voronoi tessellation of `n` points on a sphere of radius R,
+both in world units, so each face is a polygon and each vertex is shared by three of them.
+`jitter` disorders the generating points, from 0 (a regular arrangement) to 1; a regular one is
+not neutral, because the mechanics then inherits its symmetry.
+
+It also writes the targets the energy is measured against: A0 and P0 per face -- the target
+area and perimeter, in world units squared and world units -- and V0, the target lumen volume.
+Those are what growth raises and what the mechanics tries to reach.
+
+`shape` selects the geometry: `sphere` is the closed vesicle, `disc` an open flat patch. It is
+a VALUE and not a model, because the hypothesis about the tissue is identical in both -- the
+same energy, the same operators -- seeded into two different geometries. A disc has a rim whose
+cells have fewer neighbours, so the run has to be read knowing the rim does not divide.
+
+Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `n_cells` | &ndash; | 150 |
+| `radius` | &ndash; | 5.0 |
+| `jitter` | &ndash; | 0.15 |
+| `p0` | &ndash; | 3.9 |
+| `seed` | &ndash; | 0 |
+| `centre` | &ndash; | [0.0, 0.0, 0.0] |
+| `shape` | &ndash; | "sphere" |
+| `type_layout` | &ndash; | "random" |
+| `cell_set` | &ndash; | "cell" |
+| `a0_scale` | &ndash; | 1.0 |
+| `vseed_cv` | &ndash; | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: seed_mesh, at: vertex}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`vesicle`]{.op-badge} [`epithelial_shell`]{.op-badge} [`spherical`]{.op-badge} [`half_edge_mesh`]{.op-badge} [`initial_condition`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd).
+
+## Source
+
+[`src/plexus/operators/vertex_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/vertex_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed")
+class SeedMesh3D(Structural):
+    """Build the surface the whole model lives on, once, at frame 0: a closed half-edge mesh whose
+    faces are the cells.
+
+    vertex -> vertex: writes every vertex position, and stashes the half-edge table and the
+    per-face targets on the mesh.
+
+    `n` cells are placed as a spherical Voronoi tessellation of `n` points on a sphere of radius R,
+    both in world units, so each face is a polygon and each vertex is shared by three of them.
+    `jitter` disorders the generating points, from 0 (a regular arrangement) to 1; a regular one is
+    not neutral, because the mechanics then inherits its symmetry.
+
+    It also writes the targets the energy is measured against: A0 and P0 per face -- the target
+    area and perimeter, in world units squared and world units -- and V0, the target lumen volume.
+    Those are what growth raises and what the mechanics tries to reach.
+
+    `shape` selects the geometry: `sphere` is the closed vesicle, `disc` an open flat patch. It is
+    a VALUE and not a model, because the hypothesis about the tissue is identical in both -- the
+    same energy, the same operators -- seeded into two different geometries. A disc has a rim whose
+    cells have fewer neighbours, so the run has to be read knowing the rim does not divide.
+
+    Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644.
+    """
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["vesicle", "epithelial_shell", "spherical", "half_edge_mesh", "initial_condition"]
+    REFERENCE = "Okuda, S. et al. (2013). Reversible network reconnection model for simulating large deformation in 3D tissues. Biomech. Model. Mechanobiol. 12:627-644; tyssue (DamCB)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.n = int(params.get("n_cells", 150)); self.R = float(params.get("radius", 5.0))
+        self.jitter = float(params.get("jitter", 0.15)); self.p0 = float(params.get("p0", 3.9))
+        self.seed = int(params.get("seed", 0))
+        # WHERE THE SPHERE GOES. `build_sphere_mesh` returns it about the ORIGIN, and until now
+        # nothing could move it: every spec that used this ran in a `free` world centred on 0, so a
+        # unit box put the vesicle in a corner. Default [0,0,0], so the 461 specs that never asked
+        # are byte-identical.
+        self.centre = [float(v) for v in params.get("centre", [0.0, 0.0, 0.0])]
+        # `shape: sphere | disc` -- THE GEOMETRY OF THE INITIAL CONDITION, and it is a value on this
+        # operator rather than a `model:` because a flat patch and a closed shell are the same
+        # hypothesis about the tissue seeded into two different geometries. `seed_plate` already
+        # spells its geometry this way.
+        #
+        # A DISC IS AN OPEN MESH, which the rest of the vertex stack has never seen: `divide_face_3d`
+        # refuses a face whose split edges lack two distinct interior neighbours, and every rim face
+        # is one. That is the point of seeding it -- a flat sheet is where the monolayer's normal
+        # offset can be tuned with no curvature in the picture -- but it means the rim does not
+        # divide, and the run has to be read knowing that.
+        #
+        # `hexagon` IS THE THIRD VALUE, added for gate row AB-C2: one regular hexagonal cell, the
+        # only solid in the apico-basal promotion whose shape index is known on paper. See
+        # `build_hexagon_mesh`. It is a value for the same reason `disc` is -- the same hypothesis
+        # about the tissue, seeded into a geometry chosen so a closed form is reachable.
+        self.shape = str(params.get("shape", "sphere")).lower()
+        if self.shape not in ("sphere", "disc", "hexagon"):
+            raise ValueError(f"mesh_seed: shape must be 'sphere', 'disc' or 'hexagon', "
+                             f"got {self.shape!r}")
+        # PARTITION THE TYPES BY POSITION, NOT AT RANDOM. `type_layout` on a SET is applied at build
+        # (engine.py), over that set's own coordinates -- which a mesh cell does not have yet: the
+        # cells do not exist until this operator runs, so the build-time split assigns every one of
+        # them to type 0 and a two-type spheroid comes out uniform. Declaring it here instead cuts
+        # the shell at the equator of the axis named, tiling the declared `fraction`s along it, at
+        # the moment the faces first have centroids.
+        self.type_layout = str(params.get("type_layout", "random")).lower()
+        self.cell_set = params.get("cell_set", "cell")
+        # THE PREFERRED AREA, SET APART FROM THE GEOMETRY. `A0` was always `mean(area)` of the mesh
+        # just built, so every run started exactly at its target and the ONLY direction it could go
+        # was down, under whatever line tension the mechanics carried: a sweep of six specs that all
+        # ended between A/A0 0.44 and 0.72 and never once tested expansion.
+        #
+        # It is also the missing half of the Marinari crowding transform. `cell_mechanics
+        # [model: marinari]` rescales K, Lambda and Gamma by g^-2, g^-1/2 and g^-1, which leaves W
+        # invariant ONLY together with A0' = g A0 -- and that line is the seeder's, so `crowding: 4`
+        # weakened the area term 16x against a line term weakened 2x and collapsed the shell to
+        # radius 1.4 with CV(junction length) 1.9. With this, `a0_scale: g` completes the transform,
+        # and the paper's own words become the gate: a tissue "free to expand so that its total area
+        # was larger by a factor g" must settle at A = g x its seeded area.
+        self.a0_scale = float(params.get("a0_scale", 1.0))
+        if self.a0_scale <= 0:
+            raise ValueError(f"mesh_seed: a0_scale must be > 0, got {self.a0_scale}")
+        self.vseed_cv = float(params.get("vseed_cv", 0.0))       # STOCHASTIC VOLUME SEED: per-cell random cell-cycle
+        #   phase at t=0 (spread of the initial division threshold) -> desynchronises the FIRST division wave
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); dev = lvl.state.device; dt = lvl.state.dtype
+        _build = {"sphere": build_sphere_mesh, "disc": build_disc_mesh,
+                  "hexagon": build_hexagon_mesh}[self.shape]
+        verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
+        Nv = verts.shape[0]; Nbuf = lvl.state.shape[0]
+        if Nv > Nbuf:
+            raise ValueError(f"sphere mesh has {Nv} vertices but buffer n={Nbuf}")
+        verts = verts + np.asarray(self.centre, verts.dtype)
+        pos = torch.zeros(Nbuf, 3, dtype=dt, device=dev)
+        pos[:Nv] = torch.as_tensor(verts, dtype=dt, device=dev)
+        px0, px1 = lvl.state_schema["pos"]
+        st = lvl.state.clone(); st[:, px0:px1] = pos; lvl.state = st
+        if getattr(lvl, "occ", None) is not None:
+            occ = torch.zeros(Nbuf, device=dev); occ[:Nv] = 1.0; lvl.occ = occ
+        est = torch.as_tensor(es, device=dev); ett = torch.as_tensor(et, device=dev)
+        eft = torch.as_tensor(ef, device=dev)
+        area, perim, cen, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
+        A_seed = float(area.mean())
+        A0 = A_seed * self.a0_scale; P0 = self.p0 * (A0 ** 0.5)
+        if self.a0_scale != 1.0:
+            print(f"[mesh_seed] preferred area A0 = {self.a0_scale:g} x the seeded mean area "
+                  f"{A_seed:.4f} = {A0:.4f}: every cell starts at {1.0 / self.a0_scale:.3f} of its "
+                  f"target, so the shell is under-inflated and must EXPAND "
+                  f"(radius x {self.a0_scale ** 0.5:.3f} if the area term wins outright)", flush=True)
+        if self.vseed_cv > 0:                                    # random initial cell-cycle phase per cell
+            dj = np.clip(1.0 + self.vseed_cv * np.random.default_rng(self.seed + 101).standard_normal(nF), 0.4, 1.8)
+        else:
+            dj = np.ones(nF)                                     # all cells born in phase (synchronised)
+        # A `MeshTable`, WHICH IS A `dict` -- see `plexus.models.mesh`. Every reader is unchanged
+        # by construction: the type still passes `isinstance(m, dict)` (which the D4 acted-ledger
+        # tests, and whose failure would score every mesh-only operator as inert), still iterates,
+        # still takes `get`/`setdefault`/`m[k] = v` on an open namespace. What it adds is a name for
+        # the thing, a place for the carry and the snapshot to live, and an engine that knows it
+        # exists -- `grep -rn "_mesh" src/plexus/` returned NOTHING before this.
+        #
+        # FILLED, NOT REBOUND, when the set declared `mesh: half_edge`. `engine._build_mesh`
+        # allocated the table during `build`, and rebinding here would hand every consumer a
+        # DIFFERENT OBJECT from the one the engine allocated -- which is the whole failure mode the
+        # declaration exists to end: anything that took a reference before the seed ran (the
+        # recorder, a probe, the salvage) would keep writing into an orphan. So the seed writes
+        # THROUGH the existing table when there is one, and only creates one for a spec that has
+        # not declared it yet, which is nearly all of them.
+        if self.type_layout.startswith("split_"):
+            from plexus.engine import retype
+            _ax = "xyz".index(self.type_layout[-1])
+            _cl = H.level(self.cell_set) if self.cell_set in H.levels else None
+            _fr = getattr(_cl, "_type_fracs", None) if _cl is not None else None
+            if _cl is None or _fr is None or int(_fr.numel()) < 2:
+                print(f"[mesh_seed] type_layout={self.type_layout} ignored: set "
+                      f"{self.cell_set!r} declares fewer than two types", flush=True)
+            else:
+                order = torch.argsort(cen[:, _ax])              # faces, sorted along the axis
+                nt = torch.zeros(int(_cl.n), dtype=torch.long, device=dev)
+                cuts = (torch.cumsum(_fr / _fr.sum(), 0) * nF).round().long().tolist()
+                lo = 0
+                for tid, hi in enumerate(cuts):
+                    nt[order[lo:min(int(hi), nF)]] = tid
+                    lo = int(hi)
+                retype(_cl, nt)
+                _names = list(getattr(_cl, "type_names", []) or [])
+                _tally = "  ".join(f"{(_names[t] if t < len(_names) else t)}={int((nt[:nF] == t).sum())}"
+                                   for t in range(int(_fr.numel())))
+                print(f"[mesh_seed] type_layout={self.type_layout}: {nF} cells cut at the "
+                      f"{'xyz'[_ax]} equator -> {_tally}", flush=True)
+        seeded = dict(E_srce=est, E_trgt=ett, E_face=eft, nF=nF, Nv=Nv,
+                         A0=torch.full((nF,), A0, dtype=dt, device=dev),
+                         P0=torch.full((nF,), P0, dtype=dt, device=dev),
+                         alive=torch.ones(nF, dtype=dt, device=dev),
+                         divjit=torch.as_tensor(dj, dtype=dt, device=dev),   # per-cell division-threshold multiplier
+                         # THE VOLUME AND RADIUS TARGETS FOLLOW `a0_scale`, on the isotropic rescale
+                         # it implies: a preferred AREA g times larger is a preferred LENGTH sqrt(g)
+                         # larger, hence a volume g^1.5 larger. Leaving V0f at the seeded value would
+                         # set `K_V` against the very expansion `a0_scale` asks for, so the shell
+                         # would stall short of its area target and the gate would fail on a
+                         # constraint the paper's 2D model does not even have. `Vbirth` follows V0f
+                         # for the same reason: a cell must still divide at twice its OWN target,
+                         # not at twice a volume it was never meant to hold.
+                         V0f=vf.detach().clone() * self.a0_scale ** 1.5,   # PER-CELL target wedge volume (v_eq per cell)
+                         Vbirth=vf.detach().clone() * self.a0_scale ** 1.5,   # volume at birth -> cell divides when it doubles
+                         V0=float(vf.sum()) * self.a0_scale ** 1.5,
+                         v_ref=float(vf.median()) * self.a0_scale ** 1.5,   # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
+                         #   morphogen growth caps v_eq at (4/3)v_ref, cells cycle in [2/3,4/3]v_ref centred on v_ref
+                         R0=float(np.linalg.norm(verts - np.asarray(self.centre, verts.dtype),
+                                                axis=1).mean()) * self.a0_scale ** 0.5, verts0=verts)
+        m = getattr(lvl, "_mesh", None)
+        if isinstance(m, MeshTable):
+            m.clear(); m.update(seeded)          # the engine's table, filled in place
+        else:
+            lvl._mesh = MeshTable(**seeded)      # spec has no `mesh:` declaration yet
+        return {}
+```

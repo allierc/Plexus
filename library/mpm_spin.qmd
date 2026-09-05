@@ -1,6 +1,6 @@
 ---
 title: "mpm_spin"
-subtitle: "Drive an MLS-MPM body toward slow solid-body rotation (a body force)."
+subtitle: "Drive a body toward slow solid-body rotation: a controller, not a constraint, so the body is free to deform while it turns."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Drive an MLS-MPM body toward slow solid-body rotation (a body force).
 
 [`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Drive an MLS-MPM body toward slow solid-body rotation (a body force).
+Drive a body toward slow solid-body rotation: a controller, not a constraint, so the body is free to deform while it turns.
 :::
 
 ```{=html}
@@ -42,21 +42,19 @@ Drive an MLS-MPM body toward slow solid-body rotation (a body force).
 
 ## Mechanism
 
-A proportional controller toward the rigid-rotation velocity field about a centre `c`:
+is free to deform while it turns.
 
-    v_rot(x) = omega * perp(x - c)          perp((dx,dy)) = (-dy, dx)     [2D]
-                                            omega x (x - c) about `axis`  [3D]
+particle -> particle: reads pos and vel, emits an external acceleration.
 
-Returned as a particle-level delta the engine sums into `H.delta(mpm_particle)`; the MLS-MPM
-`p2g` scatter consumes it as an external body force (`a_ext += H.delta(particle)`), exactly like
-`drag` and `gravity`. `EMIT=mpm_acceleration` (the engine does not integrate the particle set; g2p
-owns advection), so the spin enters mechanics only through the substep. The `-v_i` term damps
-toward the target rate, so a disc started at rest spins UP to `omega` and then rotates steadily
--- a single "rotate the disc slowly" knob, no external swirl map or pacemaker needed. Self-
-contained counterpart of the `pulse_to_contraction` + swirl-`vector_grid` recipe.
+omega is the target angular velocity in radians per unit time and c the rotation centre,
+defaulting to the domain centre; in 3D `axis` is the rotation axis. spin_k is the controller
+gain in inverse time, so 1/spin_k is how long the body takes to reach the target rotation.
 
-Dimension-generic: 2D uses the analytic perp; 3D rotates about `axis` (default z) via
-omega * (axis x (x - c)).
+A proportional controller rather than a prescribed velocity, because prescribing the velocity
+would make the rotation kinematic and destroy any deformation the rotation itself causes --
+which for a spinning deformable body is the thing worth watching.
+
+Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM).
 
 ## Parameters
 
@@ -80,42 +78,34 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
-[`src/plexus/operators/mpm_spin.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_spin.py) &mdash; the registered operator.
+[`src/plexus/operators/mpm_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_ops.py) &mdash; the registered operator.
 
 ```python
-"""mpm_spin -- drive an MLS-MPM body toward slow solid-body rotation (a body force).
-
-A proportional controller toward the rigid-rotation velocity field about a centre `c`:
-
-    v_rot(x) = omega * perp(x - c)          perp((dx,dy)) = (-dy, dx)     [2D]
-                                            omega x (x - c) about `axis`  [3D]
-    acc_i    = spin_k * (v_rot(x_i) - v_i)
-
-Returned as a particle-level delta the engine sums into `H.delta(mpm_particle)`; the MLS-MPM
-`p2g` scatter consumes it as an external body force (`a_ext += H.delta(particle)`), exactly like
-`drag` and `gravity`. `EMIT=mpm_acceleration` (the engine does not integrate the particle set; g2p
-owns advection), so the spin enters mechanics only through the substep. The `-v_i` term damps
-toward the target rate, so a disc started at rest spins UP to `omega` and then rotates steadily
--- a single "rotate the disc slowly" knob, no external swirl map or pacemaker needed. Self-
-contained counterpart of the `pulse_to_contraction` + swirl-`vector_grid` recipe.
-
-Dimension-generic: 2D uses the analytic perp; 3D rotates about `axis` (default z) via
-omega * (axis x (x - c)).
-"""
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-
 @register_operator("mpm_spin", family="mechanics", set="particle", kind="lateral")
 class MPMSpin(Lateral):
+    """Drive a body toward slow solid-body rotation: a controller, not a constraint, so the body
+    is free to deform while it turns.
+
+    particle -> particle: reads pos and vel, emits an external acceleration.
+
+        v_p^target = omega * (axis x (x_p - c))
+        a_p        = spin_k (v_p^target - v_p)
+
+    omega is the target angular velocity in radians per unit time and c the rotation centre,
+    defaulting to the domain centre; in 3D `axis` is the rotation axis. spin_k is the controller
+    gain in inverse time, so 1/spin_k is how long the body takes to reach the target rotation.
+
+    A proportional controller rather than a prescribed velocity, because prescribing the velocity
+    would make the rotation kinematic and destroy any deformation the rotation itself causes --
+    which for a spinning deformable body is the thing worth watching.
+
+    Reference: Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM).
+    """
+
     EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["omega"]

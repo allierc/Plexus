@@ -1,0 +1,173 @@
+---
+title: "interface_push"
+subtitle: "The disqualified term, on its own and under its own name."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+The disqualified term, on its own and under its own name.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+vertex -> vertex: reads pos and the cell set's chem, emits an outward velocity on
+activator-high cells.
+
+    E   = -K_extrude sum_{activator-high j} a_j r_j
+
+a_j is the cell's activator concentration, dimensionless, and r_j the distance of its centroid
+from the tissue centre in world units; K_extrude is a force per unit concentration. The energy
+FALLS as activator-high cells move outward, so the tissue is paid, per frame, to do the thing a
+search is looking for.
+
+That is not a mechanism. Growth, division, adhesion and line tension are hypotheses about what
+cells DO; this is a hypothesis about what the experimenter WANTS, and any protrusion it
+produces is evidence about the term rather than about the tissue.
+
+It is deliberately absent from the search vocabulary, so no proposed edit can reach it. It
+exists so the forcing CAN be run when a control genuinely calls for one, and so that running it
+is an explicit act the record shows as such. Kept inside the tension operator, forcing would be
+a parameter of a sound mechanism, and a reader seeing a plausible name cannot check a term that
+is not in front of them.
+
+Same gate as the tension operator: a > a_sw * a_max.
+
+Reference: Plexus (this work) -- a forcing term retained only as an explicit control.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `K_extrude` | normal_extrusion_forcing | 0.5 |
+| `a_sw` | red_threshold | 0.6 |
+| `cell_set` | &ndash; | "cell" |
+| `eta` | &ndash; | 0.05 |
+| `cap_frac` | &ndash; | 0.10 |
+| `iters` | &ndash; | 4 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: interface_push, at: vertex}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`extrusion`]{.op-badge} [`forcing`]{.op-badge} [`control_only`]{.op-badge} [`disqualified`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/diffusion_reaction.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/diffusion_reaction.py) &mdash; the registered operator.
+
+```python
+@register_operator("interface_push", set="vertex", kind="lateral", family="mechanics")
+class ExtrusionForcing3D(Lateral):
+    """The disqualified term, on its own and under its own name. A run carrying this is a control.
+
+    vertex -> vertex: reads pos and the cell set's chem, emits an outward velocity on
+    activator-high cells.
+
+        E   = -K_extrude sum_{activator-high j} a_j r_j
+        f_v = +K_extrude a_j u_v                       outward, along the radial direction
+
+    a_j is the cell's activator concentration, dimensionless, and r_j the distance of its centroid
+    from the tissue centre in world units; K_extrude is a force per unit concentration. The energy
+    FALLS as activator-high cells move outward, so the tissue is paid, per frame, to do the thing a
+    search is looking for.
+
+    That is not a mechanism. Growth, division, adhesion and line tension are hypotheses about what
+    cells DO; this is a hypothesis about what the experimenter WANTS, and any protrusion it
+    produces is evidence about the term rather than about the tissue.
+
+    It is deliberately absent from the search vocabulary, so no proposed edit can reach it. It
+    exists so the forcing CAN be run when a control genuinely calls for one, and so that running it
+    is an explicit act the record shows as such. Kept inside the tension operator, forcing would be
+    a parameter of a sound mechanism, and a reader seeing a plausible name cannot check a term that
+    is not in front of them.
+
+    Same gate as the tension operator: a > a_sw * a_max.
+
+    Reference: Plexus (this work) -- a forcing term retained only as an explicit control.
+    """
+    SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
+    INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
+    MAPS = ["E_srce", "E_trgt", "E_face"]
+    MECHANISM_TAGS = ["extrusion", "forcing", "control_only", "disqualified"]
+    PARAM_ROLES = {"K_extrude": "normal_extrusion_forcing", "a_sw": "red_threshold"}
+    REFERENCE = "Plexus (this work) -- a forcing term retained only as an explicit control."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.K_extrude = float(params.get("K_extrude", 0.5))
+        self.a_sw = float(params.get("a_sw", 0.6)); self.eta = float(params.get("eta", 0.05))
+        self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
+
+    def forward(self, H, mask=None):
+        from plexus.operators.vertex_ops import face_geometry_3d
+        vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None); clvl = H.level(self.cat)
+        if m is None or "chem" not in clvl.state_schema:
+            return {}
+        nF = int(m["nF"]); Nv = int(m["Nv"]); dev = vlvl.state.device; dt = vlvl.state.dtype
+        es = torch.as_tensor(m["E_srce"], device=dev, dtype=torch.long)
+        et = torch.as_tensor(m["E_trgt"], device=dev, dtype=torch.long)
+        ef = torch.as_tensor(m["E_face"], device=dev, dtype=torch.long)
+        h0, _ = clvl.state_schema["chem"]
+        a = clvl.state[:nF, h0].detach().to(dev)
+        amax = float(a.max()) if a.numel() else 0.0
+        red = (a > self.a_sw * amax).to(dt) if amax > 0 else torch.zeros_like(a)
+        if float(red.sum()) < 1.0:
+            return {}
+        px0, px1 = vlvl.state_schema["pos"]
+        x0 = vlvl.state[:, px0:px1].detach()
+        x = x0[:Nv].clone()
+        cap = self.cap_frac * float((x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-3))
+        redpush = (self.K_extrude * a.clamp(min=0.0) * red)          # per-cell outward magnitude
+        for _ in range(self.iters):
+            force = torch.zeros(Nv, 3, device=dev, dtype=dt)
+            _, _, cen, _ = face_geometry_3d(x, es, et, ef, nF)
+            cdir = cen / (cen.norm(dim=-1, keepdim=True) + 1e-9)
+            force.index_add_(0, es, (redpush[ef])[:, None] * cdir[ef] / 3.0)
+            x = x + (self.eta * force).clamp(-cap, cap)
+        vel = torch.zeros_like(x0)
+        vel[:Nv] = (x - x0[:Nv]) / max(float(getattr(H.config, "dt", 1.0)), 1e-6)
+        occ = vlvl.occ[:, None] if getattr(vlvl, "occ", None) is not None else 1.0
+        return {self.at: vel * occ}
+```

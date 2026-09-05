@@ -1,14 +1,14 @@
 ---
 title: "cell_grow"
-subtitle: "Cell_grow (cell, structural): CELL rest-VOLUME growth -- the biological growth primitive."
+subtitle: "The morphogen decides where the tissue grows."
 ---
 
 ::: {.op-head}
 ![](../figures/icons/structural.png){.op-logo}
 
-[`structural`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+[`structural`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Cell_grow (cell, structural): CELL rest-VOLUME growth -- the biological growth primitive.
+The morphogen decides where the tissue grows.
 :::
 
 ```{=html}
@@ -34,228 +34,301 @@ Cell_grow (cell, structural): CELL rest-VOLUME growth -- the biological growth p
 ## Role in Plexus
 
 - **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
-- **Acts on** &mdash; `cell` (the set the operator acts on).
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
-- **Dimensions** &mdash; 2D, 3D.
+- **Dimensions** &mdash; 3D.
 
 ## Mechanism
 
-Growth belongs to the CELL, not to the material points. Each cell carries a biological growth STATE
--- a rest-volume multiplier `grow_V` (1.0 = birth size) -- that `cell_grow` advances by a GROWTH LAW.
-A backend REALIZATION then discretises that state by waking dormant reserve MPM particles (declare
-`grow_reserve:` on the mpm_particle child) so the live material tracks the target volume. The biology
-(rest-volume growth) is the invariant; particle addition is merely the current numerical realization
--- swap the discretisation (adaptive sampling, another continuum) and the growth LAW stays identical.
+TARGETS are raised, and the mechanics then inflates the cell by force balance.
 
-This is a change of ONTOLOGY, not just another behaviour: earlier operators answer "how do cells
-move?"; growth answers "how does biological material itself increase?". So the abstraction is CELL
-GROWTH, not particle activation.
+cell -> vertex: reads the cell set's chem, writes the mesh's target area A0, perimeter P0,
+volume V0f and radius R0. It moves no vertex itself -- it raises what the cells ASK for, and
+`cell_mechanics` decides whether they get it.
 
-GROWTH LAWS (`mode`):
-  isotropic    logistic rest-volume growth; new material added in all directions -> rounds by elasticity
-  anisotropic  same law, new material biased along `axis` (`aniso`) -> a finger / bud
-  tip          growth localised at the leading edge along `axis` (`tip`) -> tip-driven elongation
-`rate` is the specific growth rate (dV/dt = rate*V*(1-V/`target`), logistic -> `target` = size/contact
-inhibition). `stress_gain`>0 couples the rate to local deformation (mechano-inhibition: growth slows in
-compressed tissue). An anisotropic bud ROUNDS on its own once growth isotropises / relaxes (emergent,
-not scripted). Separates MASS INCREASE (cell_grow) from TOPOLOGY CHANGE (`cell_divide`, which then
-REPOPULATES the grown volume).
+    s_j <- s_j (1 + g_j)               the cumulative per-cell growth scale
 
-`rate<=0` is a byte-identical no-op (the reserve is inert -- p2g/g2p mask by occ). kind=structural;
-mutates `cell.grow_V` + the child occ/state, returns {}.
+rate is the growth rate in inverse frames. rho is the dimensionless baseline: the fraction of
+the full rate a cell grows at with no activator present. a_sw is the activator concentration at
+which the switch is half open, and n is `hill`, its dimensionless sharpness. The two regimes
+are the ends of one operator:
+
+    rho = 1, a_sw = 0   uniform growth, every cell at the same rate
+    rho = 0, a_sw > 0   growth only where the activator is high: self-organised budding
+    in between          a baseline everywhere plus an activator-driven excess at the tips
+
+`a_sw_rel` decides whether a_sw is an ABSOLUTE activator concentration or a fraction of the
+field's own running maximum. Both are real mechanisms -- an absolute threshold is a receptor
+with a fixed affinity, a relative one is a cell comparing itself with its neighbours -- and the
+default is absolute. `a_live` is the floor below which the field counts as dead and the
+relative gate refuses to open, so a collapsed activator cannot have its own noise rescaled into
+a threshold crossing.
+
+Reference: Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces
+autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386.
 
 ## Parameters
 
 | parameter | role | default |
 |---|---|---|
-| `rate` | growth_rate | 0.0 |
-| `target` | size_inhibition | 4.0 |
-| `aniso` | growth_anisotropy | 0.0 |
-| `tip` | tip_localization | 0.0 |
-| `stress_gain` | mechano_inhibition | 0.0 |
-| `child` | &ndash; | "mpm_particle" |
-| `mode` | &ndash; | "isotropic" |
-| `offset` | &ndash; | 0.01 |
-| `prestretch` | &ndash; | 1.0 |
-| `axis` | &ndash; | None |
+| `cell_set` | &ndash; | "cell" |
+| `rate` | &ndash; | 0.01 |
+| `a_sw` | &ndash; | 0.20 |
+| `a_sw_rel` | &ndash; | False |
+| `a_live` | &ndash; | 1e-3 |
+| `inhib_chan` | &ndash; | None |
+| `inhib_sw` | &ndash; | 0.35 |
+| `inhib_hill` | &ndash; | 4.0 |
+| `hill` | &ndash; | 3.0 |
+| `cap` | &ndash; | 2.5 |
+| `rho` | &ndash; | 0.0 |
+| `vth_frac` | &ndash; | 1.35 |
+| `conserve_amount` | &ndash; | True |
 
 ## Minimal spec
 
 ```yaml
 operators:
-  - {op: cell_grow, at: cell}
+  - {op: cell_grow, at: vertex}
 ```
 
 ## Mechanism-search tags
 
-**Mechanism** &mdash; [`tissue_growth`]{.op-badge} [`rest_volume_growth`]{.op-badge} [`anisotropic_growth`]{.op-badge} [`budding`]{.op-badge}  
+**Mechanism** &mdash; [`growth`]{.op-badge} [`morphogen_driven`]{.op-badge} [`budding`]{.op-badge} [`cross_scale`]{.op-badge}  
 
 ## Related operators
 
-Other **structural** operators: [`cell_divide`](cell_divide.qmd).
+Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd), [`cell_exclude`](cell_exclude.qmd).
 
 ## Source
 
-[`src/plexus/operators/cell_grow.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/cell_grow.py) &mdash; the registered operator.
+[`src/plexus/operators/diffusion_reaction.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/diffusion_reaction.py) &mdash; the registered operator.
 
 ```python
-"""cell_grow (cell, structural): CELL rest-VOLUME growth -- the biological growth primitive.
+@register_operator("cell_grow", set="vertex", kind="structural", family="population")
+class Grow3D(Structural):
+    """Chemistry-to-shape: the morphogen decides where the tissue grows. Each cell's mechanical
+    TARGETS are raised, and the mechanics then inflates the cell by force balance.
 
-Growth belongs to the CELL, not to the material points. Each cell carries a biological growth STATE
--- a rest-volume multiplier `grow_V` (1.0 = birth size) -- that `cell_grow` advances by a GROWTH LAW.
-A backend REALIZATION then discretises that state by waking dormant reserve MPM particles (declare
-`grow_reserve:` on the mpm_particle child) so the live material tracks the target volume. The biology
-(rest-volume growth) is the invariant; particle addition is merely the current numerical realization
--- swap the discretisation (adaptive sampling, another continuum) and the growth LAW stays identical.
+    cell -> vertex: reads the cell set's chem, writes the mesh's target area A0, perimeter P0,
+    volume V0f and radius R0. It moves no vertex itself -- it raises what the cells ASK for, and
+    `cell_mechanics` decides whether they get it.
 
-This is a change of ONTOLOGY, not just another behaviour: earlier operators answer "how do cells
-move?"; growth answers "how does biological material itself increase?". So the abstraction is CELL
-GROWTH, not particle activation.
+        g_j = rate ( rho + Hill(a_j) )
+        Hill(a) = a^n / (a^n + a_sw^n)
+        s_j <- s_j (1 + g_j)               the cumulative per-cell growth scale
 
-GROWTH LAWS (`mode`):
-  isotropic    logistic rest-volume growth; new material added in all directions -> rounds by elasticity
-  anisotropic  same law, new material biased along `axis` (`aniso`) -> a finger / bud
-  tip          growth localised at the leading edge along `axis` (`tip`) -> tip-driven elongation
-`rate` is the specific growth rate (dV/dt = rate*V*(1-V/`target`), logistic -> `target` = size/contact
-inhibition). `stress_gain`>0 couples the rate to local deformation (mechano-inhibition: growth slows in
-compressed tissue). An anisotropic bud ROUNDS on its own once growth isotropises / relaxes (emergent,
-not scripted). Separates MASS INCREASE (cell_grow) from TOPOLOGY CHANGE (`cell_divide`, which then
-REPOPULATES the grown volume).
+    rate is the growth rate in inverse frames. rho is the dimensionless baseline: the fraction of
+    the full rate a cell grows at with no activator present. a_sw is the activator concentration at
+    which the switch is half open, and n is `hill`, its dimensionless sharpness. The two regimes
+    are the ends of one operator:
 
-`rate<=0` is a byte-identical no-op (the reserve is inert -- p2g/g2p mask by occ). kind=structural;
-mutates `cell.grow_V` + the child occ/state, returns {}.
-"""
-from __future__ import annotations
+        rho = 1, a_sw = 0   uniform growth, every cell at the same rate
+        rho = 0, a_sw > 0   growth only where the activator is high: self-organised budding
+        in between          a baseline everywhere plus an activator-driven excess at the tips
 
-import torch
+    `a_sw_rel` decides whether a_sw is an ABSOLUTE activator concentration or a fraction of the
+    field's own running maximum. Both are real mechanisms -- an absolute threshold is a receptor
+    with a fixed affinity, a relative one is a cell comparing itself with its neighbours -- and the
+    default is absolute. `a_live` is the floor below which the field counts as dead and the
+    relative gate refuses to open, so a collapsed activator cannot have its own noise rescaled into
+    a threshold crossing.
 
-from plexus.models.base import Structural
-from plexus.models.registry import register_operator
+    Reference: Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces
+    autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386.
+    """
 
-
-@register_operator("cell_grow", family="growth", set="cell", kind="structural")
-class CellGrow(Structural):
-    EMIT = None                                           # structural: advances `grow_V` + wakes reserve child particles in place; returns {} — no integrable delta
-    SUPPORTED_DIMS = [2, 3]
-    REQUIRES_PARAMS = []                                  # no required params — `rate`<=0 is a no-op; all knobs optional
-    MECHANISM_TAGS = ["tissue_growth", "rest_volume_growth", "anisotropic_growth", "budding"]
-    PARAM_ROLES = {"rate": "growth_rate", "target": "size_inhibition",
-                   "aniso": "growth_anisotropy", "tip": "tip_localization",
-                   "stress_gain": "mechano_inhibition"}
-    REFERENCE = "Okuda, S. et al. (2015). Biomech. Model. Mechanobiol. 12:627-644."
+    # Reads one species' activator; the span it points into is two wide because a Gray-Scott
+    # system is. It never writes chem, so this only has to name the right column.
+    N_SPECIES = 2
+    # MAY_MUTATE_INTEGRATED_STATE is True because the `conserve_amount` branch rescales cell.chem
+    # in place, c_j <- c_j * (v_old/v_new), when the cell's target volume grows. That rescale is a
+    # change of VARIABLE forced by a volume change, not a dynamics delta -- returning it as an
+    # integrated delta would change the physics. The operator is registered kind="structural",
+    # which is the category the engine's integration invariant exempts, so declaring it honestly
+    # costs nothing. Note that the branch is only reached once chemistry is present: with no
+    # activator the rescale never runs, so a declaration of False would appear correct on every
+    # composition except the one that matters.
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["growth", "morphogen_driven", "budding", "cross_scale"]
+    REFERENCE = "Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "cell")
-        self.child = params.get("child", "mpm_particle")      # the MPM discretisation of this cell
-        self.rate = float(params.get("rate", 0.0))            # specific growth rate (per unit time)
-        self.target = float(params.get("target", 4.0))        # logistic ceiling on grow_V (size inhibition)
-        self.mode = str(params.get("mode", "isotropic"))      # isotropic | anisotropic | tip
-        self.aniso = float(params.get("aniso", 0.0))          # 0 round .. 1 fully along `axis`
-        self.tip = float(params.get("tip", 0.0))              # 0 uniform .. large = seed only the leading edge
-        self.offset = float(params.get("offset", 0.01))       # placement distance from the seed (world units)
-        # prestretch: woken-particle rest state F = prestretch * I. 1.0 = the old density-only realization
-        # (F=I -> zero corotated stress -> new material co-locates, adds DENSITY not VOLUME: byte-identical
-        # no-op). prestretch < 1 inserts each woken particle PRE-COMPRESSED (J = prestretch^D < 1) so the
-        # fixed-corotated law gives it outward pressure -> it relaxes toward rest by pushing neighbours out
-        # -> the envelope genuinely INFLATES. This is what realizes cell rest-VOLUME growth (b57 proved the
-        # F=I realization cannot: grow_ratio pinned at 1.000 across the whole offset/reserve ladder).
-        self.prestretch = float(params.get("prestretch", 1.0))
-        self.stress_gain = float(params.get("stress_gain", 0.0))  # >0 slows growth in deformed tissue
-        ax = params.get("axis", None)
-        self.axis = [float(a) for a in ax] if ax is not None else None
+        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
+        # WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are
+        # unchanged; 2 reads a second RD system living in the same buffer.
+        self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
+        # IS `a_sw` A VALUE OF THE ACTIVATOR OR A FRACTION OF ITS MAXIMUM? Default False = the
+        # absolute reading every run in this project's history used, so no archived spec changes
+        # meaning. See the gate itself in `forward` for why both are real mechanisms. `a_live` is
+        # the floor below which a field counts as dead and the relative gate refuses to open --
+        # 1e-3 against activators that reach 0.6-1.5 when alive and 1e-9 when they have collapsed.
+        self.a_sw_rel = bool(params.get("a_sw_rel", False))
+        self.a_live = float(params.get("a_live", 1e-3))
+        # THE INHIBITOR: None = off, so every existing spec is unchanged. `inhib_sw` is a fraction
+        # of the inhibitor's OWN maximum and `inhib_hill` its sharpness, mirroring a_sw/hill.
+        _ic = params.get("inhib_chan", None)
+        self.inhib_chan = None if _ic is None else int(_ic)
+        self.inhib_sw = float(params.get("inhib_sw", 0.35))
+        self.inhib_hill = float(params.get("inhib_hill", 4.0))
+        self._inhib_applied = 0.0
+        self.hill = float(params.get("hill", 3.0)); self.cap = float(params.get("cap", 2.5))
+        from plexus.operators.vertex_ops import _engine_owns_clock
+        self.every = _engine_owns_clock(params); self._k = 0
+        # OKUDA uniform-cell mode: growth rate lambda = rate*(rho + Hill(a)); rho = baseline so ALL cells
+        # cycle (the activator sets the RATE, not the size), and v_eq is capped at vth_frac*v_ref so every
+        # cell oscillates in [~2/3, vth_frac]*v_ref -> uniform. rho=0 (default) = legacy activator-only bulge.
+        self.rho = float(params.get("rho", 0.0)); self.vth_frac = float(params.get("vth_frac", 1.35))
+        # OKUDA Appendix A: the morphogen is the AMOUNT m_j (conserved within the cell); the concentration
+        # c_j=m_j/v_j is only READ by the kinetics. We store c_j, so growing v_j must DILUTE c_j to conserve
+        # amount (else we silently CREATE mass each step -> spuriously feeds the tip). On (default) = correct.
+        self.conserve_amount = bool(params.get("conserve_amount", True))
 
-    # --- backend realisation: wake `k` dormant particles of ONE cell, near its tissue, per the law ---
-    def _realize_cell(self, part, livep, free, k, rng, dev):
-        px0, px1 = part.state_schema["pos"]; D = px1 - px0
-        X = part.state[:, px0:px1]
-        Xl = X[livep]
-        a = None
-        if self.axis is not None and self.mode in ("anisotropic", "tip"):
-            a = torch.tensor(self.axis[:D], device=dev, dtype=X.dtype)
-            a = a / a.norm().clamp(min=1e-9)
-        # seed selection: leading edge along axis when tip>0, else uniform
-        if a is not None and self.tip > 0 and self.mode == "tip":
-            proj = Xl @ a
-            w = torch.softmax(self.tip * (proj - proj.max()) / proj.std().clamp(min=1e-6), dim=0)
-            sel = torch.multinomial(w, k, replacement=True, generator=rng)
-        else:
-            sel = torch.randint(0, int(livep.numel()), (k,), generator=rng, device=dev)
-        seeds = livep[sel]; slots = free[:k]
-        # placement direction: blend axis (anisotropic) with random (isotropic)
-        rnd = torch.randn(k, D, generator=rng, device=dev)
-        rnd = rnd / rnd.norm(dim=1, keepdim=True).clamp(min=1e-9)
-        dirv = (self.aniso * a[None, :] + (1.0 - self.aniso) * rnd) if a is not None else rnd
-        dirv = dirv / dirv.norm(dim=1, keepdim=True).clamp(min=1e-9)
-        jit = 0.25 * self.offset * torch.randn(k, D, generator=rng, device=dev)
-        newpos = X[seeds] + self.offset * dirv + jit
-        # inherit the seed's material; the fresh material starts PRE-COMPRESSED (F=prestretch*I, C=0) so it
-        # carries outward pressure and inflates the envelope (prestretch=1 -> F=I -> old density-only no-op)
-        buf = part.occ.shape[0]
-        part.state[slots] = part.state[seeds].clone()
-        for _n, b in list(part.named_buffers()):
-            if b is None or b.dim() == 0 or b.shape[0] != buf:
-                continue
-            b[slots] = b[seeds].clone()
-        part.state[slots, px0:px1] = newpos
-        if hasattr(part, "F") and part.F is not None:
-            part.F[slots] = (self.prestretch * torch.eye(D, device=dev)).expand(k, D, D).clone()
-        if hasattr(part, "C") and part.C is not None:
-            part.C[slots] = 0.0
-        part.occ[slots] = 1.0
-        if hasattr(part, "birth"):
-            part.birth[slots] = 1.0
+    def _advance(self, s_prev, hillv, m, v_ref):
+        """The RATE LAW, and the only thing a `model=` variant of cell_grow changes.
+
+        Returns the new per-cell linear scale. Volume is V0f_init * s**3, so a multiplicative step
+        on `s` is exponential growth in volume -- which is the default and is deliberate: it is
+        what Okuda's growth term does. Ginzberg, Kafri & Kirschner (Science 2015) name the
+        consequence exactly: "with exponential growth, larger cells grow faster than do smaller
+        cells, amplifying any existing size disparities". Measured on this campaign's own basis,
+        the coefficient of variation of cell volume climbs 0.160 at seed to 0.33-0.53 by frame 900
+        in every run. The variants below are the mechanisms that review says real cells use to
+        stop that, written so the search can put them side by side.
+        """
+        return s_prev * (1.0 + self.rate * (self.rho + hillv))
 
     def forward(self, H, mask=None):
-        if self.rate <= 0.0:
+        vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
+        if m is None:
             return {}
-        cell = H.level(self.at); dev = cell.state.device
-        part = H.level(self.child)
-        rng = getattr(H, "rng", None)
-        dt = float(getattr(H.config, "dt", 1.0))
-        ncell = cell.occ.shape[0]
-        par = part.parent
-
-        # --- biological growth STATE on the cell (lazy provision) ---
-        if getattr(cell, "grow_V", None) is None:
-            cell.register_buffer("grow_V", torch.ones(ncell, device=dev))
-        if getattr(cell, "grow_base", None) is None:           # birth-size live count per cell (grow_V==1)
-            base = torch.zeros(ncell, device=dev)
-            base.index_add_(0, par, (part.occ > 0).float())
-            cell.register_buffer("grow_base", base.clamp(min=1.0))
-
-        # --- 1. BIOLOGY: advance grow_V by the logistic growth law (+ optional mechano-inhibition) ---
-        V = cell.grow_V
-        live_cell = (cell.occ > 0).float()
-        # `at:` may restrict growth to a SUBSET of cells (e.g. cell[type=bud]): the engine
-        # passes that per-cell boolean mask, so gate the growth law by it -> only the selected
-        # cells advance grow_V and wake reserve; the rest stay at birth size. For a plain
-        # `at: cell` the mask is all-live -> live_cell unchanged -> byte-identical to before.
-        if mask is not None:
-            live_cell = live_cell * mask.to(live_cell.dtype)
-        smod = torch.ones(ncell, device=dev)
-        if self.stress_gain > 0.0 and getattr(part, "F", None) is not None:
-            eye = torch.eye(part.F.shape[-1], device=dev)
-            defo = (part.F - eye).reshape(part.F.shape[0], -1).norm(dim=1) * (part.occ > 0).float()
-            cdefo = torch.zeros(ncell, device=dev); cdefo.index_add_(0, par, defo)
-            cnt = torch.zeros(ncell, device=dev); cnt.index_add_(0, par, (part.occ > 0).float())
-            smod = 1.0 / (1.0 + self.stress_gain * (cdefo / cnt.clamp(min=1.0)))
-        cell.grow_V = V + self.rate * V * (1.0 - V / self.target) * dt * smod * live_cell
-
-        # --- 2. REALIZATION: wake dormant child particles so live count ~ grow_base * grow_V ---
-        live_mask = part.occ > 0
-        cur = torch.zeros(ncell, device=dev); cur.index_add_(0, par, live_mask.float())
-        deficit = ((cell.grow_base * cell.grow_V) - cur).floor().clamp(min=0).long()
-        if int(deficit.sum().item()) == 0:
-            return {}
-        for c in torch.nonzero(deficit > 0, as_tuple=True)[0].tolist():
-            free = ((par == c) & (part.occ == 0)).nonzero(as_tuple=True)[0]
-            livep = ((par == c) & live_mask).nonzero(as_tuple=True)[0]
-            k = min(int(deficit[c].item()), int(free.numel()))
-            if k <= 0 or livep.numel() == 0:
-                continue
-            self._realize_cell(part, livep, free, k, rng, dev)
+        self._k += 1                    # monotonic tick only -- D1: the engine owns the period
+        clvl = H.level(self.cat)
+        nF = m["nF"]
+        dev = m["V0f"].device
+        # NO CHEMISTRY IS UNIFORM GROWTH, NOT NO GROWTH. This used to `return {}` when the cell set
+        # carried no `chem` state, which made a growth operator silently inert on any composition
+        # without an RD pair -- and hid a dependency that is not real: the activator is a GATE, and
+        # with the gate open (a_sw = 0, rho = 1) the rate does not consult it at all. That guard is
+        # also why `cell_grow` had to exist as a separate operator. a = 0 is the honest reading
+        # of "there is no activator here"; the Hill term evaluates to 0 and the rho baseline stands.
+        if "chem" in clvl.state_schema:
+            # `chan` PICKS THE SPECIES THAT GATES GROWTH. With two RD systems in one buffer this is
+            # what lets them do different jobs -- species 0 driving growth while species 1 drives
+            # death -- instead of both operators reading the same activator, which would be one
+            # mechanism wearing two names.
+            h0, _h1 = clvl.state_schema["chem"]
+            a = clvl.state[:nF, h0 + self.chan].detach().to(dev)  # per-cell activator
+        else:
+            a = torch.zeros(nF, device=dev, dtype=m["V0f"].dtype)
+        if "mg_scale" not in m or m["mg_scale"].shape[0] != nF:  # per-cell cumulative linear scale (capped)
+            m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
+            m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
+        # THE GATE'S HALF-POINT, AND WHAT IT IS A FRACTION OF.
+        #
+        # `a_sw` is ABSOLUTE by default: the Hill half-point sits at a fixed value of the activator
+        # and does not move when the field does. Every other threshold on a chemistry field in this
+        # substrate is relative to that field's own maximum -- `interface_tension.a_sw`,
+        # `interface_push.a_sw`, `cell_die` chem_low, `cell_divide.orient_asw` -- and two
+        # comments in this project (crew/basis.yaml on `a_sw_gated`, and the inhibitor branch
+        # twenty lines below) already describe THIS one as a fraction of the maximum. They were
+        # describing an intention, not the code.
+        #
+        # Both are defensible and they are not the same mechanism, so this is a switch and not a
+        # correction:
+        #   absolute  the gate stops opening when the chemistry dies. A field that decays to 1e-9
+        #             drives no growth, and the tissue goes static -- which is what the 16 runs
+        #             with act_max < a_sw did, honestly.
+        #   relative  the gate always selects the same TOP FRACTION of cells, so `a_sw` means the
+        #             same thing in a run peaking at 0.6 and one peaking at 1.5. That is what a
+        #             sweepable lever has to do; measured over 154 runs the absolute gate sat
+        #             anywhere from 0.24 of the field to above all of it.
+        # The floor is what keeps `relative` honest: without it, a field decayed to noise still has
+        # cells "above 35% of the maximum" and the tissue would grow on numerical dust forever.
+        thr = self.a_sw
+        if self.a_sw_rel:
+            amax = float(a.max()) if a.numel() else 0.0
+            thr = self.a_sw * amax if amax > self.a_live else float("inf")   # inf -> Hill term 0
+        hillv = a ** self.hill / (thr ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
+        # A SECOND MORPHOGEN THAT STOPS GROWTH, so that only the activator-high spots grow.
+        #
+        # The growth law above is purely ACTIVATING: `rate * (rho + hill(a))`, so
+        # the only thing a morphogen can do is make a cell grow FASTER, and the slowest a cell can
+        # grow is the rho baseline -- which is why six rounds produced broad lobes and never a
+        # finger. A bulge sharpens into a finger when the tissue grows at the tip AND STOPS at the
+        # flanks, and no single activating field can say "stop": it has no zero to reach.
+        #
+        # `inhib_chan` names a species whose HIGH values switch growth off, multiplicatively:
+        #
+        #     growth  <-  rate * (rho + hill(a_act)) * (1 - hill(a_inhib))
+        #
+        # so where the inhibitor is saturated the cell does not grow at all, baseline included.
+        # This is lateral inhibition, and it is a different mechanism from a sharper gate: `hill`
+        # narrows the shoulder of the activating curve, this puts a floor of ZERO under it.
+        if self.inhib_chan is not None and "chem" in clvl.state_schema:
+            _h0, _ = clvl.state_schema["chem"]
+            b = clvl.state[:nF, _h0 + self.inhib_chan].detach().to(dev).clamp(min=0.0)
+            # RELATIVE TO THE INHIBITOR'S OWN MAXIMUM, for the same reason a_sw is: an absolute
+            # threshold against a field whose scale the chemistry sets is either always on or
+            # always off, and this project has paid for that twice (rd_interface_tension, chem_low).
+            bmax = float(b.max()) if b.numel() else 0.0
+            if bmax > 1e-9:
+                bn = b / bmax
+                inh = bn ** self.inhib_hill / (self.inhib_sw ** self.inhib_hill
+                                               + bn ** self.inhib_hill + 1e-12)
+                m["inhib_frac"] = inh                     # recorded, so the renderer can show it
+                hillv = hillv * (1.0 - inh)
+                self._inhib_applied = float(inh.mean())
+        s_prev = m["mg_scale"]                                    # per-cell scale BEFORE this tick (for the dilution rate)
+        v_ref = float(m.get("v_ref", 1.0))                        # SEED-TIME MEDIAN cell volume (mesh_ops:220)
+        s = self._advance(m["mg_scale"], hillv, m, v_ref)         # <-- the rate law; models override THIS only
+        if self.rho > 0:                                             # OKUDA uniform-cell mode: cap v_eq per cell at
+            s_cap = (self.vth_frac * v_ref / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)
+            s = torch.minimum(s, s_cap.clamp(min=1.0))
+        else:
+            s = torch.clamp(s, max=self.cap)                        # legacy: activator-only bulge to `cap`
+        m["mg_scale"] = s
+        m["A0"] = m["A0_init"] * (s * s)                         # keep A0/P0/v_eq consistent (area~R^2, vol~R^3)
+        m["P0"] = m["P0_init"] * s
+        m["V0f"] = m["V0f_init"] * (s ** 3)
+        m["V0"] = float(m["V0f"].sum())
+        # THE SHELL RADIUS MUST GROW WITH THE CELLS. cell_mechanics carries a radial spring,
+        #     E += K_R * sum_i (|x_i| - R0)^2
+        # and R0 is set once at seeding. An operator that grows the cells without rescaling R0
+        # leaves the mechanics pinning the shell at the SEED radius while the
+        # cells' target volumes grew sixteenfold, and the sheet had nowhere to put the extra area
+        # but through itself. Measured on mini_grow_divide_bigger: rays cast from the tissue
+        # centroid cross the surface exactly once at frame 384 (100% of them) and 13 times at
+        # frame 423. The genus check reported "sphere (as built)" at every one of those frames --
+        # Euler characteristic is combinatorial and cannot see a shell folded through its own
+        # centre, which is why this survived until premise 11 was written.
+        #
+        # The radius of the sphere enclosing the current target volume, NOT the measured mean
+        # radius: R0 must express what the cells are ASKING for. Setting it from |x| would make
+        # the spring chase the shell's own excursions and quietly penalise a growing bud, which is
+        # the one shape this campaign exists to produce.
+        if "R0" in m:
+            m["R0"] = float((3.0 * max(m["V0"], 1e-12) / (4.0 * np.pi)) ** (1.0 / 3.0))
+        if self.conserve_amount and "chem" in clvl.state_schema:
+            # conserve molecule AMOUNT: c_j <- c_j * (v_old/v_new) = c_j * (s_prev/s)^3 as v_eq grows ~ s^3.
+            # Makes dilution STRUCTURAL (no continuum -c(div.v) term); it is LOAD-BEARING (Okuda's intra-domain
+            # gradients come from it) -> keep it, don't cancel. The flood is a gamma (rate) problem, fixed elsewhere.
+            g_vol = (s / s_prev.clamp(min=1e-9)) ** 3
+            cst = clvl.state.clone()
+            # THE ACTIVATOR COLUMN ONLY. Diluting BOTH columns extinguishes Gray-Scott outright:
+            # measured, 1% loss per step kills the pattern within 250 steps, while the undiluted
+            # one reaches 53% coverage by step 250 and holds indefinitely. Diluting either column
+            # alone survives (a_max at t=60: 0.704 / 0.686); both together does not (0.047),
+            # because the substrate's own feed term F(1-u) is what pulls u back up and diluting u
+            # fights it directly. The activator has no source at all except its own autocatalysis,
+            # which is QUADRATIC, so it is the one that genuinely loses material when a cell grows.
+            # Correct physics on a fragile mechanism is still a broken model; this keeps the
+            # physics where it belongs and stops it destroying the pattern it is meant to shape.
+            cst[:nF, h0:h0 + 1] = cst[:nF, h0:h0 + 1] / g_vol.clamp(min=1e-9)[:, None]
+            clvl.state = cst
         return {}
 ```
