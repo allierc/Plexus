@@ -1,10 +1,14 @@
-"""Download google/gemma-4-12B-it into /workspace/Plexus/VLLM (Xet-backed, ~24 GB).
+"""Download google/gemma-4-12B-it beside this checkout, into <repo>/VLLM (Xet-backed, ~24 GB).
+
 Token via env: HF_TOKEN. Run:  HF_TOKEN=... python download_gemma.py
+`GEMMA_DIR` overrides the destination, and it is the same variable `describe_video.py` reads --
+so the place this writes to is the place that one loads from.
 """
 import os
 from huggingface_hub import snapshot_download
 
-DEST = "/workspace/Plexus/VLLM/gemma-4-12B-it"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEST = os.environ.get("GEMMA_DIR", os.path.join(_REPO, "VLLM", "gemma-4-12B-it"))
 print(f"[dl] google/gemma-4-12B-it -> {DEST}", flush=True)
 path = snapshot_download(
     "google/gemma-4-12B-it",

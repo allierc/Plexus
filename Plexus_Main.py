@@ -258,7 +258,12 @@ def _describe(data_dir: str, out_file: str | None, device: str = "cuda:0") -> No
     # load either finishes or the caption says UNAVAILABLE. `discovery_okuda/caption_wave.py`
     # disables it in-process for the same reason; this path runs the captioner as a SUBPROCESS, so
     # the switch has to travel in its environment instead.
-    _env = {**os.environ, "HF_HUB_DISABLE_PROGRESS_BARS": "1", "TRANSFORMERS_VERBOSITY": "error"}
+    # THE PATH THIS CHECKED IS THE PATH THE CHILD LOADS. `gemma` above is resolved against this
+    # checkout and tested with `isdir`; passing it down closes the gap where the parent verifies one
+    # directory and the subprocess then goes looking in another, which is a failure that gets past
+    # the guard and dies inside the captioner instead.
+    _env = {**os.environ, "HF_HUB_DISABLE_PROGRESS_BARS": "1", "TRANSFORMERS_VERBOSITY": "error",
+            "GEMMA_DIR": gemma}
     r = subprocess.run([sys.executable, script, *movies, "--root", gd,
                         "--out", out_file, "--append", "--device", device], check=False, env=_env)
     after = os.path.getsize(out_file) if os.path.exists(out_file) else 0

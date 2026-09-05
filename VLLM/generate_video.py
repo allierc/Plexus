@@ -24,7 +24,10 @@ import argparse
 import cv2          # NOTE: must precede torch/diffusers -- importing cv2 after them breaks libtiff/libjpeg
 from PIL import Image
 
-LTX = os.environ.get("LTX_DIR", "/workspace/Plexus/VLLM/LTX-Video")
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Beside this checkout, for the reason `describe_video` gives: an absolute default is a path on
+# one machine. `LTX_DIR` overrides.
+LTX = os.environ.get("LTX_DIR", os.path.join(_REPO, "VLLM", "LTX-Video"))
 DEV = "cuda:0"
 DEFAULT_ROOT = os.environ.get(
     "PLEXUS_OUTPUT_ROOT", os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")

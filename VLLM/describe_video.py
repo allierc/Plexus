@@ -31,7 +31,12 @@ from transformers import AutoProcessor, AutoModelForMultimodalLM
 _SPEC_MARKER = "# --- auto: video descriptions (gemma-4-12B) ---"
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GEMMA = os.environ.get("GEMMA_DIR", "/workspace/Plexus/VLLM/gemma-4-12B-it")
+# THE WEIGHTS ARE FOUND RELATIVE TO THIS CHECKOUT, not at an absolute path. An absolute default
+# is a path on ONE machine: the same repo cloned on a cluster node then asserts on a directory
+# that only ever existed in a container, while the 23 GB sitting beside it go unused. `GEMMA_DIR`
+# overrides, and `Plexus_Main` sets it to the path it has already checked, so the directory the
+# caller tested is the directory this loads.
+GEMMA = os.environ.get("GEMMA_DIR", os.path.join(_REPO, "VLLM", "gemma-4-12B-it"))
 def _pick_device():
     """The card with the most FREE memory, not card zero.
 
@@ -178,7 +183,10 @@ def main():
         videos = sorted(glob.glob(os.path.join(root, "**", "*.mp4"), recursive=True))
     out_file = args.out or os.path.join(root, "video_descriptions.txt")
     assert videos, f"no videos found (root={root})"
-    assert os.path.isdir(GEMMA), f"gemma weights not found: {GEMMA}"
+    assert os.path.isdir(GEMMA), (
+        f"gemma weights not found: {GEMMA}\n"
+        f"    They are expected beside this checkout, at <repo>/VLLM/gemma-4-12B-it.\n"
+        f"    Set GEMMA_DIR to point elsewhere, or run VLLM/download_gemma.py to fetch them.")
     print(f"[describe] {len(videos)} videos -> {out_file}", flush=True)
 
     dev = args.device or DEV
