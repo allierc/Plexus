@@ -1,50 +1,41 @@
-"""ENCODING OPERATORS: a learnable field written from its own coordinates.
+"""Encoding: a learnable field written from its own coordinates, and nothing else.
 
-`hash_encoding` is the Instant-NGP multiresolution hash encoding (`models/hashgrid.py`) with an MLP
-head, as an ordinary Plexus operator. It reads no other field: what it consumes is WHERE each cell
-is, and when. Everything it knows is in its tables.
+In the order they appear below:
 
-WHY THIS IS AN OPERATOR RATHER THAN A LAYER, which is the whole reason it is in the library instead
-of inside somebody's model class. As an operator it owns its parameters and WRITES A FIELD that
-other operators read, so an encoded quantity becomes a named mechanism in a schedule:
+    hash_encoding   field   f(x, y[, t]) from a multiresolution hash table plus an MLP head
+
+An encoder is an operator here rather than a layer inside a model class, and that is the whole
+reason it lives in the library. As an operator it owns its parameters and writes a field other
+operators read, so an encoded quantity becomes a named mechanism in a schedule:
 
     operators: [{op: hash_encoding, at: omega, ...}, {op: kuramoto_fit, at: v, omega_from: omega}]
     schedule:  [hash_encoding, kuramoto_fit]
 
-and the consequence is the one plexus2.tex asks for -- a residual is attributable to a MECHANISM. If
-that fit fails, "the encoding cannot represent the heterogeneity" and "the rule is wrong" are two
-different operators with two different parameter sets, and the schedule says which is which. Wired
-as a layer inside one model they are one blob of weights and the question cannot be asked.
+The consequence is the one plexus2.tex asks for: a residual is attributable to a mechanism. If
+that fit fails, "the encoding cannot represent the heterogeneity" and "the rule is wrong" are
+two different operators with two different parameter sets, and the schedule says which is
+which. Wired as a layer inside one model they are one blob of weights and the question cannot
+be asked.
 
-===============================================================================================
-THREE KNOBS, AND EVERYTHING ELSE FOLLOWS FROM THEM
-===============================================================================================
+THREE KNOBS, AND THE REST DERIVED. The encoder has six parameters in the reference and they
+interact, so settling them by hand is how one ends up with a ladder whose finest level is
+either below the pixel grid or far above it. A specification sets the three the data has an
+opinion about:
 
-The encoder has six parameters in the paper and they interact; settling them by hand is how one
-ends up with a ladder whose finest level is either below the pixel grid or far above it. So the
-spec sets three numbers that the DATA has an opinion about, and the rest is derived:
-
-    n_levels               L, how many levels
+    n_levels               L, how many levels in the ladder
     log2_hashmap_size      log2 T, the per-level table capacity, as a power of two
     px_per_finest_cell     how many PIXELS one cell of the finest level spans
-    frames_per_finest_cell how many FRAMES one cell of the finest level spans   (3-D only)
+    frames_per_finest_cell how many FRAMES one cell of the finest level spans   (3D only)
 
-and then, exactly as `ngp-demo/scripts/gui_scalar_time.py` settles it:
+and the ladder follows:
 
     n_min  = (8, 8, 2)                                 fixed: a coarse level is a coarse level
     n_max  = (W/px, H/px, T/frames)                    the finest level, in the data's own units
-    b      = exp((ln n_max - ln n_min) / (L - 1))      per axis
+    b      = exp((ln n_max - ln n_min) / (L - 1))      the per-axis growth factor between levels
 
-THE TIME AXIS IS IN FRAMES, THE SAME WAY SPACE IS IN PIXELS, and that is not cosmetic. "200 cells
-along t" means nothing without knowing the run is 201 frames long; "2 frames per cell" is a
-statement about what the data can support. Measured on the two-scale toy this was written against,
-the fine component's lag-1 autocorrelation is 0.829 -- past half correlation after ONE frame -- so
-1 frame per cell keeps its per-frame content and 2 already averages pairs.
-
-INTERPOLATION DEFAULTS TO SMOOTHSTEP IN SPACE AND LINEAR IN TIME. Smoothstep makes the encoding C^1,
-which anything taking a second derivative through it needs; but its weight derivative vanishes at
-every cell boundary, so on an axis whose cells line up with the sampled frames it would force df/dt
-to zero AT every sample and inflate it in between. See `models/hashgrid.py`.
+The time axis is in frames for the same reason space is in pixels, and it is not cosmetic:
+"200 cells along t" means nothing without knowing how many frames the run is, where "2 frames
+per cell" is a statement about what the data can support.
 """
 
 from __future__ import annotations
@@ -64,19 +55,42 @@ _ACTIVATIONS = {"relu": nn.ReLU, "gelu": nn.GELU, "softplus": nn.Softplus, "tanh
 @register_operator("hash_encoding", family="fields", set="field", kind="field",
                    model="multires_hash")
 class HashEncoding(FieldUpdate):
-    """Writes f(x, y[, t]) into the field it is `at:`, from a hash encoding plus an MLP head.
+    """A learnable field: the value at every cell is computed from that cell's own coordinates,
+    through a multiresolution hash table and a small MLP (multi-layer perceptron) head.
 
-    KIND IS `field`, NOT `broadcast`. `broadcast` in Plexus means L_{k+1} -> L_k through the
+    field -> field: reads the coordinates of the field named by `at:`, writes its grid in place.
+    It reads no other field -- everything it knows is in its tables.
+
+        c(x) = scale * MLP( concat_{l=1..L} interp( T_l[ hash(floor(x n_l)) ] ) )
+        n_l  = n_min b^(l-1),   b = (n_max / n_min)^(1 / (L - 1))
+
+    x is the cell centre in normalised [0, 1] coordinates, with the frame index appended and
+    divided by `n_frames` when `use_time` is set. L is `n_levels` and n_l the grid resolution of
+    level l in cells per axis, growing geometrically from n_min to n_max; each level hashes its
+    cell corners into a table T_l of 2^log2_hashmap_size entries holding
+    `n_features_per_level` numbers each, and interpolates between them. The L results are
+    concatenated and passed through `n_hidden_layers` layers of `n_neurons`. `scale` multiplies
+    the head's output and carries the unit of the target field, so the head itself stays O(1).
+
+    The kind is `field`, not `broadcast`. In Plexus `broadcast` means L_{k+1} -> L_k through the
     hierarchy's containment map; a hash table is not a level of the hierarchy -- it holds no
-    entities and nothing is contained in it -- so calling this a broadcast would claim a containment
-    map that does not exist. It computes a field's values from the field's own coordinates, which is
-    what `field` means.
+    entities and nothing is contained in it -- so calling this a broadcast would claim a
+    containment map that does not exist. It computes a field's values from that field's own
+    coordinates, which is what `field` means.
 
-    STATIC OR SPATIOTEMPORAL, by `use_time`. A quantity that is a property of POSITION -- a per-cell
-    rate, a gain, a cell type -- is encoded in 2-D or 3-D space and is the same at every tick. A
-    quantity that is a property of position AND time -- an observed field being represented -- takes
-    the tick as a further input, normalised by `n_frames`. Getting this wrong is not a tuning error:
-    a static parameter given a time axis can memorise the trajectory, and then it is not a parameter.
+    `use_time` decides whether the encoded quantity is static or spatiotemporal, and getting it
+    wrong is not a tuning error. A property of POSITION -- a per-cell rate, a gain, a cell type
+    -- is encoded in 2D or 3D and is the same at every tick. A property of position AND time
+    takes the tick as a further input. A static parameter given a time axis can memorise the
+    trajectory, and then it is not a parameter.
+
+    Interpolation defaults to smoothstep in space and linear in time. Smoothstep makes the
+    encoding C^1, which anything taking a second derivative through it needs; but its weight
+    derivative vanishes at every cell boundary, so on an axis whose cells line up with the
+    sampled frames it would force df/dt to zero AT every sample and inflate it in between.
+
+    Reference: Muller, T., Evans, A., Schied, C. & Keller, A. (2022). Instant neural graphics
+    primitives with a multiresolution hash encoding. ACM Trans. Graph. 41(4):102.
     """
 
     INPUTS: list = []
@@ -96,8 +110,9 @@ class HashEncoding(FieldUpdate):
         "use_time": "whether the encoded quantity varies in time",
         "scale": "multiplier on the head's output, in the unit of the target field",
     }
-    REFERENCE = ("Müller, T. et al. (2022). Instant neural graphics primitives with a "
-                 "multiresolution hash encoding. ACM ToG 41(4):102.")
+    REFERENCE = ("Muller, T., Evans, A., Schied, C. & Keller, A. (2022). Instant neural "
+                 "graphics primitives with a multiresolution hash encoding. ACM Trans. Graph. "
+                 "41(4):102.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -129,10 +144,8 @@ class HashEncoding(FieldUpdate):
         [1024*1024, 3] table every tick would be the dominant cost of an operator whose real work
         is a gather.
         """
-        # THE OUTPUT WIDTH IS THE TARGET FIELD'S CHANNEL COUNT, and `bind` may be called by a
-        # trainer before `forward` ever runs -- so it is passed in, defaulted, and only overridden
-        # by `forward` if it turns out to differ. An earlier version read it off the field inside
-        # `forward` and crashed when bind came first.
+        # The output width is the target field's channel count. It is passed in rather than read
+        # off the field, because a trainer may call `bind` before `forward` ever runs.
         if out_dim is not None:
             self._out_dim = int(out_dim)
         self._out_dim = int(getattr(self, "_out_dim", 1))
@@ -169,9 +182,9 @@ class HashEncoding(FieldUpdate):
     def sample(self, shape=None, t: float = 0.0) -> torch.Tensor:
         """Evaluate the encoding on an ARBITRARY grid, [C, *shape]. For figures, not for the fit.
 
-        The montage needs each level drawn at ITS OWN lattice -- a level with 12 cells across
-        cannot represent anything finer than 12 cells, and rendering it at 1024 only interpolates
-        that fact into a blur. So the resolution is an argument rather than the bound field's.
+        The resolution is an argument rather than the bound field's because a montage needs each
+        level drawn at its own lattice: a level with 12 cells across cannot represent anything
+        finer than 12 cells, and rendering it at 1024 only interpolates that fact into a blur.
         """
         shape = tuple(shape or self._shape)
         axes = torch.meshgrid(*[(torch.arange(n, device=self.device_, dtype=torch.float32) + 0.5)
