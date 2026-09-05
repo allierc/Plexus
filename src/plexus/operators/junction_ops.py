@@ -1,18 +1,26 @@
-"""Myosin, and the two places a cell can put it: on its junctions or across its apex.
+"""Myosin, and the two places an epithelial cell can put it: on its junctions, or across its apex.
 
-    junction_myosin      per-junction myosin -- `default` (one pool) and `two_pool`
-    junction_sync        keep the per-junction store aligned with the half-edge table
-    medioapical_myosin   the APICAL pool: an areal density on the face, not on its edges
-    cytokinetic_ring     the contractile ring a dividing cell closes on its own septum
+Myosin is what makes a vertex model contractile beyond a constant line tension: where the vertex
+model writes one Lambda for every edge, these operators give each junction its own multiplier
+and a rule for how it changes. All of them keep that multiplier keyed by VERTEX PAIR rather than
+by half-edge index, which is what lets it survive a T1, a division or a death without any
+topology operator knowing it exists.
 
-WHY THE TWO FILES ARE ONE. `medioapical_ops` imported `junction_ops` as `JO` and called six of its
-private helpers -- `_live_edges`, `_lookup`, `_scatter_full`, `edge_tension` -- because the two-pool
-model is not a different mechanism, it is the SAME junction bookkeeping with a second reservoir on
-the face. Splitting them across files meant the shared half of the model was private to one of them.
+In the order they appear below:
 
-WHICH POOL A SPEC GETS is chosen by `tissue.py`'s `myo_model`, through the `implementation` axis on
-one contract, which is the paper's rule and not a switch statement: `junction_myosin[default]` and
-`junction_myosin[two_pool]` are two bodies under one name.
+    junction_myosin     structural   per-junction myosin, recruited by tension
+    junction_sync       rewire       re-key the store onto half-edge arrays topology has changed
+    medioapical_myosin  lateral      the apical pool: an areal density on the face, not its edges
+    cytokinetic_ring    structural   the ring a dividing cell leaves on the junction it just built
+
+then the second model of `junction_myosin`, a different hypothesis in the same slot:
+
+    junction_myosin[two_pool]  the belt fed by the medioapical pool, as a conserved amount
+
+The medioapical operators live in this file because the two-pool model is not a separate
+mechanism: it is the same junction bookkeeping with a second reservoir on the face, and it calls
+the same helpers -- `_live_edges`, `_lookup`, `_scatter_full`, `edge_tension`. Split across two
+files, the shared half of one model would be private to the other.
 """
 from __future__ import annotations
 import torch
@@ -33,23 +41,22 @@ def _edge_key(vi, vj, stride):
 
 
 def _lookup(m, key, length, vi, vj, stride, myo_new, inherit, dev, dt_, new_val=None):
-    """The keyed store on the mesh, mapped onto the half-edge arrays AS THEY ARE NOW.
+    """The keyed store on the mesh, mapped onto the half-edge arrays as they are NOW.
 
-    Split out of `JunctionMyosin.forward` so that `junction_sync` can perform exactly the same
-    mapping after a topology operator has rewired or lengthened those arrays. One function, two callers,
-    so the myosin a frame is RECORDED with is by construction the myosin that frame's mechanics used --
-    the two cannot drift apart because there is only one piece of code that decides it.
+    One function with two callers -- `junction_myosin` and `junction_sync` -- so the myosin a
+    frame is recorded with is by construction the myosin that frame's mechanics used. They
+    cannot drift apart because only one piece of code decides it.
 
     Returns `(myo, n_new)` and touches nothing: the store is read, never written.
 
-    `new_val` IS WHAT A JUNCTION WITH NO HISTORY GETS, per half-edge, overriding the scalar `myo_new`.
-    A scalar is the right answer only when the stored quantity has a fixed scale, and in the two-pool
-    model it does not: the tissue's mean line density runs 1.07 -> 1.97 -> 1.48 over 401 frames, so a
-    newborn junction pinned at an absolute 1.0 is set to between 51% and 93% of whatever its
-    neighbours happen to hold, for no reason. Passing `new_val = myo_new * n*_f`, with
-    n*_f = tau_jun * k_ex * rho_f the density the supply into that cell's belt sustains, makes
-    `myo_new` mean what its name says -- a newborn junction as a FRACTION of what a mature one there
-    would carry -- and makes it a claim rather than a units accident.
+    `new_val` is what a junction with no history gets, per half-edge, overriding the scalar
+    `myo_new`. A scalar is right only when the stored quantity has a fixed scale, and in the
+    two-pool model it does not -- the tissue's mean line density drifts by a factor of about two
+    over a run, so a newborn junction pinned at an absolute 1.0 would be set to an arbitrary
+    fraction of what its neighbours happen to hold. Passing new_val = myo_new * n*_f, where
+    n*_f = tau_jun * k_ex * rho_f is the density the supply into that cell's belt sustains, makes
+    `myo_new` mean what its name says: a newborn junction as a FRACTION of what a mature one
+    there would carry.
     """
     keys = m.get("myo_keys")
     vals = m.get("myo_vals")
@@ -124,14 +131,14 @@ def edge_tension(m, length, myo, ef, lam, k_perim, gam, dev, dt_):
     the spec and MUST match the values `cell_mechanics` was given, or this is the tension of a
     different tissue.
 
-    RAISES rather than falling back. The first version printed a warning and returned `length`, and
-    the smoke test duly printed it -- which means run 86 would have been a LENGTH experiment wearing
-    a tension label, and the 86-88 comparison would have been vacuous while looking fine. A silent
-    fallback to the exact hypothesis under test is the worst possible failure mode.
+    Raises rather than falling back. Falling back to `length` would make a tension-keyed run a
+    LENGTH experiment wearing a tension label, and length is the exact variable such a run exists
+    to replace -- a silent fallback to the hypothesis under test is the worst available failure
+    mode.
 
-    A MODULE FUNCTION rather than a method, because `medioapical_ops` needs the same expression: the
-    tension a junction is under is a property of the mesh and the energy, not of whichever operator
-    happens to be asking. Two copies of it would be two tensions.
+    A module function rather than a method, because the medioapical operators need the same
+    expression: the tension a junction is under is a property of the mesh and the energy, not of
+    whichever operator happens to be asking. Two copies of it would be two tensions.
     """
     nF = int(m["nF"])
     P0 = m.get("P0")
@@ -176,21 +183,32 @@ def _live_edges(m, pos):
 
 @register_operator("junction_myosin", family="mechanics", set="vertex", kind="structural")
 class JunctionMyosin(Structural):
-    """Per-junction myosin, recruited by tension, surviving T1 / division / death by construction.
+    """Per-junction myosin, recruited by tension: a stretched junction recruits more, pulls
+    harder, and so shrinks -- the positive mechanical feedback a constant line tension cannot
+    express. Survives T1, division and death by construction, being keyed by vertex pair.
 
-    DYNAMICS, deliberately the simplest thing that is still mechanosensitive:
+    vertex -> vertex: reads pos and the keyed myosin store on the mesh, writes m["myo"] in place.
+    Structural rather than lateral because it writes mesh state, not a per-vertex delta.
 
-        myo_ss = activity * (l_e / l_ref)          setpoint rises with junction length, i.e. with tension
-        d myo  = (myo_ss - myo) * dt / tau         first-order relaxation toward it
+        myo_ss = a (l_e / l_ref)                the setpoint, rising with junction length
+        d myo  = (myo_ss - myo) dt / tau        first-order relaxation toward it
 
-    so a stretched junction recruits myosin and pulls harder, which is the feedback the vertex model's constant
-    `Lambda` cannot express. `activity` is the myosin-inhibition knob -- the in-silico blebbistatin --
-    and it multiplies the setpoint rather than the tension directly, so inhibition takes effect over
-    `tau` the way a drug does rather than instantly.
+    l_e is the junction's current length and l_ref the reference it is measured against, both in
+    world units; a is `activity`, the dimensionless global myosin level. The multiplier myo then
+    scales the vertex model's line tension Lambda, so myo = 1 is the uninhibited baseline.
 
-    `l_ref` is the CURRENT MEAN live edge length, not a constant: the tissue triples in radius, so a
-    fixed reference would make every junction "stretched" by the end and myosin would rise everywhere
-    for a reason that is growth, not tension.
+    `activity` is the myosin-inhibition knob, the in-silico blebbistatin, and it multiplies the
+    SETPOINT rather than the tension directly -- so inhibition takes effect over tau, the way a
+    drug does, rather than instantly.
+
+    l_ref is the CURRENT mean live edge length, not a constant. A growing tissue triples in
+    radius, so a fixed reference would eventually call every junction stretched and raise myosin
+    everywhere for a reason that is growth rather than tension.
+
+    Reference: Rauzi, M. et al. (2008). Nature and function of lateral tension during tissue
+    elongation. Nat. Cell Biol. 10:1401-1410 (myosin on shrinking junctions);
+    Fernandez-Gonzalez, R. et al. (2009). Myosin II dynamics are regulated by tension in
+    intercalating cells. Dev. Cell 17:736-743 (tension-dependent recruitment).
     """
 
     EMIT = None
@@ -203,8 +221,10 @@ class JunctionMyosin(Structural):
     PARAM_ROLES = {"activity": "global_myosin_activity", "tau": "recruitment_timescale",
                    "myo_new": "myosin_of_a_newborn_junction", "beta": "tension_sensitivity",
                    "activity_from": "per-type cell property giving each junction its drive"}
-    REFERENCE = ("Rauzi, M. et al. (2008) Nat. Cell Biol. 10:1401 (myosin on shrinking junctions); "
-                 "Fernandez-Gonzalez, R. et al. (2009) Dev. Cell 17:736 (tension-dependent recruitment).")
+    REFERENCE = ("Rauzi, M. et al. (2008). Nature and function of lateral tension during tissue "
+                 "elongation. Nat. Cell Biol. 10:1401-1410; Fernandez-Gonzalez, R. et al. (2009). "
+                 "Myosin II dynamics are regulated by tension in intercalating cells. Dev. Cell "
+                 "17:736-743.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -370,39 +390,47 @@ class JunctionMyosin(Structural):
 # Per frame, only when inheritance fires: (new edges, split halves, halves that found a parent).
 INHERIT_TRACE: list = []
 
-# Per frame: (half-edges now, half-edges when myosin was written, live junctions re-keyed). A run whose
-# second column never differs from the first is a run in which no topology operator changed the edge
-# buffer -- which for `cellfix_B_new` would itself be the bug.
+# Per frame: (half-edges now, half-edges when myosin was written, live junctions re-keyed). A run
+# whose second column never differs from the first is a run in which no topology operator changed
+# the edge buffer at all, which in a growing tissue is itself a defect worth noticing.
 SYNC_TRACE: list = []
 
 
 @register_operator("junction_sync", family="mechanics", set="vertex", kind="rewire")
 class JunctionMyosinSync(Rewire):
-    """Re-key `m["myo"]` onto the half-edge arrays a topology operator has just changed.
+    """Re-key the per-junction myosin onto the half-edge arrays a topology operator has just
+    changed, so what is recorded for a frame is what that frame's mechanics actually used.
 
-    WHY THIS IS AN OPERATOR AND NOT A LINE IN `cell_divide`. Per-FACE state already survives topology:
-    `cell_divide` and `cell_die` both rebuild the mesh through `flat_from_rings_3d` and carry every
-    per-face array across with the `keep` map, so `A0`, `P0`, `V0f`, `age` and `ndiv` are never left
-    indexed against a buffer that has moved. There is no such carry for per-HALF-EDGE state, because
-    until `junction_myosin` there was none. Adding one to each topology operator is the pattern the
-    module docstring exists to refuse -- the next per-junction state would have to edit them again.
+    vertex -> vertex: reads pos and the keyed store, rewrites m["myo"] and m["myo_amount"].
 
-    So the carry is done from the other side: myosin is keyed by vertex pair, and this operator maps
-    the store back onto whatever half-edge arrays now exist. It is `rewire` because it is the relation
-    that changed and this is the state following it; it returns nothing and writes one buffer.
+        myo_e  = gain * store[key(v_i, v_j)]     re-read at the CURRENT half-edge indices
+        N_e    = store[key(v_i, v_j)] * l_e      the amount, for the conservation ledger
 
-    WHERE IT GOES IN THE SCHEDULE. After every operator that can rewire or resize the half-edge arrays
+    The kind is `rewire` because the relation is what changed and this is the state following it.
+
+    It is an operator rather than a line inside `cell_divide` because the carry is done from the
+    other side. Per-FACE state already survives topology: the topology operators rebuild the mesh
+    and reindex every per-face array through the `keep` map, so A0, P0, V0f, age and ndiv are
+    never left pointing at a face that moved. Per-HALF-EDGE state has no such carry, and adding
+    one to each topology operator would mean editing them again for the next per-junction state.
+    Keying by vertex pair instead lets one operator map the store onto whatever half-edge arrays
+    now exist.
+
+    In the schedule it goes after every operator that can rewire or resize the half-edge arrays,
     and before `topo_record`:
 
         junction_myosin -> cell_mechanics -> edge_flip -> cell_divide
                         -> junction_sync -> topo_record
 
-    IT CANNOT CHANGE A TRAJECTORY, BY CONSTRUCTION. `cell_mechanics` reads `m["myo"]` in the same
-    frame `junction_myosin` writes it, before any topology operator runs, and next frame's
-    `junction_myosin` overwrites it from the store. Nothing between reads it. So the array this
-    operator writes is read by exactly one thing -- `topo_record` -- and adding it to a schedule
-    leaves every position, every division and every T1 bit-identical. That is a property worth having:
-    the fix to a recording defect must not be able to alter what is being recorded.
+    It cannot change a trajectory, by construction. `cell_mechanics` reads m["myo"] in the same
+    frame `junction_myosin` writes it, before any topology operator runs, and the next frame's
+    `junction_myosin` overwrites it from the store; nothing in between reads it. So the array
+    this writes is read by exactly one thing, `topo_record`, and adding it to a schedule leaves
+    every position, every division and every T1 bit-identical -- the fix to a recording defect
+    must not be able to alter what is being recorded.
+
+    Reference: none -- this is bookkeeping that keeps a mechanism correct, not a mechanism.
+    Plexus (this work).
     """
 
     EMIT = None
@@ -412,7 +440,7 @@ class JunctionMyosinSync(Rewire):
     MAY_MUTATE_INTEGRATED_STATE = False
     MECHANISM_TAGS = ["junction_state", "topology_persistent", "bookkeeping"]
     PARAM_ROLES = {"myo_new": "myosin_of_a_newborn_junction"}
-    REFERENCE = "Plexus (this work)."
+    REFERENCE = "Plexus (this work); bookkeeping that keeps a mechanism correct, not a mechanism."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -433,18 +461,19 @@ class JunctionMyosinSync(Rewire):
             return {}
         was = int(m["myo"].shape[0]) if m.get("myo") is not None else 0
         val, _ = _lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_)
-        # THE STORE HOLDS WHAT THE MODEL CHOSE TO STORE, AND `myo` IS WHAT THE MECHANICS READS. For the
-        # default model those are the same number and `myo_gain` is 1. For `two_pool` the store is a
-        # line density and the multiplier is that density scaled to a tissue mean of `activity`, so the
-        # gain is `activity / <n>`; the owning operator leaves it on the mesh and this operator applies
-        # it, which is what keeps this one model-agnostic. The gain is the one computed before the
-        # topology operators ran, i.e. over ~2,000 junctions of which a handful were just cut -- a mean
-        # that does not move at that scale, and stated here rather than hidden.
+        # The store holds what the model chose to store; `myo` is what the mechanics reads. For
+        # the default model those are the same number and `myo_gain` is 1. For `two_pool` the
+        # store is a line density and the multiplier is that density scaled to a tissue mean of
+        # `activity`, so the gain is activity / <n>. The owning operator leaves the gain on the
+        # mesh and this operator applies it, which is what keeps this one model-agnostic. The
+        # gain used is the one computed BEFORE the topology operators ran -- a mean over some
+        # thousands of junctions, of which a handful were just cut, so it does not move at that
+        # scale.
         gain = float(m.get("myo_gain", 1.0))
         m["myo"] = _scatter_full(es, live, (gain * val).clamp(0.0, 5.0), dev, dt_)
-        # AND THE AMOUNT, on the same footing. `myo` is a density (and, for `two_pool`, a normalised
-        # one), so no sum of it says how much myosin there is; N_e = (stored density) * l_e does, and
-        # it is the quantity the conservation ledger is written in. Zero on dead slots: an amount.
+        # And the amount, on the same footing. `myo` is a density -- normalised, for `two_pool` --
+        # so no sum of it says how much myosin there is; N_e = (stored density) * l_e does, and it
+        # is the quantity the conservation ledger is written in. Zero on dead slots: an amount.
         m["myo_amount"] = _scatter_full(es, live, val * length, dev, dt_, fill=0.0)
         SYNC_TRACE.append((int(es.shape[0]), was, int(live.sum())))
         if not self._said:
@@ -461,35 +490,49 @@ def _face_carry(m, name):
     """Ask the topology operators to carry a per-face array across a rebuild.
 
     `cell_divide` and `cell_die` reindex every per-face array through the `keep` map (new face ->
-    old face) so nothing is left pointing at a face that has moved. The set of names they carry was a
-    literal tuple, so a per-face state added by a new operator was silently dropped -- the same class
-    of defect as the per-half-edge myosin that `junction_sync` exists to fix, one level up.
-    `face_carry` makes the list open: an operator declares its own array once and the topology
-    operators still know nothing about what is in it.
+    old face), so nothing is left pointing at a face that has moved. The list of names they carry
+    is open rather than literal: an operator declares its own array here once, and the topology
+    operators still know nothing about what is in it. A closed list would silently drop the
+    per-face state of any operator added later -- the same class of defect as the per-half-edge
+    myosin that `junction_sync` exists to fix, one level up.
     """
     m.setdefault("face_carry", set()).add(name)
 
 
 @register_operator("medioapical_myosin", family="mechanics", set="cell", kind="lateral")
 class MedioapicalMyosin(Lateral):
-    """The apical meshwork: an AREAL myosin density on each cell, and its flux onto that cell's
-    junctions.
+    """The apical meshwork: a second myosin pool, spread over the FACE as an areal density
+    rather than along its edges, which assembles there and flows outward onto the belt.
 
-        M_f  = rho_f * A_f                                  amount, from the stored areal density
-        dM_f/dt = k_on * A_f  -  M_f / tau_med  -  sum_e J_(f->e)
-        J_(f->e) = k_ex * rho_f * l_e * (1 + beta_T (T_e/<T> - 1))
+    cell -> cell: reads the face geometry and the per-edge tension, writes m["myo_med"] (the
+    areal density) and m["myo_influx"] (the per-half-edge flux) on the mesh.
 
-    EVERY TERM IS PER WHAT. `k_on` is myosin assembled per unit APICAL AREA per frame, so a cell that
-    grows assembles more, which is what makes this pool areal rather than a per-cell budget.
-    `tau_med` is the meshwork's own turnover time IN FRAMES. `k_ex` is the fraction of the cell's
-    areal density handed to each unit LENGTH of its junctional belt per frame -- the flux is
-    proportional to `l_e` because the belt is what receives it and there is `l_e` of it.
+        M_f      = rho_f A_f                                 the amount, from the stored density
+        dM_f/dt  = k_on A_f  -  M_f / tau_med  -  sum_e J_(f->e)
+        J_(f->e) = k_ex rho_f l_e (1 + beta_T (T_e/<T> - 1))
 
-    THE SHAPE FACTOR IS A PREDICTION, NOT A PARAMETER. At steady state
-    rho* = k_on / (1/tau_med + k_ex * P_f/A_f), so a cell with more perimeter per unit area drains
-    faster and holds less medioapical myosin. P_f/A_f is fixed by shape alone, so this model says
-    elongated cells are medioapically poorer than round ones of the same area, with nothing added to
-    say so.
+    rho_f is the areal density of myosin on face f, in amount per world unit squared, and A_f the
+    face's apical area. k_on is myosin assembled per unit APICAL AREA per frame, so a cell that
+    grows assembles more -- which is what makes this pool areal rather than a per-cell budget.
+    tau_med is the meshwork's own turnover time, in frames. k_ex is the fraction of the cell's
+    areal density handed to each unit LENGTH of its junctional belt per frame; the flux is
+    proportional to l_e because the belt is what receives it and there is l_e of it. beta_T is
+    the dimensionless tension bias: at beta_T = 0 the flux is blind to mechanics, and above it a
+    junction under more than the mean tension T/<T> draws proportionally more.
+
+    The shape factor is a PREDICTION, not a parameter. At steady state
+
+        rho* = k_on / (1/tau_med + k_ex P_f/A_f)
+
+    so a cell with more perimeter per unit area drains faster and holds less medioapical myosin.
+    P_f/A_f is fixed by shape alone, so the model says elongated cells are medioapically poorer
+    than round ones of the same area -- with nothing added to make it say so.
+
+    Reference: Munjal, A., Philippe, J.-M., Munro, E. & Lecuit, T. (2015). A self-organized
+    biomechanical network drives shape changes during tissue morphogenesis. Nature 524:351-355
+    (two apical pools, medioapical pulses flowing onto junctions); Rauzi, M., Lenne, P.-F. &
+    Lecuit, T. (2010). Planar polarized actomyosin contractile flows control epithelial junction
+    remodelling. Nature 468:1110-1114 (planar-polarised junctional myosin).
     """
 
     EMIT = None
@@ -501,9 +544,11 @@ class MedioapicalMyosin(Lateral):
                       "topology_persistent"]
     PARAM_ROLES = {"k_on": "areal_assembly_rate", "tau_med": "medioapical_turnover_time",
                    "k_ex": "export_rate_onto_the_belt", "beta_T": "tension_bias_of_the_export"}
-    REFERENCE = ("Munjal, A., Philippe, J.-M., Munro, E. & Lecuit, T. (2015) Nature 524:351 "
-                 "(two apical pools, medioapical pulses flowing onto junctions); "
-                 "Rauzi, M. et al. (2010) Nature 468:1110 (planar-polarised junctional myosin).")
+    REFERENCE = ("Munjal, A., Philippe, J.-M., Munro, E. & Lecuit, T. (2015). A self-organized "
+                 "biomechanical network drives shape changes during tissue morphogenesis. Nature "
+                 "524:351-355; Rauzi, M., Lenne, P.-F. & Lecuit, T. (2010). Planar polarized "
+                 "actomyosin contractile flows control epithelial junction remodelling. Nature "
+                 "468:1110-1114.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -605,29 +650,40 @@ class MedioapicalMyosin(Lateral):
 @register_operator("junction_myosin", family="mechanics", set="vertex", kind="structural",
                    model="two_pool")
 class JunctionMyosinTwoPool(Structural):
-    """The junctional belt fed by the medioapical pool: a conserved AMOUNT, a DERIVED density.
+    """The junctional belt as a RECEIVER rather than a recruiter: it is fed by the medioapical
+    pool, holds a conserved amount, and its density follows from that amount and its length.
 
-        N_e = n_e * l_e                                  amount, from the stored line density
-        dN_e/dt = sum_(f in e) J_(f->e)  -  N_e / tau_jun
-        m_e = a * n_e / <n_e>                             what the mechanics multiplies Lambda by
+    vertex -> vertex: reads the medioapical influx and pos, writes m["myo"] and the store.
 
-    A DIFFERENT MODEL OF THE SAME CONTRACT, not a different implementation of it. `junction_myosin`'s
-    default model recruits from a mechanical drive with parameters {activity, tau, beta, keyed_on};
-    this one receives a flux from another pool with parameters {tau_jun, activity} and has no drive
-    at all. Per plexus2 those are disjoint parameter sets and therefore two biological hypotheses in
-    one slot, which is what the `model=` axis is for -- swapping them is an experiment. They share the
-    contract's kind and the state channel `m["myo"]`, so `cell_mechanics` cannot tell them apart and
-    the comparison is at the same operating point.
+        N_e      = n_e l_e                                the amount, from the line density
+        dN_e/dt  = sum_(f in e) J_(f->e)  -  N_e / tau_jun
+        m_e      = a n_e / <n_e>                          what the mechanics multiplies Lambda by
 
-    WHY THE DENSITY IS NORMALISED. `m_e` multiplies `Lambda`, and `Lambda` is calibrated against a
-    tissue whose mean multiplier is 1. Dividing by the tissue mean fixes the overall level at
-    `activity` and leaves this model predicting the PATTERN of junctional myosin, which is the part it
-    is entitled to predict; the absolute level is set by `Lambda * activity` as it always was. Without
-    it, `k_on` and `k_ex` would be a second, hidden line tension.
+    n_e is the line density of myosin on junction e, in amount per world unit of length, and l_e
+    its length. tau_jun is the belt's turnover time in frames -- the only timescale here, since
+    the supply comes from elsewhere. a is `activity`, the dimensionless global level.
 
-    THE PROPERTY THIS EXISTS FOR. `n_e` is intensive and its supply is per unit length, so at a
-    division the two halves of a cut junction keep the density they had AND relax toward the setpoint
-    they were already at. The one-pool model keeps the first and loses the second.
+    This is a different MODEL of the same contract, not a different implementation of it. The
+    default model recruits from a mechanical drive, with parameters {activity, tau, beta,
+    keyed_on}; this one receives a flux from another pool, with {tau_jun, activity}, and has no
+    drive at all. Those parameter sets are disjoint, so there is no operating point at which the
+    two agree and swapping them is an experiment -- which is what the `model=` axis is for. They
+    share the contract's kind and the channel m["myo"], so `cell_mechanics` cannot tell them
+    apart and the comparison is at least fair on that side.
+
+    The density is NORMALISED by the tissue mean because m_e multiplies Lambda, and Lambda is
+    calibrated against a tissue whose mean multiplier is 1. Dividing by <n_e> fixes the overall
+    level at `activity` and leaves this model predicting the PATTERN of junctional myosin, which
+    is the part it is entitled to predict. Without it, k_on and k_ex would be a second, hidden
+    line tension.
+
+    The property this model exists for: n_e is intensive and its supply is per unit length, so at
+    a division the two halves of a cut junction keep both the density they had AND the setpoint
+    they were relaxing toward. The one-pool model keeps the first and loses the second.
+
+    Reference: Munjal, A. et al. (2015). Nature 524:351-355 (medioapical to junctional flow);
+    Curran, S. et al. (2017). Myosin II controls junction fluctuations to guide epithelial tissue
+    ordering. Dev. Cell 43:480-492 (junctional myosin fluctuations).
     """
 
     EMIT = None
@@ -639,8 +695,9 @@ class JunctionMyosinTwoPool(Structural):
                       "topology_persistent", "conserved_amount"]
     PARAM_ROLES = {"tau_jun": "junctional_turnover_time", "activity": "global_myosin_activity",
                    "myo_new": "line_density_of_a_newborn_junction"}
-    REFERENCE = ("Munjal, A. et al. (2015) Nature 524:351 (medioapical -> junctional flow); "
-                 "Curran, S. et al. (2017) Dev. Cell 43:480 (junctional myosin fluctuations).")
+    REFERENCE = ("Munjal, A. et al. (2015). Nature 524:351-355 (medioapical to junctional flow); "
+                 "Curran, S. et al. (2017). Myosin II controls junction fluctuations to guide "
+                 "epithelial tissue ordering. Dev. Cell 43:480-492.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -745,45 +802,41 @@ class JunctionMyosinTwoPool(Structural):
 
 @register_operator("cytokinetic_ring", family="mechanics", set="vertex", kind="structural")
 class CytokineticRing(Structural):
-    """The myosin a division leaves on the junction it just built, taken from the cortex that built it.
+    """The cytokinetic ring: the myosin a division leaves on the junction it just built, debited
+    from the cortex that built it.
 
-    WHY THE MODEL NEEDED THIS, AND IT WAS VISIBLE IN A MOVIE BEFORE IT WAS MEASURED. In the two-pool
-    run the brightest junctions at a division site are the two HALVES of a contact the division cut
-    (m/<m> = 1.066, because a cell about to divide is large, has a low perimeter-to-area ratio, holds
-    more cortical myosin and feeds its belts harder) -- while the daughter--daughter interface, the one
-    place a real dividing cell puts almost all of its myosin, is the DIMMEST thing in the frame at
-    0.628. The cytokinetic ring is the most myosin-II-rich structure a cell assembles and it
-    constricts exactly there; in epithelia the nascent adherens junction between the daughters is
-    built out of it, with the neighbouring cell contributing (Herszterg et al., Dev. Cell 24:256,
-    2013; Founounou et al., Dev. Cell 24:242, 2013). A model whose division sites are bright for the
-    wrong reason and dark in the right place is getting this backwards twice.
+    vertex -> vertex: reads which vertices are new and the medioapical density, writes the keyed
+    store and debits m["myo_med"]. Runs after `cell_divide`, before `junction_sync`.
 
-    WHAT IT DOES. A junction born with BOTH endpoints new is a daughter--daughter interface -- exactly
-    the distinction `_lookup`'s inheritance already draws, since a split half has one new endpoint and
-    one old one. Those junctions are written into the keyed store at
+    A junction born with BOTH endpoints new is a daughter-daughter interface -- exactly the
+    distinction the inheritance rule already draws, since a junction merely split by a division
+    has one new endpoint and one old one. Those junctions are written into the store at
 
-        n_e = ring * n*_f,        n*_f = tau_jun * k_ex * rho_f
+        n_e  = ring * n*_f,        n*_f = tau_jun k_ex rho_f
 
-    i.e. `ring` times the density a mature junction of that cell carries, and the myosin is DEBITED
-    from the medioapical pool of the adjacent cell. That second half is not bookkeeping pedantry: the
-    ring is assembled from cortical actomyosin, so a ring that appears from nowhere would be a source
-    term in a model whose whole point is that myosin is a conserved amount, and the conservation
-    ledger would stop being able to detect a leak.
+    n*_f is the line density the supply into that cell's belt sustains at steady state, so `ring`
+    is dimensionless: how many times the density of a MATURE junction of that same cell a newborn
+    daughter-daughter interface starts at. The deposit is debited from the medioapical pool of the
+    adjacent cell, which is not bookkeeping pedantry -- the ring is assembled from cortical
+    actomyosin, and a ring appearing from nowhere would be a source term in a model whose whole
+    point is that myosin is conserved, after which the ledger could no longer detect a leak.
 
-    IT RELAXES ON ITS OWN. Nothing here decays the deposit: the junctional equation already does,
-    with dN/dt = J - N/tau_jun pulling the interface from `ring * n*` back to `n*` over tau_jun. So
-    `ring` sets how bright a new junction starts and tau_jun sets how long it stays that way, and
-    neither needs a second timescale invented for it.
+    Nothing here decays the deposit, because the junctional equation already does:
+    dN/dt = J - N/tau_jun pulls the interface from ring * n* back to n* over tau_jun. So `ring`
+    sets how bright a new junction starts and tau_jun how long it stays that way, and neither
+    needs a second timescale invented for it.
 
-    WHERE IT GOES IN THE SCHEDULE. After the topology operators, before `junction_sync`:
+    Without this operator the two-pool model gets the division site backwards twice: the brightest
+    junctions there are the two halves of a contact the division CUT -- a cell about to divide is
+    large, has a low perimeter-to-area ratio, holds more cortical myosin and feeds its belts
+    harder -- while the daughter-daughter interface, the one place a real dividing cell puts
+    almost all of its myosin, is the dimmest thing in the frame.
 
-        ... -> edge_flip -> cell_divide -> cytokinetic_ring -> junction_sync
-                                                                -> topo_record
-
-    It must see the new vertices, which means after `cell_divide`, and it must read `myo_vseen` from the
-    PREVIOUS frame's `junction_myosin` to know which vertices are new -- which it does, because
-    nothing between the two writes it. Placing it before the sync operator is what makes the deposit
-    visible in the frame it happens rather than the frame after.
+    Reference: Herszterg, S., Leibfried, A., Bosveld, F., Martin, C. & Bellaiche, Y. (2013).
+    Interplay between the dividing cell and its neighbors regulates adherens junction formation
+    during cytokinesis in epithelial tissue. Dev. Cell 24:256-270; Founounou, N., Loyer, N. & Le
+    Borgne, R. (2013). Septins regulate the contractility of the actomyosin ring to enable
+    adherens junction remodeling during cytokinesis. Dev. Cell 24:242-255.
     """
 
     EMIT = None
@@ -794,9 +847,10 @@ class CytokineticRing(Structural):
     MECHANISM_TAGS = ["actomyosin_contraction", "cytokinesis", "junction_state", "conserved_amount"]
     PARAM_ROLES = {"ring": "newborn_junction_density_as_a_multiple_of_the_local_steady_state",
                    "tau_jun": "the_belt_turnover_that_relaxes_it_back"}
-    REFERENCE = ("Herszterg, S. et al. (2013) Dev. Cell 24:256 and Founounou, N. et al. (2013) "
-                 "Dev. Cell 24:242 (the daughter--daughter junction is built from the cytokinetic "
-                 "ring, with the neighbouring cell contributing).")
+    REFERENCE = ("Herszterg, S. et al. (2013). Interplay between the dividing cell and its "
+                 "neighbors regulates adherens junction formation during cytokinesis in epithelial "
+                 "tissue. Dev. Cell 24:256-270; Founounou, N., Loyer, N. & Le Borgne, R. (2013). "
+                 "Dev. Cell 24:242-255.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
