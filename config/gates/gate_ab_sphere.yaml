@@ -1,0 +1,192 @@
+# R2 OF THE APICO-BASAL PROMOTION -- the representation exists, and it is STILL.
+#
+# The whole of this rung: every vertex acquires a second block, `sep`, the apico-basal HALF
+# separation, so that apical = pos + sep and basal = pos - sep. NOTHING ACTS ON IT YET. There is no
+# `cell_mechanics[model: apicobasal]` in this schedule, so `sep` is written once by the seed and is
+# then carried, unchanged, through growth, division and T1. That is deliberate and it is what makes
+# the rung falsifiable: if the four rows below pass on a run where nothing touches `sep`, the
+# representation is sound before any energy is written on it.
+#
+# `K_R: 0` AND THAT IS NOT A DETAIL. `graphs_data/mesh_mpm/README.md` recorded that `K_R: 0.4` on the
+# old step-4 shell "is a deliberate suppression, not physics" -- a radial spring holding the shell at
+# its seed radius, which Okuda's energy does not have. Any row about shape measured against a
+# suppressed model is measuring the suppression.
+#
+# NO `units:` BLOCK, DELIBERATELY. Every row here is dimensionless -- a count, a sign, a ratio, a
+# relative residual -- so none of them needs one, and inventing `length_um` would let a later row
+# quote a micrometre it has not earned. The measurement-tier rows arrive at R5 and bring the units
+# block with them, because that is the rung at which the separation is a solver outcome rather than
+# a declared constant.
+
+general:
+  name: gate_ab_sphere
+  seed: 0
+  n_frames: 60
+  dt: 1.0
+  # > n_frames + 1, so `sstride` is 1 and every tick is recorded. A smaller cap strides silently,
+  # and AB-B1's `reduce: all` would then be asserting over a fifth of the run while claiming the run.
+  record_cap: 64
+  boundary: free
+  dim: 3
+  world: [50.0, 50.0, 50.0]
+
+plotting:
+  renderer: vtk_mesh
+  background: black
+
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: cell
+    state:
+      # `pos` AND `vel` ARE RESTATED HERE AND THAT IS NOT BOILERPLATE. `_resolve_schema` is explicit
+      # that "the spec always wins": a `state:` block REPLACES the set's schema, it does not extend
+      # it. `schema_from_spec` gives every declared block `first_order` + `free` unless told
+      # otherwise, so a vertex set that declares only `sep` loses `pos` entirely (the seed dies on
+      # `KeyError: 'pos'`, which is the loud failure) -- and one that declares `pos` without
+      # `boundary: world` keeps running while silently losing the world clamp, which is the quiet
+      # one. The roles below reproduce `spatial_schema(3)` exactly; `seed_mesh[apicobasal]` asserts
+      # that they do, so a spec that gets this wrong is refused rather than run.
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
+      # THE SECOND DEGREE-OF-FREEDOM GROUP. `first_order` because a mechanics that acts on it will
+      # emit a velocity into it, exactly as `pos` takes one -- and because R1(a) made a single
+      # operator able to write both blocks of one set, which is the only reason this can be a block
+      # on `vertex` rather than a set of its own. A separate `wall` set would never be integrated:
+      # `_integrate` walks `emit_order`, built from each operator's DECLARED set, so a delta for a
+      # set nothing is declared `at:` is silently dropped at the next `zero_delta`.
+      sep: {width: 3, integration: first_order}
+  cell:
+    n: 1024
+    state:
+      area: {width: 1}
+      cen:  {width: 3}
+
+fields: {}
+
+seed:
+  # h0 IS THE FULL CELL THICKNESS and `sep` is half of it, so |apical - basal| = h0. At R = 5 with
+  # 200 cells the mean edge is ~1.3, so h0 = 0.4 sits under the `h0 <= 0.3 x edge` cap that
+  # `monolayer_design.md` gives for offset self-intersection.
+  - {op: seed_mesh, implementation: apicobasal, at: vertex, cell_set: cell,
+     n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15, h0: 0.4}
+
+operators:
+  - {op: cell_geometry, at: cell}
+  - {op: cell_grow, at: vertex, cell_set: cell, rate: 0.003457, rho: 1.0,
+     a_sw: 50.0, hill: 4.0, vth_frac: 2.5}
+  # THE MID-SURFACE MECHANICS, UNCHANGED, and that is the point of this rung: the tissue relaxes
+  # exactly as it always did while carrying a separation nothing reads. `K_R: 0` -- see the header.
+  - {op: cell_mechanics, at: vertex, K_A: 1.0, K_P: 1.0, K_V: 2.0, K_R: 0.0,
+     Lambda: 3.0, Gamma: 0.4, p0: 3.5, mu: 1.0, dt: 1.0,
+     relax_iters: 30, eta: 0.08, cap_frac: 0.12}
+  - {op: edge_flip, at: vertex, every: 4, engine_clock: true, l_th_frac: 0.35, max_flips: 30}
+  - {op: cell_divide, at: vertex, cell_set: cell, every: 4, engine_clock: true,
+     factor: 2.0, cycle_cv: 0.15, min_cycle: 4, max_cycle: 1000000000, p0: 3.5,
+     reset_noise: 0.12}
+  - {op: topo_record, at: vertex, every: 1}
+
+schedule: [cell_geometry, cell_grow, cell_mechanics, edge_flip, cell_divide, topo_record]
+
+# =====================================================================================
+#  THE GATE. Four rows, all bookkeeping-or-closed-form, and that is what R2 can honestly
+#  claim: the representation is sound, not that it is right about a tissue. The
+#  measurement tier arrives at R5, when `sep` stops being a declared constant.
+#
+#  EVERY THRESHOLD HERE WAS WRITTEN IN APICOBASAL_PROMOTION.md BEFORE ANY OF THESE ROWS
+#  WAS RUN, and `tools/run_gates.py --freeze-reference` now actually enforces that: since
+#  R1(d) the runner re-hashes this block and refuses to grade if it has moved.
+# =====================================================================================
+_gate:
+  id: "ab_sphere"
+  question: >
+    Does a 200-cell shell carry an apico-basal separation through 60 frames of growth, division
+    and T1 -- with nothing acting on it -- and is every cell's polyhedron closed, correctly
+    oriented, and the right shape at the seeded state?
+  operators_exercised: [seed_mesh, cell_geometry, cell_grow, cell_mechanics, edge_flip,
+                        cell_divide, topo_record]
+
+  measures:
+
+    - name: apicobasal_span_invalid_count
+      tier: bookkeeping
+      basis: identity
+      fn: apicobasal_span_invalid_count
+      reduce: all
+      assert: {eq: 0}
+      unit: "ring-referenced vertices whose span is non-finite or points inward"
+      why: >
+        AB-B1. The polarity axis is DERIVED as sep/|sep| and nothing enforces its sign -- the design
+        declines to write a `cell_polarity` operator because a normalisation of another operator's
+        state is not a mechanism, and this row is the cost of that decision. A shell that inverts
+        through itself keeps a plausible energy while apical and basal have swapped. Outward is
+        tested against the mid-surface NORMAL, not the radius: a radial test would score every
+        buckle as a failure, and buckling is what the promotion exists to produce.
+
+    - name: apicobasal_span_recorded_fraction
+      tier: bookkeeping
+      basis: identity
+      fn: apicobasal_span_recorded_fraction
+      reduce: all
+      assert: {eq: 1.0}
+      unit: "fraction of recorded rows carrying a finite, non-zero span"
+      why: >
+        AB-B7. `run_gates` never reads `operators_exercised:` -- preflight reads id, arms, measures
+        and the per-row keys only -- so a gate can NAME a variant and prove nothing about which one
+        it got. A quantity the operator itself writes is the only evidence the apicobasal seed ran,
+        and it is free because `sep` reaches the trajectory through the generic per-set path.
+
+    - name: polyhedron_volume_closure
+      tier: bookkeeping
+      basis: identity
+      fn: polyhedron_volume_closure
+      reduce: max
+      assert: {le: 1.0e-9}
+      unit: "relative discrepancy between two origins for one cell's volume (dimensionless)"
+      why: >
+        AB-B2. A closed oriented surface encloses the same volume from ANY origin. One number
+        therefore exercises both caps, one lateral quad per ring edge, the fan triangulation and the
+        orientation convention at once, and it is the only row that would catch a wall wound the
+        wrong way -- the failure the maintained C++ reference needs an explicit `polygonDirections_`
+        array to avoid. CONSISTENCY IS NOT CORRECTNESS, and this row alone would not have caught the
+        bug it was written against: an inward-wound wall is still closed, so both origins agreed
+        exactly while the volume came out -0.866 for a cell of +2.598. That was found against an
+        analytic hexagonal prism, and `tests/test_apicobasal_measures.py` keeps that check.
+
+    - name: cap_area_ratio_seeded
+      tier: closed_form
+      basis: analytic
+      fn: cap_area_ratio
+      reduce: first
+      assert: {within: [1.173611, 0.02]}
+      unit: "apical:basal cell cap-area ratio at the seeded state (dimensionless)"
+      why: >
+        AB-C3. On a spherical shell the caps scale with their own radii, so the ratio is
+        ((R + h/2)/(R - h/2))^2 = 1.1736111 at R = 5, h = 0.4. A CONTROL, not a result: at R2 `sep`
+        is frozen at (h0/2)n, so the caps are exactly what `monolayer_shells` would build and this
+        row re-measures a construction. It becomes a result at R5, when `sep` is integrated and the
+        ratio is solved -- AB-C4 is that row, and it exists so the difference is visible.
+        `reduce: first` and NOT `mean`: the shell GROWS, so R rises through the run and the ratio
+        falls with it (1.1896 -> 1.1486 over 60 frames). A mean would average a closed form over
+        radii it was never evaluated at. The plan said `mean`; the run said otherwise.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation begins with a spherical mesh composed of 200 hexagonal cells. As time
+      progresses, the mesh undergoes a topological transformation where cells begin to merge and split.
+      By the final frames, the number of cells increases to 233 as new boundaries form. The final state
+      shows a complex network of interconnected cells with distinct red and blue highlighted regions.
+    objects: The primary object is a large sphere covered in a tessellated mesh of polygonal cells. Most
+      cells are light gray and maintain a hexagonal or pentagonal shape. In the later frames, specific
+      cells are colored in bright red and blue to indicate local changes. The mesh maintains a consistent
+      overall spherical volume while the internal cell boundaries shift and multiply.
+  movie_kburns:
+    description: The video shows a static 3D mesh of a sphere with a Voronoi-like pattern. There is no
+      movement or evolution of particles, agents, or fields over the sequence of frames. The geometry
+      remains perfectly still throughout the entire duration. The lighting and shading on the surface
+      are constant across all keyframes.
+    objects: The primary object is a large sphere composed of a polygonal mesh. The mesh consists of irregular
+      hexagons and pentagons of varying sizes. The surface is a uniform light gray color with black outlines
+      defining the edges of each polygon. The overall structure is a closed, convex 3D manifold.
