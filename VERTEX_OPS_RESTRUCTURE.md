@@ -32,6 +32,43 @@ which live in the framework's own store.
 
 ---
 
+## The `structural` audit: 20 of 39 registrations are structural for the wrong reason
+
+The paper defines the kind by what it changes: **Divide creates entities, Die removes them.** By
+that test, of 39 `structural` registrations across `src/plexus/operators/`, only **19** qualify --
+`cell_divide` (6), `cell_die` (12) and `bm_secrete` (1, it lays down new membrane as the sheet
+grows). The other 20 are registered `structural` because it is the only kind permitted to write in
+place, and they group into three things the vocabulary does not have a name for:
+
+**Modulate -- writes a target or a parameter that another operator reads (13)**
+
+    cell_grow (4)        raises A0/P0/V0f; cell_mechanics moves the vertices
+    cell_cycle (4)       advances phase; cell_divide reads it
+    junction_myosin (2)  writes per-junction myosin; the energy reads it
+    cytokinetic_ring     writes the myosin a division leaves behind
+    ecm_gate_growth      the matrix's pressure slows the cell cycle
+    bm_sense             the epithelium reads the membrane it rests on
+
+**Constraint / projection -- enforces a condition on positions after the fact (5)**
+
+    plate_confine   cell_exclude   integrin_track   surface_drive   surface_track
+
+**Harness (1)** -- `topo_record`, which is a measurement and says so in its own first line.
+
+Plus `ecm_load`, which applies a force and on the face of it belongs with the dynamics operators;
+it needs reading before being classified.
+
+**This is the same finding as the two-homes problem, one level up.** `structural` has come to mean
+"may write in place" rather than "changes the entities", and it absorbed every operator that needed
+a write and was not a Divide, a Die, a Seed, a Rewire or a Field. Naming **Modulate** as a family
+beside the four state-transforming ones would take 13 of the 20; the constraint group is a second
+question and probably a projection step in the integrator rather than a kind.
+
+**Decide this before S1.** The writer-set diagnostic keys on exactly this class of operator, and if
+`Modulate` is going to exist it should exist before operators are annotated as structural writers.
+
+---
+
 ## The byte-identical harness -- BUILD THIS FIRST, CHANGE NOTHING UNTIL IT IS GREEN
 
 `tools/promotion_identical.py` compares okuda against core. This needs core against core: the same
@@ -44,23 +81,35 @@ zero over 1,800 frames with division, T1 and chemistry live.
 Pin `20eb3d06` as the reference, run the covering set on it once, store the digests, and re-run
 after every rung.
 
-### Coverage, measured
+### Coverage: `config/tissue` is the base, and it covers 12 of 31
 
-`vertex_ops` registers **31 operators across 7 contracts**. Of these, **24 are selected by at least
-one spec in `config/` and 7 are selected by none**:
+`config/tissue` is the reference set for these comparisons -- it is the suite built during this
+campaign, every spec is short, seeded, and already rendered, and it is the one directory whose runs
+are all reproducible from a spec in the tree. Measured against the 31 registrations in
+`vertex_ops.py` it covers **12**:
 
-    cell_cycle[timer]  cell_cycle[transition_probability]  cell_cycle[inhibitor_dilution]
-    cell_divide[adder]  cell_divide[concerted]  cell_die[lonely]  cell_mechanics[warp]
+    cell_mechanics[(base) apicobasal monolayer]   seed_mesh[(base) apicobasal]
+    cell_divide[(base) timer cycle]               cell_cycle[(base)]
+    cell_die[prescribed]                          edge_flip[(base)]   topo_record[(base)]
 
-Six of those seven were written in this campaign and have never had a spec. **They need one each
-before the refactor starts**, or the harness silently proves nothing about them. `cell_mechanics
-[warp]` is the exception that matters most -- it is a second implementation of the energy and the
-one most likely to drift unnoticed.
+**Nineteen are uncovered, and they are not an even spread.** Ten of them are `cell_die` models --
+`competition`, `smaller`, `dimmer`, `older`, `crowded`, `lonely`, `small`, `stalled`, `chem_low`,
+`field`, plus the base -- which differ ONLY in `_marked`, the choice of who dies. Three are
+`cell_cycle` models differing only in `_leave_g1`. Two are `cell_divide` triggers. That leaves the
+two that matter most and are neither cheap nor similar to anything covered:
 
-A greedy cover of the other 24 is 16 specs, most contributing one variant each. Do not use it as
-found: `config/okuda/_superseded_*` and `_archive_*` are three of them, and a refactor pinned to
-archived specs pins itself to whatever those were. **Write a dedicated covering set under
-`config/refactor/`, one spec per uncovered variant, short (20-60 frames) and seeded.**
+    cell_mechanics[warp]      a second IMPLEMENTATION of the energy -- the one most likely to
+                              drift unnoticed, since it is supposed to agree to the bit
+    cell_mechanics[marinari]  a different functional entirely
+
+**So the covering set to add under `config/tissue` is small**: one spec per uncovered variant,
+20-60 frames, seeded, and for the families that differ in one predicate a single spec per family
+with the variant swapped is enough -- the point is that the code path executes, not that the biology
+is interesting. `cell_mechanics[warp]` and `[marinari]` need real specs of their own.
+
+Do NOT reach into `config/okuda/_superseded_*` or `_archive_*` to close the gap, even though a
+greedy cover of the whole repo picks three of them. A refactor pinned to archived specs pins itself
+to whatever those were on the day they were archived.
 
 ### The three properties the harness must have
 
