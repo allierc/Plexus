@@ -69,7 +69,7 @@ seed:
   # h0 IS THE FULL CELL THICKNESS and `sep` is half of it, so |apical - basal| = h0. At R = 5 with
   # 200 cells the mean edge is ~1.3, so h0 = 0.4 sits under the `h0 <= 0.3 x edge` cap that
   # `monolayer_design.md` gives for offset self-intersection.
-  - {op: seed_mesh, implementation: apicobasal, at: vertex, cell_set: cell,
+  - {op: seed_mesh, model: apicobasal, at: vertex, cell_set: cell,
      n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15, h0: 0.4}
 
 operators:
