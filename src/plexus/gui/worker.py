@@ -39,7 +39,7 @@ SENTINEL = "[worker] rc="
 def _preimport() -> None:
     """Everything a generate touches, imported once. Failures are reported, never fatal."""
     for mod in ("torch", "numpy", "warp", "pyvista",
-                "plexus.operators", "plexus.operators.mpm_warp",
+                "plexus.operators",   # mpm_warp merged into mpm_ops, 2026-09-04
                 "plexus.schema", "plexus.engine", "plexus.render_vtk", "plexus.live_movie",
                 "plexus.generators.graph_data_generator", "plexus.generators.mpm_cfl"):
         try:

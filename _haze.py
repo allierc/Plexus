@@ -2,7 +2,7 @@ import sys, yaml, tempfile, os
 sys.path.insert(0,'src')
 import numpy as np, torch
 torch.cuda.set_device(1)
-import plexus.operators, plexus.operators.mpm_warp
+import plexus.operators   # mpm_warp merged into mpm_ops, 2026-09-04
 from plexus.schema import load
 from plexus import engine as E
 NG=192
