@@ -834,7 +834,7 @@ class LiveMovie:
     #     quantity: myosin    mean +- SD of the junctional myosin, per type -- the only one of
     #                         these that lives on an EDGE rather than on a face, so it is grouped by
     #                         the type of the cell each half-edge belongs to.
-    _CURVE_Q = ("cells", "area", "volume", "radius", "myosin")
+    _CURVE_Q = ("cells", "area", "volume", "radius", "myosin", "phase")
 
     def _curve_series(self, H, lvl, q, ntype):
         """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
@@ -847,6 +847,8 @@ class LiveMovie:
         """
         T = int(getattr(lvl, "_pos").shape[0])
         nt = 1 if ntype is None else int(np.max(ntype)) + 1
+        if q == "phase":
+            nt = 4                                   # G1, S, G2, M -- the partition IS the phase
         out = np.full((T, nt, 2), np.nan)
         for t in range(T):
             lvl.t = t
@@ -859,6 +861,22 @@ class LiveMovie:
             if q == "cells":
                 for j in range(nt):
                     out[t, j] = (float((k == j).sum()), 0.0)
+                continue
+            if q == "phase":
+                # PERCENT OF THE POPULATION IN EACH PHASE, four series in one panel. A cycle is
+                # read as a DISTRIBUTION -- what fraction is where -- and the count of cells does
+                # not show it: a tissue cycling steadily and one frozen in G1 both just grow. The
+                # four fractions sum to 100 at every frame, so the panel is also its own check.
+                #
+                # It ignores `ntype`: the partition here is the PHASE, and splitting phases by cell
+                # type as well would be sixteen series in one panel, which is a different plot.
+                v = m.get("phase")
+                if v is None:
+                    continue
+                a = np.rint(np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach")
+                                       else v, float).ravel()[:nF]).astype(int)
+                for j in range(min(nt, 4)):
+                    out[t, j] = (100.0 * float(np.mean(a == j)) if a.size else np.nan, 0.0)
                 continue
             if q == "myosin":
                 v = m.get("e_myo")
@@ -1093,8 +1111,17 @@ class LiveMovie:
             _pal = [tuple(v) for v in ((self.style or {}).get("colors") or {}).values()]
             _pal = _pal or [(0.35, 0.60, 1.00), (1.00, 0.35, 0.25),
                             (0.45, 0.95, 0.55), (1.00, 0.85, 0.30)]
-            cols = ([tuple(cfg["color"])] if "color" in cfg and nt == 1
-                    else [(1.0, 1.0, 1.0)] if nt == 1 else [_pal[j % len(_pal)] for j in range(nt)])
+            # THE PHASE CURVE TAKES THE PHASE COLOURS, so the panel and the tissue say the same
+            # thing with the same four colours and neither needs a legend.
+            if q == "phase":
+                import matplotlib.colors as _mc2
+                _pc = (self.style or {}).get("phase_colors") or ["#3b57c0", "#2e9e4f",
+                                                                 "#e8b024", "#e03b2f"]
+                cols = [tuple(_mc2.to_rgb(c)) for c in _pc[:nt]]
+            else:
+                cols = ([tuple(cfg["color"])] if "color" in cfg and nt == 1
+                        else [(1.0, 1.0, 1.0)] if nt == 1
+                        else [_pal[j % len(_pal)] for j in range(nt)])
             bands, lines = [], []
             for j in range(nt):
                 c = cols[j]
@@ -1102,7 +1129,7 @@ class LiveMovie:
                 lines.append(ch.line([0.0, 0.0], [0.0, 0.0], color=(*c, 1.0), width=2.0))
             self.p.add_chart(ch)
             self._curves.append({"S": S, "bands": bands, "lines": lines, "nt": nt,
-                                 "sd": bool(cfg.get("sd", q != "cells"))})
+                                 "sd": bool(cfg.get("sd", q not in ("cells", "phase")))})
             print(f"[live-movie] curve {q}: {S.shape[0]} frames, {nt} "
                   f"{'series by type' if nt > 1 else 'series'}, "
                   f"y [{ch.y_axis.range[0]:.4g}, {ch.y_axis.range[1]:.4g}]", flush=True)

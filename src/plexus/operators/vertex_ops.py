@@ -2379,7 +2379,8 @@ class CellCycle3D(Structural):
     PARAM_ROLES = {"t_g1": "G1 duration, frames", "t_s": "S duration, frames",
                    "t_g2": "G2 duration, frames", "t_m": "M duration, frames",
                    "g1_size": "G1 exit threshold, in units of v_ref",
-                   "phase_cv": "per-cell CV on the phase durations"}
+                   "phase_cv": "per-cell CV on the phase durations",
+                   "seed_async": "start the population spread over the cycle"}
     G1, S, G2, M = 0, 1, 2, 3
 
     def __init__(self, params, device="cpu"):
@@ -2389,6 +2390,7 @@ class CellCycle3D(Structural):
                   float(params.get("t_g2", 40.0)), float(params.get("t_m", 10.0))]
         self.g1_size = float(params.get("g1_size", 1.6))
         self.phase_cv = float(params.get("phase_cv", 0.0))
+        self.seed_async = bool(params.get("seed_async", True))
         self.every = _engine_owns_clock(params, default=1)
         self.seed = int(params.get("seed", 0))
         self._rng = np.random.default_rng(self.seed + 4242)
@@ -2414,7 +2416,47 @@ class CellCycle3D(Structural):
                          if k in m and m[k] is not None else None)
         ph = _np("phase"); pt = _np("phase_t"); cc = _np("cyc_inhib")
         if ph is None or len(ph) != nF:
-            ph = np.zeros(nF); pt = np.zeros(nF); cc = np.ones(nF)
+            # `seed_async` -- START THE POPULATION SOMEWHERE, NOT ALL AT THE SAME PLACE. Seeding
+            # every cell at (G1, phase_t 0) makes the tissue a synchronised culture: the first
+            # generation divides in one wave, the second in a slightly broader one, and the cell
+            # count comes out a staircase rather than a curve. A real tissue in steady state has as
+            # many cells just born as about to divide.
+            #
+            # THE THREE ARE DRAWN TOGETHER BECAUSE THEY ARE ONE QUANTITY. A cell's phase, its time
+            # in that phase and its size are not independent -- a cell in G2 has been growing
+            # longer than one in G1 and is bigger for it -- so drawing them separately would give a
+            # population that is desynchronised in the clock and synchronised in size, which is not
+            # a tissue and would make `cell_grow`'s first act a correction of the seed. One uniform
+            # draw `u` per cell over the WHOLE cycle sets all three:
+            #
+            #   u ~ U(0, 1)                  where this cell is through its cycle
+            #   phase, phase_t               the phase containing u * T, and the offset into it
+            #   V0f  <-  V0f * (1 + u) / 1.5 volume grows v_b -> 2 v_b across the cycle, so a cell
+            #                                at fraction u holds v_b (1 + u); the 1.5 is the mean
+            #                                over u, which keeps the POPULATION's mean target where
+            #                                the seed put it
+            #
+            # UNIFORM ON THE CYCLE AND NOT GAUSSIAN, for the reason `age_seed` is: a phase is a
+            # position on a loop, and a bell would pile the population mid-cycle and still divide
+            # in waves, only rounder ones.
+            u = (self._rng.random(nF) if self.seed_async else np.zeros(nF))
+            tot = float(sum(self.t)) or 1.0
+            cut = np.cumsum(self.t) / tot                    # phase boundaries as fractions of T
+            ph = np.searchsorted(cut, u, side="right").astype(np.float64).clip(0, self.M)
+            lo = np.concatenate([[0.0], cut[:-1]])[ph.astype(int)]
+            pt = (u - lo) * tot                              # frames already spent in that phase
+            cc = np.ones(nF)
+            if self.seed_async and "V0f" in m and m["V0f"] is not None:
+                v0 = m["V0f"].detach().cpu().numpy().astype(np.float64)
+                if len(v0) == nF:
+                    m["V0f"] = torch.as_tensor(v0 * (1.0 + u) / 1.5, dtype=dt, device=dev)
+                    if "Vbirth" in m and m["Vbirth"] is not None:
+                        vb = m["Vbirth"].detach().cpu().numpy().astype(np.float64)
+                        if len(vb) == nF:
+                            m["Vbirth"] = torch.as_tensor(vb / 1.5, dtype=dt, device=dev)
+                print(f"[cell_cycle] seeded {nF} cells asynchronously: "
+                      f"G1 {int((ph == 0).sum())}, S {int((ph == 1).sum())}, "
+                      f"G2 {int((ph == 2).sum())}, M {int((ph == 3).sum())}", flush=True)
         if pt is None or len(pt) != nF:
             pt = np.zeros(nF)
         if cc is None or len(cc) != nF:
