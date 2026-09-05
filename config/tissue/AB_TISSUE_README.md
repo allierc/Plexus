@@ -34,6 +34,16 @@ not stale duplicates -- which is why they were not folded away.
 `graphs_data/tissue/_orphan/` holds run directories whose spec no longer exists (`ab_sphere`).
 Quarantined rather than deleted: a run is data, and the spec that made it may come back.
 
+THE PER-PARAMETER SWEEP OF `ab_02_reduction_apicobasal` IS GONE, deliberately and completely -- 22
+variants, their runs, the montage and the guide that read them. It measured what each key of
+`cell_mechanics[model: apicobasal]` does by moving one at a time, and its two findings are worth
+keeping here rather than in a document nobody will open: `mu`, `eta` and `relax_iters` are ONE
+quantity, how far the relaxation travels per frame, so a tissue that collapsed because volume was
+cheap and one that collapsed because it had four times as long look identical; and `cap_frac` at
+0.12 almost never binds -- removing the cap entirely moved the run by 9.2e-4 of an edge -- so it is
+not silently shaping any of these specs. Rebuild it by copying `ab_02_reduction_apicobasal.yaml`
+once per key and running `tools/tissue_montage.py ab_02_reduction_apicobasal`.
+
 ---
 
 ## What the renderers draw, and why both had to change
