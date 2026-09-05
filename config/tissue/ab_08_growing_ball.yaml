@@ -1,15 +1,18 @@
 general:
-  name: ab_06_population
+  name: ab_08_growing_ball
   seed: 0
-  n_frames: 480
+  n_frames: 401
   dt: 1.0
-  record_cap: 483
+  record_cap: 403
   boundary: free
   dim: 3
   world:
-  - 16.0
-  - 16.0
-  - 16.0
+  - 50.0
+  - 50.0
+  - 50.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
 plotting:
   renderer: vtk_points
   background: black
@@ -29,7 +32,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 26.0
+    span: 34.0
     walls: 64
     loc:
     - 0.015
@@ -47,6 +50,7 @@ plotting:
     xlabel: frame
     ylabel: cell volume
     ticks: 4
+  scale_bar_corner: right
 sets:
   vertex:
     n: 25584
@@ -73,26 +77,17 @@ sets:
         width: 1
       cen:
         width: 3
+      chem:
+        width: 2
+        integration: first_order
 fields: {}
-seed:
-- op: seed_mesh
-  implementation: apicobasal
-  at: vertex
-  cell_set: cell
-  n_cells: 1280
-  radius: 5.0
-  jitter: 0.18
-  p0: 3.5
-  seed: 0
-  h0: 1.8
-  vseed_cv: 0.5
 operators:
 - op: cell_geometry
   at: cell
 - op: cell_grow
   at: vertex
   cell_set: cell
-  rate: 0.000963
+  rate: 0.003457
   rho: 1.0
   a_sw: 50.0
   hill: 4.0
@@ -104,7 +99,7 @@ operators:
   kappa_s: 0.2
   gamma: 0.0
   Lambda: 0.0
-  K_R: 0.0
+  K_R: 0.4
   mu: 1.0
   relax_iters: 30
   eta: 0.08
@@ -117,16 +112,16 @@ operators:
   l_th_frac: 0.35
   max_flips: 30
 - op: cell_divide
-  model: timer
   at: vertex
   cell_set: cell
   every: 4
   engine_clock: true
-  cycle: 60.0
-  cycle_cv: 0.4
+  factor: 2.0
+  cycle_cv: 0.15
   min_cycle: 4
   max_cycle: 1000000000
   p0: 3.5
+  reset_noise: 0.12
 - op: topo_record
   at: vertex
   every: 1
@@ -137,3 +132,15 @@ schedule:
 - edge_flip
 - cell_divide
 - topo_record
+seed:
+- op: seed_mesh
+  at: vertex
+  cell_set: cell
+  n_cells: 200
+  radius: 5.0
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+  implementation: apicobasal
+  h0: 0.4
