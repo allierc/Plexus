@@ -28,7 +28,6 @@ sets:
   vertex:
     n: 64
     mesh: half_edge
-    cell_set: cell
     state:
       pos:
         width: 3
@@ -56,12 +55,17 @@ sets:
       divjit:
         width: 1
         record: false
+  half_edge:
+    n: 128
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 seed:
 - op: seed_mesh
   model: apicobasal
   at: vertex
-  cell_set: cell
   shape: hexagon
   n_cells: 1
   jitter: 0.0

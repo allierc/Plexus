@@ -27,7 +27,6 @@ fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     radius: 5.0
     jitter: 0.18

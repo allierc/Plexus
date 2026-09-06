@@ -18,7 +18,6 @@ sets:
   vertex:
     n: 8000
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 4000
     state:
@@ -29,11 +28,16 @@ sets:
         width: 3
       area:
         width: 1
+  half_edge:
+    n: 32000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 400
     seed: 0
     vseed_cv: 0.15

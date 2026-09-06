@@ -28,7 +28,6 @@ fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     vseed_cv: 0.15
   - op: cell_geometry

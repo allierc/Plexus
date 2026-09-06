@@ -53,34 +53,34 @@ plotting:
 
 sets:
   vertex:
-    # 6396 x 4. At the reference 6396 the run refuses 1,723 divisions for want of vertex buffer and
-    # the tissue coasts to the end at a fixed 3,170 cells -- the last quarter of the movie shows an
-    # epithelium that stopped proliferating because of an ARRAY, not because of its biology.
-    # `buffer_x` is a memory allocation: it changes what the run is ALLOWED to do, not what it tries.
     n: 25584
-    # MANDATORY, and not decoration. `engine._setup_recording` builds `rec_mesh` from
-    # `lvl.mesh is not None` BEFORE the first tick, so without these two keys the trajectory carries
-    # no `vertex__mesh_*` arrays at all and eleven of the rows below become uncomputable rather than
-    # failing. Verified dynamics-neutral: `seed_mesh` fills the engine's table in place
-    # (`m.clear(); m.update(seeded)`) rather than rebinding a new one.
     mesh: half_edge
-    cell_set: cell
   cell:
-    n: 12800                      # 3200 x 4
+    n: 12800
     state:
-      area: {width: 1}
-      cen: {width: 3}
-      # INERT HERE and kept for layout fidelity with the reference: no chemistry operator is in this
-      # schedule, so `chem` stays identically zero. `cell_grow` does not need it -- it has an explicit
-      # no-chemistry branch, because no chemistry means UNIFORM growth, not no growth.
-      chem: {width: 2, integration: first_order}
-
-      Vbirth: {width: 1, record: false}
-      divjit: {width: 1, record: false}
+      area:
+        width: 1
+      cen:
+        width: 3
+      chem:
+        width: 2
+        integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+  half_edge:
+    n: 102400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}                        # required key; the loader raises without it
 
 seed:
-  - {op: mesh_seed, at: vertex, cell_set: cell, n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15}
+  - {op: mesh_seed, at: vertex, n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15}
 operators:
   # `kind: seed` declared under `operators:` is the DEPRECATED spelling and the loader says so. It
   # stays here rather than moving to a `seed:` section because migrating it is a behaviour change
@@ -88,7 +88,7 @@ operators:
   # for. `before_frame: 1` is redundant today (the window defaults to 1) and is a real guard: the
   # window is the MAX over every declared seed, so a future co-seed would widen this one's.
   - {op: cell_geometry, at: cell}
-  - {op: cell_grow, at: vertex, cell_set: cell, rate: 0.003457, rho: 1.0, a_sw: 50.0, hill: 4.0, vth_frac: 2.5}
+  - {op: cell_grow, at: vertex, rate: 0.003457, rho: 1.0, a_sw: 50.0, hill: 4.0, vth_frac: 2.5}
   # BEFORE `cell_mechanics`, because the energy reads `m["myo"]` in the frame it is written. After it,
   # the relaxation would use the previous frame's myosin -- on a 20-frame timescale, a lag nobody
   # would notice and everybody would inherit.
@@ -104,7 +104,7 @@ operators:
   # thirds of the run's flips. Gated explicitly by `t1_rail_fraction` below rather than left for a
   # reader to discover, because a T1 rate measured against a cap is a property of the cap.
   - {op: edge_flip, at: vertex, every: 4, engine_clock: true, l_th_frac: 0.35, max_flips: 30}
-  - {op: cell_divide, at: vertex, cell_set: cell, every: 4, engine_clock: true, factor: 2.0, cycle_cv: 0.15, min_cycle: 4, max_cycle: 1000000000, p0: 3.5, reset_noise: 0.12}
+  - {op: cell_divide, at: vertex, every: 4, engine_clock: true, factor: 2.0, cycle_cv: 0.15, min_cycle: 4, max_cycle: 1000000000, p0: 3.5, reset_noise: 0.12}
   # AFTER the topology operators. `edge_flip` rewires the half-edge arrays and `cell_divide` lengthens
   # them, both after `junction_myosin` wrote `m["myo"]` for the arrays as they were -- so without this
   # the record holds this frame's edges beside last writing's myosin. Measured on the 401-frame

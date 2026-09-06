@@ -155,13 +155,31 @@ def load(path: str) -> Spec:
         # VALIDATED HERE AND LOUDLY, because the failure mode of not validating is silence: before
         # this, `mesh: half-edge` (a hyphen) or `mesh:` on the wrong set parsed clean, allocated
         # nothing, and the run proceeded with a spec that claimed a topology it did not have.
+        # ---- `mesh:` NAMES A SET NOW, NOT A KIND -------------------------------------------------
+        # It used to name one of `MESH_KINDS` -- the single string "half_edge" -- and the topology
+        # it stood for was declared nowhere: `E_srce`, `E_trgt` and `E_face` were three parallel
+        # arrays on a table hanging off this set, and the CELL those faces are was a second key,
+        # `cell_set:`, repeated as a parameter on every operator that crossed between them.
+        #
+        # A HALF-EDGE IS AN ELEMENT, SO IT IS A SET. plexus2 sec. Hierarchy: a many-to-many relation
+        # needs no new primitive, because a relation IS a set with functions out of it. Every
+        # half-edge has exactly one source vertex, exactly one target vertex and exactly one face --
+        # three functions, so three maps, and the whole mesh is those three plus the sets they land
+        # in. `index_add(0, E_face, ...)` in `face_geometry_3d` is then a declared AGGREGATE along
+        # half_edge -> cell and `pos[E_srce]` a declared BROADCAST along half_edge -> vertex, which
+        # are the two families sec. Hierarchy says are the only ones allowed to cross.
+        #
+        # `cell_set:` RETIRES INTO `maps.face`. The pairing is no longer a key that names a set; it
+        # is the codomain of a declared map, so `edge_flip` cannot renumber a set the spec never
+        # said it touches, and no operator has to be told a relation the mesh already states.
+        #
+        # WHY THE MAPS ARE NOT `pre`/`post`. An edge-set is built from a STATIC `edges:` list or an
+        # npz -- the connectome is given and does not change. A half-edge table is rewritten by
+        # every division and every T1, so its maps are OWNED BY THE TOPOLOGY OPERATORS, and its `n:`
+        # is a capacity rather than a count. Same idea, different lifetime; sharing the `pre`/`post`
+        # keys would have hidden that.
         mk = s.get("mesh")
         if mk is not None:
-            from plexus.models.mesh import MESH_KINDS
-            if mk not in MESH_KINDS:
-                raise ValueError(
-                    f"set {sname!r}: mesh {mk!r} is not a known mesh kind "
-                    f"(expected one of: {', '.join(MESH_KINDS)})")
             if s.get("pre") is not None or s.get("post") is not None:
                 raise ValueError(
                     f"set {sname!r} declares `mesh:` and is an EDGE-SET (it has pre/post). An "
@@ -171,47 +189,42 @@ def load(path: str) -> Spec:
                     f"set {sname!r} declares `mesh: {mk}` but the model is "
                     f"{raw.get('general', {}).get('dim')}D -- every mesh operator declares "
                     f"SUPPORTED_DIMS = [3].")
-            # THE FACE<->CELL PAIRING IS DECLARED NOWHERE TODAY. A face of the mesh IS a cell, and
-            # every operator that crosses between them takes the cell set as an OPERATOR PARAMETER
-            # (`mesh_ops` twice, `edge_flip` falling back to the literal string "cell"). So the
-            # pairing is repeated per operator, defaulted in one place, and stated in none -- which
-            # is how `edge_flip` came to renumber a set it never declared it needed.
-            #
-            # AND `cell_set:` IS A STAND-IN FOR A MAP THIS SPEC CANNOT YET DECLARE. The paper names
-            # three (`parent` for containment, `pre`/`post` for incidence); this is none of them.
-            # It is a BIJECTION between the cell set's rows and the mesh's FACES, which are not a
-            # set at all but a table derived from E_srce/E_trgt/E_face.
-            #
-            # It is not `parent` because pi has to be a FUNCTION, and vertex -> cell is not one: on
-            # a trivalent mesh a vertex belongs to three cells. That is the whole reason the mesh
-            # took a different route from the hierarchy.
-            #
-            # THE ROUTE IT SHOULD EVENTUALLY TAKE NEEDS NO NEW PRIMITIVE, and plexus2.tex sec.
-            # Hierarchy now says so: a many-to-many relation IS a set with two functions out of it,
-            # and the half-edge table is that set -- every half-edge has exactly one source vertex
-            # and exactly one face. The mesh code already runs the two cross-level families without
-            # declaring them: `index_add(0, ef, ...)` in `face_geometry_3d` is Aggregate along
-            # half_edge -> cell, and `pos[es]` is Broadcast along half_edge -> vertex. Declaring a
-            # `half_edge` set with both legs would retire this key entirely.
-            #
-            # NOT DONE HERE, deliberately: it changes the topological master of every mesh spec in
-            # the repo, so it needs its own gate rung with a byte-identical twin, and the
-            # `cell_complex` promotion moves the target (there nF != nC and the bijection below
-            # stops holding). Designing it now would design it against a mesh already scheduled for
-            # replacement.
-            cs = s.get("cell_set")
-            if cs is None:
+            if mk not in raw["sets"]:
                 raise ValueError(
-                    f"set {sname!r} declares `mesh: {mk}` but no `cell_set:`. A face of the mesh "
-                    f"IS a cell, and the pairing must be declared once here rather than repeated "
-                    f"as a parameter on every operator that crosses between them.")
-            if cs == sname:
+                    f"set {sname!r} declares `mesh: {mk}`, which is not a set in this spec "
+                    f"(have: {', '.join(sorted(raw['sets']))}). `mesh:` names the half-edge SET "
+                    f"whose `maps:` say what the topology is; it is no longer a kind.")
+            if s.get("cell_set") is not None:
                 raise ValueError(
-                    f"set {sname!r} declares `cell_set: {cs}` -- itself. The mesh lives on the "
-                    f"VERTEX set and its faces are the CELL set; they are two different sets.")
-            if cs not in raw["sets"]:
-                raise ValueError(f"set {sname!r} declares `cell_set: {cs}`, which is not a set in "
-                                 f"this spec (have: {', '.join(sorted(raw['sets']))})")
+                    f"set {sname!r} still declares `cell_set: {s['cell_set']}`. That key retired: "
+                    f"a face of the mesh IS a cell, and the pairing is now `maps.face` on the "
+                    f"{mk!r} set. Delete it from here and from every operator line.")
+            hs = raw["sets"][mk]
+            for role in ("srce", "trgt", "face"):
+                if role not in (hs.get("maps") or {}):
+                    raise ValueError(
+                        f"set {mk!r} is used as {sname!r}'s mesh but declares no `maps.{role}:`. A "
+                        f"half-edge has exactly one source vertex, one target vertex and one face; "
+                        f"all three are functions out of it and all three must be declared.")
+
+        # ---- `maps:` -- named functions OUT of this set, one row to one row of the codomain -------
+        mp = s.get("maps")
+        if mp is not None:
+            if not isinstance(mp, dict) or not mp:
+                raise ValueError(f"set {sname!r}: `maps:` must be a mapping of role -> set name")
+            for role, tgt in mp.items():
+                if tgt not in raw["sets"]:
+                    raise ValueError(
+                        f"set {sname!r} map {role!r} lands in {tgt!r}, which is not a set in this "
+                        f"spec (have: {', '.join(sorted(raw['sets']))})")
+                if tgt == sname:
+                    raise ValueError(
+                        f"set {sname!r} map {role!r} lands in itself. A map goes OUT of a set.")
+            if s.get("pre") is not None or s.get("post") is not None:
+                raise ValueError(
+                    f"set {sname!r} declares both `maps:` and `pre`/`post`. They are the same idea "
+                    f"with different lifetimes -- pre/post are a static edge list, `maps` are "
+                    f"owned by the topology operators -- so a set has one or the other.")
 
         # optional `state:` block -- the set's StateSchema (the fifth primitive). Absent =>
         # the spatial pos/vel default. Each entry is a width (int) or {width, integration,

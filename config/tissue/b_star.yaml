@@ -18,28 +18,32 @@ sets:
   vertex:
     n: 120000
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 60000
     state:
+      area:
+        width: 1
+      cen:
+        width: 3
       chem:
         width: 2
         integration: first_order
-      cen:
-        width: 3
-      area:
-        width: 1
       Vbirth:
         width: 1
         record: false
       divjit:
         width: 1
         record: false
+  half_edge:
+    n: 480000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 seed:
   - op: seed_mesh
     at: vertex
-    cell_set: cell
     n_cells: 2000
     seed: 0
     vseed_cv: 0.15
@@ -76,7 +80,6 @@ operators:
     rate: 1.0
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.000866
     a_sw: 0.35
     hill: 4.0
@@ -102,12 +105,10 @@ operators:
     K_lumen: 0.5
   - op: interface_tension
     at: vertex
-    cell_set: cell
     K_purse: 1.0
     a_sw: 0.6
   - op: cell_divide
     at: vertex
-    cell_set: cell
     factor: 2.0
     cycle_cv: 0.15
     min_cycle: 4
