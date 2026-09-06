@@ -8,10 +8,6 @@ general:
   dim: 3
   world: [50.0, 50.0, 50.0]
 
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 64
@@ -136,3 +132,7 @@ descriptions:
       side faces and two hexagonal bases. The object is rendered in a solid, light-grey color against
       a black background. The prism occupies a significant portion of the central frame, maintaining a
       constant size throughout the sequence.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

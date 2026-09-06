@@ -36,12 +36,6 @@ operators:
   - {op: velocity_align,    at: particle, per_type: true }
   - {op: separation,   at: particle}
 schedule: [radius_graph, cohesion, velocity_align, separation]
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab20
-  point_size: 6.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -54,3 +48,9 @@ descriptions:
       are arranged in a stochastic, non-connected distribution across a two-dimensional plane. The color
       palette includes a diverse mix of red, blue, yellow, green, and pink hues. The particles are distributed
       with varying local densities, creating a textured, granular appearance.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab20
+  point_size: 6.0

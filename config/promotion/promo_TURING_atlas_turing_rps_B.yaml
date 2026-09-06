@@ -13,14 +13,6 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_mesh
-  background: black
-  blend: additive
-  species:
-    - '#ff0000'
-    - '#00ff00'
-    - '#0000ff'
 sets:
   vertex:
     n: 24000
@@ -111,3 +103,12 @@ schedule:
   - cell_mechanics
   - edge_flip
   - topo_record
+
+plotting:
+  renderer: vtk_mesh
+  background: black
+  blend: additive
+  species:
+    - '#ff0000'
+    - '#00ff00'
+    - '#0000ff'

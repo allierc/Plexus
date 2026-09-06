@@ -16,13 +16,6 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -43,3 +36,10 @@ descriptions:
       colored in a bright cyan or teal hue against a black background. The structure forms a complex,
       irregular mesh with various sized polygonal voids. The filaments vary slightly in thickness but
       maintain a consistent overall scale throughout the image.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

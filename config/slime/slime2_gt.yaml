@@ -18,14 +18,6 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-    b: [1.0, 0.35, 0.45]
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -49,3 +41,11 @@ descriptions:
       biological network or a polymer mesh. Each filament is relatively thin and elongated, exhibiting
       a smooth, curved geometry. The two colors are interspersed throughout the frame, creating a high-contrast,
       interwoven pattern.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+  background: black
+  gamma: 0.7

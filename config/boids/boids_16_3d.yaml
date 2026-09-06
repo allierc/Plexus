@@ -32,12 +32,6 @@ operators:
   - {op: velocity_align,    at: particle, per_type: true }
   - {op: separation,   at: particle}
 schedule: [radius_graph, cohesion, velocity_align, separation]
-plotting:
-  renderer: vtk_points
-  background: black
-  colormap: tab20
-  point_size: 6
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -52,3 +46,9 @@ descriptions:
       cloud with a high density in the center. As time passes, the topology shifts from a continuous field
       to a discrete set of several small, spherical clusters. Each cluster consists of a high concentration
       of multi-colored dots packed closely together, surrounded by a few scattered individual points.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  colormap: tab20
+  point_size: 6

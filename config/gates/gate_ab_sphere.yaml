@@ -30,10 +30,6 @@ general:
   dim: 3
   world: [50.0, 50.0, 50.0]
 
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 4096
@@ -201,3 +197,7 @@ descriptions:
       of irregular hexagons and pentagons that tile the surface of the sphere. The faces are a uniform
       light grey color with dark grey wireframe edges. The overall structure is a single, continuous closed
       surface with a smooth, rounded topology.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

@@ -86,34 +86,6 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
-plotting:
-  renderer: vtk_points
-  background: black
-  up_axis: 1
-  camera_elev: 1.18
-  camera_zoom: 0.0
-  camera_turns: 0.0
-  box_frame: true
-  hide_sets:
-  - cell
-  render_3d: dots
-  dot_size: 1.3
-  slow_motion: 4
-  colors:
-    ball:
-    - 0.95
-    - 0.35
-    - 0.3
-    water:
-    - 0.3
-    - 0.62
-    - 1.0
-  cross_section:
-    axis: z
-    at: 0.5
-    thickness: 2
-    only: true
-    max_points: 400000
 descriptions:
   movie:
     description: A red spherical cluster of particles descends vertically through
@@ -142,3 +114,32 @@ descriptions:
       A large blue rectangular volume occupies the bottom third of the cube.
 
       The red sphere and blue volume are spatially separated by a clear gap.'
+
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    ball:
+    - 0.95
+    - 0.35
+    - 0.3
+    water:
+    - 0.3
+    - 0.62
+    - 1.0
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 2
+    only: true
+    max_points: 400000

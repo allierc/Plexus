@@ -8,10 +8,6 @@ general:
   dim: 3
   world: [50.0, 50.0, 50.0]
 
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 4096
@@ -63,3 +59,7 @@ operators:
   - {op: topo_record, at: vertex, every: 1}
 
 schedule: [cell_geometry, cell_mechanics, topo_record]
+
+plotting:
+  renderer: vtk_mesh
+  background: black

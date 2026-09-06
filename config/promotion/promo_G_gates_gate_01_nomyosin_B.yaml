@@ -13,9 +13,6 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_mesh
-  background: black
 sets:
   vertex:
     n: 25584
@@ -96,3 +93,7 @@ schedule:
   - edge_flip
   - cell_divide
   - topo_record
+
+plotting:
+  renderer: vtk_mesh
+  background: black

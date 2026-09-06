@@ -85,24 +85,6 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
-plotting:
-  renderer: vtk_points
-  background: black
-  up_axis: 1
-  camera_elev: 1.18
-  camera_zoom: 0.0
-  camera_turns: 0.0
-  box_frame: true
-  hide_sets:
-  - cell
-  render_3d: dots
-  dot_size: 1.3
-  slow_motion: 4
-  colors:
-    water:
-    - 0.3
-    - 0.62
-    - 1.0
 descriptions:
   movie:
     description: A red spherical cluster of particles descends vertically through
@@ -149,3 +131,22 @@ descriptions:
       The blue substance is uniform in color and fills approximately one-third of the cube''s height.
 
       The cube is defined by thin white wireframe edges against a solid black background.'
+
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    water:
+    - 0.3
+    - 0.62
+    - 1.0

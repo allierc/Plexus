@@ -35,33 +35,6 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_points
-  background: black
-  up_axis: 2
-  box_frame: true
-  camera_elev: 1.18
-  camera_turns: 0.0
-  camera_zoom: 0.0
-  dot_size: 1.6
-  fps: 60
-  mesh_color: '#cfd8e3'
-  real_time: false
-  slow_motion: 2
-  cross_section:
-    axis: y
-    at: 0.5
-    thickness: 6
-    span: 28.0
-  curve:
-    - quantity: cells
-      xlabel: frame
-      ylabel: cells
-      ticks: 4
-    - quantity: area
-      xlabel: frame
-      ylabel: cell area
-      ticks: 4
 sets:
   vertex:
     n: 25584
@@ -161,3 +134,31 @@ schedule:
   - cell_divide
   - junction_sync
   - topo_record
+
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 60
+  mesh_color: '#cfd8e3'
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    span: 28.0
+  curve:
+    - quantity: cells
+      xlabel: frame
+      ylabel: cells
+      ticks: 4
+    - quantity: area
+      xlabel: frame
+      ylabel: cell area
+      ticks: 4

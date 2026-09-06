@@ -46,17 +46,6 @@ operators:
   # near it, and halving dt to 0.002 reproduces the same trajectory to three digits.
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.15, all_pairs: true}
 schedule: [squared_law]
-plotting: {renderer: vtk_points, background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55, 1.0]},
-           splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
-           # frame to the central 90% of the stars: the ~20% thrown out by the passage reach
-           # several times the size of what is worth watching, and framing on the full extent
-           # would leave the two discs 130 px wide in an 820 px frame.
-           frame_percentile: 90,
-           # camera pitch SWEEP: 0.25 rad -> 1.1 rad (~63 deg), so the encounter starts near
-           # face-on and ends nearly edge-on -- the tails read as 3D structure.
-           camera_azim: 0.7, camera_elev: 0.25, camera_elev_end: 1.1, camera_turns: 0.15,
-           camera_zoom: 0.15, camera_pan: [0.03, 0.02]}
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_star:
@@ -71,3 +60,14 @@ descriptions:
       both sets transform into elongated, spiral-shaped structures that maintain their respective colors.
       By the end of the sequence, the particles are distributed in a dense, overlapping cluster where
       the red and blue points are intermingled.
+
+plotting: {renderer: vtk_points, background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55, 1.0]},
+           splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
+           # frame to the central 90% of the stars: the ~20% thrown out by the passage reach
+           # several times the size of what is worth watching, and framing on the full extent
+           # would leave the two discs 130 px wide in an 820 px frame.
+           frame_percentile: 90,
+           # camera pitch SWEEP: 0.25 rad -> 1.1 rad (~63 deg), so the encounter starts near
+           # face-on and ends nearly edge-on -- the tails read as 3D structure.
+           camera_azim: 0.7, camera_elev: 0.25, camera_elev_end: 1.1, camera_turns: 0.15,
+           camera_zoom: 0.15, camera_pan: [0.03, 0.02]}

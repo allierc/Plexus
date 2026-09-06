@@ -8,10 +8,6 @@ general:
   dim: 3
   world: [50.0, 50.0, 50.0]
 
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 1024
@@ -243,3 +239,7 @@ descriptions:
       The cells are colored in a uniform light gray with dark gray outlines defining their boundaries.
       The mesh is relatively small in size and centered against a solid black background. The topology
       is a continuous tiling where each interior cell shares edges with its neighbors.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

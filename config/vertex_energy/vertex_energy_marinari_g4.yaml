@@ -13,18 +13,6 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_points
-  background: black
-  real_time: false
-  fps: 20
-  movie_max_frames: 300
-  mesh_edges: true
-  curve:
-    - quantity: area
-      ticks: 4
-    - quantity: radius
-      ticks: 4
 sets:
   vertex:
     n: 25584
@@ -87,3 +75,16 @@ schedule:
   - cell_mechanics
   - edge_flip
   - topo_record
+
+plotting:
+  renderer: vtk_points
+  background: black
+  real_time: false
+  fps: 20
+  movie_max_frames: 300
+  mesh_edges: true
+  curve:
+    - quantity: area
+      ticks: 4
+    - quantity: radius
+      ticks: 4

@@ -13,8 +13,6 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  background: black
 sets:
   vertex:
     n: 25584
@@ -114,3 +112,6 @@ schedule:
   - cell_divide
   - junction_sync
   - topo_record
+
+plotting:
+  background: black

@@ -8,10 +8,6 @@ general:
   dim: 3
   world: [50.0, 50.0, 50.0]
 
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 1024
@@ -88,3 +84,7 @@ descriptions:
       cells are arranged in a dense, honeycomb-like tiling pattern. The color of the mesh is a uniform
       light gray against a solid black background. The size of the individual cells remains relatively
       constant while the overall cluster maintains a compact, irregular shape.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

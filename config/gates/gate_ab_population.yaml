@@ -13,9 +13,6 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_mesh
-  background: black
 sets:
   vertex:
     n: 25584
@@ -429,3 +426,7 @@ descriptions:
       its polygonal faces. The overall shape is roughly spherical but characterized by a dense, porous,
       and knotted internal architecture. The individual tubes vary in thickness but maintain a consistent
       scale relative to the overall population mesh.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

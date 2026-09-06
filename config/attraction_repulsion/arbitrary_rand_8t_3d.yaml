@@ -19,12 +19,6 @@ operators:
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
 schedule: [radius_graph, attraction_repulsion]
-plotting:
-  renderer: vtk_points
-  background: black
-  colormap: tab10
-  splat_size: 1.4
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -37,3 +31,9 @@ descriptions:
       These particles are arranged in a dense, three-dimensional cluster that forms a diamond shape. The
       color palette consists of a mix of red, blue, green, and yellow dots. Each particle is uniform in
       size and maintains a relatively consistent spacing from its neighbors.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  colormap: tab10
+  splat_size: 1.4

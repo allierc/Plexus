@@ -24,12 +24,6 @@ operators:
   - {op: velocity_align,    at: particle, per_type: true }
   - {op: separation,   at: particle}
 schedule: [radius_graph, cohesion, velocity_align, separation]
-plotting:
-  renderer: vtk_points
-  background: black
-  colormap: tab20
-  point_size: 6
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -42,3 +36,9 @@ descriptions:
       and red. These particles are initially arranged in a large, roughly diamond-shaped cloud. As the
       simulation progresses, they organize into several dozen spherical clusters of varying sizes. The
       clusters maintain a multi-colored appearance, reflecting the diverse colors of the constituent particles.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  colormap: tab20
+  point_size: 6

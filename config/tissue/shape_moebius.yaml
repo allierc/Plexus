@@ -10,43 +10,6 @@ general:
   - 26.0
   - 26.0
   - 26.0
-plotting:
-  renderer: vtk_points
-  background: black
-  up_axis: 2
-  box_frame: true
-  camera_elev: 1.18
-  camera_turns: 0.0
-  camera_zoom: 0.0
-  dot_size: 1.6
-  fps: 30
-  mesh_color: '#cfd8e3'
-  mesh_style: surface
-  mesh_edges: true
-  real_time: false
-  slow_motion: 2
-  cross_section:
-    axis: y
-    at: 0.5
-    thickness: 6
-    span: 24.0
-    walls: 64
-    loc:
-    - 0.015
-    - 0.035
-    wall_color: '#e8e8e8'
-    mid: false
-    points: false
-  cross_section_height: 0.24
-  curve:
-  - quantity: cells
-    xlabel: frame
-    ylabel: cells
-    ticks: 4
-  - quantity: area
-    xlabel: frame
-    ylabel: cell area
-    ticks: 4
 sets:
   vertex:
     n: 16384
@@ -120,3 +83,41 @@ schedule:
 - cell_geometry
 - cell_mechanics
 - topo_record
+
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: '#cfd8e3'
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    span: 24.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: '#e8e8e8'
+    mid: false
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: area
+    xlabel: frame
+    ylabel: cell area
+    ticks: 4

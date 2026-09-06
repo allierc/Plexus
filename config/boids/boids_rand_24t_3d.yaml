@@ -40,12 +40,6 @@ operators:
   - {op: velocity_align,    at: particle, per_type: true }
   - {op: separation,   at: particle}
 schedule: [radius_graph, cohesion, velocity_align, separation]
-plotting:
-  renderer: vtk_points
-  background: black
-  colormap: tab20
-  point_size: 6
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -61,3 +55,9 @@ descriptions:
       large, spherical clusters that appear as dense, multi-colored masses. These clusters vary in size
       and are distributed somewhat evenly throughout the central area, surrounded by a thinning mist of
       individual points.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  colormap: tab20
+  point_size: 6

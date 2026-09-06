@@ -70,29 +70,6 @@ schedule:
 - sense
 - bounce
 - glide
-plotting:
-  renderer: vtk_points
-  colors:
-    a:
-    - 0.2
-    - 0.95
-    - 0.65
-    b:
-    - 1.0
-    - 0.35
-    - 0.45
-    c:
-    - 0.45
-    - 0.6
-    - 1.0
-  background: black
-  splat_size: 2.4
-  splat_sharpness: 0.85
-  splat_transparency: 0.14
-  splat_fog: 0.5
-  camera_azim: 0.7
-  camera_elev: 0.5
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -117,3 +94,26 @@ descriptions:
       and blue to differentiate between different types or chains. Each filament is thin and curved, exhibiting
       a high degree of entanglement with its neighbors. The filaments are of similar length and diameter,
       creating a uniform texture within the aggregate.
+
+plotting:
+  renderer: vtk_points
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+    b:
+    - 1.0
+    - 0.35
+    - 0.45
+    c:
+    - 0.45
+    - 0.6
+    - 1.0
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
