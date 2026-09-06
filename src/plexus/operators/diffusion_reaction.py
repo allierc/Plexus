@@ -951,6 +951,7 @@ class Grow3D(Structural):
         # c_j=m_j/v_j is only READ by the kinetics. We store c_j, so growing v_j must DILUTE c_j to conserve
         # amount (else we silently CREATE mass each step -> spuriously feeds the tip). On (default) = correct.
         self.conserve_amount = bool(params.get("conserve_amount", True))
+        self._said_no_cap = False       # the "ceiling not applied" note is printed once per run
 
     def _advance(self, s_prev, hillv, m, v_ref):
         """The RATE LAW, and the only thing a `model=` variant of cell_grow changes.
@@ -1052,9 +1053,30 @@ class Grow3D(Structural):
         s_prev = m["mg_scale"]                                    # per-cell scale BEFORE this tick (for the dilution rate)
         v_ref = float(m.get("v_ref", 1.0))                        # SEED-TIME MEDIAN cell volume (mesh_ops:220)
         s = self._advance(m["mg_scale"], hillv, m, v_ref)         # <-- the rate law; models override THIS only
-        if self.rho > 0:                                             # OKUDA uniform-cell mode: cap v_eq per cell at
+        # THE CEILING IS FOR A TISSUE WITH NO DIVIDER, AND ONLY FOR ONE.
+        #
+        # `vth_frac` is Okuda's uniform-cell mode: cap `v_eq` under `vth_frac * v_ref` so every cell
+        # oscillates in a band and the population stays uniform WITHOUT anything resetting it. Once
+        # `cell_divide` is in the schedule, division is what resets size -- a cell doubles, splits,
+        # and each daughter starts at half -- so the ceiling is no longer size control. It is a lid,
+        # and if it sits below the division threshold the tissue can never reach that threshold.
+        #
+        # IT DID. `divide_growing_ball` caps at `vth_frac 2.5 * v_ref 2.5433` = 6.36 in WEDGE units,
+        # which plateaus the polyhedron volume -- the one `cell_divide`'s trigger reads -- at 1.987
+        # against a reference of 1.229. That is 1.62x, and `factor: 2.0` needs 2x. Not one division
+        # fired in 401 frames and the cell count sat flat at 200. The two conventions are the deeper
+        # problem (AB_R7R8_TODO section 0a) but they are not what makes this spec dead: two
+        # mechanisms were doing one job.
+        _has_divider = "cell_divide" in getattr(H, "scheduled_ops", frozenset())
+        if self.rho > 0 and not _has_divider:                        # OKUDA uniform-cell mode
             s_cap = (self.vth_frac * v_ref / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)
             s = torch.minimum(s, s_cap.clamp(min=1.0))
+        elif self.rho > 0:
+            if not self._said_no_cap:
+                self._said_no_cap = True
+                print(f"[cell_grow] `cell_divide` is scheduled, so the `vth_frac` ceiling is not "
+                      f"applied: division is what resets cell size here, and a ceiling below the "
+                      f"division threshold would stop the tissue reaching it.", flush=True)
         else:
             s = torch.clamp(s, max=self.cap)                        # legacy: activator-only bulge to `cap`
         m["mg_scale"] = s
