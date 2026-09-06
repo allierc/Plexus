@@ -21,9 +21,6 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_mesh
-  background: black
 sets:
   vertex:
     n: 25584
@@ -382,3 +379,7 @@ descriptions:
       consists of small, grey-colored cells with black outlines, resembling a Voronoi diagram. These cells
       are interconnected to form a continuous, seamless surface across the entire sphere. The overall
       structure is uniform in size and distribution, creating a consistent texture.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

@@ -47,10 +47,6 @@ general:
 
 # TOP LEVEL, not under `general:`. `schema.load` reads `raw.get("plotting", {})` directly, so a
 # `plotting:` nested under `general:` is parsed, ignored and silently lost.
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 25584
@@ -382,3 +378,7 @@ descriptions:
       These cells are arranged in a dense, interlocking Voronoi pattern across the entire surface of the
       sphere. The mesh is rendered in a neutral grey color with black outlines defining the edges of each
       polygon. The individual cells are uniform in size, creating a highly regular and symmetric texture.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

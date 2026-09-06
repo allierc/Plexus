@@ -20,12 +20,6 @@ operators:
   - {op: velocity_align,    at: particle, per_type: true }
   - {op: separation,   at: particle}
 schedule: [radius_graph, cohesion, velocity_align, separation]
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab20
-  point_size: 6.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -39,3 +33,9 @@ descriptions:
       across the entire 2D space. As the simulation progresses, the particles form dense, circular clusters
       and linear chains that connect different regions. The size of the individual particles remains constant,
       but their local density varies significantly between the empty voids and the concentrated structures.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab20
+  point_size: 6.0

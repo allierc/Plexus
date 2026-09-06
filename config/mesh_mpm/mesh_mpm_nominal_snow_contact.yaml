@@ -41,47 +41,6 @@ general:
     length_um: 1172.3329425556858
     force_nN: 9162.430188008488
   record_every: 4
-plotting:
-  renderer: vtk_points
-  background: black
-  up_axis: 2
-  box_frame: true
-  camera_elev: 1.18
-  camera_turns: 0.0
-  camera_zoom: 0.0
-  fps: 60
-  mesh_color: '#cfd8e3'
-  real_time: false
-  slow_motion: 2
-  curve:
-    - quantity: cells
-      xlabel: frame
-      ylabel: cells
-      ticks: 4
-    - quantity: area
-      xlabel: frame
-      ylabel: cell area
-      ticks: 4
-    - quantity: radius
-      xlabel: frame
-      ylabel: shell radius
-      ticks: 4
-  render_3d: surface
-  color_field: deformation
-  color_range:
-    - 0.0
-    - 0.35
-  mesh_style: surface
-  mesh_edges: true
-  mesh_opacity: 1.0
-  mesh_flat: true
-  surface_opacity: 1.0
-  surface_color: '#cfd8e3'
-  cross_section:
-    axis: y
-    at: 0.5
-    thickness: 6
-    max_points: 8000
 sets:
   vertex:
     n: 524288
@@ -242,3 +201,45 @@ schedule:
   - junction_sync
   - topo_record
   - mesh_inside
+
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  fps: 60
+  mesh_color: '#cfd8e3'
+  real_time: false
+  slow_motion: 2
+  curve:
+    - quantity: cells
+      xlabel: frame
+      ylabel: cells
+      ticks: 4
+    - quantity: area
+      xlabel: frame
+      ylabel: cell area
+      ticks: 4
+    - quantity: radius
+      xlabel: frame
+      ylabel: shell radius
+      ticks: 4
+  render_3d: surface
+  color_field: deformation
+  color_range:
+    - 0.0
+    - 0.35
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  mesh_flat: true
+  surface_opacity: 1.0
+  surface_color: '#cfd8e3'
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    max_points: 8000

@@ -16,13 +16,6 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -46,3 +39,10 @@ descriptions:
       that are no longer physically connected. In the later stages, the objects become small, isolated
       dots that are distributed randomly across the field. Throughout the entire sequence, the objects
       maintain a consistent teal color while their size and connectivity decrease significantly.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

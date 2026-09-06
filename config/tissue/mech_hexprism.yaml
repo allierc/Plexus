@@ -10,20 +10,6 @@ general:
   - 4.0
   - 4.0
   - 4.0
-plotting:
-  renderer: vtk_mesh
-  background: black
-  mesh_style: surface
-  mesh_edges: true
-  mesh_opacity: 1.0
-  surface_opacity: 1.0
-  surface_color: '#cfd8e3'
-  fps: 30
-  cross_section:
-    axis: y
-    at: 0.5
-    thickness: 6
-    walls: 48
 sets:
   vertex:
     n: 64
@@ -82,3 +68,18 @@ operators:
 schedule:
 - cell_geometry
 - topo_record
+
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  surface_opacity: 1.0
+  surface_color: '#cfd8e3'
+  fps: 30
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    walls: 48

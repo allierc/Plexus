@@ -10,16 +10,6 @@ general:
   - 12.0
   - 12.0
   - 12.0
-plotting:
-  renderer: vtk_points
-  background: black
-  mesh_style: surface
-  mesh_edges: true
-  mesh_opacity: 1.0
-  surface_opacity: 1.0
-  surface_color: '#cfd8e3'
-  fps: 30
-  zoom: 1.6
 sets:
   vertex:
     n: 1024
@@ -99,3 +89,14 @@ schedule:
 - cell_geometry
 - cell_mechanics
 - topo_record
+
+plotting:
+  renderer: vtk_points
+  background: black
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  surface_opacity: 1.0
+  surface_color: '#cfd8e3'
+  fps: 30
+  zoom: 1.6

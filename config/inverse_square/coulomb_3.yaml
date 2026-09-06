@@ -17,16 +17,6 @@ operators:
   - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
   - {op: squared_law,  at: particle, law: coulomb, clamp: 1000000.0}
 schedule: [radius_graph, squared_law]
-plotting:
-  renderer: mpl2d
-  background: black
-  size_by: charge          # point size ~ |charge|
-  colors:                  # ParticleGraph PDE_E colour code (by type index)
-    q_p2: [1, 1, 1]
-    q_p1: [0, 0.5, 0.75]
-    q_n1: [1, 0, 0]
-  point_size: 9.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -38,3 +28,13 @@ descriptions:
       These particles are distributed randomly across the entire frame without any specific geometric
       arrangement or connection. Each particle is uniform in size and appears as a single pixel or a small
       cluster of pixels. The colors are vibrant and contrast sharply against the solid black background.'
+
+plotting:
+  renderer: mpl2d
+  background: black
+  size_by: charge          # point size ~ |charge|
+  colors:                  # ParticleGraph PDE_E colour code (by type index)
+    q_p2: [1, 1, 1]
+    q_p1: [0, 0.5, 0.75]
+    q_n1: [1, 0, 0]
+  point_size: 9.0

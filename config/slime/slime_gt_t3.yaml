@@ -16,13 +16,6 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -46,3 +39,10 @@ descriptions:
       filaments vary in thickness, creating a porous, sponge-like topology across the frame. The background
       is a solid black, providing high contrast for the teal structures. As the simulation progresses,
       the size of the connected components decreases until they become tiny, individual specks.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

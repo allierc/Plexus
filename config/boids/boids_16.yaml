@@ -137,12 +137,6 @@ operators:
 
 schedule: [radius_graph, cohesion, velocity_align, separation]
 
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab20
-  point_size: 6.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -155,3 +149,9 @@ descriptions:
       are colored in a variety of hues, including white, red, blue, green, orange, and pink. Initially,
       the particles are arranged in a random, scattered topology across the entire frame. As the simulation
       progresses, they form dense, concentric circular clusters that stand out against the black background.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab20
+  point_size: 6.0

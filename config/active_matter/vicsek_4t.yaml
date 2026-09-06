@@ -18,8 +18,6 @@ operators:
   - {op: velocity_align,    at: particle, a: 0.6, per_type: true}   # boids special case: per-type weight
   - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.0015}
 schedule: [radius_graph, velocity_align, velocity_cruise]
-plotting: {renderer: mpl2d, background: black, marker: triangle, triangle_size: 0.01, colormap: tab10}
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -33,3 +31,5 @@ descriptions:
       in close proximity to one another. They are arranged in loose, elongated clusters that resemble
       turbulent eddies or filaments in a fluid. Each individual particle is very small and uniform in
       size, but their collective arrangement creates large, complex topological structures.
+
+plotting: {renderer: mpl2d, background: black, marker: triangle, triangle_size: 0.01, colormap: tab10}

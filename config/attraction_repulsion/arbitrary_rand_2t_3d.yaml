@@ -13,12 +13,6 @@ operators:
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
 schedule: [radius_graph, attraction_repulsion]
-plotting:
-  renderer: vtk_points
-  background: black
-  colormap: tab10
-  splat_size: 2.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -32,3 +26,9 @@ descriptions:
       Each individual particle is uniform in size and appears as a single pixel or small dot. The two
       colors are distributed homogeneously, overlapping and mixing throughout the entire volume of the
       cluster.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  colormap: tab10
+  splat_size: 2.0

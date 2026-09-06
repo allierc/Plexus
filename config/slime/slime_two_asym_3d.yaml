@@ -63,25 +63,6 @@ schedule:
 - sense
 - bounce
 - glide
-plotting:
-  renderer: vtk_points
-  colors:
-    fast:
-    - 0.2
-    - 0.95
-    - 0.65
-    curly:
-    - 1.0
-    - 0.35
-    - 0.45
-  background: black
-  splat_size: 2.4
-  splat_sharpness: 0.85
-  splat_transparency: 0.14
-  splat_fog: 0.5
-  camera_azim: 0.7
-  camera_elev: 0.5
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -104,3 +85,22 @@ descriptions:
       web. These filaments are distributed throughout a diamond-shaped volume against a dark background.
       A faint green background field provides a secondary layer of spatial information. The red filaments
       vary in length and curvature, creating a disordered, porous topology.
+
+plotting:
+  renderer: vtk_points
+  colors:
+    fast:
+    - 0.2
+    - 0.95
+    - 0.65
+    curly:
+    - 1.0
+    - 0.35
+    - 0.45
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5

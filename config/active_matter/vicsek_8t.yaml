@@ -22,8 +22,6 @@ operators:
   - {op: velocity_align,    at: particle, a: 0.6, per_type: true}   # boids special case: per-type weight
   - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.0015}
 schedule: [radius_graph, velocity_align, velocity_cruise]
-plotting: {renderer: mpl2d, background: black, marker: triangle, triangle_size: 0.01, colormap: tab10}
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -37,3 +35,5 @@ descriptions:
       objects are arranged in a stochastic, disordered distribution across the entire frame. As the simulation
       progresses, they form elongated, curved topologies that cluster together into dense, multi-colored
       filaments.
+
+plotting: {renderer: mpl2d, background: black, marker: triangle, triangle_size: 0.01, colormap: tab10}

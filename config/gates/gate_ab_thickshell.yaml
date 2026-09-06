@@ -10,10 +10,6 @@ general:
   units:
     length_um: 10.0
 
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 16384
@@ -335,3 +331,7 @@ descriptions:
       surface is rendered in a neutral grey color with black outlines defining the edges of each cell.
       The object occupies most of the frame, exhibiting a complex, bumpy topology with various protrusions
       and indentations.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

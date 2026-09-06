@@ -22,12 +22,6 @@ operators:
   - {op: velocity_align,    at: particle, per_type: true }
   - {op: separation,   at: particle}
 schedule: [radius_graph, cohesion, velocity_align, separation]
-plotting:
-  renderer: vtk_points
-  background: black
-  colormap: tab20
-  point_size: 6.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -41,3 +35,9 @@ descriptions:
       shape of the system. The blue particles aggregate into several large, dense circular clusters of
       varying sizes. These blue clusters are the most prominent features, appearing as concentrated hubs
       within the broader field of scattered points.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  colormap: tab20
+  point_size: 6.0

@@ -18,6 +18,18 @@ operators:
   - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
   - {op: squared_law,  at: particle, law: coulomb, clamp: 1000000.0}
 schedule: [radius_graph, squared_law]
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of multicolored particles against a black background.
+      There is no visible movement or evolution of the particles between the frames. The distribution
+      of the dots remains constant throughout the entire sequence. The scene represents a steady-state
+      distribution of discrete points.
+    objects: The scene contains thousands of small, circular dots scattered randomly across the frame.
+      These particles are colored in red, blue, and various shades of gray. They are arranged in a non-uniform,
+      stochastic distribution with no clear geometric patterns or connections. Each particle is approximately
+      the same size, creating a uniform texture of noise.
+
 plotting:
   renderer: mpl2d
   background: black
@@ -30,15 +42,3 @@ plotting:
     q_p3: [0.5, 0.5, 0.5]
     q_n3: [0.5, 0.5, 0.5]
   point_size: 9.0
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_particle:
-    description: The video shows a static field of multicolored particles against a black background.
-      There is no visible movement or evolution of the particles between the frames. The distribution
-      of the dots remains constant throughout the entire sequence. The scene represents a steady-state
-      distribution of discrete points.
-    objects: The scene contains thousands of small, circular dots scattered randomly across the frame.
-      These particles are colored in red, blue, and various shades of gray. They are arranged in a non-uniform,
-      stochastic distribution with no clear geometric patterns or connections. Each particle is approximately
-      the same size, creating a uniform texture of noise.

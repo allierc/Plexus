@@ -8,10 +8,6 @@ general:
   dim: 3
   world: [50.0, 50.0, 50.0]
 
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 4096
@@ -237,3 +233,7 @@ descriptions:
       of a Voronoi-like pattern of irregular hexagons and pentagons. The lines of the mesh are thin and
       black, defining the individual cells. The sphere is large relative to the frame and centered against
       a solid black background.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

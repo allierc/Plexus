@@ -12,13 +12,6 @@ operators:
   - {op: velocity_align,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
   - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.015, chirality: 0.0}
 schedule: [radius_graph, velocity_align, velocity_cruise]
-plotting:
-  renderer: mpl2d
-  background: black
-  marker: triangle
-  triangle_size: 0.01
-  colormap: tab10
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -30,3 +23,10 @@ descriptions:
       are distributed randomly across the entire frame without any specific connectivity or clustering.
       Each individual element is very small in size relative to the overall canvas. The uniform blue color
       of the shapes contrasts sharply against the solid black background.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  colormap: tab10

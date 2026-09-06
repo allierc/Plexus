@@ -56,21 +56,6 @@ schedule:
 - sense
 - bounce
 - glide
-plotting:
-  renderer: vtk_points
-  colors:
-    a:
-    - 0.2
-    - 0.95
-    - 0.65
-  background: black
-  splat_size: 2.4
-  splat_sharpness: 0.85
-  splat_transparency: 0.14
-  splat_fog: 0.5
-  camera_azim: 0.7
-  camera_elev: 0.5
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -93,3 +78,18 @@ descriptions:
       Several thin, elongated green filaments sprout from the sphere's perimeter. These filaments are
       arranged in a radial pattern, extending into the surrounding black space. The sphere is significantly
       larger than the individual filaments, which appear as delicate, thread-like structures.
+
+plotting:
+  renderer: vtk_points
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
