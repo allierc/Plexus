@@ -669,6 +669,35 @@ PPC_TARGET = 8.0                 # 2 particles per axis in 3D (4.0 in 2D; set be
 PPC_FLOOR = 0.5                  # fraction of target below which the material is under-sampled
 
 
+def _per_parent_mean(sets: dict, sv: dict) -> float:
+    """The AVERAGE children per parent. `per_parent` is one integer, or a mapping from the parent's
+    type name to a count -- in which case the average is weighted by how many parents carry each
+    type, since a 50-point membrane patch and a 50,000-point nuclear patch are both parents."""
+    pp = sv.get("per_parent", 0)
+    if not isinstance(pp, dict):
+        return float(pp or 0)
+    ptypes = ((sets.get(sv.get("parent")) or {}).get("types") or {})
+    if not ptypes:
+        return float(sum(pp.values())) / max(len(pp), 1)
+    w = {tn: float(t.get("count", t.get("fraction", 0.0)) or 0.0) for tn, t in ptypes.items()}
+    tot = sum(w.values()) or float(len(w))
+    return sum(float(pp.get(tn, 0)) * w.get(tn, 0.0) for tn in ptypes) / tot
+
+
+def _set_size(sets: dict, name: str | None) -> int:
+    """How many elements a declared set holds: `n` at the root, else per_parent x the parent's
+    size, up the containment chain. Bounded, because a malformed spec must not hang a diagnostic."""
+    n, seen = 1.0, set()
+    while name and name in sets and name not in seen:
+        seen.add(name)
+        sv = sets[name] or {}
+        if "per_parent" in sv:
+            n *= _per_parent_mean(sets, sv); name = sv.get("parent")
+        else:
+            return int(n * int(sv.get("n", 1)))
+    return int(n)
+
+
 def _body_volumes(spec, dim):
     """(name, volume) for every declared body type: from `particle_mass`, `block`, or `radius`.
 
@@ -676,13 +705,29 @@ def _body_volumes(spec, dim):
     """
     out = []
     sets = spec.get("sets") or {}
+    # ONLY THE SETS AN MPM OPERATOR ACTUALLY ACTS ON. Every contained set declares `per_parent`,
+    # and this used to take that as "is a body of material points" -- so on a three-level model the
+    # intermediate `compartment` set, whose 813 elements are piece CENTRES and are touched by no
+    # solver, was measured against the grid and reported as "0.01 particles per grid cell,
+    # UNDER-SAMPLED, may fracture numerically". It has no particles at all; it is not a body.
+    _mpm = {str(o.get("at")) for o in (spec.get("operators") or [])
+            if isinstance(o, dict) and str(o.get("op", "")).startswith(("mpm_", "p2g", "g2p",
+                                                                       "mls_mpm"))}
     for sname, sv in sets.items():
         if not isinstance(sv, dict) or "per_parent" not in sv:
+            continue
+        if _mpm and sname not in _mpm:
             continue
         parent = sets.get(sv.get("parent"), {}) or {}
         types = parent.get("types") or {}
         rad_default = float(sv.get("radius", parent.get("radius", 0.05)) or 0.05)
-        n_par = int(parent.get("n", 1))
+        # HOW MANY BODIES THERE ACTUALLY ARE, which for a CONTAINED parent is not `n`. A parent
+        # that is itself a child declares `per_parent`, not `n`, so `parent.get("n", 1)` read 1 --
+        # and on a three-level model (cell -> compartment -> mpm_particle) every one of the 813
+        # compartments was reported as a fraction of ONE body, so all nine compartment types were
+        # warned as "ABSENT from the run" on a spec in which each has hundreds of pieces. A
+        # diagnostic that fires on a healthy spec is worse than no diagnostic.
+        n_par = int(_set_size(sets, sv.get("parent")))
         # THE MASS-DERIVED BODY, WHICH THIS FUNCTION USED TO MISS ENTIRELY. models/entities.py sizes
         # a body three ways in this order: from `particle_mass` (V = per_parent * mass / density,
         # arranged by `shape`), from an explicit `block`, or from `radius`. Only the last two were
@@ -693,21 +738,30 @@ def _body_volumes(spec, dim):
         # fired on healthy specs and the number was meaningless.
         _pm = sv.get("particle_mass")
         _rho = float(sv.get("density", 1.0) or 1.0)
-        _v_mass = (float(sv["per_parent"]) * float(_pm) / _rho) if _pm and _rho else None
+        _pp = sv.get("per_parent", 0)
+        _v_mass = ((_per_parent_mean(sets, sv) * float(_pm) / _rho)
+                   if _pm and _rho and not isinstance(_pp, dict) else None)
         if not types:
             v = _v_mass if _v_mass else (math.pi * rad_default ** 2 if dim == 2
                                          else (4.0 / 3.0) * math.pi * rad_default ** 3)
-            out.append((sname, v, int(sv["per_parent"]), n_par))
+            out.append((sname, v, int(round(_per_parent_mean(sets, sv))), n_par))
             continue
         # THE ENGINE'S EXACT ALLOCATION, replicated rather than approximated: engine.py:610 gives
         # the LAST type the remainder (`total - start`) so per-type rounding never leaves cells
         # unassigned. Applying round() to every type -- including the last -- reported `snow`
         # absent when it in fact receives every cell the others rounded away.
         _names = list(types)
+        # `count:` IS EXACT AND IS NOT ROUNDED, matching `_assign_types`: a type that states how
+        # many elements it has gets exactly that many, so the round-to-zero warning below cannot
+        # fire on it.
+        _counted = all("count" in types[_tn] for _tn in _names)
         _alloc, _start = {}, 0
         for _i, _tn in enumerate(_names):
-            _k = ((n_par - _start) if _i == len(_names) - 1
-                  else int(round(float(types[_tn].get("fraction", 1.0 / len(_names))) * n_par)))
+            if _counted:
+                _k = int(types[_tn]["count"])
+            else:
+                _k = ((n_par - _start) if _i == len(_names) - 1
+                      else int(round(float(types[_tn].get("fraction", 1.0 / len(_names))) * n_par)))
             _alloc[_tn] = max(_k, 0); _start += _k
         for tn, t in types.items():
             b = t.get("block")
@@ -738,7 +792,10 @@ def _body_volumes(spec, dim):
                      f"count. (The LAST type absorbs whatever the others round away, so it gets "
                      f"more cells than its fraction asks for.)")
                 continue
-            out.append((f"{sname}/{tn} x{_alloc[tn]}", v, int(sv["per_parent"]), n_par))
+            # PER TYPE, when `per_parent` is a mapping: this compartment's own point
+            # budget, not an average that describes none of them.
+            _ppt = int(_pp[tn]) if isinstance(_pp, dict) else int(_pp)
+            out.append((f"{sname}/{tn} x{_alloc[tn]}", v, _ppt, n_par))
     return out
 
 

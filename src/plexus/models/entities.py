@@ -136,11 +136,33 @@ class MPMParticle:
                         f"there is no parent centre to scatter a disc around. Add a `block: "
                         f"[x0,y0,z0,x1,y1,z1]` to every type, or give the set a `parent:`.")
         else:
-            types = getattr(parent, "types_raw", None) or {}
+            # THE NEAREST ANCESTOR THAT DECLARES `types`, not necessarily the immediate parent.
+            #
+            # This used to read `parent.types_raw` and stop. With two levels that is the same
+            # thing; with `cell -> compartment -> mpm_particle` it is not, and the failure is
+            # silent both ways round: a material declared on the CELL is invisible to a particle
+            # whose parent is a compartment, and every particle then builds at the 100.0 default.
+            # Walking up finds whichever level actually says what the body is made of, and stops
+            # at the FIRST one -- the finer statement wins, the same precedence a child set's own
+            # `types` already has over its parent's below.
+            #
+            # `pidx` is the COMPOSITION of the parent maps down from that ancestor, built here by
+            # hand rather than through `H.lift_index` because `provision` runs inside `build`,
+            # before this level is added to the hierarchy, so the chain cannot be walked from H.
+            anc, pidx = parent, lvl.parent
+            while not (getattr(anc, "types_raw", None) or {}):
+                nxt_name = getattr(anc, "parent_name", None)
+                if nxt_name is None or nxt_name not in H.levels:
+                    break
+                pidx = anc.parent[pidx]
+                anc = H.level(nxt_name)
+            types = getattr(anc, "types_raw", None) or {}
             type_list = list(types.values())
-            ntp = parent.node_type                               # [Nc] per-cell type id
-            pidx = lvl.parent                                    # [Np] parent cell per particle
-            n_par = parent.n
+            ntp = anc.node_type if hasattr(anc, "node_type") else \
+                torch.zeros(anc.n, dtype=torch.long, device=device)   # [Nc] per-body type id
+            n_par = anc.n
+            parent = anc                                         # radial `layers`/`core` are measured
+                                                                 # from the body that declares them
         rho = float(s.get("density", 1.0)); rad = float(s.get("radius", 0.02))
         # DENSITY MAY VARY BY TYPE, and it has to for buoyancy to mean anything. It was a single
         # set-level scalar, so two species of different density needed two SETS -- two particle
@@ -167,7 +189,20 @@ class MPMParticle:
         if _ct and _nt is not None and len(_ct) > 1 and any("density" in t for t in _ct):
             rho_p = torch.as_tensor([float(t.get("density", rho)) for t in _ct],
                                     device=device, dtype=torch.float32)[_nt]
-        ppc = int(s["per_parent"]) if parent is not None else Np
+        # HOW MANY POINTS SHARE ONE BODY, which is what `p_vol = V_body / ppc` divides by. It is a
+        # SCALAR when `per_parent` is one number and a per-particle TENSOR when `per_parent` is a
+        # mapping from the parent's type -- a nuclear-envelope patch of 50,000 points and a
+        # plasma-membrane patch of 50 cannot share a divisor, and using one would give the membrane
+        # points 1,000x the volume, hence 1,000x the mass, of the nucleus points beside them.
+        # `build` computes the vector and passes it down as `_per_particle`.
+        _ppv = s.get("_per_particle")
+        ppc = _ppv.to(device) if _ppv is not None else \
+            (int(s["per_parent"]) if parent is not None else Np)
+        if _ppv is not None and s.get("particle_mass") is not None:
+            raise ValueError(
+                f"{lvl.name}: `particle_mass` sizes a body from ONE point mass and a per-type "
+                f"`per_parent` gives each body a different point count, so the two disagree about "
+                f"every body's volume. Declare one.")
         px0, px1 = lvl.state_schema["pos"]
         D = H.dim                                                # particle dimension (2D or 3D; the global dim contract)
         pos = lvl.state[:, px0:px1].clone()
@@ -380,7 +415,8 @@ class MPMParticle:
         # per-particle volume: ball footprint (disc pi*r^2 in 2D, sphere 4/3 pi r^3 in
         # 3D) / ppc, or the box volume / ppc for a block-filled pool.
         unit_vol = math.pi * rad * rad if D == 2 else (4.0 / 3.0) * math.pi * rad ** 3
-        p_vol = torch.full((Np,), unit_vol / ppc, device=device)
+        p_vol = (unit_vol / ppc).to(device=device, dtype=torch.float32) if torch.is_tensor(ppc) \
+            else torch.full((Np,), unit_vol / ppc, device=device)
         for tid, t in enumerate(type_list):
             blk = t.get("block")
             if blk is not None:
@@ -388,7 +424,9 @@ class MPMParticle:
                 vol = 1.0
                 for k in range(D):
                     vol *= abs(v[D + k] - v[k])
-                p_vol = torch.where(ntp[pidx] == tid, torch.full_like(p_vol, vol / ppc), p_vol)
+                _pv_t = (vol / ppc).to(p_vol.dtype) if torch.is_tensor(ppc) \
+                    else torch.full_like(p_vol, vol / ppc)
+                p_vol = torch.where(ntp[pidx] == tid, _pv_t, p_vol)
         # A DECLARED PARTICLE MASS SETS p_vol OUTRIGHT, and then the geometry is only a placement.
         # WARN, DO NOT SILENTLY PICK ONE: a block says the body occupies THIS much space and a
         # particle mass says it occupies THAT much, and when they disagree the run means neither.

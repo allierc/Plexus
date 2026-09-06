@@ -13,6 +13,8 @@ other is how anyone can tell which one a specification is getting.
     ecm_ops              the matrix as MPM material, and the stiff blocks that confine it
     membrane_ops         the basement membrane, its crosslink network, and the integrin links
     contact_ops          where a triangulated surface meets a continuum, both directions
+    cell_ops             the cell as a composition: compartment pieces, the atlas that places
+                         them, and the centroid that aggregates a level onto the one above
     mpm_ops              MLS-MPM: the grid, the four-step cycle, and the forces on it
     motion_ops           single-body motion: drag, glide, sediment, walls, gravity
     encoding_ops         fields that REPRESENT rather than simulate: hash_encoding, voxelize
@@ -55,6 +57,8 @@ from . import ecm_ops               # noqa: F401  ecm_seed/stress/from_cell, cel
 from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_*
 from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, surface_track,
 #                                                 plate_confine, bm_sense, ecm_load, ecm_gate_growth
+from . import cell_ops             # noqa: F401  compartment (entity), seed_cell_atlas,
+#                                                 aggregate_centroid
 from . import neural                # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
 #                                                 (psi: shared | type_pre | type_pairwise),
 #                                                 neuron_field_input (Omega)
@@ -68,4 +72,4 @@ from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "neural", "continuous_engine"]
+           "contact_ops", "cell_ops", "neural", "continuous_engine"]

@@ -138,14 +138,58 @@ def load(path: str) -> Spec:
     for sname, s in raw["sets"].items():
         types = s.get("types", {})
         if types:
-            total = sum(t["fraction"] for t in types.values())
-            if abs(total - 1.0) > 1e-6:
-                raise ValueError(f"set {sname!r} type fractions sum to {total}, must be 1.0")
+            # TWO WAYS TO SAY THE SAME THING, AND EXACTLY ONE OF THEM PER SET. `fraction` is a
+            # share of the set and `count` is a number of elements; a set may state either, never
+            # both, because two statements of one partition are two chances to disagree and
+            # nothing downstream could tell which was meant. `count` exists because an inventory
+            # -- a cell atlas's 421 plasma-membrane pieces, 77 mitochondria -- is naturally
+            # counted, and writing it as 0.100790 of 4,177 both hides the number and reaches it
+            # only by rounding. Counts are converted to fractions HERE, so every other reader
+            # (`_type_fracs`, the operators, the atlas) is untouched; `_assign_types` then uses
+            # the count itself, so the assignment is exact by construction.
+            n_counted = sum(1 for t in types.values() if "count" in t)
+            n_frac = sum(1 for t in types.values() if "fraction" in t)
+            if n_counted and n_counted != len(types):
+                missing = [k for k, t in types.items() if "count" not in t]
+                raise ValueError(
+                    f"set {sname!r}: {n_counted} of {len(types)} types declare `count:` -- "
+                    f"missing on {missing}. A partition is stated one way for the whole set.")
+            if n_counted and n_frac:
+                both = [k for k, t in types.items() if "count" in t and "fraction" in t]
+                raise ValueError(
+                    f"set {sname!r} types {both} declare BOTH `count:` and `fraction:`. They are "
+                    f"two statements of one partition -- give the count, or give the share.")
+            if n_counted:
+                # `count` is measured against what the set actually holds: `n` for a root set,
+                # `per_parent` for a contained one (the per-parent inventory, which is what
+                # `per_parent` already means).
+                live = s.get("n", s.get("per_parent"))
+                if isinstance(live, dict):
+                    raise ValueError(
+                        f"set {sname!r} uses `count:` on its types and a per-type `per_parent:` "
+                        f"mapping. `count` counts THIS set's elements and the mapping counts its "
+                        f"CHILDREN's -- put the mapping on the child set, where it belongs.")
+                if live is None:
+                    raise ValueError(f"set {sname!r} uses `count:` but declares neither `n:` nor "
+                                     f"`per_parent:`, so there is nothing for the counts to add up to")
+                tot = sum(int(t["count"]) for t in types.values())
+                if tot != int(live):
+                    raise ValueError(
+                        f"set {sname!r} type counts sum to {tot:,}, but the set holds "
+                        f"{int(live):,}. Every element belongs to exactly one type.")
+                for t in types.values():
+                    t["fraction"] = int(t["count"]) / float(live)
+            else:
+                total = sum(t["fraction"] for t in types.values())
+                if abs(total - 1.0) > 1e-6:
+                    raise ValueError(f"set {sname!r} type fractions sum to {total}, must be 1.0")
         # `buffer` is the allocated slot count for a cardinality-changing set
         # (occupancy `occ` marks the live subset). It must hold the initial set.
         buf = s.get("buffer")
         if buf is not None:
             live0 = s.get("n", s.get("per_parent"))
+            if isinstance(live0, dict):
+                live0 = max(int(v) for v in live0.values())   # the largest block a parent may hold
             if live0 is not None and int(buf) < int(live0):
                 raise ValueError(
                     f"set {sname!r} buffer={buf} is smaller than its initial size {live0}; "
@@ -445,7 +489,9 @@ def load(path: str) -> Spec:
     # be false where it used to be the only notice anyone got.
     # `bulk_modulus` is read by mpm_scatter via TYPE_PROP_ALTERNATIVES rather than by name, so the
     # used_props scan does not see it and it would be reported as read by no operator.
-    _KNOWN_TYPE_KEYS = {"fraction", "core", "layers", "block",
+    # `count` is consumed by the schema itself (converted to `fraction` above) and by
+    # `_assign_types`, not by an operator, so it joins the keys the typo guard already knows.
+    _KNOWN_TYPE_KEYS = {"fraction", "count", "core", "layers", "block",
                         "material", "density", "tau", "bulk_modulus", "shape",
                         "eta"} | used_props          # per-type dynamic viscosity (mpm_viscosity)
     for sname, s in raw["sets"].items():
