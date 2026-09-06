@@ -63,6 +63,8 @@ sets:
       area: {width: 1}
       cen:  {width: 3}
 
+      Vbirth: {width: 1, record: false}
+      divjit: {width: 1, record: false}
 fields: {}
 
 seed:
@@ -174,19 +176,22 @@ _gate:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
-    description: The simulation begins with a spherical mesh composed of 200 hexagonal cells. As time
-      progresses, the mesh undergoes a topological transformation where cells begin to merge and split.
-      By the final frames, the number of cells increases to 233 as new boundaries form. The final state
-      shows a complex network of interconnected cells with distinct red and blue highlighted regions.
-    objects: The primary object is a large sphere covered in a tessellated mesh of polygonal cells. Most
-      cells are light gray and maintain a hexagonal or pentagonal shape. In the later frames, specific
-      cells are colored in bright red and blue to indicate local changes. The mesh maintains a consistent
-      overall spherical volume while the internal cell boundaries shift and multiply.
+    description: The simulation begins with a spherical mesh composed of 200 hexagonal cells. Over time,
+      the mesh undergoes a topological transformation where a small defect or "gate" appears and propagates
+      across the surface. By the final frames, the mesh has slightly deformed and integrated new cell
+      boundaries, resulting in a total of 209 cells. The process demonstrates a dynamic reconfiguration
+      of a spherical tiling.
+    objects: The primary object is a large, three-dimensional sphere covered in a tessellated mesh. The
+      mesh consists of numerous grey, hexagonal cells of relatively uniform size. In the final frames,
+      small red and blue colored regions appear at specific vertices, indicating localized topological
+      changes. The entire structure is set against a solid black background, highlighting the geometric
+      evolution of the sphere.
   movie_kburns:
     description: The video shows a static 3D mesh of a sphere with a Voronoi-like pattern. There is no
       movement or evolution of particles, agents, or fields over the sequence of frames. The geometry
       remains perfectly still throughout the entire duration. The lighting and shading on the surface
       are constant across all keyframes.
-    objects: The primary object is a large sphere composed of a polygonal mesh. The mesh consists of irregular
-      hexagons and pentagons of varying sizes. The surface is a uniform light gray color with black outlines
-      defining the edges of each polygon. The overall structure is a closed, convex 3D manifold.
+    objects: The primary object is a large sphere composed of a grey polygonal mesh. The mesh consists
+      of irregular hexagons and pentagons that tile the surface of the sphere. The faces are a uniform
+      light grey color with dark grey wireframe edges. The overall structure is a single, continuous closed
+      surface with a smooth, rounded topology.

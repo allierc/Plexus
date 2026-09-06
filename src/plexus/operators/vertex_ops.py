@@ -138,6 +138,42 @@ def set_cell_block(H, cat, name, values, nF):
                                   device=lvl.state.device)
 
 
+def require_cell_block(H, cat, name, nF, who):
+    """`cell_block`, but a missing declaration is an error naming the spec line that fixes it.
+
+    THE DIFFERENCE BETWEEN A REFUSAL AND A SILENT ZERO is the whole reason per-cell state is being
+    moved onto the set. A mesh table is an open namespace: `m.get("Vbirth")` on a run that never
+    seeded it returns None, and every reader of it grew its own fallback -- `divjit`'s was a
+    fixed-seed draw, which means a spec missing its seed still ran, still divided, and staggered its
+    divisions with a jitter nobody asked for. A declared block cannot be missing by accident; it can
+    only be missing from the spec, and then this says so.
+    """
+    a = cell_block(H, cat, name, nF)
+    if a is None:
+        raise KeyError(
+            f"{who} needs the set {cat!r} to declare the width-1 block {name!r}. Add it under "
+            f"`sets.{cat}.state` as `{name}: {{width: 1, record: false}}`. It is per-cell state, "
+            f"so it belongs to the set whose members are cells -- where the topology operators "
+            f"renumber it without having to know its name.")
+    return a
+
+
+def _seed_cell_blocks(H, cat, nF, dt, dev, **arrays):
+    """Write a seed operator's per-cell arrays into declared blocks on the cell set.
+
+    SEEDING IS WHERE THE DECLARATION HAS TO BE CHECKED, because it is the first write and the only
+    one that happens before frame 0. A spec that forgot the block would otherwise reach its first
+    `cell_divide` -- possibly hundreds of frames later, possibly in a run left overnight -- before
+    anything noticed.
+    """
+    for k, v in arrays.items():
+        if cell_block(H, cat, k, nF) is None:
+            raise KeyError(
+                f"seed_mesh writes the per-cell block {k!r}, which the set {cat!r} does not "
+                f"declare. Add `{k}: {{width: 1, record: false}}` under `sets.{cat}.state`.")
+        set_cell_block(H, cat, k, np.asarray(v, np.float64), nF)
+
+
 def fib_sphere(n, r=1.0):
     i = np.arange(n) + 0.5
     phi = np.arccos(1 - 2 * i / n); theta = np.pi * (1 + 5 ** 0.5) * i
@@ -703,7 +739,6 @@ class SeedMesh3D(Structural):
                          A0=torch.full((nF,), A0, dtype=dt, device=dev),
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
-                         divjit=torch.as_tensor(dj, dtype=dt, device=dev),   # per-cell division-threshold multiplier
                          age=torch.as_tensor(ag, dtype=dt, device=dev),      # per-cell cell-cycle PHASE at t=0
                          # THE VOLUME AND RADIUS TARGETS FOLLOW `a0_scale`, on the isotropic rescale
                          # it implies: a preferred AREA g times larger is a preferred LENGTH sqrt(g)
@@ -714,7 +749,6 @@ class SeedMesh3D(Structural):
                          # for the same reason: a cell must still divide at twice its OWN target,
                          # not at twice a volume it was never meant to hold.
                          V0f=vf.detach().clone() * self.a0_scale ** 1.5,   # PER-CELL target wedge volume (v_eq per cell)
-                         Vbirth=vf.detach().clone() * self.a0_scale ** 1.5,   # volume at birth -> cell divides when it doubles
                          V0=float(vf.sum()) * self.a0_scale ** 1.5,
                          v_ref=float(vf.median()) * self.a0_scale ** 1.5,   # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
                          #   morphogen growth caps v_eq at (4/3)v_ref, cells cycle in [2/3,4/3]v_ref centred on v_ref
@@ -725,6 +759,16 @@ class SeedMesh3D(Structural):
             m.clear(); m.update(seeded)          # the engine's table, filled in place
         else:
             lvl._mesh = MeshTable(**seeded)      # spec has no `mesh:` declaration yet
+        # THE PER-CELL BLOCKS GO ON THE CELL SET, not into `seeded`. `Vbirth` is the volume this
+        # cell was born holding and `divjit` its personal multiplier on the division threshold;
+        # both are one number per cell, so plexus2 puts them on the set whose members are cells,
+        # where `Hierarchy.renumber_set` carries them through every topology edit without any
+        # operator naming them. A spec that declares neither gets a clear refusal rather than a
+        # silent zero -- which is what the mesh table gave, and what `divjit`'s fixed-seed fallback
+        # was papering over.
+        _seed_cell_blocks(H, self.cell_set, nF, dt, dev,
+                          Vbirth=vf.detach().cpu().numpy() * self.a0_scale ** 1.5,
+                          divjit=np.asarray(dj, np.float64))
         return {}
 
 
@@ -1284,14 +1328,15 @@ class Divide3D(Structural):
         pos = [p for p in pos_np]
         A0 = m["A0"].detach().cpu().numpy().tolist()
         V0f = m["V0f"].detach().cpu().numpy().tolist()
-        Vbirth = m["Vbirth"].detach().cpu().numpy().tolist()
+        Vbirth = require_cell_block(H, self.cell_set, "Vbirth", nF, "cell_divide").tolist()
         alive = m["alive"].detach().cpu().numpy().tolist()
         rng = np.random.default_rng(12345 + self._k)
-        djit = m.get("divjit")                                   # per-cell threshold jitter -> staggered divisions
-        if djit is None:
-            djit = self._fresh_djit(np.random.default_rng(777), nF).tolist()
-        else:
-            djit = djit.detach().cpu().numpy().tolist()
+        # THE FIXED-SEED FALLBACK IS GONE WITH THE MESH COLUMN. It read: if `divjit` is absent,
+        # draw it here from `default_rng(777)`. That is a spec's missing seed answered by an
+        # invented one -- the run divided, staggered its thresholds with a jitter nobody declared,
+        # and looked entirely normal. A declared block cannot be absent by accident, so the honest
+        # answer is the refusal `require_cell_block` gives.
+        djit = require_cell_block(H, self.cell_set, "divjit", nF, "cell_divide").tolist()
         age = m.get("age")                                       # per-cell age in division-calls since birth
         age = ([0] * nF) if (age is None or age.shape[0] != nF) else (age.detach().cpu().numpy() + 1).tolist()
         # HAS THIS CELL EVER DIVIDED? `age` alone cannot answer it: it starts at 0 for every SEEDED
@@ -1486,8 +1531,6 @@ class Divide3D(Structural):
         m["A0"] = torch.as_tensor(A0a, dtype=dt, device=dev)
         m["P0"] = torch.as_tensor(P0a, dtype=dt, device=dev)
         m["V0f"] = torch.as_tensor(V0fa, dtype=dt, device=dev)
-        m["Vbirth"] = torch.as_tensor(Vba, dtype=dt, device=dev)
-        m["divjit"] = torch.as_tensor(dja, dtype=dt, device=dev)
         m["age"] = torch.as_tensor(agea, dtype=dt, device=dev)
         m["ndiv"] = torch.as_tensor(ndva, dtype=dt, device=dev)
         m["alive"] = torch.as_tensor(alv, dtype=dt, device=dev)
@@ -1553,6 +1596,20 @@ class Divide3D(Structural):
                 for i, mother in enumerate(daughter_mothers):
                     nt[nF + i] = nt[mother]
                 retype(clvl, nt)                                 # and put the derived buffers back
+        # LAST, BECAUSE THE INHERITANCE ABOVE COPIES THE WHOLE ROW. `cst[nF + i] = cst[mother]` is
+        # right for everything the mother and daughter share -- the morphogen, the cell type -- and
+        # WRONG for the two blocks this operator has just computed per daughter: `Vbirth` is the
+        # volume each daughter was actually born with (`half` and `other`, which differ whenever
+        # `split_cv > 0`), and `divjit` is a FRESH draw per daughter, the whole point of which is
+        # that sisters do not divide together.
+        #
+        # Written here rather than beside `m["A0"]` above, and the difference is measurable: with
+        # the writes before the copy, every daughter inherited its mother's jitter, the division
+        # stagger collapsed, and `gate_00_spheroid` finished at 6,674 cells against its pinned
+        # 6,914 with `t1_total` 1,497 against 1,499. The mesh columns never had this problem
+        # because nothing copies a mesh row wholesale.
+        set_cell_block(H, self.cell_set, "Vbirth", Vba, nF2)
+        set_cell_block(H, self.cell_set, "divjit", dja, nF2)
         return {}
 
 
@@ -1750,11 +1807,11 @@ class Apoptosis3D(Structural):
     def _q(self, m, H, nF, what):
         """The per-cell quantity a local mode compares."""
         if what == "growth":                                  # fractional growth SINCE BIRTH
-            v = m.get("V0f"); vb = m.get("Vbirth")
+            v = m.get("V0f"); vb = cell_block(H, self.cat, "Vbirth", nF)
             if v is None or vb is None:
                 return None
             return np.maximum(v.detach().cpu().numpy()[:nF]
-                              / np.maximum(vb.detach().cpu().numpy()[:nF], 1e-12) - 1.0, 0.0)
+                              / np.maximum(vb, 1e-12) - 1.0, 0.0)
         if what == "volume":
             v = m.get("V0f")
             return None if v is None else v.detach().cpu().numpy()[:nF]
@@ -1902,11 +1959,11 @@ class Apoptosis3D(Structural):
             # V0f/Vbirth is growth since birth and `age` is time since birth. Both are already
             # carried across renumbering by `keep` -- in cell_divide and in this operator -- so this
             # needs no new bookkeeping, which is the part that has gone wrong twice already.
-            v = m.get("V0f"); vb = m.get("Vbirth"); ag = m.get("age")
+            v = m.get("V0f"); vb = cell_block(H, self.cat, "Vbirth", nF); ag = m.get("age")
             if v is None or vb is None:
                 return set()
             vv = v.detach().cpu().numpy()[:nF]
-            vbb = np.maximum(vb.detach().cpu().numpy()[:nF], 1e-12)
+            vbb = np.maximum(vb, 1e-12)
             # THE EXCESS OVER BIRTH SIZE, NOT THE RATIO -- and the first version compared ratios,
             # which cannot work. V0f/Vbirth is >= 1 for any cell that has grown at all and exactly
             # 1.0 for one that has not, so with a median near 1.4 a cut at 0.5 x median = 0.7 sits
@@ -2232,7 +2289,11 @@ class Apoptosis3D(Structural):
         m["A0"] = _car("A0", A0); m["V0f"] = _car("V0f", V0f)
         m["P0"] = torch.as_tensor(self.p0 * np.sqrt(np.maximum(
             m["A0"].detach().cpu().numpy(), 1e-9)), dtype=dt, device=dev)
-        for nm in ("Vbirth", "divjit", "age", "ndiv", "alive"):
+        # `Vbirth` AND `divjit` ARE NOT HERE ANY MORE, and their absence is the point: they are
+        # blocks on the cell set, and `H.renumber_set(self.cat, keep, nF2)` a few lines below
+        # permutes the whole of that set's state with the same `keep`. Carrying them here as well
+        # would permute them twice.
+        for nm in ("age", "ndiv", "alive"):
             if nm in m:
                 m[nm] = _car(nm)
         _carry_face_state(m, keep, dt, dev)
@@ -2624,10 +2685,9 @@ class CellCycle3D(Structural):
                 v0 = m["V0f"].detach().cpu().numpy().astype(np.float64)
                 if len(v0) == nF:
                     m["V0f"] = torch.as_tensor(v0 * (1.0 + u) / 1.5, dtype=dt, device=dev)
-                    if "Vbirth" in m and m["Vbirth"] is not None:
-                        vb = m["Vbirth"].detach().cpu().numpy().astype(np.float64)
-                        if len(vb) == nF:
-                            m["Vbirth"] = torch.as_tensor(vb / 1.5, dtype=dt, device=dev)
+                    vb = cell_block(H, self.cat, "Vbirth", nF)
+                    if vb is not None and len(vb) == nF:
+                        set_cell_block(H, self.cat, "Vbirth", vb / 1.5, nF)
                 print(f"[cell_cycle] seeded {nF} cells asynchronously: "
                       f"G1 {int((ph == 0).sum())}, S {int((ph == 1).sum())}, "
                       f"G2 {int((ph == 2).sum())}, M {int((ph == 3).sum())}", flush=True)
@@ -2664,7 +2724,7 @@ class CellCycle3D(Structural):
             cc = cc * np.where(vp > 0.0, np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0), 1.0)
         set_cell_block(H, self.cat, "cyc_vprev", v_now, nF)
 
-        jit = _np("divjit")
+        jit = cell_block(H, self.cat, "divjit", nF)
         jit = np.ones(nF) if jit is None or len(jit) != nF else jit
         cvj = (1.0 + self.phase_cv * self._rng.standard_normal(nF)).clip(0.4, 1.8) \
             if self.phase_cv > 0 else np.ones(nF)
@@ -3306,7 +3366,9 @@ class ReconnectT1_3D(Rewire):
             print(f"[edge_flip] a flip left {nF - nF2} face(s) below three sides -- "
                   f"reindexing {nF} -> {nF2}. Per-face targets follow the mesh; a cell was lost "
                   f"to topology, not to biology.", flush=True)
-            for _nm in ("A0", "P0", "V0f", "Vbirth", "divjit", "age", "ndiv", "alive"):
+            # `Vbirth` and `divjit` are gone from this list for the reason `cell_die`'s note
+            # gives: they are cell-set blocks and `renumber_set` below already permutes them.
+            for _nm in ("A0", "P0", "V0f", "age", "ndiv", "alive"):
                 if _nm in m:
                     _a = m[_nm].detach().cpu().numpy()
                     m[_nm] = torch.as_tensor(np.asarray([_a[i] for i in keep]),

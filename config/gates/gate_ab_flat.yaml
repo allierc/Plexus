@@ -27,6 +27,8 @@ sets:
       area: {width: 1}
       cen:  {width: 3}
 
+      Vbirth: {width: 1, record: false}
+      divjit: {width: 1, record: false}
 fields: {}
 
 seed:
@@ -204,22 +206,20 @@ _gate:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
-    description: The simulation shows a 2D mesh of hexagonal cells undergoing a subtle deformation over
-      time. The cells appear to shift slightly in position and orientation as the frame count progresses.
-      There is a noticeable change in the curvature or "flatness" of the mesh as it evolves through the
-      sequence. By the final frame, the overall structure maintains its integrity while exhibiting a slight
-      geometric shift.
-    objects: The scene contains a single mesh composed of 48 individual hexagonal cells. These cells are
-      arranged in a contiguous, interlocking honeycomb pattern that forms a flat, irregular sheet. The
-      cells are colored in a light gray or off-white shade against a solid black background. Each cell
-      is of a uniform size, creating a consistent and repeating geometric texture across the entire mesh.
+    description: The simulation shows a 2D mesh of hexagonal cells undergoing a continuous deformation.
+      Over the course of the frames, the mesh appears to stretch and compress along a horizontal axis.
+      The overall shape of the cluster shifts slightly as the internal cell boundaries adjust to the changing
+      geometry. By the final frame, the mesh has reached a new equilibrium state of deformation.
+    objects: The scene contains a cluster of 48 hexagonal cells arranged in a honeycomb-like lattice.
+      Each cell is colored in a light gray shade with thin black outlines defining their boundaries. The
+      cells are of relatively uniform size, though they vary slightly in shape due to the deformation.
+      The entire mesh is situated against a solid black background, highlighting its geometric structure.
   movie_kburns:
     description: The simulation shows a flat mesh of hexagonal cells undergoing a continuous deformation.
-      The mesh appears to stretch and compress horizontally while maintaining its overall structural integrity.
-      The boundaries of the mesh shift slightly as the internal geometry adjusts to the applied forces.
-      The entire process occurs smoothly without any breaks or significant changes in the connectivity
-      of the cells.
+      The mesh appears to stretch and compress along its horizontal axis while maintaining its overall
+      connectivity. The boundaries of the mesh shift slightly as the internal cells adjust to the changing
+      geometry. The entire process occurs smoothly without any breaks or changes in the underlying topology.
     objects: The scene contains a single flat mesh composed of numerous interconnected hexagonal cells.
-      The cells are arranged in a dense, honeycomb-like pattern that forms a roughly elliptical shape.
-      The mesh is colored in a light gray or off-white shade against a solid black background. Each individual
-      cell is small and uniform in size, contributing to a cohesive and continuous surface.
+      The cells are colored in a uniform light gray with dark gray outlines defining their boundaries.
+      The mesh is relatively small in size and centered against a solid black background. The topology
+      is a continuous tiling where each interior cell shares edges with its neighbors.
