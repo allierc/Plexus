@@ -31,7 +31,6 @@ fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     seed: 0
     vseed_cv: 0.15
@@ -64,7 +63,6 @@ operators:
     rate: 1.0
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.000866
     a_sw: 0.8
     hill: 4.0
@@ -87,7 +85,6 @@ operators:
     cap_frac: 0.12
   - op: cell_divide
     at: vertex
-    cell_set: cell
     factor: 2.0
     cycle_cv: 0.15
     min_cycle: 4

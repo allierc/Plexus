@@ -31,7 +31,6 @@ fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     seed: 0
     vseed_cv: 0.15
@@ -67,7 +66,6 @@ operators:
     rate: 1.0
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.000866
     a_sw: 0.35
     hill: 4.0
@@ -93,7 +91,6 @@ operators:
     K_lumen: 0.5
   - op: cell_die
     at: vertex
-    cell_set: cell
     p0: 3.5
     stall_frac: 0.5
     min_age: 4
@@ -102,11 +99,9 @@ operators:
     model: dimmer
   - op: interface_tension
     at: vertex
-    cell_set: cell
     K_purse: 1.0
   - op: cell_divide
     at: vertex
-    cell_set: cell
     factor: 2.0
     cycle_cv: 0.15
     min_cycle: 4

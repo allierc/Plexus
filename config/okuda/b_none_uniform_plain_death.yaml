@@ -18,7 +18,6 @@ sets:
   vertex:
     n: 120000
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 60000
     state:
@@ -29,11 +28,16 @@ sets:
         width: 3
       area:
         width: 1
+  half_edge:
+    n: 480000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 seed:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     seed: 0
     vseed_cv: 0.15
@@ -45,7 +49,6 @@ operators:
     at: cell
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.000866
     a_sw: 0.0
     hill: 4.0
@@ -55,7 +58,6 @@ operators:
     conserve_amount: false
   - op: cell_die
     at: vertex
-    cell_set: cell
     p0: 3.5
     max_mark_frac: 0.005
     min_age: 4
@@ -80,7 +82,6 @@ operators:
     K_lumen: 0.0
   - op: cell_divide
     at: vertex
-    cell_set: cell
     factor: 2.0
     cycle_cv: 0.15
     min_cycle: 4

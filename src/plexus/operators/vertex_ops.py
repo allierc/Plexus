@@ -94,6 +94,38 @@ def _carry_face_state(m, keep, dt, dev):
         m[nm] = a.to(dev)[idx.clamp(max=max(a.shape[0] - 1, 0))].to(dt)
 
 
+def resolve_cell_set(H, at, override=None):
+    """The set this mesh's faces ARE -- read from the mesh's own declaration, not from a parameter.
+
+    DECLARED ONCE, ON THE SET. `sets.<vertex set>.cell_set:` is where the pairing lives, `schema.py`
+    refuses a `mesh:` without it, and `engine._attach_mesh` records it as `Level.mesh_cell_set`.
+    Every operator that crosses between the two then took the SAME pairing again as its own
+    `cell_set:` parameter -- 67 lines across the 21 specs in `config/tissue`, all of them the word
+    `cell` -- and defaulted it to the literal `"cell"` when absent. That is a relation stated in one
+    place and re-stated in sixty-seven, and the schema's own message already says which is right:
+    the pairing "must be declared once here rather than repeated as a parameter on every operator
+    that crosses between them".
+
+    TWO THINGS THE REPETITION COST, both already recorded in this tree. `edge_flip` fell back to the
+    literal `"cell"` and so renumbered a set it never declared it needed. And `cell_divide`
+    defaulted to `None` rather than to `"cell"` -- alone among the readers -- so on a divide line
+    the parameter was LOAD-BEARING: omit it and the daughters silently stop inheriting their
+    mother's cell state, with nothing to say so.
+
+    `override` keeps a spec that still passes `cell_set:` working; no spec in `config/tissue` takes
+    that path any more.
+    """
+    if override is not None:
+        return override
+    lvl = H.level(at) if at in getattr(H, "levels", {}) else None
+    cs = getattr(lvl, "mesh_cell_set", None) if lvl is not None else None
+    if cs is None:
+        raise KeyError(
+            f"no cell set for {at!r}: declare `cell_set:` on that set, beside its `mesh:`. A face "
+            f"of the mesh IS a cell, and this operator crosses between the two.")
+    return cs
+
+
 def cell_block(H, cat, name, nF):
     """The first `nF` rows of a DECLARED width-1 block on the cell set, as float64. None if absent.
 
@@ -625,7 +657,7 @@ class SeedMesh3D(Structural):
         # the shell at the equator of the axis named, tiling the declared `fraction`s along it, at
         # the moment the faces first have centroids.
         self.type_layout = str(params.get("type_layout", "random")).lower()
-        self.cell_set = params.get("cell_set", "cell")
+        self._cat = params.get("cell_set")          # override only; the SET declares the pairing
         # THE PREFERRED AREA, SET APART FROM THE GEOMETRY. `A0` was always `mean(area)` of the mesh
         # just built, so every run started exactly at its target and the ONLY direction it could go
         # was down, under whatever line tension the mechanics carried: a sweep of six specs that all
@@ -661,6 +693,8 @@ class SeedMesh3D(Structural):
         self.age_seed = float(params.get("age_seed", 0.0))
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cell_set = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         lvl = H.level(self.at); dev = lvl.state.device; dt = lvl.state.dtype
         if self.shape in ("plane", "ribbon", "moebius"):
             verts, es, et, ef, nF = build_strip_mesh(self.n, self.R, self.jitter, self.seed,
@@ -1215,7 +1249,7 @@ class Divide3D(Structural):
         # (a fast-growing tip cell can't divide instantly -> tighter size CV); max_cycle: force division after
         # this many calls even if volume < 2x (a stalled cell still cycles). 0/inf = pure volume-doubling.
         self.min_cycle = int(params.get("min_cycle", 0)); self.max_cycle = int(params.get("max_cycle", 10 ** 9))
-        self.cell_set = params.get("cell_set", None)             # if set, daughters inherit the mother's cell state (morphogen)
+        self._cat = params.get("cell_set")          # override only; resolved from the set in forward()
         # G1 RAMP (SimuCell3D/tyssue "birth-at-target"): set each daughter's TARGET volume v_eq to its ACTUAL
         # birth volume instead of mother_target/2. The division trigger is ACTUAL volume (vf>=2*Vbirth) but v_eq
         # is set by ramped morphogen growth, so an actively-growing tip cell has mother_V0f >> vf; halving it
@@ -1272,6 +1306,8 @@ class Divide3D(Structural):
         return v if n > 1 else float(v[0])
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cell_set = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         from plexus.models.topology import rings_from_flat_3d, flat_from_rings_3d, divide_face_3d
         # THE VERTEX PARENTAGE, collected here and spent below. Empty `vertex_carry` -> a no-op, so
         # every existing spec is byte-identical; the list is built regardless because it costs two
@@ -1653,7 +1689,7 @@ class Apoptosis3D(Structural):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.cells = [int(c) for c in (params.get("cells") or [])]
         # WHICH CELLS DIE is targeting, not a second mechanism: the shrink-shed-extrude pathway is
         # identical in every mode, so these are one operator rather than four.
@@ -2052,6 +2088,8 @@ class Apoptosis3D(Structural):
         return set()
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         # THE ACTED LEDGER IS BLIND TO THIS OPERATOR, AND TO THE WHOLE DIE FAMILY. Measured over
         # rounds r001-r012 of the live campaign: 24 runs killed cells, 6,693 deaths in total, and
         # `inert_operators` recorded `cell_die` as having acted in ZERO of them -- including
@@ -2594,7 +2632,7 @@ class CellCycle3D(Structural):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.t = [float(params.get("t_g1", 110.0)), float(params.get("t_s", 80.0)),
                   float(params.get("t_g2", 40.0)), float(params.get("t_m", 10.0))]
         self.g1_size = float(params.get("g1_size", 1.6))
@@ -2617,6 +2655,8 @@ class CellCycle3D(Structural):
         return v_now >= self.g1_size * v_ref
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
         if m is None:
             return {}
@@ -3301,6 +3341,7 @@ class ReconnectT1_3D(Rewire):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
+        self._cat = params.get("cell_set")          # override only; the SET declares the pairing
         self.l_th = float(params.get("l_th", 0.0))           # absolute; <=0 -> l_th_frac x mean edge
         self.l_th_frac = float(params.get("l_th_frac", 0.15))
         self.max_flips = int(params.get("max_flips", 20))
@@ -3409,7 +3450,10 @@ class ReconnectT1_3D(Rewire):
             #
             # `edge_flip` declares no `cell_set`, so the cell level is looked up by name and a model
             # without one simply skips: `renumber_set` returns False rather than raising.
-            _cat = getattr(self, "cat", None) or "cell"
+            # NOT `getattr(self, "cat", None) or "cell"`. This operator has no `cat`, so that
+            # expression WAS the literal `"cell"` every time -- `edge_flip` renumbering a set it
+            # never declared it needed, which is the case `resolve_cell_set`'s note names.
+            _cat = resolve_cell_set(H, self.at, self._cat)
             if not H.renumber_set(_cat, keep, n_new=nF2):
                 m["renumber_failed"] = int(m.get("renumber_failed", 0)) + 1
                 print(f"[edge_flip] renumber_set({_cat!r}) DID NOT ACT after a face drop -- the "

@@ -89,7 +89,6 @@ sets:
   vertex:
     n: 524288
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 262144
     state:
@@ -108,12 +107,18 @@ sets:
         youngs: 15.0
         density: 1.0
         block:
-          - 0.05
-          - 0.05
-          - 0.05
-          - 0.95
-          - 0.95
-          - 0.472
+        - 0.05
+        - 0.05
+        - 0.05
+        - 0.95
+        - 0.95
+        - 0.472
+  half_edge:
+    n: 2097152
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -121,7 +126,6 @@ fields:
 seed:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 200
     radius: 5.0
     jitter: 0.18
@@ -133,7 +137,6 @@ operators:
     at: cell
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.003457
     rho: 1.0
     a_sw: 50.0
@@ -209,7 +212,6 @@ operators:
     max_flips: 30
   - op: cell_divide
     at: vertex
-    cell_set: cell
     every: 4
     engine_clock: true
     factor: 2.0

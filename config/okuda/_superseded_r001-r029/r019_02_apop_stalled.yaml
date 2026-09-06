@@ -31,7 +31,6 @@ fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     radius: 5.0
     jitter: 0.15
@@ -69,7 +68,6 @@ operators:
     rate: 1.0
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.000866
     a_sw: 0.35
     hill: 4.0
@@ -96,7 +94,6 @@ operators:
     cap_frac: 0.12
   - op: cell_die
     at: vertex
-    cell_set: cell
     p0: 3.5
     stall_frac: 0.5
     min_age: 4
@@ -114,7 +111,6 @@ operators:
     cycle_cv: 0.15
     p0: 3.5
     every: 4
-    cell_set: cell
     min_cycle: 4
     max_cycle: 1000000000
     after_frame: 100

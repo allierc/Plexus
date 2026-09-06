@@ -531,6 +531,40 @@ def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
     H.add_level(lvl)
 
 
+def _link_mesh_maps(H, sim) -> None:
+    """Resolve `mesh:` -> the half-edge set -> `maps.face` -> the cell set, once every set is built.
+
+    A SECOND PASS BECAUSE A MAP NEEDS BOTH ENDS. `_build_mesh` runs while the sets are still being
+    allocated, so the half-edge set it names may not exist yet; the resolution has to happen after
+    the last `add_level`. `schema.py` has already checked that the named set exists and declares all
+    three roles, so anything reached here is a build-order bug rather than a spec error.
+
+    WHAT THIS REPLACES. `cell_set:` -- a key that named the cell set on the VERTEX set, and was then
+    repeated on 35 operator lines across `config/tissue` because an operator had no other way to
+    learn it. Now the mesh names its half-edge set, that set declares `face: cell`, and the answer
+    is derived in one place. `Level.mesh_cell_set` survives as the resolved answer so the table's
+    consumers need not each walk the maps -- derived, not declared twice.
+    """
+    for sname, lvl in H.levels.items():
+        hs = getattr(lvl, "mesh_set", None)
+        if hs is None:
+            continue
+        he = H.levels[hs] if hs in H.levels else None
+        maps = dict(getattr(he, "maps", {}) or {}) if he is not None else {}
+        if not maps:
+            raise ValueError(
+                f"set {sname!r} declares `mesh: {hs}` but {hs!r} has no `maps:`. The half-edge set "
+                f"is what states the topology: `srce`/`trgt` into the vertex set, `face` into the "
+                f"cell set.")
+        lvl.mesh_cell_set = maps["face"]
+        lvl.mesh_vertex_set = maps["srce"]
+        if maps["srce"] != sname or maps["trgt"] != sname:
+            raise ValueError(
+                f"set {hs!r} is {sname!r}'s mesh, so its `srce`/`trgt` maps must land in {sname!r}, "
+                f"not in {maps['srce']!r}/{maps['trgt']!r}. A half-edge runs between two vertices "
+                f"OF THE MESH IT BELONGS TO.")
+
+
 def _build_mesh(lvl, s: dict, device: str) -> None:
     """Allocate the set's half-edge table if it declares one (`mesh: half_edge`).
 
@@ -559,7 +593,13 @@ def _build_mesh(lvl, s: dict, device: str) -> None:
     from plexus.models.mesh import MeshTable
     z = torch.empty(0, dtype=torch.long, device=device)
     lvl.mesh = MeshTable(E_srce=z, E_trgt=z.clone(), E_face=z.clone(), nF=0, Nv=0)
-    lvl.mesh_cell_set = s.get("cell_set")
+    # THE HALF-EDGE SET THIS MESH IS, BY NAME. `mesh:` names a declared set now, and that set's
+    # `maps:` are what say the topology: `srce`/`trgt` land in the vertex set, `face` in the cell
+    # set. `mesh_cell_set` is kept as the resolved answer to "which set are the faces" so that the
+    # forty consumers of the table need not each walk the maps, but it is now DERIVED from a
+    # declaration instead of being a second declaration -- `cell_set:` is gone from the schema.
+    lvl.mesh_set = kind
+    lvl.mesh_cell_set = None            # filled by `_link_mesh_maps` once every set exists
 
 
 def _entity_class(sname: str):
@@ -866,7 +906,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema)
         lvl.render = render
         lvl.vmax = float(s["vmax"]) if "vmax" in s else None    # optional per-tick cell speed cap
-        _build_mesh(lvl, s, device)                             # `mesh: half_edge` -> an empty table to fill
+        lvl.maps = dict(s.get("maps") or {})    # declared functions OUT of this set (role -> set)
+        _build_mesh(lvl, s, device)                             # `mesh: <set>` -> an empty table to fill
         if head is not None:
             # heading is a unit VECTOR [., D] in every dimension (the universal
             # orientation representation read by glide / bounce / sense).
@@ -1003,6 +1044,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema,
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
         lvl.render = render
+        lvl.maps = dict(s.get("maps") or {})
         _build_mesh(lvl, s, device)                # a CONTAINED set may carry the surface too
         _assign_types(lvl, s, H, device)
         # an entity may provision domain-specific per-node buffers (e.g. mpm_particle's
@@ -1012,6 +1054,9 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         if provision is not None:
             provision(lvl, parent, s, H, device)
         H.add_level(lvl)
+
+    # pass 2b: resolve every mesh's maps, now that every set exists.
+    _link_mesh_maps(H, sim)
 
     # pass 3: continuous fields -- a field is a pure-state continuum bound to one
     # set; the operators (deposit/diffuse/decay/sense) do all the dynamics. One

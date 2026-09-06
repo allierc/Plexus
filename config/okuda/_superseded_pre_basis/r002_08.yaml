@@ -31,7 +31,6 @@ fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     radius: 5.0
     jitter: 0.15
@@ -68,7 +67,6 @@ operators:
     rate: 1.0
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.000433
     a_sw: 0.175
     hill: 4.0

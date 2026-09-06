@@ -40,7 +40,7 @@ import torch
 from plexus.models.base import Aggregate, Lateral, Rewire, Structural
 from plexus.models.registry import register_operator
 from plexus.models.base import Lateral
-from plexus.operators.vertex_ops import face_geometry_3d
+from plexus.operators.vertex_ops import face_geometry_3d, resolve_cell_set
 
 
 def _chan(params, who, n_species=2):
@@ -921,7 +921,7 @@ class Grow3D(Structural):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
         # WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are
         # unchanged; 2 reads a second RD system living in the same buffer.
@@ -967,6 +967,8 @@ class Grow3D(Structural):
         return s_prev * (1.0 + self.rate * (self.rho + hillv))
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
         if m is None:
             return {}
@@ -1242,7 +1244,7 @@ class InterfaceLineTension3D(Lateral):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.K_purse = float(params.get("K_purse", 1.0))
         # 0.6, AND IT WAS 1.0 -- A DEFAULT THAT CANNOT FIRE. The gate below is
         # `red = a > a_sw * amax`, so a_sw = 1.0 asks for cells STRICTLY ABOVE the maximum: the
@@ -1259,6 +1261,8 @@ class InterfaceLineTension3D(Lateral):
         self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         from plexus.operators.vertex_ops import ShapeEnergy3D
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None); clvl = H.level(self.cat)
         if m is None or "chem" not in clvl.state_schema:
@@ -1343,12 +1347,14 @@ class ExtrusionForcing3D(Lateral):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.K_extrude = float(params.get("K_extrude", 0.5))
         self.a_sw = float(params.get("a_sw", 0.6)); self.eta = float(params.get("eta", 0.05))
         self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         from plexus.operators.vertex_ops import face_geometry_3d
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None); clvl = H.level(self.cat)
         if m is None or "chem" not in clvl.state_schema:

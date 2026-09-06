@@ -31,7 +31,6 @@ fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 500
     seed: 0
     vseed_cv: 0.15
@@ -48,7 +47,6 @@ operators:
     at: cell
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.001733
     a_sw: 1.5
     hill: 4.0
@@ -75,7 +73,6 @@ operators:
     cap_frac: 0.12
   - op: rd_interface_tension
     at: vertex
-    cell_set: cell
     K_purse: 0.0
     K_extrude: 4.0
     a_sw: 0.5
@@ -94,7 +91,6 @@ operators:
     cycle_cv: 0.4
     p0: 3.9
     every: 1
-    cell_set: cell
     min_cycle: 16
     max_cycle: 1000000000
     after_frame: 100

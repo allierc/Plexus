@@ -16,7 +16,6 @@ general:
     - 50.0
 seed:
   - at: vertex
-    cell_set: cell
     jitter: 0.18
     n_cells: 200
     op: mesh_seed
@@ -29,7 +28,6 @@ operators:
     op: cell_geometry
   - a_sw: 50.0
     at: vertex
-    cell_set: cell
     hill: 4.0
     op: cell_grow
     rate: 0.003457
@@ -56,7 +54,6 @@ operators:
     max_flips: 30
     op: edge_flip
   - at: vertex
-    cell_set: cell
     cycle_cv: 0.15
     engine_clock: true
     every: 4

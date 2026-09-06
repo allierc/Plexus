@@ -16,23 +16,43 @@ sets:
   vertex:
     n: 1024
     mesh: half_edge
-    cell_set: cell
     state:
-      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
-      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
-      sep: {width: 3, integration: first_order}
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
   cell:
     n: 256
     state:
-      area: {width: 1}
-      cen:  {width: 3}
-
-      Vbirth: {width: 1, record: false}
-      divjit: {width: 1, record: false}
+      area:
+        width: 1
+      cen:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+  half_edge:
+    n: 2048
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 
 seed:
-  - {op: seed_mesh, model: apicobasal, at: vertex, cell_set: cell,
+  - {op: seed_mesh, model: apicobasal, at: vertex,
      shape: disc, n_cells: 60, radius: 5.0, centre: [0.0, 0.0, 1.0],
      jitter: 0.15, p0: 3.5, seed: 0, h0: 0.4}
 

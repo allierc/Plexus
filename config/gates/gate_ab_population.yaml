@@ -20,7 +20,6 @@ sets:
   vertex:
     n: 25584
     mesh: half_edge
-    cell_set: cell
     state:
       pos:
         width: 3
@@ -48,12 +47,17 @@ sets:
       divjit:
         width: 1
         record: false
+  half_edge:
+    n: 102400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 seed:
 - op: seed_mesh
   model: apicobasal
   at: vertex
-  cell_set: cell
   n_cells: 200
   radius: 5.0
   jitter: 0.18
@@ -66,7 +70,6 @@ operators:
   at: cell
 - op: cell_grow
   at: vertex
-  cell_set: cell
   rate: 0.003457
   rho: 1.0
   a_sw: 50.0
@@ -93,7 +96,6 @@ operators:
   max_flips: 30
 - op: cell_divide
   at: vertex
-  cell_set: cell
   every: 4
   engine_clock: true
   factor: 2.0
@@ -105,7 +107,6 @@ operators:
 - op: cell_die
   model: crowded
   at: vertex
-  cell_set: cell
   every: 4
   engine_clock: true
   n_max: 8
