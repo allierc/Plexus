@@ -135,8 +135,28 @@ from plexus.models.state import StateSchema
 # is UNEXPRESSIBLE rather than merely discouraged. This is the same move as EMIT making the
 # engine own integration: a discipline every spec had to remember becomes a guarantee the
 # language provides.
-KINDS = ("lateral", "aggregate", "broadcast", "exchange", "field", "structural", "rewire",
-         "seed")
+# `divide` AND `die` ARE THE PAPER'S OWN FAMILIES AND THEY WERE NOT KINDS. plexus2.tex sec. 3 names
+# eight: Lateral, Aggregate, Broadcast, Exchange, Rewire, Divide, Die, Seed. This tuple named a
+# different eight -- it added `field`, and it collapsed Divide and Die into one `structural` kind --
+# while the reference-implementation section called ITS list "the eight of the main text". The two
+# lists were never the same and the code implemented the second.
+#
+# THE COST OF THE COLLAPSE WAS NOT COSMETIC. `structural` came to mean "may write in place" rather
+# than "changes the entities", because it is the only kind the purity rule grants a write to, and it
+# then absorbed every operator that needed one and was not a Divide, a Die, a Seed, a Rewire or a
+# Field: 40 live registrations of which about 20 are neither Divide nor Die -- `cell_grow`,
+# `cell_cycle`, `junction_myosin`, `cytokinetic_ring`, `topo_record`, five constraint operators. A
+# kind that means two things cannot be enforced, and the class of defect it hides is not
+# hypothetical: `cell_die` and `cell_grow` both wrote `V0f`, the faster one silently erased the
+# slower, and R6 lost every extrusion to it until a gate row caught the vacuum.
+#
+# `field` AND `structural` STAY FOR NOW, deliberately. Ten `field` registrations and about twenty-two
+# `structural` ones live outside this campaign's scope (`mpm_ops`, `contact_ops`, `membrane_ops`,
+# `field_ops`), and removing a kind those specs still declare would break them at load. They go when
+# stage 2 re-kinds those modules; this tuple is the record of a migration in progress, not of a
+# settled taxonomy.
+KINDS = ("lateral", "aggregate", "broadcast", "exchange", "rewire", "divide", "die", "seed",
+         "field", "structural")
 
 
 # The recognised temporal-integration states (Axis A: how a SET moves in time), shared by

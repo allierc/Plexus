@@ -1051,7 +1051,7 @@ class ShapeEnergy3D(Lateral):
 # VOLUME, so the same plateau is `vth_frac = max_scale ** 3`.
 
 
-@register_operator("cell_divide", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", set="vertex", kind="divide", family="population")
 class Divide3D(Structural):
     """Cell division: a septum through a face, so one cell becomes two, and the surface gains a
     cell without losing its closure.
@@ -1488,7 +1488,7 @@ class Divide3D(Structural):
 
 
 
-@register_operator("cell_die", set="vertex", kind="structural", family="population")
+@register_operator("cell_die", set="vertex", kind="die", family="population")
 class Apoptosis3D(Structural):
     """Cell elimination: the Die family, and the inverse of `cell_divide`. A marked cell contracts
     its own ring to a point over several frames and is then removed from the surface.
@@ -2226,7 +2226,7 @@ class Apoptosis3D(Structural):
         return {}
 
 
-@register_operator("cell_die", model="competition", set="vertex", kind="structural",
+@register_operator("cell_die", model="competition", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DCompetition(Apoptosis3D):
     """`competition` MODEL of cell_die -- grows slower than its neighbours -- the Myc-style loser.
@@ -2237,7 +2237,7 @@ class Apoptosis3DCompetition(Apoptosis3D):
     DEATH = "competition"
 
 
-@register_operator("cell_die", model="smaller", set="vertex", kind="structural",
+@register_operator("cell_die", model="smaller", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DSmaller(Apoptosis3D):
     """`smaller` MODEL of cell_die -- smaller than its neighbours: squeezed out by a fitter crowd.
@@ -2248,7 +2248,7 @@ class Apoptosis3DSmaller(Apoptosis3D):
     DEATH = "smaller"
 
 
-@register_operator("cell_die", model="dimmer", set="vertex", kind="structural",
+@register_operator("cell_die", model="dimmer", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DDimmer(Apoptosis3D):
     """`dimmer` MODEL of cell_die -- less activator than its neighbours -- the LOCAL chemical loser.
@@ -2259,7 +2259,7 @@ class Apoptosis3DDimmer(Apoptosis3D):
     DEATH = "dimmer"
 
 
-@register_operator("cell_die", model="older", set="vertex", kind="structural",
+@register_operator("cell_die", model="older", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DOlder(Apoptosis3D):
     """`older` MODEL of cell_die -- has gone longer without dividing than its neighbours.
@@ -2270,7 +2270,7 @@ class Apoptosis3DOlder(Apoptosis3D):
     DEATH = "older"
 
 
-@register_operator("cell_die", model="crowded", set="vertex", kind="structural",
+@register_operator("cell_die", model="crowded", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DCrowded(Apoptosis3D):
     """`crowded` MODEL of cell_die -- has more neighbours than its neighbours do -- density-driven extrusion.
@@ -2281,7 +2281,7 @@ class Apoptosis3DCrowded(Apoptosis3D):
     DEATH = "crowded"
 
 
-@register_operator("cell_die", model="lonely", set="vertex", kind="structural",
+@register_operator("cell_die", model="lonely", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DLonely(Apoptosis3D):
     """`lonely` MODEL of cell_die -- has fewer -- the tissue closes over a gap.
@@ -2292,7 +2292,7 @@ class Apoptosis3DLonely(Apoptosis3D):
     DEATH = "lonely"
 
 
-@register_operator("cell_die", model="small", set="vertex", kind="structural",
+@register_operator("cell_die", model="small", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DSmall(Apoptosis3D):
     """`small` MODEL of cell_die -- below an ABSOLUTE volume threshold, not a relative one.
@@ -2303,7 +2303,7 @@ class Apoptosis3DSmall(Apoptosis3D):
     DEATH = "small"
 
 
-@register_operator("cell_die", model="stalled", set="vertex", kind="structural",
+@register_operator("cell_die", model="stalled", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DStalled(Apoptosis3D):
     """`stalled` MODEL of cell_die -- below an absolute GROWTH-RATE threshold.
@@ -2314,7 +2314,7 @@ class Apoptosis3DStalled(Apoptosis3D):
     DEATH = "stalled"
 
 
-@register_operator("cell_die", model="chem_low", set="vertex", kind="structural",
+@register_operator("cell_die", model="chem_low", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DChemLow(Apoptosis3D):
     """`chem_low` MODEL of cell_die -- below an absolute activator threshold -- dies BETWEEN the spots.
@@ -2325,7 +2325,7 @@ class Apoptosis3DChemLow(Apoptosis3D):
     DEATH = "chem_low"
 
 
-@register_operator("cell_die", model="prescribed", set="vertex", kind="structural",
+@register_operator("cell_die", model="prescribed", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DPrescribed(Apoptosis3D):
     """`prescribed` MODEL of cell_die -- the EXPERIMENTER ablates a patch; the tissue did not choose.
@@ -2343,7 +2343,7 @@ class Apoptosis3DPrescribed(Apoptosis3D):
     DEATH = "prescribed"
 
 
-@register_operator("cell_die", model="field", set="vertex", kind="structural", family="population")
+@register_operator("cell_die", model="field", set="vertex", kind="die", family="population")
 class Apoptosis3DField(Apoptosis3D):
     """`field` MODEL of cell_die -- death keyed to a per-cell quantity SOME OTHER OPERATOR published.
 
@@ -2358,7 +2358,7 @@ class Apoptosis3DField(Apoptosis3D):
     DEATH = "field"
 
 
-@register_operator("cell_divide", model="doubler", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", model="doubler", set="vertex", kind="divide", family="population")
 class Divide3DDoubler(Divide3D):
     """Divide at `factor` x THIS CELL'S OWN BIRTH VOLUME -- the rule that was the default until
     kept because it is the null the absolute-size rule has to beat, and because a large part of
@@ -2374,7 +2374,7 @@ class Divide3DDoubler(Divide3D):
         return v_now >= self.factor * jit * v_birth
 
 
-@register_operator("cell_divide", model="timer", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", model="timer", set="vertex", kind="divide", family="population")
 class Divide3DTimer(Divide3D):
     """Divide on the CLOCK: `age >= cycle * jit` division-calls since birth, size ignored entirely.
 
@@ -2667,7 +2667,7 @@ class CellCycleInhibitorDilution(CellCycle3D):
         return conc <= self.inhib_thresh
 
 
-@register_operator("cell_divide", model="cycle", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", model="cycle", set="vertex", kind="divide", family="population")
 class Divide3DCycle(Divide3D):
     """Divide when `cell_cycle` says the cell is in M. The trigger reads a phase and nothing else.
 
@@ -2691,7 +2691,7 @@ class Divide3DCycle(Divide3D):
         return (np.asarray(a, np.float64)[:nF] >= CellCycle3D.M)
 
 
-@register_operator("cell_divide", model="adder", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", model="adder", set="vertex", kind="divide", family="population")
 class Divide3DAdder(Divide3D):
     """Divide once the cell has ADDED a constant volume since birth: `v >= v_birth + delta*jit*v_ref`.
 
@@ -2733,7 +2733,7 @@ class Divide3DAdder(Divide3D):
         return v_now >= v_birth + self.delta * jit * v_ref
 
 
-@register_operator("cell_divide", model="concerted", set="vertex", kind="structural",
+@register_operator("cell_divide", model="concerted", set="vertex", kind="divide",
                    family="population")
 class Divide3DConcerted(Divide3D):
     """Size AND time together: divide when `w*(v/(factor*jit*v_ref)) + (1-w)*(age/(cycle*jit)) >= 1`.
