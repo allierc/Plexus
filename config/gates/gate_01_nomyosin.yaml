@@ -39,6 +39,12 @@ sets:
       chem:
         width: 2
         integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
 fields: {}
 seed:
   - op: mesh_seed

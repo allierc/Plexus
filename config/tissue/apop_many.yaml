@@ -29,6 +29,12 @@ sets:
         width: 3
       area:
         width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
 fields: {}
 seed:
 - op: mesh_seed

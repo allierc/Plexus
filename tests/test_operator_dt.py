@@ -51,7 +51,11 @@ def _spheroid(dt, declared_dt=None, implementation=None):
         "general": {"name": "dt_probe", "seed": 0, "n_frames": 1, "dt": dt, "dim": 3,
                     "world": [40.0, 40.0, 40.0]},
         "sets": {"vertex": {"n": 2048, "mesh": "half_edge", "cell_set": "cell"},
-                 "cell": {"n": 512, "state": {"area": {"width": 1}, "cen": {"width": 3}}}},
+                 "cell": {"n": 512, "state": {"area": {"width": 1}, "cen": {"width": 3},
+                                              # `seed_mesh` lays these down on the CELL SET, so the
+                                              # fixture declares them like any spec does.
+                                              "Vbirth": {"width": 1, "record": False},
+                                              "divjit": {"width": 1, "record": False}}}},
         "fields": {},
         "operators": [{"op": "mesh_seed", "at": "vertex", "before_frame": 1, "cell_set": "cell",
                        "n_cells": 24, "radius": 5.0, "jitter": 0.18, "p0": 3.5, "seed": 0},

@@ -50,8 +50,9 @@ RESERVED = ("E_srce", "E_trgt", "E_face", "nF", "Nv")
 # What `mesh_seed` lays down. Recorded here so a checkpoint loader can be checked against it: a
 # reload that produces fewer keys drops straight into the silent-zero paths (`age`/`ndiv` become
 # zeros on a length mismatch; `divjit` falls back to a fixed-seed draw).
-SEED_KEYS = RESERVED + ("A0", "P0", "alive", "divjit", "V0f", "Vbirth", "V0", "v_ref",
-                        "R0", "verts0")
+# `divjit` and `Vbirth` LEFT THIS LIST AT S2c-1: they are declared blocks on the CELL SET now, so
+# a checkpoint loader checks them against the set's schema and not against this tuple.
+SEED_KEYS = RESERVED + ("A0", "P0", "alive", "V0f", "V0", "v_ref", "R0", "verts0")
 
 MESH_KINDS = ("half_edge",)
 

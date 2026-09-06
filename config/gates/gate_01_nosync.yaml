@@ -39,6 +39,12 @@ sets:
       chem:
         width: 2
         integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
 fields: {}
 seed:
   - op: mesh_seed
@@ -351,3 +357,26 @@ _gate:
         scale of an hour or more, so at 600 s a frame the frame-to-frame survival must be high --
         below 0.90 the tissue is remodelling every contact within ten minutes, which no epithelium
         does. Only sayable because `units:` declares 1 frame = 600 s.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a spherical surface undergoing a dynamic cellular division process.
+      Over time, the initial large cells split into progressively smaller units, significantly increasing
+      the total cell count. Red and blue colored cells appear and multiply, eventually populating a large
+      portion of the sphere's surface. By the final frame, the sphere is covered in a dense, complex network
+      of thousands of small, multi-colored cells.
+    objects: The primary objects are polygonal cells arranged in a continuous, tessellated mesh on a spherical
+      surface. Most cells are light grey or white, while a subset of cells are colored bright red or blue.
+      The size of the individual cells decreases rapidly as the simulation progresses from frame 1 to
+      frame 60. The cells maintain a connected topology, sharing edges to form a seamless, expanding cellular
+      structure.
+  movie_kburns:
+    description: The video shows a static spherical mesh that does not change over time. The geometric
+      pattern remains perfectly still throughout the entire sequence. There is no movement, deformation,
+      or evolution of the underlying structure. The scene is a constant representation of a Voronoi-like
+      tessellation on a sphere.
+    objects: The primary object is a large sphere covered in a dense, irregular polygonal mesh. The mesh
+      consists of small, grey-colored cells with black outlines, resembling a Voronoi diagram. These cells
+      are interconnected to form a continuous, seamless surface across the entire sphere. The overall
+      structure is uniform in size and distribution, creating a consistent texture.
