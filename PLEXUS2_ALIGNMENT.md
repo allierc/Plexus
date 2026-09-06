@@ -310,3 +310,71 @@ model does once daughters stop inheriting a stranger's phase. The old behaviour 
 population at every division and hid it. Whether a real tissue should re-synchronise this strongly
 under a `g1_size` checkpoint with `phase_cv: 0.15` is a question about the model, and the answer
 belongs in the spec or in `cell_cycle`, not in the carry.
+
+---
+
+# The campaign is blocked, and this is the measurement that blocks it
+
+**`gate_00_spheroid`'s three reference pins are byte-identity wearing a different name, and every
+remaining rung of S2c fails them.** Not because the model changes -- because the run is chaotic and
+the pins are exact.
+
+## What was measured
+
+S2c-2 moves `cell_grow`'s baseline (`mg_scale`, `A0_init`, `P0_init`, `V0f_init`) to the cell set.
+Against `808ece7b`, same spec, `PLEXUS_STRICT_DETERMINISM=1`, on `gate_00_spheroid`:
+
+| | ref | now |
+|---|---|---|
+| positions first differ | frame 33 | max \|dx\| **4.5e-06**, mean 4.2e-07, on 399 of 400 vertices |
+| cell count first differs | frame 72 | 277 against 278 -- **one cell** |
+| final cell count | frame 401 | **6,914 against 6,749** (2.4%) |
+
+`edge_flip` reconnects on an edge-length comparison, so a perturbation at the 24th bit of a float32
+coordinate decides one flip differently and the trajectories part. `promotion_identical`'s own
+header already recorded this: *one differing mantissa bit would move an `edge_flip` decision and
+diverge from then on*.
+
+Four variants of the same change were measured -- 6,840 (move only), 6,749 (cap rewritten in
+volume), 6,749 (plus explicit per-cell absorption of foreign writes), 6,639 (forcing the old global
+reset). **Scattered, not shifted.** A different model gives a direction; divergence gives scatter.
+
+## The pins are not broken -- that is the problem
+
+`gate_00_spheroid` re-run at `808ece7b` on **cuda:1** returns `final_cell_count 6914`,
+`t1_total 1499`, `apical_radius_fold 3.86064` -- identical to cuda:0. The run is bit-reproducible
+across devices, so the pins are meaningful **for a fixed code path** and worthless for a refactor:
+anything that changes floating-point association order fails them, and a refactor is nothing but a
+change to association order.
+
+    final_cell_count   eq 6914      <- the last frame of a 400-frame chaotic trajectory, as an integer
+    t1_total           eq 1499      <- likewise
+    apical_radius_fold within [3.8607, 0.002]   <- 0.05%, on the same trajectory
+
+## Three ways out, and the choice is not a code decision
+
+1. **Read the pins before the divergence amplifies.** The cell count is IDENTICAL to frame 72 and
+   the positions agree to 4.5e-06 at frame 33. A pin at frame 50 would still catch a real
+   regression -- a wrong split, a dropped column, a lost carry all show up in the first ten frames
+   -- and would be immune to bit-level reassociation. This is the option that keeps an equality.
+2. **Make them bands.** `within [6914, 0.05]` and `within [1499, 0.05]`. Cheap, but it weakens the
+   only rows that currently catch a population-level regression, and 5% is a number chosen after
+   seeing 2.4%.
+3. **Freeze the reference per code-path.** Re-pin deliberately at each rung with
+   `--freeze-reference`, which is what that flag is for, and accept that the pin certifies "this
+   commit reproduces itself" rather than "this commit matches the paper's run".
+
+Option 1 is the recommendation: it is the only one that keeps an exact assertion while measuring
+something a refactor cannot legitimately change.
+
+## What is on which branch
+
+| branch | state |
+|---|---|
+| `plexus2-algebra-alignment` | `808ece7b`, **green** -- 9 gates, 73 rows, 69 PASS / 4 KNOWN_RED / 0 FAIL; suite 113 passed + the 8 in `TEST_KNOWN_FAILURES.md` |
+| `s2c-2-growth-baseline` | `7f6ec238`, the parked rung, with the full diagnosis in its message |
+
+`tests/test_state_census.py` pins the moves already made: `phase`, `phase_t`, `cyc_inhib`,
+`cyc_vprev`, `Vbirth` and `divjit` are asserted to be declared blocks on the cell set and NOT
+columns on the mesh table, and the remaining per-cell column count is bounded so a new one has to
+be argued for.
