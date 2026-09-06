@@ -41,6 +41,16 @@ import sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# THREE SPECS IN `config/tissue` ARE NOT PART OF THIS CAMPAIGN AND COST MORE THAN ALL THE REST
+# TOGETHER. `b_star`, `r010_00_ctrl` and `r020_00_ctrl` predate the apico-basal work, run 1,800
+# frames of 2,000 cells each, and exercise no operator the other eighteen do not. Left in the
+# default set they turn a per-rung check into an overnight one, and a check that is not run after
+# every commit is not a check. Skipped by default and reachable with `--all`.
+#
+# It is a judgement about COST, not about coverage: the covering set is what makes a byte-identity
+# claim mean something, and these three add nothing to it.
+SLOW = ("b_star", "r010_00_ctrl", "r020_00_ctrl")
 WORKTREES = os.path.join(ROOT, "log", "_worktrees")
 PY = sys.executable
 
@@ -121,6 +131,8 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--device-ref", default="cuda:1", help="the reference side runs here, in parallel")
     ap.add_argument("--out", default="/tmp/plexus_refactor")
+    ap.add_argument("--all", action="store_true",
+                    help=f"include the slow pre-campaign specs ({', '.join(SLOW)})")
     a = ap.parse_args()
 
     wt = _worktree(a.ref)
@@ -131,6 +143,11 @@ def main():
     here = {os.path.basename(p)[:-5] for p in glob.glob(os.path.join(ROOT, "config", a.group, "*.yaml"))}
     skipped = [n for n in names if n not in here]
     names = [n for n in names if n in here]
+    if not a.all and not a.specs:
+        slow = [n for n in names if n in SLOW]
+        names = [n for n in names if n not in SLOW]
+        if slow:
+            print(f"skipping {len(slow)} slow pre-campaign spec(s): {', '.join(slow)}  (--all to include)")
 
     print(f"reference {a.ref} in {wt}")
     print(f"{len(names)} spec(s) in config/{a.group}/"
