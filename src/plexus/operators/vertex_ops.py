@@ -1447,7 +1447,32 @@ class Divide3D(Structural):
         m["age"] = torch.as_tensor(agea, dtype=dt, device=dev)
         m["ndiv"] = torch.as_tensor(ndva, dtype=dt, device=dev)
         m["alive"] = torch.as_tensor(alv, dtype=dt, device=dev)
-        _carry_face_state(m, keep, dt, dev)
+        # A DAUGHTER MUST BE CARRIED FROM ITS MOTHER, AND `keep` ALONE CANNOT SAY THAT.
+        #
+        # `keep[j]` is the index of new face `j` in the RINGS LIST, and `divide_face_3d` APPENDS
+        # daughter B at rings index `nF + i` while daughter A keeps the mother's index `f`. The
+        # eight explicit targets above survive that because their python lists were extended in the
+        # same order before `keep` was applied -- `A0.append(a0e)`, `age.append(0)` -- so `A0[keep]`
+        # finds a real entry at `nF + i`. A `face_carry` array is NOT extended: it is still the
+        # length-nF tensor the operator wrote last frame, and `reindex_faces` CLAMPS an out-of-range
+        # index to `nF - 1`. So every daughter B was given THE LAST CELL'S VALUE -- not its
+        # mother's, not a default, but whichever cell happened to sit at the end of the array.
+        #
+        # WHAT THAT COST, on `cycle_phases`: daughter B inherited a stranger's phase and time-in-
+        # phase, so `cell_cycle`'s reset -- which fires on "age 0 AND phase still M" -- missed it
+        # whenever that stranger was not in M, and the daughter carried on from the middle of
+        # someone else's cycle. Measured at frame 13 of 120, 17 of 217 cells held a `phase_t` that
+        # belonged to no ancestor of theirs; the worst read 56.5 frames into a phase it had never
+        # entered against the 1.0 its mother's reset should have given it.
+        #
+        # `carry` is `keep` with the appended rows redirected to the mother, which is what
+        # `reindex_faces`'s docstring has always CLAIMED the map does. Faces that merely moved are
+        # untouched, so a spec that never divides is unaffected.
+        carry = keep
+        if daughter_mothers:
+            born = {nF + i: mo for i, mo in enumerate(daughter_mothers)}
+            carry = np.array([born.get(int(o), int(o)) for o in keep], np.int64)
+        _carry_face_state(m, carry, dt, dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
         if self.local_relax > 0 and "mech" in m and Nv2 > Nv:    # heal the fresh caps in place at birth
             esT = m["E_srce"]; etT = m["E_trgt"]; efT = m["E_face"]
