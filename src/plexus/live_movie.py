@@ -287,6 +287,7 @@ class LiveMovie:
         # '_skin'` at frame 2 -- which the class swallows and turns into "movie DISABLED",
         # so a run still finished, still wrote its trajectory, and silently had no movie.
         self._skin = self._surf = self._skin_sub = None
+        self._skins = []                      # `render_3d: compartments`: one bound surface per type
         self._meshes = []
         self._mesh_is_subject = False
         self._curves = []
@@ -505,6 +506,12 @@ class LiveMovie:
                                                   np.sin(e))
             self.p.camera.position = tuple(centre + d * radius * 6.0)
             self.p.camera.focal_point = tuple(centre)
+            # KEPT, so `cutaway: {axis: view}` can cut along the direction the camera looks. A cut
+            # plane that is not perpendicular to the view is seen as a bowl at an angle, and the
+            # shell then reads as a crescent -- thick where it is seen edge-on through its whole
+            # depth, and vanishing on the opposite side where the cut circle meets the silhouette.
+            # That asymmetry is entirely projective and looks exactly like a seeding defect.
+            self._view_dir = d.copy()
             u = np.zeros(3); u[self.up] = 1.0
             self.p.camera.up = tuple(u)
             self.p.camera.parallel_projection = True
@@ -727,6 +734,62 @@ class LiveMovie:
             else:
                 g = torch.Generator(device="cpu").manual_seed(self.seed)
                 self.idx = torch.randperm(self.n, generator=g)[:k].to(lvl.state.device)
+            # `plotting.cutaway` -- OPEN THE BODY AND KEEP THE COLOURS. A dense 3D cloud is an
+            # opaque silhouette: 813,000 points arranged as a cell show a beige sphere, and every
+            # organelle inside it is hidden behind the membrane that encloses them. The existing
+            # `cross_section` answers this with a 2D chart overlay, which is the right picture for a
+            # jet's footprint and the wrong one here -- it is flat, it is capped at a few thousand
+            # points, and it carries `color_field` bands rather than the per-type palette that says
+            # which organelle a dot belongs to.
+            #
+            # This instead DISCARDS one half-space, so the remaining points are drawn by the
+            # ordinary path: same renderer, same dots, same colours, and the cell is simply cut
+            # open. It is the CUT AWAY of the atlas viewer the model is built from.
+            #
+            # SELECTED ONCE, FROM THE FIRST FRAME, and this is the same argument as the fixed
+            # subset above. Re-testing the plane every frame would let a point cross it and vanish
+            # or appear, so the cut surface would boil while the body deformed and a bounce would
+            # read as material being created. Cutting the material once and then following THAT
+            # material is what makes the section a section rather than a stencil.
+            _cut = (self.style or {}).get("cutaway")
+            if _cut:
+                _cut = {} if _cut is True else dict(_cut)
+                _axn = str(_cut.get("axis", "view")).lower()
+                _P = lvl.get("pos").detach()[self.idx]
+                if _axn == "view":
+                    # THE DEFAULT, AND THE ONLY ONE THAT LOOKS RIGHT WITHOUT TUNING. Cutting along
+                    # the VIEW direction puts the camera on the plane's normal, so the exposed face
+                    # is seen square-on and the remaining shell is an even ring instead of a
+                    # crescent. A named axis is still allowed for a fixed anatomical section, but
+                    # then the camera has to be aimed at it by hand.
+                    _n = torch.as_tensor(getattr(self, "_view_dir", np.array([0.0, 0.0, 1.0])),
+                                         dtype=_P.dtype, device=_P.device)
+                    _n = _n / _n.norm().clamp_min(1e-12)
+                    _c = _P @ _n
+                    # `at` is a fraction of the DRAWN BODY's extent along the normal, not of the
+                    # world box: the plane has to pass through the cell wherever the cell is, and
+                    # a world fraction would miss it the moment the body moved or was not centred.
+                    _lo, _hi = float(_c.min()), float(_c.max())
+                    _at = _lo + float(_cut.get("at", 0.5)) * (_hi - _lo)
+                    # DISCARD THE HALF NEAREST THE CAMERA (`_view_dir` points scene -> camera), so
+                    # the cut face is what you look into.
+                    _m = _c <= _at
+                    _keep = "far side of the view plane"
+                else:
+                    _ax = _CS_AXIS[_axn]
+                    _at = float(_cut.get("at", 0.5)) * float(self.world[_ax])
+                    _below = str(_cut.get("keep", "below")).lower() in ("below", "low", "minus")
+                    _c = _P[:, _ax]
+                    _m = (_c <= _at) if _below else (_c >= _at)
+                    _keep = f"{'lower' if _below else 'upper'} half-space of axis {_ax}"
+                if bool(_m.any()):
+                    self.idx = self.idx[_m]
+                    print(f"[live-movie] cutaway: keeping the {_keep} at {_at:.3f} -- "
+                          f"{int(self.idx.numel()):,} of {k:,} drawn", flush=True)
+                else:
+                    print(f"[live-movie] cutaway at {_at:.3f} keeps NO particles; drawing the "
+                          f"whole set instead", flush=True)
+                k = int(self.idx.numel())
             self.drawn = k
             pos = self._xyz(lvl)
             self.cloud = self.pv.PolyData(pos)
@@ -752,10 +815,16 @@ class LiveMovie:
             # top, and a mesh-only run draws the mesh. Nothing about the spec has to say which.
             _m = getattr(lvl, "mesh", None)
             self._mesh_is_subject = bool(_m is not None and int(_m.get("nF", 0) or 0))
+            _r3d = str((self.style or {}).get("render_3d", "dots")).lower()
             if self._mesh_is_subject:
                 pass
-            elif str((self.style or {}).get("render_3d", "dots")).lower() != "surface" \
-                    or not self._skin_build(H, lvl, pos):
+            elif _r3d == "compartments":
+                # ONE TRANSLUCENT SURFACE PER COMPARTMENT. Falls back to the dot cloud if the
+                # reconstruction cannot be built, like the single-surface path does.
+                if not self._skins_build(H, lvl, pos):
+                    self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
+                                    point_size=self._dot_px(pos))
+            elif _r3d != "surface" or not self._skin_build(H, lvl, pos):
                 self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                 point_size=self._dot_px(pos))
             self._add_meshes(H)
@@ -1293,7 +1362,177 @@ class LiveMovie:
                   f"drawing the point cloud instead", flush=True)
             return False
 
+    # ---- ONE SURFACE PER COMPARTMENT, WITH TRANSPARENCY -----------------------------------
+    #
+    # `render_3d: compartments`. The single-surface path above skins the WHOLE cloud, which for a
+    # composed cell reconstructs one blob: the atlas's nine organelles share a set, so the density
+    # isosurface of all of them together is the outside of the plasma membrane and nothing else.
+    # What the reference picture actually shows is nine SEPARATE surfaces, the outer ones
+    # translucent so the inner ones read through them -- which is why a cut-away was needed at all
+    # to see inside a dot cloud, and is not needed here.
+    #
+    # THE PARTITION IS THE ONE THE MODEL ALREADY DECLARES: the particles' parent's `node_type`, so
+    # the surfaces are the compartments of the specification and not a clustering of the point
+    # cloud. Each gets `plotting.colors[<type>]` for its hue and `plotting.opacity[<type>]` for its
+    # transparency, defaulting to `surface_opacity`.
+    #
+    # DRAWN BACK TO FRONT IS NOT NEEDED. VTK's depth peeling resolves the ordering, and it is
+    # enabled here rather than left to the caller because without it a translucent membrane in
+    # front of a translucent nucleus composites in draw order and the nucleus disappears at some
+    # camera angles and not others -- an intermittent picture, which is the worst kind.
+    def _skins_build(self, H, lvl, pos):
+        """Build one bound surface per parent type. Returns True when at least one is live."""
+        self._skins = []
+        try:
+            import numpy as np
+            st = self.style or {}
+            pname = getattr(lvl, "parent_name", None)
+            own = getattr(lvl, "node_type", None)
+            par = getattr(lvl, "parent", None)
+            if own is not None:
+                names = list(getattr(lvl, "type_names", []) or [])
+                tid = own[self.idx].detach().cpu().numpy()
+            elif pname and par is not None:
+                plv = H.level(pname)
+                names = list(getattr(plv, "type_names", []) or [])
+                pnt = getattr(plv, "node_type", None)
+                if pnt is None:
+                    raise ValueError(f"{pname!r} carries no node_type to partition by")
+                tid = pnt.detach().cpu().numpy()[par[self.idx].detach().cpu().numpy()]
+            else:
+                raise ValueError("no type partition: the set has no types and no typed parent")
+            if not names:
+                raise ValueError("the typed set declares no `types:`, so there are no compartments")
+            from matplotlib.colors import to_rgb
+            pal = st.get("colors") or {}
+            opa = st.get("opacity") or {}
+            _dflt_op = float(st.get("surface_opacity", 1.0))
+            X = np.asarray(pos, dtype=np.float64)
+            nsub = int(st.get("surface_sample", 60_000))
+            self.p.enable_depth_peeling(number_of_peels=int(st.get("depth_peels", 12)),
+                                        occlusion_ratio=0.0)
+            _per = st.get("surface") or {}
+            for j, nm in enumerate(names):
+                sel = np.nonzero(tid == j)[0]
+                # A COMPARTMENT TOO SPARSE TO CONTOUR IS DRAWN AS DOTS, NOT DROPPED. A 50-point
+                # membrane patch has no density field worth contouring at the grid's dx, and a
+                # missing plasma membrane is a picture of a cell that has none.
+                #
+                # SO IS ONE TOO THIN TO CONTOUR, and that is a separate case with the same answer.
+                # A cytoskeletal filament is 60 nm across in a 20 um cell; resolving it as an
+                # isosurface needs a voxel of ~30 nm, and the filaments span the whole cytoplasm,
+                # so the grid would be 750^3 = 422 M cells FOR ONE COMPARTMENT. Contoured at any
+                # affordable spacing it comes back as a chain of beads -- which is exactly what the
+                # first render showed, and reads as a defect in the model rather than in the
+                # renderer. `render: dots` on that compartment draws its points instead: a hairline
+                # is what a thin filament looks like, and it costs no grid at all.
+                if str((_per.get(nm) or {}).get("render", "")).lower() == "dots" \
+                        or sel.size < int(st.get("surface_min_points", 400)):
+                    self._skins.append(self._dots_for(X, sel, nm, pal, opa, _dflt_op,
+                                                      (_per.get(nm) or {}).get("point_size")))
+                    continue
+                step = max(1, sel.size // max(nsub, 1))
+                sub = sel[::step]
+                surf = self._isosurface(X[sel], st, per_compartment=nm)
+                if surf is None or surf.n_points == 0:
+                    self._skins.append(self._dots_for(X, sel, nm, pal, opa, _dflt_op))
+                    continue
+                skin = self.Skin(surf.points, X[sub], k=int(st.get("surface_k", 8)))
+                col = to_rgb(tuple(pal[nm])) if nm in pal else (0.8, 0.8, 0.8)
+                self.p.add_mesh(surf, color=col,
+                                opacity=float(opa.get(nm, _dflt_op)),
+                                smooth_shading=True, specular=0.3, specular_power=24,
+                                ambient=0.22, diffuse=0.78, show_scalar_bar=False)
+                self._skins.append({"kind": "surface", "surf": surf, "skin": skin, "sub": sub,
+                                    "name": nm, "n": int(sel.size),
+                                    "faces": int(surf.n_faces_strict)})
+            _ns = sum(1 for s in self._skins if s and s["kind"] == "surface")
+            print(f"[live-movie] compartment surfaces: {_ns} of {len(names)} reconstructed "
+                  f"(" + ", ".join(f"{s['name']} {s.get('faces', 0):,}f" for s in self._skins
+                                   if s and s['kind'] == 'surface') + "); the rest drawn as dots",
+                  flush=True)
+            return bool(self._skins)
+        except Exception as e:                       # noqa: BLE001 -- fall back to dots, never die
+            self._skins = []
+            print(f"[live-movie] compartment surfaces failed ({type(e).__name__}: {e}); "
+                  f"drawing the point cloud instead", flush=True)
+            return False
+
+    def _dots_for(self, X, sel, nm, pal, opa, dflt_op, point_size=None):
+        """A compartment kept as points: its own PolyData, its own hue, its own opacity."""
+        import numpy as np
+        from matplotlib.colors import to_rgb
+        if sel.size == 0:
+            return None
+        pd = self.pv.PolyData(np.asarray(X[sel], np.float32))
+        col = to_rgb(tuple(pal[nm])) if nm in pal else (0.8, 0.8, 0.8)
+        _ps = float(point_size if point_size is not None
+                    else (self.style or {}).get("dot_size", 2.0))
+        self.p.add_mesh(pd, color=col, opacity=float(opa.get(nm, dflt_op)),
+                        render_points_as_spheres=True, point_size=_ps,
+                        lighting=False, show_scalar_bar=False)
+        return {"kind": "dots", "surf": pd, "sub": sel, "name": nm, "n": int(sel.size)}
+
+    def _isosurface(self, X, st, per_compartment=""):
+        """The density isosurface of one point cloud -- the same recipe `_skin_build` uses.
+
+        PER-COMPARTMENT RESOLUTION, via `plotting.surface: {<type>: {spacing, blur, smooth, iso}}`.
+        One spacing cannot serve the whole atlas and the default (the MPM grid's own dx) serves
+        almost none of it: at dx = 0.39 um a cytoskeletal filament of radius 0.18 um is thinner
+        than one voxel, so its density field is a chain of isolated blobs and the reconstruction
+        draws a string of beads; a plasma membrane assembled from 421 separate patches needs the
+        OPPOSITE -- a coarser cell and a heavier blur, so the patches merge into one shell instead
+        of 421 lumps. The simulation's resolution is a property of the solver; the resolution a
+        structure has to be DRAWN at is a property of the structure.
+        """
+        import numpy as np
+        from scipy.ndimage import gaussian_filter
+        _ov = ((st.get("surface") or {}).get(per_compartment) or {}) if per_compartment else {}
+        st = {**st, **{f"surface_{k}": v for k, v in _ov.items()}}
+        h = float(st.get("surface_spacing", 0.0)) or self._cs_dx
+        lo = X.min(0) - 3.0 * h
+        dim = np.maximum(np.ceil((X.max(0) + 3.0 * h - lo) / h).astype(int) + 1, 2)
+        # A CAP ON THE GRID, because this now runs once PER COMPARTMENT and a thin shell spanning
+        # the whole cell has a bounding box as large as the cell: nine full-cell grids at the MPM
+        # dx is nine times the memory of one, and a smooth-ER tubule network wandering 0.9 R has
+        # the biggest box of all while holding the fewest points.
+        while int(np.prod(dim)) > int(st.get("surface_max_cells", 24_000_000)):
+            h *= 1.3
+            dim = np.maximum(np.ceil((X.max(0) + 3.0 * h - lo) / h).astype(int) + 1, 2)
+        ijk = np.clip(((X - lo) / h).astype(np.int64), 0, dim - 1)
+        D = np.zeros(tuple(dim), np.float32)
+        np.add.at(D, (ijk[:, 0], ijk[:, 1], ijk[:, 2]), 1.0)
+        D = gaussian_filter(D, sigma=float(st.get("surface_blur", 1.0)))
+        occ = D[D > 0]
+        if occ.size == 0:
+            return None
+        iso = float(st.get("surface_iso", 0.0)) or 0.5 * float(np.median(occ))
+        g = self.pv.ImageData(dimensions=tuple(int(v) for v in dim),
+                              spacing=(h, h, h), origin=tuple(float(v) for v in lo))
+        g.point_data["d"] = D.ravel(order="F")
+        surf = g.contour([iso], scalars="d")
+        if surf.n_points == 0:
+            return None
+        # NOT `extract_largest`, which is right for one body and wrong for a COMPARTMENT: there are
+        # 77 mitochondria and 421 membrane patches, and keeping only the biggest connected piece
+        # would draw one of them.
+        return surf.smooth_taubin(n_iter=int(st.get("surface_smooth", 20)), pass_band=0.08)
+
+    def _skins_update(self, pos):
+        import numpy as np
+        X = np.asarray(pos, dtype=np.float64)
+        for s in getattr(self, "_skins", None) or []:
+            if not s:
+                continue
+            if s["kind"] == "surface":
+                s["surf"].points = s["skin"](X[s["sub"]]).astype(np.float32)
+            else:
+                s["surf"].points = np.asarray(X[s["sub"]], np.float32)
+
     def _skin_update(self, H, lvl, pos):
+        if getattr(self, "_skins", None):
+            self._skins_update(pos)
+            return
         if self._skin is None or self._surf is None:
             return
         X = np.asarray(pos, dtype=np.float64)[self._skin_sub]
@@ -2615,6 +2854,26 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
     lvl = H.levels[sname]
     P = lvl._pos                                       # [T, N, D]
     T, D = int(P.shape[0]), int(P.shape[2])
+
+    # A ONE-FRAME TRAJECTORY CANNOT REPLACE A MOVIE, and until now it did. `save_data: false` tells
+    # the engine to record a single frame as a stub, because the run's picture is the LIVE movie
+    # written frame by frame while it computes. `-o generate` then captions by default, and the
+    # captioner needs the mp4, so `plot_dataset` re-renders -- off the stub. Measured on
+    # cell_atlas_bounce: a 200-frame live movie was overwritten by a 1-frame replay, and the
+    # caption that followed described a still image as if it were a run ("the cluster expands until
+    # the particles reach the boundaries", of a cell that fell and bounced). Every `save_data:
+    # false` spec in the corpus -- the whole si_material family -- has been losing its movie this
+    # way. The stub is still a legitimate thing to render if there is nothing to lose.
+    # `< 3`, NOT `< 2`: a `save_data: false` stub records the FIRST and LAST tick, so it is two
+    # frames, not one -- and two frames of a 400-frame run is a still with a flicker, not a movie.
+    _out = out or os.path.join(data_dir, "movie.mp4")
+    if T < 3 and os.path.exists(_out):
+        print(f"[live-movie] replay skipped: trajectory.npz holds {T} frame(s) (the spec sets "
+              f"`save_data: false`, so it is a stub), and {os.path.basename(_out)} already exists "
+              f"-- keeping the movie the run wrote live rather than replacing it with a still. "
+              f"Set `save_data: true` or a `record_cap` to make `-o plot` reproduce it.",
+              flush=True)
+        return _out
 
     # --- the box, and the shift that puts the cloud inside it ---
     ws = np.asarray(z["world_size"], np.float64) if "world_size" in z.files else None

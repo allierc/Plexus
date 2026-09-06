@@ -708,10 +708,21 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
     else:
         perm = torch.randperm(lvl.n, generator=H.rng, device=device)
         total = lvl.n
+    # `count:` -- SAY HOW MANY, WHEN HOW MANY IS THE FACT YOU HAVE. A share is the natural
+    # statement for a mixture ("30% of the cells are motile") and the wrong one for an inventory:
+    # a cell atlas reports 421 plasma-membrane pieces and 77 mitochondria, and writing those as
+    # 0.100790 and 0.018433 of 4,177 hides the numbers, cannot be checked by eye, and lands on
+    # 421 only by rounding. The schema converts counts to fractions so every other reader is
+    # unchanged; the assignment below uses the count itself, so it is exact by construction and
+    # not by the arithmetic happening to round the right way.
+    counted = all("count" in t for t in type_list)
     start = 0
     for tid, t in enumerate(type_list):
-        # last type absorbs the remainder, so per-type rounding never leaves nodes unassigned
-        k = (total - start) if tid == len(type_list) - 1 else int(round(t["fraction"] * total))
+        if counted:
+            k = int(t["count"])
+        else:
+            # last type absorbs the remainder, so per-type rounding never leaves nodes unassigned
+            k = (total - start) if tid == len(type_list) - 1 else int(round(t["fraction"] * total))
         node_type[perm[start:start + k]] = tid; start += k
     lvl.register_buffer("node_type", node_type)
     if all("p" in t for t in types.values()):
@@ -974,7 +985,43 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         if s.get("edge_set"):                                     # an edge-set: elements are connections (pre/post), not scattered in space
             _build_edge_set(H, sname, s, device)
             continue
-        per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
+        # `per_parent` MAY DEPEND ON WHAT KIND OF PARENT IT IS. As a single integer it says every
+        # parent holds the same number of children, which is right when the parents are copies of
+        # one body and wrong when they are not: a cell atlas gives a plasma-membrane patch 50
+        # material points and a nuclear-envelope patch 50,000, because a patch is thin and a
+        # nucleus is not, and forcing one number on both either under-samples the nucleus or spends
+        # 400,000 points on a membrane that needs 21,000. Written as a MAPPING from the parent's
+        # type name to a count, it stays one statement per compartment and the containment map
+        # absorbs the variation.
+        #
+        # The uniform path below is untouched -- `per` stays an int, `per_tot` stays an int, and
+        # every existing spec allocates exactly the tensor it did before.
+        per_map = s["per_parent"]
+        if isinstance(per_map, dict):
+            _tn = list(getattr(parent, "type_names", []) or [])
+            if not _tn:
+                raise ValueError(
+                    f"set {sname!r} gives `per_parent` as a mapping, but its parent {pname!r} "
+                    f"declares no `types:` -- there are no parent kinds to key it by.")
+            _missing = [t for t in _tn if t not in per_map]
+            _extra = [t for t in per_map if t not in _tn]
+            if _missing or _extra:
+                raise ValueError(
+                    f"set {sname!r} `per_parent` mapping does not match {pname!r}'s types: "
+                    f"missing {_missing or '-'}, unknown {_extra or '-'}. Every parent must be "
+                    f"told how many children it holds.")
+            if int(s.get("grow_reserve", 0)):
+                raise ValueError(
+                    f"set {sname!r} combines a `per_parent` mapping with `grow_reserve`. The "
+                    f"reserve is a fixed dormant tail on every parent's block, and with unequal "
+                    f"blocks there is no single tail length -- declare one or the other.")
+            per_vec = torch.tensor([int(per_map[_tn[int(t)]]) for t in parent.node_type.tolist()],
+                                   dtype=torch.long, device=device)
+            per = None                                       # no single count; `per_vec` is the answer
+        else:
+            per = int(per_map)
+            per_vec = None
+        radius = float(s.get("radius", 0.02))
         # AN INNER RADIUS, SO A CHILD SET CAN BE A SHELL RATHER THAN A BALL. Without it every child
         # is scattered through the WHOLE ball about its parent, so a cytosol and a nucleus declared
         # on the same cell interpenetrate -- the nucleus occupies a volume the cytosol is also
@@ -984,13 +1031,22 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         # archived moves.
         r_in = float(s.get("radius_inner", 0.0))
         reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for agent_grow to wake
-        per_tot = per + reserve
+        per_tot = None if per is None else per + reserve
         _, render, depth = _entity_meta(sname, H.dim)  # render hints + depth from the registry
         schema = _resolve_schema(s, H.dim, sname)      # StateSchema: `state:` block, else the entity's, else pos/vel
         dim = schema.dim
         has_pos = "pos" in schema                                 # spatial child: scatter in space; non-spatial (voltage,...) child: no placement
-        Np = parent.n * per_tot                                   # `per` live + `reserve` dormant per parent slot
-        parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per_tot)
+        if per_vec is None:
+            Np = parent.n * per_tot                               # `per` live + `reserve` dormant per parent slot
+            parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per_tot)
+        else:
+            # THE BLOCKS ARE UNEQUAL BUT STILL CONTIGUOUS AND STILL IN PARENT ORDER, which is the
+            # property every reader of `lvl.parent` relies on -- `repeat_interleave` with a vector
+            # gives exactly that, so a child's rows are `[offset[p], offset[p] + per_vec[p])`.
+            Np = int(per_vec.sum())
+            parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per_vec)
+            lvl_per_particle = per_vec[parent_idx]                 # this child's block size, per child
+            s = {**s, "_per_vec": per_vec, "_per_particle": lvl_per_particle}
         state = torch.zeros(Np, dim, device=device)
         D = H.dim                                                # the child's pos dimension (the global dim contract)
         if has_pos:
@@ -1064,6 +1120,17 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl.maps = dict(s.get("maps") or {})
         _build_mesh(lvl, s, device)                # a CONTAINED set may carry the surface too
         _assign_types(lvl, s, H, device)
+        # A CONTAINED SET IS ALSO SOMEBODY'S PARENT, and until now only a ROOT set published its
+        # raw type table. `MPMParticle.provision` reads `parent.types_raw` for `youngs`,
+        # `material`, `density`, `layers` and `core`, so in a three-level chain -- cell ->
+        # compartment -> mpm_particle -- the middle set's types were invisible: MEASURED, a
+        # compartment set declaring `youngs: 400` (membrane) and `youngs: 80` (mitochondrion)
+        # produced mu = 41.67 for BOTH, the Lame pair of the 100.0 default, and no material mask
+        # was ever set. Two compartments meant to be two materials were one material wearing two
+        # colours, exactly as the two-level case was before the child's own `types` were honoured.
+        # Inert for every existing spec: the only three-level chains in the corpus are the neural
+        # ones (brain -> assembly -> neuron), and `Neuron` has no `provision` to read this.
+        lvl.types_raw = s.get("types")
         # an entity may provision domain-specific per-node buffers (e.g. mpm_particle's
         # F/C/mass/mu/la/p_vol + block-fill) -- read off the parent's per-type config.
         ent = _entity_class(sname)

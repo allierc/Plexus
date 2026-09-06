@@ -1,0 +1,248 @@
+general:
+  name: cell_atlas_surface
+  seed: 0
+  n_frames: 400
+  dt: 0.002
+  boundary: wall
+  dim: 3
+  world:
+    - 1.0
+    - 1.0
+    - 1.0
+  save_data: false
+  units:
+    length_um: 50.0
+sets:
+  cell:
+    n: 1
+    start:
+      - - 0.5
+        - 0.55
+        - 0.5
+  compartment:
+    parent: cell
+    per_parent: 815
+    radius: 0.20
+    types:
+      plasma_membrane:
+        count: 421
+        youngs: 260.0
+        density: 1.0
+        material: elastic
+      cytoskeleton:
+        count: 116
+        youngs: 600.0
+        density: 1.0
+        material: elastic
+      nucleus:
+        count: 138
+        youngs: 200.0
+        density: 1.1
+        material: elastic
+      chromatin:
+        count: 31
+        youngs: 45.0
+        density: 1.2
+        material: elastic
+      nucleolus:
+        count: 2
+        youngs: 120.0
+        density: 1.3
+        material: elastic
+      rough_er:
+        count: 11
+        youngs: 70.0
+        density: 1.0
+        material: elastic
+      smooth_er:
+        count: 3
+        youngs: 60.0
+        density: 1.0
+        material: elastic
+      golgi:
+        count: 14
+        youngs: 65.0
+        density: 1.0
+        material: elastic
+      mitochondria:
+        count: 77
+        youngs: 110.0
+        density: 1.1
+        material: elastic
+      centriole:
+        count: 2
+        youngs: 700.0
+        density: 1.1
+        material: elastic
+  mpm_particle:
+    parent: compartment
+    per_parent:
+      plasma_membrane: 50
+      cytoskeleton: 1000
+      nucleus: 4000
+      chromatin: 1000
+      nucleolus: 1000
+      rough_er: 10000
+      smooth_er: 10000
+      golgi: 1000
+      mitochondria: 1000
+      centriole: 1000
+    radius: 0.02
+    density: 1.0
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 128
+seed:
+  - op: seed_cell_atlas
+    at: compartment
+    particles: mpm_particle
+    cell_radius: 0.20
+    seed: 0
+operators:
+  - op: gravity
+    at: cell
+    g: 4.0
+  - op: mpm_strain
+    at: mpm_particle
+    implementation: warp
+  - op: mpm_scatter
+    at: mpm_particle
+    to: mpm_grid
+    drag: 0.0
+    a_max: 200.0
+    implementation: warp
+    polar: higham
+  - op: mpm_grid_update
+    at: mpm_grid
+    wall_damp: 1.0
+  - op: mpm_gather
+    at: mpm_particle
+    from: mpm_grid
+    wall_damp: 1.0
+    vmax: 1.0e9
+    implementation: warp
+  - op: aggregate_centroid
+    at: compartment
+    child: mpm_particle
+  - op: aggregate_centroid
+    at: cell
+    child: compartment
+schedule:
+  - gravity
+  - substep_dt: 0.0001
+    steps:
+      - mpm_strain
+      - mpm_scatter
+      - mpm_grid_update
+      - mpm_gather
+  - aggregate_centroid
+  - aggregate_centroid
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: compartments
+  dot_size: 1.2
+  fps: 60
+  slow_motion: 2
+  hide_sets:
+    - cell
+    - compartment
+  colors:
+    plasma_membrane:
+      - 0.86
+      - 0.76
+      - 0.62
+    cytoskeleton:
+      - 0.60
+      - 0.74
+      - 0.86
+    nucleus:
+      - 0.74
+      - 0.62
+      - 0.88
+    chromatin:
+      - 0.52
+      - 0.36
+      - 0.74
+    nucleolus:
+      - 0.92
+      - 0.38
+      - 0.66
+    rough_er:
+      - 0.16
+      - 0.52
+      - 0.56
+    smooth_er:
+      - 0.36
+      - 0.78
+      - 0.72
+    golgi:
+      - 0.96
+      - 0.62
+      - 0.20
+    mitochondria:
+      - 0.88
+      - 0.22
+      - 0.16
+    centriole:
+      - 0.98
+      - 0.92
+      - 0.45
+  surface_smooth: 24
+  surface_blur: 1.1
+  surface_spacing: 0.0035
+  surface_sample: 60000
+  surface_max_cells: 60000000
+  surface:
+    plasma_membrane:
+      spacing: 0.0060
+      blur: 1.6
+      smooth: 60
+    nucleus:
+      spacing: 0.0045
+      blur: 1.4
+      smooth: 50
+    cytoskeleton:
+      render: dots
+      point_size: 1.1
+    chromatin:
+      render: dots
+      point_size: 1.4
+    smooth_er:
+      render: dots
+      point_size: 1.3
+    rough_er:
+      spacing: 0.0018
+      blur: 0.8
+      smooth: 16
+    golgi:
+      spacing: 0.0012
+      blur: 0.8
+      smooth: 14
+    mitochondria:
+      spacing: 0.0018
+      blur: 0.8
+      smooth: 16
+    nucleolus:
+      spacing: 0.0030
+      blur: 0.9
+    centriole:
+      render: dots
+      point_size: 1.6
+  opacity:
+    plasma_membrane: 0.10
+    cytoskeleton: 0.85
+    nucleus: 0.22
+    chromatin: 0.85
+    nucleolus: 1.0
+    rough_er: 0.75
+    smooth_er: 0.85
+    golgi: 0.95
+    mitochondria: 1.0
+    centriole: 1.0

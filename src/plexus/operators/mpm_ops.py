@@ -308,6 +308,42 @@ def _scale_constant(name, dx, rho=1.0):
     return v0 * (float(rho) / _REF_RHO) ** a * (float(dx) / _REF_DX) ** b
 
 
+def _ancestor_accel(H, p, a_max, D, dev):
+    """The body acceleration reaching these material points from EVERY level above them.
+
+    `[Np, D]`, the sum over the containment chain of each ancestor's accumulated delta, broadcast
+    down the composed containment map:
+
+        a_ext = sum_{L in ancestors(p)}  delta_L [ pi_L (p) ]
+
+    with pi_L the composition of the parent maps from the particle set up to L (`H.lift_index`).
+
+    WHY IT IS A SUM OVER THE CHAIN AND NOT ONE HOP. Every one of the five MPM scatter bodies
+    used to read `H.delta(p.parent_name)[p.parent]`, which is Broadcast across exactly one
+    containment map. That is correct and complete for the two-level models the corpus is made of
+    -- `cell -> mpm_particle` -- and silently wrong the moment a model has three:
+    `cell -> compartment -> mpm_particle` with `gravity at: cell` builds, validates, runs, and
+    the cell does not fall, because the delta sits on a set no reader ever reaches. Nothing
+    raises, because a body force of zero is a legal body force.
+
+    Summing over the whole chain is also the right SEMANTICS and not just the reachable one:
+    gravity declared on the organism, a pressure declared on the tissue and a drag declared on
+    the cell are three body forces on the same material point, and superposing them is what
+    forces do. Each level's delta is clamped as before, once, at the level it was written.
+    """
+    a_ext = None
+    for anc in H.ancestors(p.name):
+        d = H.delta(anc)
+        if d is None or d.numel() == 0:
+            continue
+        d = torch.nan_to_num(d, posinf=a_max, neginf=-a_max).clamp(-a_max, a_max)
+        if d.shape[1] != D:
+            continue                        # a non-spatial ancestor (voltage, chemistry): not a body force
+        term = d[H.lift_index(p.name, anc)]
+        a_ext = term if a_ext is None else a_ext + term
+    return torch.zeros(p.n, D, device=dev) if a_ext is None else a_ext
+
+
 def _hand_body_force_to_grid(op, H, a_ext, dev, D):
     """WHERE A BODY FORCE BELONGS. Canonical MLS-MPM applies gravity ON THE GRID, as an
     acceleration, AFTER the momentum has been divided by nodal mass -- Taichi's mpm88/mpm99 read
@@ -469,13 +505,7 @@ class MPMScatter(Exchange):
         offsets = stencil_offsets(D, dev)
         X, V = p.get("pos"), p.get("vel")
         # external per-cell acceleration from the parent set's accumulated delta (gravity)
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            a_cell = H.delta(pn)
-            a_cell = torch.nan_to_num(a_cell, posinf=self.a_max, neginf=-self.a_max).clamp(-self.a_max, self.a_max)
-            a_ext = a_cell[p.parent]
-        else:
-            a_ext = torch.zeros(p.n, D, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, D, dev)
         part_accel = getattr(H, "part_accel", None)
         if part_accel is not None:
             a_ext = a_ext + part_accel
@@ -2283,13 +2313,7 @@ class MLSMPMMechanics(Exchange):
         # force operator (e.g. gravity) returns {cell: g}; the engine accumulates it and --
         # since the cell has no EMIT -- never integrates it, so the MPM substep is free
         # to consume it here as a body force (no bespoke `H.cell_accel`).
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            a_cell = H.delta(pn)                            # [Nc,2] accumulated parent force (zeros if none)
-            a_cell = torch.nan_to_num(a_cell, posinf=self.a_max, neginf=-self.a_max).clamp(-self.a_max, self.a_max)
-            a_ext = a_cell[p.parent]                        # broadcast down  [Np,2]
-        else:
-            a_ext = torch.zeros(p.n, 2, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, 2, dev)   # broadcast down the WHOLE chain [Np,2]
         part_accel = getattr(H, "part_accel", None)        # optional per-particle external accel
         if part_accel is not None:
             a_ext = a_ext + part_accel                     # (e.g. per-cell cohesion for identity)
@@ -2546,13 +2570,8 @@ class MPMScatterWarp(MPMScatter):
         # NOT `pa`/`va`: `pa` is rebound to H.part_accel eleven lines down, which silently turned
         # the pos column offset into a tensor.
         p_off, _ = p.state_schema["pos"]; v_off, _ = p.state_schema["vel"]
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            ac = torch.nan_to_num(H.delta(pn), posinf=self.a_max, neginf=-self.a_max
-                                  ).clamp(-self.a_max, self.a_max)
-            a_ext = ac[p.parent]
-        else:
-            a_ext = torch.zeros(p.n, D, device=dev)
+        from plexus.operators.mpm_ops import _ancestor_accel
+        a_ext = _ancestor_accel(H, p, self.a_max, D, dev)
         pa = getattr(H, "part_accel", None)
         if pa is not None:
             a_ext = a_ext + pa
@@ -3388,14 +3407,7 @@ class MPMScatterTriton(MPMScatter):
         dt = sub_dt(H, self.dt_sub)
 
         X, V = p.get("pos"), p.get("vel")
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            a_cell = H.delta(pn)
-            a_cell = torch.nan_to_num(a_cell, posinf=self.a_max, neginf=-self.a_max
-                                      ).clamp(-self.a_max, self.a_max)
-            a_ext = a_cell[p.parent]
-        else:
-            a_ext = torch.zeros(p.n, D, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, D, dev)
         pa = getattr(H, "part_accel", None)
         if pa is not None:
             a_ext = a_ext + pa
@@ -3574,13 +3586,7 @@ class MPMScatterTritonColour(MPMScatterTriton):
         NG = int(g.nx); inv_dx = 1.0 / float(g.dx)
 
         X, V = p.get("pos"), p.get("vel")
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            ac = torch.nan_to_num(H.delta(pn), posinf=self.a_max, neginf=-self.a_max
-                                  ).clamp(-self.a_max, self.a_max)
-            a_ext = ac[p.parent]
-        else:
-            a_ext = torch.zeros(p.n, D, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, D, dev)
         pa = getattr(H, "part_accel", None)
         if pa is not None:
             a_ext = a_ext + pa
