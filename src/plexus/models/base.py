@@ -227,7 +227,15 @@ class Level(nn.Module):
         # State is first-class: normalize a legacy {block:(c0,c1)} dict into a StateSchema
         # (the shim). A StateSchema is still dict-indexable (schema['pos'] == (c0,c1)), so
         # `get('pos')` and every legacy call site are unchanged.
-        self.state_schema = StateSchema.normalize(state_schema or {"pos": (0, 2), "vel": (2, 4)})
+        # `is not None`, NOT `or`. `StateSchema` defines `__len__`, so an EMPTY schema is falsy and
+        # `state_schema or {...}` silently replaced it with the legacy 2-D pos/vel default. That is
+        # only reachable for a set that legitimately has no columns -- a relation like `half_edge`,
+        # whose content is its maps -- and the consequence was not a missing block but a hundred
+        # thousand PARTICLES: the set acquired a `pos`, pass 1 seeded it across the world box, and
+        # the movie drew that cloud instead of the epithelium. An absent argument and an empty one
+        # are different statements and this line now tells them apart.
+        self.state_schema = StateSchema.normalize(
+            state_schema if state_schema is not None else {"pos": (0, 2), "vel": (2, 4)})
         N = state.shape[0]
         self.register_buffer("state", state)
         self.embedding = nn.Parameter(embedding) if embedding is not None else None
