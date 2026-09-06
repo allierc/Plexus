@@ -1310,7 +1310,7 @@ class Divide3D(Structural):
         # reads size or time -- but `model: cycle` reads a PHASE another operator owns, which is not
         # among them. `_ready_mask` is the opt-in: a model that defines it gets one per-face boolean
         # computed once, and every model that does not is untouched.
-        _mask = self._ready_mask(m, nF) if hasattr(self, "_ready_mask") else None
+        _mask = self._ready_mask(H, m, nF) if hasattr(self, "_ready_mask") else None
 
         def _ready(f):
             if rings[f] is None or len(rings[f]) < 4 or alive[f] <= 0:
@@ -2562,25 +2562,34 @@ class CellCycle3D(Structural):
         nF = int(m["nF"]); dev = lvl.state.device; dt = lvl.state.dtype
         _np = lambda k: (m[k].detach().cpu().numpy().astype(np.float64)     # noqa: E731
                          if k in m and m[k] is not None else None)
-        # THE THREE PRIVATE ARRAYS LIVE ON THE CELL SET, NOT ON THE MESH TABLE -- see `cell_block`.
-        # `phase` is still a face column because it is RECORDED (`MeshTable.FACE_RECORD`) and the
-        # renderer colours by it; moving a recorded array renames `vertex__mesh_phase` to
-        # `cell__phase` and is its own rung, with the renderer changed in the same commit. These
-        # three were never recorded, so this move changes no trajectory key and the run is
-        # byte-identical -- which is the whole reason they go first.
-        for _b in ("phase_t", "cyc_inhib", "cyc_vprev"):
+        # ALL FOUR PER-CELL ARRAYS LIVE ON THE CELL SET -- see `cell_block`. `phase` joined them at
+        # S2b, which is the rung that also renamed its recorded key from `vertex__mesh_phase` to
+        # `cell__phase` and taught both renderer paths to read it there. Nothing of this operator's
+        # state is on the mesh table any more, so `face_carry` is empty for a `cell_cycle` run and
+        # the daughter-inheritance question is answered in one place: `cell_divide` copies the
+        # mother's whole cell-set row.
+        for _b in ("phase", "phase_t", "cyc_inhib", "cyc_vprev"):
             if cell_block(H, self.cat, _b, nF) is None:
                 raise KeyError(
                     f"cell_cycle needs the set {self.cat!r} to declare the width-1 block {_b!r}. "
                     f"Add it under `sets.{self.cat}.state` -- `{_b}: {{width: 1, record: false}}` "
-                    f"-- for all three of phase_t, cyc_inhib, cyc_vprev. They are the operator's "
-                    f"own bookkeeping (time in phase, inhibitor concentration, last frame's "
-                    f"volume), so they are not recorded; they are declared because per-cell state "
-                    f"belongs to the cell set, where the topology operators already renumber it.")
-        ph = _np("phase")
+                    f"-- for all four of phase, phase_t, cyc_inhib, cyc_vprev. `phase` is the "
+                    f"one that is RECORDED and drawn (0 = G1, 1 = S, 2 = G2, 3 = M); the other "
+                    f"three are the operator's own bookkeeping -- time in phase, inhibitor "
+                    f"concentration, last frame's volume -- and take `record: false`. All four "
+                    f"are declared because per-cell state belongs to the cell set, where the "
+                    f"topology operators already renumber it.")
+        ph = cell_block(H, self.cat, "phase", nF)
         pt = cell_block(H, self.cat, "phase_t", nF)
         cc = cell_block(H, self.cat, "cyc_inhib", nF)
-        if ph is None or len(ph) != nF:
+        # THE SEED FIRES ON `cyc_vprev == 0`, NOT ON A MISSING `phase`. A mesh column did not exist
+        # before its first write, so `phase is None` was a sound test for "this operator has not run
+        # yet". A declared block exists from the moment the set is built and reads 0.0, which is a
+        # LEGITIMATE phase (G1) -- so the old test would never fire and the population would start
+        # every cell at (G1, phase_t 0), the synchronised culture `seed_async` exists to avoid.
+        # `cyc_vprev` is a volume: 0 is not a value any live cell can hold, and this operator is the
+        # only writer, so it is the one array whose zero unambiguously means "never written".
+        if not np.any(cell_block(H, self.cat, "cyc_vprev", nF) > 0.0):
             # `seed_async` -- START THE POPULATION SOMEWHERE, NOT ALL AT THE SAME PLACE. Seeding
             # every cell at (G1, phase_t 0) makes the tissue a synchronised culture: the first
             # generation divides in one wave, the second in a slightly broader one, and the cell
@@ -2629,7 +2638,6 @@ class CellCycle3D(Structural):
         # DECLARED ONCE, CARRIED BY THE TOPOLOGY FROM THEN ON -- see `_carry_face_state`. Only
         # `phase` is here now; the other three are blocks on the cell set and are carried by
         # `Hierarchy.renumber_set` and by `cell_divide`'s mother-row copy instead.
-        m.setdefault("face_carry", set()).add("phase")
 
         _, _, _, vf = face_geometry_3d(lvl.get("pos")[:int(m["Nv"])].detach(),
                                        m["E_srce"], m["E_trgt"], m["E_face"], nF)
@@ -2675,7 +2683,7 @@ class CellCycle3D(Structural):
         # while never making a cell, which is a population model that silently is not one.
         ph = np.where(adv, np.minimum(ph + 1, self.M), ph)
         pt = np.where(adv, 0.0, pt)
-        m["phase"] = torch.as_tensor(ph, dtype=dt, device=dev)
+        set_cell_block(H, self.cat, "phase", ph, nF)
         set_cell_block(H, self.cat, "phase_t", pt, nF)
         set_cell_block(H, self.cat, "cyc_inhib", cc, nF)
         return {}
@@ -2793,12 +2801,15 @@ class Divide3DCycle(Divide3D):
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
         return False                                    # replaced wholesale in forward, below
 
-    def _ready_mask(self, m, nF):
-        ph = m.get("phase")
+    def _ready_mask(self, H, m, nF):
+        # THE PHASE IS A BLOCK ON THE CELL SET, so this needs the hierarchy and not just the mesh
+        # table. A spec that schedules this model without declaring the block, or without
+        # `cell_cycle`, gets an all-False mask and divides nothing -- the honest failure named in
+        # the class docstring, unchanged by where the array lives.
+        ph = cell_block(H, self.cell_set, "phase", nF)
         if ph is None:
             return np.zeros(nF, bool)
-        a = ph.detach().cpu().numpy() if hasattr(ph, "detach") else np.asarray(ph)
-        return (np.asarray(a, np.float64)[:nF] >= CellCycle3D.M)
+        return ph >= CellCycle3D.M
 
 
 @register_operator("cell_divide", model="adder", set="vertex", kind="divide", family="population")
@@ -2936,7 +2947,7 @@ class TopoSnapshot3D(Structural):
             # that only existed inside one frame's forward pass, and "where is growth stopped" is
             # the whole point of an inhibitor -- an invisible mechanism is one nobody can check.
             # None-safe, so a run without an inhibitor records None and the renderer draws nothing.
-            inhib=cp("inhib_frac"), phase=cp("phase"),
+            inhib=cp("inhib_frac"),
             # THE CONSERVATION LAW'S OWN ERROR TERM. Material a dying cell could not bequeath
             # without pushing a neighbour out of the integrator's basin is dropped and counted
             # here rather than injected. It must be ~0 on a healthy run; a large value says the

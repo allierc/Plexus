@@ -856,6 +856,11 @@ class LiveMovie:
             if m is None or not int(m.get("nF", 0) or 0):
                 continue
             nF = int(m["nF"])
+            # THE CELL SET'S BLOCKS, on the curve path too. `phase` is a block on the cell set and
+            # not a face column, and this is the only reader of it outside `_mesh_face_rgb`; the
+            # panel is the one that says what fraction of the tissue is in G1/S/G2/M, so without
+            # the overlay it would draw four empty series and look like a run with no cycle.
+            m = _MeshView(m, self._cell_cols(H, lvl, nF))
             k = (np.zeros(nF, int) if ntype is None
                  else np.asarray(ntype)[np.clip(np.arange(nF), 0, len(ntype) - 1)].astype(int))
             if q == "cells":
@@ -1335,7 +1340,21 @@ class LiveMovie:
         return P if (sc == 1.0 or ct is None) else (P - P.mean(0)) * sc + ct
 
     def _mesh_levels(self, H):
-        """Every Level carrying a non-empty half-edge table, minus `plotting.hide_sets`."""
+        """Every Level carrying a non-empty half-edge table, minus `plotting.hide_sets`.
+
+        THE CELL SET'S BLOCKS ARE OVERLAID ON THE MESH TABLE, and that is what lets one renderer
+        keep working while per-cell state moves off the mesh. A face of the mesh IS a cell -- the
+        spec declares the pairing as `cell_set:` and the engine records it as `Level.mesh_cell_set`
+        -- so a width-1 block on the cell set is a per-face quantity by construction, and the two
+        readers that want one (`_mesh_face_rgb`'s `mesh_color_by`, the `phase` curve) go on asking
+        `m.get(name)`. `phase` is the first to arrive this way; `A0`, `age` and the rest follow
+        without touching this file again.
+
+        A `_MeshView` RATHER THAN A WRITE INTO `m`. Putting the cell's block back onto the mesh
+        table would restore the two homes this move exists to remove, and it would do it in the
+        renderer, where nothing renumbers. The view is read-only and the mesh table wins any name
+        clash, so an overlay can never shadow `nF`, `E_srce` or a genuine face column.
+        """
         hide = set((self.style or {}).get("hide_sets", []) or [])
         out = []
         for name, lvl in H.levels.items():
@@ -1348,7 +1367,31 @@ class LiveMovie:
             m = getattr(lvl, "mesh", None)
             if m is None or not int(m.get("nF", 0) or 0):
                 continue
-            out.append((name, lvl, m))
+            out.append((name, lvl, _MeshView(m, self._cell_cols(H, lvl, int(m["nF"])))))
+        return out
+
+    @staticmethod
+    def _cell_cols(H, lvl, nF):
+        """{block: array[nF]} for every width-1 recorded block on this mesh's cell set.
+
+        TWO SOURCES, ONE ANSWER, AND NEITHER GUESSES THE SET. Live, the name is
+        `Level.mesh_cell_set`, written by the engine from the spec's `cell_set:`; on replay the
+        level has already loaded the same set's recorded blocks, because `replay` read the pairing
+        out of the spec and handed it down. A renderer that scanned the trajectory for a key ending
+        in `__phase` would be inferring a declared relation instead of reading it.
+        """
+        pre = getattr(lvl, "cell_cols", None)          # replay: loaded in _ReplayLevel.__init__
+        if pre is not None:
+            return pre(nF)
+        cs = getattr(lvl, "mesh_cell_set", None)
+        clvl = H.level(cs) if cs and cs in getattr(H, "levels", {}) else None
+        if clvl is None or getattr(clvl, "state", None) is None:
+            return {}
+        out = {}
+        for b in getattr(clvl.state_schema, "blocks", ()):
+            if not getattr(b, "record", True) or b.width != 1:
+                continue
+            out[b.name] = clvl.get(b.name)[:nF, 0]
         return out
 
     @staticmethod
@@ -1583,6 +1626,12 @@ class LiveMovie:
                 m = getattr(lvl, "mesh", None)
                 if m is None:
                     continue
+                # THE SAME OVERLAY THE FIRST FRAME GOT. This is the PER-FRAME path -- the first
+                # frame is built in `_mesh_actors` through `_mesh_levels`, every frame after it
+                # comes through here -- and it re-fetched the bare mesh table. So a per-cell block
+                # that lives on the cell set was visible on frame 0 and gone from frame 1, which
+                # renders as the cycle colours appearing once and then freezing.
+                m = _MeshView(m, self._cell_cols(H, lvl, int(m["nF"])))
                 n_now = int(m["Nv"])
                 sig = self._conn_sig(m)
                 seen = getattr(self, "_mesh_conn", {})
@@ -2322,10 +2371,47 @@ class LiveMovie:
 # WHAT REPLAY CANNOT DO, and says so: `color_field` (vorticity / pressure) needs `C` and `F`, the
 # per-particle affine and deformation tensors, and a trajectory stores neither. Those colours are a
 # live-only feature; the replay falls back to the type palette and prints that it did.
+class _MeshView:
+    """A read-only mesh table with the cell set's per-cell blocks overlaid.
+
+    WHY A VIEW AND NOT A DICT COPY. The live path's `m` is a `MeshTable` holding CUDA tensors and
+    the replay path's is a plain dict; both are read the same two ways, `m["nF"]` and
+    `m.get(name)`, and nothing in the renderer writes to either. Wrapping keeps one code path for
+    both and copies nothing.
+
+    THE MESH WINS EVERY NAME CLASH. An overlay is consulted only for a name the table does not
+    have, so a cell-set block called `area` -- and there is one -- can never shadow a face column
+    or `nF`. The overlay is what the mesh no longer carries, never a second opinion about what it
+    does.
+    """
+
+    __slots__ = ("_m", "_c")
+
+    def __init__(self, m, cell_cols):
+        self._m = m
+        self._c = cell_cols or {}
+
+    def __getitem__(self, k):
+        try:
+            return self._m[k]
+        except KeyError:
+            return self._c[k]
+
+    def __contains__(self, k):
+        return k in self._m or k in self._c
+
+    def get(self, k, default=None):
+        v = self._m.get(k, None)
+        return self._c.get(k, default) if v is None else v
+
+    def __getattr__(self, a):                 # `reindex_faces`, `snapshot`, ... stay reachable
+        return getattr(self._m, a)
+
+
 class _ReplayLevel:
     """One set of a trajectory.npz, shaped like the Level the renderer reads off the engine."""
 
-    def __init__(self, z, name, dev):
+    def __init__(self, z, name, dev, cell_set=None):
         import torch
         self._pos = torch.as_tensor(np.asarray(z[f"{name}__pos"], np.float32), device=dev)
         _occ = z[f"{name}__occ"] if f"{name}__occ" in z.files else None
@@ -2339,6 +2425,20 @@ class _ReplayLevel:
         pn = z[f"{name}__parent_name"] if f"{name}__parent_name" in z.files else None
         self.parent_name = None if pn is None else str(pn)
         self.C = self.F = None                        # not stored in a trajectory -- see above
+        # THE CELL SET'S RECORDED BLOCKS, for a set that has a mesh. `cell_set` is the name the
+        # spec declared and `replay` passed down; the structural arrays are excluded by name
+        # because they are not per-cell quantities. See `cell_cols`.
+        self._cell_blocks = {}
+        if cell_set:
+            skip = ("occ", "node_type", "parent", "parent_name", "pos")
+            pre = f"{cell_set}__"
+            for k in z.files:
+                if not k.startswith(pre) or "__mesh_" in k:
+                    continue
+                b = k[len(pre):]
+                if b in skip:
+                    continue
+                self._cell_blocks[b] = np.asarray(z[k])
         # THE HALF-EDGE TABLE IS IN THE TRAJECTORY AND WAS NOT BEING READ, so a replay of a
         # vertex-model run drew the mesh's VERTICES as dots while the same renderer, driven live
         # from the engine, drew the surface. One renderer that produces two different pictures of
@@ -2405,6 +2505,22 @@ class _ReplayLevel:
                 self._edge_cols[c] = (np.asarray(z[k]),
                                       np.asarray(z[o]) if o in z.files else self._mo)
 
+    def cell_cols(self, nF):
+        """{block: array[nF]} for this frame, from the CELL SET the spec paired with this mesh.
+
+        THE REPLAY HALF OF `_mesh_levels._cell_cols`, and it exists because a cell set has no
+        `pos`: it never becomes a level here, so the renderer cannot reach it the way it reaches
+        the live one. The blocks are loaded once in `__init__` from the name `replay` read out of
+        the spec -- not from a scan of the trajectory for a key that looks right.
+
+        CUT TO `nF`, NOT TO THE BUFFER. The cell set is allocated to a capacity (12,800 slots for a
+        run that ends near 5,000 cells) and the tail is stale, so a colour map over the whole array
+        would paint thousands of dead slots. `nF` is the frame's live face count and a face IS a
+        cell.
+        """
+        return {k: np.asarray(v[self.t])[:nF, 0] for k, v in self._cell_blocks.items()
+                if v.ndim == 3 and v.shape[2] == 1}
+
     @property
     def mesh(self):
         """The frame's half-edge table, in the shape `_mesh_live` and `_mesh_faces` expect."""
@@ -2449,7 +2565,7 @@ class _ReplayLevel:
 class _ReplayState:
     """The `H` the renderer expects: a name -> level mapping and nothing else."""
 
-    def __init__(self, z, dev):
+    def __init__(self, z, dev, cell_sets=None):
         # EVERY SET'S TYPES, not only the sets that carry positions. A vertex model's `cell` set has
         # `cen`/`area`/`node_type` and NO `pos`, so it never becomes a level here -- and the curve's
         # per-type split, which indexes faces by the cell set's node_type, silently collapsed to one
@@ -2457,7 +2573,8 @@ class _ReplayState:
         self.node_types = {k[: -len("__node_type")]: np.asarray(z[k])
                            for k in z.files if k.endswith("__node_type")}
         names = sorted({k[: -len("__pos")] for k in z.files if k.endswith("__pos")})
-        self.levels = {n: _ReplayLevel(z, n, dev) for n in names}
+        cs = cell_sets or {}
+        self.levels = {n: _ReplayLevel(z, n, dev, cell_set=cs.get(n)) for n in names}
         self.fields = {}
         self.dim = int(next(iter(self.levels.values()))._pos.shape[2]) if self.levels else 3
 
@@ -2484,7 +2601,14 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
     z = traj if traj is not None else np.load(os.path.join(data_dir, "trajectory.npz"))
     style = dict((sim.plotting or {}) if sim is not None else {})
     dev = torch.device("cpu")
-    H = _ReplayState(z, dev)
+    # THE MESH -> CELL PAIRING COMES FROM THE SPEC, WHICH IS WHERE IT WAS DECLARED. `sets.<s>.mesh`
+    # with `sets.<s>.cell_set` is the same pair the engine puts on `Level.mesh_cell_set` for the
+    # live path; reading it here is what lets the replay draw a per-cell block that no longer sits
+    # on the mesh table -- `phase` today, `A0` and `age` later -- without scanning the trajectory
+    # for a plausible-looking key.
+    _cs = {n: d.get("cell_set") for n, d in ((sim.sets or {}) if sim is not None else {}).items()
+           if isinstance(d, dict) and d.get("mesh") and d.get("cell_set")}
+    H = _ReplayState(z, dev, cell_sets=_cs)
     if not H.levels:
         raise ValueError(f"{data_dir}: no set carries positions, nothing to render")
     sname = _biggest_particle_set(H)
