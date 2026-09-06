@@ -203,7 +203,8 @@ reconstruct it from `git log`. Every entry names the evidence, not just the chan
 | S1 divide/die kinds | `e8e61540` | 18 identical, every digest equal to S0's; suite and 9 gates unchanged |
 | (gate repair) | `2a3a55dc` | `ab_thickshell` `n_frames` 20 -> 80; roll-up back to 69 PASS / 4 KNOWN_RED / **0 FAIL** |
 | (defect fix) | `96c58a06` | daughters inherit the mother through `face_carry`; 17 identical, `cycle_phases` opt-in |
-| S2a cycle state -> cell set | *in progress* | `phase_t`, `cyc_inhib`, `cyc_vprev` declared on `cell` |
+| S2a cycle state -> cell set | `fdd72d76` | `phase_t`, `cyc_inhib`, `cyc_vprev` on `cell`; 18 of 18 byte-identical |
+| S2b phase -> cell set | `a77d025a` | one key renamed, 193,002 values over 402 frames unchanged; both renderer paths |
 
 ## Two things found on the way, both worth keeping in view
 
@@ -243,3 +244,69 @@ age:
 visible, not incurred: the operator has always written per-cell state in place, and could claim
 False only because the state sat outside the tensor `engine._run_token`'s tick-0 invariant guards.
 S4 removes the flag and the write together.
+
+## S2c — the eight go together, and the reason is in the code
+
+`A0`, `P0`, `V0f`, `Vbirth`, `divjit`, `age`, `ndiv`, `alive` are not eight independent arrays that
+happen to sit on the same table. They are one unit, spelled as a literal tuple in three places:
+
+- `cell_divide` reads all eight off the mesh into python LISTS, extends each list by one entry per
+  daughter, and rebuilds every one through `keep` (`vertex_ops.py:1287`, `:1470-1494`);
+- `cell_die` carries five of them by name, `("Vbirth", "divjit", "age", "ndiv", "alive")`
+  (`vertex_ops.py:2235`);
+- `edge_flip` carries all eight by name when a flip drops a face (`vertex_ops.py:3309`).
+
+Moving one of them alone means running two mechanisms side by side inside the same function for
+several commits -- a python list rebuilt through `keep` for seven of them, a cell-set block
+renumbered by `renumber_set` for the eighth -- and the plan's "one array per commit" was written
+before that was known. **The unit is the group.** ~137 references over five live files
+(`vertex_ops`, `diffusion_reaction`, `contact_ops`, `membrane_ops`, `mesh`), plus
+`tools/test_mesh_carry.py`.
+
+Three of the eight are RECORDED (`A0`, `P0`, `V0f`, `age`, `ndiv` -- five, in fact), so the rung is
+an opt-in for every spec that has a mesh, not just for one. That is a much wider blast radius than
+S2a or S2b and it is the reason this note exists instead of a commit: the design should be seen
+before it is executed.
+
+### The question S2c has to answer first
+
+`cell_divide`'s daughter is APPENDED, and the eight are given explicitly computed values there --
+`A0.append(a0e)`, `age.append(0)`, `ndiv.append(ndiv[f])`. On the cell set the equivalent is a write
+to row `nF + i` after `renumber_set`, which is a different shape of code from `cst[nF + i] =
+cst[mother]` (a copy) and must not be confused with it: **half of these are not inherited, they are
+COMPUTED at birth**, and `A0`/`V0f` are split between the daughters rather than copied to both.
+Getting that backwards would double the tissue's target volume at every division, which is exactly
+the extensive/intensive trap `reindex_faces`'s docstring warns about and `96c58a06` has already
+shown this repo can fall into.
+
+### Suggested order once the design is agreed
+
+1. the five `cell_die` carries, which are pure permutation;
+2. `cell_divide`'s rebuild, where the daughter values are computed;
+3. `edge_flip`'s face-drop path, which is permutation again;
+4. delete the three literal tuples.
+
+## Where the branch stands
+
+Five rungs, all green: `e8e61540` (S1), `2a3a55dc` (gate repair), `96c58a06` (daughter carry),
+`fdd72d76` (S2a), `a77d025a` (S2b). Suite 113 passed with the same 8 pre-existing failures; all 9
+gates re-run from scratch after every rung, 73 rows, **69 PASS / 4 KNOWN_RED / 0 FAIL**.
+
+In `vertex_ops` the only operators still registering a kind that is not one of the eight of §3 are
+`cell_cycle` (`structural`, waiting on S4) and `topo_record` (`structural`, waiting on S5). Both are
+now unblocked: S4 became possible the moment `cell_cycle`'s state was declared, because an operator
+can only emit a delta for state the engine knows about.
+
+**S4 is a MODEL change and should be watched, not run unattended.** It replaces the discrete phase
+index with a continuous `cycle_progress`, and `cycle_phases` is re-run and compared by eye rather
+than held to byte-identity.
+
+## One model observation, for whoever looks at `cycle_phases` next
+
+With `96c58a06` in place the population cycles in visible WAVES: the phase fractions swing between
+about 0 and 90 per cent with a period near 150 frames, and the cell count rises in a staircase with
+plateaus around frames 160 and 241. This is not a defect introduced by the move -- it is what the
+model does once daughters stop inheriting a stranger's phase. The old behaviour scrambled the
+population at every division and hid it. Whether a real tissue should re-synchronise this strongly
+under a `g1_size` checkpoint with `phase_cv: 0.15` is a question about the model, and the answer
+belongs in the spec or in `cell_cycle`, not in the carry.
