@@ -1355,11 +1355,42 @@ class Divide3D(Structural):
                     _s[:_Nv].to(torch.float32).cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
                     m["E_face"].cpu(), nF)
                 vf = _vp.numpy().astype(np.float64)
-                if "v_ref_poly" not in m:
-                    m["v_ref_poly"] = float(np.median(vf))
-                    print(f"[cell_divide] this run carries a separation, so the trigger reads the "
-                          f"POLYHEDRON volume; reference {m['v_ref_poly']:.4f} "
-                          f"(the wedge reference is {float(m.get('v_ref', 1.0)):.4f})", flush=True)
+                # THE REFERENCE IS TAKEN FROM THE RELAXED SHELL, NOT FROM THE SEED.
+                #
+                # This was `if "v_ref_poly" not in m`, so the median was cached on the FIRST call --
+                # and the first call happens while the shell is still at its seeded thickness. On
+                # `divide_growing_ball`, `|sep|` at that moment is exactly 0.2000, the value
+                # `seed_mesh` wrote, and the polyhedron median is 0.6127. The shell then nearly
+                # DOUBLES that volume just by relaxing: 1.167 four ticks later, 1.229 by tick 12,
+                # where it settles. So `factor * v_ref_poly` was met by the shell SETTLING rather
+                # than by any cell growing, and the population ran away -- 12,543 cells against the
+                # 920 the wedge trigger gave on the same spec, a run whose every frame is a
+                # division cascade.
+                #
+                # The wedge reference never had this problem, and the reason is the one this whole
+                # block exists for: a wedge volume is blind to thickness, so relaxing the shell
+                # barely moves it and a seed-time median is as good as a relaxed one. The moment
+                # the trigger can see the thickness, WHEN the reference is measured starts to
+                # matter as much as WHICH volume it measures.
+                #
+                # So it is re-taken on every call until it stops moving, then frozen. 1% between
+                # consecutive calls is the test: the settling is a factor of two, so anything that
+                # coarse separates it from the growth the operator is there to measure, and no
+                # tick count has to be guessed for a spec whose relaxation rate nobody knows.
+                _med = float(np.median(vf))
+                _prev = m.get("v_ref_poly")
+                if _prev is None or (not m.get("v_ref_poly_frozen")
+                                     and abs(_med - _prev) > 0.01 * max(abs(_prev), 1e-12)):
+                    m["v_ref_poly"] = _med
+                    if _prev is None:
+                        print(f"[cell_divide] this run carries a separation, so the trigger reads "
+                              f"the POLYHEDRON volume (the wedge reference is "
+                              f"{float(m.get('v_ref', 1.0)):.4f}); the reference is re-taken until "
+                              f"the shell settles", flush=True)
+                elif _prev is not None and not m.get("v_ref_poly_frozen"):
+                    m["v_ref_poly_frozen"] = True
+                    print(f"[cell_divide] polyhedron reference settled at "
+                          f"{float(m['v_ref_poly']):.4f}", flush=True)
         rings = rings_from_flat_3d(es, et, ef, nF)
         pos = [p for p in pos_np]
         A0 = m["A0"].detach().cpu().numpy().tolist()

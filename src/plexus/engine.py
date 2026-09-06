@@ -455,6 +455,23 @@ def _resolve_schema(s: dict, D: int, sname: str | None = None) -> StateSchema:
     have -- so no existing spec moves a byte (`promotion_identical.py --phase A`)."""
     if "state" in s:
         return schema_from_spec(s["state"])
+    # STEP 1b: A SET THAT IS A RELATION CARRIES NO POSITION, AND MUST NOT BE GIVEN ONE.
+    #
+    # A set declaring `maps:` is a relation -- a half-edge is a pairing of two vertices with a face,
+    # not a thing that sits anywhere -- so the pos/vel fallback below is wrong for it in a way that
+    # is not merely wasteful. Falling through to `spatial_schema` gave `half_edge` a `pos` block,
+    # and pass 1 SEEDS positions across the domain for any set that has one: declaring the mesh's
+    # 32,768-slot half-edge set on `divide_growing_ball` created 102,400 real particles scattered
+    # through the world box, which then outnumbered the 25,584 vertices and so became
+    # `_biggest_particle_set`'s answer -- the movie drew that cloud, demoted the epithelium to an
+    # inset, and the per-frame render went 55 ms -> 106 ms. Nothing about the physics changed; the
+    # spec had simply acquired a hundred thousand particles nobody asked for.
+    #
+    # An empty schema is the honest layout: no columns, `has_pos` False, no seeding, no `__pos` in
+    # the trajectory, and therefore invisible to every consumer that finds sets by asking which
+    # ones carry positions. The relation's content is its MAPS, which the topology operators own.
+    if s.get("maps"):
+        return StateSchema([])
     if sname is not None:
         ent_schema, _render, _depth = _entity_meta(sname, D)
         if ent_schema is not None:
