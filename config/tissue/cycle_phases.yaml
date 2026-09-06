@@ -88,6 +88,8 @@ sets:
       chem:
         width: 2
         integration: first_order
+      phase:
+        width: 1
       phase_t:
         width: 1
         record: false
