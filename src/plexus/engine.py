@@ -883,6 +883,20 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     # OUTSIDE the graph, read as a tensor INSIDE it, so the value the kernels see is current.
     H.frame_t = torch.zeros((), device=device)
     H.obstacles = list(getattr(sim, "obstacles", []) or [])   # wall rects/discs for the `bounce` op
+    # WHAT ELSE IS IN THE SCHEDULE, so an operator can ask instead of guess.
+    #
+    # Needed because two operators can implement the same mechanism and only one of them should be
+    # active. `cell_grow`'s `vth_frac` ceiling is Okuda's uniform-cell mode -- it holds `v_eq` under
+    # `vth_frac * v_ref` so cells oscillate in a band WITHOUT a divider resetting them -- and once
+    # `cell_divide` is scheduled, division is what resets size. Left on, the ceiling is not size
+    # control, it is a lid BELOW the division threshold: on `divide_growing_ball` it caps the cell
+    # at 1.62x its reference while the trigger needs 2x, so growth stalls and the population sits at
+    # 200 for 401 frames.
+    #
+    # A NAME SET AND NOT A FLAG ON THE OPERATOR LINE, because the question is about the SCHEDULE and
+    # a spec should not have to say twice that it contains a divider. It is read-only and built once.
+    H.scheduled_ops = frozenset(o.op for o in (getattr(sim, "operators", None) or [])
+                                if getattr(o, "op", None))
 
     # pass 1: top-level sets (no parent) -- positions seeded across the domain.
     for sname, s in sim.sets.items():
