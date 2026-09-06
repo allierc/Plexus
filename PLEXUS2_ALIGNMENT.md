@@ -187,3 +187,59 @@ the design note.
 that campaign removes them. `AB_R7R8_TODO.md` §0a (one volume convention across growth, division,
 death and the energy) stays open on `main`; it is independent of this work but touches `cell_grow`
 and `cell_die`, so it should land before S3.
+
+---
+
+# Progress log
+
+Appended as each rung lands, so the branch carries its own record and a reader does not have to
+reconstruct it from `git log`. Every entry names the evidence, not just the change.
+
+| rung | commit | evidence |
+|---|---|---|
+| S-1 branch + plan | `777f91aa` | cut from `20eb3d06`, the working point |
+| S0 harness | `2f32a470` | `tools/refactor_identical.py`, core-against-core over every recorded array |
+| S0 gate | `733ec22b` | 18 of 18 `config/tissue` specs byte-identical against `20eb3d06` |
+| S1 divide/die kinds | `e8e61540` | 18 identical, every digest equal to S0's; suite and 9 gates unchanged |
+| (gate repair) | `2a3a55dc` | `ab_thickshell` `n_frames` 20 -> 80; roll-up back to 69 PASS / 4 KNOWN_RED / **0 FAIL** |
+| (defect fix) | `96c58a06` | daughters inherit the mother through `face_carry`; 17 identical, `cycle_phases` opt-in |
+| S2a cycle state -> cell set | *in progress* | `phase_t`, `cyc_inhib`, `cyc_vprev` declared on `cell` |
+
+## Two things found on the way, both worth keeping in view
+
+**The recorded working point was not reproducible, and nobody had checked.** `ab_thickshell`'s
+AB-C4 row read FAIL 0.9275 against its `within [1.0, 0.02]` band on a fresh run at every commit
+tested -- including `58693ed5`, the commit that CREATED the gate -- while the handover recorded
+0 FAIL. The cause was not the model: the shell's apical:basal cap-area quotient dips to 0.8750 at
+frame 5 as a minority of cells wedge to a basal point, and recovers to 1.0093 by frame 80, entering
+the band at frame 48. The gate stopped at frame 20, so `reduce: last` graded a shell still relaxing.
+Every number in that gate's prose came from a run made before the cap-area change that shares its
+commit. **Lesson for the rest of this campaign: a tally is evidence only if the run that produced it
+was made from the code being claimed about.** Each rung here re-grades rather than quoting.
+
+**`face_carry` gave every newly born daughter a stranger's value.** `keep` indexes the rings list,
+`divide_face_3d` appends daughter B beyond the end of a length-nF array, and `reindex_faces` clamps
+-- so the daughter got cell `nF - 1`'s value. It was found by declaring `cell_cycle`'s arrays on the
+cell set and running the two stores side by side, not by reading the code, and it is the third time
+this campaign's premise has been confirmed: state kept where the framework cannot see it is state
+nothing checks. See `96c58a06`.
+
+## S2 as it is actually being done
+
+Not one rung. The plan's "one array per commit" holds, but the order is set by RECORDING, not by
+age:
+
+1. **S2a -- the three unrecorded arrays**: `phase_t`, `cyc_inhib`, `cyc_vprev`. They are not in
+   `MeshTable.FACE_RECORD`, so declaring them `record: false` on the `cell` set changes no
+   trajectory key and the rung is byte-identical. `cell_cycle` gains a loud failure naming the
+   three blocks and the set when a spec has not declared them.
+2. **S2b -- `phase`**, which IS recorded and IS what the renderer colours by. Moving it renames
+   `vertex__mesh_phase` to `cell__phase`; the renderer and `MeshTable.FACE_RECORD` change in the
+   same commit and `cycle_phases` is an opt-in difference.
+3. **S2c.. -- `A0`/`P0`/`V0f` together** (two writers), then `Vbirth`, `divjit`, `age`, `ndiv`,
+   `mg_scale`, and `alive` last, which everything reads.
+
+`MAY_MUTATE_INTEGRATED_STATE` flips False -> True on `cell_cycle` at S2a and that is a debt made
+visible, not incurred: the operator has always written per-cell state in place, and could claim
+False only because the state sat outside the tensor `engine._run_token`'s tick-0 invariant guards.
+S4 removes the flag and the write together.
