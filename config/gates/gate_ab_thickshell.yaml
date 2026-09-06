@@ -1,9 +1,9 @@
 general:
   name: gate_ab_thickshell
   seed: 0
-  n_frames: 20
+  n_frames: 80
   dt: 1.0
-  record_cap: 24
+  record_cap: 84
   boundary: free
   dim: 3
   world: [50.0, 50.0, 50.0]
@@ -75,25 +75,33 @@ _gate:
         solution.
 
         THE BAND IS INHERITED FROM AB-C3 UNMODIFIED, +/- 0.02, and it is not a loose one on this
-        specimen. The shell is thick on purpose: at the last frame h = 1.08 against R = 5.94, so the
-        closed form is 1.4391 -- a 44% apical-over-basal excess, not a few percent. A model that got
-        the curvature wrong and simply offset both caps equally would score 1/1.4391 = 0.695, fifteen
-        band-widths outside. What passes is a solved thickness that still lands where a spherical
-        shell of that thickness must.
+        specimen. The shell is thick on purpose: at the last frame the median cell thickness is
+        h = 0.866 against a mean shell radius R = 6.82, so the closed form is 1.2895 -- a 29%
+        apical-over-basal cap-area excess, not a few percent. A model that got the curvature wrong
+        and simply offset both caps equally would produce a ratio of 1 and score 1/1.2895 = 0.776,
+        eleven band-widths outside. What passes is a solved thickness that still lands where a
+        spherical shell of that thickness must.
 
         THE STATISTIC OVER CELLS IS THE MEDIAN AND THAT IS A CORRECTION TO WHAT THE MEASURE FIRST
         DID. An apical:basal ratio is unbounded as its denominator vanishes, and once `sep` is free
-        a minority of cells wedge to a basal point, the worst reaching 97.5 while the tissue's own
-        ratio is 1.43. On this row the mean over cells is 2.6874 and the median 1.4298, against the
-        closed form's 1.4391 -- the mean describes the tail, the median the shell. The tail is not
-        thereby discarded: it is graded two rows down, which is the difference between a reducer
-        choice and a hidden one.
+        a minority of cells wedge to a basal point: at the peak of the transient, frame 4, the worst
+        cell of 1280 reads 130 while the median over the same 1280 is 1.41. On this row, at the
+        last frame, the mean over cells is 1.4042 and the median 1.3014, against 1.2895 -- the
+        mean still carries what is left of the tail, the median the shell. The tail is not thereby
+        discarded: it is graded two rows down, which is the difference between a reducer choice and
+        a hidden one.
 
-        `reduce: last` IS INHERITED FROM THE DECLARED TABLE AND IS NOT THE KINDEST FRAME. The
-        quotient is 0.9903 on the first recorded row, dips to 0.8742 at frame 6 and returns to
-        0.9936 by frame 20, and that excursion is the same event as the wedging two rows down --
-        the tail is fattest at frames 3-6 and decays after. The dip is graded in its own right by
-        the row immediately below rather than left for a reader to find.
+        `reduce: last` IS THE ROW, AND `n_frames: 80` IS WHAT MAKES IT AN HONEST ONE. The quotient
+        is 0.9923 on the first recorded row, falls to 0.8750 at frame 5, and climbs back through
+        0.9275 at frame 20 and 0.9843 at frame 48 to 1.0093 at frame 80; it is inside +/- 0.02 of 1
+        from frame 48 onwards and stays there. That excursion is the same event as the wedging two
+        rows down -- the tail is fattest at frames 3-6 and decays after -- so a run that stopped at
+        frame 20, as this gate did until 5 September, graded `reduce: last` ON A SHELL STILL
+        RELAXING and read 0.9275: a FAIL that said the closed form was wrong when what was wrong was
+        the stopping time. 80 frames is 32 past the last frame outside the band, which is margin
+        rather than a fit: the run is stopped where the transient is over, not where the number is
+        best. The dip itself is graded in its own right by the row immediately below rather than
+        left for a reader to find.
 
     - name: cap_geometry_holds_through_the_whole_run
       tier: closed_form
@@ -105,11 +113,13 @@ _gate:
       unit: "the same quotient at its worst frame rather than its last (dimensionless)"
       why: >
         THE SAME COMPARISON AS THE ROW ABOVE AT ITS WORST FRAME, DECLARED RED SO THE EXCURSION IS IN
-        THE TABLE INSTEAD OF IN A FOOTNOTE. It reads 0.8742 at frame 6 against the same +/- 0.02. The
+        THE TABLE INSTEAD OF IN A FOOTNOTE. It reads 0.8750 at frame 5 against the same +/- 0.02. The
         shell does not fail the closed form at the end of the run -- it fails it in the middle, while
         the wedging transient is at its peak, and the two rows are measuring one event: the fraction
-        of cells that have lost their basal cap rises from 0.0023 to 0.0781 over frames 0-3 and
-        decays to 0.0297 by frame 20, and this quotient tracks it inverted.
+        of cells that have lost their basal cap rises from 0.0023 at frame 0 to 0.0828 at frame 4,
+        decays to 0.0297 by frame 20 and reaches exactly zero at frame 45, and this quotient tracks
+        it inverted -- which is why the row above, graded 35 frames after the last collapsed cell,
+        is green while this one is red.
 
         IT IS NOT WIDENED TO 0.13, WHICH IS WHAT IT WOULD TAKE. A band that admitted the excursion
         would also admit a shell whose caps were 13% off the geometry it actually has, and AB-C4
@@ -139,13 +149,13 @@ _gate:
         perimeter -- which is strictly positive with no target area to push back. So the thickness
         can only go down, and `lt` rather than `ne` is what says the run agreed with the sign the
         functional predicts. 0.95 rather than 1.0 because a fold of 0.999 would be a tissue that did
-        not move, and the whole point of the row is that it did: measured, 0.7555.
+        not move, and the whole point of the row is that it did: measured, 0.6067.
 
         THE DENOMINATOR IS THE FIRST RECORDED ROW AND NOT THE SEEDED `h0`, WHICH UNDERSTATES THE
         MOVEMENT RATHER THAN FLATTERING IT. `engine.py` records row 0 as the state after ONE pass,
-        so the thickness has already fallen from the seeded 1.8 to 1.4280 before the series starts,
-        and it reaches 1.0789 by frame 20. Against the seed that is a fold of 0.599; the row grades
-        0.7555, the part of it the recorded trajectory can actually show. Stated in terms of row 0
+        so the thickness has already fallen from the seeded 1.8 to 1.4277 before the series starts,
+        and it reaches 0.8662 by frame 80. Against the seed that is a fold of 0.481; the row grades
+        0.6067, the part of it the recorded trajectory can actually show. Stated in terms of row 0
         because that is the only reference a measure reading a trajectory has -- `h0` is a spec
         constant the trajectory does not carry.
 
@@ -159,28 +169,34 @@ _gate:
       why: >
         THE PHENOMENON THE FREE SEPARATION PRODUCES ON ITS OWN, DECLARED RATHER THAN ABSORBED BY A
         REDUCER. With `sep` integrated, a minority of cells wedge until their inner cap is nearly a
-        point: at the last frame 38 of 1280, with an apical cap of 0.55 against a basal cap of
-        0.026, at ordinary thickness and ordinary ring valence. Nothing about them is degenerate --
-        the span-sign row is 0, every entry is finite -- so these are bottle cells, formed under a
-        linear surface tension on a curved sheet with NO MYOSIN ANYWHERE IN THE SPEC. They are also
-        what forced AB-C4's median, and a gate that changed a reducer to survive a phenomenon
-        without ever naming the phenomenon would be the dishonest version of this rung.
+        point: 106 of 1280 at the peak, and at frame 20 the surviving 38 have an apical cap of 0.55
+        against a basal cap of 0.026, at ordinary thickness and ordinary ring valence. Nothing about
+        them is degenerate -- the span-sign row is 0, every entry is finite -- so these are bottle
+        cells, formed under a linear surface tension on a curved sheet with NO MYOSIN ANYWHERE IN
+        THE SPEC. They are also what forced AB-C4's median, and a gate that changed a reducer to
+        survive a phenomenon without ever naming the phenomenon would be the dishonest version of
+        this rung.
 
-        IT IS A TRANSIENT, WHICH IS THE FACT `reduce: last` WOULD HAVE HIDDEN. The fraction rises
-        from 0.0023 on the first recorded row to a peak of 0.0781 -- 100 of 1280 cells -- at frame
-        3, then decays monotonically to 0.0297 by frame 20. `reduce: max` grades the peak, because a
-        row that reported only the end would say 0.03 about a run that reached 0.08, and the peak is
-        also where AB-C4's quotient makes its 0.8742 excursion. The two are one event seen twice.
+        IT IS A TRANSIENT, WHICH IS THE FACT `reduce: last` WOULD HAVE HIDDEN AND WHICH THE 80-FRAME
+        RUN NOW SHOWS ENDING. The fraction rises from 0.0023 on the first recorded row to a peak of
+        0.0828 -- 106 of 1280 cells -- at frame 4, decays to 0.0297 by frame 20, and is exactly zero
+        from frame 45 to the end of the run: not one cell of 1280 finishes wedged. `reduce: max`
+        grades the peak, because a row that reported only the end would say 0.0 about a run that
+        reached 0.08, and the peak is also where AB-C4's quotient makes its 0.8750 excursion. The
+        two are one event seen twice.
 
-        THE BOUND IS A CLAIM AND NOT THE MEASURED VALUE, AND THE MARGIN IS THIN -- 0.0781 against
-        0.10, a factor of 1.28 and not a comfortable one. 0.10 says the wedging is a TAIL, that the
+        THE BOUND IS A CLAIM AND NOT THE MEASURED VALUE, AND THE MARGIN IS THIN -- 0.0828 against
+        0.10, a factor of 1.21 and not a comfortable one. 0.10 says the wedging is a TAIL, that the
         shell rows around it are measuring a shell; a tissue in which a tenth of cells had lost
         their basal surface would not be a monolayer with a few bottle cells but a different object,
         and AB-C4's median would then describe something that no longer exists. The bound was
-        declared before this run at a round tenth and is left where it is, but it should be read as
-        a row that is nearly red rather than as a comfortable pass: a longer run, a coarser mesh or
-        a larger `sep_mu` could take the peak past it, and if one does, the answer is to explain the
-        wedging, not to move the bound.
+        declared before this run at a round tenth and is left where it is. ONE OF ITS THREE NAMED
+        HAZARDS HAS SINCE BEEN TESTED AND DID NOT MATERIALISE: this row used to warn that a longer
+        run could take the peak past 0.10, and quadrupling the run from 20 to 80 frames left the
+        peak where it was, at frame 4, because the peak is a property of the first few frames of
+        relaxation and not of the duration. A coarser mesh and a larger `sep_mu` remain untested,
+        and if either takes the peak past the bound the answer is to explain the wedging, not to
+        move the bound.
 
         IT IS BOOKKEEPING AND NOT A MEASUREMENT, deliberately. The functional predicts wedging on a
         curved sheet; nothing here has been set against a measured bottle-cell fraction in a real
@@ -279,21 +295,21 @@ _gate:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
-    description: The simulation begins with a smooth, spherical shell composed of a regular Voronoi-like
-      mesh. As time progresses, the surface begins to buckle and deform, losing its perfect sphericity.
-      The mesh cells become increasingly irregular and elongated as the surface develops sharp, jagged
-      protrusions. By the final frame, the sphere has transformed into a highly complex, spiky structure
-      with significant surface area expansion.
-    objects: The primary object is a single spherical shell composed of 1280 interconnected polygonal
-      cells. The surface is rendered in a light gray color with black lines defining the boundaries of
-      each cell. Initially, the cells are relatively uniform in size and shape, creating a smooth appearance.
-      Over time, the cells vary greatly in size and geometry, forming sharp, needle-like spikes that extend
-      outward from the main body.
+    description: A spherical shell undergoes a structural deformation over a series of time steps. The
+      surface initially appears smooth and perfectly round before developing significant irregularities.
+      As time progresses, the shell buckles and creates prominent protrusions and indentations. By the
+      final frames, the object has settled into a complex, lumpy, and non-uniform shape.
+    objects: The scene contains a single large, three-dimensional shell object. It is composed of a grey
+      surface covered by a black polygonal mesh of 1280 cells. The shell maintains a roughly spherical
+      volume but changes its surface topology from smooth to highly irregular. The mesh lines remain constant
+      in number and connectivity while the underlying geometry deforms.
   movie_kburns:
-    description: The simulation shows a static 3D mesh structure that does not change over time. The geometry
-      remains perfectly still across all keyframes provided. There is no movement, deformation, or evolution
-      of the surface features. The scene represents a single state of a "thickshell" mesh.
-    objects: The object is a complex, spherical mesh composed of numerous irregular polygonal faces. It
-      features a jagged, spiky surface with sharp protrusions extending outward from the main body. The
-      mesh is rendered in a light gray or off-white color with black wireframe edges defining the facets.
-      The overall structure is large and occupies the majority of the frame against a solid black background.
+    description: The simulation shows a 3D mesh surface that undergoes subtle deformations over time.
+      The surface appears to ripple and shift slightly as if responding to internal pressure or external
+      forces. The overall shape remains relatively stable, maintaining its irregular, lumpy geometry throughout
+      the sequence. The mesh lines adjust dynamically to accommodate the changing curvature of the surface.
+    objects: The scene features a single, large, irregular 3D shell mesh. The mesh is composed of a dense
+      network of polygonal faces, primarily hexagons and pentagons, forming a Voronoi-like pattern. The
+      surface is rendered in a neutral grey color with black outlines defining the edges of each cell.
+      The object occupies most of the frame, exhibiting a complex, bumpy topology with various protrusions
+      and indentations.
