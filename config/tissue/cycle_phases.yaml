@@ -88,6 +88,15 @@ sets:
       chem:
         width: 2
         integration: first_order
+      phase_t:
+        width: 1
+        record: false
+      cyc_inhib:
+        width: 1
+        record: false
+      cyc_vprev:
+        width: 1
+        record: false
 fields: {}
 operators:
 - op: cell_geometry

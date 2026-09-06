@@ -94,6 +94,50 @@ def _carry_face_state(m, keep, dt, dev):
         m[nm] = a.to(dev)[idx.clamp(max=max(a.shape[0] - 1, 0))].to(dt)
 
 
+def cell_block(H, cat, name, nF):
+    """The first `nF` rows of a DECLARED width-1 block on the cell set, as float64. None if absent.
+
+    THE OTHER HOME FOR PER-CELL STATE, AND THE ONE plexus2 ACTUALLY DESCRIBES. Two stores have
+    grown up side by side: `chem`, `area` and `cen` are declared blocks on the `cell` SET, permuted
+    by `Hierarchy.renumber_set`; `A0`, `V0f`, `age`, `phase` and the rest are columns on the mesh
+    table of the `vertex` set, permuted by `MeshTable.reindex_faces` through `m["face_carry"]`. They
+    hold the same kind of quantity -- one number per cell -- and the paper knows about only one of
+    them. An operator whose output is not declared state cannot emit a delta, which is why every
+    writer of the second store had to register `kind="structural"`; the two facts are one fact.
+
+    THE THREE TOPOLOGY PATHS ALREADY AGREE, which is what makes moving a column safe rather than a
+    rewrite. `cell_die` calls `reindex_faces(keep)` and `renumber_set(cat, keep, nF2)` with THE SAME
+    `keep`; `edge_flip` does the same after a face drop; `cell_divide` reindexes the face columns by
+    `keep` and copies the mother's whole cell-set row onto each daughter (`cst[nF + i] =
+    cst[mother]`), which is the same semantics `reindex_faces` gives -- the parent's value on both
+    daughters, so what moves must be INTENSIVE, exactly as before. A column therefore lands in the
+    same place either way, and the byte-identity harness is what says so rather than this comment.
+
+    RETURNS None RATHER THAN RAISING when the block is not declared, because the caller is better
+    placed to say what the spec is missing: `cell_cycle` names the three blocks and the set in one
+    message. A silent zero here would be the defect this move exists to remove.
+    """
+    lvl = H.level(cat) if cat else None
+    if lvl is None or getattr(lvl, "state", None) is None or name not in lvl.state_schema:
+        return None
+    return lvl.get(name)[:nF, 0].detach().cpu().numpy().astype(np.float64)
+
+
+def set_cell_block(H, cat, name, values, nF):
+    """Write `values` (length nF) into the first nF rows of a declared width-1 cell block.
+
+    IN PLACE, ON THE VIEW `Level.get` RETURNS, which is a slice of the set's `state`. That is
+    writing integrated state from an operator and it is why `cell_cycle` is still `kind:
+    structural` after this rung -- S4 turns the phase into a continuous progress variable that can
+    be emitted as a delta, and only then does the write go away. Moving the STORE and changing the
+    KIND are two separate claims and this rung makes only the first.
+    """
+    lvl = H.level(cat)
+    col = lvl.get(name)
+    col[:nF, 0] = torch.as_tensor(np.asarray(values), dtype=lvl.state.dtype,
+                                  device=lvl.state.device)
+
+
 def fib_sphere(n, r=1.0):
     i = np.arange(n) + 0.5
     phi = np.arccos(1 - 2 * i / n); theta = np.pi * (1 + 5 ** 0.5) * i
@@ -1512,7 +1556,6 @@ class Divide3D(Structural):
         return {}
 
 
-
 @register_operator("cell_die", set="vertex", kind="die", family="population")
 class Apoptosis3D(Structural):
     """Cell elimination: the Die family, and the inverse of `cell_divide`. A marked cell contracts
@@ -2445,20 +2488,34 @@ class CellCycle3D(Structural):
     them, which is what the measurements report and also what makes the models comparable -- one
     transition changes, so a difference between two runs has one possible cause.
 
-    WHAT THE DAUGHTERS INHERIT, AND THE TRAP IN IT. `m["face_carry"]` reindexes a declared per-face
-    array through division, death and T1, and its docstring is explicit that `keep` COPIES the
-    parent's value onto BOTH daughters -- so what is carried must be INTENSIVE. `phase` (a label)
-    and `phase_t` (a time) are; an inhibitor AMOUNT would not be, and would double at every
-    division. That is why `inhibitor_dilution` below stores a CONCENTRATION and dilutes it by the
-    volume ratio, which is also the physically right thing: halving the volume and halving the
-    amount leaves the concentration where it was.
+    WHERE THE STATE LIVES. `phase_t`, `cyc_inhib` and `cyc_vprev` are declared width-1 blocks on
+    the CELL SET and must appear under `sets.<cell_set>.state` or this operator refuses to run --
+    see `cell_block`. `phase` is still a column on the mesh table, because it is recorded and drawn
+    and moving a recorded array renames a trajectory key; that is a separate rung.
+
+    WHAT THE DAUGHTERS INHERIT, AND THE TRAP IN IT. Both stores copy the parent's value onto BOTH
+    daughters -- `m["face_carry"]` through `keep`, the cell set through `cell_divide`'s
+    `cst[nF + i] = cst[mother]` -- so what is carried must be INTENSIVE. `phase` (a label) and
+    `phase_t` (a time) are; an inhibitor AMOUNT would not be, and would double at every division.
+    That is why `inhibitor_dilution` below stores a CONCENTRATION and dilutes it by the volume
+    ratio, which is also the physically right thing: halving the volume and halving the amount
+    leaves the concentration where it was.
 
     RESET IS DETECTED, NOT SIGNALLED. A cell that has just divided is the one carrying `age == 0`
     while its inherited phase is still M -- `cell_divide` zeroes `age` for both daughters and the
     carry copies M onto them -- so the reset needs no second channel between the two operators and
     cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.
     """
-    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
+    # `MAY_MUTATE_INTEGRATED_STATE` FLIPPED False -> True WHEN THE THREE ARRAYS MOVED TO THE CELL
+    # SET, AND THAT IS A DEBT MADE VISIBLE RATHER THAN A DEBT INCURRED. This operator has always
+    # written per-cell state in place. It could claim False only because the state was a column on
+    # the mesh table, where `engine._run_token`'s tick-0 invariant -- clone every set's `state`,
+    # call the operator, refuse if the tensor moved -- cannot see it. Declaring the arrays on the
+    # cell set puts them inside the tensor the engine guards, and the guard fires immediately and
+    # correctly. Setting the flag is the accurate statement of what the operator does today; S4
+    # removes both the flag and the write, by making the phase a continuous `cycle_progress` that
+    # can be RETURNED as a delta and integrated like any other Lateral.
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "phase_progression", "restriction_point",
                       "size_checkpoint"]
     REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
@@ -2505,7 +2562,24 @@ class CellCycle3D(Structural):
         nF = int(m["nF"]); dev = lvl.state.device; dt = lvl.state.dtype
         _np = lambda k: (m[k].detach().cpu().numpy().astype(np.float64)     # noqa: E731
                          if k in m and m[k] is not None else None)
-        ph = _np("phase"); pt = _np("phase_t"); cc = _np("cyc_inhib")
+        # THE THREE PRIVATE ARRAYS LIVE ON THE CELL SET, NOT ON THE MESH TABLE -- see `cell_block`.
+        # `phase` is still a face column because it is RECORDED (`MeshTable.FACE_RECORD`) and the
+        # renderer colours by it; moving a recorded array renames `vertex__mesh_phase` to
+        # `cell__phase` and is its own rung, with the renderer changed in the same commit. These
+        # three were never recorded, so this move changes no trajectory key and the run is
+        # byte-identical -- which is the whole reason they go first.
+        for _b in ("phase_t", "cyc_inhib", "cyc_vprev"):
+            if cell_block(H, self.cat, _b, nF) is None:
+                raise KeyError(
+                    f"cell_cycle needs the set {self.cat!r} to declare the width-1 block {_b!r}. "
+                    f"Add it under `sets.{self.cat}.state` -- `{_b}: {{width: 1, record: false}}` "
+                    f"-- for all three of phase_t, cyc_inhib, cyc_vprev. They are the operator's "
+                    f"own bookkeeping (time in phase, inhibitor concentration, last frame's "
+                    f"volume), so they are not recorded; they are declared because per-cell state "
+                    f"belongs to the cell set, where the topology operators already renumber it.")
+        ph = _np("phase")
+        pt = cell_block(H, self.cat, "phase_t", nF)
+        cc = cell_block(H, self.cat, "cyc_inhib", nF)
         if ph is None or len(ph) != nF:
             # `seed_async` -- START THE POPULATION SOMEWHERE, NOT ALL AT THE SAME PLACE. Seeding
             # every cell at (G1, phase_t 0) makes the tissue a synchronised culture: the first
@@ -2552,8 +2626,10 @@ class CellCycle3D(Structural):
             pt = np.zeros(nF)
         if cc is None or len(cc) != nF:
             cc = np.ones(nF)
-        # DECLARED ONCE, CARRIED BY THE TOPOLOGY FROM THEN ON -- see `_carry_face_state`.
-        m.setdefault("face_carry", set()).update({"phase", "phase_t", "cyc_inhib"})
+        # DECLARED ONCE, CARRIED BY THE TOPOLOGY FROM THEN ON -- see `_carry_face_state`. Only
+        # `phase` is here now; the other three are blocks on the cell set and are carried by
+        # `Hierarchy.renumber_set` and by `cell_divide`'s mother-row copy instead.
+        m.setdefault("face_carry", set()).add("phase")
 
         _, _, _, vf = face_geometry_3d(lvl.get("pos")[:int(m["Nv"])].detach(),
                                        m["E_srce"], m["E_trgt"], m["E_face"], nF)
@@ -2566,11 +2642,19 @@ class CellCycle3D(Structural):
             ph[born] = self.G1; pt[born] = 0.0; cc[born] = 1.0
         # DILUTION IS APPLIED TO EVERY CELL EVERY FRAME, whatever the model, because it is a
         # statement about volume and not about the rule: a concentration in a growing cell falls.
-        vp = _np("cyc_vprev")
+        #
+        # A ZERO IN `cyc_vprev` MEANS "NOT YET SET" AND MUST NOT DILUTE. On the mesh table the
+        # column simply did not exist before the first write, and `_np` returned None, so the first
+        # frame skipped the dilution. A declared block exists from the moment the set is built and
+        # reads zero, and a bare `vp / v_now` would then multiply every cell's inhibitor by 0 on
+        # frame 0 -- every cell instantly past its dilution checkpoint, which is the opposite of
+        # the model. The per-cell `vp > 0` test reproduces the old behaviour exactly: zero only
+        # ever occurs on the first frame, because a daughter inherits its mother's row and a
+        # renumbered cell keeps its own.
+        vp = cell_block(H, self.cat, "cyc_vprev", nF)
         if vp is not None and len(vp) == nF:
-            cc = cc * np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0)
-        m["cyc_vprev"] = torch.as_tensor(v_now, dtype=dt, device=dev)
-        m.setdefault("face_carry", set()).add("cyc_vprev")
+            cc = cc * np.where(vp > 0.0, np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0), 1.0)
+        set_cell_block(H, self.cat, "cyc_vprev", v_now, nF)
 
         jit = _np("divjit")
         jit = np.ones(nF) if jit is None or len(jit) != nF else jit
@@ -2592,9 +2676,10 @@ class CellCycle3D(Structural):
         ph = np.where(adv, np.minimum(ph + 1, self.M), ph)
         pt = np.where(adv, 0.0, pt)
         m["phase"] = torch.as_tensor(ph, dtype=dt, device=dev)
-        m["phase_t"] = torch.as_tensor(pt, dtype=dt, device=dev)
-        m["cyc_inhib"] = torch.as_tensor(cc, dtype=dt, device=dev)
+        set_cell_block(H, self.cat, "phase_t", pt, nF)
+        set_cell_block(H, self.cat, "cyc_inhib", cc, nF)
         return {}
+
 
 
 @register_operator("cell_cycle", model="timer", set="vertex", kind="structural", family="population")
