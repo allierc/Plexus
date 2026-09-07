@@ -47,6 +47,18 @@ sets:
         width: 1
       ndiv:
         width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
   half_edge:
     n: 520032
     maps:

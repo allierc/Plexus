@@ -992,7 +992,24 @@ class Grow3D(Structural):
             a = clvl.state[:nF, h0 + self.chan].detach().to(dev)  # per-cell activator
         else:
             a = torch.zeros(nF, device=dev, dtype=m["V0f"].dtype)
-        if "mg_scale" not in m or m["mg_scale"].shape[0] != nF:  # per-cell cumulative linear scale (capped)
+        # THE TEST WAS DOING TWO JOBS AND THE MOVE SEPARATES THEM. `"mg_scale" not in m or
+        # m["mg_scale"].shape[0] != nF` meant BOTH "this operator has not run yet" AND "the cell
+        # count changed since it last did" -- and on the cell set the name is always present with
+        # length exactly `nF`, so the test can never fire, `s` stays 0 and every target collapses.
+        #
+        # `mg_scale_nF` IS THE SECOND MEANING, WRITTEN DOWN. It is a scalar on the mesh table, like
+        # `n_div` and `div_blocked`, because it is one number per run and not one per cell. The
+        # behaviour is exactly what it was: re-baseline whenever the face count moves, which with
+        # `cell_divide` every four frames is most frames.
+        #
+        # THAT POLICY IS WRONG AND IS NOT CHANGED HERE. Re-taking the whole population's baseline
+        # because SOME cell divided is why `mg_scale` stops meaning "how much this cell has grown"
+        # -- measured, it climbs 1.0035 -> 1.0459 before the first division and then never exceeds
+        # 1.0139 -- and `contact_ops.ecm_gate_growth` read it as cumulative and spent 400 frames
+        # correcting nothing. Fixing it moves numbers, so it is its own rung with its own evidence;
+        # this one only moves the storage, and is byte-identical because of that.
+        if int(m.get("mg_scale_nF", -1)) != int(nF):
+            m["mg_scale_nF"] = int(nF)
             m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
             m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
         # THE GATE'S HALF-POINT, AND WHAT IT IS A FRACTION OF.
