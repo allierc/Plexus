@@ -1,0 +1,223 @@
+---
+title: "load_run"
+subtitle: "Take `x_0` from a finished run's recorded frame."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Take `x_0` from a finished run's recorded frame.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `run`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+any set -> the same sets: writes `pos` on every set of this model that the run also has, at
+the same cardinality. Reads nothing from the current state.
+
+`run` names the source the way a spec names a config -- `cell/adh_jelly_x10`, or an absolute
+directory (`plexus.paths.resolve_run`). `frame` indexes the recorded frames, -1 being the last.
+
+A set is matched BY NAME AND BY COUNT. Both are required and the count is the one that catches
+real mistakes: two models can share a set name and disagree about how many elements it has, and
+writing 2,013,800 positions into a set of 402,760 is a silent corruption in numpy's favour.
+A set present here and absent there is reported and left at whatever `build` gave it, because
+a new model is allowed to introduce sets the old one never had -- that is the point of loading
+a configuration and running different operators over it.
+
+Reference: none -- an initial condition read from disk. Plexus (this work).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `run` | source_run | **required** |
+| `frame` | recorded_frame_index | -1 |
+| `sets` | which_sets_to_restore | "all" |
+| `require` | fail_if_unmatched | True |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: load_run, at: particle, run: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`initial_condition`]{.op-badge} [`checkpoint`]{.op-badge} [`continuation`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/io_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/io_ops.py) &mdash; the registered operator.
+
+```python
+"""Reading state from outside the run: continue from a finished simulation.
+
+    load_run    seed    x_0 taken from another run's recorded frame
+
+WHY THIS IS A SEED AND NOT A "RESUME". The language already has the right word for it. `seed` is
+the phase that establishes `x_0` before any dynamics (plexus2, "The seed window"), and starting
+from a previous run's final configuration is exactly that -- an initial condition that happens to
+have been computed rather than constructed. Making it a seed means it composes: a spec may seed a
+cell atlas, then overwrite the positions from a finished run, then run a COMPLETELY DIFFERENT
+schedule over the result, and nothing in the engine has to know that two of those came from
+different places.
+
+WHAT IS RESTORED, AND WHAT IS NOT -- and the second half matters more than the first.
+
+    restored     every set's `pos` (and any other recorded block the set still declares)
+    NOT restored `vel`, and the MPM continuum state: the deformation gradient F, the affine
+                 velocity C, the plastic ratio Jp
+
+The trajectory records positions and occupancy; `vel` is `record=False` on a spatial set and F, C
+and Jp are per-particle BUFFERS, which no trajectory holds. So a loaded run starts from the right
+SHAPE with F = I, C = 0 and v = 0: the geometry of a settled cell, with its stress history
+discarded and its material at rest. For "take these spread cells and now do something else to
+them" that is the correct semantics and not a compromise. For "continue the same physics from
+where it stopped" it is NOT a resume, and this operator says so loudly rather than letting a run
+look continuous while its elastic energy silently went to zero.
+
+ORDER MATTERS IN THE `seed:` SECTION. Seeds run in declaration order, so a spec that wants both
+the atlas's per-piece volumes and a loaded geometry declares `seed_cell_atlas` FIRST and
+`load_run` second: the atlas sets `p_vol`/`mass` from each piece's shape, and the load then moves
+the points. Reversed, the atlas would overwrite the loaded positions.
+"""
+from __future__ import annotations
+
+import os
+
+import numpy as np
+import torch
+
+from plexus.models.base import Seed
+from plexus.models.registry import register_operator
+from plexus.paths import resolve_run
+
+
+@register_operator("load_run", family="io", set="particle", kind="seed")
+class LoadRun(Seed):
+    """Take `x_0` from a finished run's recorded frame.
+
+    any set -> the same sets: writes `pos` on every set of this model that the run also has, at
+    the same cardinality. Reads nothing from the current state.
+
+    `run` names the source the way a spec names a config -- `cell/adh_jelly_x10`, or an absolute
+    directory (`plexus.paths.resolve_run`). `frame` indexes the recorded frames, -1 being the last.
+
+    A set is matched BY NAME AND BY COUNT. Both are required and the count is the one that catches
+    real mistakes: two models can share a set name and disagree about how many elements it has, and
+    writing 2,013,800 positions into a set of 402,760 is a silent corruption in numpy's favour.
+    A set present here and absent there is reported and left at whatever `build` gave it, because
+    a new model is allowed to introduce sets the old one never had -- that is the point of loading
+    a configuration and running different operators over it.
+
+    Reference: none -- an initial condition read from disk. Plexus (this work).
+    """
+
+    EMIT = None                       # writes x_0 in place; there is no integrable delta
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["run"]
+    MECHANISM_TAGS = ["initial_condition", "checkpoint", "continuation"]
+    PARAM_ROLES = {"run": "source_run", "frame": "recorded_frame_index",
+                   "sets": "which_sets_to_restore", "require": "fail_if_unmatched"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.run = str(params["run"])
+        self.frame = int(params.get("frame", -1))
+        # `sets: all` (the default) restores every set that matches; a list restores only those,
+        # which is how a spec loads a cell's geometry while leaving a new set it has added alone.
+        self.sets = params.get("sets", "all")
+        # REFUSE A LOAD THAT MATCHED NOTHING. The failure mode this guards is a spec that renames
+        # a set and then runs from build's placement -- a scatter in a ball -- while reporting that
+        # it loaded a run. Every number downstream is then about a configuration nobody chose.
+        self.require = bool(params.get("require", True))
+
+    def forward(self, H, mask=None):
+        path = resolve_run(self.run)
+        npz = os.path.join(path, "trajectory.npz")
+        if not os.path.isfile(npz):
+            raise FileNotFoundError(
+                f"load_run: {path} holds no trajectory.npz. A run with `save_data: false` records "
+                f"a two-frame stub or nothing at all -- re-run the source with `record_cap:` set, "
+                f"or point at a run that saved its trajectory.")
+        z = np.load(npz)
+        want = None if self.sets == "all" else set(self.sets)
+
+        matched, skipped, mismatched = [], [], []
+        for name, lvl in H.levels.items():
+            if want is not None and name not in want:
+                continue
+            key = f"{name}__pos"
+            if key not in z.files or "pos" not in lvl.state_schema:
+                skipped.append(name)
+                continue
+            A = z[key]
+            if A.ndim != 3 or A.shape[1] != lvl.n:
+                mismatched.append(f"{name} ({A.shape[1]:,} in the run vs {lvl.n:,} here)")
+                continue
+            P = torch.as_tensor(np.asarray(A[self.frame], np.float32), device=lvl.state.device)
+            p0, p1 = lvl.state_schema["pos"]
+            lvl.state[:, p0:p1] = P[:, : p1 - p0]
+            if "vel" in lvl.state_schema:                 # start at rest: `vel` is never recorded
+                v0, v1 = lvl.state_schema["vel"]
+                lvl.state[:, v0:v1] = 0.0
+            matched.append(name)
+
+        n_fr = int(z[f"{matched[0]}__pos"].shape[0]) if matched else 0
+        print(f"[load_run] {os.path.relpath(path, os.path.dirname(path))}: frame "
+              f"{self.frame} of {n_fr} -> {len(matched)} set(s) restored, "
+              f"{len(skipped)} not in the run", flush=True)
+        if mismatched:
+            raise ValueError(
+                "load_run: these sets exist in both models at DIFFERENT sizes, which is a "
+                "different model wearing the same names: " + "; ".join(mismatched))
+        if self.require and not matched:
+            raise ValueError(
+                f"load_run: {path} matched none of this model's sets "
+                f"(it has {sorted(k[:-5] for k in z.files if k.endswith('__pos'))[:6]}...). "
+                f"Set `require: false` to start from `build`'s placement instead.")
+        # SAID EVERY TIME, not once in a docstring: a loaded run is a SHAPE, not a continuation.
+        print("[load_run] restored positions only -- velocity, the deformation gradient F, the "
+              "affine velocity C and the plastic ratio Jp are NOT in a trajectory, so the material "
+              "starts at rest and unstressed. This is a new run from a computed configuration, "
+              "not a resume.", flush=True)
+        return {}
+```

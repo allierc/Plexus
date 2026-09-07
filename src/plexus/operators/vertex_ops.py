@@ -1715,7 +1715,7 @@ class Divide3D(Structural):
 
 @register_operator("cell_die", set="vertex", kind="die", family="population")
 class Apoptosis3D(Structural):
-    """Cell elimination: the Die family, and the inverse of `cell_divide`. A marked cell contracts
+    """Cell elimination: the die family, and the inverse of `cell_divide`. A marked cell contracts
     its own ring to a point over several frames and is then removed from the surface.
 
     vertex -> vertex: shrinks the marked cells' target area and perimeter, then rebuilds the
@@ -1729,7 +1729,7 @@ class Apoptosis3D(Structural):
     a hole its neighbours have no rule for closing.
 
     It matters that this family exists at all. Growth inflates and division subdivides, so a vertex
-    model with no Die operator can only deform its sheet OUTWARD, and invagination -- one of the
+    model with no die operator can only deform its sheet OUTWARD, and invagination -- one of the
     canonical morphologies -- is unreachable however the other parameters are set.
 
     The base contract carries no criterion of its own; every `model:` below differs ONLY in what
@@ -2651,7 +2651,7 @@ class CellCycle3D(Lateral):
 
         cycle_progress  p: the cell's continuous position through one cycle, 0 at birth, 1 at
                         the end of M. THIS is the state; the operator returns dp/dt and the engine
-                        integrates it, like any other Lateral.
+                        integrates it, like any other lateral.
         phase           0 = G1, 1 = S, 2 = G2, 3 = M -- read off `p` by the phase boundaries, so it
                         holds nothing `p` does not. Kept because it is what the renderer colours by
                         and what `cell_divide[model: cycle]` triggers on.

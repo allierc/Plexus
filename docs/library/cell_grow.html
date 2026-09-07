@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.6.42">
+<meta name="generator" content="quarto-1.8.26">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -21,8 +21,9 @@ ul.task-list li input[type="checkbox"] {
   vertical-align: middle;
 }
 /* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -33,7 +34,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
   { counter-reset: source-line 0; }
@@ -64,17 +65,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
 <script src="../site_libs/quarto-html/popper.min.js"></script>
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b758ccaa5987ceb1b75504551e579abf.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-70408cb9dc52a2002c2463371a30459f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -118,7 +123,7 @@ const typesetMath = (el) => {
     var macros = [];
     for (var i = 0; i < mathElements.length; i++) {
       var texText = mathElements[i].firstChild;
-      if (mathElements[i].tagName == "SPAN") {
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
         window.katex.render(texText.data, mathElements[i], {
           displayMode: mathElements[i].classList.contains('display'),
           throwOnError: false,
@@ -136,7 +141,169 @@ window.Quarto = {
 
 </head>
 
-<body class="nav-fixed">
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
@@ -159,7 +326,7 @@ window.Quarto = {
   </li>  
   <li class="nav-item">
     <a class="nav-link" href="../language.html"> 
-<span class="menu-text">The language</span></a>
+<span class="menu-text">Language</span></a>
   </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
@@ -219,10 +386,11 @@ window.Quarto = {
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
+
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">cell_grow</h1>
-<p class="subtitle lead">Cell_grow (cell, structural): CELL rest-VOLUME growth – the biological growth primitive.</p>
+<p class="subtitle lead">The morphogen decides where the tissue grows.</p>
 </div>
 
 
@@ -240,9 +408,9 @@ window.Quarto = {
 
 
 <div class="op-head">
-<p><img src="../figures/icons/structural.png" class="op-logo img-fluid"></p>
-<p><span class="op-badge"><code>structural</code></span> <span class="op-badge"><code>acts on: cell</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
-<p>Cell_grow (cell, structural): CELL rest-VOLUME growth – the biological growth primitive.</p>
+<p><img src="../figures/icons/lateral.png" class="op-logo img-fluid"></p>
+<p><span class="op-badge"><code>lateral</code></span> <span class="op-badge"><code>acts on: vertex</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
+<p>The morphogen decides where the tissue grows.</p>
 </div>
 <style>
 .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
@@ -264,20 +432,25 @@ window.Quarto = {
 <section id="role-in-plexus" class="level2">
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
-<li><strong>Kind</strong> — <span class="math inline">\(|S|\)</span> <strong>Structural</strong>: change the entities themselves — Divide, Die, grow.</li>
-<li><strong>Acts on</strong> — <code>cell</code> (the set the operator acts on).</li>
+<li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
+<li><strong>Acts on</strong> — <code>vertex</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — –</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
-<li><strong>Dimensions</strong> — 2D, 3D.</li>
+<li><strong>Dimensions</strong> — 3D.</li>
 </ul>
 </section>
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
-<p>Growth belongs to the CELL, not to the material points. Each cell carries a biological growth STATE – a rest-volume multiplier <code>grow_V</code> (1.0 = birth size) – that <code>cell_grow</code> advances by a GROWTH LAW. A backend REALIZATION then discretises that state by waking dormant reserve MPM particles (declare <code>grow_reserve:</code> on the mpm_particle child) so the live material tracks the target volume. The biology (rest-volume growth) is the invariant; particle addition is merely the current numerical realization – swap the discretisation (adaptive sampling, another continuum) and the growth LAW stays identical.</p>
-<p>This is a change of ONTOLOGY, not just another behaviour: earlier operators answer “how do cells move?”; growth answers “how does biological material itself increase?”. So the abstraction is CELL GROWTH, not particle activation.</p>
-<p>GROWTH LAWS (<code>mode</code>): isotropic logistic rest-volume growth; new material added in all directions -&gt; rounds by elasticity anisotropic same law, new material biased along <code>axis</code> (<code>aniso</code>) -&gt; a finger / bud tip growth localised at the leading edge along <code>axis</code> (<code>tip</code>) -&gt; tip-driven elongation <code>rate</code> is the specific growth rate (dV/dt = rate<em>V</em>(1-V/<code>target</code>), logistic -&gt; <code>target</code> = size/contact inhibition). <code>stress_gain</code>&gt;0 couples the rate to local deformation (mechano-inhibition: growth slows in compressed tissue). An anisotropic bud ROUNDS on its own once growth isotropises / relaxes (emergent, not scripted). Separates MASS INCREASE (cell_grow) from TOPOLOGY CHANGE (<code>cell_divide</code>, which then REPOPULATES the grown volume).</p>
-<p><code>rate&lt;=0</code> is a byte-identical no-op (the reserve is inert – p2g/g2p mask by occ). kind=structural; mutates <code>cell.grow_V</code> + the child occ/state, returns {}.</p>
+<p>TARGETS are raised, and the mechanics then inflates the cell by force balance.</p>
+<p>cell -&gt; vertex: reads the cell set’s chem, writes the mesh’s target area A0, perimeter P0, volume V0f and radius R0. It moves no vertex itself – it raises what the cells ASK for, and <code>cell_mechanics</code> decides whether they get it.</p>
+<pre><code>s_j                                the cumulative per-cell growth scale, integrated by the engine</code></pre>
+<p>rate is the growth rate in inverse units of simulation time – the fraction of itself a cell adds per unit time, so a spec’s own <code>dt</code> sets how much of it lands in one frame. rho is the dimensionless baseline: the fraction of the full rate a cell grows at with no activator present. a_sw is the activator concentration at which the switch is half open, and n is <code>hill</code>, its dimensionless sharpness. The two regimes are the ends of one operator:</p>
+<pre><code>rho = 1, a_sw = 0   uniform growth, every cell at the same rate
+rho = 0, a_sw &gt; 0   growth only where the activator is high: self-organised budding
+in between          a baseline everywhere plus an activator-driven excess at the tips</code></pre>
+<p><code>a_sw_rel</code> decides whether a_sw is an ABSOLUTE activator concentration or a fraction of the field’s own running maximum. Both are real mechanisms – an absolute threshold is a receptor with a fixed affinity, a relative one is a cell comparing itself with its neighbours – and the default is absolute. <code>a_live</code> is the floor below which the field counts as dead and the relative gate refuses to open, so a collapsed activator cannot have its own noise rescaled into a threshold crossing.</p>
+<p>Reference: Okuda, S. et al.&nbsp;(2018). Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis of the tissue. Sci. Rep.&nbsp;8:2386.</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
@@ -292,230 +465,401 @@ window.Quarto = {
 <tbody>
 <tr class="odd">
 <td><code>rate</code></td>
-<td>growth_rate</td>
-<td>0.0</td>
-</tr>
-<tr class="even">
-<td><code>target</code></td>
-<td>size_inhibition</td>
-<td>4.0</td>
-</tr>
-<tr class="odd">
-<td><code>aniso</code></td>
-<td>growth_anisotropy</td>
-<td>0.0</td>
-</tr>
-<tr class="even">
-<td><code>tip</code></td>
-<td>tip_localization</td>
-<td>0.0</td>
-</tr>
-<tr class="odd">
-<td><code>stress_gain</code></td>
-<td>mechano_inhibition</td>
-<td>0.0</td>
-</tr>
-<tr class="even">
-<td><code>child</code></td>
-<td>–</td>
-<td>“mpm_particle”</td>
-</tr>
-<tr class="odd">
-<td><code>mode</code></td>
-<td>–</td>
-<td>“isotropic”</td>
-</tr>
-<tr class="even">
-<td><code>offset</code></td>
 <td>–</td>
 <td>0.01</td>
 </tr>
-<tr class="odd">
-<td><code>prestretch</code></td>
+<tr class="even">
+<td><code>a_sw</code></td>
 <td>–</td>
-<td>1.0</td>
+<td>0.20</td>
+</tr>
+<tr class="odd">
+<td><code>a_sw_rel</code></td>
+<td>–</td>
+<td>False</td>
 </tr>
 <tr class="even">
-<td><code>axis</code></td>
+<td><code>a_live</code></td>
+<td>–</td>
+<td>1e-3</td>
+</tr>
+<tr class="odd">
+<td><code>inhib_chan</code></td>
 <td>–</td>
 <td>None</td>
+</tr>
+<tr class="even">
+<td><code>inhib_sw</code></td>
+<td>–</td>
+<td>0.35</td>
+</tr>
+<tr class="odd">
+<td><code>inhib_hill</code></td>
+<td>–</td>
+<td>4.0</td>
+</tr>
+<tr class="even">
+<td><code>hill</code></td>
+<td>–</td>
+<td>3.0</td>
+</tr>
+<tr class="odd">
+<td><code>cap</code></td>
+<td>–</td>
+<td>2.5</td>
+</tr>
+<tr class="even">
+<td><code>rho</code></td>
+<td>–</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td><code>vth_frac</code></td>
+<td>–</td>
+<td>1.35</td>
+</tr>
+<tr class="even">
+<td><code>conserve_amount</code></td>
+<td>–</td>
+<td>True</td>
 </tr>
 </tbody>
 </table>
 </section>
 <section id="minimal-spec" class="level2">
 <h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> cell_grow</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> cell_grow</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> vertex</span><span class="kw">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="mechanism-search-tags" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
-<p><strong>Mechanism</strong> — <span class="op-badge"><code>tissue_growth</code></span> <span class="op-badge"><code>rest_volume_growth</code></span> <span class="op-badge"><code>anisotropic_growth</code></span> <span class="op-badge"><code>budding</code></span></p>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>growth</code></span> <span class="op-badge"><code>morphogen_driven</code></span> <span class="op-badge"><code>budding</code></span> <span class="op-badge"><code>cross_scale</code></span></p>
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>structural</strong> operators: <a href="../library/cell_divide.html"><code>cell_divide</code></a>.</p>
+<p>Other <strong>lateral</strong> operators: <a href="../library/attraction_repulsion.html"><code>attraction_repulsion</code></a>, <a href="../library/squared_law.html"><code>squared_law</code></a>, <a href="../library/cohesion.html"><code>cohesion</code></a>, <a href="../library/separation.html"><code>separation</code></a>, <a href="../library/velocity_align.html"><code>velocity_align</code></a>, <a href="../library/alignment.html"><code>alignment</code></a>.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
-<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/cell_grow.py"><code>src/plexus/operators/cell_grow.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""cell_grow (cell, structural): CELL rest-VOLUME growth -- the biological growth primitive.</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">Growth belongs to the CELL, not to the material points. Each cell carries a biological growth STATE</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">-- a rest-volume multiplier `grow_V` (1.0 = birth size) -- that `cell_grow` advances by a GROWTH LAW.</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">A backend REALIZATION then discretises that state by waking dormant reserve MPM particles (declare</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">`grow_reserve:` on the mpm_particle child) so the live material tracks the target volume. The biology</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">(rest-volume growth) is the invariant; particle addition is merely the current numerical realization</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- swap the discretisation (adaptive sampling, another continuum) and the growth LAW stays identical.</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">This is a change of ONTOLOGY, not just another behaviour: earlier operators answer "how do cells</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">move?"; growth answers "how does biological material itself increase?". So the abstraction is CELL</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">GROWTH, not particle activation.</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">GROWTH LAWS (`mode`):</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">  isotropic    logistic rest-volume growth; new material added in all directions -&gt; rounds by elasticity</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">  anisotropic  same law, new material biased along `axis` (`aniso`) -&gt; a finger / bud</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co">  tip          growth localised at the leading edge along `axis` (`tip`) -&gt; tip-driven elongation</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="co">`rate` is the specific growth rate (dV/dt = rate*V*(1-V/`target`), logistic -&gt; `target` = size/contact</span></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="co">inhibition). `stress_gain`&gt;0 couples the rate to local deformation (mechano-inhibition: growth slows in</span></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co">compressed tissue). An anisotropic bud ROUNDS on its own once growth isotropises / relaxes (emergent,</span></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="co">not scripted). Separates MASS INCREASE (cell_grow) from TOPOLOGY CHANGE (`cell_divide`, which then</span></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="co">REPOPULATES the grown volume).</span></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="co">`rate&lt;=0` is a byte-identical no-op (the reserve is inert -- p2g/g2p mask by occ). kind=structural;</span></span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="co">mutates `cell.grow_V` + the child occ/state, returns {}.</span></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Structural</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"cell_grow"</span>, family<span class="op">=</span><span class="st">"growth"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"structural"</span>)</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> CellGrow(Structural):</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span>                                           <span class="co"># structural: advances `grow_V` + wakes reserve child particles in place; returns {} — no integrable delta</span></span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []                                  <span class="co"># no required params — `rate`&lt;=0 is a no-op; all knobs optional</span></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"tissue_growth"</span>, <span class="st">"rest_volume_growth"</span>, <span class="st">"anisotropic_growth"</span>, <span class="st">"budding"</span>]</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"rate"</span>: <span class="st">"growth_rate"</span>, <span class="st">"target"</span>: <span class="st">"size_inhibition"</span>,</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"aniso"</span>: <span class="st">"growth_anisotropy"</span>, <span class="st">"tip"</span>: <span class="st">"tip_localization"</span>,</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"stress_gain"</span>: <span class="st">"mechano_inhibition"</span>}</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Okuda, S. et al. (2015). Biomech. Model. Mechanobiol. 12:627-644."</span></span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"cell"</span>)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.child <span class="op">=</span> params.get(<span class="st">"child"</span>, <span class="st">"mpm_particle"</span>)      <span class="co"># the MPM discretisation of this cell</span></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.0</span>))            <span class="co"># specific growth rate (per unit time)</span></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.target <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"target"</span>, <span class="fl">4.0</span>))        <span class="co"># logistic ceiling on grow_V (size inhibition)</span></span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.mode <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"mode"</span>, <span class="st">"isotropic"</span>))      <span class="co"># isotropic | anisotropic | tip</span></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.aniso <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"aniso"</span>, <span class="fl">0.0</span>))          <span class="co"># 0 round .. 1 fully along `axis`</span></span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.tip <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"tip"</span>, <span class="fl">0.0</span>))              <span class="co"># 0 uniform .. large = seed only the leading edge</span></span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.offset <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"offset"</span>, <span class="fl">0.01</span>))       <span class="co"># placement distance from the seed (world units)</span></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="co"># prestretch: woken-particle rest state F = prestretch * I. 1.0 = the old density-only realization</span></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        <span class="co"># (F=I -&gt; zero corotated stress -&gt; new material co-locates, adds DENSITY not VOLUME: byte-identical</span></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        <span class="co"># no-op). prestretch &lt; 1 inserts each woken particle PRE-COMPRESSED (J = prestretch^D &lt; 1) so the</span></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        <span class="co"># fixed-corotated law gives it outward pressure -&gt; it relaxes toward rest by pushing neighbours out</span></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        <span class="co"># -&gt; the envelope genuinely INFLATES. This is what realizes cell rest-VOLUME growth (b57 proved the</span></span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        <span class="co"># F=I realization cannot: grow_ratio pinned at 1.000 across the whole offset/reserve ladder).</span></span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.prestretch <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"prestretch"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.stress_gain <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"stress_gain"</span>, <span class="fl">0.0</span>))  <span class="co"># &gt;0 slows growth in deformed tissue</span></span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        ax <span class="op">=</span> params.get(<span class="st">"axis"</span>, <span class="va">None</span>)</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.axis <span class="op">=</span> [<span class="bu">float</span>(a) <span class="cf">for</span> a <span class="kw">in</span> ax] <span class="cf">if</span> ax <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> <span class="va">None</span></span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>    <span class="co"># --- backend realisation: wake `k` dormant particles of ONE cell, near its tissue, per the law ---</span></span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _realize_cell(<span class="va">self</span>, part, livep, free, k, rng, dev):</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        px0, px1 <span class="op">=</span> part.state_schema[<span class="st">"pos"</span>]<span class="op">;</span> D <span class="op">=</span> px1 <span class="op">-</span> px0</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        X <span class="op">=</span> part.state[:, px0:px1]</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        Xl <span class="op">=</span> X[livep]</span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        a <span class="op">=</span> <span class="va">None</span></span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.axis <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="va">self</span>.mode <span class="kw">in</span> (<span class="st">"anisotropic"</span>, <span class="st">"tip"</span>):</span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>            a <span class="op">=</span> torch.tensor(<span class="va">self</span>.axis[:D], device<span class="op">=</span>dev, dtype<span class="op">=</span>X.dtype)</span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>            a <span class="op">=</span> a <span class="op">/</span> a.norm().clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        <span class="co"># seed selection: leading edge along axis when tip&gt;0, else uniform</span></span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> a <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="va">self</span>.tip <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">and</span> <span class="va">self</span>.mode <span class="op">==</span> <span class="st">"tip"</span>:</span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>            proj <span class="op">=</span> Xl <span class="op">@</span> a</span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>            w <span class="op">=</span> torch.softmax(<span class="va">self</span>.tip <span class="op">*</span> (proj <span class="op">-</span> proj.<span class="bu">max</span>()) <span class="op">/</span> proj.std().clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>), dim<span class="op">=</span><span class="dv">0</span>)</span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>            sel <span class="op">=</span> torch.multinomial(w, k, replacement<span class="op">=</span><span class="va">True</span>, generator<span class="op">=</span>rng)</span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>            sel <span class="op">=</span> torch.randint(<span class="dv">0</span>, <span class="bu">int</span>(livep.numel()), (k,), generator<span class="op">=</span>rng, device<span class="op">=</span>dev)</span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>        seeds <span class="op">=</span> livep[sel]<span class="op">;</span> slots <span class="op">=</span> free[:k]</span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        <span class="co"># placement direction: blend axis (anisotropic) with random (isotropic)</span></span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>        rnd <span class="op">=</span> torch.randn(k, D, generator<span class="op">=</span>rng, device<span class="op">=</span>dev)</span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        rnd <span class="op">=</span> rnd <span class="op">/</span> rnd.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        dirv <span class="op">=</span> (<span class="va">self</span>.aniso <span class="op">*</span> a[<span class="va">None</span>, :] <span class="op">+</span> (<span class="fl">1.0</span> <span class="op">-</span> <span class="va">self</span>.aniso) <span class="op">*</span> rnd) <span class="cf">if</span> a <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> rnd</span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>        dirv <span class="op">=</span> dirv <span class="op">/</span> dirv.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        jit <span class="op">=</span> <span class="fl">0.25</span> <span class="op">*</span> <span class="va">self</span>.offset <span class="op">*</span> torch.randn(k, D, generator<span class="op">=</span>rng, device<span class="op">=</span>dev)</span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>        newpos <span class="op">=</span> X[seeds] <span class="op">+</span> <span class="va">self</span>.offset <span class="op">*</span> dirv <span class="op">+</span> jit</span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>        <span class="co"># inherit the seed's material; the fresh material starts PRE-COMPRESSED (F=prestretch*I, C=0) so it</span></span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>        <span class="co"># carries outward pressure and inflates the envelope (prestretch=1 -&gt; F=I -&gt; old density-only no-op)</span></span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>        buf <span class="op">=</span> part.occ.shape[<span class="dv">0</span>]</span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>        part.state[slots] <span class="op">=</span> part.state[seeds].clone()</span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> _n, b <span class="kw">in</span> <span class="bu">list</span>(part.named_buffers()):</span>
-<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> b <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> b.dim() <span class="op">==</span> <span class="dv">0</span> <span class="kw">or</span> b.shape[<span class="dv">0</span>] <span class="op">!=</span> buf:</span>
-<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
-<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>            b[slots] <span class="op">=</span> b[seeds].clone()</span>
-<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>        part.state[slots, px0:px1] <span class="op">=</span> newpos</span>
-<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">hasattr</span>(part, <span class="st">"F"</span>) <span class="kw">and</span> part.F <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>            part.F[slots] <span class="op">=</span> (<span class="va">self</span>.prestretch <span class="op">*</span> torch.eye(D, device<span class="op">=</span>dev)).expand(k, D, D).clone()</span>
-<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">hasattr</span>(part, <span class="st">"C"</span>) <span class="kw">and</span> part.C <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>            part.C[slots] <span class="op">=</span> <span class="fl">0.0</span></span>
-<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a>        part.occ[slots] <span class="op">=</span> <span class="fl">1.0</span></span>
-<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">hasattr</span>(part, <span class="st">"birth"</span>):</span>
-<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a>            part.birth[slots] <span class="op">=</span> <span class="fl">1.0</span></span>
-<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.rate <span class="op">&lt;=</span> <span class="fl">0.0</span>:</span>
-<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}</span>
-<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a>        cell <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> dev <span class="op">=</span> cell.state.device</span>
-<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>        part <span class="op">=</span> H.level(<span class="va">self</span>.child)</span>
-<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>        rng <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"rng"</span>, <span class="va">None</span>)</span>
-<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a>        ncell <span class="op">=</span> cell.occ.shape[<span class="dv">0</span>]</span>
-<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a>        par <span class="op">=</span> part.parent</span>
-<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a>        <span class="co"># --- biological growth STATE on the cell (lazy provision) ---</span></span>
-<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">getattr</span>(cell, <span class="st">"grow_V"</span>, <span class="va">None</span>) <span class="kw">is</span> <span class="va">None</span>:</span>
-<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>            cell.register_buffer(<span class="st">"grow_V"</span>, torch.ones(ncell, device<span class="op">=</span>dev))</span>
-<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">getattr</span>(cell, <span class="st">"grow_base"</span>, <span class="va">None</span>) <span class="kw">is</span> <span class="va">None</span>:           <span class="co"># birth-size live count per cell (grow_V==1)</span></span>
-<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>            base <span class="op">=</span> torch.zeros(ncell, device<span class="op">=</span>dev)</span>
-<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>            base.index_add_(<span class="dv">0</span>, par, (part.occ <span class="op">&gt;</span> <span class="dv">0</span>).<span class="bu">float</span>())</span>
-<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a>            cell.register_buffer(<span class="st">"grow_base"</span>, base.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1.0</span>))</span>
-<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a>        <span class="co"># --- 1. BIOLOGY: advance grow_V by the logistic growth law (+ optional mechano-inhibition) ---</span></span>
-<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>        V <span class="op">=</span> cell.grow_V</span>
-<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a>        live_cell <span class="op">=</span> (cell.occ <span class="op">&gt;</span> <span class="dv">0</span>).<span class="bu">float</span>()</span>
-<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `at:` may restrict growth to a SUBSET of cells (e.g. cell[type=bud]): the engine</span></span>
-<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a>        <span class="co"># passes that per-cell boolean mask, so gate the growth law by it -&gt; only the selected</span></span>
-<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cells advance grow_V and wake reserve; the rest stay at birth size. For a plain</span></span>
-<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `at: cell` the mask is all-live -&gt; live_cell unchanged -&gt; byte-identical to before.</span></span>
-<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a>            live_cell <span class="op">=</span> live_cell <span class="op">*</span> mask.to(live_cell.dtype)</span>
-<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a>        smod <span class="op">=</span> torch.ones(ncell, device<span class="op">=</span>dev)</span>
-<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.stress_gain <span class="op">&gt;</span> <span class="fl">0.0</span> <span class="kw">and</span> <span class="bu">getattr</span>(part, <span class="st">"F"</span>, <span class="va">None</span>) <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a>            eye <span class="op">=</span> torch.eye(part.F.shape[<span class="op">-</span><span class="dv">1</span>], device<span class="op">=</span>dev)</span>
-<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a>            defo <span class="op">=</span> (part.F <span class="op">-</span> eye).reshape(part.F.shape[<span class="dv">0</span>], <span class="op">-</span><span class="dv">1</span>).norm(dim<span class="op">=</span><span class="dv">1</span>) <span class="op">*</span> (part.occ <span class="op">&gt;</span> <span class="dv">0</span>).<span class="bu">float</span>()</span>
-<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a>            cdefo <span class="op">=</span> torch.zeros(ncell, device<span class="op">=</span>dev)<span class="op">;</span> cdefo.index_add_(<span class="dv">0</span>, par, defo)</span>
-<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a>            cnt <span class="op">=</span> torch.zeros(ncell, device<span class="op">=</span>dev)<span class="op">;</span> cnt.index_add_(<span class="dv">0</span>, par, (part.occ <span class="op">&gt;</span> <span class="dv">0</span>).<span class="bu">float</span>())</span>
-<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a>            smod <span class="op">=</span> <span class="fl">1.0</span> <span class="op">/</span> (<span class="fl">1.0</span> <span class="op">+</span> <span class="va">self</span>.stress_gain <span class="op">*</span> (cdefo <span class="op">/</span> cnt.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1.0</span>)))</span>
-<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a>        cell.grow_V <span class="op">=</span> V <span class="op">+</span> <span class="va">self</span>.rate <span class="op">*</span> V <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> V <span class="op">/</span> <span class="va">self</span>.target) <span class="op">*</span> dt <span class="op">*</span> smod <span class="op">*</span> live_cell</span>
-<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a>        <span class="co"># --- 2. REALIZATION: wake dormant child particles so live count ~ grow_base * grow_V ---</span></span>
-<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a>        live_mask <span class="op">=</span> part.occ <span class="op">&gt;</span> <span class="dv">0</span></span>
-<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a>        cur <span class="op">=</span> torch.zeros(ncell, device<span class="op">=</span>dev)<span class="op">;</span> cur.index_add_(<span class="dv">0</span>, par, live_mask.<span class="bu">float</span>())</span>
-<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a>        deficit <span class="op">=</span> ((cell.grow_base <span class="op">*</span> cell.grow_V) <span class="op">-</span> cur).floor().clamp(<span class="bu">min</span><span class="op">=</span><span class="dv">0</span>).<span class="bu">long</span>()</span>
-<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">int</span>(deficit.<span class="bu">sum</span>().item()) <span class="op">==</span> <span class="dv">0</span>:</span>
-<span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}</span>
-<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> c <span class="kw">in</span> torch.nonzero(deficit <span class="op">&gt;</span> <span class="dv">0</span>, as_tuple<span class="op">=</span><span class="va">True</span>)[<span class="dv">0</span>].tolist():</span>
-<span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a>            free <span class="op">=</span> ((par <span class="op">==</span> c) <span class="op">&amp;</span> (part.occ <span class="op">==</span> <span class="dv">0</span>)).nonzero(as_tuple<span class="op">=</span><span class="va">True</span>)[<span class="dv">0</span>]</span>
-<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a>            livep <span class="op">=</span> ((par <span class="op">==</span> c) <span class="op">&amp;</span> live_mask).nonzero(as_tuple<span class="op">=</span><span class="va">True</span>)[<span class="dv">0</span>]</span>
-<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a>            k <span class="op">=</span> <span class="bu">min</span>(<span class="bu">int</span>(deficit[c].item()), <span class="bu">int</span>(free.numel()))</span>
-<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> k <span class="op">&lt;=</span> <span class="dv">0</span> <span class="kw">or</span> livep.numel() <span class="op">==</span> <span class="dv">0</span>:</span>
-<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
-<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._realize_cell(part, livep, free, k, rng, dev)</span>
-<span id="cb2-157"><a href="#cb2-157" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/diffusion_reaction.py"><code>src/plexus/operators/diffusion_reaction.py</code></a> — the registered operator.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"cell_grow"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"vertex"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>, family<span class="op">=</span><span class="st">"population"</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Grow3D(Lateral):</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Chemistry-to-shape: the morphogen decides where the tissue grows. Each cell's mechanical</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">    TARGETS are raised, and the mechanics then inflates the cell by force balance.</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co">    cell -&gt; vertex: reads the cell set's chem, writes the mesh's target area A0, perimeter P0,</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co">    volume V0f and radius R0. It moves no vertex itself -- it raises what the cells ASK for, and</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co">    `cell_mechanics` decides whether they get it.</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="co">        ds_j/dt = s_j rate ( rho + Hill(a_j) )</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co">        Hill(a) = a^n / (a^n + a_sw^n)</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="co">        s_j                                the cumulative per-cell growth scale, integrated by the engine</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="co">    rate is the growth rate in inverse units of simulation time -- the fraction of itself a cell</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co">    adds per unit time, so a spec's own `dt` sets how much of it lands in one frame. rho is the dimensionless baseline: the fraction of</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="co">    the full rate a cell grows at with no activator present. a_sw is the activator concentration at</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="co">    which the switch is half open, and n is `hill`, its dimensionless sharpness. The two regimes</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="co">    are the ends of one operator:</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="co">        rho = 1, a_sw = 0   uniform growth, every cell at the same rate</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="co">        rho = 0, a_sw &gt; 0   growth only where the activator is high: self-organised budding</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="co">        in between          a baseline everywhere plus an activator-driven excess at the tips</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a><span class="co">    `a_sw_rel` decides whether a_sw is an ABSOLUTE activator concentration or a fraction of the</span></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="co">    field's own running maximum. Both are real mechanisms -- an absolute threshold is a receptor</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="co">    with a fixed affinity, a relative one is a cell comparing itself with its neighbours -- and the</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a><span class="co">    default is absolute. `a_live` is the floor below which the field counts as dead and the</span></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a><span class="co">    relative gate refuses to open, so a collapsed activator cannot have its own noise rescaled into</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="co">    a threshold crossing.</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a><span class="co">    Reference: Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces</span></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a><span class="co">    autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386.</span></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Reads one species' activator; the span it points into is two wide because a Gray-Scott</span></span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>    <span class="co"># system is. It never writes chem, so this only has to name the right column.</span></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>    N_SPECIES <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>    <span class="co"># MAY_MUTATE_INTEGRATED_STATE IS STILL TRUE, AND GROWTH IS NO LONGER WHY. The four targets --</span></span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>    <span class="co"># `mg_scale`, `A0`, `P0`, `V0f` -- are returned as deltas now and the engine integrates them,</span></span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>    <span class="co"># so the dynamics this operator exists for writes nothing. Three things it does BESIDE the</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>    <span class="co"># dynamics still land in place on the cell set, and each is a different kind of write:</span></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>    <span class="co">#</span></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>    <span class="co">#   the baseline re-take   `A0_init` / `P0_init` / `V0f_init` are re-seeded whenever `nF` moves.</span></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>    <span class="co">#                          That is a RESET, not a rate, and it has no delta form. (The policy of</span></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>    <span class="co">#                          re-taking the whole population's baseline because some cell divided is</span></span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a>    <span class="co">#                          wrong and is its own parked rung -- see the note at the test below.)</span></span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a>    <span class="co">#   `conserve_amount`      c_j &lt;- c_j * (v_old/v_new) when the cell's target volume grows: a</span></span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a>    <span class="co">#                          change of VARIABLE forced by a volume change, not a dynamics delta.</span></span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a>    <span class="co">#                          Returning it as an integrated delta would change the physics.</span></span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a>    <span class="co">#   `inhib_frac`           a readout of the inhibitor gate, recorded so the renderer can show it.</span></span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a>    <span class="co">#</span></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a>    <span class="co"># None of the three is reached on every composition -- the rescale needs chemistry present, the</span></span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a>    <span class="co"># inhibitor needs `inhib_chan` set -- so a declaration of False would look correct on most runs</span></span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>    <span class="co"># and fail on the ones that matter.</span></span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">3</span>]<span class="op">;</span> DIFFERENTIABLE <span class="op">=</span> <span class="va">False</span><span class="op">;</span> MAY_MUTATE_INTEGRATED_STATE <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"growth"</span>, <span class="st">"morphogen_driven"</span>, <span class="st">"budding"</span>, <span class="st">"cross_scale"</span>]</span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386."</span></span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"vertex"</span>)<span class="op">;</span> <span class="va">self</span>._cat <span class="op">=</span> params.get(<span class="st">"cell_set"</span>)</span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.01</span>))<span class="op">;</span> <span class="va">self</span>.a_sw <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"a_sw"</span>, <span class="fl">0.20</span>))</span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a>        <span class="co"># WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are</span></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a>        <span class="co"># unchanged; 2 reads a second RD system living in the same buffer.</span></span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.chan <span class="op">=</span> _chan(params, <span class="bu">type</span>(<span class="va">self</span>).<span class="va">__name__</span>, <span class="va">self</span>.N_SPECIES)</span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a>        <span class="co"># IS `a_sw` A VALUE OF THE ACTIVATOR OR A FRACTION OF ITS MAXIMUM? Default False = the</span></span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>        <span class="co"># absolute reading every run in this project's history used, so no archived spec changes</span></span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a>        <span class="co"># meaning. See the gate itself in `forward` for why both are real mechanisms. `a_live` is</span></span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the floor below which a field counts as dead and the relative gate refuses to open --</span></span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a>        <span class="co"># 1e-3 against activators that reach 0.6-1.5 when alive and 1e-9 when they have collapsed.</span></span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.a_sw_rel <span class="op">=</span> <span class="bu">bool</span>(params.get(<span class="st">"a_sw_rel"</span>, <span class="va">False</span>))</span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.a_live <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"a_live"</span>, <span class="fl">1e-3</span>))</span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE INHIBITOR: None = off, so every existing spec is unchanged. `inhib_sw` is a fraction</span></span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a>        <span class="co"># of the inhibitor's OWN maximum and `inhib_hill` its sharpness, mirroring a_sw/hill.</span></span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a>        _ic <span class="op">=</span> params.get(<span class="st">"inhib_chan"</span>, <span class="va">None</span>)</span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.inhib_chan <span class="op">=</span> <span class="va">None</span> <span class="cf">if</span> _ic <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> <span class="bu">int</span>(_ic)</span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.inhib_sw <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"inhib_sw"</span>, <span class="fl">0.35</span>))</span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.inhib_hill <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"inhib_hill"</span>, <span class="fl">4.0</span>))</span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._inhib_applied <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.hill <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"hill"</span>, <span class="fl">3.0</span>))<span class="op">;</span> <span class="va">self</span>.cap <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"cap"</span>, <span class="fl">2.5</span>))</span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>        <span class="im">from</span> plexus.operators.vertex_ops <span class="im">import</span> _engine_owns_clock</span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.every <span class="op">=</span> _engine_owns_clock(params)<span class="op">;</span> <span class="va">self</span>._k <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a>        <span class="co"># OKUDA uniform-cell mode: growth rate lambda = rate*(rho + Hill(a)); rho = baseline so ALL cells</span></span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cycle (the activator sets the RATE, not the size), and v_eq is capped at vth_frac*v_ref so every</span></span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cell oscillates in [~2/3, vth_frac]*v_ref -&gt; uniform. rho=0 (default) = legacy activator-only bulge.</span></span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rho <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rho"</span>, <span class="fl">0.0</span>))<span class="op">;</span> <span class="va">self</span>.vth_frac <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"vth_frac"</span>, <span class="fl">1.35</span>))</span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a>        <span class="co"># OKUDA Appendix A: the morphogen is the AMOUNT m_j (conserved within the cell); the concentration</span></span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a>        <span class="co"># c_j=m_j/v_j is only READ by the kinetics. We store c_j, so growing v_j must DILUTE c_j to conserve</span></span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a>        <span class="co"># amount (else we silently CREATE mass each step -&gt; spuriously feeds the tip). On (default) = correct.</span></span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.conserve_amount <span class="op">=</span> <span class="bu">bool</span>(params.get(<span class="st">"conserve_amount"</span>, <span class="va">True</span>))</span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._said_no_cap <span class="op">=</span> <span class="va">False</span>       <span class="co"># the "ceiling not applied" note is printed once per run</span></span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _rate(<span class="va">self</span>, s_prev, hillv, m, v_ref):</span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""The RATE LAW, and the only thing a `model=` variant of cell_grow changes.</span></span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a><span class="co">        Returns ds/dt: the per-UNIT-TIME rate of change of the per-cell linear growth scale `s`,</span></span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a><span class="co">        which the engine integrates as `s &lt;- s + dt * ds`. Volume is V0f_init * s**3, so a constant</span></span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a><span class="co">        proportional rate on `s` is exponential growth in volume -- which is the default and is</span></span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a><span class="co">        deliberate: it is what Okuda's growth term does. Ginzberg, Kafri &amp; Kirschner (Science 2015)</span></span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a><span class="co">        name the consequence exactly: "with exponential growth, larger cells grow faster than do</span></span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a><span class="co">        smaller cells, amplifying any existing size disparities". Measured on this campaign's own</span></span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a><span class="co">        basis, the coefficient of variation of cell volume climbs 0.160 at seed to 0.33-0.53 by</span></span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a><span class="co">        frame 900 in every run. The variants below are the mechanisms that review says real cells</span></span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a><span class="co">        use to stop that, written so the search can put them side by side.</span></span>
+<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a><span class="co">        A RATE, NOT A PER-FRAME FACTOR, and that is the change this rung made. The law used to be</span></span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a><span class="co">        `s &lt;- s (1 + rate (rho + Hill(a)))` applied once per CALL, so `rate` meant "fraction of</span></span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a><span class="co">        itself a cell adds per frame" and the simulation's own `dt` did not appear in it. That is</span></span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a><span class="co">        the same number only at `dt = 1`. Every `config/tissue` spec is `dt: 1.0` and reads</span></span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a><span class="co">        identically; `log/okuda_ECM` runs `dt: 0.0032` and its growth was running 312x faster per</span></span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a><span class="co">        unit of simulated time than the same `rate` now means, so those specs carry `rate / dt` to</span></span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a><span class="co">        preserve what they did.</span></span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a><span class="co">        """</span></span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> s_prev <span class="op">*</span> <span class="va">self</span>.rate <span class="op">*</span> (<span class="va">self</span>.rho <span class="op">+</span> hillv)</span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.</span></span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cat <span class="op">=</span> resolve_cell_set(H, <span class="va">self</span>.at, <span class="bu">getattr</span>(<span class="va">self</span>, <span class="st">"_cat"</span>, <span class="va">None</span>))</span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a>        vlvl <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> m <span class="op">=</span> <span class="bu">getattr</span>(vlvl, <span class="st">"_mesh"</span>, <span class="va">None</span>)</span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> m <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}</span>
+<span id="cb4-122"><a href="#cb4-122" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._k <span class="op">+=</span> <span class="dv">1</span>                    <span class="co"># monotonic tick only -- D1: the engine owns the period</span></span>
+<span id="cb4-123"><a href="#cb4-123" aria-hidden="true" tabindex="-1"></a>        clvl <span class="op">=</span> H.level(<span class="va">self</span>.cat)</span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a>        nF <span class="op">=</span> m[<span class="st">"nF"</span>]</span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> m[<span class="st">"V0f"</span>].device</span>
+<span id="cb4-126"><a href="#cb4-126" aria-hidden="true" tabindex="-1"></a>        <span class="co"># NO CHEMISTRY IS UNIFORM GROWTH, NOT NO GROWTH. This used to `return {}` when the cell set</span></span>
+<span id="cb4-127"><a href="#cb4-127" aria-hidden="true" tabindex="-1"></a>        <span class="co"># carried no `chem` state, which made a growth operator silently inert on any composition</span></span>
+<span id="cb4-128"><a href="#cb4-128" aria-hidden="true" tabindex="-1"></a>        <span class="co"># without an RD pair -- and hid a dependency that is not real: the activator is a GATE, and</span></span>
+<span id="cb4-129"><a href="#cb4-129" aria-hidden="true" tabindex="-1"></a>        <span class="co"># with the gate open (a_sw = 0, rho = 1) the rate does not consult it at all. That guard is</span></span>
+<span id="cb4-130"><a href="#cb4-130" aria-hidden="true" tabindex="-1"></a>        <span class="co"># also why `cell_grow` had to exist as a separate operator. a = 0 is the honest reading</span></span>
+<span id="cb4-131"><a href="#cb4-131" aria-hidden="true" tabindex="-1"></a>        <span class="co"># of "there is no activator here"; the Hill term evaluates to 0 and the rho baseline stands.</span></span>
+<span id="cb4-132"><a href="#cb4-132" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="st">"chem"</span> <span class="kw">in</span> clvl.state_schema:</span>
+<span id="cb4-133"><a href="#cb4-133" aria-hidden="true" tabindex="-1"></a>            <span class="co"># `chan` PICKS THE SPECIES THAT GATES GROWTH. With two RD systems in one buffer this is</span></span>
+<span id="cb4-134"><a href="#cb4-134" aria-hidden="true" tabindex="-1"></a>            <span class="co"># what lets them do different jobs -- species 0 driving growth while species 1 drives</span></span>
+<span id="cb4-135"><a href="#cb4-135" aria-hidden="true" tabindex="-1"></a>            <span class="co"># death -- instead of both operators reading the same activator, which would be one</span></span>
+<span id="cb4-136"><a href="#cb4-136" aria-hidden="true" tabindex="-1"></a>            <span class="co"># mechanism wearing two names.</span></span>
+<span id="cb4-137"><a href="#cb4-137" aria-hidden="true" tabindex="-1"></a>            h0, _h1 <span class="op">=</span> clvl.state_schema[<span class="st">"chem"</span>]</span>
+<span id="cb4-138"><a href="#cb4-138" aria-hidden="true" tabindex="-1"></a>            a <span class="op">=</span> clvl.state[:nF, h0 <span class="op">+</span> <span class="va">self</span>.chan].detach().to(dev)  <span class="co"># per-cell activator</span></span>
+<span id="cb4-139"><a href="#cb4-139" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb4-140"><a href="#cb4-140" aria-hidden="true" tabindex="-1"></a>            a <span class="op">=</span> torch.zeros(nF, device<span class="op">=</span>dev, dtype<span class="op">=</span>m[<span class="st">"V0f"</span>].dtype)</span>
+<span id="cb4-141"><a href="#cb4-141" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE </span><span class="al">TEST</span><span class="co"> WAS DOING TWO JOBS AND THE MOVE SEPARATES THEM. `"mg_scale" not in m or</span></span>
+<span id="cb4-142"><a href="#cb4-142" aria-hidden="true" tabindex="-1"></a>        <span class="co"># m["mg_scale"].shape[0] != nF` meant BOTH "this operator has not run yet" AND "the cell</span></span>
+<span id="cb4-143"><a href="#cb4-143" aria-hidden="true" tabindex="-1"></a>        <span class="co"># count changed since it last did" -- and on the cell set the name is always present with</span></span>
+<span id="cb4-144"><a href="#cb4-144" aria-hidden="true" tabindex="-1"></a>        <span class="co"># length exactly `nF`, so the test can never fire, `s` stays 0 and every target collapses.</span></span>
+<span id="cb4-145"><a href="#cb4-145" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-146"><a href="#cb4-146" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `mg_scale_nF` IS THE SECOND MEANING, WRITTEN DOWN. It is a scalar on the mesh table, like</span></span>
+<span id="cb4-147"><a href="#cb4-147" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `n_div` and `div_blocked`, because it is one number per run and not one per cell. The</span></span>
+<span id="cb4-148"><a href="#cb4-148" aria-hidden="true" tabindex="-1"></a>        <span class="co"># behaviour is exactly what it was: re-baseline whenever the face count moves, which with</span></span>
+<span id="cb4-149"><a href="#cb4-149" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `cell_divide` every four frames is most frames.</span></span>
+<span id="cb4-150"><a href="#cb4-150" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-151"><a href="#cb4-151" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THAT POLICY IS WRONG AND IS NOT CHANGED HERE. Re-taking the whole population's baseline</span></span>
+<span id="cb4-152"><a href="#cb4-152" aria-hidden="true" tabindex="-1"></a>        <span class="co"># because SOME cell divided is why `mg_scale` stops meaning "how much this cell has grown"</span></span>
+<span id="cb4-153"><a href="#cb4-153" aria-hidden="true" tabindex="-1"></a>        <span class="co"># -- measured, it climbs 1.0035 -&gt; 1.0459 before the first division and then never exceeds</span></span>
+<span id="cb4-154"><a href="#cb4-154" aria-hidden="true" tabindex="-1"></a>        <span class="co"># 1.0139 -- and `contact_ops.ecm_gate_growth` read it as cumulative and spent 400 frames</span></span>
+<span id="cb4-155"><a href="#cb4-155" aria-hidden="true" tabindex="-1"></a>        <span class="co"># correcting nothing. Fixing it moves numbers, so it is its own rung with its own evidence;</span></span>
+<span id="cb4-156"><a href="#cb4-156" aria-hidden="true" tabindex="-1"></a>        <span class="co"># this one only moves the storage, and is byte-identical because of that.</span></span>
+<span id="cb4-157"><a href="#cb4-157" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">int</span>(m.get(<span class="st">"mg_scale_nF"</span>, <span class="op">-</span><span class="dv">1</span>)) <span class="op">!=</span> <span class="bu">int</span>(nF):</span>
+<span id="cb4-158"><a href="#cb4-158" aria-hidden="true" tabindex="-1"></a>            m[<span class="st">"mg_scale_nF"</span>] <span class="op">=</span> <span class="bu">int</span>(nF)</span>
+<span id="cb4-159"><a href="#cb4-159" aria-hidden="true" tabindex="-1"></a>            m[<span class="st">"mg_scale"</span>] <span class="op">=</span> torch.ones(nF, device<span class="op">=</span>dev, dtype<span class="op">=</span>m[<span class="st">"V0f"</span>].dtype)</span>
+<span id="cb4-160"><a href="#cb4-160" aria-hidden="true" tabindex="-1"></a>            m[<span class="st">"A0_init"</span>] <span class="op">=</span> m[<span class="st">"A0"</span>].clone()<span class="op">;</span> m[<span class="st">"P0_init"</span>] <span class="op">=</span> m[<span class="st">"P0"</span>].clone()<span class="op">;</span> m[<span class="st">"V0f_init"</span>] <span class="op">=</span> m[<span class="st">"V0f"</span>].clone()</span>
+<span id="cb4-161"><a href="#cb4-161" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE GATE'S HALF-POINT, AND WHAT IT IS A FRACTION OF.</span></span>
+<span id="cb4-162"><a href="#cb4-162" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-163"><a href="#cb4-163" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `a_sw` is ABSOLUTE by default: the Hill half-point sits at a fixed value of the activator</span></span>
+<span id="cb4-164"><a href="#cb4-164" aria-hidden="true" tabindex="-1"></a>        <span class="co"># and does not move when the field does. Every other threshold on a chemistry field in this</span></span>
+<span id="cb4-165"><a href="#cb4-165" aria-hidden="true" tabindex="-1"></a>        <span class="co"># substrate is relative to that field's own maximum -- `interface_tension.a_sw`,</span></span>
+<span id="cb4-166"><a href="#cb4-166" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `interface_push.a_sw`, `cell_die` chem_low, `cell_divide.orient_asw` -- and two</span></span>
+<span id="cb4-167"><a href="#cb4-167" aria-hidden="true" tabindex="-1"></a>        <span class="co"># comments in this project (crew/basis.yaml on `a_sw_gated`, and the inhibitor branch</span></span>
+<span id="cb4-168"><a href="#cb4-168" aria-hidden="true" tabindex="-1"></a>        <span class="co"># twenty lines below) already describe THIS one as a fraction of the maximum. They were</span></span>
+<span id="cb4-169"><a href="#cb4-169" aria-hidden="true" tabindex="-1"></a>        <span class="co"># describing an intention, not the code.</span></span>
+<span id="cb4-170"><a href="#cb4-170" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-171"><a href="#cb4-171" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Both are defensible and they are not the same mechanism, so this is a switch and not a</span></span>
+<span id="cb4-172"><a href="#cb4-172" aria-hidden="true" tabindex="-1"></a>        <span class="co"># correction:</span></span>
+<span id="cb4-173"><a href="#cb4-173" aria-hidden="true" tabindex="-1"></a>        <span class="co">#   absolute  the gate stops opening when the chemistry dies. A field that decays to 1e-9</span></span>
+<span id="cb4-174"><a href="#cb4-174" aria-hidden="true" tabindex="-1"></a>        <span class="co">#             drives no growth, and the tissue goes static -- which is what the 16 runs</span></span>
+<span id="cb4-175"><a href="#cb4-175" aria-hidden="true" tabindex="-1"></a>        <span class="co">#             with act_max &lt; a_sw did, honestly.</span></span>
+<span id="cb4-176"><a href="#cb4-176" aria-hidden="true" tabindex="-1"></a>        <span class="co">#   relative  the gate always selects the same TOP FRACTION of cells, so `a_sw` means the</span></span>
+<span id="cb4-177"><a href="#cb4-177" aria-hidden="true" tabindex="-1"></a>        <span class="co">#             same thing in a run peaking at 0.6 and one peaking at 1.5. That is what a</span></span>
+<span id="cb4-178"><a href="#cb4-178" aria-hidden="true" tabindex="-1"></a>        <span class="co">#             sweepable lever has to do; measured over 154 runs the absolute gate sat</span></span>
+<span id="cb4-179"><a href="#cb4-179" aria-hidden="true" tabindex="-1"></a>        <span class="co">#             anywhere from 0.24 of the field to above all of it.</span></span>
+<span id="cb4-180"><a href="#cb4-180" aria-hidden="true" tabindex="-1"></a>        <span class="co"># The floor is what keeps `relative` honest: without it, a field decayed to noise still has</span></span>
+<span id="cb4-181"><a href="#cb4-181" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cells "above 35% of the maximum" and the tissue would grow on numerical dust forever.</span></span>
+<span id="cb4-182"><a href="#cb4-182" aria-hidden="true" tabindex="-1"></a>        thr <span class="op">=</span> <span class="va">self</span>.a_sw</span>
+<span id="cb4-183"><a href="#cb4-183" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.a_sw_rel:</span>
+<span id="cb4-184"><a href="#cb4-184" aria-hidden="true" tabindex="-1"></a>            amax <span class="op">=</span> <span class="bu">float</span>(a.<span class="bu">max</span>()) <span class="cf">if</span> a.numel() <span class="cf">else</span> <span class="fl">0.0</span></span>
+<span id="cb4-185"><a href="#cb4-185" aria-hidden="true" tabindex="-1"></a>            thr <span class="op">=</span> <span class="va">self</span>.a_sw <span class="op">*</span> amax <span class="cf">if</span> amax <span class="op">&gt;</span> <span class="va">self</span>.a_live <span class="cf">else</span> <span class="bu">float</span>(<span class="st">"inf"</span>)   <span class="co"># inf -&gt; Hill term 0</span></span>
+<span id="cb4-186"><a href="#cb4-186" aria-hidden="true" tabindex="-1"></a>        hillv <span class="op">=</span> a <span class="op">**</span> <span class="va">self</span>.hill <span class="op">/</span> (thr <span class="op">**</span> <span class="va">self</span>.hill <span class="op">+</span> a <span class="op">**</span> <span class="va">self</span>.hill <span class="op">+</span> <span class="fl">1e-12</span>)   <span class="co"># Hill activation in [0,1]</span></span>
+<span id="cb4-187"><a href="#cb4-187" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A SECOND MORPHOGEN THAT STOPS GROWTH, so that only the activator-high spots grow.</span></span>
+<span id="cb4-188"><a href="#cb4-188" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-189"><a href="#cb4-189" aria-hidden="true" tabindex="-1"></a>        <span class="co"># The growth law above is purely ACTIVATING: `rate * (rho + hill(a))`, so</span></span>
+<span id="cb4-190"><a href="#cb4-190" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the only thing a morphogen can do is make a cell grow FASTER, and the slowest a cell can</span></span>
+<span id="cb4-191"><a href="#cb4-191" aria-hidden="true" tabindex="-1"></a>        <span class="co"># grow is the rho baseline -- which is why six rounds produced broad lobes and never a</span></span>
+<span id="cb4-192"><a href="#cb4-192" aria-hidden="true" tabindex="-1"></a>        <span class="co"># finger. A bulge sharpens into a finger when the tissue grows at the tip AND STOPS at the</span></span>
+<span id="cb4-193"><a href="#cb4-193" aria-hidden="true" tabindex="-1"></a>        <span class="co"># flanks, and no single activating field can say "stop": it has no zero to reach.</span></span>
+<span id="cb4-194"><a href="#cb4-194" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-195"><a href="#cb4-195" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `inhib_chan` names a species whose HIGH values switch growth off, multiplicatively:</span></span>
+<span id="cb4-196"><a href="#cb4-196" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-197"><a href="#cb4-197" aria-hidden="true" tabindex="-1"></a>        <span class="co">#     growth  &lt;-  rate * (rho + hill(a_act)) * (1 - hill(a_inhib))</span></span>
+<span id="cb4-198"><a href="#cb4-198" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-199"><a href="#cb4-199" aria-hidden="true" tabindex="-1"></a>        <span class="co"># so where the inhibitor is saturated the cell does not grow at all, baseline included.</span></span>
+<span id="cb4-200"><a href="#cb4-200" aria-hidden="true" tabindex="-1"></a>        <span class="co"># This is lateral inhibition, and it is a different mechanism from a sharper gate: `hill`</span></span>
+<span id="cb4-201"><a href="#cb4-201" aria-hidden="true" tabindex="-1"></a>        <span class="co"># narrows the shoulder of the activating curve, this puts a floor of ZERO under it.</span></span>
+<span id="cb4-202"><a href="#cb4-202" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.inhib_chan <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="st">"chem"</span> <span class="kw">in</span> clvl.state_schema:</span>
+<span id="cb4-203"><a href="#cb4-203" aria-hidden="true" tabindex="-1"></a>            _h0, _ <span class="op">=</span> clvl.state_schema[<span class="st">"chem"</span>]</span>
+<span id="cb4-204"><a href="#cb4-204" aria-hidden="true" tabindex="-1"></a>            b <span class="op">=</span> clvl.state[:nF, _h0 <span class="op">+</span> <span class="va">self</span>.inhib_chan].detach().to(dev).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">0.0</span>)</span>
+<span id="cb4-205"><a href="#cb4-205" aria-hidden="true" tabindex="-1"></a>            <span class="co"># RELATIVE TO THE INHIBITOR'S OWN MAXIMUM, for the same reason a_sw is: an absolute</span></span>
+<span id="cb4-206"><a href="#cb4-206" aria-hidden="true" tabindex="-1"></a>            <span class="co"># threshold against a field whose scale the chemistry sets is either always on or</span></span>
+<span id="cb4-207"><a href="#cb4-207" aria-hidden="true" tabindex="-1"></a>            <span class="co"># always off, and this project has paid for that twice (rd_interface_tension, chem_low).</span></span>
+<span id="cb4-208"><a href="#cb4-208" aria-hidden="true" tabindex="-1"></a>            bmax <span class="op">=</span> <span class="bu">float</span>(b.<span class="bu">max</span>()) <span class="cf">if</span> b.numel() <span class="cf">else</span> <span class="fl">0.0</span></span>
+<span id="cb4-209"><a href="#cb4-209" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> bmax <span class="op">&gt;</span> <span class="fl">1e-9</span>:</span>
+<span id="cb4-210"><a href="#cb4-210" aria-hidden="true" tabindex="-1"></a>                bn <span class="op">=</span> b <span class="op">/</span> bmax</span>
+<span id="cb4-211"><a href="#cb4-211" aria-hidden="true" tabindex="-1"></a>                inh <span class="op">=</span> bn <span class="op">**</span> <span class="va">self</span>.inhib_hill <span class="op">/</span> (<span class="va">self</span>.inhib_sw <span class="op">**</span> <span class="va">self</span>.inhib_hill</span>
+<span id="cb4-212"><a href="#cb4-212" aria-hidden="true" tabindex="-1"></a>                                               <span class="op">+</span> bn <span class="op">**</span> <span class="va">self</span>.inhib_hill <span class="op">+</span> <span class="fl">1e-12</span>)</span>
+<span id="cb4-213"><a href="#cb4-213" aria-hidden="true" tabindex="-1"></a>                m[<span class="st">"inhib_frac"</span>] <span class="op">=</span> inh                     <span class="co"># recorded, so the renderer can show it</span></span>
+<span id="cb4-214"><a href="#cb4-214" aria-hidden="true" tabindex="-1"></a>                hillv <span class="op">=</span> hillv <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> inh)</span>
+<span id="cb4-215"><a href="#cb4-215" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>._inhib_applied <span class="op">=</span> <span class="bu">float</span>(inh.mean())</span>
+<span id="cb4-216"><a href="#cb4-216" aria-hidden="true" tabindex="-1"></a>        s_prev <span class="op">=</span> m[<span class="st">"mg_scale"</span>]                                    <span class="co"># per-cell scale BEFORE this tick (for the dilution rate)</span></span>
+<span id="cb4-217"><a href="#cb4-217" aria-hidden="true" tabindex="-1"></a>        v_ref <span class="op">=</span> <span class="bu">float</span>(m.get(<span class="st">"v_ref"</span>, <span class="fl">1.0</span>))                        <span class="co"># SEED-TIME MEDIAN cell volume (mesh_ops:220)</span></span>
+<span id="cb4-218"><a href="#cb4-218" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb4-219"><a href="#cb4-219" aria-hidden="true" tabindex="-1"></a>        ds <span class="op">=</span> <span class="va">self</span>._rate(s_prev, hillv, m, v_ref)                  <span class="co"># &lt;-- the rate law; models override THIS only</span></span>
+<span id="cb4-220"><a href="#cb4-220" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE CEILING IS FOR A TISSUE WITH NO DIVIDER, AND ONLY FOR ONE.</span></span>
+<span id="cb4-221"><a href="#cb4-221" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-222"><a href="#cb4-222" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `vth_frac` is Okuda's uniform-cell mode: cap `v_eq` under `vth_frac * v_ref` so every cell</span></span>
+<span id="cb4-223"><a href="#cb4-223" aria-hidden="true" tabindex="-1"></a>        <span class="co"># oscillates in a band and the population stays uniform WITHOUT anything resetting it. Once</span></span>
+<span id="cb4-224"><a href="#cb4-224" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `cell_divide` is in the schedule, division is what resets size -- a cell doubles, splits,</span></span>
+<span id="cb4-225"><a href="#cb4-225" aria-hidden="true" tabindex="-1"></a>        <span class="co"># and each daughter starts at half -- so the ceiling is no longer size control. It is a lid,</span></span>
+<span id="cb4-226"><a href="#cb4-226" aria-hidden="true" tabindex="-1"></a>        <span class="co"># and if it sits below the division threshold the tissue can never reach that threshold.</span></span>
+<span id="cb4-227"><a href="#cb4-227" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-228"><a href="#cb4-228" aria-hidden="true" tabindex="-1"></a>        <span class="co"># IT DID. `divide_growing_ball` caps at `vth_frac 2.5 * v_ref 2.5433` = 6.36 in WEDGE units,</span></span>
+<span id="cb4-229"><a href="#cb4-229" aria-hidden="true" tabindex="-1"></a>        <span class="co"># which plateaus the polyhedron volume -- the one `cell_divide`'s trigger reads -- at 1.987</span></span>
+<span id="cb4-230"><a href="#cb4-230" aria-hidden="true" tabindex="-1"></a>        <span class="co"># against a reference of 1.229. That is 1.62x, and `factor: 2.0` needs 2x. Not one division</span></span>
+<span id="cb4-231"><a href="#cb4-231" aria-hidden="true" tabindex="-1"></a>        <span class="co"># fired in 401 frames and the cell count sat flat at 200. The two conventions are the deeper</span></span>
+<span id="cb4-232"><a href="#cb4-232" aria-hidden="true" tabindex="-1"></a>        <span class="co"># problem (AB_R7R8_TODO section 0a) but they are not what makes this spec dead: two</span></span>
+<span id="cb4-233"><a href="#cb4-233" aria-hidden="true" tabindex="-1"></a>        <span class="co"># mechanisms were doing one job.</span></span>
+<span id="cb4-234"><a href="#cb4-234" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-235"><a href="#cb4-235" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A CEILING ON A RATE IS A GATE, NOT A CLAMP. When the operator wrote `s` itself the lid was</span></span>
+<span id="cb4-236"><a href="#cb4-236" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `s &lt;- min(s, s_cap)`; an operator that only emits ds/dt cannot clamp a value it does not</span></span>
+<span id="cb4-237"><a href="#cb4-237" aria-hidden="true" tabindex="-1"></a>        <span class="co"># own, so the lid is applied to the RATE -- a cell at or above its ceiling grows at zero.</span></span>
+<span id="cb4-238"><a href="#cb4-238" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Same fixed point (`s` settles on `s_cap`), and it no longer overshoots-then-truncates</span></span>
+<span id="cb4-239"><a href="#cb4-239" aria-hidden="true" tabindex="-1"></a>        <span class="co"># within a step, so the band is entered rather than snapped to.</span></span>
+<span id="cb4-240"><a href="#cb4-240" aria-hidden="true" tabindex="-1"></a>        _has_divider <span class="op">=</span> <span class="st">"cell_divide"</span> <span class="kw">in</span> <span class="bu">getattr</span>(H, <span class="st">"scheduled_ops"</span>, <span class="bu">frozenset</span>())</span>
+<span id="cb4-241"><a href="#cb4-241" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.rho <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">and</span> <span class="kw">not</span> _has_divider:                        <span class="co"># OKUDA uniform-cell mode</span></span>
+<span id="cb4-242"><a href="#cb4-242" aria-hidden="true" tabindex="-1"></a>            s_cap <span class="op">=</span> ((<span class="va">self</span>.vth_frac <span class="op">*</span> v_ref</span>
+<span id="cb4-243"><a href="#cb4-243" aria-hidden="true" tabindex="-1"></a>                      <span class="op">/</span> m[<span class="st">"V0f_init"</span>].clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)) <span class="op">**</span> (<span class="fl">1.0</span> <span class="op">/</span> <span class="fl">3.0</span>)).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1.0</span>)</span>
+<span id="cb4-244"><a href="#cb4-244" aria-hidden="true" tabindex="-1"></a>            ds <span class="op">=</span> torch.where(s_prev <span class="op">+</span> dt <span class="op">*</span> ds <span class="op">&gt;</span> s_cap, (s_cap <span class="op">-</span> s_prev) <span class="op">/</span> <span class="bu">max</span>(dt, <span class="fl">1e-12</span>), ds)</span>
+<span id="cb4-245"><a href="#cb4-245" aria-hidden="true" tabindex="-1"></a>        <span class="cf">elif</span> <span class="va">self</span>.rho <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb4-246"><a href="#cb4-246" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="kw">not</span> <span class="va">self</span>._said_no_cap:</span>
+<span id="cb4-247"><a href="#cb4-247" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>._said_no_cap <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb4-248"><a href="#cb4-248" aria-hidden="true" tabindex="-1"></a>                <span class="bu">print</span>(<span class="ss">f"[cell_grow] `cell_divide` is scheduled, so the `vth_frac` ceiling is not "</span></span>
+<span id="cb4-249"><a href="#cb4-249" aria-hidden="true" tabindex="-1"></a>                      <span class="ss">f"applied: division is what resets cell size here, and a ceiling below the "</span></span>
+<span id="cb4-250"><a href="#cb4-250" aria-hidden="true" tabindex="-1"></a>                      <span class="ss">f"division threshold would stop the tissue reaching it."</span>, flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-251"><a href="#cb4-251" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb4-252"><a href="#cb4-252" aria-hidden="true" tabindex="-1"></a>            <span class="co"># legacy: activator-only bulge, gated to a stop at `cap` for the same reason as above</span></span>
+<span id="cb4-253"><a href="#cb4-253" aria-hidden="true" tabindex="-1"></a>            cap <span class="op">=</span> torch.as_tensor(<span class="va">self</span>.cap, device<span class="op">=</span>ds.device, dtype<span class="op">=</span>ds.dtype)</span>
+<span id="cb4-254"><a href="#cb4-254" aria-hidden="true" tabindex="-1"></a>            ds <span class="op">=</span> torch.where(s_prev <span class="op">+</span> dt <span class="op">*</span> ds <span class="op">&gt;</span> cap, (cap <span class="op">-</span> s_prev) <span class="op">/</span> <span class="bu">max</span>(dt, <span class="fl">1e-12</span>), ds)</span>
+<span id="cb4-255"><a href="#cb4-255" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE FOUR TARGETS ARE ONE INTEGRAND SEEN FOUR WAYS, and the chain rule is what keeps them</span></span>
+<span id="cb4-256"><a href="#cb4-256" aria-hidden="true" tabindex="-1"></a>        <span class="co"># one. `s` is what grows; A0 = A0_init s^2, P0 = P0_init s, V0f = V0f_init s^3 are algebraic</span></span>
+<span id="cb4-257"><a href="#cb4-257" aria-hidden="true" tabindex="-1"></a>        <span class="co"># functions of it, so their rates are its rate times the derivative of each map:</span></span>
+<span id="cb4-258"><a href="#cb4-258" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-259"><a href="#cb4-259" aria-hidden="true" tabindex="-1"></a>        <span class="co">#     dA0/dt = 2 A0_init s (ds/dt)      dP0/dt = P0_init (ds/dt)      dV0f/dt = 3 V0f_init s^2 (ds/dt)</span></span>
+<span id="cb4-260"><a href="#cb4-260" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-261"><a href="#cb4-261" aria-hidden="true" tabindex="-1"></a>        <span class="co"># WHAT THIS COSTS, said plainly, because it is a real difference and not a reassociation.</span></span>
+<span id="cb4-262"><a href="#cb4-262" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Writing `A0 = A0_init s_new^2` was exact in `s`; integrating its derivative is exact only</span></span>
+<span id="cb4-263"><a href="#cb4-263" aria-hidden="true" tabindex="-1"></a>        <span class="co"># to first order, and leaves A0 short of A0_init s^2 by A0_init (dt ds)^2 per step. On this</span></span>
+<span id="cb4-264"><a href="#cb4-264" aria-hidden="true" tabindex="-1"></a>        <span class="co"># campaign's own growth rate (5.78e-04 per unit time) that is 3.3e-07 of A0 per frame. The</span></span>
+<span id="cb4-265"><a href="#cb4-265" aria-hidden="true" tabindex="-1"></a>        <span class="co"># alternative -- emitting the exact chord (s_new^2 - s^2)/dt -- would reproduce today's</span></span>
+<span id="cb4-266"><a href="#cb4-266" aria-hidden="true" tabindex="-1"></a>        <span class="co"># numbers bit for bit but requires the operator to integrate `s` itself, which is the engine's</span></span>
+<span id="cb4-267"><a href="#cb4-267" aria-hidden="true" tabindex="-1"></a>        <span class="co"># job and the thing this rung exists to give back to it.</span></span>
+<span id="cb4-268"><a href="#cb4-268" aria-hidden="true" tabindex="-1"></a>        s_next <span class="op">=</span> s_prev <span class="op">+</span> dt <span class="op">*</span> ds                                <span class="co"># what `s` will be once the engine integrates</span></span>
+<span id="cb4-269"><a href="#cb4-269" aria-hidden="true" tabindex="-1"></a>        deltas <span class="op">=</span> {(<span class="va">self</span>.cat, <span class="st">"mg_scale"</span>): ds,</span>
+<span id="cb4-270"><a href="#cb4-270" aria-hidden="true" tabindex="-1"></a>                  (<span class="va">self</span>.cat, <span class="st">"A0"</span>): <span class="fl">2.0</span> <span class="op">*</span> m[<span class="st">"A0_init"</span>] <span class="op">*</span> s_prev <span class="op">*</span> ds,</span>
+<span id="cb4-271"><a href="#cb4-271" aria-hidden="true" tabindex="-1"></a>                  (<span class="va">self</span>.cat, <span class="st">"P0"</span>): m[<span class="st">"P0_init"</span>] <span class="op">*</span> ds,</span>
+<span id="cb4-272"><a href="#cb4-272" aria-hidden="true" tabindex="-1"></a>                  (<span class="va">self</span>.cat, <span class="st">"V0f"</span>): <span class="fl">3.0</span> <span class="op">*</span> m[<span class="st">"V0f_init"</span>] <span class="op">*</span> s_prev <span class="op">*</span> s_prev <span class="op">*</span> ds}</span>
+<span id="cb4-273"><a href="#cb4-273" aria-hidden="true" tabindex="-1"></a>        s <span class="op">=</span> s_next                                               <span class="co"># the scalars below summarise the POST-tick tissue</span></span>
+<span id="cb4-274"><a href="#cb4-274" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"V0"</span>] <span class="op">=</span> <span class="bu">float</span>((m[<span class="st">"V0f_init"</span>] <span class="op">*</span> s <span class="op">**</span> <span class="dv">3</span>).<span class="bu">sum</span>())</span>
+<span id="cb4-275"><a href="#cb4-275" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE SHELL RADIUS MUST GROW WITH THE CELLS. cell_mechanics carries a radial spring,</span></span>
+<span id="cb4-276"><a href="#cb4-276" aria-hidden="true" tabindex="-1"></a>        <span class="co">#     E += K_R * sum_i (|x_i| - R0)^2</span></span>
+<span id="cb4-277"><a href="#cb4-277" aria-hidden="true" tabindex="-1"></a>        <span class="co"># and R0 is set once at seeding. An operator that grows the cells without rescaling R0</span></span>
+<span id="cb4-278"><a href="#cb4-278" aria-hidden="true" tabindex="-1"></a>        <span class="co"># leaves the mechanics pinning the shell at the SEED radius while the</span></span>
+<span id="cb4-279"><a href="#cb4-279" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cells' target volumes grew sixteenfold, and the sheet had nowhere to put the extra area</span></span>
+<span id="cb4-280"><a href="#cb4-280" aria-hidden="true" tabindex="-1"></a>        <span class="co"># but through itself. Measured on mini_grow_divide_bigger: rays cast from the tissue</span></span>
+<span id="cb4-281"><a href="#cb4-281" aria-hidden="true" tabindex="-1"></a>        <span class="co"># centroid cross the surface exactly once at frame 384 (100% of them) and 13 times at</span></span>
+<span id="cb4-282"><a href="#cb4-282" aria-hidden="true" tabindex="-1"></a>        <span class="co"># frame 423. The genus check reported "sphere (as built)" at every one of those frames --</span></span>
+<span id="cb4-283"><a href="#cb4-283" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Euler characteristic is combinatorial and cannot see a shell folded through its own</span></span>
+<span id="cb4-284"><a href="#cb4-284" aria-hidden="true" tabindex="-1"></a>        <span class="co"># centre, which is why this survived until premise 11 was written.</span></span>
+<span id="cb4-285"><a href="#cb4-285" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb4-286"><a href="#cb4-286" aria-hidden="true" tabindex="-1"></a>        <span class="co"># The radius of the sphere enclosing the current target volume, NOT the measured mean</span></span>
+<span id="cb4-287"><a href="#cb4-287" aria-hidden="true" tabindex="-1"></a>        <span class="co"># radius: R0 must express what the cells are ASKING for. Setting it from |x| would make</span></span>
+<span id="cb4-288"><a href="#cb4-288" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the spring chase the shell's own excursions and quietly penalise a growing bud, which is</span></span>
+<span id="cb4-289"><a href="#cb4-289" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the one shape this campaign exists to produce.</span></span>
+<span id="cb4-290"><a href="#cb4-290" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="st">"R0"</span> <span class="kw">in</span> m:</span>
+<span id="cb4-291"><a href="#cb4-291" aria-hidden="true" tabindex="-1"></a>            m[<span class="st">"R0"</span>] <span class="op">=</span> <span class="bu">float</span>((<span class="fl">3.0</span> <span class="op">*</span> <span class="bu">max</span>(m[<span class="st">"V0"</span>], <span class="fl">1e-12</span>) <span class="op">/</span> (<span class="fl">4.0</span> <span class="op">*</span> np.pi)) <span class="op">**</span> (<span class="fl">1.0</span> <span class="op">/</span> <span class="fl">3.0</span>))</span>
+<span id="cb4-292"><a href="#cb4-292" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.conserve_amount <span class="kw">and</span> <span class="st">"chem"</span> <span class="kw">in</span> clvl.state_schema:</span>
+<span id="cb4-293"><a href="#cb4-293" aria-hidden="true" tabindex="-1"></a>            <span class="co"># conserve molecule AMOUNT: c_j &lt;- c_j * (v_old/v_new) = c_j * (s_prev/s)^3 as v_eq grows ~ s^3.</span></span>
+<span id="cb4-294"><a href="#cb4-294" aria-hidden="true" tabindex="-1"></a>            <span class="co"># Makes dilution STRUCTURAL (no continuum -c(div.v) term); it is LOAD-BEARING (Okuda's intra-domain</span></span>
+<span id="cb4-295"><a href="#cb4-295" aria-hidden="true" tabindex="-1"></a>            <span class="co"># gradients come from it) -&gt; keep it, don't cancel. The flood is a gamma (rate) problem, fixed elsewhere.</span></span>
+<span id="cb4-296"><a href="#cb4-296" aria-hidden="true" tabindex="-1"></a>            g_vol <span class="op">=</span> (s <span class="op">/</span> s_prev.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)) <span class="op">**</span> <span class="dv">3</span></span>
+<span id="cb4-297"><a href="#cb4-297" aria-hidden="true" tabindex="-1"></a>            cst <span class="op">=</span> clvl.state.clone()</span>
+<span id="cb4-298"><a href="#cb4-298" aria-hidden="true" tabindex="-1"></a>            <span class="co"># THE ACTIVATOR COLUMN ONLY. Diluting BOTH columns extinguishes Gray-Scott outright:</span></span>
+<span id="cb4-299"><a href="#cb4-299" aria-hidden="true" tabindex="-1"></a>            <span class="co"># measured, 1% loss per step kills the pattern within 250 steps, while the undiluted</span></span>
+<span id="cb4-300"><a href="#cb4-300" aria-hidden="true" tabindex="-1"></a>            <span class="co"># one reaches 53% coverage by step 250 and holds indefinitely. Diluting either column</span></span>
+<span id="cb4-301"><a href="#cb4-301" aria-hidden="true" tabindex="-1"></a>            <span class="co"># alone survives (a_max at t=60: 0.704 / 0.686); both together does not (0.047),</span></span>
+<span id="cb4-302"><a href="#cb4-302" aria-hidden="true" tabindex="-1"></a>            <span class="co"># because the substrate's own feed term F(1-u) is what pulls u back up and diluting u</span></span>
+<span id="cb4-303"><a href="#cb4-303" aria-hidden="true" tabindex="-1"></a>            <span class="co"># fights it directly. The activator has no source at all except its own autocatalysis,</span></span>
+<span id="cb4-304"><a href="#cb4-304" aria-hidden="true" tabindex="-1"></a>            <span class="co"># which is QUADRATIC, so it is the one that genuinely loses material when a cell grows.</span></span>
+<span id="cb4-305"><a href="#cb4-305" aria-hidden="true" tabindex="-1"></a>            <span class="co"># Correct physics on a fragile mechanism is still a broken model; this keeps the</span></span>
+<span id="cb4-306"><a href="#cb4-306" aria-hidden="true" tabindex="-1"></a>            <span class="co"># physics where it belongs and stops it destroying the pattern it is meant to shape.</span></span>
+<span id="cb4-307"><a href="#cb4-307" aria-hidden="true" tabindex="-1"></a>            cst[:nF, h0:h0 <span class="op">+</span> <span class="dv">1</span>] <span class="op">=</span> cst[:nF, h0:h0 <span class="op">+</span> <span class="dv">1</span>] <span class="op">/</span> g_vol.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)[:, <span class="va">None</span>]</span>
+<span id="cb4-308"><a href="#cb4-308" aria-hidden="true" tabindex="-1"></a>            clvl.state <span class="op">=</span> cst</span>
+<span id="cb4-309"><a href="#cb4-309" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE LIVE CELLS ARE A PREFIX OF THE BUFFER, and a block delta has to be the whole buffer:</span></span>
+<span id="cb4-310"><a href="#cb4-310" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `_integrate` adds it to `lvl.state[:, cx0:cx1]` with no mask, so a short tensor would not</span></span>
+<span id="cb4-311"><a href="#cb4-311" aria-hidden="true" tabindex="-1"></a>        <span class="co"># broadcast and a full one must be zero past `nF` or the dead tail of the buffer would grow.</span></span>
+<span id="cb4-312"><a href="#cb4-312" aria-hidden="true" tabindex="-1"></a>        N <span class="op">=</span> <span class="bu">int</span>(clvl.state.shape[<span class="dv">0</span>])</span>
+<span id="cb4-313"><a href="#cb4-313" aria-hidden="true" tabindex="-1"></a>        out <span class="op">=</span> {}</span>
+<span id="cb4-314"><a href="#cb4-314" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> key, d <span class="kw">in</span> deltas.items():</span>
+<span id="cb4-315"><a href="#cb4-315" aria-hidden="true" tabindex="-1"></a>            z <span class="op">=</span> torch.zeros(N, <span class="dv">1</span>, device<span class="op">=</span>clvl.state.device, dtype<span class="op">=</span>clvl.state.dtype)</span>
+<span id="cb4-316"><a href="#cb4-316" aria-hidden="true" tabindex="-1"></a>            z[:nF, <span class="dv">0</span>] <span class="op">=</span> d.to(device<span class="op">=</span>clvl.state.device, dtype<span class="op">=</span>clvl.state.dtype)</span>
+<span id="cb4-317"><a href="#cb4-317" aria-hidden="true" tabindex="-1"></a>            out[key] <span class="op">=</span> z</span>
+<span id="cb4-318"><a href="#cb4-318" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> out</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 
 </section>
@@ -533,7 +877,7 @@ window.Quarto = {
   font-family: sans-serif; cursor: pointer; opacity: .75; z-index: 10001; user-select: none; }
 #vbox-close:hover { opacity: 1; }
 </style>
-<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">&times;</span><video id="vbox-video" controls loop muted playsinline></video></div>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
 <script>
 (function () {
   var ov = document.getElementById('vbox-overlay'),
@@ -578,380 +922,256 @@ window.Quarto = {
 })();
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
-window.document.addEventListener("DOMContentLoaded", function (event) {
-  const toggleBodyColorMode = (bsSheetEl) => {
-    const mode = bsSheetEl.getAttribute("data-mode");
-    const bodyEl = window.document.querySelector("body");
-    if (mode === "dark") {
-      bodyEl.classList.add("quarto-dark");
-      bodyEl.classList.remove("quarto-light");
-    } else {
-      bodyEl.classList.add("quarto-light");
-      bodyEl.classList.remove("quarto-dark");
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
     }
-  }
-  const toggleBodyColorPrimary = () => {
-    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
-    if (bsSheetEl) {
-      toggleBodyColorMode(bsSheetEl);
-    }
-  }
-  toggleBodyColorPrimary();  
-  const disableStylesheet = (stylesheets) => {
-    for (let i=0; i < stylesheets.length; i++) {
-      const stylesheet = stylesheets[i];
-      stylesheet.rel = 'prefetch';
-    }
-  }
-  const enableStylesheet = (stylesheets) => {
-    for (let i=0; i < stylesheets.length; i++) {
-      const stylesheet = stylesheets[i];
-      stylesheet.rel = 'stylesheet';
-    }
-  }
-  const manageTransitions = (selector, allowTransitions) => {
-    const els = window.document.querySelectorAll(selector);
-    for (let i=0; i < els.length; i++) {
-      const el = els[i];
-      if (allowTransitions) {
-        el.classList.remove('notransition');
-      } else {
-        el.classList.add('notransition');
-      }
-    }
-  }
-  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
-    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
-    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
-    let newTheme = '';
-    if(darkModeDefault) {
-      newTheme = isAlternate ? baseTheme : alternateTheme;
-    } else {
-      newTheme = isAlternate ? alternateTheme : baseTheme;
-    }
-    const changeGiscusTheme = () => {
-      // From: https://github.com/giscus/giscus/issues/336
-      const sendMessage = (message) => {
-        const iframe = document.querySelector('iframe.giscus-frame');
-        if (!iframe) return;
-        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
-      }
-      sendMessage({
-        setConfig: {
-          theme: newTheme
-        }
-      });
-    }
-    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
-    if (isGiscussLoaded) {
-      changeGiscusTheme();
-    }
-  }
-  const toggleColorMode = (alternate) => {
-    // Switch the stylesheets
-    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
-    manageTransitions('#quarto-margin-sidebar .nav-link', false);
-    if (alternate) {
-      enableStylesheet(alternateStylesheets);
-      for (const sheetNode of alternateStylesheets) {
-        if (sheetNode.id === "quarto-bootstrap") {
-          toggleBodyColorMode(sheetNode);
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
         }
       }
-    } else {
-      disableStylesheet(alternateStylesheets);
-      toggleBodyColorPrimary();
-    }
-    manageTransitions('#quarto-margin-sidebar .nav-link', true);
-    // Switch the toggles
-    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
-    for (let i=0; i < toggles.length; i++) {
-      const toggle = toggles[i];
-      if (toggle) {
-        if (alternate) {
-          toggle.classList.add("alternate");     
-        } else {
-          toggle.classList.remove("alternate");
-        }
-      }
-    }
-    // Hack to workaround the fact that safari doesn't
-    // properly recolor the scrollbar when toggling (#1455)
-    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
-      manageTransitions("body", false);
-      window.scrollTo(0, 1);
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-        manageTransitions("body", true);
-      }, 40);  
-    }
-  }
-  const isFileUrl = () => { 
-    return window.location.protocol === 'file:';
-  }
-  const hasAlternateSentinel = () => {  
-    let styleSentinel = getColorSchemeSentinel();
-    if (styleSentinel !== null) {
-      return styleSentinel === "alternate";
-    } else {
       return false;
     }
-  }
-  const setStyleSentinel = (alternate) => {
-    const value = alternate ? "alternate" : "default";
-    if (!isFileUrl()) {
-      window.localStorage.setItem("quarto-color-scheme", value);
-    } else {
-      localAlternateSentinel = value;
-    }
-  }
-  const getColorSchemeSentinel = () => {
-    if (!isFileUrl()) {
-      const storageValue = window.localStorage.getItem("quarto-color-scheme");
-      return storageValue != null ? storageValue : localAlternateSentinel;
-    } else {
-      return localAlternateSentinel;
-    }
-  }
-  const darkModeDefault = false;
-  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
-  // Dark / light mode switch
-  window.quartoToggleColorScheme = () => {
-    // Read the current dark / light value 
-    let toAlternate = !hasAlternateSentinel();
-    toggleColorMode(toAlternate);
-    setStyleSentinel(toAlternate);
-    toggleGiscusIfUsed(toAlternate, darkModeDefault);
-  };
-  // Ensure there is a toggle, if there isn't float one in the top right
-  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
-    const a = window.document.createElement('a');
-    a.classList.add('top-right');
-    a.classList.add('quarto-color-scheme-toggle');
-    a.href = "";
-    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
-    const i = window.document.createElement("i");
-    i.classList.add('bi');
-    a.appendChild(i);
-    window.document.body.appendChild(a);
-  }
-  // Switch to dark mode if need be
-  if (hasAlternateSentinel()) {
-    toggleColorMode(true);
-  } else {
-    toggleColorMode(false);
-  }
-  const icon = "";
-  const anchorJS = new window.AnchorJS();
-  anchorJS.options = {
-    placement: 'right',
-    icon: icon
-  };
-  anchorJS.add('.anchored');
-  const isCodeAnnotation = (el) => {
-    for (const clz of el.classList) {
-      if (clz.startsWith('code-annotation-')) {                     
-        return true;
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
       }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
     }
-    return false;
-  }
-  const onCopySuccess = function(e) {
-    // button target
-    const button = e.trigger;
-    // don't keep focus
-    button.blur();
-    // flash "checked"
-    button.classList.add('code-copy-button-checked');
-    var currentTitle = button.getAttribute("title");
-    button.setAttribute("title", "Copied!");
-    let tooltip;
-    if (window.bootstrap) {
-      button.setAttribute("data-bs-toggle", "tooltip");
-      button.setAttribute("data-bs-placement", "left");
-      button.setAttribute("data-bs-title", "Copied!");
-      tooltip = new bootstrap.Tooltip(button, 
-        { trigger: "manual", 
-          customClass: "code-copy-button-tooltip",
-          offset: [0, -8]});
-      tooltip.show();    
-    }
-    setTimeout(function() {
-      if (tooltip) {
-        tooltip.hide();
-        button.removeAttribute("data-bs-title");
-        button.removeAttribute("data-bs-toggle");
-        button.removeAttribute("data-bs-placement");
-      }
-      button.setAttribute("title", currentTitle);
-      button.classList.remove('code-copy-button-checked');
-    }, 1000);
-    // clear code selection
-    e.clearSelection();
-  }
-  const getTextToCopy = function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
       for (const childEl of codeEl.children) {
         if (isCodeAnnotation(childEl)) {
           childEl.remove();
         }
       }
       return codeEl.innerText;
-  }
-  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
-    text: getTextToCopy
-  });
-  clipboard.on('success', onCopySuccess);
-  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
-      text: getTextToCopy,
-      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
     });
-    clipboardModal.on('success', onCopySuccess);
-  }
-    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
-    var mailtoRegex = new RegExp(/^mailto:/);
-      var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
-    var isInternal = (href) => {
-        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
     }
-    // Inspect non-navigation links and adorn them if external
- 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
-    for (var i=0; i<links.length; i++) {
-      const link = links[i];
-      if (!isInternal(link.href)) {
-        // undo the damage that might have been done by quarto-nav.js in the case of
-        // links that we want to consider external
-        if (link.dataset.originalHref !== undefined) {
-          link.href = link.dataset.originalHref;
-        }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
-    }
-  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
-    const config = {
-      allowHTML: true,
-      maxWidth: 500,
-      delay: 100,
-      arrow: false,
-      appendTo: function(el) {
-          return el.parentElement;
-      },
-      interactive: true,
-      interactiveBorder: 10,
-      theme: 'quarto',
-      placement: 'bottom-start',
-    };
-    if (contentFn) {
-      config.content = contentFn;
-    }
-    if (onTriggerFn) {
-      config.onTrigger = onTriggerFn;
-    }
-    if (onUntriggerFn) {
-      config.onUntrigger = onUntriggerFn;
-    }
-    window.tippy(el, config); 
-  }
-  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
-  for (var i=0; i<noterefs.length; i++) {
-    const ref = noterefs[i];
-    tippyHover(ref, function() {
-      // use id or data attribute instead here
-      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
-      try { href = new URL(href).hash; } catch {}
-      const id = href.replace(/^#\/?/, "");
-      const note = window.document.getElementById(id);
-      if (note) {
-        return note.innerHTML;
-      } else {
-        return "";
-      }
-    });
-  }
-  const xrefs = window.document.querySelectorAll('a.quarto-xref');
-  const processXRef = (id, note) => {
-    // Strip column container classes
-    const stripColumnClz = (el) => {
-      el.classList.remove("page-full", "page-columns");
-      if (el.children) {
-        for (const child of el.children) {
-          stripColumnClz(child);
-        }
-      }
-    }
-    stripColumnClz(note)
-    if (id === null || id.startsWith('sec-')) {
-      // Special case sections, only their first couple elements
-      const container = document.createElement("div");
-      if (note.children && note.children.length > 2) {
-        container.appendChild(note.children[0].cloneNode(true));
-        for (let i = 1; i < note.children.length; i++) {
-          const child = note.children[i];
-          if (child.tagName === "P" && child.innerText === "") {
-            continue;
-          } else {
-            container.appendChild(child.cloneNode(true));
-            break;
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
           }
         }
-        if (window.Quarto?.typesetMath) {
-          window.Quarto.typesetMath(container);
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
         }
-        return container.innerHTML
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
       } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
         if (window.Quarto?.typesetMath) {
           window.Quarto.typesetMath(note);
         }
-        return note.innerHTML;
-      }
-    } else {
-      // Remove any anchor links if they are present
-      const anchorLink = note.querySelector('a.anchorjs-link');
-      if (anchorLink) {
-        anchorLink.remove();
-      }
-      if (window.Quarto?.typesetMath) {
-        window.Quarto.typesetMath(note);
-      }
-      if (note.classList.contains("callout")) {
-        return note.outerHTML;
-      } else {
-        return note.innerHTML;
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
       }
     }
-  }
-  for (var i=0; i<xrefs.length; i++) {
-    const xref = xrefs[i];
-    tippyHover(xref, undefined, function(instance) {
-      instance.disable();
-      let url = xref.getAttribute('href');
-      let hash = undefined; 
-      if (url.startsWith('#')) {
-        hash = url;
-      } else {
-        try { hash = new URL(url).hash; } catch {}
-      }
-      if (hash) {
-        const id = hash.replace(/^#\/?/, "");
-        const note = window.document.getElementById(id);
-        if (note !== null) {
-          try {
-            const html = processXRef(id, note.cloneNode(true));
-            instance.setContent(html);
-          } finally {
-            instance.enable();
-            instance.show();
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
           }
         } else {
-          // See if we can fetch this
-          fetch(url.split('#')[0])
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
           .then(res => res.text())
           .then(html => {
             const parser = new DOMParser();
             const htmlDoc = parser.parseFromString(html, "text/html");
-            const note = htmlDoc.getElementById(id);
+            const note = htmlDoc.querySelector('main.content');
             if (note !== null) {
-              const html = processXRef(id, note);
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
               instance.setContent(html);
             } 
           }).finally(() => {
@@ -959,185 +1179,161 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             instance.show();
           });
         }
-      } else {
-        // See if we can fetch a full url (with no hash to target)
-        // This is a special case and we should probably do some content thinning / targeting
-        fetch(url)
-        .then(res => res.text())
-        .then(html => {
-          const parser = new DOMParser();
-          const htmlDoc = parser.parseFromString(html, "text/html");
-          const note = htmlDoc.querySelector('main.content');
-          if (note !== null) {
-            // This should only happen for chapter cross references
-            // (since there is no id in the URL)
-            // remove the first header
-            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
-              note.children[0].remove();
-            }
-            const html = processXRef(null, note);
-            instance.setContent(html);
-          } 
-        }).finally(() => {
-          instance.enable();
-          instance.show();
-        });
-      }
-    }, function(instance) {
-    });
-  }
-      let selectedAnnoteEl;
-      const selectorForAnnotation = ( cell, annotation) => {
-        let cellAttr = 'data-code-cell="' + cell + '"';
-        let lineAttr = 'data-code-annotation="' +  annotation + '"';
-        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
-        return selector;
-      }
-      const selectCodeLines = (annoteEl) => {
-        const doc = window.document;
-        const targetCell = annoteEl.getAttribute("data-target-cell");
-        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
-        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
-        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
-        const lineIds = lines.map((line) => {
-          return targetCell + "-" + line;
-        })
-        let top = null;
-        let height = null;
-        let parent = null;
-        if (lineIds.length > 0) {
-            //compute the position of the single el (top and bottom and make a div)
-            const el = window.document.getElementById(lineIds[0]);
-            top = el.offsetTop;
-            height = el.offsetHeight;
-            parent = el.parentElement.parentElement;
-          if (lineIds.length > 1) {
-            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-            height = bottom - top;
-          }
-          if (top !== null && height !== null && parent !== null) {
-            // cook up a div (if necessary) and position it 
-            let div = window.document.getElementById("code-annotation-line-highlight");
-            if (div === null) {
-              div = window.document.createElement("div");
-              div.setAttribute("id", "code-annotation-line-highlight");
-              div.style.position = 'absolute';
-              parent.appendChild(div);
-            }
-            div.style.top = top - 2 + "px";
-            div.style.height = height + 4 + "px";
-            div.style.left = 0;
-            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-            if (gutterDiv === null) {
-              gutterDiv = window.document.createElement("div");
-              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-              gutterDiv.style.position = 'absolute';
-              const codeCell = window.document.getElementById(targetCell);
-              const gutter = codeCell.querySelector('.code-annotation-gutter');
-              gutter.appendChild(gutterDiv);
-            }
-            gutterDiv.style.top = top - 2 + "px";
-            gutterDiv.style.height = height + 4 + "px";
-          }
-          selectedAnnoteEl = annoteEl;
-        }
-      };
-      const unselectCodeLines = () => {
-        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
-        elementsIds.forEach((elId) => {
-          const div = window.document.getElementById(elId);
-          if (div) {
-            div.remove();
-          }
-        });
-        selectedAnnoteEl = undefined;
-      };
-        // Handle positioning of the toggle
-    window.addEventListener(
-      "resize",
-      throttle(() => {
-        elRect = undefined;
-        if (selectedAnnoteEl) {
-          selectCodeLines(selectedAnnoteEl);
-        }
-      }, 10)
-    );
-    function throttle(fn, ms) {
-    let throttle = false;
-    let timer;
-      return (...args) => {
-        if(!throttle) { // first call gets through
-            fn.apply(this, args);
-            throttle = true;
-        } else { // all the others get throttled
-            if(timer) clearTimeout(timer); // cancel #2
-            timer = setTimeout(() => {
-              fn.apply(this, args);
-              timer = throttle = false;
-            }, ms);
-        }
-      };
-    }
-      // Attach click handler to the DT
-      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
-      for (const annoteDlNode of annoteDls) {
-        annoteDlNode.addEventListener('click', (event) => {
-          const clickedEl = event.target;
-          if (clickedEl !== selectedAnnoteEl) {
-            unselectCodeLines();
-            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
-            if (activeEl) {
-              activeEl.classList.remove('code-annotation-active');
-            }
-            selectCodeLines(clickedEl);
-            clickedEl.classList.add('code-annotation-active');
-          } else {
-            // Unselect the line
-            unselectCodeLines();
-            clickedEl.classList.remove('code-annotation-active');
-          }
-        });
-      }
-  const findCites = (el) => {
-    const parentEl = el.parentElement;
-    if (parentEl) {
-      const cites = parentEl.dataset.cites;
-      if (cites) {
-        return {
-          el,
-          cites: cites.split(' ')
-        };
-      } else {
-        return findCites(el.parentElement)
-      }
-    } else {
-      return undefined;
-    }
-  };
-  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
-  for (var i=0; i<bibliorefs.length; i++) {
-    const ref = bibliorefs[i];
-    const citeInfo = findCites(ref);
-    if (citeInfo) {
-      tippyHover(citeInfo.el, function() {
-        var popup = window.document.createElement('div');
-        citeInfo.cites.forEach(function(cite) {
-          var citeDiv = window.document.createElement('div');
-          citeDiv.classList.add('hanging-indent');
-          citeDiv.classList.add('csl-entry');
-          var biblioDiv = window.document.getElementById('ref-' + cite);
-          if (biblioDiv) {
-            citeDiv.innerHTML = biblioDiv.innerHTML;
-          }
-          popup.appendChild(citeDiv);
-        });
-        return popup.innerHTML;
+      }, function(instance) {
       });
     }
-  }
-});
-</script>
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">

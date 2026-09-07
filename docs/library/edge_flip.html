@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.26">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>edge_flip – Plexus</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b758ccaa5987ceb1b75504551e579abf.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-70408cb9dc52a2002c2463371a30459f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Plexus</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../language.html"> 
+<span class="menu-text">Language</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="../library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../optimization.html"> 
+<span class="menu-text">Optimization</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../inverse.html"> 
+<span class="menu-text">Inverse problem</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+    <a href="https://github.com/allierc/Plexus" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
+  <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
+  <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
+  <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
+  <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">edge_flip</h1>
+<p class="subtitle lead">The T1 transition: a reversible neighbour exchange, and the ingredient that makes this a dynamic vertex model rather than a repeatedly re-tessellated one.</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="op-head">
+<p><img src="../figures/icons/rewire.png" class="op-logo img-fluid"></p>
+<p><span class="op-badge"><code>rewire</code></span> <span class="op-badge"><code>acts on: vertex</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
+<p>The T1 transition: a reversible neighbour exchange, and the ingredient that makes this a dynamic vertex model rather than a repeatedly re-tessellated one.</p>
+</div>
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+<section id="role-in-plexus" class="level2">
+<h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
+<ul>
+<li><strong>Kind</strong> — <span class="math inline">\(\mathcal{R}\!:E\)</span> <strong>rewire</strong>: rebuild the relation <span class="math inline">\(E\)</span> each tick.</li>
+<li><strong>Acts on</strong> — <code>vertex</code> (the set the operator acts on).</li>
+<li><strong>Reads</strong> — –</li>
+<li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
+<li><strong>Prediction</strong> — <code>none</code>.</li>
+<li><strong>Dimensions</strong> — 3D.</li>
+</ul>
+</section>
+<section id="mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
+<p>dynamic vertex model rather than a repeatedly re-tessellated one.</p>
+<p>vertex -&gt; vertex: reads pos, flips short interior edges and repositions their two vertices.</p>
+<pre><code>flip edge e when   l_e  &lt;  l_T1</code></pre>
+<p>l_T1 is the threshold length in world units. The edge is removed and reconnected across the other diagonal of the two faces sharing it, so two cells that were neighbours cease to be and two that were not become so. The two vertices are repositioned to give the new edge a length just above the threshold, otherwise it would flip straight back.</p>
+<p>It preserves the counts of vertices, edges and faces, and therefore the Euler characteristic: nothing is created or destroyed, only reconnected. That is what distinguishes it from division and death, and it is why a flip that would produce an invalid configuration is simply not committed rather than repaired afterwards.</p>
+<p>A route that re-tessellates the surface each frame cannot have this operator, because it never represents the intermediate: intercalation is then an artefact of re-meshing rather than a mechanism with a threshold anyone can set.</p>
+<p>Reference: Okuda, S., Inoue, Y., Eiraku, M., Sasai, Y. &amp; Adachi, T. (2013). Reversible network reconnection model for simulating large deformation in dynamic tissue morphogenesis. Biomech. Model. Mechanobiol. 12(4):627-644.</p>
+</section>
+<section id="parameters" class="level2">
+<h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>role</th>
+<th>default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>l_th</code></td>
+<td>reconnection_threshold_length (absolute; 0 -&gt; use l_th_frac)</td>
+<td>0.0</td>
+</tr>
+<tr class="even">
+<td><code>l_th_frac</code></td>
+<td>threshold as fraction of the mean edge length</td>
+<td>0.15</td>
+</tr>
+<tr class="odd">
+<td><code>max_flips</code></td>
+<td>cap on reconnections per call</td>
+<td>20</td>
+</tr>
+<tr class="even">
+<td><code>every</code></td>
+<td>call period (ticks)</td>
+<td>–</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="minimal-spec" class="level2">
+<h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> edge_flip</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> vertex</span><span class="kw">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="mechanism-search-tags" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>T1_transition</code></span> <span class="op-badge"><code>reversible_network_reconnection</code></span> <span class="op-badge"><code>intercalation</code></span> <span class="op-badge"><code>neighbour_exchange</code></span> <span class="op-badge"><code>vertex_model</code></span> <span class="op-badge"><code>vesicle</code></span> <span class="op-badge"><code>surface</code></span></p>
+</section>
+<section id="related-operators" class="level2">
+<h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
+<p>Other <strong>rewire</strong> operators: <a href="../library/radius_graph.html"><code>radius_graph</code></a>, <a href="../library/cell_neighbours.html"><code>cell_neighbours</code></a>, <a href="../library/junction_sync.html"><code>junction_sync</code></a>, <a href="../library/bm_unbond.html"><code>bm_unbond</code></a>, <a href="../library/adhesion_turnover.html"><code>adhesion_turnover</code></a>, <a href="../library/bm_crosslink.html"><code>bm_crosslink</code></a>.</p>
+</section>
+<section id="source" class="level2">
+<h2 class="anchored" data-anchor-id="source">Source</h2>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/vertex_ops.py"><code>src/plexus/operators/vertex_ops.py</code></a> — the registered operator.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"edge_flip"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"vertex"</span>, kind<span class="op">=</span><span class="st">"rewire"</span>, family<span class="op">=</span><span class="st">"topology"</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ReconnectT1_3D(Rewire):</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""The T1 transition: a reversible neighbour exchange, and the ingredient that makes this a</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">    dynamic vertex model rather than a repeatedly re-tessellated one.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">    vertex -&gt; vertex: reads pos, flips short interior edges and repositions their two vertices.</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co">        flip edge e when   l_e  &lt;  l_T1</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co">    l_T1 is the threshold length in world units. The edge is removed and reconnected across the</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">    other diagonal of the two faces sharing it, so two cells that were neighbours cease to be and</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co">    two that were not become so. The two vertices are repositioned to give the new edge a length</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co">    just above the threshold, otherwise it would flip straight back.</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co">    It preserves the counts of vertices, edges and faces, and therefore the Euler characteristic:</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="co">    nothing is created or destroyed, only reconnected. That is what distinguishes it from division</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co">    and death, and it is why a flip that would produce an invalid configuration is simply not</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="co">    committed rather than repaired afterwards.</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co">    A route that re-tessellates the surface each frame cannot have this operator, because it never</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="co">    represents the intermediate: intercalation is then an artefact of re-meshing rather than a</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="co">    mechanism with a threshold anyone can set.</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="co">    Reference: Okuda, S., Inoue, Y., Eiraku, M., Sasai, Y. &amp; Adachi, T. (2013). Reversible network</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="co">    reconnection model for simulating large deformation in dynamic tissue morphogenesis. Biomech.</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="co">    Model. Mechanobiol. 12(4):627-644.</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">3</span>]<span class="op">;</span> DIFFERENTIABLE <span class="op">=</span> <span class="va">False</span><span class="op">;</span> MAY_MUTATE_INTEGRATED_STATE <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"T1_transition"</span>, <span class="st">"reversible_network_reconnection"</span>, <span class="st">"intercalation"</span>,</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"neighbour_exchange"</span>, <span class="st">"vertex_model"</span>, <span class="st">"vesicle"</span>, <span class="st">"surface"</span>]</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"l_th"</span>: <span class="st">"reconnection_threshold_length (absolute; 0 -&gt; use l_th_frac)"</span>,</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"l_th_frac"</span>: <span class="st">"threshold as fraction of the mean edge length"</span>,</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"max_flips"</span>: <span class="st">"cap on reconnections per call"</span>, <span class="st">"every"</span>: <span class="st">"call period (ticks)"</span>}</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"vertex"</span>)</span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._cat <span class="op">=</span> params.get(<span class="st">"cell_set"</span>)          <span class="co"># override only; the SET declares the pairing</span></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.l_th <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"l_th"</span>, <span class="fl">0.0</span>))           <span class="co"># absolute; &lt;=0 -&gt; l_th_frac x mean edge</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.l_th_frac <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"l_th_frac"</span>, <span class="fl">0.15</span>))</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.max_flips <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"max_flips"</span>, <span class="dv">20</span>))</span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>        <span class="co"># (was `from mesh_ops import _engine_owns_clock`) -- same module now</span></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.every <span class="op">=</span> _engine_owns_clock(params)<span class="op">;</span> <span class="va">self</span>._k <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> m <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="st">"_mesh"</span>, <span class="va">None</span>)</span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> m <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}</span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._k <span class="op">+=</span> <span class="dv">1</span>                    <span class="co"># monotonic tick only -- D1: the engine owns the period</span></span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> lvl.state.device<span class="op">;</span> dt <span class="op">=</span> lvl.state.dtype</span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>        Nv <span class="op">=</span> <span class="bu">int</span>(m[<span class="st">"Nv"</span>])</span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>        pos_np <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)[:Nv].detach().cpu().numpy().astype(np.float64)</span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>        es <span class="op">=</span> m[<span class="st">"E_srce"</span>].detach().cpu().numpy()<span class="op">;</span> et <span class="op">=</span> m[<span class="st">"E_trgt"</span>].detach().cpu().numpy()</span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>        ef <span class="op">=</span> m[<span class="st">"E_face"</span>].detach().cpu().numpy()<span class="op">;</span> nF <span class="op">=</span> <span class="bu">int</span>(m[<span class="st">"nF"</span>])</span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>        rings <span class="op">=</span> rings_from_flat_3d(es, et, ef, nF)</span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>        <span class="co"># READ OFF `mech`, NOT DECLARED AGAIN HERE. `cell_mechanics` stashes the constraint it is</span></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>        <span class="co"># solving under, so a spec says `plane_axis` once and every topology operator that moves a</span></span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a>        <span class="co"># vertex honours the same plane. Repeating it per operator is how three of them end up</span></span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>        <span class="co"># disagreeing about which surface the tissue lives on.</span></span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>        _plane <span class="op">=</span> (m.get(<span class="st">"mech"</span>) <span class="kw">or</span> {}).get(<span class="st">"plane_axis"</span>)</span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>        emap <span class="op">=</span> _edge_face_map(rings)<span class="op">;</span> vf <span class="op">=</span> _vertex_faces(rings)   <span class="co"># build the adjacency maps ONCE; t1_flip_3d</span></span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a>        <span class="co">#   updates them incrementally on each successful flip (was rebuilt O(F) per candidate = the hot spot)</span></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> [p.copy() <span class="cf">for</span> p <span class="kw">in</span> pos_np]</span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>        length <span class="op">=</span> np.linalg.norm(pos_np[et] <span class="op">-</span> pos_np[es], axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>        thr <span class="op">=</span> <span class="va">self</span>.l_th <span class="cf">if</span> <span class="va">self</span>.l_th <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">else</span> <span class="va">self</span>.l_th_frac <span class="op">*</span> <span class="bu">float</span>(length.mean())</span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>        order <span class="op">=</span> np.argsort(length)                           <span class="co"># shortest interior edges first</span></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>        seen <span class="op">=</span> <span class="bu">set</span>()<span class="op">;</span> used <span class="op">=</span> <span class="bu">set</span>()<span class="op">;</span> ndone <span class="op">=</span> <span class="dv">0</span>                <span class="co"># `used` verts -&gt; one flip per vertex / call</span></span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k <span class="kw">in</span> order:</span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> ndone <span class="op">&gt;=</span> <span class="va">self</span>.max_flips <span class="kw">or</span> length[k] <span class="op">&gt;=</span> thr:</span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>                <span class="cf">break</span></span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>            a, b <span class="op">=</span> <span class="bu">int</span>(es[k]), <span class="bu">int</span>(et[k])<span class="op">;</span> key <span class="op">=</span> (<span class="bu">min</span>(a, b), <span class="bu">max</span>(a, b))</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> key <span class="kw">in</span> seen <span class="kw">or</span> a <span class="kw">in</span> used <span class="kw">or</span> b <span class="kw">in</span> used:</span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>            seen.add(key)</span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> t1_flip_3d(rings, pos, (a, b), new_len<span class="op">=</span>thr, emap<span class="op">=</span>emap, vf<span class="op">=</span>vf,</span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>                          plane_axis<span class="op">=</span>_plane) <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>                used.add(a)<span class="op">;</span> used.add(b)<span class="op">;</span> ndone <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>        <span class="co"># TRACED PER FRAME, because the RATE is the observable that separates a length-keyed myosin</span></span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a>        <span class="co"># feedback from a tension-keyed one. A length feedback homogenises junction lengths and should</span></span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a>        <span class="co"># SUPPRESS T1s; a tension feedback is the destabilising one the germband-extension literature</span></span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a>        <span class="co"># describes and should PRODUCE them. Both move junction-length CV the same way, so CV cannot</span></span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a>        <span class="co"># tell them apart -- this can. `n_t1` was already accumulated; only the per-frame series was</span></span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a>        <span class="co"># missing, and without it the discriminating measurement was unavailable.</span></span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a>        T1_TRACE.append((<span class="bu">int</span>(<span class="bu">getattr</span>(H, <span class="st">"frame"</span>, <span class="op">-</span><span class="dv">1</span>) <span class="kw">or</span> <span class="op">-</span><span class="dv">1</span>), ndone, <span class="bu">int</span>(m.get(<span class="st">"n_t1"</span>, <span class="dv">0</span>)) <span class="op">+</span> ndone,</span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a>                         <span class="bu">int</span>(nF)))</span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> ndone <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}</span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a>        es2, et2, ef2, nF2, keep <span class="op">=</span> flat_from_rings_3d(rings)</span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a>        <span class="co"># "T1 DROPS NO FACE" WAS AN ASSUMPTION, NOT AN INVARIANT, and it held only while nothing</span></span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a>        <span class="co"># shrank a cell to nothing. `flat_from_rings_3d` discards any ring that falls below three</span></span>
+<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a>        <span class="co"># vertices; a flip on a cell that is already a triangle can do exactly that. This line</span></span>
+<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a>        <span class="co"># threw `keep` away, so when it happened T1 lost a face and left EVERY per-face array --</span></span>
+<span id="cb3-93"><a href="#cb3-93" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A0, P0, V0f, Vbirth, divjit, age, ndiv, alive -- shifted by one against the mesh.</span></span>
+<span id="cb3-94"><a href="#cb3-94" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-95"><a href="#cb3-95" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Found by cell_die, which is the first operator that shrinks a cell far enough to</span></span>
+<span id="cb3-96"><a href="#cb3-96" aria-hidden="true" tabindex="-1"></a>        <span class="co"># reach the case: marking ONE cell for death produced three deaths at ticks 86, 164 and</span></span>
+<span id="cb3-97"><a href="#cb3-97" aria-hidden="true" tabindex="-1"></a>        <span class="co"># 236, each reporting exactly one marked cell, because the shift kept handing the flag to</span></span>
+<span id="cb3-98"><a href="#cb3-98" aria-hidden="true" tabindex="-1"></a>        <span class="co"># a new victim. The control with T1 and no apoptosis holds at 2000 cells, which is why</span></span>
+<span id="cb3-99"><a href="#cb3-99" aria-hidden="true" tabindex="-1"></a>        <span class="co"># this went eighteen rounds unseen.</span></span>
+<span id="cb3-100"><a href="#cb3-100" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> nF2 <span class="op">!=</span> nF:</span>
+<span id="cb3-101"><a href="#cb3-101" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"[edge_flip] a flip left </span><span class="sc">{</span>nF <span class="op">-</span> nF2<span class="sc">}</span><span class="ss"> face(s) below three sides -- "</span></span>
+<span id="cb3-102"><a href="#cb3-102" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"reindexing </span><span class="sc">{</span>nF<span class="sc">}</span><span class="ss"> -&gt; </span><span class="sc">{</span>nF2<span class="sc">}</span><span class="ss">. Per-face targets follow the mesh; a cell was lost "</span></span>
+<span id="cb3-103"><a href="#cb3-103" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"to topology, not to biology."</span>, flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-104"><a href="#cb3-104" aria-hidden="true" tabindex="-1"></a>            <span class="co"># `Vbirth` and `divjit` are gone from this list for the reason `cell_die`'s note</span></span>
+<span id="cb3-105"><a href="#cb3-105" aria-hidden="true" tabindex="-1"></a>            <span class="co"># gives: they are cell-set blocks and `renumber_set` below already permutes them.</span></span>
+<span id="cb3-106"><a href="#cb3-106" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> _nm <span class="kw">in</span> (<span class="st">"A0"</span>, <span class="st">"P0"</span>, <span class="st">"V0f"</span>, <span class="st">"age"</span>, <span class="st">"ndiv"</span>, <span class="st">"alive"</span>):</span>
+<span id="cb3-107"><a href="#cb3-107" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> _nm <span class="kw">in</span> m:</span>
+<span id="cb3-108"><a href="#cb3-108" aria-hidden="true" tabindex="-1"></a>                    _a <span class="op">=</span> m[_nm].detach().cpu().numpy()</span>
+<span id="cb3-109"><a href="#cb3-109" aria-hidden="true" tabindex="-1"></a>                    m[_nm] <span class="op">=</span> torch.as_tensor(np.asarray([_a[i] <span class="cf">for</span> i <span class="kw">in</span> keep]),</span>
+<span id="cb3-110"><a href="#cb3-110" aria-hidden="true" tabindex="-1"></a>                                             dtype<span class="op">=</span>m[_nm].dtype, device<span class="op">=</span>m[_nm].device)</span>
+<span id="cb3-111"><a href="#cb3-111" aria-hidden="true" tabindex="-1"></a>            <span class="co"># ONLY WHILE IT IS STILL A MESH COLUMN. Declared on the cell set it is permuted by</span></span>
+<span id="cb3-112"><a href="#cb3-112" aria-hidden="true" tabindex="-1"></a>            <span class="co"># `H.renumber_set` below, with the same `keep`; carrying it here as well would permute</span></span>
+<span id="cb3-113"><a href="#cb3-113" aria-hidden="true" tabindex="-1"></a>            <span class="co"># it twice.</span></span>
+<span id="cb3-114"><a href="#cb3-114" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="bu">isinstance</span>(<span class="bu">dict</span>.get(m, <span class="st">"apop_flag"</span>, <span class="va">None</span>), np.ndarray):</span>
+<span id="cb3-115"><a href="#cb3-115" aria-hidden="true" tabindex="-1"></a>                m[<span class="st">"apop_flag"</span>] <span class="op">=</span> np.asarray([m[<span class="st">"apop_flag"</span>][i] <span class="cf">for</span> i <span class="kw">in</span> keep], np.float64)</span>
+<span id="cb3-116"><a href="#cb3-116" aria-hidden="true" tabindex="-1"></a>            <span class="co"># AND THE OPEN NAMES, which this branch has never carried. The tuple above is the</span></span>
+<span id="cb3-117"><a href="#cb3-117" aria-hidden="true" tabindex="-1"></a>            <span class="co"># CLOSED list every topology operator knows; `face_carry` is the open one an operator</span></span>
+<span id="cb3-118"><a href="#cb3-118" aria-hidden="true" tabindex="-1"></a>            <span class="co"># declares for itself, and `cell_divide` and `cell_die` have routed it through</span></span>
+<span id="cb3-119"><a href="#cb3-119" aria-hidden="true" tabindex="-1"></a>            <span class="co"># `_carry_face_state` since it existed. This one did not, so a flip that lost a face</span></span>
+<span id="cb3-120"><a href="#cb3-120" aria-hidden="true" tabindex="-1"></a>            <span class="co"># left `medioapical_myosin`'s per-face density indexed against faces that had moved --</span></span>
+<span id="cb3-121"><a href="#cb3-121" aria-hidden="true" tabindex="-1"></a>            <span class="co"># the same defect class as per-half-edge myosin before `junction_sync`, one level up.</span></span>
+<span id="cb3-122"><a href="#cb3-122" aria-hidden="true" tabindex="-1"></a>            <span class="co">#</span></span>
+<span id="cb3-123"><a href="#cb3-123" aria-hidden="true" tabindex="-1"></a>            <span class="co"># UNREACHABLE IN THE GATED RUN, and asserted so: this branch needs `nF2 != nF`, which</span></span>
+<span id="cb3-124"><a href="#cb3-124" aria-hidden="true" tabindex="-1"></a>            <span class="co"># `_ring_ok` refuses to produce (it rejects any new ring below three sides). The fix is</span></span>
+<span id="cb3-125"><a href="#cb3-125" aria-hidden="true" tabindex="-1"></a>            <span class="co"># covered by `tools/test_mesh_carry.py` instead, which constructs the condition.</span></span>
+<span id="cb3-126"><a href="#cb3-126" aria-hidden="true" tabindex="-1"></a>            _carry_face_state(m, keep, m[<span class="st">"A0"</span>].dtype <span class="cf">if</span> <span class="st">"A0"</span> <span class="kw">in</span> m <span class="cf">else</span> torch.float32,</span>
+<span id="cb3-127"><a href="#cb3-127" aria-hidden="true" tabindex="-1"></a>                                        m[<span class="st">"E_srce"</span>].device)</span>
+<span id="cb3-128"><a href="#cb3-128" aria-hidden="true" tabindex="-1"></a>            <span class="co"># THE CELL STATE AND THE PENDING DELTAS FOLLOW TOO, and leaving them behind is the</span></span>
+<span id="cb3-129"><a href="#cb3-129" aria-hidden="true" tabindex="-1"></a>            <span class="co"># same defect cell_die had: `chem` is indexed by face, and the engine zeroes its</span></span>
+<span id="cb3-130"><a href="#cb3-130" aria-hidden="true" tabindex="-1"></a>            <span class="co"># delta accumulator once per TICK and integrates at the </span><span class="re">END</span><span class="co"> of the schedule, so</span></span>
+<span id="cb3-131"><a href="#cb3-131" aria-hidden="true" tabindex="-1"></a>            <span class="co"># cell_chem_diffuse and cell_chem_react deposit per-cell deltas that are applied after this runs.</span></span>
+<span id="cb3-132"><a href="#cb3-132" aria-hidden="true" tabindex="-1"></a>            <span class="co"># Renumber the faces without renumbering those and every activator value, and every</span></span>
+<span id="cb3-133"><a href="#cb3-133" aria-hidden="true" tabindex="-1"></a>            <span class="co"># pending flux, lands on a different cell.</span></span>
+<span id="cb3-134"><a href="#cb3-134" aria-hidden="true" tabindex="-1"></a>            <span class="co">#</span></span>
+<span id="cb3-135"><a href="#cb3-135" aria-hidden="true" tabindex="-1"></a>            <span class="co"># It stayed hidden because a flip only drops a face when a cell is ALREADY a triangle,</span></span>
+<span id="cb3-136"><a href="#cb3-136" aria-hidden="true" tabindex="-1"></a>            <span class="co"># which needs something to have shrunk it -- so nothing reached this branch until</span></span>
+<span id="cb3-137"><a href="#cb3-137" aria-hidden="true" tabindex="-1"></a>            <span class="co"># apoptosis existed. It then fails immediately and enormously -- the activator goes</span></span>
+<span id="cb3-138"><a href="#cb3-138" aria-hidden="true" tabindex="-1"></a>            <span class="co"># many orders of magnitude negative when division and death run in the same tick,</span></span>
+<span id="cb3-139"><a href="#cb3-139" aria-hidden="true" tabindex="-1"></a>            <span class="co"># where the same operator on a non-growing tissue holds it at exactly zero.</span></span>
+<span id="cb3-140"><a href="#cb3-140" aria-hidden="true" tabindex="-1"></a>            <span class="co"># edge_flip declares no `cell_set`, so the cell level is looked up by name and</span></span>
+<span id="cb3-141"><a href="#cb3-141" aria-hidden="true" tabindex="-1"></a>            <span class="co"># a model without one simply skips this -- H.level raises rather than returning None.</span></span>
+<span id="cb3-142"><a href="#cb3-142" aria-hidden="true" tabindex="-1"></a>            <span class="co"># ONE ENGINE CALL, for the same reason `cell_die` makes it: state, occupancy, the</span></span>
+<span id="cb3-143"><a href="#cb3-143" aria-hidden="true" tabindex="-1"></a>            <span class="co"># coordinate delta accumulator and the extra first-order block deltas are four stores</span></span>
+<span id="cb3-144"><a href="#cb3-144" aria-hidden="true" tabindex="-1"></a>            <span class="co"># the engine keeps per set, and a renumber that forgets one scrambles it silently. The</span></span>
+<span id="cb3-145"><a href="#cb3-145" aria-hidden="true" tabindex="-1"></a>            <span class="co"># version this replaces forgot the fourth -- its guard tested `isinstance(key, tuple)`</span></span>
+<span id="cb3-146"><a href="#cb3-146" aria-hidden="true" tabindex="-1"></a>            <span class="co"># while `_delta_blocks` is keyed by level NAME, so the branch could never run.</span></span>
+<span id="cb3-147"><a href="#cb3-147" aria-hidden="true" tabindex="-1"></a>            <span class="co">#</span></span>
+<span id="cb3-148"><a href="#cb3-148" aria-hidden="true" tabindex="-1"></a>            <span class="co"># `edge_flip` declares no `cell_set`, so the cell level is looked up by name and a model</span></span>
+<span id="cb3-149"><a href="#cb3-149" aria-hidden="true" tabindex="-1"></a>            <span class="co"># without one simply skips: `renumber_set` returns False rather than raising.</span></span>
+<span id="cb3-150"><a href="#cb3-150" aria-hidden="true" tabindex="-1"></a>            <span class="co"># NOT `getattr(self, "cat", None) or "cell"`. This operator has no `cat`, so that</span></span>
+<span id="cb3-151"><a href="#cb3-151" aria-hidden="true" tabindex="-1"></a>            <span class="co"># expression WAS the literal `"cell"` every time -- `edge_flip` renumbering a set it</span></span>
+<span id="cb3-152"><a href="#cb3-152" aria-hidden="true" tabindex="-1"></a>            <span class="co"># never declared it needed, which is the case `resolve_cell_set`'s note names.</span></span>
+<span id="cb3-153"><a href="#cb3-153" aria-hidden="true" tabindex="-1"></a>            _cat <span class="op">=</span> resolve_cell_set(H, <span class="va">self</span>.at, <span class="va">self</span>._cat)</span>
+<span id="cb3-154"><a href="#cb3-154" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="kw">not</span> H.renumber_set(_cat, keep, n_new<span class="op">=</span>nF2):</span>
+<span id="cb3-155"><a href="#cb3-155" aria-hidden="true" tabindex="-1"></a>                m[<span class="st">"renumber_failed"</span>] <span class="op">=</span> <span class="bu">int</span>(m.get(<span class="st">"renumber_failed"</span>, <span class="dv">0</span>)) <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb3-156"><a href="#cb3-156" aria-hidden="true" tabindex="-1"></a>                <span class="bu">print</span>(<span class="ss">f"[edge_flip] renumber_set(</span><span class="sc">{</span>_cat<span class="sc">!r}</span><span class="ss">) DID NOT ACT after a face drop -- the "</span></span>
+<span id="cb3-157"><a href="#cb3-157" aria-hidden="true" tabindex="-1"></a>                      <span class="ss">f"cell state is now mis-indexed against the mesh"</span>, flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-158"><a href="#cb3-158" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"E_srce"</span>] <span class="op">=</span> torch.as_tensor(es2, device<span class="op">=</span>dev)</span>
+<span id="cb3-159"><a href="#cb3-159" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"E_trgt"</span>] <span class="op">=</span> torch.as_tensor(et2, device<span class="op">=</span>dev)</span>
+<span id="cb3-160"><a href="#cb3-160" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"E_face"</span>] <span class="op">=</span> torch.as_tensor(ef2, device<span class="op">=</span>dev)</span>
+<span id="cb3-161"><a href="#cb3-161" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"nF"</span>] <span class="op">=</span> nF2</span>
+<span id="cb3-162"><a href="#cb3-162" aria-hidden="true" tabindex="-1"></a>        px0, px1 <span class="op">=</span> lvl.state_schema[<span class="st">"pos"</span>]                   <span class="co"># write the two moved verts back (like cell_divide)</span></span>
+<span id="cb3-163"><a href="#cb3-163" aria-hidden="true" tabindex="-1"></a>        st <span class="op">=</span> lvl.state.clone()</span>
+<span id="cb3-164"><a href="#cb3-164" aria-hidden="true" tabindex="-1"></a>        st[:Nv, px0:px1] <span class="op">=</span> torch.as_tensor(np.asarray(pos), dtype<span class="op">=</span>dt, device<span class="op">=</span>dev)</span>
+<span id="cb3-165"><a href="#cb3-165" aria-hidden="true" tabindex="-1"></a>        lvl.state <span class="op">=</span> st</span>
+<span id="cb3-166"><a href="#cb3-166" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"n_t1"</span>] <span class="op">=</span> <span class="bu">int</span>(m.get(<span class="st">"n_t1"</span>, <span class="dv">0</span>)) <span class="op">+</span> ndone</span>
+<span id="cb3-167"><a href="#cb3-167" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+
+</section>
+
+</main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) are click-to-fullscreen */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: #000; z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { width: 100%; height: 100%; max-width: 100vw; max-height: 100vh;
+  object-fit: contain; background: #000; cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .75; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+  function requestFS() {
+    try {
+      if (ov.requestFullscreen) return ov.requestFullscreen();
+      if (ov.webkitRequestFullscreen) return ov.webkitRequestFullscreen();
+      if (vv.webkitEnterFullscreen) return vv.webkitEnterFullscreen();   // iOS Safari: video only
+    } catch (e) {}
+  }
+  function exitFS() {
+    try { if (fsElement()) (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document); }
+    catch (e) {}
+  }
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+    var r = requestFS(); if (r && r.catch) r.catch(function () {});   // expand to full screen on the click gesture
+  }
+  function close() {
+    exitFS();
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc || (v.querySelector('source') && v.querySelector('source').src) || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov.classList.contains('open')) close(); });
+  function onFsChange() { if (!fsElement() && ov.classList.contains('open')) close(); }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  vv.addEventListener('webkitendfullscreen', function () { if (ov.classList.contains('open')) close(); }); // iOS exit
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Cedric Allier · Janelia Research Campus · 2026</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

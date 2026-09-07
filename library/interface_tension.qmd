@@ -33,7 +33,7 @@ A purse-string line tension on the activator interface -- and nothing else.
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
 - **Acts on** &mdash; `vertex` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -69,7 +69,6 @@ Sci. Rep. 8:2386.
 |---|---|---|
 | `K_purse` | interface_line_tension | 1.0 |
 | `a_sw` | red_threshold | 0.6 |
-| `cell_set` | &ndash; | "cell" |
 | `eta` | &ndash; | 0.05 |
 | `cap_frac` | &ndash; | 0.10 |
 | `iters` | &ndash; | 4 |
@@ -128,7 +127,7 @@ class InterfaceLineTension3D(Lateral):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.K_purse = float(params.get("K_purse", 1.0))
         # 0.6, AND IT WAS 1.0 -- A DEFAULT THAT CANNOT FIRE. The gate below is
         # `red = a > a_sw * amax`, so a_sw = 1.0 asks for cells STRICTLY ABOVE the maximum: the
@@ -145,6 +144,8 @@ class InterfaceLineTension3D(Lateral):
         self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         from plexus.operators.vertex_ops import ShapeEnergy3D
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None); clvl = H.level(self.cat)
         if m is None or "chem" not in clvl.state_schema:

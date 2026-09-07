@@ -226,7 +226,7 @@ rate: no level is reduced to a parameter of the one above it.
 
 Operators can act within a level or across levels. Within a cell, for example, operators
 may couple receptors → signalling proteins → cytoskeleton. Across the containment map,
-**Aggregate ↑** builds parent state from children — a cell position from its particles, or
+**aggregate ↑** builds parent state from children — a cell position from its particles, or
 a neuron input from its synapses — while **broadcast ↓** propagates parent state to
 children — a material property to every particle owned by a cell, or a constraint imposed
 by the parent.

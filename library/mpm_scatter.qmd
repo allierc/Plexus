@@ -33,7 +33,7 @@ Particle to grid: the first step of the MLS-MPM cycle.
 
 ## Role in Plexus
 
-- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
+- **Kind** &mdash; push / pull **exchange**: set &harr; field.
 - **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `youngs`  (per-type props: `youngs`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -218,13 +218,7 @@ class MPMScatter(Exchange):
         offsets = stencil_offsets(D, dev)
         X, V = p.get("pos"), p.get("vel")
         # external per-cell acceleration from the parent set's accumulated delta (gravity)
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            a_cell = H.delta(pn)
-            a_cell = torch.nan_to_num(a_cell, posinf=self.a_max, neginf=-self.a_max).clamp(-self.a_max, self.a_max)
-            a_ext = a_cell[p.parent]
-        else:
-            a_ext = torch.zeros(p.n, D, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, D, dev)
         part_accel = getattr(H, "part_accel", None)
         if part_accel is not None:
             a_ext = a_ext + part_accel
@@ -294,7 +288,15 @@ class MPMScatter(Exchange):
         # fixed-corotated elastic stress before the affine scatter. Default off (absent -> None ->
         # pure elastic); same units / scaling / scatter as the elastic stress. Same H side-channel
         # idiom as part_accel; it feeds the tissue through stress divergence, not a pointwise force.
-        act = getattr(H, "active_stress", None)
+        # PER-LEVEL FIRST, THEN THE GLOBAL SIDE-CHANNEL. `H.active_stress` is one tensor for the
+        # whole run, which is exactly right while a model has ONE particle cloud and unusable the
+        # moment it has fifteen: the second scatter would read a stress sized for the first. A
+        # buffer on the LEVEL is per-set by construction. Both are honoured and summed, so the
+        # existing 2D field-driven operator is untouched.
+        act = getattr(p, "act_stress", None)
+        _gact = getattr(H, "active_stress", None)
+        if _gact is not None:
+            act = _gact if act is None else act + _gact
         if act is not None:
             stress = stress + act
         # THE SAME CHANNEL, FOR A DIFFERENT MECHANISM. `extra_stress` is any additive Kirchhoff

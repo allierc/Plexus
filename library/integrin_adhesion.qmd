@@ -33,7 +33,7 @@ Anchor the basement membrane to the epithelium, the way integrins do: each parti
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
 - **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `surface`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

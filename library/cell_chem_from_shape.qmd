@@ -33,7 +33,7 @@ The chemistry listens to CURVATURE: the tissue's shape telling its cells where t
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
 - **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `beta`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -103,12 +103,12 @@ class ShapeToChemCurvature(_ShapeToChemBase):
     MECHANISM_TAGS = _ShapeToChemBase.MECHANISM_TAGS + ["curvature_sensing"]
 
     def _feature(self, pt, m, es, et, ef, nF):
-        area, _, cen, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
+        area, _, centroid, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
                                            torch.as_tensor(et), torch.as_tensor(ef), nF)
-        cen = cen.numpy()
+        centroid = centroid.numpy()
         nrm = np.zeros((nF, 3))                        # Newell normal per cell, outward
         for a, b, f in zip(es, et, ef):
-            nrm[f] += np.cross(pt[a] - cen[f], pt[b] - cen[f])
+            nrm[f] += np.cross(pt[a] - centroid[f], pt[b] - centroid[f])
         ln = np.linalg.norm(nrm, axis=1, keepdims=True)
         nrm = nrm / np.maximum(ln, 1e-12)
         src, dst = _cell_adjacency(es, et, ef, nF)
@@ -117,9 +117,9 @@ class ShapeToChemCurvature(_ShapeToChemBase):
         deg = np.bincount(src, minlength=nF).astype(float)
         nb = np.zeros((nF, 3))
         for d in range(3):
-            nb[:, d] = np.bincount(src, weights=cen[dst][:, d], minlength=nF)
+            nb[:, d] = np.bincount(src, weights=centroid[dst][:, d], minlength=nF)
         nb /= np.maximum(deg, 1)[:, None]
-        delta = nb - cen                                # umbrella vector
+        delta = nb - centroid                                # umbrella vector
         # Divide by the NEIGHBOUR SPACING squared, not by |delta|^2. On a sphere the tangential
         # parts of the umbrella cancel, so |delta| is itself only ~L^2/2R -- dividing by it gives
         # 2R/L^2, which GROWS with radius. That reads as 1/R only if you hold the cell count fixed
@@ -127,7 +127,7 @@ class ShapeToChemCurvature(_ShapeToChemBase):
         # test. With the spacing: delta.n = -L^2/2R, so H = 2 (delta.n) / L^2 = 1/R. Correct, and
         # now independent of how finely the sphere is meshed.
         sp = np.zeros(nF)
-        np.add.at(sp, src, np.linalg.norm(cen[dst] - cen[src], axis=1))
+        np.add.at(sp, src, np.linalg.norm(centroid[dst] - centroid[src], axis=1))
         L = sp / np.maximum(deg, 1)
         return -2.0 * (delta * nrm).sum(1) / np.maximum(L ** 2, 1e-12)
 ```

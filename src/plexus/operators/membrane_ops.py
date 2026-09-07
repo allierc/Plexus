@@ -746,7 +746,7 @@ class BasementMembraneBondBreak(Structural):
     `every` frames rather than continuously, since bond failure is slow beside the mechanics.
 
     The kind is `rewire`, and that is not decoration: a broken crosslink changes the relation, which
-    is exactly what a Rewire is for.
+    is exactly what a rewire is for.
 
     What it reports is the thing that matters -- not how many bonds broke, but whether the sheet is
     still ONE PIECE. A membrane that has lost a third of its bonds and is still connected is not

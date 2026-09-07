@@ -51,7 +51,7 @@ import math
 
 import torch
 
-from plexus.models.base import Aggregate, Lateral, Seed
+from plexus.models.base import Aggregate, Lateral, Seed, Structural
 from plexus.models.registry import register_entity, register_operator
 from plexus.models.state import spatial_schema
 
@@ -1515,4 +1515,224 @@ class PolarGrowth(Lateral):
         if mask is not None:
             G = torch.where(mask.bool()[:, None, None], G, I)
         p.F.copy_(torch.bmm(G, p.F))
+        return {}
+
+
+@register_operator("park_reserve", family="cell", set="particle", kind="seed")
+class ParkReserve(Seed):
+    """Hold back a fraction of every piece's material points, dormant, as a monomer pool.
+
+    particle -> particle: sets `occ = 0`, `mass = 0` and parks the position on the last `fraction`
+    of each parent's block. Keeps the mass it took away in a `mass_rest` buffer, so waking a point
+    restores what the atlas computed for it rather than guessing.
+
+    THE RESERVOIR IS SPARE CAPACITY IN THE SET THAT WILL GROW, not a second set. Every level is
+    already allocated at a fixed buffer size with an occupancy `occ` marking the live subset, and
+    the whole MPM path honours it: `mpm_scatter` masks its weights by occupancy, `mpm_gather`
+    freezes dormant points instead of advecting them, and `mpm_strain` does not integrate their F.
+    A dormant point therefore costs memory and nothing else -- no mass on the grid, no stress, no
+    motion -- and waking one is a write to three buffers rather than a reallocation, which is what
+    makes it safe inside a captured CUDA graph.
+
+    Declaration order in `seed:` matters: `seed_cell_atlas` first (it lays every point out and
+    computes its volume and mass), then this, which retires the tail of each piece.
+
+    Reference: Plexus (this work); the same reservoir discipline as `mpm_emit`'s inlet pool.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["fraction"]
+    MECHANISM_TAGS = ["reservoir", "monomer_pool", "occupancy"]
+    PARAM_ROLES = {"fraction": "dormant_fraction_per_piece"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.fraction = float(params["fraction"])
+        if not 0.0 < self.fraction < 1.0:
+            raise ValueError("park_reserve: `fraction` is the share of each piece's points held "
+                             "back, strictly between 0 and 1.")
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        par = p.parent
+        # THE TAIL OF EACH PIECE'S OWN BLOCK, not the tail of the set: the points are tiled per
+        # parent, so a flat tail would empty the last fibres completely and leave the first ones
+        # with no reserve at all.
+        n_per = torch.bincount(par, minlength=int(par.max()) + 1)
+        start = torch.cumsum(n_per, 0) - n_per
+        rank = torch.arange(p.n, device=par.device) - start[par]
+        keep = (n_per[par].float() * (1.0 - self.fraction)).long()
+        dorm = rank >= keep
+        if not hasattr(p, "mass_rest"):
+            p.register_buffer("mass_rest", p.mass.clone())
+        else:
+            p.mass_rest.copy_(p.mass)
+        p.occ[dorm] = 0.0
+        p.mass[dorm] = 0.0
+        print(f"[park_reserve] {self.at}: {int(dorm.sum()):,} of {p.n:,} points held dormant "
+              f"({100 * self.fraction:.0f}% of each of {n_per.numel():,} pieces) -- a monomer pool "
+              f"worth {float(p.p_vol[dorm].sum()):.3e} of volume", flush=True)
+        return {}
+
+
+@register_operator("polymerize_tips", family="motility", set="particle", kind="structural")
+class PolymerizeTips(Structural):
+    """Add material at the growing end of every fibre, and let the cell be pushed by it.
+
+    particle -[containment]-> particle: finds each fibre's tip along the cell's polarity, wakes
+    `rate` dormant points from that fibre's own reserve, and places them beyond the tip.
+
+    HOW ADDING PARTICLES DEFORMS ANYTHING, which is the part that is not obvious and is easy to get
+    wrong. It does not, by itself. The fixed-corotated stress a material point scatters is a
+    function of its deformation gradient F alone -- at F = I it is exactly zero -- so a point woken
+    with F = I contributes MASS to the grid and no force whatsoever, however crowded the place it
+    was woken in. Nothing in the constitutive law counts particles.
+
+    So the new material is woken PRE-COMPRESSED ALONG THE FIBRE:
+
+        F_new = I + (c - 1) d d^T,      c = `compress` < 1,   J = c
+
+    d being the growth direction. The point now believes it is squeezed to a fraction c of its rest
+    length along d, and the stress that relieves that -- through the ordinary scatter, grid solve
+    and gather, with no new physics anywhere -- pushes its neighbours apart by exactly the volume
+    it was missing, p_vol (1 - c). That is the deformation, and it is momentum-conserving because
+    it arrives as a stress divergence rather than as an injected velocity.
+
+    WHY NOT INJECT INTO THE GRID INSTEAD, which is the obvious alternative: an operator adding a
+    divergence to the grid velocity field would also deform the material, since G2P hands the grid's
+    velocity gradient to every nearby point's C and `mpm_strain` integrates F <- (I + dt C) F. But
+    it creates momentum from nothing, and it deforms whatever happens to be near the injection site
+    -- cytoplasm, membrane, a passing mitochondrion -- rather than the thing that grew. The
+    per-particle route reaches the same grid through the path the solver already has.
+
+    WHAT THE RESERVOIR SIZE BUYS, in volume, because this is the binding constraint and not the
+    rate. The cytoplasm is nearly incompressible, so the cell's shape changes by the volume that is
+    inserted. A cell of 28 x 28 x 12 um is about 4,900 um^3 over 2.0 M points, i.e. 0.0025 um^3 a
+    point; a protrusion 30 um long and 8 um across is about 1,500 um^3, which is 30% of the cell and
+    some 600,000 points of reserve. A reserve of 240,000 points is a 12% bulge, not a new cell
+    shape. Trebling the cell by polymerisation alone would take twice its own volume in points.
+    Taking material off the back at the same rate -- treadmilling -- moves the cell without paying
+    that, which is what the real cytoskeleton does.
+
+    Reference: Mogilner, A. & Oster, G. (1996). Cell motility driven by actin polymerization.
+    Biophys. J. 71:3030-3045; Pollard, T. D. & Borisy, G. G. (2003). Cell 112:453-465.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True            # it writes positions, velocities and occupancy
+    REQUIRES_PARAMS = ["cell_set"]
+    REQUIRES_BUFFERS = ["F", "occ"]
+    INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
+    READS = ["polarity", "phase"]; WRITES = ["pos", "vel"]
+    MAPS = ["parent"]
+    MECHANISM_TAGS = ["polymerization", "protrusion", "motility", "cytoskeleton", "growth"]
+    PARAM_ROLES = {"rate": "points_per_fibre_per_frame", "compress": "insertion_stretch",
+                   "spacing": "insertion_step_length", "front_only": "leading_edge_restriction",
+                   "cell_set": "polarity_owner", "gate": "phase_gate"}
+    REFERENCE = ("Mogilner, A. & Oster, G. (1996). Biophys. J. 71:3030-3045; "
+                 "Pollard, T. D. & Borisy, G. G. (2003). Cell 112:453-465.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.cell_set = str(params["cell_set"])
+        self.block = str(params.get("block", "polarity"))
+        self.rate = float(params.get("rate", 1.0))
+        self.compress = float(params.get("compress", 0.6))
+        # THE STEP IS THE MATERIAL'S OWN POINT SPACING, not a length in world units: a fibre whose
+        # points sit 0.0008 apart and receives them 0.01 apart is not a fibre, it is a dotted line
+        # the grid cannot see as connected. Left unset it is read from the set's own p_vol.
+        self.spacing = params.get("spacing")
+        self.front_only = bool(params.get("front_only", True))
+        self.gate = params.get("gate")
+        self._cursor = None
+        self._exhausted = False
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        cl = H.level(self.cell_set)
+        D = p.F.shape[-1]
+        X, V = p.get("pos"), p.get("vel")
+        par = p.parent
+        nP = int(par.max()) + 1
+        live = p.occ > 0
+        idx_cell = H.lift_index(p.name, self.cell_set)
+        b0, b1 = cl.state_schema[self.block]
+        n_cell = cl.state[:, b0:b1][:, :D]
+        n_cell = n_cell / n_cell.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        d = n_cell[idx_cell]                                   # growth direction, per point
+
+        if self._cursor is None:
+            n_per = torch.bincount(par, minlength=nP)
+            self._start = (torch.cumsum(n_per, 0) - n_per)
+            self._n_per = n_per
+            self._cursor = torch.zeros(nP, dtype=torch.long, device=par.device)
+            # the first dormant rank of each piece: everything at or past it is reserve
+            rank = torch.arange(p.n, device=par.device) - self._start[par]
+            big = torch.full((nP,), 1 << 30, device=par.device, dtype=torch.long)
+            self._first_dorm = big.scatter_reduce(0, par[~live], rank[~live], "amin",
+                                                  include_self=True)
+            if self.spacing is None:
+                self.spacing = float(p.p_vol.mean() ** (1.0 / 3.0))
+            print(f"[polymerize_tips] {self.at}: {nP:,} fibres, "
+                  f"{int((~live).sum()):,} points in reserve, step {self.spacing:.2e} "
+                  f"({self.spacing * float(getattr(H, 'length_um', 100.0)):.3f} um)", flush=True)
+
+        # ---- each fibre's TIP: its live point that reaches furthest along d ----
+        proj = (X * d).sum(1)
+        neg = torch.finfo(proj.dtype).min
+        best = torch.full((nP,), neg, device=X.device, dtype=proj.dtype)
+        best = best.scatter_reduce(0, par[live], proj[live], "amax", include_self=True)
+        is_tip = live & (proj >= best[par] - 1e-12)
+        tip_idx = torch.full((nP,), -1, dtype=torch.long, device=X.device)
+        tip_idx[par[is_tip]] = torch.arange(p.n, device=X.device)[is_tip]
+
+        # ---- which fibres grow: the leading edge, and the half of the cycle that extends ----
+        grow = tip_idx >= 0
+        if self.front_only:
+            c = cl.state[:, cl.state_schema["pos"][0]:cl.state_schema["pos"][0] + D]
+            f_cell = H.lift_index(p.name, self.cell_set)[tip_idx.clamp_min(0)]
+            ahead = ((X[tip_idx.clamp_min(0)] - c[f_cell]) * n_cell[f_cell]).sum(1)
+            grow = grow & (ahead > 0)
+        k = self.rate
+        gt = _gate(self, H, tip_idx.clamp_min(0))
+        if gt is not None:
+            k = self.rate * gt.clamp_min(0.0)
+        k = torch.as_tensor(k, device=X.device, dtype=X.dtype).expand(nP).clone()
+        # A FRACTIONAL RATE IS A PROBABILITY, not a rounded-down zero: `rate: 0.3` must mean three
+        # points every ten frames, and int() would make it mean none, ever.
+        n_new = torch.floor(k + torch.rand(nP, device=X.device)).long().clamp_min(0)
+        n_new = torch.where(grow, n_new, torch.zeros_like(n_new))
+        room = (self._n_per - self._first_dorm.clamp_max(self._n_per) - self._cursor).clamp_min(0)
+        n_new = torch.minimum(n_new, room)
+        if int(n_new.sum()) == 0:
+            if not self._exhausted and int(room.sum()) == 0:
+                self._exhausted = True
+                print("[polymerize_tips] the reserve is spent -- every fibre has woken all of its "
+                      "dormant points. The cell cannot grow further without a bigger pool.",
+                      flush=True)
+            return {}
+
+        # ---- wake them: contiguous from each fibre's cursor, laid beyond its tip ----
+        f = torch.repeat_interleave(torch.arange(nP, device=X.device), n_new)
+        j = torch.arange(int(n_new.sum()), device=X.device) - \
+            torch.repeat_interleave(torch.cumsum(n_new, 0) - n_new, n_new)
+        slot = self._start[f] + self._first_dorm[f] + self._cursor[f] + j
+        self._cursor += n_new
+        t = tip_idx[f]
+        p.state[slot, :D] = X[t] + (j + 1).to(X.dtype)[:, None] * self.spacing * d[t]
+        v0, v1 = p.state_schema["vel"]
+        p.state[slot, v0:v1] = V[t][:, : v1 - v0]              # arrives moving with the tip
+        eye = torch.eye(D, device=X.device, dtype=p.F.dtype)
+        dd = d[t][:, :, None] * d[t][:, None, :]
+        p.F[slot] = eye[None] + (self.compress - 1.0) * dd     # squeezed along the fibre
+        p.C[slot] = 0.0
+        if getattr(p, "Jp", None) is not None:
+            p.Jp[slot] = 1.0
+        p.mass[slot] = (p.mass_rest[slot] if hasattr(p, "mass_rest")
+                        else p.p_vol[slot] * float(getattr(p, "density", 1.0)))
+        p.occ[slot] = 1.0
         return {}
