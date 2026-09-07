@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.6.42">
+<meta name="generator" content="quarto-1.8.26">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -30,17 +30,21 @@ ul.task-list li input[type="checkbox"] {
 <script src="site_libs/quarto-search/fuse.min.js"></script>
 <script src="site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="./">
-<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/axe/axe-check.js" type="module"></script>
 <script src="site_libs/quarto-html/popper.min.js"></script>
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-b758ccaa5987ceb1b75504551e579abf.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-70408cb9dc52a2002c2463371a30459f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -84,7 +88,7 @@ const typesetMath = (el) => {
     var macros = [];
     for (var i = 0; i < mathElements.length; i++) {
       var texText = mathElements[i].firstChild;
-      if (mathElements[i].tagName == "SPAN") {
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
         window.katex.render(texText.data, mathElements[i], {
           displayMode: mathElements[i].classList.contains('display'),
           throwOnError: false,
@@ -102,7 +106,169 @@ window.Quarto = {
 
 </head>
 
-<body class="nav-fixed">
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
@@ -183,6 +349,7 @@ window.Quarto = {
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
+
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">Plexus</h1>
@@ -212,7 +379,7 @@ window.Quarto = {
 <p>The central hypothesis of Plexus is that a large fraction of existing biological simulation models can be expressed as compositions of a small number of elementary operator kinds. The proposed algebra consists of <strong>eight</strong>:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<p><img src="figures/fig_ops.png" class="img-fluid quarto-figure quarto-figure-center figure-img" style="width:100.0%"></p>
 </figure>
 </div>
 <ul>
@@ -234,11 +401,6 @@ window.Quarto = {
 <section id="composing-hierarchy" class="level2">
 <h2 class="anchored" data-anchor-id="composing-hierarchy">Composing hierarchy</h2>
 <p>A set may be contained in another — proteins in a cell, cells in a tissue, tissues in an organism — through an explicit child → parent map. Importantly, a parent may contain several distinct sets: the same cell can contain receptors, signalling proteins, cytoskeletal elements and particles. These sets remain distinct objects, with their own state and operators, while sharing the same parent. Each level can also run at its own rate: no level is reduced to a parameter of the one above it.</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/fig_hier.png" class="img-fluid figure-img" style="width:70.0%"></p>
-</figure>
-</div>
 <p>Operators can act within a level or across levels. Within a cell, for example, operators may couple receptors → signalling proteins → cytoskeleton. Across the containment map, <strong>Aggregate ↑</strong> builds parent state from children — a cell position from its particles, or a neuron input from its synapses — while <strong>Broadcast ↓</strong> propagates parent state to children — a material property to every particle owned by a cell, or a constraint imposed by the parent.</p>
 <p>Fields are level-specific too. <strong>Exchange</strong> couples a set to a field at the appropriate level, allowing a protein concentration field, a cellular morphogen field and a tissue mechanical grid to coexist as distinct objects.</p>
 <p>The consequence is that proteins → cells → tissues is not a pipeline of separate simulators. It is one compositional graph: multiple sets may coexist inside each parent, operators connect them locally, and Aggregate/Broadcast connect the levels. The same operator kinds are reused throughout; adding another biological scale requires no new engine.</p>
@@ -249,6 +411,8 @@ window.Quarto = {
 <style>
 .sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1.1rem;margin:.6rem 0 2.4rem}
 .sim-gallery.g3{grid-template-columns:repeat(3,1fr)}
+.sim-gallery.g4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:900px){.sim-gallery.g4{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:560px){.sim-gallery.g3{grid-template-columns:repeat(2,1fr)}}
 .sim-gallery.wide{grid-template-columns:1fr;max-width:900px;margin:.6rem auto 2.4rem}
 .sim-gallery.wide .sim-card video{aspect-ratio:auto !important;height:auto !important;object-fit:contain !important}
@@ -266,11 +430,11 @@ window.Quarto = {
 </style>
 
 <h3 class="anchored">Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">The simplest composition: cells carrying two molecular states, coupled by diffusion between neighbouring cells and by local activator–inhibitor reactions within each cell. The same biological entities participate in two mechanisms whose composition generates spatial patterning. Shown on a 2D cell disc are a striped regime, a spotted one obtained by changing a single reaction parameter, and two chemistries patterning the same cells at once — then, below, those two chemistries coupled through their reaction, and three species in cyclic competition.</p>
+<p class="opk">The simplest composition: cells carrying two molecular states, coupled by diffusion between neighbouring cells and by local activator–inhibitor reactions within each cell. The same biological entities participate in two mechanisms whose composition generates spatial patterning. Shown on a 2D cell disc are a striped regime, a spotted one obtained by changing a single reaction parameter, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/turing_gs_stripes.mp4" autoplay loop muted playsinline preload="metadata"></video>
+<div class="sim-gallery g4">
+  <figure class="sim-card figure">
+    <video src="gallery/turing_gs_stripes.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">stripes (F = 0.05)<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_kappa_B
@@ -331,8 +495,8 @@ plotting:
       <span class="sim-cap">one Gray–Scott chemistry diffusing over the cell–cell graph: the pattern settles into 4 winding activator bands covering 45% of the 4,000 cells</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_gs_spots.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_gs_spots.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">spots (F = 0.034)<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_eta_B
@@ -393,99 +557,8 @@ plotting:
       <span class="sim-cap">the same graph, the same diffusion, F 0.034 instead of 0.05 — the only difference — and the bands break into 18 separate spots over 26% of the cells</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_two_beta.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">two chemistries<span class="sim-spec"><pre>general:
-  name: promo_TURING_atlas_turing2d_two_beta_B
-  seed: 0
-  n_frames: 6000
-  record_cap: 602
-  dt: 1.0
-  dim: 2
-  boundary: free
-  world:
-  - 49.4
-  - 49.4
-sets:
-  cell:
-    n: 4000
-    spawn: sunflower
-    spawn_radius: 19.0
-    state:
-      pos:
-        width: 2
-        integration: none
-        boundary: free
-      chem:
-        width: 4
-        integration: first_order
-        boundary: free
-fields: {}
-operators:
-- op: cell_chem_seed
-  at: cell
-  seed: 0
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.12
-  chan: 0
-- op: cell_chem_seed
-  at: cell
-  seed: 2
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.12
-  chan: 2
-- op: radius_graph
-  at: cell
-  radius: 0.95
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
-  chan: 0
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.03
-  d_h: 0.16
-  chi: 1.3
-  chan: 2
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.046
-  kk: 0.062
-  rate: 1.0
-  chan: 0
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.026
-  kk: 0.051
-  rate: 1.0
-  chan: 2
-schedule:
-- cell_chem_seed
-- cell_chem_seed
-- radius_graph
-- cell_chem_diffuse
-- cell_chem_diffuse
-- cell_chem_react
-- cell_chem_react
-plotting:
-  background: black
-  dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">two chemistries on the same cells, each with its own seed, diffusion and reaction — two Gray–Scott systems side by side rather than one</span>
-    </figcaption>
-  </figure>
-</div>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/turing_gs_coupled_eta_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_gs_coupled_eta_10.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">two chemistries, coupled<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_coupled_eta_B
@@ -568,8 +641,8 @@ plotting:
       <span class="sim-cap">the same two Gray–Scott systems, now <b>coupled through the reaction term</b> (γ = 0.2) rather than run side by side: they exclude one another, 0 of the 4,000 cells carrying both against 238 when the coupling is removed</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_rps_a2p0_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_rps_a2p0_10.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">cyclic competition<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_rps_a2p0_B
@@ -642,127 +715,6 @@ plotting:
 <p class="opk">A more structured representation of epithelial cells and their shared junctions. Cells are polygons whose boundaries share vertices, making junction geometry itself part of the biological state. Area elasticity and junction tension couple neighbouring cells and relax the tissue toward mechanical equilibrium, while growth, division and cell death modify its organization. Here the same cellular entities therefore carry geometry, interact mechanically, and change their topology over time.</p>
 <p class="opk-ref">Reference — active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/tyssue_spheroid_gate00.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">grow &amp; divide<span class="sim-spec"><pre>general:
-  name: promo_G_gates_gate_00_spheroid_A
-  seed: 0
-  n_frames: 401
-  dt: 1.0
-  record_cap: 403
-  boundary: free
-  dim: 3
-  world:
-  - 50.0
-  - 50.0
-  - 50.0
-  units:
-    length_um: 10.0
-    time_s: 600.0
-plotting:
-  background: black
-sets:
-  vertex:
-    n: 25584
-    mesh: half_edge
-    cell_set: cell
-  cell:
-    n: 12800
-    state:
-      area:
-        width: 1
-      cen:
-        width: 3
-      chem:
-        width: 2
-        integration: first_order
-fields: {}
-operators:
-- op: mesh_seed
-  at: vertex
-  before_frame: 1
-  cell_set: cell
-  n_cells: 200
-  radius: 5.0
-  jitter: 0.18
-  p0: 3.5
-  seed: 0
-  vseed_cv: 0.15
-- op: cell_geometry
-  at: cell
-- op: cell_grow
-  at: vertex
-  cell_set: cell
-  rate: 0.003457
-  rho: 1.0
-  a_sw: 50.0
-  hill: 4.0
-  vth_frac: 2.5
-- op: junction_myosin
-  at: vertex
-  activity: 1.0
-  tau: 20.0
-  beta: 1.0
-  myo_new: 1.0
-  dt: 1.0
-  inherit: true
-  keyed_on: length
-  destabilising: true
-  k_perim: 1.0
-  lam: 0.0
-  gam: 0.0
-- op: cell_mechanics
-  at: vertex
-  K_A: 1.0
-  K_P: 1.0
-  K_V: 2.0
-  K_R: 0.4
-  Lambda: 3.0
-  Gamma: 0.4
-  p0: 3.5
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: edge_flip
-  at: vertex
-  every: 4
-  engine_clock: true
-  l_th_frac: 0.35
-  max_flips: 30
-- op: cell_divide
-  at: vertex
-  cell_set: cell
-  every: 4
-  engine_clock: true
-  factor: 2.0
-  cycle_cv: 0.15
-  min_cycle: 4
-  max_cycle: 1000000000
-  p0: 3.5
-  reset_noise: 0.12
-- op: junction_sync
-  at: vertex
-  myo_new: 1.0
-  inherit: true
-- op: topo_record
-  at: vertex
-  every: 1
-schedule:
-- mesh_seed
-- cell_geometry
-- cell_grow
-- junction_myosin
-- cell_mechanics
-- edge_flip
-- cell_divide
-- junction_sync
-- topo_record</pre></span></span>
-      <span class="sim-cap">the vertex model on its own: 200 cells grow and divide into 6,914 over 401 frames, and the shell stays round (elongation 1.01, where 1.00 is a sphere)</span>
-    </figcaption>
-  </figure>
   <figure class="sim-card figure">
     <video src="gallery/tyssue_apoptose.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
@@ -914,8 +866,8 @@ schedule:   # the order the operators run each frame
 <p class="opk">Morphogenesis emerges from the composition of mechanisms acting on the same epithelial cells. Growth expands the surface, division changes its cellular resolution, while cell death removes material and allows the tissue to contract and reshape. A dying cell progressively shrinks and loses neighbours before being extruded, while the surrounding junction mechanics close the sheet. Here, adding a single operator changes the behaviour of the composed system: removing 71% of the cells can reshape the vesicle while preserving a closed surface.</p>
 <p class="opk-ref">Reference — apoptotic force driving epithelial folding after Monier et&nbsp;al., <i>Nature</i> <b>518</b>:245 (2015).</p>
 <div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/apop_patch_big_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/apop_patch_big_v5.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">a dying big patch<span class="sim-spec"><pre>general:
   name: apop_patch_big
@@ -1010,8 +962,8 @@ _basis:
       <span class="sim-cap">seen from the pole: 293 cells (blue) are marked to die, and the surface is drawn <b>inward</b> where they go — an invagination, the one deformation growth cannot make</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/apop_rings9_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/apop_rings9_v5.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">nine dying rings<span class="sim-spec"><pre>general:
   name: apop_rings9
@@ -1107,8 +1059,8 @@ _basis:
       <span class="sim-cap">895 deaths in nine bands: the vesicle does not fall apart, it closes over every gap and shrinks</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/apop_half_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/apop_half_v5.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">half the sheet<span class="sim-spec"><pre>general:
   name: apopgeo_half
@@ -1205,13 +1157,12 @@ _apopgeo:
   </figure>
 </div>
 
-
 <h3 class="anchored">Growing tissue + Turing pattern</h3>
 <p class="opk">Two mechanisms now act on the <b>same evolving tissue</b>. Cells grow and divide, changing the geometry and adjacency on which molecular states diffuse and react; in turn, the resulting Turing pattern is carried by the growing population and shapes its surface. Neither mechanism is a post-processing step: <b>patterning and morphogenesis evolve together on the same cells</b>. This is a first composition of independently defined biological operators into a coupled dynamical model.</p>
 <p class="opk-ref">Reference — this is the experiment of <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018), <i>Sci. Rep.</i> 8:2386</a> — Turing patterning on a 3D vertex model — rebuilt as Plexus operators on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> mesh; the chemistry is the Gray–Scott system cited in the Turing section above.</p>
 <div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/turing_grow_divide_v4.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_grow_divide_v4.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">grow &amp; divide<span class="sim-spec"><pre>general:
   name: grow_divide
@@ -1317,8 +1268,8 @@ schedule:
       <span class="sim-cap">growth that no morphogen gates, and division following it: 2,000 cells to 25,079, and the shell stays a sphere (reduced volume 1.00)</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_coral_v4.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_coral_v4.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:
   name: r021_12
@@ -1463,8 +1414,8 @@ _basis:
       <span class="sim-cap">a Gray–Scott pattern riding a growing shell: red stripes wander across 4,199 cells and the shell stays round (protrusion peak 1.03)</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_morphogen_v6.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_morphogen_v6.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">morphogen + growth<span class="sim-spec"><pre>general:
   name: r005_06
@@ -1666,8 +1617,8 @@ _discovery:
 
 <!-- BEGIN vertex-turing-shapes (generated by discovery_okuda/ops/minisite_section.py) -->
 <div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/turing_flower_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_flower_v3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">purse-string, k = 0.062<span class="sim-spec"><pre>general:
   name: r013_05
@@ -1863,8 +1814,8 @@ _discovery:
       <span class="sim-cap">eight arms from one activator: 12,201 cells, protrusion peak 1.41</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_lobes_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_lobes_v3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">purse-string, k = 0.031<span class="sim-spec"><pre>general:
   name: r016_01
@@ -2060,8 +2011,8 @@ _discovery:
       <span class="sim-cap">the same graph at half the Gray–Scott k, and it lobes and branches instead: 22,231 cells</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_noline_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_noline_v3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">no purse-string<span class="sim-spec"><pre>general:
   name: r017_00_ctrl
@@ -2248,8 +2199,8 @@ _discovery:
 
 <!-- BEGIN vertex-turing-rate (generated by discovery_okuda/ops/minisite_section.py) -->
 <div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/turing_folds_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_folds_v3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">reaction rate 0.75<span class="sim-spec"><pre>general:
   name: r020_01
@@ -2431,8 +2382,8 @@ _discovery:
       <span class="sim-cap">chemistry fast against growth: the shell folds rather than forming arms, and carries 24,661 cells</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_arms_r020ctrl.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_arms_r020ctrl.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">rate 0.5, purse-string on<span class="sim-spec"><pre>general:
   name: r020_00_ctrl
@@ -2637,8 +2588,8 @@ _discovery:
       <span class="sim-cap">the same reaction rate with the purse-string on: 12,223 cells drawn into 13 arms, protrusion peak 1.79</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_spikes_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_spikes_v3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">rate 0.25, growth doubled<span class="sim-spec"><pre>general:
   name: r021_06
@@ -2825,8 +2776,8 @@ _discovery:
 
 <!-- BEGIN vertex-turing-second-field (generated by discovery_okuda/ops/minisite_section.py) -->
 <div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/turing_death_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_death_v5.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">cell death<span class="sim-spec"><pre>general:
   name: tsd_max
@@ -3023,8 +2974,8 @@ _two_species:
       <span class="sim-cap">the second field marks cells to die instead, from frame 180 — under half the cells the inhibited run keeps, from the same growth law. 2,895 cells from 2,000 seeded</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_antiphase_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_antiphase_v5.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">one field, in antiphase<span class="sim-spec"><pre>general:
   name: sc_antiphase
@@ -3199,497 +3150,2320 @@ _sculpt:
 
 
 <h3 class="anchored">Continuum mechanics — MLS-MPM</h3>
-<p class="opk">Plexus can make the numerical structure of a mechanism explicit when greater physical detail is required. Here a material is represented by particles coupled through an Eulerian grid, and continuum mechanics is decomposed into <b>strain, particle-to-grid transfer, grid dynamics and grid-to-particle transfer</b>. Different constitutive laws on the same structure produce elastic, fluid and granular materials. Rather than treating MLS-MPM as a monolithic simulator, Plexus exposes its material operations as composable operators.</p>
+<p class="opk">Plexus can make the numerical structure of a mechanism explicit when greater physical detail is required. Here a material is represented by particles coupled through an Eulerian grid, and continuum mechanics is decomposed into <b>strain, particle-to-grid transfer, grid dynamics and grid-to-particle transfer</b>. The eight clips below run those same operators throughout: what changes along the row is the spec — first the constitutive law, then a single material number, then a plastic law in place of a fluid one, then one added force term; then the schedule itself gains inflow and outflow, a solid is put inside the fluid, and finally only the particle count grows, from five million to a billion. Rather than treating MLS-MPM as a monolithic simulator, Plexus exposes its material operations as composable operators.</p>
 <p class="opk-ref">Reference — the MLS-MPM solver is our PyTorch port (<a href="https://github.com/saalfeldlab/MPM_pytorch">saalfeldlab/MPM_pytorch</a>) of Yuanming&nbsp;Hu’s <a href="https://github.com/yuanming-hu/taichi_mpm">taichi_mpm</a>, implementing MLS-MPM (Hu et&nbsp;al. 2018).</p>
-<div class="sim-gallery g3">
+<div class="sim-gallery g4">
   <figure class="sim-card figure">
-    <video src="gallery/material_multi.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/mpm2_multimaterial.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">multi-material<span class="sim-spec"><pre># mpm3d_multimaterial -- three materials side by side in one 3D box (the spirit of
-# MPM_pytorch's multimaterial_1_3D, trimmed to three blocks for a quick inspect):
-# an elastic jelly cube, a liquid water cube and a plastic snow cube fall together.
-# Three cells, one material type each (assigned by `fraction`), each block-filled.
-# Tests multi-object / multi-material 3D in a single grid solve.
-general: {name: material_3d_multimaterial, seed: 0, n_frames: 360, dt: 0.0032, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+      <span class="sim-name" tabindex="0">three materials, one solve<span class="sim-spec"><pre>general:
+  name: sit_multimaterial
+  seed: 0
+  n_frames: 2400
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
 sets:
   cell:
     n: 3
-    start: [[0.24, 0.6, 0.5], [0.5, 0.6, 0.5], [0.76, 0.6, 0.5]]
+    start:
+    - - 0.08
+      - 0.305
+      - 0.25
+    - - 0.25
+      - 0.305
+      - 0.25
+    - - 0.42
+      - 0.305
+      - 0.25
     types:
-      jelly: {fraction: 0.3334, youngs: 260, block: [0.14, 0.50, 0.40, 0.34, 0.72, 0.60]}
+      jelly:
+        fraction: 0.3333
+        density: 1150.0
+        block:
+        - 0.03
+        - 0.25
+        - 0.2
+        - 0.13
+        - 0.36
+        - 0.3
+        bulk_modulus: 981000.0
+        material: liquid
       water:
         fraction: 0.3333
-        youngs: 200
-        block: [0.40, 0.50, 0.40, 0.60, 0.72, 0.60]
-        layers: [{frac: 1.0, youngs: 200, material: liquid}]
+        density: 1000.0
+        material: liquid
+        block:
+        - 0.16
+        - 0.25
+        - 0.16
+        - 0.34
+        - 0.36
+        - 0.34
+        bulk_modulus: 981000.0
       snow:
-        fraction: 0.3333
-        youngs: 90
-        block: [0.66, 0.50, 0.40, 0.86, 0.72, 0.60]
-        layers: [{frac: 1.0, youngs: 90, material: snow}]
-  mpm_particle: {parent: cell, per_parent: 6000, radius: 0.16, density: 1.0}
+        fraction: 0.3334
+        density: 350.0
+        material: snow
+        block:
+        - 0.37
+        - 0.25
+        - 0.2
+        - 0.47
+        - 0.36
+        - 0.3
+        youngs: 500000.0
+  mpm_particle:
+    parent: cell
+    per_parent: 870334
+    radius: 0.08
+    density: 1000.0
+    particle_mass: 2.20758e-06
 fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 64}
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 192
 operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 16.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.7}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1000000000.0}
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  vmax: 1000000000.0
+  implementation: warp
 schedule:
 - aggregate
 - gravity
-- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+- substep_dt: 2.604167e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
 plotting:
   background: black
   up_axis: 1
   camera_elev: 1.18
   camera_zoom: 0.0
   box_frame: true
-  fps: 60
-  hide_sets: [cell]
+  hide_sets:
+  - cell
   dot_size: 1.2
   render_3d: dots
   splat_size: 2.4
   splat_res: 600
   camera_turns: 0.0
-  colors: {jelly: [0.40, 0.85, 0.55], water: [0.30, 0.62, 1.0], snow: [0.95, 0.96, 1.0]}
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_mpm_particle:
-    description: Initially, three distinct clusters of particles are arranged in a linear sequence along a diagonal axis. Over time, the central blue cluster begins to expand and flatten, spreading across the bottom plane of the bounding box. The green and white clusters remain relatively stationary as the blue cluster grows to encompass the area beneath them. By the final frame, the blue particles form a large, thin sheet on the floor while the green and white clusters sit atop it.
-    objects: 'There are three primary clusters of particles: one green, one blue, and one white. The green cluster is a compact, roughly spherical mass located on the left side of the scene. The white cluster is a similar compact, spherical mass located on the right side of the scene. The blue cluster starts as a compact sphere in the center but transforms into a large, flat, two-dimensional sheet that covers the bottom of the cube.'</pre></span></span>
-      <span class="sim-cap">particles + grid: one solver for many materials</span>
+  colors:
+    jelly:
+    - 0.4
+    - 0.85
+    - 0.55
+    water:
+    - 0.3
+    - 0.62
+    - 1.0
+    snow:
+    - 0.95
+    - 0.96
+    - 1.0
+  slow_motion: 4</pre></span></span>
+      <span class="sim-cap">two liquids of different density and a snow-like plastic dropped into the same 192³ grid solve — 2.6&nbsp;M particles, three constitutive laws, one schedule</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/material_map.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/mpm2_viscosities.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">material map (4 quadrants)<span class="sim-spec"><pre>fields:
-  activation: {frame: grid, res: 128}
-  mpm_grid: {frame: mpm_grid, n_grid: 128}
-  stiffness_map: {frame: image, source: material/map_four_quadrants.tif}
-general: {boundary: wall, dt: 0.002, n_frames: 250, name: material_map_four_quadrants, seed: 0}
+      <span class="sim-name" tabindex="0">viscosity, swept<span class="sim-spec"><pre>general:
+  name: si_three_viscosities
+  seed: 0
+  n_frames: 1200
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.1
+  - 0.1
+  obstacles:
+  - - 0.0
+    - 0.045
+    - 0.0
+    - 0.1
+    - 0.05
+    - 0.0015
+  - - 0.0
+    - 0.045
+    - 0.00985
+    - 0.1
+    - 0.05
+    - 0.01135
+  - - 0.0
+    - 0.045
+    - 0.0197
+    - 0.1
+    - 0.05
+    - 0.0212
+  - - 0.0
+    - 0.045
+    - 0.02955
+    - 0.1
+    - 0.05
+    - 0.03105
+  - - 0.0
+    - 0.045
+    - 0.0394
+    - 0.1
+    - 0.05
+    - 0.0409
+  - - 0.0
+    - 0.045
+    - 0.04925
+    - 0.1
+    - 0.05
+    - 0.05075
+  - - 0.0
+    - 0.045
+    - 0.0591
+    - 0.1
+    - 0.05
+    - 0.0606
+  - - 0.0
+    - 0.045
+    - 0.06895
+    - 0.1
+    - 0.05
+    - 0.07045
+  - - 0.0
+    - 0.045
+    - 0.0788
+    - 0.1
+    - 0.05
+    - 0.0803
+  - - 0.0
+    - 0.045
+    - 0.08865
+    - 0.1
+    - 0.05
+    - 0.09015
+  - - 0.0
+    - 0.045
+    - 0.0985
+    - 0.1
+    - 0.05
+    - 0.1
+  - - 0.0
+    - 0.045
+    - 0.0
+    - 0.0015
+    - 0.05
+    - 0.1
+  - - 0.00985
+    - 0.045
+    - 0.0
+    - 0.01135
+    - 0.05
+    - 0.1
+  - - 0.0197
+    - 0.045
+    - 0.0
+    - 0.0212
+    - 0.05
+    - 0.1
+  - - 0.02955
+    - 0.045
+    - 0.0
+    - 0.03105
+    - 0.05
+    - 0.1
+  - - 0.0394
+    - 0.045
+    - 0.0
+    - 0.0409
+    - 0.05
+    - 0.1
+  - - 0.04925
+    - 0.045
+    - 0.0
+    - 0.05075
+    - 0.05
+    - 0.1
+  - - 0.0591
+    - 0.045
+    - 0.0
+    - 0.0606
+    - 0.05
+    - 0.1
+  - - 0.06895
+    - 0.045
+    - 0.0
+    - 0.07045
+    - 0.05
+    - 0.1
+  - - 0.0788
+    - 0.045
+    - 0.0
+    - 0.0803
+    - 0.05
+    - 0.1
+  - - 0.08865
+    - 0.045
+    - 0.0
+    - 0.09015
+    - 0.05
+    - 0.1
+  - - 0.0985
+    - 0.045
+    - 0.0
+    - 0.1
+    - 0.05
+    - 0.1
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 3
+    start:
+    - - 0.05
+      - 0.075
+      - 0.025
+    - - 0.05
+      - 0.075
+      - 0.05
+    - - 0.05
+      - 0.075
+      - 0.075
+    types:
+      water:
+        fraction: 0.3334
+        material: liquid
+        bulk_modulus: 10000.0
+        shape: ball
+        eta: 0.001
+      gel:
+        fraction: 0.3333
+        material: liquid
+        bulk_modulus: 10000.0
+        shape: ball
+        eta: 1.0
+      snow:
+        fraction: 0.3333
+        material: snow
+        youngs: 50000.0
+        shape: ball
+  mpm_particle:
+    parent: cell
+    per_parent: 100000
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 4.19006e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
 operators:
-- {at: cell, op: aggregate}
-- {op: apply_material_map, at: mpm_particle, from: stiffness_map, target: youngs, min: 20, max: 200}
-- {at: activation, duration: 30, name: beat, op: pacemaker, period: 150, phase: 0}
-- at: activation
-  center: [0.5, 0.5]
-  clock: beat
-  op: activation_pulse
-  radius: 0.12
-- {amplitude: 20.0, at: mpm_particle, from: activation, mode: inward, op: active_force}
-- {at: mpm_particle, k: 30.0, op: drag, emit: mpm_acceleration}
-- {at: mpm_particle, op: mpm_strain}
-- {a_max: 200, at: mpm_particle, drag: 0.0, op: mpm_scatter, to: mpm_grid}
-- {at: mpm_grid, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
-- {at: mpm_particle, from: mpm_grid, op: mpm_gather, wall_contact: 0.06, wall_damp: 0.5}
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  implementation: warp
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  implementation: warp
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
 schedule:
 - aggregate
-- apply_material_map
-- pacemaker
-- activation_pulse
-- active_force
-- drag
-- substep_dt: 0.0002
-  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+- gravity
+- substep_dt: 1.736111e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    water:
+    - 0.3
+    - 0.62
+    - 1.0
+    gel:
+    - 0.35
+    - 0.85
+    - 0.45
+    snow:
+    - 0.92
+    - 0.94
+    - 1.0</pre></span></span>
+      <span class="sim-cap">three balls on a perforated plate; only the viscosity η differs — water at 1&nbsp;mPa·s and a gel at 1&nbsp;Pa·s both drain through, the snow-like plastic never does</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/mpm2_hourglass.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">granular discharge<span class="sim-spec"><pre>general:
+  name: si_hourglass
+  seed: 0
+  n_frames: 2400
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.3
+  - 0.3
+  - 0.3
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  obstacles:
+  - - 0.0
+    - 0.02
+    - 0.0
+    - 0.045
+    - 0.05
+    - 0.3
+  - - 0.255
+    - 0.02
+    - 0.0
+    - 0.3
+    - 0.05
+    - 0.3
+  - - 0.0
+    - 0.05
+    - 0.0
+    - 0.066
+    - 0.08
+    - 0.3
+  - - 0.23399999999999999
+    - 0.05
+    - 0.0
+    - 0.3
+    - 0.08
+    - 0.3
+  - - 0.0
+    - 0.08
+    - 0.0
+    - 0.087
+    - 0.11
+    - 0.3
+  - - 0.213
+    - 0.08
+    - 0.0
+    - 0.3
+    - 0.11
+    - 0.3
+  - - 0.0
+    - 0.11
+    - 0.0
+    - 0.108
+    - 0.14
+    - 0.3
+  - - 0.192
+    - 0.11
+    - 0.0
+    - 0.3
+    - 0.14
+    - 0.3
+  - - 0.0
+    - 0.15
+    - 0.0
+    - 0.126
+    - 0.19
+    - 0.3
+  - - 0.174
+    - 0.15
+    - 0.0
+    - 0.3
+    - 0.19
+    - 0.3
+  - - 0.0
+    - 0.19
+    - 0.0
+    - 0.09899999999999999
+    - 0.23
+    - 0.3
+  - - 0.201
+    - 0.19
+    - 0.0
+    - 0.3
+    - 0.23
+    - 0.3
+  - - 0.0
+    - 0.23
+    - 0.0
+    - 0.072
+    - 0.27
+    - 0.3
+  - - 0.22799999999999998
+    - 0.23
+    - 0.0
+    - 0.3
+    - 0.27
+    - 0.3
+  - - 0.0
+    - 0.27
+    - 0.0
+    - 0.044999999999999984
+    - 0.3
+    - 0.3
+  - - 0.255
+    - 0.27
+    - 0.0
+    - 0.3
+    - 0.3
+    - 0.3
 sets:
   cell:
     n: 1
-    start:
-    - [0.5, 0.5]
     types:
-      sheet:
-        block: [0.15, 0.15, 0.85, 0.85]
+      snow:
+        material: snow
+        youngs: 500000.0
+        block:
+        - 0.115
+        - 0.16
+        - 0.02
+        - 0.185
+        - 0.29
+        - 0.28
         fraction: 1.0
-        youngs: 80
-  mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_activation:
-    description: A single greyish-white circular blob appears in the center of a black background. The blob remains stationary and maintains its shape throughout the duration of the video. There is no movement, expansion, or contraction of the object over time. The scene remains static with no changes in lighting or environment.
-    objects: The scene contains a single circular object located in the center of the frame. The object is a soft-edged, greyish-white sphere or disk. It is relatively small compared to the overall black background. The object is isolated and does not interact with any other elements.
-  movie_cell:
-    description: The simulation begins with a uniform distribution of blue particles within a square boundary. Over time, a subtle inward migration occurs, causing the density of particles to increase toward the center of the frame. This central concentration creates a darker, more saturated blue region as the particles cluster together. By the final frame, the central core is noticeably denser than the surrounding periphery.
-    objects: The scene contains a large collection of small, individual blue particles. These particles are arranged in a roughly square formation with a porous, speckled texture. The color of the particles is a consistent medium blue against a white background. The size of each individual particle is very small and uniform, creating a granular appearance across the entire field.
-  movie_mpm_particle:
-    description: The simulation shows a large collection of blue particles distributed within a square boundary. Over time, the particles exhibit a subtle inward migration toward the center of the frame. The density of the particles increases slightly in the middle region as the simulation progresses. The overall distribution remains largely stochastic, with no significant structural formation or large-scale movement.
-    objects: The scene contains thousands of small, individual blue dots representing particles. These particles are arranged in a roughly uniform, two-dimensional distribution across a white background. Each particle is approximately the same size and maintains a consistent blue color throughout the sequence. The particles are not connected to one another, forming a discrete point cloud rather than a continuous field.
+  mpm_particle:
+    parent: cell
+    per_parent: 620232
+    radius: 0.5
+    density: 400.0
+    particle_mass: 1.52588e-06
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.85
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.85
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- aggregate
+- gravity
+- substep_dt: 3.333333e-05
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
 plotting:
-  background: black</pre></span></span>
-      <span class="sim-cap">material map + active contraction</span>
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    snow:
+    - 0.92
+    - 0.94
+    - 1.0</pre></span></span>
+      <span class="sim-cap">the same transfer operators with a plastic return map in place of the fluid one: 620,000 grains arch and drain through the neck</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/material_water_lots.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/mpm2_two_drops.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">water (deep pool)<span class="sim-spec"><pre># material_3d_water_lots_x10 -- 27 liquid cubes (3x3x3), per_parent=35000 -&gt; ~945000 particles,
-# each cube a DISTINCT colour (same material -&gt; colour just tags the cube so you can watch
-# them merge/mix), launched with per-cube velocity and dropped in a box -&gt; a large splash.
-general: {name: material_3d_water_lots_x10, seed: 0, n_frames: 1280, dt: 0.0036, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+      <span class="sim-name" tabindex="0">surface tension<span class="sim-spec"><pre>general:
+  name: si_two_drops3d_s144
+  seed: 0
+  n_frames: 400
+  dt: 0.006798181946504358
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.1
+  - 0.1
+  save_data: true
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 2
+    start:
+    - - 0.03900000000000001
+      - 0.05
+      - 0.05
+    - - 0.061
+      - 0.05
+      - 0.05
+    types:
+      a:
+        fraction: 0.5
+        material: liquid
+        bulk_modulus: 10000.0
+        shape: ball
+      b:
+        fraction: 0.5
+        material: liquid
+        bulk_modulus: 10000.0
+        shape: ball
+  mpm_particle:
+    parent: cell
+    per_parent: 315690
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 1.766063548900463e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 192
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 0.0
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+  surface_tension: 0.144
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- aggregate
+- gravity
+- substep_dt: 6.536713410100344e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  dot_size: 1.4
+  slow_motion: 1
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  colors:
+    a:
+    - 0.3
+    - 0.62
+    - 1.0
+    b:
+    - 1.0
+    - 0.55
+    - 0.2</pre></span></span>
+      <span class="sim-cap">one extra term in the grid update — a surface force at σ&nbsp;=&nbsp;0.144&nbsp;N/m — and at zero gravity two drops of 0.6&nbsp;M particles pull themselves into one sphere</span>
+    </figcaption>
+  </figure>
+</div>
+<div class="sim-gallery g4">
+  <figure class="sim-card figure">
+    <video src="gallery/mpm2_buckling.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">an open system<span class="sim-spec"><pre>general:
+  name: si_buckling_mid
+  seed: 0
+  n_frames: 450
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.16
+  - 0.1
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  engine: continuous
+  obstacles:
+  - - 0.025
+    - 0.028
+    - 0.025
+    - 0.075
+    - 0.032
+    - 0.075
+sets:
+  cell:
+    n: 1
+    types:
+      water:
+        material: liquid
+        bulk_modulus: 276136.0
+        density: 1000.0
+        fraction: 1.0
+        shape: cube
+  mpm_particle:
+    parent: cell
+    per_parent: 4039999
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 1.5625000000000003e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 320
+operators:
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_emit
+  at: mpm_particle
+  face: -y
+  speed: 0.5
+  ppc: 8.0
+  patch:
+  - 0.42
+  - 0.42
+  - 0.58
+  - 0.58
+- op: mpm_drain
+  at: mpm_particle
+  face: -y
+  at_fraction: 0.02
+  sponge: 6.0
+  damp: 0.6
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 16.0
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 392.40000000000003
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  surface_tension: 0.0
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- gravity
+- mpm_emit
+- mpm_drain
+- substep_dt: 1.8601190476190478e-06
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.05
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    water:
+    - 1.0
+    - 0.55
+    - 0.12</pre></span></span>
+      <span class="sim-cap">the schedule gains <code>mpm_emit</code> and <code>mpm_drain</code>: a jet at 16&nbsp;Pa·s, 16,000× the viscosity of water, is injected at the top and buckles as it piles — 4.0&nbsp;M particles</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/mpm2_ball_wake.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">a solid inside the fluid<span class="sim-spec"><pre>general:
+  name: si_ball_wake_wide
+  seed: 0
+  n_frames: 700
+  dt: 0.000178
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.3
+  - 0.03333333333333333
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 60
+    start:
+    - &amp;id001
+      - 0.05
+      - 0.288
+      - 0.016666666666666666
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    types:
+      ball:
+        fraction: 0.016666666666666666
+        material: elastic
+        youngs: 5000000.0
+        density: 7850.0
+        shape: ball
+      water:
+        fraction: 0.9833333333333333
+        material: liquid
+        bulk_modulus: 3000000.0
+        density: 1000.0
+        eta: 0.001
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.1
+        - 0.3
+        - 0.03333333333333333
+  mpm_particle:
+    parent: cell
+    per_parent: 254237
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 6.65238e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 370
+operators:
+- op: gravity
+  at: cell
+  g: 88.29
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 1800.0
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+schedule:
+- gravity
+- substep_dt: 5.741935e-06
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 2
+    only: true
+    max_points: 900000
+  color_field: vorticity
+  color_range:
+  - 1.0
+  - 1000.0
+  field_log: true
+  field_cmap: turbo
+  colors:
+    ball:
+    - 0.95
+    - 0.35
+    - 0.3
+    water:
+    - 0.3
+    - 0.62
+    - 1.0</pre></span></span>
+      <span class="sim-cap">a steel-density elastic ball falls through a 15.3&nbsp;M-particle water column on one shared grid; the slice is coloured by vorticity magnitude, 1–1000&nbsp;s⁻¹ on a log scale</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/mpm2_waterfall_5m.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">5 million particles<span class="sim-spec"><pre>general:
+  name: si_waterfall_5m
+  seed: 0
+  n_frames: 2400
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  obstacles:
+  - - 0.0
+    - 0.28
+    - 0.0
+    - 0.3
+    - 0.32
+    - 0.5
+  - - 0.0
+    - 0.16
+    - 0.0
+    - 0.44
+    - 0.2
+    - 0.5
+  - - 0.0
+    - 0.04
+    - 0.0
+    - 0.5
+    - 0.08
+    - 0.5
+sets:
+  cell:
+    n: 1
+    types:
+      water:
+        fraction: 1.0
+        material: liquid
+        bulk_modulus: 981000.0
+        block:
+        - 0.03
+        - 0.32
+        - 0.18
+        - 0.17
+        - 0.46
+        - 0.32
+  mpm_particle:
+    parent: cell
+    per_parent: 5000000
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 5.488e-07
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 192
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- aggregate
+- gravity
+- substep_dt: 3.205128e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.1
+  slow_motion: 4
+  colors:
+    water:
+    - 0.3
+    - 0.62
+    - 1.0</pre></span></span>
+      <span class="sim-cap">the same water spec at 5&nbsp;M particles, cascading over three ledges on a 192³ grid</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/mpm2_bench_1b.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">one billion particles<span class="sim-spec"><pre>fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 320
+general:
+  boundary: wall
+  dim: 3
+  dt: 0.0036
+  n_frames: 180
+  name: si_bench_1b
+  record_cap: 2
+  seed: 0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  save_data: false
+operators:
+- at: cell
+  g: 16.0
+  op: gravity
+- at: mpm_particle
+  implementation: warp
+  op: mpm_strain
+- a_max: 200
+  at: mpm_particle
+  drag: 0.05
+  implementation: warp
+  op: mpm_scatter
+  polar: higham
+  polar_iters: 4
+  to: mpm_grid
+- at: mpm_grid
+  csf_mass_floor: 1.7e-15
+  mass_floor: 1.7e-15
+  op: mpm_grid_update
+  surface_tension: 0.0
+  wall_damp: 0.9
+  implementation: warp
+- at: mpm_particle
+  from: mpm_grid
+  implementation: warp
+  op: mpm_gather
+  vmax: 1000000000.0
+  wall_contact: 0.04
+  wall_damp: 1.0
+plotting:
+  background: black
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  colors:
+    w00:
+    - 1.0
+    - 0.0
+    - 0.0
+    w01:
+    - 1.0
+    - 0.208
+    - 0.0
+    w02:
+    - 1.0
+    - 0.417
+    - 0.0
+    w03:
+    - 1.0
+    - 0.649
+    - 0.0
+    w04:
+    - 1.0
+    - 0.857
+    - 0.0
+    w05:
+    - 0.911
+    - 1.0
+    - 0.0
+    w06:
+    - 0.703
+    - 1.0
+    - 0.0
+    w07:
+    - 0.471
+    - 1.0
+    - 0.0
+    w08:
+    - 0.263
+    - 1.0
+    - 0.0
+    w09:
+    - 0.031
+    - 1.0
+    - 0.0
+    w10:
+    - 0.0
+    - 1.0
+    - 0.177
+    w11:
+    - 0.0
+    - 1.0
+    - 0.409
+    w12:
+    - 0.0
+    - 1.0
+    - 0.617
+    w13:
+    - 0.0
+    - 1.0
+    - 0.849
+    w14:
+    - 0.0
+    - 0.943
+    - 1.0
+    w15:
+    - 0.0
+    - 0.711
+    - 1.0
+    w16:
+    - 0.0
+    - 0.503
+    - 1.0
+    w17:
+    - 0.0
+    - 0.271
+    - 1.0
+    w18:
+    - 0.0
+    - 0.063
+    - 1.0
+    w19:
+    - 0.169
+    - 0.0
+    - 1.0
+    w20:
+    - 0.378
+    - 0.0
+    - 1.0
+    w21:
+    - 0.609
+    - 0.0
+    - 1.0
+    w22:
+    - 0.818
+    - 0.0
+    - 1.0
+    w23:
+    - 0.996
+    - 0.0
+    - 0.946
+    w24:
+    - 1.0
+    - 0.0
+    - 0.742
+    w25:
+    - 1.0
+    - 0.0
+    - 0.511
+    w26:
+    - 1.0
+    - 0.0
+    - 0.302
+  dot_size: 1.2
+  fps: 60
+  hide_sets:
+  - cell
+  render_3d: dots
+  up_axis: 1
+schedule:
+- gravity
+- capture: false
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  substep_dt: 0.0001636364
 sets:
   cell:
     n: 27
     types:
-      w00: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.11, 0.19, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w01: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.11, 0.44, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w02: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.11, 0.69, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w03: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.11, 0.19, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w04: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.11, 0.44, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w05: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.11, 0.69, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w06: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.11, 0.19, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w07: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.11, 0.44, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w08: {fraction: 0.037037, youngs: 200, block: [0.61, 0.61, 0.11, 0.69, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w09: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.36, 0.19, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w10: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.36, 0.44, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w11: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.36, 0.69, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w12: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.36, 0.19, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w13: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.36, 0.44, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w14: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.36, 0.69, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w15: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.36, 0.19, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w16: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.36, 0.44, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w17: {fraction: 0.037037, youngs: 200, block: [0.61, 0.61, 0.36, 0.69, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w18: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.61, 0.19, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w19: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.61, 0.44, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w20: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.61, 0.69, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w21: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.61, 0.19, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w22: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.61, 0.44, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w23: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.61, 0.69, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w24: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.61, 0.19, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w25: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.61, 0.44, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w26: {fraction: 0.037038, youngs: 200, block: [0.61, 0.61, 0.61, 0.69, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-  mpm_particle: {parent: cell, per_parent: 35000, radius: 0.05, density: 1.0, vel_init: 2.5}
-fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 96}
-operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 16.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
-schedule:
-- aggregate
-- gravity
-- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
-plotting:
-  background: black
-  up_axis: 1
-  camera_elev: 1.18
-  camera_turns: 0.0
-  camera_zoom: 0.0
-  render_3d: dots
-  dot_size: 1.2
-  splat_res: 640
-  box_frame: true
-  fps: 60
-  hide_sets: [cell]
-  colors:
-    w00: [1.0, 0.0, 0.0]
-    w01: [1.0, 0.208, 0.0]
-    w02: [1.0, 0.417, 0.0]
-    w03: [1.0, 0.649, 0.0]
-    w04: [1.0, 0.857, 0.0]
-    w05: [0.911, 1.0, 0.0]
-    w06: [0.703, 1.0, 0.0]
-    w07: [0.471, 1.0, 0.0]
-    w08: [0.263, 1.0, 0.0]
-    w09: [0.031, 1.0, 0.0]
-    w10: [0.0, 1.0, 0.177]
-    w11: [0.0, 1.0, 0.409]
-    w12: [0.0, 1.0, 0.617]
-    w13: [0.0, 1.0, 0.849]
-    w14: [0.0, 0.943, 1.0]
-    w15: [0.0, 0.711, 1.0]
-    w16: [0.0, 0.503, 1.0]
-    w17: [0.0, 0.271, 1.0]
-    w18: [0.0, 0.063, 1.0]
-    w19: [0.169, 0.0, 1.0]
-    w20: [0.378, 0.0, 1.0]
-    w21: [0.609, 0.0, 1.0]
-    w22: [0.818, 0.0, 1.0]
-    w23: [0.996, 0.0, 0.946]
-    w24: [1.0, 0.0, 0.742]
-    w25: [1.0, 0.0, 0.511]
-    w26: [1.0, 0.0, 0.302]
+      w00:
+        block:
+        - 0.024
+        - 0.024
+        - 0.024
+        - 0.176
+        - 0.296
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w01:
+        block:
+        - 0.024
+        - 0.024
+        - 0.344
+        - 0.176
+        - 0.296
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w02:
+        block:
+        - 0.024
+        - 0.024
+        - 0.664
+        - 0.176
+        - 0.296
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w03:
+        block:
+        - 0.024
+        - 0.304
+        - 0.024
+        - 0.176
+        - 0.576
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w04:
+        block:
+        - 0.024
+        - 0.304
+        - 0.344
+        - 0.176
+        - 0.576
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w05:
+        block:
+        - 0.024
+        - 0.304
+        - 0.664
+        - 0.176
+        - 0.576
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w06:
+        block:
+        - 0.024
+        - 0.584
+        - 0.024
+        - 0.176
+        - 0.856
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w07:
+        block:
+        - 0.024
+        - 0.584
+        - 0.344
+        - 0.176
+        - 0.856
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w08:
+        block:
+        - 0.024
+        - 0.584
+        - 0.664
+        - 0.176
+        - 0.856
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w09:
+        block:
+        - 0.184
+        - 0.024
+        - 0.024
+        - 0.336
+        - 0.296
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w10:
+        block:
+        - 0.184
+        - 0.024
+        - 0.344
+        - 0.336
+        - 0.296
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w11:
+        block:
+        - 0.184
+        - 0.024
+        - 0.664
+        - 0.336
+        - 0.296
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w12:
+        block:
+        - 0.184
+        - 0.304
+        - 0.024
+        - 0.336
+        - 0.576
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w13:
+        block:
+        - 0.184
+        - 0.304
+        - 0.344
+        - 0.336
+        - 0.576
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w14:
+        block:
+        - 0.184
+        - 0.304
+        - 0.664
+        - 0.336
+        - 0.576
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w15:
+        block:
+        - 0.184
+        - 0.584
+        - 0.024
+        - 0.336
+        - 0.856
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w16:
+        block:
+        - 0.184
+        - 0.584
+        - 0.344
+        - 0.336
+        - 0.856
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w17:
+        block:
+        - 0.184
+        - 0.584
+        - 0.664
+        - 0.336
+        - 0.856
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w18:
+        block:
+        - 0.344
+        - 0.024
+        - 0.024
+        - 0.496
+        - 0.296
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w19:
+        block:
+        - 0.344
+        - 0.024
+        - 0.344
+        - 0.496
+        - 0.296
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w20:
+        block:
+        - 0.344
+        - 0.024
+        - 0.664
+        - 0.496
+        - 0.296
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w21:
+        block:
+        - 0.344
+        - 0.304
+        - 0.024
+        - 0.496
+        - 0.576
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w22:
+        block:
+        - 0.344
+        - 0.304
+        - 0.344
+        - 0.496
+        - 0.576
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w23:
+        block:
+        - 0.344
+        - 0.304
+        - 0.664
+        - 0.496
+        - 0.576
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w24:
+        block:
+        - 0.344
+        - 0.584
+        - 0.024
+        - 0.496
+        - 0.856
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w25:
+        block:
+        - 0.344
+        - 0.584
+        - 0.344
+        - 0.496
+        - 0.856
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w26:
+        block:
+        - 0.344
+        - 0.584
+        - 0.664
+        - 0.496
+        - 0.856
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+  mpm_particle:
+    density: 1.0
+    parent: cell
+    per_parent: 37037037
+    vel_init: 0.0</pre></span></span>
+      <span class="sim-cap">10⁹ particles on a 320³ grid, 100&nbsp;M of them drawn, 24.4&nbsp;s per frame — the same transfer and grid operators, unchanged</span>
+    </figcaption>
+  </figure>
+</div>
+<!-- vertex-mpm: hand-authored 2026-09-07 from graphs_data/mesh_mpm; no longer generated by discovery_okuda/ops/minisite_section.py -->
+<h3 class="anchored">Vertex + MPM</h3>
+<p class="opk">The previous representations can themselves be composed. A <b>triangulated surface</b> and an <b>MPM material</b> remain distinct entities, with different states and different mechanical implementations, but interact through an explicit interface that transfers contact forces in both directions. Everything is held fixed across the four clips — the same gel, the same 500,000 material points, the same penalty contact and the same travel — so what differs between the movies is the shape of the surface, and in the last one the fact that it reaches the material by growing rather than by being pushed. This is the computational pattern needed to compose heterogeneous biological structures.</p>
+<p class="opk-ref">Reference — contact:
+<a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>).</p>
+<div class="sim-gallery g4">
+  <figure class="sim-card figure">
+    <video src="gallery/meshmpm_sheet.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">flat plate<span class="sim-spec"><pre># MESH-MPM 00 -- the FLAT PLATE: an open planar patch pressed into an elastic gel.
+#
+# THE BASE OF THE LADDER, and the awkward case for the contact rather than the easy one. An
+# open patch has no interior for the star-shape reference to sit in, so `centre_offset` puts it
+# 0.30 above the plate, in the body of the piston -- put it IN the plate's plane and the ray
+# cast is degenerate, put it below and the plate pushes upward. Neither crashes; both report
+# zero contacts, which reads as nothing happened.
+#
+# A FLAT PUNCH loads a fixed area from the moment it touches, and its pressure is singular at
+# the rim. That is the whole difference from the sphere: same material, same depth, a load
+# history that starts at full area instead of growing into it.
+#
+# THE LADDER'S SHARED PART, IDENTICAL IN ALL THREE RUNGS. Same gel (E = 30 stress units = 200 Pa at
+# this calibration, a 1-3 mg/ml collagen I gel), same 500,000 material points, same warp solver,
+# same penalty (`k_frac: 0.45`, 20% of the explicit ceiling), same descent. Only the TOOL differs,
+# so anything that differs between the movies is the shape of the indenter.
+#
+# THE TOOL STARTS 0.01 ABOVE THE GEL -- 10 um, two thirds of a grid cell -- and travels `by: -0.11`
+# over 320 of the 400 frames, then holds for 80. The approach used to be 0.10 of the box, i.e. half
+# the run spent watching a tool fall through empty space; contact now begins around frame 30 and the
+# rest of the movie is the thing the run is about. The hold is not padding either: it is the only
+# stretch in which the surface is at REST under load, where the friction law's regularised branch
+# and the penalty's steady overlap can be read without a sliding term.
+#
+# `by:` AND NOT `target:`, because `target` is an absolute coordinate of the surface's CENTROID --
+# the low point of a flat plate, the centre of a sphere, and neither for a pyramid. Three rungs
+# meant to travel the same distance would have had to declare three different numbers.
+#
+# `centre: centroid` RIDES THE TOOL. `mesh_contact` is star-shaped: it rays from `centre` and pushes
+# anything between `centre` and the surface outward, so `centre` names the region the gel may not
+# enter. Re-read every frame it is the tool's own middle, and `centre_offset` lifts it into the body
+# of an OPEN tool (a plate or a pyramid has no interior to sit in). Declared fixed, the standoff
+# drifts as the tool descends -- 0.30 to 0.50 on the first version of the sheet, which walked the
+# contact's direction-bin grid from 90 rows to 150 for a geometry that never changed.
 
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_mpm_particle:
-    description: The simulation begins with a discrete set of colored hexagonal particles distributed
-      within a 3D bounding box. Over time, these particles rapidly transition into a dense, continuous
-      field of points that settle toward the bottom plane of the volume. The field exhibits complex, swirling
-      patterns and turbulent structures as it evolves. Eventually, the distribution stabilizes into a
-      layered, multi-colored sheet with distinct peaks and valleys.
-    objects: The scene contains a collection of hexagonal particles that are initially separated and scattered
-      in space. These particles are rendered in a vibrant spectrum of colors including magenta, cyan,
-      green, blue, and orange. As the simulation progresses, the individual hexagons merge into a massive,
-      interconnected cloud of tiny points. The final state shows a large, flat surface of points with
-      varying heights and intricate, nested color patterns.</pre></span></span>
-      <span class="sim-cap">water sloshes, settles and fills the tank</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card figure">
-    <video src="gallery/material_visco.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">viscoelastic vs elastic<span class="sim-spec"><pre># material_viscoelastic_vs_elastic -- two identical-stiffness balls dropped in 2D to compare
-# the NEW `viscoelastic` (Maxwell) material against pure `elastic`.
-#
-#   LEFT  ball = ELASTIC (orange): fixed-corotated spring; keeps full shape memory -&gt; bounces
-#                repeatedly (wall_damp 1.0 = ~no wall loss, so only the material decides rebound).
-#   RIGHT ball = VISCOELASTIC (purple): same youngs, but its deformation gradient F relaxes toward
-#                isotropic with time-constant `tau` -&gt; stored shear stress DECAYS -&gt; it deforms on
-#                impact, dissipates energy, and bounces lower each time (fast poke = solid, slow = flows).
-#
-# `tau` is the relaxation time (world time units). tau -&gt; inf recovers pure elastic; tau -&gt; 0 -&gt; liquid.
-# `general.dt` = sim-time per FRAME (lower for slow-mo); `substep_dt` = CFL micro-step (dt/substep_dt subs/frame).
-general: {name: material_viscoelastic_vs_elastic, seed: 0, n_frames: 6000, dt: 0.0015, boundary: wall}
-sets:
-  cell:
-    n: 2
-    start: [[0.3, 0.76], [0.7, 0.76]]         # cell 0 (left)=elastic, cell 1 (right)=viscoelastic
-    types:
-      elastic:                                 # LEFT ball -- pure elastic reference
-        fraction: 0.5
-        youngs: 400
-      visco:                                   # RIGHT ball -- viscoelastic (Maxwell), same stiffness
-        fraction: 0.5
-        youngs: 400
-        layers:
-          - {frac: 1.0, youngs: 400, material: viscoelastic, tau: 0.05}
-  mpm_particle: {parent: cell, per_parent: 3000, radius: 0.09, density: 1.0}
-fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 128}
-operators:
-  - {op: aggregate, at: cell}
-  - {op: gravity, at: cell, g: 9.0}
-  - {op: mpm_strain, at: mpm_particle}
-  - {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200}
-  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 1.0}
-  - {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
-schedule:
-  - aggregate
-  - gravity
-  - {substep_dt: 0.0001, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
-plotting:
-  background: black
-  colors: {elastic: [0.95, 0.55, 0.2], visco: [0.38, 0.10, 0.52]}   # elastic=orange, viscoelastic=DARK PURPLE
-  fps: 30                # movie playback frames/sec (NEW plotting param; lower = slower bouncing)
-  movie_max_frames: 600  # keep up to 600 recorded frames -&gt; ~20 s smooth (was 120 -&gt; ~4 s)</pre></span></span>
-      <span class="sim-cap">elastic and viscoelastic materials respond differently</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card figure">
-    <video src="gallery/material_obstacle.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">sphere obstacle<span class="sim-spec"><pre># material_3d_obstacle_sphere -- 3D MLS-MPM with fixed obstacles (no-slip box/sphere solids).
 general:
-  name: material_3d_obstacle_sphere
+  name: mesh_mpm_sheet_elastic
   seed: 0
-  n_frames: 320
-  dt: 0.0036
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
   boundary: wall
   dim: 3
-  world: [1.0, 1.0, 1.0]
-  obstacles:
-  - [0.5, 0.3, 0.5, 0.13]
-sets:
-  cell:
-    n: 1
-    types:
-      water: {fraction: 1.0, youngs: 200, block: [0.36, 0.58, 0.36, 0.64, 0.86, 0.64], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-  mpm_particle: {parent: cell, per_parent: 16000, radius: 0.05, density: 1.0}
-fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 96}
-operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 14.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.9, wall_contact: 0.04, vmax: 1000000000.0}
-schedule:
-- aggregate
-- gravity
-- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
+  box_frame: true
   camera_elev: 1.18
   camera_turns: 0.0
   camera_zoom: 0.0
-  render_3d: dots
-  dot_size: 1.2
-  splat_res: 620
-  box_frame: true
+  render_3d: surface
+  dot_size: 1.6
   fps: 60
-  hide_sets: [cell]
-  colors:
-    water: [0.30, 0.62, 1.0]
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_mpm_particle:
-    description: A blue cluster of particles initially occupies the upper half of a cubic volume. Over time, the cluster descends toward the bottom surface, gradually flattening into a thin layer. A smaller, spherical cluster of grey particles is positioned directly beneath the blue mass and is eventually enveloped by it. By the final frame, the blue particles have spread out to cover the entire bottom face of the cube.
-    objects: The primary object is a large, dense cluster of blue particles that changes shape from a cube to a flat sheet. A secondary, smaller spherical cluster of grey particles is located in the center of the cube. Both sets of particles are contained within a large, transparent white wireframe cube. The blue particles are significantly more numerous and larger in total volume than the grey particles.</pre></span></span>
-      <span class="sim-cap">material flows around an obstacle</span>
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: plate_face
+  plate_face:
+    n: 2304
+  mpm_particle:
+    n: 500000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.45
+        - 0.85
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: seed_plate
+  at: vertex
+  shape: sheet
+  nq: 48
+  half_width: 0.25
+  axis: 1
+  height: 0.46
+  centre:
+  - 0.5
+  - 0.5
+  standoff: 0.3
+- op: surface_drive
+  at: vertex
+  axis: 1
+  by: -0.11
+  over: 320
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+  centre_offset:
+  - 0.0
+  - 0.3
+  - 0.0
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+schedule:
+- seed_plate
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- mesh_inside</pre></span></span>
+      <span class="sim-cap">a flat triangulated patch driven 0.11 box units into 500,000 elastic gel points (E&nbsp;=&nbsp;200&nbsp;Pa, a 1–3&nbsp;mg/ml collagen&nbsp;I gel): a flat punch loads its whole area from the moment it touches</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/material_two_drops.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/meshmpm_sphere.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">two drops (surface tension)<span class="sim-spec"><pre>general: {name: material_two_drops_st, seed: 0, n_frames: 4000, dt: 0.0028, boundary: wall}
-sets:
-  cell:
-    n: 2
-    start:
-    - [0.39, 0.5]
-    - [0.61, 0.5]
-    types:
-      a:
-        fraction: 0.5
-        youngs: 200
-        layers:
-        - {frac: 1.0, youngs: 200, material: liquid}
-      b:
-        fraction: 0.5
-        youngs: 200
-        layers:
-        - {frac: 1.0, youngs: 200, material: liquid}
-  mpm_particle: {parent: cell, per_parent: 3000, radius: 0.11, density: 1.0}
-fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 128}
-operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 0.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, surface_tension: 120.0, wall_damp: 1.0}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
-schedule:
-- aggregate
-- gravity
-- substep_dt: 0.0002
-  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+      <span class="sim-name" tabindex="0">sphere<span class="sim-spec"><pre># MESH-MPM 01 -- the SPHERE: a closed vertex surface driven into the same elastic gel.
+#
+# THE CONTACT'S NATIVE CASE, WHICH MAKES IT THE CONTROL. For a closed star-shaped shell the
+# forbidden region IS the shell's interior, so `centre: centroid` needs no offset: there is no
+# standoff to choose and no degenerate ray to avoid. The plate and the pyramid are the awkward
+# cases; this is the one `mesh_contact` was written for, and all three now run one code path.
+#
+# A HERTZIAN CONTACT: the patch GROWS with indentation, so the gel is loaded through a
+# different history from the flat punch's at the same final depth. `seed_mesh` builds the shell
+# as a spherical Voronoi tessellation -- 400 faces -- which is the same seeder 461 okuda specs
+# use for an epithelium, here carrying no biology and only its geometry.
+#
+# THE LADDER'S SHARED PART, IDENTICAL IN ALL THREE RUNGS. Same gel (E = 30 stress units = 200 Pa at
+# this calibration, a 1-3 mg/ml collagen I gel), same 500,000 material points, same warp solver,
+# same penalty (`k_frac: 0.45`, 20% of the explicit ceiling), same descent. Only the TOOL differs,
+# so anything that differs between the movies is the shape of the indenter.
+#
+# THE TOOL STARTS 0.01 ABOVE THE GEL -- 10 um, two thirds of a grid cell -- and travels `by: -0.11`
+# over 320 of the 400 frames, then holds for 80. The approach used to be 0.10 of the box, i.e. half
+# the run spent watching a tool fall through empty space; contact now begins around frame 30 and the
+# rest of the movie is the thing the run is about. The hold is not padding either: it is the only
+# stretch in which the surface is at REST under load, where the friction law's regularised branch
+# and the penalty's steady overlap can be read without a sliding term.
+#
+# `by:` AND NOT `target:`, because `target` is an absolute coordinate of the surface's CENTROID --
+# the low point of a flat plate, the centre of a sphere, and neither for a pyramid. Three rungs
+# meant to travel the same distance would have had to declare three different numbers.
+#
+# `centre: centroid` RIDES THE TOOL. `mesh_contact` is star-shaped: it rays from `centre` and pushes
+# anything between `centre` and the surface outward, so `centre` names the region the gel may not
+# enter. Re-read every frame it is the tool's own middle, and `centre_offset` lifts it into the body
+# of an OPEN tool (a plate or a pyramid has no interior to sit in). Declared fixed, the standoff
+# drifts as the tool descends -- 0.30 to 0.50 on the first version of the sheet, which walked the
+# contact's direction-bin grid from 90 rows to 150 for a geometry that never changed.
 
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_cell:
-    description: Two separate circular particles initially move toward each other from the left and right sides of the frame. They collide and begin to merge into a single, unified shape. As they fuse, the boundary between the two colors becomes irregular and complex. Finally, the two particles completely integrate into a single, multi-colored blob.
-    objects: The scene contains two primary circular particles that are initially distinct and separate. One particle is light blue and the other is light orange, both having a similar diameter. As the simulation progresses, the two circles overlap and deform into a single, larger irregular shape. The final object is a single composite blob featuring both blue and orange colors with a jagged internal boundary.
-  movie_mpm_particle:
-    description: Two separate blue and orange circular clusters of particles initially exist side-by-side. They begin to move toward each other and merge into a single, unified spherical mass. As they merge, the blue and orange particles intermix to form a composite globe-like structure. The final frames show a stable, integrated sphere where the two colors are distributed across the surface.
-    objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation progresses, the particles reorganize into a single spherical topology. The final object is a single sphere composed of both blue and orange particles of uniform size.
+general:
+  name: mesh_mpm_sphere_elastic
+  seed: 0
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
 plotting:
-  background: black</pre></span></span>
-      <span class="sim-cap">surface tension makes two drops merge</span>
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: surface
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: sphere_face
+  sphere_face:
+    n: 512
+  mpm_particle:
+    n: 500000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.45
+        - 0.85
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: mesh_seed
+  at: vertex
+  n_cells: 400
+  radius: 0.15
+  centre:
+  - 0.5
+  - 0.61
+  - 0.5
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+- op: surface_drive
+  at: vertex
+  axis: 1
+  by: -0.11
+  over: 320
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+schedule:
+- mesh_seed
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- mesh_inside</pre></span></span>
+      <span class="sim-cap">only the tool differs — same gel, same descent, same penalty contact at friction μ&nbsp;=&nbsp;0.4 — and the sphere grows its contact patch instead of starting at full area</span>
     </figcaption>
   </figure>
-</div>
+  <figure class="sim-card figure">
+    <video src="gallery/meshmpm_pyramid.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">pyramid<span class="sim-spec"><pre># MESH-MPM 02 -- the INVERTED PYRAMID: a four-sided tip, apex down, driven into the same gel.
+#
+# THE NANOINDENTER'S GEOMETRY. `profile: pyramid` displaces the same lattice `seed_plate`
+# already builds -- apex at the declared `height`, four faces rising by `profile_depth` to the
+# rim -- so the shape mask (sheet/disc/hole/grid) and the out-of-plane profile stay orthogonal
+# and a conical tip is `disc` + `cone` from the same seeder.
+#
+# 0.12 OF RISE OVER 0.25 OF HALF-WIDTH is a half-angle of 64.4 deg from the axis -- between a
+# Vickers (68) and a sharper tip, quoted as an equivalent cone. It is declared as a RISE and
+# not as an angle because the angle also depends on `half_width`, and two numbers pinning one
+# geometry is one too many; the operator prints the angle it implies.
+#
+# WHY THIS IS THE HARD RUNG. A sharp tip concentrates the whole load on the few particles at
+# the apex, so it is where a penalty contact is most likely to be seen letting material
+# through -- and where `height` meaning THE TOOL'S LOWEST POINT matters, since the apex touches
+# 0.12 before the rim would.
+#
+# THE LADDER'S SHARED PART, IDENTICAL IN ALL THREE RUNGS. Same gel (E = 30 stress units = 200 Pa at
+# this calibration, a 1-3 mg/ml collagen I gel), same 500,000 material points, same warp solver,
+# same penalty (`k_frac: 0.45`, 20% of the explicit ceiling), same descent. Only the TOOL differs,
+# so anything that differs between the movies is the shape of the indenter.
+#
+# THE TOOL STARTS 0.01 ABOVE THE GEL -- 10 um, two thirds of a grid cell -- and travels `by: -0.11`
+# over 320 of the 400 frames, then holds for 80. The approach used to be 0.10 of the box, i.e. half
+# the run spent watching a tool fall through empty space; contact now begins around frame 30 and the
+# rest of the movie is the thing the run is about. The hold is not padding either: it is the only
+# stretch in which the surface is at REST under load, where the friction law's regularised branch
+# and the penalty's steady overlap can be read without a sliding term.
+#
+# `by:` AND NOT `target:`, because `target` is an absolute coordinate of the surface's CENTROID --
+# the low point of a flat plate, the centre of a sphere, and neither for a pyramid. Three rungs
+# meant to travel the same distance would have had to declare three different numbers.
+#
+# `centre: centroid` RIDES THE TOOL. `mesh_contact` is star-shaped: it rays from `centre` and pushes
+# anything between `centre` and the surface outward, so `centre` names the region the gel may not
+# enter. Re-read every frame it is the tool's own middle, and `centre_offset` lifts it into the body
+# of an OPEN tool (a plate or a pyramid has no interior to sit in). Declared fixed, the standoff
+# drifts as the tool descends -- 0.30 to 0.50 on the first version of the sheet, which walked the
+# contact's direction-bin grid from 90 rows to 150 for a geometry that never changed.
 
-<!-- BEGIN vertex-mpm (generated by discovery_okuda/ops/minisite_section.py) -->
-<h3 class="anchored">Vertex + MPM</h3>
-<p class="opk">The previous representations can themselves be composed. A <b>triangulated surface</b> and an <b>MPM material</b> remain distinct entities, with different states and different mechanical implementations, but interact through an explicit interface that transfers contact forces in both directions. Pressing, dragging and breaching therefore couple two mechanical descriptions without collapsing them into a common solver. This is the computational pattern needed to compose heterogeneous biological structures.</p>
-<p class="opk-ref">Reference — contact:
-<a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over
-grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>),
-which needs mesh and grid cells of a size ours are not; solid:
-<a href="https://doi.org/10.1145/3197517.3201293">MLS-MPM, Hu et&nbsp;al. (2018)</a>; surface: the
-vertex mesh of
-<a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018)</a>. Rig and
-operators ours (<code>discovery_okuda/ops</code>).</p>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/vertex_mpm_press.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">press<span class="sim-spec"><pre>what: particle-to-surface contact between a triangulated patch and an MPM block
-scheme: ICFEMP-style (Chen et al. 2015 CMAME 293:1); grid-node coupling (CFEMP, Lian
-  et al. 2011) needs mesh/grid size consistency, which this prototype violates
-simplification: flat axis-aligned patch, so face lookup is O(1); a general mesh needs
-  a BVH
-measures:
-- momentum residual
-- penetration depth in grid cells
-- slip with and without friction
-variant:
-  floor: null
-  hole_r: 0.0
-  which: free block
-  loading: press at 1 box units per unit time for 60% of the run, then lift at 0.7
-rig:
-  mesh_cell_over_dx: 1.6800003051757812
-  n_grid: 64
-  particles: 81202
-  k_penalty: 2.1457672119140625
+general:
+  name: mesh_mpm_pyramid_elastic
+  seed: 0
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: surface
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: plate_face
+  plate_face:
+    n: 2304
+  mpm_particle:
+    n: 500000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.45
+        - 0.85
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: seed_plate
+  at: vertex
+  shape: sheet
+  nq: 48
+  half_width: 0.25
+  axis: 1
+  height: 0.46
+  centre:
+  - 0.5
+  - 0.5
+  profile: pyramid
+  profile_depth: 0.12
+  standoff: 0.3
+- op: surface_drive
+  at: vertex
+  axis: 1
+  by: -0.11
+  over: 320
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.45
   mu: 0.4
-  dt: 0.0001</pre></span></span>
-      <span class="sim-cap">a free block, indented and released. 751 particles in contact at the deepest; momentum balances to 1.5e-07 of the applied force, and friction cuts the slip 3.2-fold against μ = 0</span>
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+  centre_offset:
+  - 0.0
+  - 0.3
+  - 0.0
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+schedule:
+- seed_plate
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- mesh_inside</pre></span></span>
+      <span class="sim-cap">and an edge rather than a face. The tool’s shape is one line of the spec; the two-way force transfer across the interface is not</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/vertex_mpm_shear.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/meshmpm_spheroid_gel.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">drag<span class="sim-spec"><pre>what: 'a triangulated patch pressed into an MPM block and then DRAGGED across it:
-  the tangential half of the contact law, as a loading rather than as a number'
-scheme: ICFEMP-style particle-to-surface contact (Chen et al. 2015 CMAME 293:1), the
-  same interface as 03c; only the rim's prescribed velocity and the grid boundary
-  conditions differ
-loading: press 2.6 grid cells, then translate 0.12 box units at constant depth
-colour: von Mises of the Kirchhoff stress -- a drag is deviatoric, so |J-1| is blank
-  where the shear band is
-rig:
-  mesh_cell_over_dx: 1.2000007629394531
-  n_grid: 64
-  particles: 93952
-  k_penalty: 5.9604644775390625
-  mu: 0.9
-  dt: 0.0001
-  floor: 0.18
-  hole_r: 0.0
-  walls: null
-measured:
-  momentum_residual_max: 1.0260407079598801e-07
-  penetration_max_cells: 1.4166336059570312
-  compression: 0.1543962709619502</pre></span></span>
-      <span class="sim-cap">pressed 5.9 cells in, then dragged 0.13 box units at that depth over a pinned base: it ploughs and shears. Von Mises, because a drag changes shape at constant volume</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/vertex_mpm_breach.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">breach<span class="sim-spec"><pre>what: 'a triangulated patch with a hole pressed into a laterally CONFINED MPM block:
-  with no rim to escape through, the matrix extrudes as a plug through the breach'
-scheme: ICFEMP-style particle-to-surface contact (Chen et al. 2015 CMAME 293:1), the
-  same interface as 03c; only the rim's prescribed velocity and the grid boundary
-  conditions differ
-loading: press at 0.5 box units per unit time throughout, box closed on x and y
-colour: '|J-1|, the volumetric strain: under a confined press the material cannot
-  leave except through the hole'
-rig:
-  mesh_cell_over_dx: 1.8400001525878906
-  n_grid: 64
-  particles: 81202
-  k_penalty: 15.258789062500004
+      <span class="sim-name" tabindex="0">a shell that grows<span class="sim-spec"><pre># MESH-MPM 05 -- THE SPHEROID INDENTS THE GEL BY GROWING. Nothing is translated.
+#
+# `mesh_mpm_sphere_elastic.yaml` WITH ONE OPERATOR LINE CHANGED: `surface_drive` scales the shell
+# about its own centroid instead of pushing it down. Same gel, same 500,000 material points, same
+# solver, same penalty -- so what differs from rung 01 is that the tool inflates rather than
+# descends, and the contact patch grows for a reason a real spheroid has.
+#
+# THE SURFACE IS PRESCRIBED, AND THAT IS THE WHOLE DESIGN. There is no `cell_grow`, no
+# `cell_mechanics`, no `cell_divide`, no `edge_flip` -- the shell is a kinematic tool, exactly as
+# the plate, the sphere and the pyramid are. The gel feels the shell; the shell feels nothing.
+#
+# WHY NOT A SOLVED EPITHELIUM, having tried it. `log/okuda_ECM/04_spheroid_ecm` is the run this
+# reproduces and it has NO vertex set at all: its only sets are the MPM parent and the material
+# points, and its surface is 200 cached meshes replayed out of
+# `_tissue/cellfix_B_new_f401_x4_c4a5698982.npz`. It worked precisely BECAUSE there was no tissue in
+# it -- a replayed surface cannot answer, so the coupling is one-way by construction. Putting a live
+# okuda vesicle in the same schedule is a different experiment, and the first attempt showed why:
+# the tissue divided about ten times too fast (2,022 faces at frame 100 against 201 for the same
+# tissue alone), which a spec-for-spec probe pinned on the presence of the MPM set and the contact
+# rather than on the boundary, the radial term's origin or the timestep. That is an influence FROM
+# the gel TO the spheroid, and it is unresolved. This rung does not depend on it.
+#
+# THE GEOMETRY, so the comparison with rung 01 is exact. Seeded at radius 0.08 with its lower pole
+# at 0.45 -- the gel's top -- and grown x2.4 over 320 of the 400 frames, the pole travels
+# 0.192 - 0.08 = 0.112 into the gel, against the 0.11 rung 01's sphere is driven. The shell's
+# TESSELLATION is unchanged by scaling, so the contact's direction-bin grid stays at ~17 rows for
+# the whole run instead of railing at its floor the way a dividing tissue's did.
+
+general:
+  name: mesh_mpm_spheroid_gel
+  seed: 0
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: surface
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  mesh_flat: true
+  mesh_color: '#cfd8e3'
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: sphere_face
+  sphere_face:
+    n: 512
+  mpm_particle:
+    n: 500000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.45
+        - 0.85
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: mesh_seed
+  at: vertex
+  n_cells: 400
+  radius: 0.08
+  centre:
+  - 0.5
+  - 0.53
+  - 0.5
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+- op: surface_drive
+  at: vertex
+  grow: 2.4
+  over: 320
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.45
   mu: 0.4
-  dt: 0.0001
-  floor: 0.18
-  hole_r: 0.09
-  walls:
-  - 0.28
-  - 0.72
-measured:
-  momentum_residual_max: 1.324563153324408e-07
-  penetration_max_cells: 1.9284839630126953
-  compression: 0.22596009093189695</pre></span></span>
-      <span class="sim-cap">closed on all four sides and nearly incompressible, so the matrix leaves through the hole: a plug 3.2 cells proud of a plate that has descended 6.3</span>
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+schedule:
+- mesh_seed
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- mesh_inside</pre></span></span>
+      <span class="sim-cap">the same sphere, inflated 2.4× about its own centroid rather than pushed down, so the contact patch spreads for the reason a spheroid’s does; colour is equivalent deviatoric strain, 0–0.35</span>
     </figcaption>
   </figure>
 </div>
-<!-- END vertex-mpm -->
 
 <!-- BEGIN spheroid-bm-ecm (generated by discovery_okuda/ops/minisite_section.py) -->
 <h3 class="anchored">Cell tissue + basement membrane + extracellular matrix</h3>
@@ -3702,8 +5476,8 @@ protease network, <a href="https://doi.org/10.1074/jbc.M403627200">Karagiannis &
 <a href="https://doi.org/10.1074/jbc.M000907200">Yu et&nbsp;al. (2000)</a>. Note:
 <code>discovery_okuda/note_spheroid_bm_ecm.pdf</code>.</p>
 <div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/spheroid_bm_ecm_07i2.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/spheroid_bm_ecm_07i2.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">from tissue to cells to proteins<span class="sim-spec"><pre>general:
   name: 07i_ramp
@@ -3777,8 +5551,8 @@ run:
       <span class="sim-cap">cells, basement membrane and matrix grow together</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/bm_07k_breach_hole.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/bm_07k_breach_hole.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">small holes in the membrane<span class="sim-spec"><pre>general:
   name: 07k_breach_hole
@@ -3889,8 +5663,8 @@ run:
       <span class="sim-cap">the sheet perforates wherever the enzyme sits: 7.7% of its faces gone by frame 187, through 54 separate openings, the first at frame 40</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/bm_07j_hole_tiny.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/bm_07j_hole_tiny.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">larger hole in the membrane<span class="sim-spec"><pre>general:
   name: 07j_hole_tiny
@@ -3999,8 +5773,8 @@ run:
       <span class="sim-cap">one localised source instead: 2.0% of the faces gone, but through only 6 openings — 2.3x as much of the sheet per opening as the card at left</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/bm_07k_breach_torn.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/bm_07k_breach_torn.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">membrane tears apart<span class="sim-spec"><pre>general:
   name: 07k_breach_torn
@@ -5138,8 +6912,8 @@ descriptions:
       <span class="sim-cap">a heavier central mass reshapes the disc</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/nbody_cluster.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/nbody_cluster.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">N-body cluster<span class="sim-spec"><pre># nbody_cluster -- gravitational N-body collapse via the unified `squared_law` operator
 # (law: gravity, all_pairs). After Philip Mocz, "Create Your Own N-body Simulation
@@ -5179,8 +6953,8 @@ descriptions:
       <span class="sim-cap">mutual gravity merges four clumps into one cluster</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/galaxy_collision_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/galaxy_collision_3d.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">two galaxies, grazing<span class="sim-spec"><pre># galaxy_collision_3d -- TWO 3D galaxies on a grazing prograde passage. The same `squared_law`
 # (law: gravity, all_pairs) that holds one disc together is what pulls the two discs into each
@@ -5188,9 +6962,9 @@ descriptions:
 # law sums over the whole set, so mutual gravity between the galaxies is not a second operator.
 #
 # Initialization stays a SPEC concern (no operator): `spawn: two_disks` places two flat discs
-# `spawn_separation` apart along x, the second tilted `spawn_tilt` radians out of the first&#x27;s
+# `spawn_separation` apart along x, the second tilted `spawn_tilt` radians out of the first's
 # plane; `vel_init: {mode: circular_orbit}` then spins EACH disc about its own centre in its own
-# plane (from that disc&#x27;s enclosed mass + its `central_mass` core) and adds the encounter velocity
+# plane (from that disc's enclosed mass + its `central_mass` core) and adds the encounter velocity
 # as two half-speeds -- `approach` closing along the separation axis, `swirl` tangential to it.
 #
 # THE ORBIT IS DESIGNED BACKWARDS FROM ITS PERICENTRE. With G = 1 and M_tot = 3.0 (two galaxies of
@@ -5201,7 +6975,7 @@ descriptions:
 # The angular momentum has to come from `swirl`: offsetting the discs and aiming them at each
 # other leaves L = 0, and a pilot of that plunges to pericentre 0.4, shreds both discs and unbinds
 # half the stars. A prograde passage at ~2 disc radii is the tail-raising case, after Toomre &amp;
-# Toomre, &quot;Galactic Bridges and Tails&quot; (1972). Softened gravity is Mocz&#x27;s, vendored at
+# Toomre, "Galactic Bridges and Tails" (1972). Softened gravity is Mocz's, vendored at
 # papers/nbody-python/ (MIT).
 #
 # `type_layout: split_x` types the set by x, and at frame 0 the two discs are disjoint in x (each
@@ -5217,7 +6991,7 @@ sets:
     spawn_thickness: 0.06                           # out-of-plane scatter: a thin disc, not a sheet
     spawn_separation: 6.0                           # distance between the two disc centres at frame 0
     spawn_offset: 0.0                               # no lateral offset: `swirl` carries the angular momentum
-    spawn_tilt: 0.6                                 # the blue disc&#x27;s plane, tilted 0.6 rad about x
+    spawn_tilt: 0.6                                 # the blue disc's plane, tilted 0.6 rad about x
     type_layout: split_x                            # low-x disc -&gt; red, high-x disc -&gt; blue
     vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.15,
                central_mass: 0.75, jitter: 0.06, approach: 0.18, swirl: 0.26}
@@ -5258,11 +7032,11 @@ descriptions:
       <span class="sim-cap">two galaxies interact and form tidal tails</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/galaxy_merger_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
+  <figure class="sim-card figure">
+    <video src="gallery/galaxy_merger_3d.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">two galaxies, head-on<span class="sim-spec"><pre># galaxy_merger_3d -- the SAME two galaxies, head-on: one knob apart from `galaxy_collision_3d`
-# (`swirl: 0.26` -&gt; `0.0`), and that knob is the encounter&#x27;s angular momentum. L = 0 makes the
+# (`swirl: 0.26` -&gt; `0.0`), and that knob is the encounter's angular momentum. L = 0 makes the
 # orbit radial, so the pericentre is 0 instead of 2.0 disc radii: the two discs fall straight
 # through each other, the cores sink and merge on the first passage, and what is left is one
 # spheroidal remnant with red and blue stars mixed through it and a debris halo -- no tails, since
@@ -5271,9 +7045,9 @@ descriptions:
 # 0.50 -- still half the parabolic 1.00 at separation 6, so the pair is bound.)
 #
 # Initialization stays a SPEC concern (no operator): `spawn: two_disks` places two flat discs
-# `spawn_separation` apart along x, the second tilted `spawn_tilt` radians out of the first&#x27;s
+# `spawn_separation` apart along x, the second tilted `spawn_tilt` radians out of the first's
 # plane; `vel_init: {mode: circular_orbit}` then spins EACH disc about its own centre in its own
-# plane (from that disc&#x27;s enclosed mass + its `central_mass` core) and adds the encounter velocity
+# plane (from that disc's enclosed mass + its `central_mass` core) and adds the encounter velocity
 # as two half-speeds -- `approach` closing along the separation axis, `swirl` tangential to it.
 #
 # `type_layout: split_x` types the set by x, and at frame 0 the two discs are disjoint in x (each
@@ -5289,7 +7063,7 @@ sets:
     spawn_thickness: 0.06                           # out-of-plane scatter: a thin disc, not a sheet
     spawn_separation: 6.0                           # distance between the two disc centres at frame 0
     spawn_offset: 0.0                               # head-on: no offset and no swirl, so L = 0
-    spawn_tilt: 0.6                                 # the blue disc&#x27;s plane, tilted 0.6 rad about x
+    spawn_tilt: 0.6                                 # the blue disc's plane, tilted 0.6 rad about x
     type_layout: split_x                            # low-x disc -&gt; red, high-x disc -&gt; blue
     vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.15,
                central_mass: 0.75, jitter: 0.06, approach: 0.25, swirl: 0.0}
@@ -5331,7 +7105,6 @@ descriptions:
 </div>
 
 </section>
-
 <section id="read-the-blueprint" class="level2">
 <h2 class="anchored" data-anchor-id="read-the-blueprint">Read the blueprint</h2>
 <ul>
@@ -5356,7 +7129,7 @@ descriptions:
   font-family: sans-serif; cursor: pointer; opacity: .75; z-index: 10001; user-select: none; }
 #vbox-close:hover { opacity: 1; }
 </style>
-<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">&times;</span><video id="vbox-video" controls loop muted playsinline></video></div>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
 <script>
 (function () {
   var ov = document.getElementById('vbox-overlay'),
@@ -5401,380 +7174,256 @@ descriptions:
 })();
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
-window.document.addEventListener("DOMContentLoaded", function (event) {
-  const toggleBodyColorMode = (bsSheetEl) => {
-    const mode = bsSheetEl.getAttribute("data-mode");
-    const bodyEl = window.document.querySelector("body");
-    if (mode === "dark") {
-      bodyEl.classList.add("quarto-dark");
-      bodyEl.classList.remove("quarto-light");
-    } else {
-      bodyEl.classList.add("quarto-light");
-      bodyEl.classList.remove("quarto-dark");
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
     }
-  }
-  const toggleBodyColorPrimary = () => {
-    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
-    if (bsSheetEl) {
-      toggleBodyColorMode(bsSheetEl);
-    }
-  }
-  toggleBodyColorPrimary();  
-  const disableStylesheet = (stylesheets) => {
-    for (let i=0; i < stylesheets.length; i++) {
-      const stylesheet = stylesheets[i];
-      stylesheet.rel = 'prefetch';
-    }
-  }
-  const enableStylesheet = (stylesheets) => {
-    for (let i=0; i < stylesheets.length; i++) {
-      const stylesheet = stylesheets[i];
-      stylesheet.rel = 'stylesheet';
-    }
-  }
-  const manageTransitions = (selector, allowTransitions) => {
-    const els = window.document.querySelectorAll(selector);
-    for (let i=0; i < els.length; i++) {
-      const el = els[i];
-      if (allowTransitions) {
-        el.classList.remove('notransition');
-      } else {
-        el.classList.add('notransition');
-      }
-    }
-  }
-  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
-    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
-    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
-    let newTheme = '';
-    if(darkModeDefault) {
-      newTheme = isAlternate ? baseTheme : alternateTheme;
-    } else {
-      newTheme = isAlternate ? alternateTheme : baseTheme;
-    }
-    const changeGiscusTheme = () => {
-      // From: https://github.com/giscus/giscus/issues/336
-      const sendMessage = (message) => {
-        const iframe = document.querySelector('iframe.giscus-frame');
-        if (!iframe) return;
-        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
-      }
-      sendMessage({
-        setConfig: {
-          theme: newTheme
-        }
-      });
-    }
-    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
-    if (isGiscussLoaded) {
-      changeGiscusTheme();
-    }
-  }
-  const toggleColorMode = (alternate) => {
-    // Switch the stylesheets
-    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
-    manageTransitions('#quarto-margin-sidebar .nav-link', false);
-    if (alternate) {
-      enableStylesheet(alternateStylesheets);
-      for (const sheetNode of alternateStylesheets) {
-        if (sheetNode.id === "quarto-bootstrap") {
-          toggleBodyColorMode(sheetNode);
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
         }
       }
-    } else {
-      disableStylesheet(alternateStylesheets);
-      toggleBodyColorPrimary();
-    }
-    manageTransitions('#quarto-margin-sidebar .nav-link', true);
-    // Switch the toggles
-    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
-    for (let i=0; i < toggles.length; i++) {
-      const toggle = toggles[i];
-      if (toggle) {
-        if (alternate) {
-          toggle.classList.add("alternate");     
-        } else {
-          toggle.classList.remove("alternate");
-        }
-      }
-    }
-    // Hack to workaround the fact that safari doesn't
-    // properly recolor the scrollbar when toggling (#1455)
-    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
-      manageTransitions("body", false);
-      window.scrollTo(0, 1);
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-        manageTransitions("body", true);
-      }, 40);  
-    }
-  }
-  const isFileUrl = () => { 
-    return window.location.protocol === 'file:';
-  }
-  const hasAlternateSentinel = () => {  
-    let styleSentinel = getColorSchemeSentinel();
-    if (styleSentinel !== null) {
-      return styleSentinel === "alternate";
-    } else {
       return false;
     }
-  }
-  const setStyleSentinel = (alternate) => {
-    const value = alternate ? "alternate" : "default";
-    if (!isFileUrl()) {
-      window.localStorage.setItem("quarto-color-scheme", value);
-    } else {
-      localAlternateSentinel = value;
-    }
-  }
-  const getColorSchemeSentinel = () => {
-    if (!isFileUrl()) {
-      const storageValue = window.localStorage.getItem("quarto-color-scheme");
-      return storageValue != null ? storageValue : localAlternateSentinel;
-    } else {
-      return localAlternateSentinel;
-    }
-  }
-  const darkModeDefault = false;
-  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
-  // Dark / light mode switch
-  window.quartoToggleColorScheme = () => {
-    // Read the current dark / light value 
-    let toAlternate = !hasAlternateSentinel();
-    toggleColorMode(toAlternate);
-    setStyleSentinel(toAlternate);
-    toggleGiscusIfUsed(toAlternate, darkModeDefault);
-  };
-  // Ensure there is a toggle, if there isn't float one in the top right
-  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
-    const a = window.document.createElement('a');
-    a.classList.add('top-right');
-    a.classList.add('quarto-color-scheme-toggle');
-    a.href = "";
-    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
-    const i = window.document.createElement("i");
-    i.classList.add('bi');
-    a.appendChild(i);
-    window.document.body.appendChild(a);
-  }
-  // Switch to dark mode if need be
-  if (hasAlternateSentinel()) {
-    toggleColorMode(true);
-  } else {
-    toggleColorMode(false);
-  }
-  const icon = "";
-  const anchorJS = new window.AnchorJS();
-  anchorJS.options = {
-    placement: 'right',
-    icon: icon
-  };
-  anchorJS.add('.anchored');
-  const isCodeAnnotation = (el) => {
-    for (const clz of el.classList) {
-      if (clz.startsWith('code-annotation-')) {                     
-        return true;
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
       }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
     }
-    return false;
-  }
-  const onCopySuccess = function(e) {
-    // button target
-    const button = e.trigger;
-    // don't keep focus
-    button.blur();
-    // flash "checked"
-    button.classList.add('code-copy-button-checked');
-    var currentTitle = button.getAttribute("title");
-    button.setAttribute("title", "Copied!");
-    let tooltip;
-    if (window.bootstrap) {
-      button.setAttribute("data-bs-toggle", "tooltip");
-      button.setAttribute("data-bs-placement", "left");
-      button.setAttribute("data-bs-title", "Copied!");
-      tooltip = new bootstrap.Tooltip(button, 
-        { trigger: "manual", 
-          customClass: "code-copy-button-tooltip",
-          offset: [0, -8]});
-      tooltip.show();    
-    }
-    setTimeout(function() {
-      if (tooltip) {
-        tooltip.hide();
-        button.removeAttribute("data-bs-title");
-        button.removeAttribute("data-bs-toggle");
-        button.removeAttribute("data-bs-placement");
-      }
-      button.setAttribute("title", currentTitle);
-      button.classList.remove('code-copy-button-checked');
-    }, 1000);
-    // clear code selection
-    e.clearSelection();
-  }
-  const getTextToCopy = function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
       for (const childEl of codeEl.children) {
         if (isCodeAnnotation(childEl)) {
           childEl.remove();
         }
       }
       return codeEl.innerText;
-  }
-  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
-    text: getTextToCopy
-  });
-  clipboard.on('success', onCopySuccess);
-  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
-      text: getTextToCopy,
-      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
     });
-    clipboardModal.on('success', onCopySuccess);
-  }
-    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
-    var mailtoRegex = new RegExp(/^mailto:/);
-      var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
-    var isInternal = (href) => {
-        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
     }
-    // Inspect non-navigation links and adorn them if external
- 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
-    for (var i=0; i<links.length; i++) {
-      const link = links[i];
-      if (!isInternal(link.href)) {
-        // undo the damage that might have been done by quarto-nav.js in the case of
-        // links that we want to consider external
-        if (link.dataset.originalHref !== undefined) {
-          link.href = link.dataset.originalHref;
-        }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
-    }
-  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
-    const config = {
-      allowHTML: true,
-      maxWidth: 500,
-      delay: 100,
-      arrow: false,
-      appendTo: function(el) {
-          return el.parentElement;
-      },
-      interactive: true,
-      interactiveBorder: 10,
-      theme: 'quarto',
-      placement: 'bottom-start',
-    };
-    if (contentFn) {
-      config.content = contentFn;
-    }
-    if (onTriggerFn) {
-      config.onTrigger = onTriggerFn;
-    }
-    if (onUntriggerFn) {
-      config.onUntrigger = onUntriggerFn;
-    }
-    window.tippy(el, config); 
-  }
-  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
-  for (var i=0; i<noterefs.length; i++) {
-    const ref = noterefs[i];
-    tippyHover(ref, function() {
-      // use id or data attribute instead here
-      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
-      try { href = new URL(href).hash; } catch {}
-      const id = href.replace(/^#\/?/, "");
-      const note = window.document.getElementById(id);
-      if (note) {
-        return note.innerHTML;
-      } else {
-        return "";
-      }
-    });
-  }
-  const xrefs = window.document.querySelectorAll('a.quarto-xref');
-  const processXRef = (id, note) => {
-    // Strip column container classes
-    const stripColumnClz = (el) => {
-      el.classList.remove("page-full", "page-columns");
-      if (el.children) {
-        for (const child of el.children) {
-          stripColumnClz(child);
-        }
-      }
-    }
-    stripColumnClz(note)
-    if (id === null || id.startsWith('sec-')) {
-      // Special case sections, only their first couple elements
-      const container = document.createElement("div");
-      if (note.children && note.children.length > 2) {
-        container.appendChild(note.children[0].cloneNode(true));
-        for (let i = 1; i < note.children.length; i++) {
-          const child = note.children[i];
-          if (child.tagName === "P" && child.innerText === "") {
-            continue;
-          } else {
-            container.appendChild(child.cloneNode(true));
-            break;
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
           }
         }
-        if (window.Quarto?.typesetMath) {
-          window.Quarto.typesetMath(container);
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
         }
-        return container.innerHTML
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
       } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
         if (window.Quarto?.typesetMath) {
           window.Quarto.typesetMath(note);
         }
-        return note.innerHTML;
-      }
-    } else {
-      // Remove any anchor links if they are present
-      const anchorLink = note.querySelector('a.anchorjs-link');
-      if (anchorLink) {
-        anchorLink.remove();
-      }
-      if (window.Quarto?.typesetMath) {
-        window.Quarto.typesetMath(note);
-      }
-      if (note.classList.contains("callout")) {
-        return note.outerHTML;
-      } else {
-        return note.innerHTML;
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
       }
     }
-  }
-  for (var i=0; i<xrefs.length; i++) {
-    const xref = xrefs[i];
-    tippyHover(xref, undefined, function(instance) {
-      instance.disable();
-      let url = xref.getAttribute('href');
-      let hash = undefined; 
-      if (url.startsWith('#')) {
-        hash = url;
-      } else {
-        try { hash = new URL(url).hash; } catch {}
-      }
-      if (hash) {
-        const id = hash.replace(/^#\/?/, "");
-        const note = window.document.getElementById(id);
-        if (note !== null) {
-          try {
-            const html = processXRef(id, note.cloneNode(true));
-            instance.setContent(html);
-          } finally {
-            instance.enable();
-            instance.show();
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
           }
         } else {
-          // See if we can fetch this
-          fetch(url.split('#')[0])
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
           .then(res => res.text())
           .then(html => {
             const parser = new DOMParser();
             const htmlDoc = parser.parseFromString(html, "text/html");
-            const note = htmlDoc.getElementById(id);
+            const note = htmlDoc.querySelector('main.content');
             if (note !== null) {
-              const html = processXRef(id, note);
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
               instance.setContent(html);
             } 
           }).finally(() => {
@@ -5782,185 +7431,161 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             instance.show();
           });
         }
-      } else {
-        // See if we can fetch a full url (with no hash to target)
-        // This is a special case and we should probably do some content thinning / targeting
-        fetch(url)
-        .then(res => res.text())
-        .then(html => {
-          const parser = new DOMParser();
-          const htmlDoc = parser.parseFromString(html, "text/html");
-          const note = htmlDoc.querySelector('main.content');
-          if (note !== null) {
-            // This should only happen for chapter cross references
-            // (since there is no id in the URL)
-            // remove the first header
-            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
-              note.children[0].remove();
-            }
-            const html = processXRef(null, note);
-            instance.setContent(html);
-          } 
-        }).finally(() => {
-          instance.enable();
-          instance.show();
-        });
-      }
-    }, function(instance) {
-    });
-  }
-      let selectedAnnoteEl;
-      const selectorForAnnotation = ( cell, annotation) => {
-        let cellAttr = 'data-code-cell="' + cell + '"';
-        let lineAttr = 'data-code-annotation="' +  annotation + '"';
-        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
-        return selector;
-      }
-      const selectCodeLines = (annoteEl) => {
-        const doc = window.document;
-        const targetCell = annoteEl.getAttribute("data-target-cell");
-        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
-        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
-        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
-        const lineIds = lines.map((line) => {
-          return targetCell + "-" + line;
-        })
-        let top = null;
-        let height = null;
-        let parent = null;
-        if (lineIds.length > 0) {
-            //compute the position of the single el (top and bottom and make a div)
-            const el = window.document.getElementById(lineIds[0]);
-            top = el.offsetTop;
-            height = el.offsetHeight;
-            parent = el.parentElement.parentElement;
-          if (lineIds.length > 1) {
-            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-            height = bottom - top;
-          }
-          if (top !== null && height !== null && parent !== null) {
-            // cook up a div (if necessary) and position it 
-            let div = window.document.getElementById("code-annotation-line-highlight");
-            if (div === null) {
-              div = window.document.createElement("div");
-              div.setAttribute("id", "code-annotation-line-highlight");
-              div.style.position = 'absolute';
-              parent.appendChild(div);
-            }
-            div.style.top = top - 2 + "px";
-            div.style.height = height + 4 + "px";
-            div.style.left = 0;
-            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-            if (gutterDiv === null) {
-              gutterDiv = window.document.createElement("div");
-              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-              gutterDiv.style.position = 'absolute';
-              const codeCell = window.document.getElementById(targetCell);
-              const gutter = codeCell.querySelector('.code-annotation-gutter');
-              gutter.appendChild(gutterDiv);
-            }
-            gutterDiv.style.top = top - 2 + "px";
-            gutterDiv.style.height = height + 4 + "px";
-          }
-          selectedAnnoteEl = annoteEl;
-        }
-      };
-      const unselectCodeLines = () => {
-        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
-        elementsIds.forEach((elId) => {
-          const div = window.document.getElementById(elId);
-          if (div) {
-            div.remove();
-          }
-        });
-        selectedAnnoteEl = undefined;
-      };
-        // Handle positioning of the toggle
-    window.addEventListener(
-      "resize",
-      throttle(() => {
-        elRect = undefined;
-        if (selectedAnnoteEl) {
-          selectCodeLines(selectedAnnoteEl);
-        }
-      }, 10)
-    );
-    function throttle(fn, ms) {
-    let throttle = false;
-    let timer;
-      return (...args) => {
-        if(!throttle) { // first call gets through
-            fn.apply(this, args);
-            throttle = true;
-        } else { // all the others get throttled
-            if(timer) clearTimeout(timer); // cancel #2
-            timer = setTimeout(() => {
-              fn.apply(this, args);
-              timer = throttle = false;
-            }, ms);
-        }
-      };
-    }
-      // Attach click handler to the DT
-      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
-      for (const annoteDlNode of annoteDls) {
-        annoteDlNode.addEventListener('click', (event) => {
-          const clickedEl = event.target;
-          if (clickedEl !== selectedAnnoteEl) {
-            unselectCodeLines();
-            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
-            if (activeEl) {
-              activeEl.classList.remove('code-annotation-active');
-            }
-            selectCodeLines(clickedEl);
-            clickedEl.classList.add('code-annotation-active');
-          } else {
-            // Unselect the line
-            unselectCodeLines();
-            clickedEl.classList.remove('code-annotation-active');
-          }
-        });
-      }
-  const findCites = (el) => {
-    const parentEl = el.parentElement;
-    if (parentEl) {
-      const cites = parentEl.dataset.cites;
-      if (cites) {
-        return {
-          el,
-          cites: cites.split(' ')
-        };
-      } else {
-        return findCites(el.parentElement)
-      }
-    } else {
-      return undefined;
-    }
-  };
-  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
-  for (var i=0; i<bibliorefs.length; i++) {
-    const ref = bibliorefs[i];
-    const citeInfo = findCites(ref);
-    if (citeInfo) {
-      tippyHover(citeInfo.el, function() {
-        var popup = window.document.createElement('div');
-        citeInfo.cites.forEach(function(cite) {
-          var citeDiv = window.document.createElement('div');
-          citeDiv.classList.add('hanging-indent');
-          citeDiv.classList.add('csl-entry');
-          var biblioDiv = window.document.getElementById('ref-' + cite);
-          if (biblioDiv) {
-            citeDiv.innerHTML = biblioDiv.innerHTML;
-          }
-          popup.appendChild(citeDiv);
-        });
-        return popup.innerHTML;
+      }, function(instance) {
       });
     }
-  }
-});
-</script>
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">
