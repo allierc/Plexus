@@ -41,6 +41,18 @@ sets:
       divjit:
         width: 1
         record: false
+      A0:
+        width: 1
+        record: false
+      P0:
+        width: 1
+        record: false
+      V0f:
+        width: 1
+        record: false
+      alive:
+        width: 1
+        record: false
   half_edge:
     n: 2048
     maps:

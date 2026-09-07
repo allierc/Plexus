@@ -57,10 +57,19 @@ def test_moved_state_is_on_the_cell_set_and_not_on_the_mesh(name, moved):
         assert b in clvl.state_schema, (
             f"{name}: {b!r} is not a declared block on {lvl.mesh_cell_set!r}. Per-cell state "
             f"belongs to the cell set -- see this file's header.")
-        assert m.get(b) is None, (
-            f"{name}: {b!r} is BACK on the mesh table. It was moved to the cell set so that "
-            f"`renumber_set` carries it; a column here is carried by a name list instead, and "
-            f"every name list in this tree has been wrong at least once.")
+        # STORED, NOT REACHABLE. `MeshTable` SERVES a moved block -- `m["A0"]` still works, and
+        # deliberately, because routing the name instead of editing 130 call sites is what made the
+        # move testable by byte-identity. What must not exist is a COPY in the table's own dict:
+        # that is the thing `reindex_faces` carries by a name list and `snapshot` records, and the
+        # thing every defect in this campaign came out of. `dict.__contains__` asks the storage
+        # directly, under the proxy.
+        assert not dict.__contains__(m, b), (
+            f"{name}: {b!r} is stored ON the mesh table again. It belongs to the cell set, where "
+            f"`renumber_set` permutes it with everything else; a column here is carried by a name "
+            f"list instead, and every name list in this tree has been wrong at least once.")
+        assert b in getattr(m, "_proxied", ()), (
+            f"{name}: {b!r} is declared on the cell set but the mesh table is not bound to it, so "
+            f"a reader asking `m[{b!r}]` gets nothing. See `MeshTable.bind_cell_state`.")
 
 
 def test_the_census_names_what_is_left_rather_than_claiming_none():
@@ -80,7 +89,7 @@ def test_the_census_names_what_is_left_rather_than_claiming_none():
            "v_ref", "v_ref_poly", "R0", "face_carry", "vertex_carry", "mech", "centroid_np",
            "apop_marked_once"}
     per_cell = []
-    for k in sorted(m.keys()):
+    for k in sorted(dict.keys(m)):          # the table's OWN storage, not what it proxies
         if k in own:
             continue
         v = m.get(k)
@@ -88,6 +97,6 @@ def test_the_census_names_what_is_left_rather_than_claiming_none():
             np.asarray(v) if not isinstance(v, (set, dict, str, bool)) else None)
         if a is not None and a.ndim and a.shape[0] == nF:
             per_cell.append(k)
-    assert len(per_cell) <= 10, (
+    assert len(per_cell) <= 6, (
         f"the mesh table gained a per-cell column: {per_cell}. Declare it on the cell set "
         f"instead, or raise this bound in the same commit that explains why.")
