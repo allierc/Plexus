@@ -101,11 +101,14 @@ it.**
 
 ```{=html}
 <style>
-.sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1.1rem;margin:.6rem 0 2.4rem}
-.sim-gallery.g3{grid-template-columns:repeat(3,1fr)}
-.sim-gallery.g4{grid-template-columns:repeat(4,1fr)}
-@media (max-width:900px){.sim-gallery.g4{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:560px){.sim-gallery.g3{grid-template-columns:repeat(2,1fr)}}
+/* Four clips per row everywhere. `g3` is kept as an alias of `g4` rather than deleted from the
+   markup, because three of the galleries below are rewritten wholesale by
+   discovery_okuda/ops/minisite_section.py, which emits `g3`; aliasing it here means a regenerated
+   block stays four-wide instead of quietly reverting to three. A section whose clip count is not a
+   multiple of four simply ends on a short row. */
+.sim-gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1rem;margin:.6rem 0 2.4rem}
+.sim-gallery.g3,.sim-gallery.g4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:900px){.sim-gallery,.sim-gallery.g3,.sim-gallery.g4{grid-template-columns:repeat(2,1fr)}}
 .sim-gallery.wide{grid-template-columns:1fr;max-width:900px;margin:.6rem auto 2.4rem}
 .sim-gallery.wide .sim-card video{aspect-ratio:auto !important;height:auto !important;object-fit:contain !important}
 .sim-card{margin:0}
@@ -2842,7 +2845,7 @@ _sculpt:
 
 
 <h3>Continuum mechanics — MLS-MPM</h3>
-<p class="opk">Plexus can make the numerical structure of a mechanism explicit when greater physical detail is required. Here a material is represented by particles coupled through an Eulerian grid, and continuum mechanics is decomposed into <b>strain, particle-to-grid transfer, grid dynamics and grid-to-particle transfer</b>. The eight clips below run those same operators throughout: what changes along the row is the spec — first the constitutive law, then a single material number, then a plastic law in place of a fluid one, then one added force term; then the schedule itself gains inflow and outflow, a solid is put inside the fluid, and finally only the particle count grows, from five million to a billion. Rather than treating MLS-MPM as a monolithic simulator, Plexus exposes its material operations as composable operators.</p>
+<p class="opk">Plexus can make the numerical structure of a mechanism explicit when greater physical detail is required. Here a material is represented by particles coupled through an Eulerian grid, and continuum mechanics is decomposed into <b>strain, particle-to-grid transfer, grid dynamics and grid-to-particle transfer</b>. The eight clips run those same operators throughout. Along the first row it is the <b>spec</b> that changes — the constitutive law, then a single material number, then one added force term, and then nothing at all except the geometry the drop falls into. Along the second row only the <b>size</b> changes, from 1.3&nbsp;million particles to a billion. Rather than treating MLS-MPM as a monolithic simulator, Plexus exposes its material operations as composable operators.</p>
 <p class="opk-ref">Reference — the MLS-MPM solver is our PyTorch port (<a href="https://github.com/saalfeldlab/MPM_pytorch">saalfeldlab/MPM_pytorch</a>) of Yuanming&nbsp;Hu’s <a href="https://github.com/yuanming-hu/taichi_mpm">taichi_mpm</a>, implementing MLS-MPM (Hu et&nbsp;al. 2018).</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
@@ -3258,201 +3261,6 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/mpm2_hourglass.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">granular discharge<span class="sim-spec"><pre>general:
-  name: si_hourglass
-  seed: 0
-  n_frames: 2400
-  dt: 0.0008333333333333334
-  boundary: wall
-  dim: 3
-  world:
-  - 0.3
-  - 0.3
-  - 0.3
-  save_data: false
-  units:
-    length_um: 1000000.0
-    time_s: 1.0
-    force_nN: 1000000000.0
-  obstacles:
-  - - 0.0
-    - 0.02
-    - 0.0
-    - 0.045
-    - 0.05
-    - 0.3
-  - - 0.255
-    - 0.02
-    - 0.0
-    - 0.3
-    - 0.05
-    - 0.3
-  - - 0.0
-    - 0.05
-    - 0.0
-    - 0.066
-    - 0.08
-    - 0.3
-  - - 0.23399999999999999
-    - 0.05
-    - 0.0
-    - 0.3
-    - 0.08
-    - 0.3
-  - - 0.0
-    - 0.08
-    - 0.0
-    - 0.087
-    - 0.11
-    - 0.3
-  - - 0.213
-    - 0.08
-    - 0.0
-    - 0.3
-    - 0.11
-    - 0.3
-  - - 0.0
-    - 0.11
-    - 0.0
-    - 0.108
-    - 0.14
-    - 0.3
-  - - 0.192
-    - 0.11
-    - 0.0
-    - 0.3
-    - 0.14
-    - 0.3
-  - - 0.0
-    - 0.15
-    - 0.0
-    - 0.126
-    - 0.19
-    - 0.3
-  - - 0.174
-    - 0.15
-    - 0.0
-    - 0.3
-    - 0.19
-    - 0.3
-  - - 0.0
-    - 0.19
-    - 0.0
-    - 0.09899999999999999
-    - 0.23
-    - 0.3
-  - - 0.201
-    - 0.19
-    - 0.0
-    - 0.3
-    - 0.23
-    - 0.3
-  - - 0.0
-    - 0.23
-    - 0.0
-    - 0.072
-    - 0.27
-    - 0.3
-  - - 0.22799999999999998
-    - 0.23
-    - 0.0
-    - 0.3
-    - 0.27
-    - 0.3
-  - - 0.0
-    - 0.27
-    - 0.0
-    - 0.044999999999999984
-    - 0.3
-    - 0.3
-  - - 0.255
-    - 0.27
-    - 0.0
-    - 0.3
-    - 0.3
-    - 0.3
-sets:
-  cell:
-    n: 1
-    types:
-      snow:
-        material: snow
-        youngs: 500000.0
-        block:
-        - 0.115
-        - 0.16
-        - 0.02
-        - 0.185
-        - 0.29
-        - 0.28
-        fraction: 1.0
-  mpm_particle:
-    parent: cell
-    per_parent: 620232
-    radius: 0.5
-    density: 400.0
-    particle_mass: 1.52588e-06
-fields:
-  mpm_grid:
-    frame: mpm_grid
-    n_grid: 96
-operators:
-- op: aggregate
-  at: cell
-- op: gravity
-  at: cell
-  g: 9.81
-- op: mpm_strain
-  at: mpm_particle
-  implementation: warp
-- op: mpm_scatter
-  at: mpm_particle
-  to: mpm_grid
-  drag: 0.0
-  a_max: 200.0
-  implementation: warp
-  polar: higham
-- op: mpm_grid_update
-  at: mpm_grid
-  wall_damp: 0.85
-- op: mpm_gather
-  at: mpm_particle
-  from: mpm_grid
-  wall_damp: 0.85
-  vmax: 1000000000.0
-  implementation: warp
-schedule:
-- aggregate
-- gravity
-- substep_dt: 3.333333e-05
-  steps:
-  - mpm_strain
-  - mpm_scatter
-  - mpm_grid_update
-  - mpm_gather
-plotting:
-  background: black
-  up_axis: 1
-  camera_elev: 1.18
-  camera_zoom: 0.0
-  camera_turns: 0.0
-  box_frame: true
-  hide_sets:
-  - cell
-  render_3d: dots
-  dot_size: 1.3
-  slow_motion: 4
-  colors:
-    snow:
-    - 0.92
-    - 0.94
-    - 1.0</pre></span></span>
-      <span class="sim-cap">the same transfer operators with a plastic return map in place of the fluid one: 620,000 grains arch and drain through the neck</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
     <video src="gallery/mpm2_two_drops.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">surface tension<span class="sim-spec"><pre>general:
@@ -3566,103 +3374,96 @@ plotting:
       <span class="sim-cap">one extra term in the grid update — a surface force at &sigma;&nbsp;=&nbsp;0.144&nbsp;N/m — and at zero gravity two drops of 0.6&nbsp;M particles pull themselves into one sphere</span>
     </figcaption>
   </figure>
-</div>
-<div class="sim-gallery g4">
   <figure class="sim-card">
-    <video src="gallery/mpm2_buckling.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/mpm2_crown.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">an open system<span class="sim-spec"><pre>general:
-  name: si_buckling_mid
+      <span class="sim-name" tabindex="0">a crown splash<span class="sim-spec"><pre>general:
+  name: si_crown_drop
   seed: 0
-  n_frames: 450
+  n_frames: 2400
   dt: 0.0008333333333333334
   boundary: wall
   dim: 3
   world:
-  - 0.1
-  - 0.16
-  - 0.1
+  - 0.03
+  - 0.03
+  - 0.03
   save_data: false
   units:
     length_um: 1000000.0
     time_s: 1.0
     force_nN: 1000000000.0
-  engine: continuous
-  obstacles:
-  - - 0.025
-    - 0.028
-    - 0.025
-    - 0.075
-    - 0.032
-    - 0.075
 sets:
   cell:
     n: 1
     types:
-      water:
+      film:
         material: liquid
-        bulk_modulus: 276136.0
-        density: 1000.0
-        fraction: 1.0
-        shape: cube
+        bulk_modulus: 58860.0
+        block:
+        - 0.001
+        - 0.001
+        - 0.001
+        - 0.029
+        - 0.006
+        - 0.029
+        fraction: 0.5
+      drop:
+        material: liquid
+        bulk_modulus: 58860.0
+        block:
+        - 0.012
+        - 0.02
+        - 0.012
+        - 0.018
+        - 0.026
+        - 0.018
+        fraction: 0.5
   mpm_particle:
     parent: cell
-    per_parent: 4039999
+    per_parent: 1084227
     radius: 0.5
     density: 1000.0
-    particle_mass: 1.5625000000000003e-08
+    particle_mass: 3.8147e-09
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 320
+    n_grid: 96
 operators:
+- op: aggregate
+  at: cell
 - op: gravity
   at: cell
   g: 9.81
-- op: mpm_emit
-  at: mpm_particle
-  face: -y
-  speed: 0.5
-  ppc: 8.0
-  patch:
-  - 0.42
-  - 0.42
-  - 0.58
-  - 0.58
-- op: mpm_drain
-  at: mpm_particle
-  face: -y
-  at_fraction: 0.02
-  sponge: 6.0
-  damp: 0.6
 - op: mpm_strain
   at: mpm_particle
   implementation: warp
 - op: mpm_viscosity
   at: mpm_particle
-  eta: 16.0
+  eta: 0.001
 - op: mpm_scatter
   at: mpm_particle
   to: mpm_grid
   drag: 0.0
-  a_max: 392.40000000000003
+  a_max: 200.0
   implementation: warp
   polar: higham
 - op: mpm_grid_update
   at: mpm_grid
-  wall_damp: 0.9
-  surface_tension: 0.0
+  wall_damp: 1.0
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
 - op: mpm_gather
   at: mpm_particle
   from: mpm_grid
-  wall_damp: 0.9
+  wall_damp: 1.0
   vmax: 1000000000.0
   implementation: warp
 schedule:
+- aggregate
 - gravity
-- mpm_emit
-- mpm_drain
-- substep_dt: 1.8601190476190478e-06
+- substep_dt: 1.602564e-05
   steps:
   - mpm_strain
   - mpm_viscosity
@@ -3672,7 +3473,173 @@ schedule:
 plotting:
   background: black
   up_axis: 1
-  camera_elev: 1.05
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.1
+  slow_motion: 4
+  colors:
+    film:
+    - 0.3
+    - 0.62
+    - 1.0
+    drop:
+    - 1.0
+    - 0.55
+    - 0.2</pre></span></span>
+      <span class="sim-cap">the same surface force with inertia behind it: a drop falls into a shallow film of its own liquid and throws a crown, its jets and its secondary droplets — none of which any operator names. 1.1&nbsp;M particles in a 3&nbsp;cm box</span>
+    </figcaption>
+  </figure>
+</div>
+<div class="sim-gallery g4">
+  <figure class="sim-card">
+    <video src="gallery/mpm2_pillar_forest.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">nine pillars<span class="sim-spec"><pre>general:
+  name: si_pillar_forest
+  seed: 0
+  n_frames: 2400
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  obstacles:
+  - - 0.16
+    - 0.0
+    - 0.16
+    - 0.20500000000000002
+    - 0.3
+    - 0.20500000000000002
+  - - 0.16
+    - 0.0
+    - 0.26
+    - 0.20500000000000002
+    - 0.3
+    - 0.305
+  - - 0.16
+    - 0.0
+    - 0.36
+    - 0.20500000000000002
+    - 0.3
+    - 0.40499999999999997
+  - - 0.26
+    - 0.0
+    - 0.16
+    - 0.305
+    - 0.3
+    - 0.20500000000000002
+  - - 0.26
+    - 0.0
+    - 0.26
+    - 0.305
+    - 0.3
+    - 0.305
+  - - 0.26
+    - 0.0
+    - 0.36
+    - 0.305
+    - 0.3
+    - 0.40499999999999997
+  - - 0.36
+    - 0.0
+    - 0.16
+    - 0.40499999999999997
+    - 0.3
+    - 0.20500000000000002
+  - - 0.36
+    - 0.0
+    - 0.26
+    - 0.40499999999999997
+    - 0.3
+    - 0.305
+  - - 0.36
+    - 0.0
+    - 0.36
+    - 0.40499999999999997
+    - 0.3
+    - 0.40499999999999997
+sets:
+  cell:
+    n: 1
+    types:
+      water:
+        material: liquid
+        bulk_modulus: 981000.0
+        block:
+        - 0.01
+        - 0.01
+        - 0.01
+        - 0.13
+        - 0.42
+        - 0.49
+        fraction: 1.0
+  mpm_particle:
+    parent: cell
+    per_parent: 1337211
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 1.76606e-05
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- aggregate
+- gravity
+- substep_dt: 6.410256e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
   camera_zoom: 0.0
   camera_turns: 0.0
   box_frame: true
@@ -3683,16 +3650,140 @@ plotting:
   slow_motion: 4
   colors:
     water:
-    - 1.0
-    - 0.55
-    - 0.12</pre></span></span>
-      <span class="sim-cap">the schedule gains <code>mpm_emit</code> and <code>mpm_drain</code>: a jet at 16&nbsp;Pa&middot;s, 16,000&times; the viscosity of water, is injected at the top and buckles as it piles — 4.0&nbsp;M particles</span>
+    - 0.3
+    - 0.62
+    - 1.0</pre></span></span>
+      <span class="sim-cap">the obstacle geometry is spec-level too: 1.3&nbsp;M particles of water thread nine fixed pillars and leave a wake behind each</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/mpm2_waterfall_5m.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">5 million particles<span class="sim-spec"><pre>general:
+  name: si_waterfall_5m
+  seed: 0
+  n_frames: 2400
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  obstacles:
+  - - 0.0
+    - 0.28
+    - 0.0
+    - 0.3
+    - 0.32
+    - 0.5
+  - - 0.0
+    - 0.16
+    - 0.0
+    - 0.44
+    - 0.2
+    - 0.5
+  - - 0.0
+    - 0.04
+    - 0.0
+    - 0.5
+    - 0.08
+    - 0.5
+sets:
+  cell:
+    n: 1
+    types:
+      water:
+        fraction: 1.0
+        material: liquid
+        bulk_modulus: 981000.0
+        block:
+        - 0.03
+        - 0.32
+        - 0.18
+        - 0.17
+        - 0.46
+        - 0.32
+  mpm_particle:
+    parent: cell
+    per_parent: 5000000
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 5.488e-07
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 192
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- aggregate
+- gravity
+- substep_dt: 3.205128e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.1
+  slow_motion: 4
+  colors:
+    water:
+    - 0.3
+    - 0.62
+    - 1.0</pre></span></span>
+      <span class="sim-cap">the same water spec at 5&nbsp;M particles, cascading over three ledges on a 192&sup3; grid</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/mpm2_ball_wake.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a solid inside the fluid<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">15 million, and one is a solid<span class="sim-spec"><pre>general:
   name: si_ball_wake_wide
   seed: 0
   n_frames: 700
@@ -3874,130 +3965,6 @@ plotting:
     - 0.62
     - 1.0</pre></span></span>
       <span class="sim-cap">a steel-density elastic ball falls through a 15.3&nbsp;M-particle water column on one shared grid; the slice is coloured by vorticity magnitude, 1–1000&nbsp;s&#8315;&sup1; on a log scale</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/mpm2_waterfall_5m.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">5 million particles<span class="sim-spec"><pre>general:
-  name: si_waterfall_5m
-  seed: 0
-  n_frames: 2400
-  dt: 0.0008333333333333334
-  boundary: wall
-  dim: 3
-  world:
-  - 0.5
-  - 0.5
-  - 0.5
-  save_data: false
-  units:
-    length_um: 1000000.0
-    time_s: 1.0
-    force_nN: 1000000000.0
-  obstacles:
-  - - 0.0
-    - 0.28
-    - 0.0
-    - 0.3
-    - 0.32
-    - 0.5
-  - - 0.0
-    - 0.16
-    - 0.0
-    - 0.44
-    - 0.2
-    - 0.5
-  - - 0.0
-    - 0.04
-    - 0.0
-    - 0.5
-    - 0.08
-    - 0.5
-sets:
-  cell:
-    n: 1
-    types:
-      water:
-        fraction: 1.0
-        material: liquid
-        bulk_modulus: 981000.0
-        block:
-        - 0.03
-        - 0.32
-        - 0.18
-        - 0.17
-        - 0.46
-        - 0.32
-  mpm_particle:
-    parent: cell
-    per_parent: 5000000
-    radius: 0.5
-    density: 1000.0
-    particle_mass: 5.488e-07
-fields:
-  mpm_grid:
-    frame: mpm_grid
-    n_grid: 192
-operators:
-- op: aggregate
-  at: cell
-- op: gravity
-  at: cell
-  g: 9.81
-- op: mpm_strain
-  at: mpm_particle
-  implementation: warp
-- op: mpm_viscosity
-  at: mpm_particle
-  eta: 0.001
-- op: mpm_scatter
-  at: mpm_particle
-  to: mpm_grid
-  drag: 0.0
-  a_max: 200.0
-  implementation: warp
-  polar: higham
-- op: mpm_grid_update
-  at: mpm_grid
-  wall_damp: 0.9
-  surface_tension: 0.072
-  csf_rho: 1000.0
-  csf_band: 0.2
-- op: mpm_gather
-  at: mpm_particle
-  from: mpm_grid
-  wall_damp: 0.9
-  vmax: 1000000000.0
-  implementation: warp
-schedule:
-- aggregate
-- gravity
-- substep_dt: 3.205128e-05
-  steps:
-  - mpm_strain
-  - mpm_viscosity
-  - mpm_scatter
-  - mpm_grid_update
-  - mpm_gather
-plotting:
-  background: black
-  up_axis: 1
-  camera_elev: 1.18
-  camera_zoom: 0.0
-  camera_turns: 0.0
-  box_frame: true
-  hide_sets:
-  - cell
-  render_3d: dots
-  dot_size: 1.1
-  slow_motion: 4
-  colors:
-    water:
-    - 0.3
-    - 0.62
-    - 1.0</pre></span></span>
-      <span class="sim-cap">the same water spec at 5&nbsp;M particles, cascading over three ledges on a 192&sup3; grid</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4491,7 +4458,7 @@ sets:
 </div>
 <!-- vertex-mpm: hand-authored 2026-09-07 from graphs_data/mesh_mpm; no longer generated by discovery_okuda/ops/minisite_section.py -->
 <h3>Vertex + MPM</h3>
-<p class="opk">The previous representations can themselves be composed. A <b>triangulated surface</b> and an <b>MPM material</b> remain distinct entities, with different states and different mechanical implementations, but interact through an explicit interface that transfers contact forces in both directions. Everything is held fixed across the four clips — the same gel, the same 500,000 material points, the same penalty contact and the same travel — so what differs between the movies is the shape of the surface, and in the last one the fact that it reaches the material by growing rather than by being pushed. This is the computational pattern needed to compose heterogeneous biological structures.</p>
+<p class="opk">The previous representations can themselves be composed. A <b>triangulated surface</b> and an <b>MPM material</b> remain distinct entities, with different states and different mechanical implementations, but interact through an explicit interface that transfers contact forces in both directions. Everything is held fixed across the four clips — the same gel, the same 500,000 material points, the same penalty contact and the same travel — so what differs between the movies is the shape of the surface, and in the last one the fact that it reaches the material by growing rather than by being pushed. All four are coloured by the <b>equivalent deviatoric strain</b> in the gel, 0–0.35 on a turbo scale — shape change with the volume change divided out — so the load each tool puts into the material can be read off the clip. This is the computational pattern needed to compose heterogeneous biological structures.</p>
 <p class="opk-ref">Reference — contact:
 <a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>).</p>
 <div class="sim-gallery g4">
@@ -5152,7 +5119,7 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap">the same sphere, inflated 2.4&times; about its own centroid rather than pushed down, so the contact patch spreads for the reason a spheroid’s does; colour is equivalent deviatoric strain, 0–0.35</span>
+      <span class="sim-cap">the same sphere, inflated 2.4&times; about its own centroid rather than pushed down, so the contact patch spreads for the reason a spheroid’s does — and the strain it drives into the gel reaches the same 0.35 the pressed tools do</span>
     </figcaption>
   </figure>
 </div>
