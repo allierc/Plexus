@@ -26,7 +26,7 @@ resources:
 ```
 
 
-Each operator belongs to one of the elementary **families** of the [operator algebra](language.qmd) &mdash; Lateral, Aggregate, Broadcast, Exchange, Field, Rewire, Structural (Divide and Die) and Seed; the logo marks which. The runtime also exposes a **field** kind, a field&rsquo;s own self-update.
+Each operator belongs to one of the elementary **families** of the [operator algebra](language.qmd) &mdash; lateral, aggregate, broadcast, exchange, field, rewire, structural (divide and die) and seed; the logo marks which. The runtime also exposes a **field** kind, a field&rsquo;s own self-update.
 
 ## <img class="kind-h" src="figures/icons/lateral.png"> Lateral <span class="kind-sym">$\mathcal{O}_E$</span>
 
@@ -125,12 +125,12 @@ Each operator belongs to one of the elementary **families** of the [operator alg
 
 ## <img class="kind-h" src="figures/icons/structural.png"> Structural <span class="kind-sym">$|S|$</span>
 
-*Change the entities themselves &mdash; Divide, Die, grow.*
+*Change the entities themselves &mdash; divide, die, grow.*
 
 ::: {.op-grid}
 <a class="op-card" href="library/bm_secrete.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">bm_secrete</span><span class="op-card-sub">Lay down NEW membrane as the surface it sits on grows: the sheet gains material rather than only thinning.</span></span></a>
 <a class="op-card" href="library/bm_sense.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">bm_sense</span><span class="op-card-sub">The epithelium reads the membrane it is resting on: each cell senses how much basement membrane is under it, and a shortfall becomes a chemical signal the rest of the model can act on -- the matrix-to-cell half of the coupling.</span></span></a>
-<a class="op-card" href="library/cell_die.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">cell_die</span><span class="op-card-sub">Cell elimination: the Die family, and the inverse of `cell_divide`.</span></span></a>
+<a class="op-card" href="library/cell_die.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">cell_die</span><span class="op-card-sub">Cell elimination: the die family, and the inverse of `cell_divide`.</span></span></a>
 <a class="op-card" href="library/cell_divide.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">cell_divide</span><span class="op-card-sub">Cell division: a septum through a face, so one cell becomes two, and the surface gains a cell without losing its closure.</span></span></a>
 <a class="op-card" href="library/cell_exclude.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">cell_exclude</span><span class="op-card-sub">A hard non-penetration backstop: no matrix particle may end a frame inside the tissue.</span></span></a>
 <a class="op-card" href="library/cell_grow.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">cell_grow</span><span class="op-card-sub">The morphogen decides where the tissue grows.</span></span></a>
