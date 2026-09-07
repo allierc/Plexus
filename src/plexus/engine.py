@@ -558,6 +558,14 @@ def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
     H.add_level(lvl)
 
 
+# THE PER-CELL NAMES THAT MAY LIVE ON THE CELL SET. A name here is served from the set when the
+# spec declares it and stays a mesh column when it does not, so the migration is per spec and per
+# rung rather than a flag day.
+MESH_CELL_STATE = ("A0", "P0", "V0f", "alive", "age", "ndiv",
+                   "Vbirth", "divjit", "phase", "phase_t", "cyc_inhib", "cyc_vprev",
+                   "mg_scale", "A0_init", "P0_init", "V0f_init", "apop_flag", "elong")
+
+
 def _link_mesh_maps(H, sim) -> None:
     """Resolve `mesh:` -> the half-edge set -> `maps.face` -> the cell set, once every set is built.
 
@@ -585,6 +593,18 @@ def _link_mesh_maps(H, sim) -> None:
                 f"cell set.")
         lvl.mesh_cell_set = maps["face"]
         lvl.mesh_vertex_set = maps["srce"]
+        # PER-CELL STATE THE CELL SET DECLARES IS SERVED FROM THERE, not stored on the mesh table.
+        # Only the names the spec actually declares are bound, so a spec that has not moved yet
+        # keeps its columns and runs exactly as before -- which is what lets the twelve arrays
+        # migrate one writer-group at a time instead of in one unbisectable commit.
+        cl = H.levels.get(maps["face"]) if hasattr(H.levels, "get") else (
+            H.levels[maps["face"]] if maps["face"] in H.levels else None)
+        m = getattr(lvl, "mesh", None)
+        if cl is not None and m is not None and hasattr(m, "bind_cell_state"):
+            bound = m.bind_cell_state(cl, MESH_CELL_STATE)
+            if bound:
+                print(f"[build] {sname}: {len(bound)} per-cell block(s) served from "
+                      f"{maps['face']!r}: {', '.join(bound)}", flush=True)
         if maps["srce"] != sname or maps["trgt"] != sname:
             raise ValueError(
                 f"set {hs!r} is {sname!r}'s mesh, so its `srce`/`trgt` maps must land in {sname!r}, "

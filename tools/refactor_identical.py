@@ -120,6 +120,58 @@ def _digest(path):
     return per, h.hexdigest()
 
 
+def _close(pa, pb, tol):
+    """Compare two runs to a RELATIVE TOLERANCE instead of bit for bit.
+
+    WHY A TOLERANCE MODE AT ALL. Byte-identity is the right gate while a rung claims to move
+    nothing, and it carried S1, S2a, S2b and S2c-1. It stops being the right gate the moment a
+    rung reassociates a floating-point sum, because this model is chaotic in `edge_flip`: a
+    perturbation at the 24th bit of a float32 coordinate decides one reconnection differently and
+    the trajectories part. Measured on `gate_00_spheroid`, 4.5e-06 at frame 33 becomes 6,914 cells
+    against 6,749 by frame 401 -- a 2.4% divergence from a change that moved no physics.
+
+    WHAT IS COMPARED, AND WHY NOT ELEMENTWISE. The ragged mesh arrays are concatenations whose
+    length is the run's own history -- 204,162 entries against 202,658 -- so they cannot be lined
+    up elementwise at all once the cell counts differ by one. What CAN be compared is the run's
+    trajectory of summary quantities: the live cell count frame by frame, and the mean of every
+    recorded per-face column over the live faces. Those are what a reader of the movie sees, and a
+    refactor that leaves them within a tolerance has not changed the model even where it has
+    changed the last bits.
+
+    Returns (ok, "<worst array> <relative deviation>").
+    """
+    za, zb = np.load(pa, allow_pickle=True), np.load(pb, allow_pickle=True)
+    worst, wname = 0.0, "-"
+
+    def rel(u, v):
+        d = float(np.max(np.abs(np.asarray(u, np.float64) - np.asarray(v, np.float64))))
+        s = max(float(np.max(np.abs(np.asarray(u, np.float64)))), 1e-12)
+        return d / s
+
+    for k in sorted(set(za.files) & set(zb.files)):
+        A, B = np.asarray(za[k]), np.asarray(zb[k])
+        if k.endswith(("_offsets",)) or A.dtype.kind not in "fiu":
+            continue
+        if k.endswith("__mesh_nF") or k.endswith("__mesh_Nv"):
+            r = rel(A, B) if A.shape == B.shape else 1.0
+        elif "__mesh_" in k and A.ndim == 1 and A.shape != B.shape:
+            # a ragged per-face column: compare the PER-FRAME MEAN, which is defined either way
+            s = k.split("__mesh_")[0]
+            fa, fb = np.asarray(za[f"{s}__mesh_face_offsets"]), np.asarray(zb[f"{s}__mesh_face_offsets"])
+            na, nb = np.asarray(za[f"{s}__mesh_nF"]), np.asarray(zb[f"{s}__mesh_nF"])
+            T = min(len(na), len(nb))
+            ma = np.array([A[int(fa[t]):int(fa[t] + na[t])].mean() for t in range(T)])
+            mb = np.array([B[int(fb[t]):int(fb[t] + nb[t])].mean() for t in range(T)])
+            r = rel(ma, mb)
+        elif A.shape != B.shape:
+            r = 1.0
+        else:
+            r = rel(A, B)
+        if r > worst:
+            worst, wname = r, k
+    return worst <= tol, f"{wname} {worst:.3%}"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -131,6 +183,9 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--device-ref", default="cuda:1", help="the reference side runs here, in parallel")
     ap.add_argument("--out", default="/tmp/plexus_refactor")
+    ap.add_argument("--tol", type=float, default=0.0,
+                    help="accept a RELATIVE difference this large instead of bit-for-bit "
+                         "(e.g. 0.01); compares per-frame summaries, see `_close`")
     ap.add_argument("--all", action="store_true",
                     help=f"include the slow pre-campaign specs ({', '.join(SLOW)})")
     a = ap.parse_args()
@@ -163,6 +218,14 @@ def main():
         pa, pb = _reap(*ja), _reap(*jb)
         if pa is None or pb is None:
             failed.append(n); print(f"  {n:<28} RUN FAILED"); continue
+        if a.tol > 0:
+            ok, worst = _close(pa, pb, a.tol)
+            if ok:
+                print(f"  {n:<28} within {a.tol:.1%}   worst {worst}")
+                continue
+            print(f"  {n:<28} EXCEEDS {a.tol:.1%}   worst {worst}")
+            bad.append(n)
+            continue
         da, ha = _digest(pa)
         db, hb = _digest(pb)
         only_a, only_b = sorted(set(da) - set(db)), sorted(set(db) - set(da))

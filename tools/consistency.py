@@ -82,7 +82,7 @@ def census(H, vset, cset):
         return [], []
     nF = int(m["nF"])
     on_mesh = []
-    for k in sorted(getattr(m, "keys", lambda: [])()):
+    for k in sorted(dict.keys(m) if isinstance(m, dict) else []):   # OWN storage, not proxies
         if k in MESH_OWN:
             continue
         a = _live(m.get(k))
@@ -210,7 +210,11 @@ def one(group, name, frames, device, traj_dir=None):
     H, _traj = engine_run(sim, out_path=None, device=device)
     rows = []
     for vs, d in vsets.items():
-        cs = d.get("cell_set")
+        # `cell_set:` RETIRED AT S6. The pairing is `maps.face` on the half-edge set the `mesh:`
+        # key names, and the engine resolves it onto `Level.mesh_cell_set`; reading the old key
+        # here reported every cell set as absent and printed "on the CELL SET (0)".
+        cs = getattr(H.level(vs), "mesh_cell_set", None) or (
+            ((sim.sets.get(d.get("mesh")) or {}).get("maps") or {}).get("face"))
         on_mesh, on_cell = census(H, vs, cs)
         rows.append((vs, cs, on_mesh, on_cell))
     declared = {s: list((d.get("state") or {}).keys())

@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 import cluster as C                                                   # noqa: E402
 
 
-def submit(name, group="tissue", dry=False, wall=None, force=True):
+def submit(name, group="tissue", dry=False, wall=None, force=True, oroot=None):
     """One `bsub` for one spec. Returns the job name, or None if the submission failed."""
     out = os.path.join(ROOT, "log", "sweeps", group, name)
     os.makedirs(out, exist_ok=True)
@@ -49,7 +49,8 @@ def submit(name, group="tissue", dry=False, wall=None, force=True):
             "export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8",
             "export MPLBACKEND=Agg PLEXUS_STRICT_DETERMINISM=1",
             f"conda run -n {C.ENV} python Plexus_Main.py -o generate {group}/{name} "
-            f"--device cuda:0" + (" --force" if force else ""),
+            f"--device cuda:0" + (f" --output_root {C.cpath(oroot)}" if oroot else "")
+            + (" --force" if force else ""),
         ]) + "\n")
     os.chmod(sh, 0o755)
     o = C.cpath(os.path.join(out, "run.out"))
@@ -76,6 +77,8 @@ def main():
     ap.add_argument("--group", default="tissue")
     ap.add_argument("--glob", default=None, help="spec-name glob under config/<group>/")
     ap.add_argument("--wall", default=None, help="minutes; default cluster.WALL")
+    ap.add_argument("--output-root", default=None,
+                    help="write elsewhere, so a verification run does not overwrite the reference")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     names = list(a.names)
@@ -87,7 +90,7 @@ def main():
     if not names:
         print("  no specs matched"); return 1
     print(f"  {len(names)} job(s) -> {C.QUEUE} as {C.SSH}, {C.NCPUS} slots + 1 GPU each")
-    ok = [submit(n, a.group, a.dry_run, a.wall) for n in names]
+    ok = [submit(n, a.group, a.dry_run, a.wall, oroot=a.output_root) for n in names]
     print(f"  {sum(x is not None for x in ok)} submitted, {sum(x is None for x in ok)} failed")
     print("  watch:  ssh " + C.SSH + " bjobs   |   collect: "
           f"PYTHONPATH=src python tools/cv_report.py --group {a.group} --glob '{a.glob or '*'}'")
