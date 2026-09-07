@@ -129,7 +129,11 @@ operators:
     at: cell
   - op: cell_grow
     at: vertex
-    rate: 0.003457
+    # PER UNIT TIME, NOT PER FRAME. `cell_grow` used to apply `rate` once per call regardless
+    # of `dt`; it now emits a rate the engine integrates as `s += dt * ds`. This spec runs
+    # `general.dt: 0.0032`, so the per-frame growth it had is `0.003457 / 0.0032` per unit of
+    # simulation time -- the number below -- and the run is unchanged.
+    rate: 1.0803125
     rho: 1.0
     a_sw: 50.0
     hill: 4.0
