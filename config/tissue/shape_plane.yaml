@@ -33,7 +33,7 @@ sets:
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       Vbirth:
         width: 1
@@ -57,7 +57,7 @@ seed:
   jitter: 0.18
   p0: 3.5
   seed: 0
-  h0: 0.6
+  h0: 0.9
   shape: plane
   width: 4.0
 operators:

@@ -33,7 +33,7 @@ sets:
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       Vbirth:
         width: 1

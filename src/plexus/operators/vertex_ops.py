@@ -130,7 +130,7 @@ def cell_block(H, cat, name, nF):
     """The first `nF` rows of a DECLARED width-1 block on the cell set, as float64. None if absent.
 
     THE OTHER HOME FOR PER-CELL STATE, AND THE ONE plexus2 ACTUALLY DESCRIBES. Two stores have
-    grown up side by side: `chem`, `area` and `cen` are declared blocks on the `cell` SET, permuted
+    grown up side by side: `chem`, `area` and `centroid` are declared blocks on the `cell` SET, permuted
     by `Hierarchy.renumber_set`; `A0`, `V0f`, `age`, `phase` and the rest are columns on the mesh
     table of the `vertex` set, permuted by `MeshTable.reindex_faces` through `m["face_carry"]`. They
     hold the same kind of quantity -- one number per cell -- and the paper knows about only one of
@@ -457,9 +457,9 @@ def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
     area = N.norm(dim=-1)
     perim = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, length)
     cnt = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, w)
-    cen = torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, sw) / cnt.clamp(min=1)[:, None]
-    vf = (1.0 / 3.0) * (cen * N).sum(dim=-1)                 # per-cell wedge volume (sum = lumen volume)
-    return area, perim, cen, vf
+    centroid = torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, sw) / cnt.clamp(min=1)[:, None]
+    vf = (1.0 / 3.0) * (centroid * N).sum(dim=-1)                 # per-cell wedge volume (sum = lumen volume)
+    return area, perim, centroid, vf
 
 
 def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R, Lam, Gam,
@@ -468,7 +468,7 @@ def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_
     change, so it compiles once even under division). Dead slots are masked out: `alive` (faces),
     `eocc` (half-edges), `vocc` (vertices, for the radial term). R0 is a tensor (changes each frame);
     the K_* / Lam / Gam coefficients are compile-time constants."""
-    area, perim, cen, vf = face_geometry_3d(pos, es, et, ef, nF, eocc)
+    area, perim, centroid, vf = face_geometry_3d(pos, es, et, ef, nF, eocc)
     E = (K_A * (area - A0) ** 2 + K_P * (perim - P0) ** 2 + 0.5 * Gam * perim ** 2) * alive
     line = (pos[et] - pos[es]).norm(dim=-1) * eocc          # line tension over live half-edges only
     # PER-JUNCTION MYOSIN, when a junction operator has supplied it. `Lam` alone is one number for the
@@ -671,6 +671,7 @@ class SeedMesh3D(Structural):
         # and the paper's own words become the gate: a tissue "free to expand so that its total area
         # was larger by a factor g" must settle at A = g x its seeded area.
         self.a0_scale = float(params.get("a0_scale", 1.0))
+        self.v0_uniform = bool(params.get("v0_uniform", False))   # one target volume for every cell
         if self.a0_scale <= 0:
             raise ValueError(f"mesh_seed: a0_scale must be > 0, got {self.a0_scale}")
         self.vseed_cv = float(params.get("vseed_cv", 0.0))       # STOCHASTIC VOLUME SEED: per-cell random cell-cycle
@@ -715,7 +716,7 @@ class SeedMesh3D(Structural):
             occ = torch.zeros(Nbuf, device=dev); occ[:Nv] = 1.0; lvl.occ = occ
         est = torch.as_tensor(es, device=dev); ett = torch.as_tensor(et, device=dev)
         eft = torch.as_tensor(ef, device=dev)
-        area, perim, cen, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
+        area, perim, centroid, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
         A_seed = float(area.mean())
         A0 = A_seed * self.a0_scale; P0 = self.p0 * (A0 ** 0.5)
         if self.a0_scale != 1.0:
@@ -756,7 +757,7 @@ class SeedMesh3D(Structural):
                 print(f"[mesh_seed] type_layout={self.type_layout} ignored: set "
                       f"{self.cell_set!r} declares fewer than two types", flush=True)
             else:
-                order = torch.argsort(cen[:, _ax])              # faces, sorted along the axis
+                order = torch.argsort(centroid[:, _ax])              # faces, sorted along the axis
                 nt = torch.zeros(int(_cl.n), dtype=torch.long, device=dev)
                 cuts = (torch.cumsum(_fr / _fr.sum(), 0) * nF).round().long().tolist()
                 lo = 0
@@ -782,7 +783,17 @@ class SeedMesh3D(Structural):
                          # constraint the paper's 2D model does not even have. `Vbirth` follows V0f
                          # for the same reason: a cell must still divide at twice its OWN target,
                          # not at twice a volume it was never meant to hold.
-                         V0f=vf.detach().clone() * self.a0_scale ** 1.5,   # PER-CELL target wedge volume (v_eq per cell)
+                         # `v0_uniform` -- EVERY CELL ASKS FOR THE SAME VOLUME, which is the
+                         # control this seed could not express. `A0` and `P0` are already scalars
+                         # here (`torch.full`), so the target AREA is uniform and only the target
+                         # VOLUME is per-cell, taken from each cell's own seeded wedge. That
+                         # asymmetry is invisible until you want to ask whether the mechanics
+                         # equalises cell volume on its own: with per-cell targets it cannot, because
+                         # every cell is already at the size it was asked for, and the answer would
+                         # be about the seed rather than about the energy. Setting them all to the
+                         # MEDIAN makes the question well posed.
+                         V0f=(torch.full_like(vf, float(vf.median())) if self.v0_uniform
+                              else vf.detach().clone()) * self.a0_scale ** 1.5,
                          V0=float(vf.sum()) * self.a0_scale ** 1.5,
                          v_ref=float(vf.median()) * self.a0_scale ** 1.5,   # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
                          #   morphogen growth caps v_eq at (4/3)v_ref, cells cycle in [2/3,4/3]v_ref centred on v_ref
@@ -1355,42 +1366,31 @@ class Divide3D(Structural):
                     _s[:_Nv].to(torch.float32).cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
                     m["E_face"].cpu(), nF)
                 vf = _vp.numpy().astype(np.float64)
-                # THE REFERENCE IS TAKEN FROM THE RELAXED SHELL, NOT FROM THE SEED.
+                # THE REFERENCE IS THE SEED-TIME MEDIAN, THE WAY THE WEDGE ONE ALWAYS WAS -- and
+                # that is only honest because `seed_mesh` now seeds `h0` at the thickness the energy
+                # wants. It was not always so. `h0` used to be an arbitrary number: 0.4 on this spec
+                # against an equilibrium of 0.8796, 1.8 on `mech_shell_free` against 0.8001. The
+                # seeded shell then spent the opening of every run RELAXING toward a thickness
+                # nobody had asked for -- on `mech_shell_free` about 300 frames, with the mean
+                # radius drifting 5.03 -> 7.47 on the way -- and the polyhedron volume moved with
+                # it, 0.613 -> 1.229 here.
                 #
-                # This was `if "v_ref_poly" not in m`, so the median was cached on the FIRST call --
-                # and the first call happens while the shell is still at its seeded thickness. On
-                # `divide_growing_ball`, `|sep|` at that moment is exactly 0.2000, the value
-                # `seed_mesh` wrote, and the polyhedron median is 0.6127. The shell then nearly
-                # DOUBLES that volume just by relaxing: 1.167 four ticks later, 1.229 by tick 12,
-                # where it settles. So `factor * v_ref_poly` was met by the shell SETTLING rather
-                # than by any cell growing, and the population ran away -- 12,543 cells against the
-                # 920 the wedge trigger gave on the same spec, a run whose every frame is a
-                # division cascade.
+                # Every attempt to time a measurement on that ramp produced a different population
+                # from the same spec: cache at the first call, 12,543 cells; wait for the shell to
+                # settle, 236; freeze when the median stops moving by 1% a call, 200 and flat,
+                # because once growth is uncapped it moves MORE than 1% a call and the reference
+                # simply tracked the cells -- median 17.339 against a reference of 17.339, a trigger
+                # comparing a quantity with itself. None of those numbers was wrong about what it
+                # measured. They were all measuring a shell that had not finished moving.
                 #
-                # The wedge reference never had this problem, and the reason is the one this whole
-                # block exists for: a wedge volume is blind to thickness, so relaxing the shell
-                # barely moves it and a seed-time median is as good as a relaxed one. The moment
-                # the trigger can see the thickness, WHEN the reference is measured starts to
-                # matter as much as WHICH volume it measures.
-                #
-                # So it is re-taken on every call until it stops moving, then frozen. 1% between
-                # consecutive calls is the test: the settling is a factor of two, so anything that
-                # coarse separates it from the growth the operator is there to measure, and no
-                # tick count has to be guessed for a spec whose relaxation rate nobody knows.
-                _med = float(np.median(vf))
-                _prev = m.get("v_ref_poly")
-                if _prev is None or (not m.get("v_ref_poly_frozen")
-                                     and abs(_med - _prev) > 0.01 * max(abs(_prev), 1e-12)):
-                    m["v_ref_poly"] = _med
-                    if _prev is None:
-                        print(f"[cell_divide] this run carries a separation, so the trigger reads "
-                              f"the POLYHEDRON volume (the wedge reference is "
-                              f"{float(m.get('v_ref', 1.0)):.4f}); the reference is re-taken until "
-                              f"the shell settles", flush=True)
-                elif _prev is not None and not m.get("v_ref_poly_frozen"):
-                    m["v_ref_poly_frozen"] = True
-                    print(f"[cell_divide] polyhedron reference settled at "
-                          f"{float(m['v_ref_poly']):.4f}", flush=True)
+                # `tools/equilibrium_h.py` measures the thickness a spec's energy settles to, and
+                # the specs now seed it. With the shell starting where it ends, the first call is a
+                # rest state and needs no window, no tolerance and no freeze.
+                if "v_ref_poly" not in m:
+                    m["v_ref_poly"] = float(np.median(vf))
+                    print(f"[cell_divide] this run carries a separation, so the trigger reads the "
+                          f"POLYHEDRON volume; reference {m['v_ref_poly']:.4f} "
+                          f"(the wedge reference is {float(m.get('v_ref', 1.0)):.4f})", flush=True)
         rings = rings_from_flat_3d(es, et, ef, nF)
         pos = [p for p in pos_np]
         A0 = m["A0"].detach().cpu().numpy().tolist()
@@ -1976,17 +1976,17 @@ class Apoptosis3D(Structural):
         if self.mode == "list":
             return {c for c in self.cells if c < nF}
         # THE CENTROID IS A PRECONDITION OF TWO MODES, NOT OF DEATH. This guard used to stand here
-        # unconditionally -- `if cen is None: return set()` -- so every mode in the operator was
+        # unconditionally -- `if centroid is None: return set()` -- so every mode in the operator was
         # silently gated behind a quantity only `band` and `cone` read. A geometric precondition
         # that switches off a competition rule, or a probe-driven one, is the same defect as an
         # absolute threshold on a relative field: the operator goes quiet for a reason unrelated to
         # its own mechanism, and quiet is indistinguishable from "nothing qualified".
         u = None
         if self.mode in ("band", "cone"):
-            cen = m.get("cen_np")                                  # per-cell centroid from the rings
-            if cen is None:
+            centroid = m.get("centroid_np")                                  # per-cell centroid from the rings
+            if centroid is None:
                 return set()
-            u = cen / (np.linalg.norm(cen, axis=1) + 1e-12)[:, None]
+            u = centroid / (np.linalg.norm(centroid, axis=1) + 1e-12)[:, None]
         if self.mode == "band":                                    # `n_bands` latitude rings
             lat = np.degrees(np.arcsin(np.clip(u[:, 2], -1, 1)))   # -90 .. +90
             if self.n_bands <= 1:
@@ -2164,7 +2164,7 @@ class Apoptosis3D(Structural):
         es = m["E_srce"].cpu().numpy(); et = m["E_trgt"].cpu().numpy(); ef = m["E_face"].cpu().numpy()
         rings = [np.asarray(r, np.int64) for r in rings_from_flat_3d(es, et, ef, nF)]
         # per-cell centroid, for the geometric modes
-        m["cen_np"] = np.array([pos_t[r].mean(0) if r is not None and len(r) else np.zeros(3)
+        m["centroid_np"] = np.array([pos_t[r].mean(0) if r is not None and len(r) else np.zeros(3)
                                 for r in rings])
         # MARKED CELLS ARE A PER-FACE FLAG, NOT A LIST OF INDICES, and the first version was a
         # list. Every collapse renumbers the faces through `keep`, so `cells: [900]` pointed at a
@@ -3659,10 +3659,10 @@ def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
     a_s, a_t, b_s, b_t = a[es], a[et], b[es], b[et]
     z3 = lambda: torch.zeros(nF, 3, device=dev, dtype=dt)                        # noqa: E731
     cnt = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, ones_e).clamp(min=1e-9)
-    cen = z3().index_add(0, ef, pos[es] * ones_e[:, None]) / cnt[:, None]        # mid-ring centroid
+    centroid = z3().index_add(0, ef, pos[es] * ones_e[:, None]) / cnt[:, None]        # mid-ring centroid
     ca = z3().index_add(0, ef, a_s * ones_e[:, None]) / cnt[:, None]             # apical cap centroid
     cb = z3().index_add(0, ef, b_s * ones_e[:, None]) / cnt[:, None]             # basal cap centroid
-    o = cen[ef]
+    o = centroid[ef]
 
     def tri(p, q, r):
         return torch.einsum("ij,ij->i", p - o, torch.cross(q - o, r - o, dim=-1)) * ones_e
@@ -4325,8 +4325,8 @@ if HAVE_WARP:
         Nf = N[f] * 0.5                             # the half-sum, applied once
         area = wp.length(Nf)
         cnt = wp.max(CNT[f], 1.0)
-        cen = CSUM[f] / cnt
-        vf = wp.dot(cen, Nf) / 3.0
+        centroid = CSUM[f] / cnt
+        vf = wp.dot(centroid, Nf) / 3.0
 
         dA = 2.0 * K_A * (area - A0[f]) * a
         DP[f] = (2.0 * K_P * (P[f] - P0[f]) + Gam * P[f]) * a
@@ -4337,7 +4337,7 @@ if HAVE_WARP:
             nhat = Nf / area
         # HALVED HERE, not in the half-edge kernel: dN_f/d(cross_e) = 1/2, and folding it in once
         # per face keeps the scatter pass to the three cross products it is really doing.
-        G[f] = (nhat * dA + cen * (dv / 3.0)) * 0.5
+        G[f] = (nhat * dA + centroid * (dv / 3.0)) * 0.5
         CG[f] = Nf * (dv / (3.0 * cnt))
 
     @wp.kernel

@@ -79,7 +79,7 @@ sets:
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       chem:
         integration: first_order

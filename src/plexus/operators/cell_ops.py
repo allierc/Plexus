@@ -132,13 +132,14 @@ ATLAS: dict[str, dict] = {
     # rather than perforated -- a perforated shell is not a membrane, it is a colander.
     "plasma_membrane": dict(place="shell", r=1.00, axis="radial",
                             shape="patch", size=0.105, thickness=0.05),
-    # filaments spanning the cytoplasm, laid RADIALLY and nearly straight (persistence 0.85), each
-    # centred between the nuclear envelope and the membrane. The radial placement band is narrow
-    # (0.62-0.74 of the cell radius) BECAUSE the filaments are long: a piece of contour length
-    # 0.45 R centred at 0.68 R spans roughly 0.46 R to 0.90 R, which is the cytoplasm and neither
-    # the nucleus (envelope at 0.42 R) nor the membrane (inner surface at 0.95 R).
-    "cytoskeleton":    dict(place="ball", r_in=0.62, r_out=0.74, axis="radial",
-                            shape="filament", size=0.45, thickness=0.006, persistence=0.85),
+    # filaments spanning the cytoplasm, laid RADIALLY and nearly straight (persistence 0.88), each
+    # centred between the nuclear envelope and the membrane. A contour length of 0.60 R centred in
+    # the band 0.62-0.78 R reaches roughly 0.35 R to 1.02 R -- so the outer ends ANCHOR IN THE
+    # MEMBRANE rather than stopping short of it, which is what a cytoskeleton does and what a
+    # filament floating free in the cytoplasm does not. The inner ends stop outside the nuclear
+    # envelope (0.42 R + its thickness), so the skeleton does not thread the nucleus.
+    "cytoskeleton":    dict(place="ball", r_in=0.62, r_out=0.78, axis="radial",
+                            shape="filament", size=0.60, thickness=0.006, persistence=0.88),
     # the nuclear ENVELOPE, not the nuclear volume: 138 patches on a sphere at 0.42 of the cell
     # radius. Same Fibonacci-spacing argument as the plasma membrane (2/sqrt(138) = 0.170 of
     # THAT sphere's radius = 0.0715 of the cell radius).
@@ -179,6 +180,17 @@ ATLAS: dict[str, dict] = {
     "centriole":       dict(place="ball", r_in=0.50, r_out=0.58, axis="random",
                             shape="barrel", size=0.011, thickness=0.0026,
                             blades=9, length=4.5, skew=0.30),
+    # THE CROWD. Five protein species filling the whole cell -- one PIECE each, a ball of the
+    # cell's own radius, drawn as dots. They are not an organelle and they are the reason a cell is
+    # not hollow: a real cytoplasm is 20-30% protein by volume, and a shell with vacuum inside
+    # pancakes on impact instead of bouncing, which is exactly what the first run did.
+    #
+    # ONE PIECE EACH, NOT A CLOUD OF PIECES, because a protein species is not counted in pieces --
+    # it is a concentration. `volume_frac` is what keeps five co-located balls from claiming five
+    # cell volumes of mass between them.
+    **{f"protein_{k}": dict(place="ball", r_in=0.0, r_out=0.0, axis="random",
+                            shape="ball", size=0.95, volume_frac=0.12)
+       for k in ("a", "b", "c", "d", "e")},
 }
 
 _SHAPES = ("patch", "sheet", "rod", "ball", "filament",
@@ -301,6 +313,14 @@ class SeedCellAtlas(Seed):
         self.cell_radius = float(params["cell_radius"])    # world units; every atlas length scales by it
         self.centre = params.get("centre", None)           # override the parent cell's own position
         self.geometry = dict(params.get("geometry", {}) or {})
+        # ONE LAUNCH VELOCITY PER CELL, and it has to be written here rather than declared on a
+        # set. `vel_init` on a CONTAINED set draws one vector per PARENT and shares it among that
+        # parent's children -- which for `mpm_particle` means one vector per COMPARTMENT PIECE, so
+        # a 1,104-piece cell would leave frame 0 as 1,104 fragments flying apart. The velocity is a
+        # property of the CELL, two levels up, and the only thing that knows the cell a material
+        # point belongs to is the containment chain this operator already walks.
+        self.vel_init = float(params.get("vel_init", 0.0))     # max speed, world units per time
+        self.vel_axes = params.get("vel_init_axes", None)      # e.g. [0, 2]: launch in the plane
         self.seed = int(params.get("seed", 0))
 
     # -- geometry of one compartment, merged from the table and the spec ------------------- #
@@ -324,10 +344,23 @@ class SeedCellAtlas(Seed):
 
     @staticmethod
     def _piece_volume(row: dict, R: float) -> float:
-        """The closed-form volume of ONE piece, in world units cubed (lengths are fractions of R)."""
+        """The closed-form volume of ONE piece, in world units cubed (lengths are fractions of R).
+
+        `volume_frac` scales the result, and it exists for the one case the closed forms cannot
+        express: several bodies OCCUPYING THE SAME REGION, each holding a share of it. Five protein
+        species crowding the cytoplasm are five balls of the cell's own radius, so taking each at
+        its full geometric volume would give the cell five times its own mass. `volume_frac: 0.12`
+        says this species fills 12% of the ball it is drawn in; the five together are a 60%
+        crowded cytosol, which is roughly what a real one is. It changes only `p_vol` and hence
+        the mass -- the points are still drawn throughout the region, because that is where the
+        molecules are.
+        """
         s = float(row.get("size", 0.05)) * R
         t = float(row.get("thickness", 0.02)) * R
         shape = row["shape"]
+        vf = float(row.get("volume_frac", 1.0))
+        if vf != 1.0:
+            return vf * SeedCellAtlas._piece_volume({**row, "volume_frac": 1.0}, R)
         if shape in ("patch", "sheet"):
             return math.pi * s * s * t                     # a disc of radius s, t deep
         if shape == "rod":
@@ -377,7 +410,7 @@ class SeedCellAtlas(Seed):
 
     # -- where the points inside one piece go ------------------------------------------------ #
     def _fill(self, row: dict, n_pieces: int, per: int, R: float,
-              cen: torch.Tensor, e1, e2, e3, gen) -> torch.Tensor:
+              centroid: torch.Tensor, e1, e2, e3, gen) -> torch.Tensor:
         """World positions [n_pieces * per, 3] of the material points of these pieces.
 
         Row-major: piece p owns rows [p*per, (p+1)*per), which is the layout `build` gives a
@@ -391,18 +424,18 @@ class SeedCellAtlas(Seed):
         rep = lambda v: v.repeat_interleave(per, dim=0)                       # noqa: E731
 
         if shape == "ball":
-            return rep(cen) + _in_ball(N, gen) * s
+            return rep(centroid) + _in_ball(N, gen) * s
 
         if shape == "rod":
             a, b = _in_disc(N, gen)
             z = (torch.rand(N, generator=gen) * 2.0 - 1.0) * s
-            return rep(cen) + rep(e1) * (a * t)[:, None] + rep(e2) * (b * t)[:, None] \
+            return rep(centroid) + rep(e1) * (a * t)[:, None] + rep(e2) * (b * t)[:, None] \
                 + rep(e3) * z[:, None]
 
         if shape == "sheet":
             a, b = _in_disc(N, gen)
             z = (torch.rand(N, generator=gen) - 0.5) * t
-            return rep(cen) + rep(e1) * (a * s)[:, None] + rep(e2) * (b * s)[:, None] \
+            return rep(centroid) + rep(e1) * (a * s)[:, None] + rep(e2) * (b * s)[:, None] \
                 + rep(e3) * z[:, None]
 
         if shape == "patch":
@@ -414,8 +447,8 @@ class SeedCellAtlas(Seed):
             a, b = _in_disc(N, gen)
             tang = rep(e1) * (a * s)[:, None] + rep(e2) * (b * s)[:, None]
             depth = (torch.rand(N, generator=gen) - 0.5) * t
-            rad = cen.norm(dim=1, keepdim=True)                # the shell radius of each piece
-            dirn = _unit(rep(cen) + tang)
+            rad = centroid.norm(dim=1, keepdim=True)                # the shell radius of each piece
+            dirn = _unit(rep(centroid) + tang)
             return dirn * (rep(rad) + depth[:, None])
 
         if shape == "filament":
@@ -445,7 +478,7 @@ class SeedCellAtlas(Seed):
             f = (u - i)[:, None]
             pid = torch.arange(n_pieces).repeat_interleave(per)
             a0 = nodes[pid, i]; a1 = nodes[pid, i + 1]
-            return rep(cen) + a0 + f * (a1 - a0) + _in_ball(N, gen) * t
+            return rep(centroid) + a0 + f * (a1 - a0) + _in_ball(N, gen) * t
 
         if shape == "cisterna":
             # A BOWED, FENESTRATED SHEET. The bow is a paraboloid in the sheet's own plane --
@@ -481,7 +514,7 @@ class SeedCellAtlas(Seed):
                     break
             rho2 = a * a + b * b
             z = (torch.rand(N, generator=gen) - 0.5) * t + bow * s * (1.0 - rho2)
-            return rep(cen) + rep(e1) * (a * s)[:, None] + rep(e2) * (b * s)[:, None] \
+            return rep(centroid) + rep(e1) * (a * s)[:, None] + rep(e2) * (b * s)[:, None] \
                 + rep(e3) * z[:, None]
 
         if shape == "tubule":
@@ -519,7 +552,7 @@ class SeedCellAtlas(Seed):
             si = torch.randint(0, n_seg, (N,), generator=gen)
             f = torch.rand(N, 1, generator=gen)
             a0 = NODES[pid, A[pid, si]]; a1 = NODES[pid, B[pid, si]]
-            return rep(cen) + a0 + f * (a1 - a0) + _in_ball(N, gen) * t
+            return rep(centroid) + a0 + f * (a1 - a0) + _in_ball(N, gen) * t
 
         if shape == "stack":
             # `layers` BOWED CISTERNAE along e3, tapering cis -> trans. Each point picks a layer
@@ -536,7 +569,7 @@ class SeedCellAtlas(Seed):
             rho2 = a * a + b * b
             z = (li.float() - (nl - 1) / 2.0) * gap + (torch.rand(N, generator=gen) - 0.5) * t \
                 + bow * s * (1.0 - rho2)
-            return rep(cen) + rep(e1) * (a * s * frac)[:, None] \
+            return rep(centroid) + rep(e1) * (a * s * frac)[:, None] \
                 + rep(e2) * (b * s * frac)[:, None] + rep(e3) * z[:, None]
 
         if shape == "mito":
@@ -571,7 +604,7 @@ class SeedCellAtlas(Seed):
             scale = torch.where(is_cr, torch.rand(N, generator=gen).sqrt() * 0.80, shell)
             ca, cb = ca / crho * scale, cb / crho * scale
             # e1 carries the bend, so the cross-section rides e1 (offset by `lateral`) and e2
-            return rep(cen) + rep(e3) * along[:, None] \
+            return rep(centroid) + rep(e3) * along[:, None] \
                 + rep(e1) * ((lateral + ca * t))[:, None] + rep(e2) * (cb * t)[:, None]
 
         if shape == "barrel":
@@ -589,7 +622,7 @@ class SeedCellAtlas(Seed):
             ca, cb = _in_disc(N, gen)
             x = torch.cos(th) * s + ca * t
             y = torch.sin(th) * s + cb * t
-            return rep(cen) + rep(e1) * x[:, None] + rep(e2) * y[:, None] + rep(e3) * z[:, None]
+            return rep(centroid) + rep(e1) * x[:, None] + rep(e2) * y[:, None] + rep(e3) * z[:, None]
 
         raise ValueError(f"unhandled shape {shape!r}")
 
@@ -614,21 +647,28 @@ class SeedCellAtlas(Seed):
                 f"seed_cell_atlas: set {lvl.name!r} declares no `types:`. The atlas IS the type "
                 f"table -- one type per compartment, its `count:` the number of pieces -- so a "
                 f"compartment set without one has nothing to lay out.")
+        # ONE ATLAS PER CELL. `centres` is [n_cells, 3] and `owner` says which cell each PIECE
+        # belongs to, so a scene of 100 cells is 100 independent layouts sharing one set -- which
+        # is the point of the containment map, and needs no per-cell set.
+        #
+        # THIS USED TO REFUSE ANY CELL COUNT BUT ONE, and the refusal was correct at the time:
+        # `types.count` was assigned over the whole compartment level with a single permutation, so
+        # 25 cells received a MULTINOMIAL DRAW of each organelle rather than the atlas. That is
+        # fixed where it belonged, in `_assign_types` -- a count on a CONTAINED set is per parent,
+        # tiled and shuffled inside each parent's block -- so the inventory is now identical from
+        # cell to cell and only the placement's randomness differs.
         pname = getattr(lvl, "parent_name", None)
         if self.centre is not None:
-            centre = torch.tensor([float(v) for v in self.centre])
+            centres = torch.tensor([[float(v) for v in self.centre]])
+            owner = torch.zeros(lvl.n, dtype=torch.long)
         elif pname is not None:
             par = H.level(pname)
-            if par.n != 1:
-                raise ValueError(
-                    f"seed_cell_atlas: {pname!r} has {par.n} elements. The piece counts come from "
-                    f"`types.count` on {lvl.name!r}, which the engine spreads over the whole set, "
-                    f"so with more than one cell each would get a random share of each compartment "
-                    f"rather than the atlas. Run one cell, or give the counts per parent.")
-            centre = par.get("pos")[0, :3].detach().cpu()
+            centres = par.get("pos")[:, :3].detach().cpu()
+            owner = lvl.parent.detach().cpu()
         else:
             raise ValueError("seed_cell_atlas: set has no `parent:` and the operator line gives "
                              "no `centre:` -- there is nothing to place the atlas around.")
+        n_cells = int(centres.shape[0])
 
         # HOW MANY POINTS EACH PIECE OWNS, AND WHERE ITS ROWS ARE -- read off the containment map
         # rather than assumed uniform. `per_parent` may be a mapping from compartment type to
@@ -649,42 +689,53 @@ class SeedCellAtlas(Seed):
         pvol = torch.zeros(plvl.n)
         ntc = nt.detach().cpu()
         report = []
-        for tid, name in enumerate(names):
-            idx = torch.nonzero(ntc == tid, as_tuple=False).flatten()
-            k = int(idx.numel())
-            if k == 0:
-                continue
-            row = self._row(name)
-            # EVERY PIECE OF ONE COMPARTMENT HAS THE SAME POINT COUNT, because `per_parent` keys on
-            # the parent's TYPE and a compartment is exactly one type. That is what lets the fill
-            # below stay a single vectorised call per compartment instead of a loop over pieces.
-            per = int(counts[idx[0]])
-            if not bool((counts[idx] == per).all()):
-                raise ValueError(
-                    f"seed_cell_atlas: pieces of compartment {name!r} own different numbers of "
-                    f"material points ({int(counts[idx].min())}..{int(counts[idx].max())}). "
-                    f"`per_parent` varies by parent TYPE, and every piece here is one type.")
-            off, dirn = self._place(row, k, R, gen)
-            e3 = dirn if row["axis"] == "radial" else _unit(torch.randn(k, 3, generator=gen))
-            e1, e2 = _ortho(e3)
-            cpos[idx] = centre + off
-            # the piece's points, in the piece's own frame about its centre-offset, then shifted
-            # to world by the cell centre. `_fill` works in cell-centred coordinates because the
-            # `patch` shape needs the shell radius, which is only meaningful about that centre.
-            pts = self._fill(row, k, per, R, off, e1, e2, e3, gen) + centre
-            rows = (offset[idx][:, None] + torch.arange(per)).flatten()
-            ppos[rows] = pts
-            v = self._piece_volume(row, R)
-            pvol[rows] = v / per
-            # THE RADIAL EXTENT, MEASURED, not derived from the table. `place` and `shape` are
-            # two independent statements and a compartment sits where their SUM puts it, which is
-            # how 116 cytoskeletal filaments came to stick 0.6 R out of a cell whose every
-            # parameter looked reasonable in isolation. Printing min/max radius per compartment
-            # is what makes "the mitochondria are in the cytoplasm" a checkable claim.
-            rad = (pts - centre).norm(dim=1) / R
-            report.append(f"{name:16s} x{k:<4d} {row['shape']:9s} {per:>6,}/piece "
-                          f"({k * per:>9,} pts)  r in [{rad.min():.2f}, {rad.max():.2f}] R  "
-                          f"V={v:.3e}  spacing={(v / per) ** (1 / 3):.4f}")
+        tally = {}
+        for cid in range(n_cells):
+            centre = centres[cid]
+            in_cell = (owner == cid)
+            for tid, name in enumerate(names):
+                idx = torch.nonzero(in_cell & (ntc == tid), as_tuple=False).flatten()
+                k = int(idx.numel())
+                if k == 0:
+                    continue
+                row = self._row(name)
+                # EVERY PIECE OF ONE COMPARTMENT HAS THE SAME POINT COUNT, because `per_parent` keys on
+                # the parent's TYPE and a compartment is exactly one type. That is what lets the fill
+                # below stay a single vectorised call per compartment instead of a loop over pieces.
+                per = int(counts[idx[0]])
+                if not bool((counts[idx] == per).all()):
+                    raise ValueError(
+                        f"seed_cell_atlas: pieces of compartment {name!r} own different numbers of "
+                        f"material points ({int(counts[idx].min())}..{int(counts[idx].max())}). "
+                        f"`per_parent` varies by parent TYPE, and every piece here is one type.")
+                off, dirn = self._place(row, k, R, gen)
+                e3 = dirn if row["axis"] == "radial" else _unit(torch.randn(k, 3, generator=gen))
+                e1, e2 = _ortho(e3)
+                cpos[idx] = centre + off
+                # the piece's points, in the piece's own frame about its centre-offset, then shifted
+                # to world by the cell centre. `_fill` works in cell-centred coordinates because the
+                # `patch` shape needs the shell radius, which is only meaningful about that centre.
+                pts = self._fill(row, k, per, R, off, e1, e2, e3, gen) + centre
+                rows = (offset[idx][:, None] + torch.arange(per)).flatten()
+                ppos[rows] = pts
+                v = self._piece_volume(row, R)
+                pvol[rows] = v / per
+                # THE RADIAL EXTENT, MEASURED, not derived from the table. `place` and `shape`
+                # are two independent statements and a compartment sits where their SUM puts it,
+                # which is how 116 cytoskeletal filaments came to stick 0.6 R out of a cell whose
+                # every parameter looked reasonable in isolation. It makes "the mitochondria are
+                # in the cytoplasm" a checkable claim.
+                #
+                # REPORTED FOR THE FIRST CELL ONLY. The inventory is identical from cell to cell
+                # -- the counts are per parent -- so 100 copies of the same ten lines is a
+                # thousand lines of log saying one thing.
+                rad = (pts - centre).norm(dim=1) / R
+                tally[name] = tally.get(name, 0) + k * per
+                if cid == 0:
+                    report.append(
+                        f"{name:16s} x{k:<4d} {row['shape']:9s} {per:>6,}/piece "
+                        f"({k * per:>8,} pts/cell)  r in [{rad.min():.2f}, {rad.max():.2f}] R  "
+                        f"V={v:.3e}  spacing={(v / per) ** (1 / 3):.4f}")
 
         px0, px1 = lvl.state_schema["pos"]
         lvl.state[:, px0:px1] = cpos.to(dev)
@@ -695,7 +746,28 @@ class SeedCellAtlas(Seed):
         plvl.state[:, qx0:qx1] = ppos.to(dev)
         if "vel" in plvl.state_schema:
             vx0, vx1 = plvl.state_schema["vel"]
-            plvl.state[:, vx0:vx1] = 0.0
+            if self.vel_init > 0:
+                # ISOTROPIC IN DIRECTION, UNIFORM IN SPEED, one draw per cell, then broadcast down
+                # BOTH containment maps -- piece by `owner`, point by the piece it belongs to. A
+                # cell translates; it does not come apart.
+                dirs = _unit(torch.randn(n_cells, 3, generator=gen))
+                spd = torch.rand(n_cells, 1, generator=gen) * self.vel_init
+                vcell = dirs * spd
+                if self.vel_axes is not None:
+                    keep = torch.zeros(3)
+                    for ax in self.vel_axes:
+                        keep[int(ax)] = 1.0
+                    vcell = vcell * keep
+                per_piece = vcell[owner]                       # [n_pieces, 3]
+                plvl.state[:, vx0:vx1] = per_piece[pcpu].to(dev)
+                if "vel" in lvl.state_schema:
+                    lx0, lx1 = lvl.state_schema["vel"]
+                    lvl.state[:, lx0:lx1] = per_piece.to(dev)
+                print(f"[seed_cell_atlas] launch: |v| <= {self.vel_init:g} per cell, isotropic"
+                      + (f", axes {self.vel_axes}" if self.vel_axes else "")
+                      + f"; mean speed {float(spd.mean()):.4g}", flush=True)
+            else:
+                plvl.state[:, vx0:vx1] = 0.0
 
         # in place, so a captured CUDA graph keeps pointing at the same storage
         if hasattr(plvl, "p_vol"):
@@ -704,9 +776,9 @@ class SeedCellAtlas(Seed):
                 plvl.mass.copy_(plvl.p_vol * plvl.density)
             else:
                 plvl.mass.copy_(plvl.p_vol)
-        print(f"[seed_cell_atlas] {lvl.n:,} pieces / {plvl.n:,} material points "
-              f"({int(counts.min()):,}-{int(counts.max()):,} per piece), cell radius {R} about "
-              f"{[round(float(c), 4) for c in centre]}", flush=True)
+        print(f"[seed_cell_atlas] {n_cells} cell(s), {lvl.n:,} pieces / {plvl.n:,} material "
+              f"points ({int(counts.min()):,}-{int(counts.max()):,} per piece), cell radius {R}; "
+              f"{plvl.n // max(n_cells, 1):,} points per cell", flush=True)
         for line in report:
             print(f"[seed_cell_atlas]   {line}", flush=True)
         return {}
@@ -798,12 +870,12 @@ class AggregateCentroid(Aggregate):
         den = torch.zeros(parent.n, device=x.device, dtype=x.dtype)
         num.index_add_(0, pidx, x * w[:, None])
         den.index_add_(0, pidx, w)
-        cen = num / den.clamp_min(1e-12)[:, None]
+        centroid = num / den.clamp_min(1e-12)[:, None]
         px0, px1 = parent.state_schema["pos"]
         if torch.is_grad_enabled():
             # THE DIFFERENTIABLE PATH: clone, so the tape keeps the old state alive.
             st = parent.state.clone()
-            st[:, px0:px1] = torch.where(den[:, None] > 0, cen, st[:, px0:px1])
+            st[:, px0:px1] = torch.where(den[:, None] > 0, centroid, st[:, px0:px1])
             parent.state = st
         else:
             # THE FORWARD PATH WRITES IN PLACE, AND MUST. Reassigning `parent.state` allocates a
@@ -814,5 +886,5 @@ class AggregateCentroid(Aggregate):
             # dropping the CUDA graph" on the first tick -- for a write to `compartment`, a set
             # the substep never touches.
             old = parent.state[:, px0:px1]
-            parent.state[:, px0:px1] = torch.where(den[:, None] > 0, cen, old)
+            parent.state[:, px0:px1] = torch.where(den[:, None] > 0, centroid, old)
         return {}

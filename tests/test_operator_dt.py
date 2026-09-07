@@ -53,7 +53,7 @@ def _spheroid(dt, declared_dt=None, implementation=None):
         "sets": {"vertex": {"n": 2048, "mesh": "half_edge"},
                  "half_edge": {"n": 4096, "maps": {"srce": "vertex", "trgt": "vertex",
                                                 "face": "cell"}},
-                 "cell": {"n": 512, "state": {"area": {"width": 1}, "cen": {"width": 3},
+                 "cell": {"n": 512, "state": {"area": {"width": 1}, "centroid": {"width": 3},
                                               # `seed_mesh` lays these down on the CELL SET, so the
                                               # fixture declares them like any spec does.
                                               "Vbirth": {"width": 1, "record": False},

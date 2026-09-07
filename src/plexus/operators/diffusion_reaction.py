@@ -103,7 +103,7 @@ class CellGeometry3D(Aggregate):
     reaction-diffusion runs on.
 
     vertex -> cell: reads the half-edge table stashed on the vertex set and writes the cell set's
-    centroid `cen` and area, by scatter-add over half-edges.
+    centroid `centroid` and area, by scatter-add over half-edges.
 
         cen_f = (1/n_f) sum_{e in f} x_srce(e)          the face centroid
         A_f   = (1/2) | sum_{e in f} x_srce(e) x x_trgt(e) |
@@ -118,7 +118,7 @@ class CellGeometry3D(Aggregate):
     Reference: none -- a geometric readout, not a mechanism. Plexus (this work).
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
-    INPUTS = ["vertex"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["area", "cen"]
+    INPUTS = ["vertex"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["area", "centroid"]
     MECHANISM_TAGS = ["aggregate", "cell_geometry", "cross_scale"]
     REFERENCE = "Plexus (this work)."
 
@@ -132,10 +132,10 @@ class CellGeometry3D(Aggregate):
         if m is None:
             return {}
         pos = vlvl.get("pos")[:m["Nv"]]
-        area, _, cen, _ = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], m["nF"])
+        area, _, centroid, _ = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], m["nF"])
         nF = m["nF"]; st = clvl.state.clone(); sch = clvl.state_schema
-        if "cen" in sch:
-            i0, i1 = sch["cen"]; st[:nF, i0:i1] = cen.detach()
+        if "centroid" in sch:
+            i0, i1 = sch["centroid"]; st[:nF, i0:i1] = centroid.detach()
         if "area" in sch:
             i0, i1 = sch["area"]; st[:nF, i0:i1] = area.detach()[:, None]
         clvl.state = st
@@ -278,7 +278,7 @@ class CellRDSeed(Structural):
         # `H.level(self.vat)` unconditionally, so a spec with no `vertex` set died on
         # `KeyError: 'vertex'` -- and `SUPPORTED_DIMS` says [2, 3], so a flat 2D run is supposed to
         # be legal. All this operator wants from the mesh is nF, THE NUMBER OF CELLS; `scatter` and
-        # `noise` use no geometry whatever, and `patch`/`cones` already guard on `"cen" in
+        # `noise` use no geometry whatever, and `patch`/`cones` already guard on `"centroid" in
         # state_schema` and fall back to a uniform 0.02 without it. On a mesh-free set the cell
         # level IS the population, so its own occupancy answers the only question being asked.
         # `in` rather than `.get`: `H.levels` is an `nn.ModuleDict`, which has no `.get` -- the
@@ -298,16 +298,16 @@ class CellRDSeed(Structural):
         g = torch.Generator(device="cpu"); g.manual_seed(self.seed)
         if self.mode == "patch":                                # localized activation source (a bud/tube driver)
             a = torch.full((nF,), 0.02, device=dev)
-            if "cen" in clvl.state_schema:
-                ci0, ci1 = clvl.state_schema["cen"]; zc = clvl.state[:nF, ci0 + 2]
+            if "centroid" in clvl.state_schema:
+                ci0, ci1 = clvl.state_schema["centroid"]; zc = clvl.state[:nF, ci0 + 2]
                 a = torch.where(zc > self.patch_z * float(zc.max()), torch.ones(nF, device=dev), a)
             u = torch.ones(nF, device=dev)
         elif self.mode == "cones":                              # N FIXED radial activation cones (Fig 5 multi-tube):
             a = torch.full((nF,), 0.02, device=dev)             # each cone's tip stays activated as it extends ->
-            if "cen" in clvl.state_schema:                      # N radial tubes. Re-seeded every frame (tracks tips).
-                ci0, ci1 = clvl.state_schema["cen"]; cen = clvl.state[:nF, ci0:ci0 + 3]
-                d = cen / (cen.norm(dim=1, keepdim=True) + 1e-9)
-                dirs = torch.as_tensor(self._cone_dirs(), dtype=cen.dtype, device=dev)
+            if "centroid" in clvl.state_schema:                      # N radial tubes. Re-seeded every frame (tracks tips).
+                ci0, ci1 = clvl.state_schema["centroid"]; centroid = clvl.state[:nF, ci0:ci0 + 3]
+                d = centroid / (centroid.norm(dim=1, keepdim=True) + 1e-9)
+                dirs = torch.as_tensor(self._cone_dirs(), dtype=centroid.dtype, device=dev)
                 cosmax = (d @ dirs.T).max(dim=1).values
                 a = torch.where(cosmax > float(np.cos(np.radians(self.cone_deg))), torch.ones(nF, device=dev), a)
             u = torch.ones(nF, device=dev)
@@ -1398,8 +1398,8 @@ class ExtrusionForcing3D(Lateral):
         redpush = (self.K_extrude * a.clamp(min=0.0) * red)          # per-cell outward magnitude
         for _ in range(self.iters):
             force = torch.zeros(Nv, 3, device=dev, dtype=dt)
-            _, _, cen, _ = face_geometry_3d(x, es, et, ef, nF)
-            cdir = cen / (cen.norm(dim=-1, keepdim=True) + 1e-9)
+            _, _, centroid, _ = face_geometry_3d(x, es, et, ef, nF)
+            cdir = centroid / (centroid.norm(dim=-1, keepdim=True) + 1e-9)
             force.index_add_(0, es, (redpush[ef])[:, None] * cdir[ef] / 3.0)
             x = x + (self.eta * force).clamp(-cap, cap)
         vel = torch.zeros_like(x0)
@@ -1592,12 +1592,12 @@ class ShapeToChemCurvature(_ShapeToChemBase):
     MECHANISM_TAGS = _ShapeToChemBase.MECHANISM_TAGS + ["curvature_sensing"]
 
     def _feature(self, pt, m, es, et, ef, nF):
-        area, _, cen, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
+        area, _, centroid, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
                                            torch.as_tensor(et), torch.as_tensor(ef), nF)
-        cen = cen.numpy()
+        centroid = centroid.numpy()
         nrm = np.zeros((nF, 3))                        # Newell normal per cell, outward
         for a, b, f in zip(es, et, ef):
-            nrm[f] += np.cross(pt[a] - cen[f], pt[b] - cen[f])
+            nrm[f] += np.cross(pt[a] - centroid[f], pt[b] - centroid[f])
         ln = np.linalg.norm(nrm, axis=1, keepdims=True)
         nrm = nrm / np.maximum(ln, 1e-12)
         src, dst = _cell_adjacency(es, et, ef, nF)
@@ -1606,9 +1606,9 @@ class ShapeToChemCurvature(_ShapeToChemBase):
         deg = np.bincount(src, minlength=nF).astype(float)
         nb = np.zeros((nF, 3))
         for d in range(3):
-            nb[:, d] = np.bincount(src, weights=cen[dst][:, d], minlength=nF)
+            nb[:, d] = np.bincount(src, weights=centroid[dst][:, d], minlength=nF)
         nb /= np.maximum(deg, 1)[:, None]
-        delta = nb - cen                                # umbrella vector
+        delta = nb - centroid                                # umbrella vector
         # Divide by the NEIGHBOUR SPACING squared, not by |delta|^2. On a sphere the tangential
         # parts of the umbrella cancel, so |delta| is itself only ~L^2/2R -- dividing by it gives
         # 2R/L^2, which GROWS with radius. That reads as 1/R only if you hold the cell count fixed
@@ -1616,7 +1616,7 @@ class ShapeToChemCurvature(_ShapeToChemBase):
         # test. With the spacing: delta.n = -L^2/2R, so H = 2 (delta.n) / L^2 = 1/R. Correct, and
         # now independent of how finely the sphere is meshed.
         sp = np.zeros(nF)
-        np.add.at(sp, src, np.linalg.norm(cen[dst] - cen[src], axis=1))
+        np.add.at(sp, src, np.linalg.norm(centroid[dst] - centroid[src], axis=1))
         L = sp / np.maximum(deg, 1)
         return -2.0 * (delta * nrm).sum(1) / np.maximum(L ** 2, 1e-12)
 
@@ -1756,9 +1756,9 @@ if __name__ == "__main__":
         g = np.exp(-((u[:, 2] - 1.0) ** 2) / (2 * 0.05 ** 2))
         w = v + amp * g[:, None] * u
         h = op._feature(w, m, es, et, ef, nF)
-        _, _, cen, _ = face_geometry_3d(torch.as_tensor(w), torch.as_tensor(es),
+        _, _, centroid, _ = face_geometry_3d(torch.as_tensor(w), torch.as_tensor(es),
                                         torch.as_tensor(et), torch.as_tensor(ef), nF)
-        top = cen.numpy()[:, 2] > 0.90 * np.linalg.norm(cen.numpy(), axis=1)
+        top = centroid.numpy()[:, 2] > 0.90 * np.linalg.norm(centroid.numpy(), axis=1)
         d = float(np.median(h[top]) - np.median(h[~top]))
         print(f"        {tag:7} curvature at the feature minus elsewhere: {d:+.4f}")
         chk((d > 0) if amp > 0 else (d < 0), f"a {tag} reads the right SIGN")

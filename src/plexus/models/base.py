@@ -650,7 +650,7 @@ class Hierarchy(nn.Module):
         # `ModuleDict` now, so the two cannot diverge again.
         #
         # WHAT IT COST. From the first death, the cell set's `chem` no longer lines up with the
-        # faces. `cell_geometry` rewrites `cen`, `area` and `occ` from `nF` every tick, so those
+        # faces. `cell_geometry` rewrites `centroid`, `area` and `occ` from `nF` every tick, so those
         # self-heal a tick later; `chem` has no rewriter and stays permanently mis-indexed. On
         # r023_07 the two sides run bit-identical through the first two extrusions and diverge at
         # the third, and the activator goes non-finite at frame 889.

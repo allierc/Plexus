@@ -260,14 +260,14 @@ class MeshContact(Lateral):
         # source, so a scatter-mean over `E_srce` is the polygon's centroid with no ring ordering
         # required -- and the ordering is exactly what a re-meshed tissue does not hand over.
         cnt = torch.bincount(ef, minlength=nF).clamp_min(1)
-        cen = torch.zeros(nF, 3, device=dev, dtype=dt_)
-        cen.index_add_(0, ef, V[es])
-        cen = cen / cnt[:, None].to(dt_)
+        centroid = torch.zeros(nF, 3, device=dev, dtype=dt_)
+        centroid.index_add_(0, ef, V[es])
+        centroid = centroid / cnt[:, None].to(dt_)
         # ONE TRIANGLE PER HALF-EDGE: (face centroid, source vertex, target vertex). A fan, but
         # built from the half-edge list rather than from a ring, so it is correct for a polygon of
         # any size and needs no ordering. The centroid is a VIRTUAL vertex: whatever reaction it
         # receives is handed to the face's real vertices, equally, at the end.
-        A, B, C = cen[ef], V[es], V[et]
+        A, B, C = centroid[ef], V[es], V[et]
         nrm = torch.cross(B - A, C - A, dim=1)
         nrm = nrm / nrm.norm(dim=1, keepdim=True).clamp_min(1e-20)
         # OUTWARD, DECIDED BY THE STAR-SHAPE. The mesh is centroid-referenced, so a face's own
@@ -822,11 +822,11 @@ class BMSense3D(Structural):
         e_s, e_f = es[live].long(), ef[live].long()
         cnt = torch.zeros(nF, device=dev, dtype=dt_).index_add_(
             0, e_f, torch.ones_like(e_f, dtype=dt_))
-        cen = torch.zeros(nF, 3, device=dev, dtype=dt_).index_add_(0, e_f, pos[e_s].to(dt_))
+        centroid = torch.zeros(nF, 3, device=dev, dtype=dt_).index_add_(0, e_f, pos[e_s].to(dt_))
         ok = cnt > 0
-        cen[ok] /= cnt[ok, None]
-        origin = cen[ok].mean(0) if ok.any() else torch.zeros(3, device=dev, dtype=dt_)
-        d = cen - origin
+        centroid[ok] /= cnt[ok, None]
+        origin = centroid[ok].mean(0) if ok.any() else torch.zeros(3, device=dev, dtype=dt_)
+        d = centroid - origin
         u = d / d.norm(dim=1).clamp_min(1e-9)[:, None]
         M = self.P[self._t].to(dev, dt_)
         nth, nph = M.shape
@@ -1763,11 +1763,11 @@ class ECMGrowthGate3D(Structural):
         e_s, e_f = es[live].long(), ef[live].long()
         cnt = torch.zeros(nF, device=dev, dtype=dt_).index_add_(
             0, e_f, torch.ones_like(e_f, dtype=dt_))
-        cen = torch.zeros(nF, 3, device=dev, dtype=dt_).index_add_(0, e_f, pos[e_s].to(dt_))
+        centroid = torch.zeros(nF, 3, device=dev, dtype=dt_).index_add_(0, e_f, pos[e_s].to(dt_))
         ok = cnt > 0
-        cen[ok] /= cnt[ok, None]
-        origin = cen[ok].mean(0) if ok.any() else torch.zeros(3, device=dev, dtype=dt_)
-        d = cen - origin
+        centroid[ok] /= cnt[ok, None]
+        origin = centroid[ok].mean(0) if ok.any() else torch.zeros(3, device=dev, dtype=dt_)
+        d = centroid - origin
         r = d.norm(dim=1).clamp_min(1e-9)
         u = d / r[:, None]
         M = self.P[self._t].to(dev, dt_)

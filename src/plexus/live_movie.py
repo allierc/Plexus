@@ -977,6 +977,23 @@ class LiveMovie:
             pos = torch.as_tensor(lvl.get("pos")[:nv], dtype=torch.float64)
             a, _p, _c, _v = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], nF)
             a = a.numpy()
+            # `area` FOLLOWS `volume`'S RULE, AND FOR THE SAME REASON. What `face_geometry_3d`
+            # returns is the MID-SURFACE area, and on an apico-basal run the mid-surface is not a
+            # boundary of anything: the cell's surface is the polyhedron's -- two caps and one wall
+            # per ring edge -- and that is the `S` the energy's `kappa_s` integrates. A panel
+            # labelled "cell area" showing the area of a surface the cell does not have is the same
+            # defect the volume branch below documents, one term along in the same functional.
+            #
+            # Falls back to the mid-surface when the run carries no `sep`, where it IS the cell.
+            if q == "area":
+                _sa = lvl.get("sep")
+                if _sa is not None and int(_sa.shape[0]) >= nv:
+                    from plexus.operators.vertex_ops import apicobasal_geometry_3d
+                    _ss = torch.as_tensor(np.asarray(_sa[:nv].detach().cpu()
+                                                     if hasattr(_sa, "detach") else _sa[:nv]),
+                                          dtype=torch.float64)
+                    a = apicobasal_geometry_3d(pos, _ss, m["E_srce"], m["E_trgt"],
+                                               m["E_face"], nF)[1].numpy()
             if q == "volume":
                 # THE VOLUME THE ENERGY DEFENDS, WHICH ON AN APICO-BASAL RUN IS NOT `_v`.
                 # `face_geometry_3d` returns the origin-referenced WEDGE volume -- the cone from
@@ -1439,10 +1456,45 @@ class LiveMovie:
                     continue
                 skin = self.Skin(surf.points, X[sub], k=int(st.get("surface_k", 8)))
                 col = to_rgb(tuple(pal[nm])) if nm in pal else (0.8, 0.8, 0.8)
-                self.p.add_mesh(surf, color=col,
+                # THE MATERIAL, NOT JUST THE ALPHA -- and it is the material that decides whether a
+                # membrane reads as GLASS or as frosted plastic. These four numbers were fixed at
+                # `ambient 0.22, diffuse 0.78, specular 0.3`, which is a matte plastic: ambient
+                # light is emitted regardless of angle, so a closed shell contributes 0.22 of its
+                # colour at EVERY pixel and does it twice (the near wall and the far one). At
+                # alpha 0.04 that is still a visible milky wash, which is why dropping the opacity
+                # alone stopped helping -- measured on the first contact sheet, where the 0.04 row
+                # was barely clearer than the 0.08 one.
+                #
+                # Water is the opposite: almost no ambient, little diffuse, a hard specular
+                # highlight. `backface_culling` completes it by drawing only the wall facing the
+                # camera, which halves the accumulated alpha AND is what makes the inside visible
+                # -- you look through the near surface at the organelles, not at the far surface
+                # through the near one.
+                _m = (_per.get(nm) or {})
+                _act = self.p.add_mesh(surf, color=col,
                                 opacity=float(opa.get(nm, _dflt_op)),
-                                smooth_shading=True, specular=0.3, specular_power=24,
-                                ambient=0.22, diffuse=0.78, show_scalar_bar=False)
+                                smooth_shading=True,
+                                specular=float(_m.get("specular", st.get("surface_specular", 0.3))),
+                                # CLAMPED, because VTK's range is (0, 128] and pyvista RAISES
+                                # outside it -- which this class swallows, so a spec asking for a
+                                # harder highlight silently lost its whole surface and fell back to
+                                # a point cloud. Measured: `specular_power: 160` on the membrane
+                                # dropped all six reconstructed compartments in one panel.
+                                specular_power=min(128.0, max(1e-3, float(
+                                    _m.get("specular_power",
+                                           st.get("surface_specular_power", 24))))),
+                                ambient=float(_m.get("ambient", st.get("surface_ambient", 0.22))),
+                                diffuse=float(_m.get("diffuse", st.get("surface_diffuse", 0.78))),
+                                show_scalar_bar=False)
+                # BACKFACE CULLING IS AN ACTOR PROPERTY, not an `add_mesh` keyword -- pyvista's
+                # signature has no such argument in this version, so passing it raised and the
+                # whole compartment fell back to dots. Set on the actor, where VTK keeps it.
+                if bool(_m.get("backface_culling",
+                               st.get("surface_backface_culling", False))):
+                    try:
+                        _act.prop.backface_culling = True
+                    except Exception:                            # noqa: BLE001
+                        _act.GetProperty().BackfaceCullingOn()
                 self._skins.append({"kind": "surface", "surf": surf, "skin": skin, "sub": sub,
                                     "name": nm, "n": int(sel.size),
                                     "faces": int(surf.n_faces_strict)})
@@ -2664,6 +2716,11 @@ class _ReplayLevel:
         pn = z[f"{name}__parent_name"] if f"{name}__parent_name" in z.files else None
         self.parent_name = None if pn is None else str(pn)
         self.C = self.F = None                        # not stored in a trajectory -- see above
+        # EVERY RECORDED STATE BLOCK OF THIS SET, so `get` can serve them -- see `get`.
+        _skip = ("pos", "occ", "node_type", "parent", "parent_name")
+        self._blocks = {k[len(name) + 2:]: np.asarray(z[k]) for k in z.files
+                        if k.startswith(f"{name}__") and "__mesh_" not in k
+                        and k[len(name) + 2:] not in _skip}
         # THE CELL SET'S RECORDED BLOCKS, for a set that has a mesh. `cell_set` is the name the
         # spec declared and `replay` passed down; the structural arrays are excluded by name
         # because they are not per-cell quantities. See `cell_cols`.
@@ -2794,11 +2851,30 @@ class _ReplayLevel:
         return None if self._occ is None else self._occ[self.t]
 
     def get(self, key):
+        """Any RECORDED state block of this set at the current frame, not just `pos` and `occ`.
+
+        THIS RETURNED None FOR EVERYTHING ELSE, AND A CURVE FELL BACK WITHOUT SAYING SO. The
+        `volume` curve asks for `sep` to compute the polyhedron volume -- the one the energy
+        defends -- and falls back to the origin-referenced WEDGE volume when a run carries no
+        separation. On the replay path `sep` is in the trajectory but this method did not serve it,
+        so every saved movie and every `3d.png` plotted the wedge under a panel labelled "cell
+        volume". The wedge is a cone from the world origin to the cell's ring, so its spread is
+        dominated by WHERE a cell sits on the shell rather than by how big it is: on
+        `cv_target_uniform` the panel showed a band of about +/-4 on a mean of 1.4, while the cells'
+        actual volumes were 1.3725 +/- 0.0080 -- a tissue that is uniform to half a percent drawn
+        as one that is not uniform at all.
+
+        The live pass reads the real `Level` and was always right, so the two passes disagreed and
+        only the wrong one was kept. That is the same live-versus-replay split that hid the
+        cell-cycle phase colours, and the same fix: ask the file what it has instead of listing
+        names.
+        """
         if key == "pos":
             return self._pos[self.t]
         if key == "occ" and self._occ is not None:
             return self._occ[self.t]
-        return None
+        a = self._blocks.get(key)
+        return None if a is None else a[self.t]
 
 
 class _ReplayState:
@@ -2806,7 +2882,7 @@ class _ReplayState:
 
     def __init__(self, z, dev, cell_sets=None):
         # EVERY SET'S TYPES, not only the sets that carry positions. A vertex model's `cell` set has
-        # `cen`/`area`/`node_type` and NO `pos`, so it never becomes a level here -- and the curve's
+        # `centroid`/`area`/`node_type` and NO `pos`, so it never becomes a level here -- and the curve's
         # per-type split, which indexes faces by the cell set's node_type, silently collapsed to one
         # series. The types are in the file either way.
         self.node_types = {k[: -len("__node_type")]: np.asarray(z[k])

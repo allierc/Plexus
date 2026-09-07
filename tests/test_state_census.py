@@ -77,7 +77,7 @@ def test_the_census_names_what_is_left_rather_than_claiming_none():
     nF = int(m["nF"])
     own = {"E_srce", "E_trgt", "E_face", "nF", "Nv", "n_t1", "n_apop", "n_div", "div_blocked",
            "apop_spill", "renumber_failed", "mono_h", "mono_k", "mono_delta", "buf_full",
-           "v_ref", "v_ref_poly", "R0", "face_carry", "vertex_carry", "mech", "cen_np",
+           "v_ref", "v_ref_poly", "R0", "face_carry", "vertex_carry", "mech", "centroid_np",
            "apop_marked_once"}
     per_cell = []
     for k in sorted(m.keys()):
