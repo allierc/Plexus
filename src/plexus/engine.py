@@ -716,14 +716,37 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
     # unchanged; the assignment below uses the count itself, so it is exact by construction and
     # not by the arithmetic happening to round the right way.
     counted = all("count" in t for t in type_list)
-    start = 0
-    for tid, t in enumerate(type_list):
-        if counted:
-            k = int(t["count"])
-        else:
-            # last type absorbs the remainder, so per-type rounding never leaves nodes unassigned
-            k = (total - start) if tid == len(type_list) - 1 else int(round(t["fraction"] * total))
-        node_type[perm[start:start + k]] = tid; start += k
+    # A COUNT ON A CONTAINED SET IS PER PARENT, and it has to be, because that is what
+    # `per_parent` -- the number the schema makes it add up to -- already means. Assigned over the
+    # WHOLE level with one permutation, 25 cells sharing 27,600 compartments would each receive a
+    # MULTINOMIAL DRAW of each organelle rather than the atlas: one cell with 431 membrane patches
+    # and 129 nuclear ones, the next with 410 and 147, and nothing saying so. The inventory is a
+    # property of a cell, so it is tiled per cell and shuffled INSIDE each cell's block.
+    #
+    # The blocks are contiguous and in parent order (`repeat_interleave` in build's pass 2), so a
+    # parent's rows are `[b*per, (b+1)*per)`; the per-block shuffle is one argsort of a random
+    # matrix rather than a python loop over parents.
+    _per = s.get("per_parent")
+    if counted and "parent" in s and _per is not None and not isinstance(_per, dict):
+        per = int(_per) + int(s.get("grow_reserve", 0))
+        nblk = lvl.n // per
+        if nblk * per != lvl.n:
+            raise ValueError(f"{lvl.name}: {lvl.n} elements do not divide into blocks of {per}")
+        pat = torch.cat([torch.full((int(t["count"]),), tid, dtype=torch.long, device=device)
+                         for tid, t in enumerate(type_list)])
+        if pat.numel() < per:                       # a `grow_reserve` tail: dormant slots take type 0
+            pat = torch.cat([pat, torch.zeros(per - pat.numel(), dtype=torch.long, device=device)])
+        order = torch.argsort(torch.rand(nblk, per, generator=H.rng, device=device), dim=1)
+        node_type = pat[order].reshape(-1)
+    else:
+        start = 0
+        for tid, t in enumerate(type_list):
+            if counted:
+                k = int(t["count"])
+            else:
+                # last type absorbs the remainder, so per-type rounding never leaves nodes unassigned
+                k = (total - start) if tid == len(type_list) - 1 else int(round(t["fraction"] * total))
+            node_type[perm[start:start + k]] = tid; start += k
     lvl.register_buffer("node_type", node_type)
     if all("p" in t for t in types.values()):
         P = torch.tensor([list(t["p"]) for t in types.values()], dtype=torch.float32, device=device)

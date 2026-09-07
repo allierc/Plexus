@@ -24,7 +24,7 @@ sets:
       chem:
         width: 4
         integration: first_order
-      cen:
+      centroid:
         width: 3
       area:
         width: 1

@@ -36,7 +36,7 @@ sets:
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       Vbirth:
         width: 1
@@ -132,8 +132,7 @@ seed:
   seed: 0
   vseed_cv: 0.15
   model: apicobasal
-  h0: 0.4
-
+  h0: 0.88
 plotting:
   renderer: vtk_points
   background: black

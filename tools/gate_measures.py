@@ -11,7 +11,7 @@ WHAT IS IN A CORE TRAJECTORY, since every function here is bounded by it:
 
     <set>__pos              [T, buffer, D]      positions, the live prefix given by nF/Nv
     <set>__occ              [T, buffer]         bool
-    <set>__<block>          [T, buffer, width]  every recorded state block (chem, area, cen, ...)
+    <set>__<block>          [T, buffer, width]  every recorded state block (chem, area, centroid, ...)
     <set>__mesh_offsets     [T+1]               HALF-EDGE row offsets
     <set>__mesh_face_offsets[T+1]               FACE row offsets -- a DIFFERENT ragged length
     <set>__mesh_nF/_Nv      [T]
@@ -361,7 +361,7 @@ def topology_ledger(T, **kw):
     return out or [0]
 
 
-def nonfinite_count(T, blocks=("chem", "area", "cen"), vblocks=(), **kw):
+def nonfinite_count(T, blocks=("chem", "area", "centroid"), vblocks=(), **kw):
     """Non-finite entries in `pos`, in the named CELL blocks, and in the named VERTEX blocks.
 
     `vblocks` DEFAULTS TO EMPTY so every gate that already declares this row is unchanged, and
@@ -572,11 +572,11 @@ def polyhedron_volume_closure(T, name="sep", **kw):
         es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
         pos = T.pos(t); nF = T.nF(t)
         a, b = pos + sep, pos - sep
-        cen = np.zeros((nF, 3)); cnt = np.zeros(nF)
-        np.add.at(cen, ef, pos[es]); np.add.at(cnt, ef, 1.0)
-        cen /= np.maximum(cnt, 1.0)[:, None]
+        centroid = np.zeros((nF, 3)); cnt = np.zeros(nF)
+        np.add.at(centroid, ef, pos[es]); np.add.at(cnt, ef, 1.0)
+        centroid /= np.maximum(cnt, 1.0)[:, None]
         v_o = _cell_polyhedron_volume(a, b, es, et, ef, nF, np.zeros((nF, 3)))
-        v_c = _cell_polyhedron_volume(a, b, es, et, ef, nF, cen)
+        v_c = _cell_polyhedron_volume(a, b, es, et, ef, nF, centroid)
         d = np.abs(v_o - v_c) / np.maximum(np.abs(v_c), 1e-12)
         out.append(float(np.nanmax(d)) if d.size else 0.0)
     return out
@@ -626,10 +626,10 @@ def _cap_fan_area(p, es, et, ef, nF):
     into one. The two agree exactly on a planar convex ring, which is why AB-C1 and AB-C2 did not
     notice and a curved shell did.
     """
-    cen = np.zeros((nF, 3)); cnt = np.zeros(nF)
-    np.add.at(cen, ef, p[es]); np.add.at(cnt, ef, 1.0)
-    cen /= np.maximum(cnt, 1.0)[:, None]
-    tri = 0.5 * np.linalg.norm(np.cross(p[es] - cen[ef], p[et] - cen[ef]), axis=1)
+    centroid = np.zeros((nF, 3)); cnt = np.zeros(nF)
+    np.add.at(centroid, ef, p[es]); np.add.at(cnt, ef, 1.0)
+    centroid /= np.maximum(cnt, 1.0)[:, None]
+    tri = 0.5 * np.linalg.norm(np.cross(p[es] - centroid[ef], p[et] - centroid[ef]), axis=1)
     out = np.zeros(nF); np.add.at(out, ef, tri)
     return out
 
@@ -666,10 +666,10 @@ def _cell_geom(T, t, name="sep"):
     es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
     pos = T.pos(t); nF = T.nF(t)
     a, b = pos + sep, pos - sep
-    cen = np.zeros((nF, 3)); cnt = np.zeros(nF)
-    np.add.at(cen, ef, pos[es]); np.add.at(cnt, ef, 1.0)
-    cen /= np.maximum(cnt, 1.0)[:, None]
-    V = _cell_polyhedron_volume(a, b, es, et, ef, nF, cen)
+    centroid = np.zeros((nF, 3)); cnt = np.zeros(nF)
+    np.add.at(centroid, ef, pos[es]); np.add.at(cnt, ef, 1.0)
+    centroid /= np.maximum(cnt, 1.0)[:, None]
+    V = _cell_polyhedron_volume(a, b, es, et, ef, nF, centroid)
     S, _, _ = _cell_polyhedron_surface(a, b, es, et, ef, nF)
     return V, S, _newell_area(pos, es, et, ef, nF), _cell_thickness(sep, es, ef, nF)
 
@@ -1320,12 +1320,12 @@ def mean_cell_diameter(T, **kw):
         live = ef < nF
         a, b, f = np.asarray(es)[live], np.asarray(et)[live], np.asarray(ef)[live]
         # each face's centroid, as the mean of its own half-edge sources
-        cen = np.zeros((nF, 3))
+        centroid = np.zeros((nF, 3))
         cnt = np.zeros(nF)
-        np.add.at(cen, f, p[a])
+        np.add.at(centroid, f, p[a])
         np.add.at(cnt, f, 1.0)
-        cen /= np.maximum(cnt, 1)[:, None]
-        tri = 0.5 * np.linalg.norm(np.cross(p[a] - cen[f], p[b] - cen[f]), axis=1)
+        centroid /= np.maximum(cnt, 1)[:, None]
+        tri = 0.5 * np.linalg.norm(np.cross(p[a] - centroid[f], p[b] - centroid[f]), axis=1)
         area = np.zeros(nF)
         np.add.at(area, f, tri)
         out.append(float(np.sqrt(area.mean())))

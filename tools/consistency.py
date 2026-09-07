@@ -59,7 +59,7 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 MESH_OWN = {"E_srce", "E_trgt", "E_face", "nF", "Nv",
             "n_t1", "n_apop", "n_div", "div_blocked", "apop_spill", "renumber_failed",
             "mono_h", "mono_k", "mono_delta", "buf_full", "v_ref", "v_ref_poly", "R0",
-            "face_carry", "vertex_carry", "mech", "cen_np", "apop_marked_once"}
+            "face_carry", "vertex_carry", "mech", "centroid_np", "apop_marked_once"}
 
 
 def _live(x):
