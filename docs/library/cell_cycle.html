@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.26">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>cell_cycle – Plexus</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b758ccaa5987ceb1b75504551e579abf.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-70408cb9dc52a2002c2463371a30459f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Plexus</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../language.html"> 
+<span class="menu-text">Language</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="../library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../optimization.html"> 
+<span class="menu-text">Optimization</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../inverse.html"> 
+<span class="menu-text">Inverse problem</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+    <a href="https://github.com/allierc/Plexus" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
+  <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
+  <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
+  <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
+  <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">cell_cycle</h1>
+<p class="subtitle lead">G1 -&gt; S -&gt; G2 -&gt; M as per-cell STATE, advanced by a declared rule.</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="op-head">
+<p><img src="../figures/icons/lateral.png" class="op-logo img-fluid"></p>
+<p><span class="op-badge"><code>lateral</code></span> <span class="op-badge"><code>acts on: vertex</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
+<p>G1 -&gt; S -&gt; G2 -&gt; M as per-cell STATE, advanced by a declared rule.</p>
+</div>
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+<section id="role-in-plexus" class="level2">
+<h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
+<ul>
+<li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
+<li><strong>Acts on</strong> — <code>vertex</code> (the set the operator acts on).</li>
+<li><strong>Reads</strong> — –</li>
+<li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
+<li><strong>Prediction</strong> — <code>none</code>.</li>
+<li><strong>Dimensions</strong> — 3D.</li>
+</ul>
+</section>
+<section id="mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
+<p>WHY THIS IS ITS OWN CONTRACT AND NOT A <code>model:</code> OF <code>cell_divide</code>, by this repo’s own two tests. <code>cell_divide._trigger</code>’s docstring says “THE ONLY THING A <code>model=</code> VARIANT OF cell_divide CHANGES” is the trigger, and a four-phase machine is not a trigger – it is state, transitions and its own couplings. And AXES.md’s second test is decisive: “a variant that needs a second SET or a second state BLOCK is making a different claim”. A cycle needs <code>phase</code>. So it cannot live on that contract, and the split is the same one already drawn between <code>cell_grow</code> (what the cell ASKS for) and <code>cell_divide</code> (what the topology DOES): this operator says when a cell is ready, <code>cell_divide[model: cycle]</code> performs the division.</p>
+<pre><code>cycle_progress  p: the cell's continuous position through one cycle, 0 at birth, 1 at
+                the end of M. THIS is the state; the operator returns dp/dt and the engine
+                integrates it, like any other lateral.
+phase           0 = G1, 1 = S, 2 = G2, 3 = M -- read off `p` by the phase boundaries, so it
+                holds nothing `p` does not. Kept because it is what the renderer colours by
+                and what `cell_divide[model: cycle]` triggers on.
+phase_t         time spent in the current phase. A readout: nothing consults it any more.</code></pre>
+<p>THE PHASE DURATIONS ARE NOT EQUAL AND THE DEFAULTS SAY SO. A mammalian cycle of about 24 h runs roughly G1 11 h, S 8 h, G2 4 h, M 1 h, so the defaults are in that proportion (110/80/40/10 of 240 frames). It matters for more than realism: <strong>G1 is where nearly all the variability lives</strong>, and every model below differs ONLY in how a cell leaves G1. S, G2 and M are clocks in all of them, which is what the measurements report and also what makes the models comparable – one transition changes, so a difference between two runs has one possible cause.</p>
+<p>WHERE THE STATE LIVES. <code>phase_t</code>, <code>cyc_inhib</code> and <code>cyc_vprev</code> are declared width-1 blocks on the CELL SET and must appear under <code>sets.&lt;cell_set&gt;.state</code> or this operator refuses to run – see <code>cell_block</code>. <code>phase</code> is still a column on the mesh table, because it is recorded and drawn and moving a recorded array renames a trajectory key; that is a separate rung.</p>
+<p>WHAT THE DAUGHTERS INHERIT, AND THE TRAP IN IT. Both stores copy the parent’s value onto BOTH daughters – <code>m["face_carry"]</code> through <code>keep</code>, the cell set through <code>cell_divide</code>’s <code>cst[nF + i] = cst[mother]</code> – so what is carried must be INTENSIVE. <code>phase</code> (a label) and <code>phase_t</code> (a time) are; an inhibitor AMOUNT would not be, and would double at every division. That is why <code>inhibitor_dilution</code> below stores a CONCENTRATION and dilutes it by the volume ratio, which is also the physically right thing: halving the volume and halving the amount leaves the concentration where it was.</p>
+<p>RESET IS DETECTED, NOT SIGNALLED. A cell that has just divided is the one carrying <code>age == 0</code> while its inherited phase is still M – <code>cell_divide</code> zeroes <code>age</code> for both daughters and the carry copies M onto them – so the reset needs no second channel between the two operators and cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.</p>
+</section>
+<section id="parameters" class="level2">
+<h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>role</th>
+<th>default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>t_g1</code></td>
+<td>G1 duration, frames</td>
+<td>110.0</td>
+</tr>
+<tr class="even">
+<td><code>t_s</code></td>
+<td>S duration, frames</td>
+<td>80.0</td>
+</tr>
+<tr class="odd">
+<td><code>t_g2</code></td>
+<td>G2 duration, frames</td>
+<td>40.0</td>
+</tr>
+<tr class="even">
+<td><code>t_m</code></td>
+<td>M duration, frames</td>
+<td>10.0</td>
+</tr>
+<tr class="odd">
+<td><code>g1_size</code></td>
+<td>G1 exit threshold, in units of v_ref</td>
+<td>1.6</td>
+</tr>
+<tr class="even">
+<td><code>phase_cv</code></td>
+<td>per-cell CV on the phase durations</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td><code>seed_async</code></td>
+<td>start the population spread over the cycle</td>
+<td>True</td>
+</tr>
+<tr class="even">
+<td><code>seed</code></td>
+<td>–</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="minimal-spec" class="level2">
+<h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> cell_cycle</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> vertex</span><span class="kw">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="mechanism-search-tags" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>cell_cycle</code></span> <span class="op-badge"><code>G1_S_G2_M</code></span> <span class="op-badge"><code>phase_progression</code></span> <span class="op-badge"><code>restriction_point</code></span> <span class="op-badge"><code>size_checkpoint</code></span></p>
+</section>
+<section id="related-operators" class="level2">
+<h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
+<p>Other <strong>lateral</strong> operators: <a href="../library/attraction_repulsion.html"><code>attraction_repulsion</code></a>, <a href="../library/squared_law.html"><code>squared_law</code></a>, <a href="../library/cohesion.html"><code>cohesion</code></a>, <a href="../library/separation.html"><code>separation</code></a>, <a href="../library/velocity_align.html"><code>velocity_align</code></a>, <a href="../library/alignment.html"><code>alignment</code></a>.</p>
+</section>
+<section id="source" class="level2">
+<h2 class="anchored" data-anchor-id="source">Source</h2>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/vertex_ops.py"><code>src/plexus/operators/vertex_ops.py</code></a> — the registered operator.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"cell_cycle"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"vertex"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>, family<span class="op">=</span><span class="st">"population"</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> CellCycle3D(Lateral):</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""G1 -&gt; S -&gt; G2 -&gt; M as per-cell STATE, advanced by a declared rule. It divides nothing.</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">    WHY THIS IS ITS OWN CONTRACT AND NOT A `model:` OF `cell_divide`, by this repo's own two tests.</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">    `cell_divide._trigger`'s docstring says "THE ONLY THING A `model=` VARIANT OF cell_divide</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co">    CHANGES" is the trigger, and a four-phase machine is not a trigger -- it is state, transitions</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co">    and its own couplings. And AXES.md's second test is decisive: "a variant that needs a second SET</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co">    or a second state BLOCK is making a different claim". A cycle needs `phase`. So it cannot live</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co">    on that contract, and the split is the same one already drawn between `cell_grow` (what the cell</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">    ASKS for) and `cell_divide` (what the topology DOES): this operator says when a cell is ready,</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co">    `cell_divide[model: cycle]` performs the division.</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co">        cycle_progress  p: the cell's continuous position through one cycle, 0 at birth, 1 at</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co">                        the end of M. THIS is the state; the operator returns dp/dt and the engine</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="co">                        integrates it, like any other lateral.</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co">        phase           0 = G1, 1 = S, 2 = G2, 3 = M -- read off `p` by the phase boundaries, so it</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="co">                        holds nothing `p` does not. Kept because it is what the renderer colours by</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co">                        and what `cell_divide[model: cycle]` triggers on.</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co">        phase_t         time spent in the current phase. A readout: nothing consults it any more.</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="co">    THE PHASE DURATIONS ARE NOT EQUAL AND THE DEFAULTS SAY SO. A mammalian cycle of about 24 h runs</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="co">    roughly G1 11 h, S 8 h, G2 4 h, M 1 h, so the defaults are in that proportion (110/80/40/10 of</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="co">    240 frames). It matters for more than realism: **G1 is where nearly all the variability lives**,</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="co">    and every model below differs ONLY in how a cell leaves G1. S, G2 and M are clocks in all of</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="co">    them, which is what the measurements report and also what makes the models comparable -- one</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="co">    transition changes, so a difference between two runs has one possible cause.</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a><span class="co">    WHERE THE STATE LIVES. `phase_t`, `cyc_inhib` and `cyc_vprev` are declared width-1 blocks on</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="co">    the CELL SET and must appear under `sets.&lt;cell_set&gt;.state` or this operator refuses to run --</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a><span class="co">    see `cell_block`. `phase` is still a column on the mesh table, because it is recorded and drawn</span></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a><span class="co">    and moving a recorded array renames a trajectory key; that is a separate rung.</span></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a><span class="co">    WHAT THE DAUGHTERS INHERIT, AND THE TRAP IN IT. Both stores copy the parent's value onto BOTH</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a><span class="co">    daughters -- `m["face_carry"]` through `keep`, the cell set through `cell_divide`'s</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a><span class="co">    `cst[nF + i] = cst[mother]` -- so what is carried must be INTENSIVE. `phase` (a label) and</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a><span class="co">    `phase_t` (a time) are; an inhibitor AMOUNT would not be, and would double at every division.</span></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a><span class="co">    That is why `inhibitor_dilution` below stores a CONCENTRATION and dilutes it by the volume</span></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a><span class="co">    ratio, which is also the physically right thing: halving the volume and halving the amount</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a><span class="co">    leaves the concentration where it was.</span></span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a><span class="co">    RESET IS DETECTED, NOT SIGNALLED. A cell that has just divided is the one carrying `age == 0`</span></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a><span class="co">    while its inherited phase is still M -- `cell_divide` zeroes `age` for both daughters and the</span></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a><span class="co">    carry copies M onto them -- so the reset needs no second channel between the two operators and</span></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a><span class="co">    cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.</span></span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    <span class="co"># `MAY_MUTATE_INTEGRATED_STATE` IS STILL TRUE AFTER S4, AND THE DYNAMICS IS NO LONGER WHY.</span></span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Every per-frame quantity this operator produces -- `cycle_progress`, `phase`, `phase_t`,</span></span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>    <span class="co"># `cyc_inhib`, `cyc_vprev`, `cyc_rate` -- is returned as a delta on a declared block and</span></span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>    <span class="co"># integrated by the engine. What is left in place is ONE thing, and it happens once:</span></span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>    <span class="co">#</span></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>    <span class="co">#     `seed_async` draws the initial spread over the cycle and, with it, rescales `V0f` and</span></span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>    <span class="co">#     `Vbirth` so that a cell drawn mid-cycle has the volume of a cell mid-cycle. That is an</span></span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>    <span class="co">#     initial condition, not a rate, and it fires on tick 0 -- exactly the tick the invariant</span></span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>    <span class="co">#     checks. It belongs in `seed_mesh` and moving it is its own rung.</span></span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>    <span class="co">#</span></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>    <span class="co"># So the flag now names a seeding write rather than a dynamics one, which is a much smaller</span></span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a>    <span class="co"># claim than the one it used to make.</span></span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">3</span>]<span class="op">;</span> DIFFERENTIABLE <span class="op">=</span> <span class="va">False</span><span class="op">;</span> MAY_MUTATE_INTEGRATED_STATE <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"cell_cycle"</span>, <span class="st">"G1_S_G2_M"</span>, <span class="st">"phase_progression"</span>, <span class="st">"restriction_point"</span>,</span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"size_checkpoint"</span>]</span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> (<span class="st">"Ginzberg, M.B., Kafri, R. &amp; Kirschner, M.W. (2015). On being the right (cell) "</span></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"size. Science 348:1245075 (the G1 size checkpoint); Schmoller, K.M. et al. "</span></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"(2015). Dilution of the cell-cycle inhibitor Whi5 controls budding-yeast cell "</span></span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"size. Nature 526:268-272; Zatulovskiy, E. et al. (2020). Cell growth dilutes the "</span></span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"cell cycle inhibitor Rb to trigger cell division. Science 369:466-471; "</span></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"Smith, J.A. &amp; Martin, L. (1973). Do cells cycle? PNAS 70:1263-1267."</span>)</span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"t_g1"</span>: <span class="st">"G1 duration, frames"</span>, <span class="st">"t_s"</span>: <span class="st">"S duration, frames"</span>,</span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"t_g2"</span>: <span class="st">"G2 duration, frames"</span>, <span class="st">"t_m"</span>: <span class="st">"M duration, frames"</span>,</span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"g1_size"</span>: <span class="st">"G1 exit threshold, in units of v_ref"</span>,</span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"phase_cv"</span>: <span class="st">"per-cell CV on the phase durations"</span>,</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"seed_async"</span>: <span class="st">"start the population spread over the cycle"</span>}</span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>    G1, S, G2, M <span class="op">=</span> <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span></span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"vertex"</span>)<span class="op">;</span> <span class="va">self</span>._cat <span class="op">=</span> params.get(<span class="st">"cell_set"</span>)</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.t <span class="op">=</span> [<span class="bu">float</span>(params.get(<span class="st">"t_g1"</span>, <span class="fl">110.0</span>)), <span class="bu">float</span>(params.get(<span class="st">"t_s"</span>, <span class="fl">80.0</span>)),</span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a>                  <span class="bu">float</span>(params.get(<span class="st">"t_g2"</span>, <span class="fl">40.0</span>)), <span class="bu">float</span>(params.get(<span class="st">"t_m"</span>, <span class="fl">10.0</span>))]</span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.g1_size <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"g1_size"</span>, <span class="fl">1.6</span>))</span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.phase_cv <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"phase_cv"</span>, <span class="fl">0.0</span>))</span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.seed_async <span class="op">=</span> <span class="bu">bool</span>(params.get(<span class="st">"seed_async"</span>, <span class="va">True</span>))</span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.every <span class="op">=</span> _engine_owns_clock(params, default<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.seed <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"seed"</span>, <span class="dv">0</span>))</span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._rng <span class="op">=</span> np.random.default_rng(<span class="va">self</span>.seed <span class="op">+</span> <span class="dv">4242</span>)</span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a>    <span class="co"># ------------------------------------------------------------------ the rule</span></span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _g1_rate(<span class="va">self</span>, ctx):</span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""dp/dt THROUGH G1. THE ONLY THING A MODEL CHANGES; the base is the size checkpoint.</span></span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a><span class="co">        A cell leaves G1 when it is big enough, not when it is old enough: this is the restriction</span></span>
+<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a><span class="co">        point in mammalian cells and Start in budding yeast, and it is the transition Ginzberg et al.</span></span>
+<span id="cb3-93"><a href="#cb3-93" aria-hidden="true" tabindex="-1"></a><span class="co">        review as the one that has to be read on an ABSOLUTE scale for size control to work at all.</span></span>
+<span id="cb3-94"><a href="#cb3-94" aria-hidden="true" tabindex="-1"></a><span class="co">        `g1_size` is therefore in units of `v_ref`, the seed-time median cell volume, exactly as</span></span>
+<span id="cb3-95"><a href="#cb3-95" aria-hidden="true" tabindex="-1"></a><span class="co">        `cell_divide.factor` and `.delta` are.</span></span>
+<span id="cb3-96"><a href="#cb3-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-97"><a href="#cb3-97" aria-hidden="true" tabindex="-1"></a><span class="co">        AS A RATE, THE SIZER SAYS SOMETHING THE PREDICATE COULD NOT: progress through G1 IS volume</span></span>
+<span id="cb3-98"><a href="#cb3-98" aria-hidden="true" tabindex="-1"></a><span class="co">        accumulated toward the checkpoint. The cell needs to add `v* - v_birth` of volume to pass,</span></span>
+<span id="cb3-99"><a href="#cb3-99" aria-hidden="true" tabindex="-1"></a><span class="co">        it adds `dV/dt` of it per unit time, and G1 occupies the fraction `f_G1` of the cycle, so</span></span>
+<span id="cb3-100"><a href="#cb3-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-101"><a href="#cb3-101" aria-hidden="true" tabindex="-1"></a><span class="co">            dp/dt = f_G1 * (dV/dt) / (v* - v_birth),      v* = g1_size * v_ref</span></span>
+<span id="cb3-102"><a href="#cb3-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-103"><a href="#cb3-103" aria-hidden="true" tabindex="-1"></a><span class="co">        reaches exactly the G1/S boundary at exactly the moment the old predicate fired. A cell that</span></span>
+<span id="cb3-104"><a href="#cb3-104" aria-hidden="true" tabindex="-1"></a><span class="co">        is ALREADY past `v*` -- one born large, or one whose threshold moved -- is carried over the</span></span>
+<span id="cb3-105"><a href="#cb3-105" aria-hidden="true" tabindex="-1"></a><span class="co">        boundary within the step by the second term, which reproduces the predicate's own answer for</span></span>
+<span id="cb3-106"><a href="#cb3-106" aria-hidden="true" tabindex="-1"></a><span class="co">        that case rather than making it wait for a volume increment it does not need.</span></span>
+<span id="cb3-107"><a href="#cb3-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-108"><a href="#cb3-108" aria-hidden="true" tabindex="-1"></a><span class="co">        `ctx` carries the per-cell arrays the models read: see `forward`, where it is built.</span></span>
+<span id="cb3-109"><a href="#cb3-109" aria-hidden="true" tabindex="-1"></a><span class="co">        """</span></span>
+<span id="cb3-110"><a href="#cb3-110" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE RATE IS SIGNED, AND THAT IS NOT AN OVERSIGHT. A cell that SHRINKS moves back through</span></span>
+<span id="cb3-111"><a href="#cb3-111" aria-hidden="true" tabindex="-1"></a>        <span class="co"># G1, because the predicate this replaces read the cell's volume NOW -- `v_now &gt;= v*` is</span></span>
+<span id="cb3-112"><a href="#cb3-112" aria-hidden="true" tabindex="-1"></a>        <span class="co"># false again the moment the cell falls back under the threshold, and progress that only</span></span>
+<span id="cb3-113"><a href="#cb3-113" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ever accumulated would be a ratchet the predicate never had. Measured with the ratchet in</span></span>
+<span id="cb3-114"><a href="#cb3-114" aria-hidden="true" tabindex="-1"></a>        <span class="co"># place, the sizer's population reached 2,289 cells against the predicate's 1,493 over 401</span></span>
+<span id="cb3-115"><a href="#cb3-115" aria-hidden="true" tabindex="-1"></a>        <span class="co"># frames, because cells banked every transient inflation and never paid it back.</span></span>
+<span id="cb3-116"><a href="#cb3-116" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ONE VOLUME CONVENTION, AND `Vbirth` IS NOT IN IT. `v_now` and `v_ref` are WEDGE volumes --</span></span>
+<span id="cb3-117"><a href="#cb3-117" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `face_geometry_3d`'s origin-referenced cones, which is what the predicate compared -- while</span></span>
+<span id="cb3-118"><a href="#cb3-118" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `Vbirth` is the POLYHEDRON volume `cell_divide` records (measured on this spec: v_ref</span></span>
+<span id="cb3-119"><a href="#cb3-119" aria-hidden="true" tabindex="-1"></a>        <span class="co"># 2.5433 against a Vbirth median of 1.6374, so `v* - Vbirth` was 2.43 where the wedge answer</span></span>
+<span id="cb3-120"><a href="#cb3-120" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is 1.53, and G1 was 60% too long). The distance a cell has to cover is stated in the</span></span>
+<span id="cb3-121"><a href="#cb3-121" aria-hidden="true" tabindex="-1"></a>        <span class="co"># reference's own units instead: it must add `(g1_size - 1)` of `v_ref` to pass, which is</span></span>
+<span id="cb3-122"><a href="#cb3-122" aria-hidden="true" tabindex="-1"></a>        <span class="co"># what an absolute size checkpoint at `g1_size * v_ref` means for a cell born at `v_ref`.</span></span>
+<span id="cb3-123"><a href="#cb3-123" aria-hidden="true" tabindex="-1"></a>        <span class="co"># (The two conventions are AB_R7R8_TODO section 0a and are not settled here.)</span></span>
+<span id="cb3-124"><a href="#cb3-124" aria-hidden="true" tabindex="-1"></a>        v_star <span class="op">=</span> <span class="va">self</span>.g1_size <span class="op">*</span> ctx[<span class="st">"v_ref"</span>]</span>
+<span id="cb3-125"><a href="#cb3-125" aria-hidden="true" tabindex="-1"></a>        need <span class="op">=</span> <span class="bu">max</span>((<span class="va">self</span>.g1_size <span class="op">-</span> <span class="fl">1.0</span>) <span class="op">*</span> ctx[<span class="st">"v_ref"</span>], <span class="fl">1e-9</span>)</span>
+<span id="cb3-126"><a href="#cb3-126" aria-hidden="true" tabindex="-1"></a>        r <span class="op">=</span> ctx[<span class="st">"f"</span>][<span class="va">self</span>.G1] <span class="op">*</span> ctx[<span class="st">"dv_dt"</span>] <span class="op">/</span> need</span>
+<span id="cb3-127"><a href="#cb3-127" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> np.where(ctx[<span class="st">"v_now"</span>] <span class="op">&gt;=</span> v_star, np.maximum(r, ctx[<span class="st">"to_boundary"</span>]), r)</span>
+<span id="cb3-128"><a href="#cb3-128" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-129"><a href="#cb3-129" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-130"><a href="#cb3-130" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.</span></span>
+<span id="cb3-131"><a href="#cb3-131" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cat <span class="op">=</span> resolve_cell_set(H, <span class="va">self</span>.at, <span class="bu">getattr</span>(<span class="va">self</span>, <span class="st">"_cat"</span>, <span class="va">None</span>))</span>
+<span id="cb3-132"><a href="#cb3-132" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> m <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="st">"_mesh"</span>, <span class="va">None</span>)</span>
+<span id="cb3-133"><a href="#cb3-133" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> m <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb3-134"><a href="#cb3-134" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}</span>
+<span id="cb3-135"><a href="#cb3-135" aria-hidden="true" tabindex="-1"></a>        nF <span class="op">=</span> <span class="bu">int</span>(m[<span class="st">"nF"</span>])<span class="op">;</span> dev <span class="op">=</span> lvl.state.device<span class="op">;</span> dt <span class="op">=</span> lvl.state.dtype</span>
+<span id="cb3-136"><a href="#cb3-136" aria-hidden="true" tabindex="-1"></a>        _np <span class="op">=</span> <span class="kw">lambda</span> k: (m[k].detach().cpu().numpy().astype(np.float64)     <span class="co"># noqa: E731</span></span>
+<span id="cb3-137"><a href="#cb3-137" aria-hidden="true" tabindex="-1"></a>                         <span class="cf">if</span> k <span class="kw">in</span> m <span class="kw">and</span> m[k] <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> <span class="va">None</span>)</span>
+<span id="cb3-138"><a href="#cb3-138" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ALL FOUR PER-CELL ARRAYS LIVE ON THE CELL SET -- see `cell_block`. `phase` joined them at</span></span>
+<span id="cb3-139"><a href="#cb3-139" aria-hidden="true" tabindex="-1"></a>        <span class="co"># S2b, which is the rung that also renamed its recorded key from `vertex__mesh_phase` to</span></span>
+<span id="cb3-140"><a href="#cb3-140" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `cell__phase` and taught both renderer paths to read it there. Nothing of this operator's</span></span>
+<span id="cb3-141"><a href="#cb3-141" aria-hidden="true" tabindex="-1"></a>        <span class="co"># state is on the mesh table any more, so `face_carry` is empty for a `cell_cycle` run and</span></span>
+<span id="cb3-142"><a href="#cb3-142" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the daughter-inheritance question is answered in one place: `cell_divide` copies the</span></span>
+<span id="cb3-143"><a href="#cb3-143" aria-hidden="true" tabindex="-1"></a>        <span class="co"># mother's whole cell-set row.</span></span>
+<span id="cb3-144"><a href="#cb3-144" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> _b <span class="kw">in</span> (<span class="st">"phase"</span>, <span class="st">"phase_t"</span>, <span class="st">"cyc_inhib"</span>, <span class="st">"cyc_vprev"</span>):</span>
+<span id="cb3-145"><a href="#cb3-145" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> cell_block(H, <span class="va">self</span>.cat, _b, nF) <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb3-146"><a href="#cb3-146" aria-hidden="true" tabindex="-1"></a>                <span class="cf">raise</span> <span class="pp">KeyError</span>(</span>
+<span id="cb3-147"><a href="#cb3-147" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"cell_cycle needs the set </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cat<span class="sc">!r}</span><span class="ss"> to declare the width-1 block </span><span class="sc">{</span>_b<span class="sc">!r}</span><span class="ss">. "</span></span>
+<span id="cb3-148"><a href="#cb3-148" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"Add it under `sets.</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cat<span class="sc">}</span><span class="ss">.state` -- `</span><span class="sc">{</span>_b<span class="sc">}</span><span class="ss">: </span><span class="ch">{{</span><span class="ss">width: 1, record: false</span><span class="ch">}}</span><span class="ss">` "</span></span>
+<span id="cb3-149"><a href="#cb3-149" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"-- for all four of phase, phase_t, cyc_inhib, cyc_vprev. `phase` is the "</span></span>
+<span id="cb3-150"><a href="#cb3-150" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"one that is RECORDED and drawn (0 = G1, 1 = S, 2 = G2, 3 = M); the other "</span></span>
+<span id="cb3-151"><a href="#cb3-151" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"three are the operator's own bookkeeping -- time in phase, inhibitor "</span></span>
+<span id="cb3-152"><a href="#cb3-152" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"concentration, last frame's volume -- and take `record: false`. All four "</span></span>
+<span id="cb3-153"><a href="#cb3-153" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"are declared because per-cell state belongs to the cell set, where the "</span></span>
+<span id="cb3-154"><a href="#cb3-154" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"topology operators already renumber it."</span>)</span>
+<span id="cb3-155"><a href="#cb3-155" aria-hidden="true" tabindex="-1"></a>        ph <span class="op">=</span> cell_block(H, <span class="va">self</span>.cat, <span class="st">"phase"</span>, nF)</span>
+<span id="cb3-156"><a href="#cb3-156" aria-hidden="true" tabindex="-1"></a>        pt <span class="op">=</span> cell_block(H, <span class="va">self</span>.cat, <span class="st">"phase_t"</span>, nF)</span>
+<span id="cb3-157"><a href="#cb3-157" aria-hidden="true" tabindex="-1"></a>        cc <span class="op">=</span> cell_block(H, <span class="va">self</span>.cat, <span class="st">"cyc_inhib"</span>, nF)</span>
+<span id="cb3-158"><a href="#cb3-158" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A DELTA IS MEASURED AGAINST WHAT THE BLOCK HOLDS, NOT AGAINST A LOCAL COPY OF IT, and the</span></span>
+<span id="cb3-159"><a href="#cb3-159" aria-hidden="true" tabindex="-1"></a>        <span class="co"># difference is the whole reason the async seed and the birth reset still work. Both of them</span></span>
+<span id="cb3-160"><a href="#cb3-160" aria-hidden="true" tabindex="-1"></a>        <span class="co"># SET a value -- `seed_async` scatters the population over the cycle, division puts a</span></span>
+<span id="cb3-161"><a href="#cb3-161" aria-hidden="true" tabindex="-1"></a>        <span class="co"># daughter back at (G1, 0) -- and under the old in-place write `set_cell_block` simply stored</span></span>
+<span id="cb3-162"><a href="#cb3-162" aria-hidden="true" tabindex="-1"></a>        <span class="co"># it. An operator that returns rates cannot store anything, so a set has to be expressed as</span></span>
+<span id="cb3-163"><a href="#cb3-163" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the rate that reaches it in one step: `(target - stored) / dt`. Measured against the</span></span>
+<span id="cb3-164"><a href="#cb3-164" aria-hidden="true" tabindex="-1"></a>        <span class="co"># post-seed LOCAL instead, the seed cancels itself and every cell starts at G1 with the</span></span>
+<span id="cb3-165"><a href="#cb3-165" aria-hidden="true" tabindex="-1"></a>        <span class="co"># population synchronised, which is exactly what `seed_async` exists to prevent.</span></span>
+<span id="cb3-166"><a href="#cb3-166" aria-hidden="true" tabindex="-1"></a>        ph_st, pt_st, cc_st <span class="op">=</span> ph.copy(), pt.copy(), cc.copy()</span>
+<span id="cb3-167"><a href="#cb3-167" aria-hidden="true" tabindex="-1"></a>        _seeded <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb3-168"><a href="#cb3-168" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE SEED FIRES ON `cyc_vprev == 0`, NOT ON A MISSING `phase`. A mesh column did not exist</span></span>
+<span id="cb3-169"><a href="#cb3-169" aria-hidden="true" tabindex="-1"></a>        <span class="co"># before its first write, so `phase is None` was a sound test for "this operator has not run</span></span>
+<span id="cb3-170"><a href="#cb3-170" aria-hidden="true" tabindex="-1"></a>        <span class="co"># yet". A declared block exists from the moment the set is built and reads 0.0, which is a</span></span>
+<span id="cb3-171"><a href="#cb3-171" aria-hidden="true" tabindex="-1"></a>        <span class="co"># LEGITIMATE phase (G1) -- so the old test would never fire and the population would start</span></span>
+<span id="cb3-172"><a href="#cb3-172" aria-hidden="true" tabindex="-1"></a>        <span class="co"># every cell at (G1, phase_t 0), the synchronised culture `seed_async` exists to avoid.</span></span>
+<span id="cb3-173"><a href="#cb3-173" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `cyc_vprev` is a volume: 0 is not a value any live cell can hold, and this operator is the</span></span>
+<span id="cb3-174"><a href="#cb3-174" aria-hidden="true" tabindex="-1"></a>        <span class="co"># only writer, so it is the one array whose zero unambiguously means "never written".</span></span>
+<span id="cb3-175"><a href="#cb3-175" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> np.<span class="bu">any</span>(cell_block(H, <span class="va">self</span>.cat, <span class="st">"cyc_vprev"</span>, nF) <span class="op">&gt;</span> <span class="fl">0.0</span>):</span>
+<span id="cb3-176"><a href="#cb3-176" aria-hidden="true" tabindex="-1"></a>            _seeded <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb3-177"><a href="#cb3-177" aria-hidden="true" tabindex="-1"></a>            <span class="co"># `seed_async` -- START THE POPULATION SOMEWHERE, NOT ALL AT THE SAME PLACE. Seeding</span></span>
+<span id="cb3-178"><a href="#cb3-178" aria-hidden="true" tabindex="-1"></a>            <span class="co"># every cell at (G1, phase_t 0) makes the tissue a synchronised culture: the first</span></span>
+<span id="cb3-179"><a href="#cb3-179" aria-hidden="true" tabindex="-1"></a>            <span class="co"># generation divides in one wave, the second in a slightly broader one, and the cell</span></span>
+<span id="cb3-180"><a href="#cb3-180" aria-hidden="true" tabindex="-1"></a>            <span class="co"># count comes out a staircase rather than a curve. A real tissue in steady state has as</span></span>
+<span id="cb3-181"><a href="#cb3-181" aria-hidden="true" tabindex="-1"></a>            <span class="co"># many cells just born as about to divide.</span></span>
+<span id="cb3-182"><a href="#cb3-182" aria-hidden="true" tabindex="-1"></a>            <span class="co">#</span></span>
+<span id="cb3-183"><a href="#cb3-183" aria-hidden="true" tabindex="-1"></a>            <span class="co"># THE THREE ARE DRAWN TOGETHER BECAUSE THEY ARE ONE QUANTITY. A cell's phase, its time</span></span>
+<span id="cb3-184"><a href="#cb3-184" aria-hidden="true" tabindex="-1"></a>            <span class="co"># in that phase and its size are not independent -- a cell in G2 has been growing</span></span>
+<span id="cb3-185"><a href="#cb3-185" aria-hidden="true" tabindex="-1"></a>            <span class="co"># longer than one in G1 and is bigger for it -- so drawing them separately would give a</span></span>
+<span id="cb3-186"><a href="#cb3-186" aria-hidden="true" tabindex="-1"></a>            <span class="co"># population that is desynchronised in the clock and synchronised in size, which is not</span></span>
+<span id="cb3-187"><a href="#cb3-187" aria-hidden="true" tabindex="-1"></a>            <span class="co"># a tissue and would make `cell_grow`'s first act a correction of the seed. One uniform</span></span>
+<span id="cb3-188"><a href="#cb3-188" aria-hidden="true" tabindex="-1"></a>            <span class="co"># draw `u` per cell over the WHOLE cycle sets all three:</span></span>
+<span id="cb3-189"><a href="#cb3-189" aria-hidden="true" tabindex="-1"></a>            <span class="co">#</span></span>
+<span id="cb3-190"><a href="#cb3-190" aria-hidden="true" tabindex="-1"></a>            <span class="co">#   u ~ U(0, 1)                  where this cell is through its cycle</span></span>
+<span id="cb3-191"><a href="#cb3-191" aria-hidden="true" tabindex="-1"></a>            <span class="co">#   phase, phase_t               the phase containing u * T, and the offset into it</span></span>
+<span id="cb3-192"><a href="#cb3-192" aria-hidden="true" tabindex="-1"></a>            <span class="co">#   V0f  &lt;-  V0f * (1 + u) / 1.5 volume grows v_b -&gt; 2 v_b across the cycle, so a cell</span></span>
+<span id="cb3-193"><a href="#cb3-193" aria-hidden="true" tabindex="-1"></a>            <span class="co">#                                at fraction u holds v_b (1 + u); the 1.5 is the mean</span></span>
+<span id="cb3-194"><a href="#cb3-194" aria-hidden="true" tabindex="-1"></a>            <span class="co">#                                over u, which keeps the POPULATION's mean target where</span></span>
+<span id="cb3-195"><a href="#cb3-195" aria-hidden="true" tabindex="-1"></a>            <span class="co">#                                the seed put it</span></span>
+<span id="cb3-196"><a href="#cb3-196" aria-hidden="true" tabindex="-1"></a>            <span class="co">#</span></span>
+<span id="cb3-197"><a href="#cb3-197" aria-hidden="true" tabindex="-1"></a>            <span class="co"># UNIFORM ON THE CYCLE AND NOT GAUSSIAN, for the reason `age_seed` is: a phase is a</span></span>
+<span id="cb3-198"><a href="#cb3-198" aria-hidden="true" tabindex="-1"></a>            <span class="co"># position on a loop, and a bell would pile the population mid-cycle and still divide</span></span>
+<span id="cb3-199"><a href="#cb3-199" aria-hidden="true" tabindex="-1"></a>            <span class="co"># in waves, only rounder ones.</span></span>
+<span id="cb3-200"><a href="#cb3-200" aria-hidden="true" tabindex="-1"></a>            u <span class="op">=</span> (<span class="va">self</span>._rng.random(nF) <span class="cf">if</span> <span class="va">self</span>.seed_async <span class="cf">else</span> np.zeros(nF))</span>
+<span id="cb3-201"><a href="#cb3-201" aria-hidden="true" tabindex="-1"></a>            tot <span class="op">=</span> <span class="bu">float</span>(<span class="bu">sum</span>(<span class="va">self</span>.t)) <span class="kw">or</span> <span class="fl">1.0</span></span>
+<span id="cb3-202"><a href="#cb3-202" aria-hidden="true" tabindex="-1"></a>            cut <span class="op">=</span> np.cumsum(<span class="va">self</span>.t) <span class="op">/</span> tot                    <span class="co"># phase boundaries as fractions of T</span></span>
+<span id="cb3-203"><a href="#cb3-203" aria-hidden="true" tabindex="-1"></a>            ph <span class="op">=</span> np.searchsorted(cut, u, side<span class="op">=</span><span class="st">"right"</span>).astype(np.float64).clip(<span class="dv">0</span>, <span class="va">self</span>.M)</span>
+<span id="cb3-204"><a href="#cb3-204" aria-hidden="true" tabindex="-1"></a>            lo <span class="op">=</span> np.concatenate([[<span class="fl">0.0</span>], cut[:<span class="op">-</span><span class="dv">1</span>]])[ph.astype(<span class="bu">int</span>)]</span>
+<span id="cb3-205"><a href="#cb3-205" aria-hidden="true" tabindex="-1"></a>            pt <span class="op">=</span> (u <span class="op">-</span> lo) <span class="op">*</span> tot                              <span class="co"># frames already spent in that phase</span></span>
+<span id="cb3-206"><a href="#cb3-206" aria-hidden="true" tabindex="-1"></a>            cc <span class="op">=</span> np.ones(nF)</span>
+<span id="cb3-207"><a href="#cb3-207" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="va">self</span>.seed_async <span class="kw">and</span> <span class="st">"V0f"</span> <span class="kw">in</span> m <span class="kw">and</span> m[<span class="st">"V0f"</span>] <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb3-208"><a href="#cb3-208" aria-hidden="true" tabindex="-1"></a>                v0 <span class="op">=</span> m[<span class="st">"V0f"</span>].detach().cpu().numpy().astype(np.float64)</span>
+<span id="cb3-209"><a href="#cb3-209" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> <span class="bu">len</span>(v0) <span class="op">==</span> nF:</span>
+<span id="cb3-210"><a href="#cb3-210" aria-hidden="true" tabindex="-1"></a>                    m[<span class="st">"V0f"</span>] <span class="op">=</span> torch.as_tensor(v0 <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">+</span> u) <span class="op">/</span> <span class="fl">1.5</span>, dtype<span class="op">=</span>dt, device<span class="op">=</span>dev)</span>
+<span id="cb3-211"><a href="#cb3-211" aria-hidden="true" tabindex="-1"></a>                    vb <span class="op">=</span> cell_block(H, <span class="va">self</span>.cat, <span class="st">"Vbirth"</span>, nF)</span>
+<span id="cb3-212"><a href="#cb3-212" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">if</span> vb <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="bu">len</span>(vb) <span class="op">==</span> nF:</span>
+<span id="cb3-213"><a href="#cb3-213" aria-hidden="true" tabindex="-1"></a>                        set_cell_block(H, <span class="va">self</span>.cat, <span class="st">"Vbirth"</span>, vb <span class="op">/</span> <span class="fl">1.5</span>, nF)</span>
+<span id="cb3-214"><a href="#cb3-214" aria-hidden="true" tabindex="-1"></a>                <span class="bu">print</span>(<span class="ss">f"[cell_cycle] seeded </span><span class="sc">{</span>nF<span class="sc">}</span><span class="ss"> cells asynchronously: "</span></span>
+<span id="cb3-215"><a href="#cb3-215" aria-hidden="true" tabindex="-1"></a>                      <span class="ss">f"G1 </span><span class="sc">{</span><span class="bu">int</span>((ph <span class="op">==</span> <span class="dv">0</span>).<span class="bu">sum</span>())<span class="sc">}</span><span class="ss">, S </span><span class="sc">{</span><span class="bu">int</span>((ph <span class="op">==</span> <span class="dv">1</span>).<span class="bu">sum</span>())<span class="sc">}</span><span class="ss">, "</span></span>
+<span id="cb3-216"><a href="#cb3-216" aria-hidden="true" tabindex="-1"></a>                      <span class="ss">f"G2 </span><span class="sc">{</span><span class="bu">int</span>((ph <span class="op">==</span> <span class="dv">2</span>).<span class="bu">sum</span>())<span class="sc">}</span><span class="ss">, M </span><span class="sc">{</span><span class="bu">int</span>((ph <span class="op">==</span> <span class="dv">3</span>).<span class="bu">sum</span>())<span class="sc">}</span><span class="ss">"</span>, flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-217"><a href="#cb3-217" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> pt <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="bu">len</span>(pt) <span class="op">!=</span> nF:</span>
+<span id="cb3-218"><a href="#cb3-218" aria-hidden="true" tabindex="-1"></a>            pt <span class="op">=</span> np.zeros(nF)</span>
+<span id="cb3-219"><a href="#cb3-219" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> cc <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="bu">len</span>(cc) <span class="op">!=</span> nF:</span>
+<span id="cb3-220"><a href="#cb3-220" aria-hidden="true" tabindex="-1"></a>            cc <span class="op">=</span> np.ones(nF)</span>
+<span id="cb3-221"><a href="#cb3-221" aria-hidden="true" tabindex="-1"></a>        <span class="co"># DECLARED ONCE, CARRIED BY THE TOPOLOGY FROM THEN ON -- see `_carry_face_state`. Only</span></span>
+<span id="cb3-222"><a href="#cb3-222" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `phase` is here now; the other three are blocks on the cell set and are carried by</span></span>
+<span id="cb3-223"><a href="#cb3-223" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `Hierarchy.renumber_set` and by `cell_divide`'s mother-row copy instead.</span></span>
+<span id="cb3-224"><a href="#cb3-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-225"><a href="#cb3-225" aria-hidden="true" tabindex="-1"></a>        _, _, _, vf <span class="op">=</span> face_geometry_3d(lvl.get(<span class="st">"pos"</span>)[:<span class="bu">int</span>(m[<span class="st">"Nv"</span>])].detach(),</span>
+<span id="cb3-226"><a href="#cb3-226" aria-hidden="true" tabindex="-1"></a>                                       m[<span class="st">"E_srce"</span>], m[<span class="st">"E_trgt"</span>], m[<span class="st">"E_face"</span>], nF)</span>
+<span id="cb3-227"><a href="#cb3-227" aria-hidden="true" tabindex="-1"></a>        v_now <span class="op">=</span> vf.detach().cpu().numpy().astype(np.float64)</span>
+<span id="cb3-228"><a href="#cb3-228" aria-hidden="true" tabindex="-1"></a>        v_ref <span class="op">=</span> <span class="bu">float</span>(m.get(<span class="st">"v_ref"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb3-229"><a href="#cb3-229" aria-hidden="true" tabindex="-1"></a>        _dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb3-230"><a href="#cb3-230" aria-hidden="true" tabindex="-1"></a>        vb0 <span class="op">=</span> cell_block(H, <span class="va">self</span>.cat, <span class="st">"Vbirth"</span>, nF)</span>
+<span id="cb3-231"><a href="#cb3-231" aria-hidden="true" tabindex="-1"></a>        _rate_prev <span class="op">=</span> cell_block(H, <span class="va">self</span>.cat, <span class="st">"cyc_rate"</span>, nF)</span>
+<span id="cb3-232"><a href="#cb3-232" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> _rate_prev <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="bu">len</span>(_rate_prev) <span class="op">!=</span> nF:</span>
+<span id="cb3-233"><a href="#cb3-233" aria-hidden="true" tabindex="-1"></a>            _rate_prev <span class="op">=</span> np.zeros(nF)</span>
+<span id="cb3-234"><a href="#cb3-234" aria-hidden="true" tabindex="-1"></a>        age <span class="op">=</span> _np(<span class="st">"age"</span>)</span>
+<span id="cb3-235"><a href="#cb3-235" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE RESET: just divided = age 0 while still carrying the mother's M. See the class note.</span></span>
+<span id="cb3-236"><a href="#cb3-236" aria-hidden="true" tabindex="-1"></a>        born <span class="op">=</span> np.zeros(nF, <span class="bu">bool</span>)</span>
+<span id="cb3-237"><a href="#cb3-237" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> age <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="bu">len</span>(age) <span class="op">==</span> nF:</span>
+<span id="cb3-238"><a href="#cb3-238" aria-hidden="true" tabindex="-1"></a>            born <span class="op">=</span> (age <span class="op">&lt;=</span> <span class="dv">0</span>) <span class="op">&amp;</span> (ph <span class="op">&gt;=</span> <span class="va">self</span>.M)</span>
+<span id="cb3-239"><a href="#cb3-239" aria-hidden="true" tabindex="-1"></a>            ph <span class="op">=</span> np.where(born, <span class="bu">float</span>(<span class="va">self</span>.G1), ph)</span>
+<span id="cb3-240"><a href="#cb3-240" aria-hidden="true" tabindex="-1"></a>            pt <span class="op">=</span> np.where(born, <span class="fl">0.0</span>, pt)</span>
+<span id="cb3-241"><a href="#cb3-241" aria-hidden="true" tabindex="-1"></a>            cc <span class="op">=</span> np.where(born, <span class="fl">1.0</span>, cc)</span>
+<span id="cb3-242"><a href="#cb3-242" aria-hidden="true" tabindex="-1"></a>        <span class="co"># DILUTION IS APPLIED TO EVERY CELL EVERY FRAME, whatever the model, because it is a</span></span>
+<span id="cb3-243"><a href="#cb3-243" aria-hidden="true" tabindex="-1"></a>        <span class="co"># statement about volume and not about the rule: a concentration in a growing cell falls.</span></span>
+<span id="cb3-244"><a href="#cb3-244" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-245"><a href="#cb3-245" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A ZERO IN `cyc_vprev` MEANS "NOT YET SET" AND MUST NOT DILUTE. On the mesh table the</span></span>
+<span id="cb3-246"><a href="#cb3-246" aria-hidden="true" tabindex="-1"></a>        <span class="co"># column simply did not exist before the first write, and `_np` returned None, so the first</span></span>
+<span id="cb3-247"><a href="#cb3-247" aria-hidden="true" tabindex="-1"></a>        <span class="co"># frame skipped the dilution. A declared block exists from the moment the set is built and</span></span>
+<span id="cb3-248"><a href="#cb3-248" aria-hidden="true" tabindex="-1"></a>        <span class="co"># reads zero, and a bare `vp / v_now` would then multiply every cell's inhibitor by 0 on</span></span>
+<span id="cb3-249"><a href="#cb3-249" aria-hidden="true" tabindex="-1"></a>        <span class="co"># frame 0 -- every cell instantly past its dilution checkpoint, which is the opposite of</span></span>
+<span id="cb3-250"><a href="#cb3-250" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the model. The per-cell `vp &gt; 0` test reproduces the old behaviour exactly: zero only</span></span>
+<span id="cb3-251"><a href="#cb3-251" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ever occurs on the first frame, because a daughter inherits its mother's row and a</span></span>
+<span id="cb3-252"><a href="#cb3-252" aria-hidden="true" tabindex="-1"></a>        <span class="co"># renumbered cell keeps its own.</span></span>
+<span id="cb3-253"><a href="#cb3-253" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE INHIBITOR JUST BEFORE THE DILUTION, which is what `inhibitor_dilution` spends: taken</span></span>
+<span id="cb3-254"><a href="#cb3-254" aria-hidden="true" tabindex="-1"></a>        <span class="co"># AFTER the birth reset, so a daughter's first frame dilutes from the 1.0 it was reset to</span></span>
+<span id="cb3-255"><a href="#cb3-255" aria-hidden="true" tabindex="-1"></a>        <span class="co"># rather than from the mother's spent concentration.</span></span>
+<span id="cb3-256"><a href="#cb3-256" aria-hidden="true" tabindex="-1"></a>        cc0 <span class="op">=</span> cc.copy()</span>
+<span id="cb3-257"><a href="#cb3-257" aria-hidden="true" tabindex="-1"></a>        vp <span class="op">=</span> cell_block(H, <span class="va">self</span>.cat, <span class="st">"cyc_vprev"</span>, nF)</span>
+<span id="cb3-258"><a href="#cb3-258" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> vp <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="bu">len</span>(vp) <span class="op">==</span> nF:</span>
+<span id="cb3-259"><a href="#cb3-259" aria-hidden="true" tabindex="-1"></a>            cc <span class="op">=</span> cc <span class="op">*</span> np.where(vp <span class="op">&gt;</span> <span class="fl">0.0</span>, np.clip(vp <span class="op">/</span> np.maximum(v_now, <span class="fl">1e-12</span>), <span class="fl">0.0</span>, <span class="fl">4.0</span>), <span class="fl">1.0</span>)</span>
+<span id="cb3-260"><a href="#cb3-260" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `cyc_vprev` IS RETURNED AS A DELTA NOW rather than written here, and the arithmetic is</span></span>
+<span id="cb3-261"><a href="#cb3-261" aria-hidden="true" tabindex="-1"></a>        <span class="co"># unchanged by that: the engine adds `dt * (v_now - vp)/dt` to `vp`, which is `v_now`.</span></span>
+<span id="cb3-262"><a href="#cb3-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-263"><a href="#cb3-263" aria-hidden="true" tabindex="-1"></a>        jit <span class="op">=</span> cell_block(H, <span class="va">self</span>.cat, <span class="st">"divjit"</span>, nF)</span>
+<span id="cb3-264"><a href="#cb3-264" aria-hidden="true" tabindex="-1"></a>        jit <span class="op">=</span> np.ones(nF) <span class="cf">if</span> jit <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="bu">len</span>(jit) <span class="op">!=</span> nF <span class="cf">else</span> jit</span>
+<span id="cb3-265"><a href="#cb3-265" aria-hidden="true" tabindex="-1"></a>        cvj <span class="op">=</span> (<span class="fl">1.0</span> <span class="op">+</span> <span class="va">self</span>.phase_cv <span class="op">*</span> <span class="va">self</span>._rng.standard_normal(nF)).clip(<span class="fl">0.4</span>, <span class="fl">1.8</span>) <span class="op">\</span></span>
+<span id="cb3-266"><a href="#cb3-266" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="va">self</span>.phase_cv <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">else</span> np.ones(nF)</span>
+<span id="cb3-267"><a href="#cb3-267" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-268"><a href="#cb3-268" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ============================================================ the cycle as a rate, not a jump</span></span>
+<span id="cb3-269"><a href="#cb3-269" aria-hidden="true" tabindex="-1"></a>        <span class="co"># WHAT S4 CHANGED, in one sentence: the cycle used to be four integers and a per-phase</span></span>
+<span id="cb3-270"><a href="#cb3-270" aria-hidden="true" tabindex="-1"></a>        <span class="co"># counter advanced by a predicate, and it is now ONE continuous coordinate `p` -- position</span></span>
+<span id="cb3-271"><a href="#cb3-271" aria-hidden="true" tabindex="-1"></a>        <span class="co"># through the cycle, 0 at birth, 1 at the end of M -- whose RATE the models set. `phase` is</span></span>
+<span id="cb3-272"><a href="#cb3-272" aria-hidden="true" tabindex="-1"></a>        <span class="co"># read off `p` by the phase boundaries and no longer holds anything `p` does not.</span></span>
+<span id="cb3-273"><a href="#cb3-273" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-274"><a href="#cb3-274" aria-hidden="true" tabindex="-1"></a>        <span class="co"># WHY IT HAD TO CHANGE. plexus2's eight families are all rate laws: an operator says how</span></span>
+<span id="cb3-275"><a href="#cb3-275" aria-hidden="true" tabindex="-1"></a>        <span class="co"># fast state moves and the engine integrates. A predicate that assigns `phase + 1` is not a</span></span>
+<span id="cb3-276"><a href="#cb3-276" aria-hidden="true" tabindex="-1"></a>        <span class="co"># rate, has no delta form, and is exactly why this operator was `kind: structural` and had</span></span>
+<span id="cb3-277"><a href="#cb3-277" aria-hidden="true" tabindex="-1"></a>        <span class="co"># to declare `MAY_MUTATE_INTEGRATED_STATE`. Every per-frame quantity below is now returned</span></span>
+<span id="cb3-278"><a href="#cb3-278" aria-hidden="true" tabindex="-1"></a>        <span class="co"># as a delta on a declared block, so the engine does the updating and the tick-0 invariant</span></span>
+<span id="cb3-279"><a href="#cb3-279" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is free to check it.</span></span>
+<span id="cb3-280"><a href="#cb3-280" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-281"><a href="#cb3-281" aria-hidden="true" tabindex="-1"></a>        <span class="co"># WHAT `p` BUYS BEYOND COMPLIANCE, which is the part worth keeping even if the algebra had</span></span>
+<span id="cb3-282"><a href="#cb3-282" aria-hidden="true" tabindex="-1"></a>        <span class="co"># not asked. Under the predicate, a cell in G1 was a cell in G1 -- there was no reading of</span></span>
+<span id="cb3-283"><a href="#cb3-283" aria-hidden="true" tabindex="-1"></a>        <span class="co"># HOW FAR through it was, because "far" was only ever elapsed frames and G1's exit does not</span></span>
+<span id="cb3-284"><a href="#cb3-284" aria-hidden="true" tabindex="-1"></a>        <span class="co"># read elapsed frames in three of the four models. `p` is that reading, and it is defined by</span></span>
+<span id="cb3-285"><a href="#cb3-285" aria-hidden="true" tabindex="-1"></a>        <span class="co"># each model's own currency: volume accumulated toward the checkpoint for the sizer,</span></span>
+<span id="cb3-286"><a href="#cb3-286" aria-hidden="true" tabindex="-1"></a>        <span class="co"># inhibitor diluted away for `inhibitor_dilution`, elapsed time for `timer`, fraction of the</span></span>
+<span id="cb3-287"><a href="#cb3-287" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cell's own drawn waiting time for `transition_probability`. A population's spread in `p`</span></span>
+<span id="cb3-288"><a href="#cb3-288" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is therefore comparable across the four in a way a phase histogram never was.</span></span>
+<span id="cb3-289"><a href="#cb3-289" aria-hidden="true" tabindex="-1"></a>        T <span class="op">=</span> <span class="bu">float</span>(<span class="bu">sum</span>(<span class="va">self</span>.t)) <span class="kw">or</span> <span class="fl">1.0</span></span>
+<span id="cb3-290"><a href="#cb3-290" aria-hidden="true" tabindex="-1"></a>        f <span class="op">=</span> np.asarray(<span class="va">self</span>.t, np.float64) <span class="op">/</span> T                  <span class="co"># each phase as a fraction of the cycle</span></span>
+<span id="cb3-291"><a href="#cb3-291" aria-hidden="true" tabindex="-1"></a>        cut <span class="op">=</span> np.cumsum(f)                                      <span class="co"># phase boundaries in `p`</span></span>
+<span id="cb3-292"><a href="#cb3-292" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> cell_block(H, <span class="va">self</span>.cat, <span class="st">"cycle_progress"</span>, nF)</span>
+<span id="cb3-293"><a href="#cb3-293" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> p <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb3-294"><a href="#cb3-294" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> <span class="pp">KeyError</span>(</span>
+<span id="cb3-295"><a href="#cb3-295" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"cell_cycle needs the set </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cat<span class="sc">!r}</span><span class="ss"> to declare the width-1 block "</span></span>
+<span id="cb3-296"><a href="#cb3-296" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"'cycle_progress' -- `cycle_progress: </span><span class="ch">{{</span><span class="ss">width: 1</span><span class="ch">}}</span><span class="ss">` under `sets.</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cat<span class="sc">}</span><span class="ss">.state`. "</span></span>
+<span id="cb3-297"><a href="#cb3-297" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"It is the cell's continuous position through the cycle (0 at birth, 1 at the end "</span></span>
+<span id="cb3-298"><a href="#cb3-298" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"of M) and it is what this operator integrates; `phase` is read off it."</span>)</span>
+<span id="cb3-299"><a href="#cb3-299" aria-hidden="true" tabindex="-1"></a>        p_st <span class="op">=</span> p.copy()</span>
+<span id="cb3-300"><a href="#cb3-300" aria-hidden="true" tabindex="-1"></a>        <span class="co"># SEEDED FROM THE PHASES THE ASYNC DRAW ALREADY MADE, so `seed_async` keeps meaning what it</span></span>
+<span id="cb3-301"><a href="#cb3-301" aria-hidden="true" tabindex="-1"></a>        <span class="co"># meant: a cell drawn into the middle of S starts at the `p` that IS the middle of S.</span></span>
+<span id="cb3-302"><a href="#cb3-302" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> _seeded:</span>
+<span id="cb3-303"><a href="#cb3-303" aria-hidden="true" tabindex="-1"></a>            lo <span class="op">=</span> np.concatenate([[<span class="fl">0.0</span>], cut[:<span class="op">-</span><span class="dv">1</span>]])[ph.astype(<span class="bu">int</span>)]</span>
+<span id="cb3-304"><a href="#cb3-304" aria-hidden="true" tabindex="-1"></a>            p <span class="op">=</span> lo <span class="op">+</span> pt <span class="op">/</span> T                        <span class="co"># `pt` frames into a phase is pt/T of the cycle</span></span>
+<span id="cb3-305"><a href="#cb3-305" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> np.where(born, <span class="fl">0.0</span>, p) <span class="cf">if</span> age <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="bu">len</span>(age) <span class="op">==</span> nF <span class="cf">else</span> p</span>
+<span id="cb3-306"><a href="#cb3-306" aria-hidden="true" tabindex="-1"></a>        <span class="co"># dV/dt AND -dc/dt ARE THE TWO CURRENCIES THE MODELS SPEND. Both come from the frame's own</span></span>
+<span id="cb3-307"><a href="#cb3-307" aria-hidden="true" tabindex="-1"></a>        <span class="co"># volume change, which `cyc_vprev` already recorded for the dilution above.</span></span>
+<span id="cb3-308"><a href="#cb3-308" aria-hidden="true" tabindex="-1"></a>        dv_dt <span class="op">=</span> np.where(vp <span class="op">&gt;</span> <span class="fl">0.0</span>, (v_now <span class="op">-</span> vp) <span class="op">/</span> <span class="bu">max</span>(_dt, <span class="fl">1e-12</span>), <span class="fl">0.0</span>) <span class="op">\</span></span>
+<span id="cb3-309"><a href="#cb3-309" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> vp <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="bu">len</span>(vp) <span class="op">==</span> nF <span class="cf">else</span> np.zeros(nF)</span>
+<span id="cb3-310"><a href="#cb3-310" aria-hidden="true" tabindex="-1"></a>        _rate_draw <span class="op">=</span> _rate_prev.copy()</span>
+<span id="cb3-311"><a href="#cb3-311" aria-hidden="true" tabindex="-1"></a>        ctx <span class="op">=</span> <span class="bu">dict</span>(v_now<span class="op">=</span>v_now, v_ref<span class="op">=</span>v_ref, v_birth<span class="op">=</span>(vb0 <span class="cf">if</span> vb0 <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> v_now),</span>
+<span id="cb3-312"><a href="#cb3-312" aria-hidden="true" tabindex="-1"></a>                   rate_prev<span class="op">=</span>_rate_prev, rate_draw<span class="op">=</span>_rate_draw, born<span class="op">=</span>born, conc_prev<span class="op">=</span>cc0,</span>
+<span id="cb3-313"><a href="#cb3-313" aria-hidden="true" tabindex="-1"></a>                   dv_dt<span class="op">=</span>dv_dt, conc<span class="op">=</span>cc, jit<span class="op">=</span>jit, cvj<span class="op">=</span>cvj, f<span class="op">=</span>f, T<span class="op">=</span>T, p<span class="op">=</span>p, dt<span class="op">=</span>_dt,</span>
+<span id="cb3-314"><a href="#cb3-314" aria-hidden="true" tabindex="-1"></a>                   to_boundary<span class="op">=</span>np.maximum(cut[<span class="va">self</span>.G1] <span class="op">-</span> p, <span class="fl">0.0</span>) <span class="op">/</span> <span class="bu">max</span>(_dt, <span class="fl">1e-12</span>),</span>
+<span id="cb3-315"><a href="#cb3-315" aria-hidden="true" tabindex="-1"></a>                   rng<span class="op">=</span><span class="va">self</span>._rng)</span>
+<span id="cb3-316"><a href="#cb3-316" aria-hidden="true" tabindex="-1"></a>        <span class="co"># OUTSIDE G1 EVERY MODEL IS THE SAME CLOCK, and that is the design of the family rather than</span></span>
+<span id="cb3-317"><a href="#cb3-317" aria-hidden="true" tabindex="-1"></a>        <span class="co"># a simplification: S, G2 and M are near-fixed in all four hypotheses, so a difference</span></span>
+<span id="cb3-318"><a href="#cb3-318" aria-hidden="true" tabindex="-1"></a>        <span class="co"># between two runs has exactly one possible cause. `1/T` in cycle units per unit time is a</span></span>
+<span id="cb3-319"><a href="#cb3-319" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cycle of exactly `T` -- the phase fractions do the rest, because a phase of fraction f_k</span></span>
+<span id="cb3-320"><a href="#cb3-320" aria-hidden="true" tabindex="-1"></a>        <span class="co"># traversed at 1/T takes f_k * T, which is `t_k`.</span></span>
+<span id="cb3-321"><a href="#cb3-321" aria-hidden="true" tabindex="-1"></a>        rate <span class="op">=</span> np.full(nF, <span class="fl">1.0</span> <span class="op">/</span> T) <span class="op">/</span> np.maximum(jit <span class="op">*</span> cvj, <span class="fl">1e-9</span>)</span>
+<span id="cb3-322"><a href="#cb3-322" aria-hidden="true" tabindex="-1"></a>        g1 <span class="op">=</span> p <span class="op">&lt;</span> cut[<span class="va">self</span>.G1]</span>
+<span id="cb3-323"><a href="#cb3-323" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> g1.<span class="bu">any</span>():</span>
+<span id="cb3-324"><a href="#cb3-324" aria-hidden="true" tabindex="-1"></a>            rate <span class="op">=</span> np.where(g1, <span class="va">self</span>._g1_rate(ctx), rate)</span>
+<span id="cb3-325"><a href="#cb3-325" aria-hidden="true" tabindex="-1"></a>        <span class="co"># M IS NOT ADVANCED. A cell leaves M by DIVIDING, which is `cell_divide[model: cycle]`'s</span></span>
+<span id="cb3-326"><a href="#cb3-326" aria-hidden="true" tabindex="-1"></a>        <span class="co"># business; advancing it here would let a tissue with no divide operator cycle for ever</span></span>
+<span id="cb3-327"><a href="#cb3-327" aria-hidden="true" tabindex="-1"></a>        <span class="co"># while never making a cell, which is a population model that silently is not one. Under</span></span>
+<span id="cb3-328"><a href="#cb3-328" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the predicate that was `min(phase + 1, M)`; here it is a rate of zero, which is the same</span></span>
+<span id="cb3-329"><a href="#cb3-329" aria-hidden="true" tabindex="-1"></a>        <span class="co"># statement and is one the engine can integrate.</span></span>
+<span id="cb3-330"><a href="#cb3-330" aria-hidden="true" tabindex="-1"></a>        rate <span class="op">=</span> np.where(p <span class="op">&gt;=</span> cut[<span class="va">self</span>.G2], <span class="fl">0.0</span>, rate)</span>
+<span id="cb3-331"><a href="#cb3-331" aria-hidden="true" tabindex="-1"></a>        <span class="co"># BACKWARD ONLY INSIDE G1. S, G2 and M are clocks in every model and a clock does not run</span></span>
+<span id="cb3-332"><a href="#cb3-332" aria-hidden="true" tabindex="-1"></a>        <span class="co"># backwards; only the G1 rules read a quantity that can fall.</span></span>
+<span id="cb3-333"><a href="#cb3-333" aria-hidden="true" tabindex="-1"></a>        rate <span class="op">=</span> np.where((p <span class="op">&gt;=</span> cut[<span class="va">self</span>.G1]) <span class="op">&amp;</span> (rate <span class="op">&lt;</span> <span class="fl">0.0</span>), <span class="fl">0.0</span>, rate)</span>
+<span id="cb3-334"><a href="#cb3-334" aria-hidden="true" tabindex="-1"></a>        rate <span class="op">=</span> np.where(born, <span class="fl">0.0</span>, rate) <span class="cf">if</span> age <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="bu">len</span>(age) <span class="op">==</span> nF <span class="cf">else</span> rate</span>
+<span id="cb3-335"><a href="#cb3-335" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A CELL STOPS AT M'S DOORSTEP. `rate` is already zero once `p` is inside M, so the only</span></span>
+<span id="cb3-336"><a href="#cb3-336" aria-hidden="true" tabindex="-1"></a>        <span class="co"># way past is the single step that crosses -- and an unbounded rate can carry it far past</span></span>
+<span id="cb3-337"><a href="#cb3-337" aria-hidden="true" tabindex="-1"></a>        <span class="co"># (a `transition_probability` cell whose drawn waiting time is a fraction of a frame reached</span></span>
+<span id="cb3-338"><a href="#cb3-338" aria-hidden="true" tabindex="-1"></a>        <span class="co"># p = 3.76 before this cap). `p` has no meaning beyond the start of M, because M is left by</span></span>
+<span id="cb3-339"><a href="#cb3-339" aria-hidden="true" tabindex="-1"></a>        <span class="co"># dividing and not by progressing, so the crossing step lands exactly on the boundary.</span></span>
+<span id="cb3-340"><a href="#cb3-340" aria-hidden="true" tabindex="-1"></a>        p_next <span class="op">=</span> np.clip(p <span class="op">+</span> _dt <span class="op">*</span> rate, <span class="fl">0.0</span>, cut[<span class="va">self</span>.G2])</span>
+<span id="cb3-341"><a href="#cb3-341" aria-hidden="true" tabindex="-1"></a>        ph_next <span class="op">=</span> np.searchsorted(cut, p_next, side<span class="op">=</span><span class="st">"right"</span>).astype(np.float64).clip(<span class="dv">0</span>, <span class="va">self</span>.M)</span>
+<span id="cb3-342"><a href="#cb3-342" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `phase_t` IS A READOUT NOW, NOT A DRIVER. Nothing above consults it -- the models spend</span></span>
+<span id="cb3-343"><a href="#cb3-343" aria-hidden="true" tabindex="-1"></a>        <span class="co"># volume, inhibitor or a drawn waiting time, and `timer` spends `p` itself -- but it is</span></span>
+<span id="cb3-344"><a href="#cb3-344" aria-hidden="true" tabindex="-1"></a>        <span class="co"># declared by every spec that runs this operator and is what a reader means by "how long has</span></span>
+<span id="cb3-345"><a href="#cb3-345" aria-hidden="true" tabindex="-1"></a>        <span class="co"># this cell been in S", so it is kept and reset on a phase change like before.</span></span>
+<span id="cb3-346"><a href="#cb3-346" aria-hidden="true" tabindex="-1"></a>        pt_next <span class="op">=</span> np.where(ph_next <span class="op">!=</span> ph, <span class="fl">0.0</span>, pt <span class="op">+</span> _dt)</span>
+<span id="cb3-347"><a href="#cb3-347" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>._emit(H, nF, {</span>
+<span id="cb3-348"><a href="#cb3-348" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cycle_progress"</span>: (p_next <span class="op">-</span> p_st) <span class="op">/</span> <span class="bu">max</span>(_dt, <span class="fl">1e-12</span>),</span>
+<span id="cb3-349"><a href="#cb3-349" aria-hidden="true" tabindex="-1"></a>            <span class="st">"phase"</span>:          (ph_next <span class="op">-</span> ph_st) <span class="op">/</span> <span class="bu">max</span>(_dt, <span class="fl">1e-12</span>),</span>
+<span id="cb3-350"><a href="#cb3-350" aria-hidden="true" tabindex="-1"></a>            <span class="st">"phase_t"</span>:        (pt_next <span class="op">-</span> pt_st) <span class="op">/</span> <span class="bu">max</span>(_dt, <span class="fl">1e-12</span>),</span>
+<span id="cb3-351"><a href="#cb3-351" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cyc_inhib"</span>:      (cc <span class="op">-</span> cc_st) <span class="op">/</span> <span class="bu">max</span>(_dt, <span class="fl">1e-12</span>),</span>
+<span id="cb3-352"><a href="#cb3-352" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cyc_vprev"</span>:      (v_now <span class="op">-</span> (vp <span class="cf">if</span> vp <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> v_now)) <span class="op">/</span> <span class="bu">max</span>(_dt, <span class="fl">1e-12</span>),</span>
+<span id="cb3-353"><a href="#cb3-353" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cyc_rate"</span>:       (ctx[<span class="st">"rate_draw"</span>] <span class="op">-</span> _rate_prev) <span class="op">/</span> <span class="bu">max</span>(_dt, <span class="fl">1e-12</span>),</span>
+<span id="cb3-354"><a href="#cb3-354" aria-hidden="true" tabindex="-1"></a>        })</span>
+<span id="cb3-355"><a href="#cb3-355" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-356"><a href="#cb3-356" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _emit(<span class="va">self</span>, H, nF, blocks):</span>
+<span id="cb3-357"><a href="#cb3-357" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Per-cell deltas -&gt; full-buffer `(set, block)` deltas the engine integrates.</span></span>
+<span id="cb3-358"><a href="#cb3-358" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-359"><a href="#cb3-359" aria-hidden="true" tabindex="-1"></a><span class="co">        THE LIVE CELLS ARE A PREFIX OF THE BUFFER and `_integrate` adds a block delta to the whole</span></span>
+<span id="cb3-360"><a href="#cb3-360" aria-hidden="true" tabindex="-1"></a><span class="co">        of `lvl.state[:, cx0:cx1]` with no mask, so a short tensor would not broadcast and a full</span></span>
+<span id="cb3-361"><a href="#cb3-361" aria-hidden="true" tabindex="-1"></a><span class="co">        one must be zero past `nF` or the dead tail of the buffer would drift.</span></span>
+<span id="cb3-362"><a href="#cb3-362" aria-hidden="true" tabindex="-1"></a><span class="co">        """</span></span>
+<span id="cb3-363"><a href="#cb3-363" aria-hidden="true" tabindex="-1"></a>        clvl <span class="op">=</span> H.level(<span class="va">self</span>.cat)</span>
+<span id="cb3-364"><a href="#cb3-364" aria-hidden="true" tabindex="-1"></a>        N <span class="op">=</span> <span class="bu">int</span>(clvl.state.shape[<span class="dv">0</span>])</span>
+<span id="cb3-365"><a href="#cb3-365" aria-hidden="true" tabindex="-1"></a>        out <span class="op">=</span> {}</span>
+<span id="cb3-366"><a href="#cb3-366" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> name, d <span class="kw">in</span> blocks.items():</span>
+<span id="cb3-367"><a href="#cb3-367" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> d <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> cell_block(H, <span class="va">self</span>.cat, name, nF) <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb3-368"><a href="#cb3-368" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span>                       <span class="co"># a block this spec did not declare is not written</span></span>
+<span id="cb3-369"><a href="#cb3-369" aria-hidden="true" tabindex="-1"></a>            z <span class="op">=</span> torch.zeros(N, <span class="dv">1</span>, device<span class="op">=</span>clvl.state.device, dtype<span class="op">=</span>clvl.state.dtype)</span>
+<span id="cb3-370"><a href="#cb3-370" aria-hidden="true" tabindex="-1"></a>            z[:nF, <span class="dv">0</span>] <span class="op">=</span> torch.as_tensor(np.asarray(d, np.float64),</span>
+<span id="cb3-371"><a href="#cb3-371" aria-hidden="true" tabindex="-1"></a>                                        device<span class="op">=</span>clvl.state.device).to(clvl.state.dtype)</span>
+<span id="cb3-372"><a href="#cb3-372" aria-hidden="true" tabindex="-1"></a>            out[(<span class="va">self</span>.cat, name)] <span class="op">=</span> z</span>
+<span id="cb3-373"><a href="#cb3-373" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> out</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+
+</section>
+
+</main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) are click-to-fullscreen */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: #000; z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { width: 100%; height: 100%; max-width: 100vw; max-height: 100vh;
+  object-fit: contain; background: #000; cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .75; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+  function requestFS() {
+    try {
+      if (ov.requestFullscreen) return ov.requestFullscreen();
+      if (ov.webkitRequestFullscreen) return ov.webkitRequestFullscreen();
+      if (vv.webkitEnterFullscreen) return vv.webkitEnterFullscreen();   // iOS Safari: video only
+    } catch (e) {}
+  }
+  function exitFS() {
+    try { if (fsElement()) (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document); }
+    catch (e) {}
+  }
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+    var r = requestFS(); if (r && r.catch) r.catch(function () {});   // expand to full screen on the click gesture
+  }
+  function close() {
+    exitFS();
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc || (v.querySelector('source') && v.querySelector('source').src) || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov.classList.contains('open')) close(); });
+  function onFsChange() { if (!fsElement() && ov.classList.contains('open')) close(); }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  vv.addEventListener('webkitendfullscreen', function () { if (ov.classList.contains('open')) close(); }); // iOS exit
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Cedric Allier · Janelia Research Campus · 2026</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

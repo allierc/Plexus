@@ -33,7 +33,7 @@ Re-key the per-junction myosin onto the half-edge arrays a topology operator has
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{R}\!:E$ **Rewire**: rebuild the relation $E$ each tick.
+- **Kind** &mdash; $\mathcal{R}\!:E$ **rewire**: rebuild the relation $E$ each tick.
 - **Acts on** &mdash; `vertex` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

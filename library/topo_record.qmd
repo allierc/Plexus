@@ -33,7 +33,7 @@ A measurement, as an operator: record the current mesh once per frame, so a vesi
 
 ## Role in Plexus
 
-- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Kind** &mdash; $|S|$ **structural**: change the entities themselves &mdash; divide, die, grow.
 - **Acts on** &mdash; `vertex` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -67,7 +67,7 @@ operators:
 
 ## Related operators
 
-Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd), [`cell_exclude`](cell_exclude.qmd).
+Other **structural** operators: [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd), [`cell_exclude`](cell_exclude.qmd), [`bm_secrete`](bm_secrete.qmd), [`integrin_track`](integrin_track.qmd), [`bm_sense`](bm_sense.qmd).
 
 ## Source
 
@@ -155,8 +155,10 @@ class TopoSnapshot3D(Structural):
             # a dying cell is drawn exactly like a living one, the sheet closes over the gap, and
             # the mechanism is invisible in the movie -- which is what happened: a 293-cell patch
             # dying at the north pole could not be seen even looking straight down at it.
-            apop=(np.asarray(m["apop_flag"]).copy()
-                  if isinstance(m.get("apop_flag"), np.ndarray) else None),
+            # EITHER TYPE. The flag is a declared block on the cell set now, so it arrives as a
+            # tensor; a spec that has not moved it still has the numpy column. An `isinstance`
+            # check on one of the two silently recorded None for the other.
+            apop=_as_np(m.get("apop_flag")),
             buf_full=bool(m.get("buf_full"))))
         return {}
 ```

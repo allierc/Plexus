@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.26">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>bm_bond – Plexus</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b758ccaa5987ceb1b75504551e579abf.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-70408cb9dc52a2002c2463371a30459f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Plexus</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../language.html"> 
+<span class="menu-text">Language</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="../library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../optimization.html"> 
+<span class="menu-text">Optimization</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../inverse.html"> 
+<span class="menu-text">Inverse problem</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+    <a href="https://github.com/allierc/Plexus" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
+  <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
+  <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
+  <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
+  <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">bm_bond</h1>
+<p class="subtitle lead">Springs between neighbouring membrane particles, built once and thereafter breakable.</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="op-head">
+<p><img src="../figures/icons/lateral.png" class="op-logo img-fluid"></p>
+<p><span class="op-badge"><code>lateral</code></span> <span class="op-badge"><code>acts on: particle</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
+<p>Springs between neighbouring membrane particles, built once and thereafter breakable.</p>
+</div>
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+<section id="role-in-plexus" class="level2">
+<h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
+<ul>
+<li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
+<li><strong>Acts on</strong> — <code>particle</code> (the set the operator acts on).</li>
+<li><strong>Reads</strong> — –</li>
+<li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
+<li><strong>Prediction</strong> — <code>none</code>.</li>
+<li><strong>Dimensions</strong> — 3D.</li>
+</ul>
+</section>
+<section id="mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
+<p>breakable. They are what makes the sheet a membrane rather than a cloud of stiff dust.</p>
+<p>basement_membrane -&gt; basement_membrane: reads pos, emits an acceleration.</p>
+<pre><code>L_e     = |x_j - x_i|</code></pre>
+<p>rest_e is each bond’s own rest length, recorded when it formed, in world units; k is the crosslink stiffness in inverse time squared, so k times a length is an acceleration. The sheet therefore resists stretching IN ITS OWN PLANE, which is how a basement membrane carries load and is mostly what collagen IV contributes.</p>
+<p>HOOKEAN IN THE EXTENSION, NOT IN THE STRAIN, and the difference is not cosmetic. k * strain is k (L - rest) / rest, and rest is the particle spacing – a small number – so writing the force that way multiplies the declared stiffness by 1/rest, which for a typical spacing is a factor of several hundred. A nominal stiffness then acts as an enormous one, one percent of strain produces an acceleration that moves a particle several times its own spacing in a frame, and the sheet oscillates and tears itself apart before the tissue has grown into it. The BREAKING criterion stays relative, because strain is the right dimensionless failure measure; only the force is extension-based.</p>
+<p><code>aniso</code> makes crosslinks stiffer around the girth than along the long axis – the molecular corset: a sheet resisting circumferential expansion more than meridional expansion squeezes the middle and pushes growth into the ends. A bond’s orientation is measured against the local circle of latitude.</p>
+<p>It emits an acceleration rather than moving particles itself, so the engine integrates it alongside everything else acting on the set rather than behind the solver’s back.</p>
+<p>Reference: Topfer, U. et al.&nbsp;(2022). Basement membrane stiffness determines organ shape. Collagen IV is the principal contributor to basement-membrane stiffness.</p>
+</section>
+<section id="parameters" class="level2">
+<h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>role</th>
+<th>default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>k</code></td>
+<td>bond_stiffness</td>
+<td>2.0e5</td>
+</tr>
+<tr class="even">
+<td><code>cutoff</code></td>
+<td>neighbour_search_radius</td>
+<td>0.020</td>
+</tr>
+<tr class="odd">
+<td><code>max_neighbours</code></td>
+<td>bonds_per_particle</td>
+<td>6</td>
+</tr>
+<tr class="even">
+<td><code>damp</code></td>
+<td>bond_damping</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td><code>graph_mode</code></td>
+<td>–</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<td><code>snapshot_every</code></td>
+<td>–</td>
+<td>20</td>
+</tr>
+<tr class="odd">
+<td><code>rebond_every</code></td>
+<td>–</td>
+<td>20</td>
+</tr>
+<tr class="even">
+<td><code>aniso</code></td>
+<td>–</td>
+<td>1.0</td>
+</tr>
+<tr class="odd">
+<td><code>record_hoop</code></td>
+<td>–</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<td><code>centre</code></td>
+<td>–</td>
+<td>[0.5, 0.5, 0.5]</td>
+</tr>
+<tr class="odd">
+<td><code>k_adhesion_hint</code></td>
+<td>–</td>
+<td>0.0</td>
+</tr>
+<tr class="even">
+<td><code>overdamped_gamma</code></td>
+<td>–</td>
+<td>0.0</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="minimal-spec" class="level2">
+<h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> bm_bond</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="mechanism-search-tags" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>crosslink</code></span> <span class="op-badge"><code>basement_membrane</code></span> <span class="op-badge"><code>elastic_network</code></span></p>
+</section>
+<section id="related-operators" class="level2">
+<h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
+<p>Other <strong>lateral</strong> operators: <a href="../library/attraction_repulsion.html"><code>attraction_repulsion</code></a>, <a href="../library/squared_law.html"><code>squared_law</code></a>, <a href="../library/cohesion.html"><code>cohesion</code></a>, <a href="../library/separation.html"><code>separation</code></a>, <a href="../library/velocity_align.html"><code>velocity_align</code></a>, <a href="../library/alignment.html"><code>alignment</code></a>.</p>
+</section>
+<section id="source" class="level2">
+<h2 class="anchored" data-anchor-id="source">Source</h2>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/membrane_ops.py"><code>src/plexus/operators/membrane_ops.py</code></a> — the registered operator.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"bm_bond"</span>, family<span class="op">=</span><span class="st">"mechanics"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> BasementMembraneBond(Lateral):</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Crosslinks: springs between neighbouring membrane particles, built once and thereafter</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">    breakable. They are what makes the sheet a membrane rather than a cloud of stiff dust.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">    basement_membrane -&gt; basement_membrane: reads pos, emits an acceleration.</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co">        L_e     = |x_j - x_i|</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co">        f_e     = k (L_e - rest_e) (x_j - x_i) / L_e            on i, and -f_e on j</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co">        strain_e = (L_e - rest_e) / rest_e                       reported, and used for breaking</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co">    rest_e is each bond's own rest length, recorded when it formed, in world units; k is the</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co">    crosslink stiffness in inverse time squared, so k times a length is an acceleration. The sheet</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co">    therefore resists stretching IN ITS OWN PLANE, which is how a basement membrane carries load</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co">    and is mostly what collagen IV contributes.</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co">    HOOKEAN IN THE EXTENSION, NOT IN THE STRAIN, and the difference is not cosmetic. k * strain is</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="co">    k (L - rest) / rest, and rest is the particle spacing -- a small number -- so writing the force</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co">    that way multiplies the declared stiffness by 1/rest, which for a typical spacing is a factor</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co">    of several hundred. A nominal stiffness then acts as an enormous one, one percent of strain</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="co">    produces an acceleration that moves a particle several times its own spacing in a frame, and</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="co">    the sheet oscillates and tears itself apart before the tissue has grown into it. The BREAKING</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="co">    criterion stays relative, because strain is the right dimensionless failure measure; only the</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="co">    force is extension-based.</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="co">    `aniso` makes crosslinks stiffer around the girth than along the long axis -- the molecular</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="co">    corset: a sheet resisting circumferential expansion more than meridional expansion squeezes the</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="co">    middle and pushes growth into the ends. A bond's orientation is measured against the local</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a><span class="co">    circle of latitude.</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a><span class="co">    It emits an acceleration rather than moving particles itself, so the engine integrates it</span></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a><span class="co">    alongside everything else acting on the set rather than behind the solver's back.</span></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a><span class="co">    Reference: Topfer, U. et al. (2022). Basement membrane stiffness determines organ shape.</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a><span class="co">    Collagen IV is the principal contributor to basement-membrane stiffness.</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>    <span class="co"># `mpm_acceleration` routes the force into the MPM substep as an external body force; `acceleration`</span></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>    <span class="co"># hands it to the engine, which integrates v += dt*a; x += dt*v directly. The spring graph needs the</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>    <span class="co"># second, and the spec sets `emit:` per run -- `_resolve_emit` reads the spec ahead of this default.</span></span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="st">"mpm_acceleration"</span></span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">3</span>]</span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []</span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"crosslink"</span>, <span class="st">"basement_membrane"</span>, <span class="st">"elastic_network"</span>]</span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"k"</span>: <span class="st">"bond_stiffness"</span>, <span class="st">"cutoff"</span>: <span class="st">"neighbour_search_radius"</span>,</span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"max_neighbours"</span>: <span class="st">"bonds_per_particle"</span>, <span class="st">"damp"</span>: <span class="st">"bond_damping"</span>}</span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Topfer, U. et al. (2022) Development 149:dev200456."</span></span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"basement_membrane_particle"</span>)</span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>        <span class="co"># STABILITY BOUND, stated because it is the thing that limits this number: the bond is a</span></span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>        <span class="co"># spring-mass oscillator with omega = sqrt(k), and explicit integration needs</span></span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>        <span class="co"># dt_sub &lt; 2/omega. At dt_sub = 2e-4 that is k &lt; 1e8; 2e5 gives ~70 substeps per period, which</span></span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is stable with room to spare.</span></span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.k <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"k"</span>, <span class="fl">2.0e5</span>))</span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ...AND THAT ARGUMENT ONLY HOLDS FOR THE MPM PATH. `emit: acceleration` hands the force to the</span></span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ENGINE, which integrates once per FRAME at dt = 4e-3 -- twenty times the MPM substep. The limit</span></span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is dt &lt; 2/omega with omega = sqrt(k_eff), and k_eff is not k but the SUM over a node's bonds,</span></span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>        <span class="co"># about 4.6 of them, so the ceiling drops by another factor of 4.6:</span></span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a>        <span class="co">#     k_max  =  4 / (dt^2 * bonds_per_node)   ~  5.4e4  at dt = 4e-3</span></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Above it the sheet does not wobble, it diverges: the first graph-mode run returned a mean</span></span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>        <span class="co"># crosslink strain of INFINITY at k = 2e5, a value that is obviously wrong and would have been</span></span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>        <span class="co"># obviously wrong to average into a sweep. Checked here rather than discovered there.</span></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.graph_mode <span class="op">=</span> <span class="bu">bool</span>(params.get(<span class="st">"graph_mode"</span>, <span class="va">False</span>))</span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.snapshot_every <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"snapshot_every"</span>, <span class="dv">20</span>))</span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rebond_every <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"rebond_every"</span>, <span class="dv">20</span>))   <span class="co"># ongoing crosslinking</span></span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.aniso <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"aniso"</span>, <span class="fl">1.0</span>))          <span class="co"># circumferential : meridional stiffness</span></span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.record_hoop <span class="op">=</span> <span class="bu">bool</span>(params.get(<span class="st">"record_hoop"</span>, <span class="va">False</span>))</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.centre_t <span class="op">=</span> torch.tensor([<span class="bu">float</span>(v) <span class="cf">for</span> v <span class="kw">in</span> params.get(<span class="st">"centre"</span>, [<span class="fl">0.5</span>, <span class="fl">0.5</span>, <span class="fl">0.5</span>])])</span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the adhesion stiffness acting on the same nodes; the spec passes it so the ceiling can see it</span></span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.k_adh_hint <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"k_adhesion_hint"</span>, <span class="fl">0.0</span>))</span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.gamma <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"overdamped_gamma"</span>, <span class="fl">0.0</span>))</span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cutoff <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"cutoff"</span>, <span class="fl">0.020</span>))</span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.max_nb <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"max_neighbours"</span>, <span class="dv">6</span>))</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.damp <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"damp"</span>, <span class="fl">0.0</span>))</span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.i <span class="op">=</span> <span class="va">self</span>.j <span class="op">=</span> <span class="va">self</span>.rest <span class="op">=</span> <span class="va">self</span>.alive <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._said <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _check_stability(<span class="va">self</span>, bonds_per_node, dt_frame<span class="op">=</span><span class="fl">4.0e-3</span>):</span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Refuse a stiffness the frame-rate integration cannot carry.</span></span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a><span class="co">        CALIBRATED AGAINST A SWEEP, not derived and left. The textbook dt &lt; 2/omega using the crosslinks</span></span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a><span class="co">        alone gives 4.4e4; a measured sweep over k = 200..40,000 put the real transition between 5,000</span></span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a><span class="co">        and 10,000, six times lower:</span></span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a><span class="co">          k    200-5,000   bonds ~50,700   strain 0.101-0.106   stable</span></span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a><span class="co">          k       10,000   bonds  33,421   strain 0.114         transition</span></span>
+<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a><span class="co">          k   20,000+      bonds  63,615   strain 2.02          diverged</span></span>
+<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-93"><a href="#cb3-93" aria-hidden="true" tabindex="-1"></a><span class="co">        Two corrections to the textbook form. The INTEGRIN spring pulls on the same node, so it belongs</span></span>
+<span id="cb3-94"><a href="#cb3-94" aria-hidden="true" tabindex="-1"></a><span class="co">        in the effective stiffness; and the usable criterion with drag present is dt*omega &lt; 1, not the</span></span>
+<span id="cb3-95"><a href="#cb3-95" aria-hidden="true" tabindex="-1"></a><span class="co">        marginal 2. (The diverged runs also over-secrete -- 29k nodes against 11k -- because the</span></span>
+<span id="cb3-96"><a href="#cb3-96" aria-hidden="true" tabindex="-1"></a><span class="co">        secretion setpoint keys on mean radius and an exploding sheet has a large one. A numerical</span></span>
+<span id="cb3-97"><a href="#cb3-97" aria-hidden="true" tabindex="-1"></a><span class="co">        failure that reads as biology.)</span></span>
+<span id="cb3-98"><a href="#cb3-98" aria-hidden="true" tabindex="-1"></a><span class="co">        """</span></span>
+<span id="cb3-99"><a href="#cb3-99" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> <span class="va">self</span>.graph_mode:</span>
+<span id="cb3-100"><a href="#cb3-100" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span>                                   <span class="co"># MPM path: integrated at the substep, ~70 per period</span></span>
+<span id="cb3-101"><a href="#cb3-101" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE CRITERION DEPENDS ON WHICH EQUATION OF MOTION IS BEING INTEGRATED, and using the wrong one</span></span>
+<span id="cb3-102"><a href="#cb3-102" aria-hidden="true" tabindex="-1"></a>        <span class="co"># refuses exactly the runs that motivated the change. Inertial (v += dt*a) is a spring-mass</span></span>
+<span id="cb3-103"><a href="#cb3-103" aria-hidden="true" tabindex="-1"></a>        <span class="co"># oscillator, dt*sqrt(k_eff) &lt; 1. Overdamped (x += dt*F/gamma) is first order, dt*k_eff/gamma &lt; 2.</span></span>
+<span id="cb3-104"><a href="#cb3-104" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Either way k_eff is the sum over the node's OWN bonds plus its tether, not k alone.</span></span>
+<span id="cb3-105"><a href="#cb3-105" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-106"><a href="#cb3-106" aria-hidden="true" tabindex="-1"></a>        <span class="co">#     inertial     k_max = (1/dt^2 - kappa)/z   ~ 9.0e3</span></span>
+<span id="cb3-107"><a href="#cb3-107" aria-hidden="true" tabindex="-1"></a>        <span class="co">#     overdamped   k_max = (2*gamma/dt - kappa)/z ~ 1.7e5   at gamma = 2000</span></span>
+<span id="cb3-108"><a href="#cb3-108" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-109"><a href="#cb3-109" aria-hidden="true" tabindex="-1"></a>        <span class="co"># 19x, not the 120x I first claimed -- that figure dropped the coordination factor z, which is</span></span>
+<span id="cb3-110"><a href="#cb3-110" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the same term that made the first version of this guard 13x too generous.</span></span>
+<span id="cb3-111"><a href="#cb3-111" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-112"><a href="#cb3-112" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Worth stating because it changes what a stiffness sweep MEANS: overdamped, k and gamma enter</span></span>
+<span id="cb3-113"><a href="#cb3-113" aria-hidden="true" tabindex="-1"></a>        <span class="co"># only as k/gamma, a relaxation RATE. So the ceiling is not a property of the sheet, it can be</span></span>
+<span id="cb3-114"><a href="#cb3-114" aria-hidden="true" tabindex="-1"></a>        <span class="co"># moved by raising gamma -- at the cost of a sheet that responds more slowly than the tissue grows.</span></span>
+<span id="cb3-115"><a href="#cb3-115" aria-hidden="true" tabindex="-1"></a>        z <span class="op">=</span> <span class="bu">max</span>(bonds_per_node, <span class="fl">1.0</span>)</span>
+<span id="cb3-116"><a href="#cb3-116" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.gamma <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb3-117"><a href="#cb3-117" aria-hidden="true" tabindex="-1"></a>            k_max <span class="op">=</span> (<span class="fl">2.0</span> <span class="op">*</span> <span class="va">self</span>.gamma <span class="op">/</span> dt_frame <span class="op">-</span> <span class="va">self</span>.k_adh_hint) <span class="op">/</span> z</span>
+<span id="cb3-118"><a href="#cb3-118" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb3-119"><a href="#cb3-119" aria-hidden="true" tabindex="-1"></a>            k_max <span class="op">=</span> (<span class="fl">1.0</span> <span class="op">/</span> dt_frame <span class="op">**</span> <span class="dv">2</span> <span class="op">-</span> <span class="va">self</span>.k_adh_hint) <span class="op">/</span> z</span>
+<span id="cb3-120"><a href="#cb3-120" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.k <span class="op">&gt;</span> k_max:</span>
+<span id="cb3-121"><a href="#cb3-121" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> <span class="pp">RuntimeError</span>(</span>
+<span id="cb3-122"><a href="#cb3-122" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"bm_bond: k = </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>k<span class="sc">:.3g}</span><span class="ss"> exceeds the explicit-integration ceiling "</span></span>
+<span id="cb3-123"><a href="#cb3-123" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"</span><span class="sc">{</span>k_max<span class="sc">:.3g}</span><span class="ss"> for graph mode at dt = </span><span class="sc">{</span>dt_frame<span class="sc">:g}</span><span class="ss"> with </span><span class="sc">{</span>bonds_per_node<span class="sc">:.1f}</span><span class="ss"> bonds per "</span></span>
+<span id="cb3-124"><a href="#cb3-124" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"node. The spring graph is integrated once per FRAME, not at the MPM substep, so it "</span></span>
+<span id="cb3-125"><a href="#cb3-125" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"cannot carry the stiffness the MPM path could: this run would return an infinite "</span></span>
+<span id="cb3-126"><a href="#cb3-126" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"strain rather than a soft sheet. Either lower k, or give the membrane its own substep "</span></span>
+<span id="cb3-127"><a href="#cb3-127" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"loop (which is what moving off MPM gave up)."</span>)</span>
+<span id="cb3-128"><a href="#cb3-128" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-129"><a href="#cb3-129" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _neighbours_celllist(<span class="va">self</span>, pos, k):</span>
+<span id="cb3-130"><a href="#cb3-130" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""k nearest within `cutoff`, in O(N) instead of O(N^2), via a uniform cell list.</span></span>
+<span id="cb3-131"><a href="#cb3-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-132"><a href="#cb3-132" aria-hidden="true" tabindex="-1"></a><span class="co">        WHY THIS REPLACED THE CHUNKED PAIRWISE SEARCH. The old comment here said a grid hash was "more</span></span>
+<span id="cb3-133"><a href="#cb3-133" aria-hidden="true" tabindex="-1"></a><span class="co">        code for a cost paid a single time", which was true at 40k nodes and false the moment secretion</span></span>
+<span id="cb3-134"><a href="#cb3-134" aria-hidden="true" tabindex="-1"></a><span class="co">        started re-bonding and the deposition term began measuring local sparsity every frame. At 45k the</span></span>
+<span id="cb3-135"><a href="#cb3-135" aria-hidden="true" tabindex="-1"></a><span class="co">        pairwise form is 2e9 distances; at 500k it is 2.5e11, and it is no longer paid once.</span></span>
+<span id="cb3-136"><a href="#cb3-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-137"><a href="#cb3-137" aria-hidden="true" tabindex="-1"></a><span class="co">        Cell size IS the cutoff, so every neighbour within range lies in the particle's own cell or one</span></span>
+<span id="cb3-138"><a href="#cb3-138" aria-hidden="true" tabindex="-1"></a><span class="co">        of the 26 around it. On a shell at this density that is order 100 candidates per node rather than</span></span>
+<span id="cb3-139"><a href="#cb3-139" aria-hidden="true" tabindex="-1"></a><span class="co">        N, and the total work becomes linear.</span></span>
+<span id="cb3-140"><a href="#cb3-140" aria-hidden="true" tabindex="-1"></a><span class="co">        """</span></span>
+<span id="cb3-141"><a href="#cb3-141" aria-hidden="true" tabindex="-1"></a>        n <span class="op">=</span> pos.shape[<span class="dv">0</span>]</span>
+<span id="cb3-142"><a href="#cb3-142" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> pos.device</span>
+<span id="cb3-143"><a href="#cb3-143" aria-hidden="true" tabindex="-1"></a>        c <span class="op">=</span> torch.div(pos, <span class="va">self</span>.cutoff, rounding_mode<span class="op">=</span><span class="st">"floor"</span>).<span class="bu">long</span>()</span>
+<span id="cb3-144"><a href="#cb3-144" aria-hidden="true" tabindex="-1"></a>        c <span class="op">=</span> c <span class="op">-</span> c.<span class="bu">min</span>(<span class="dv">0</span>).values                                  <span class="co"># non-negative cell coords</span></span>
+<span id="cb3-145"><a href="#cb3-145" aria-hidden="true" tabindex="-1"></a>        G <span class="op">=</span> <span class="bu">int</span>(c.<span class="bu">max</span>().item()) <span class="op">+</span> <span class="dv">2</span></span>
+<span id="cb3-146"><a href="#cb3-146" aria-hidden="true" tabindex="-1"></a>        cid <span class="op">=</span> (c[:, <span class="dv">0</span>] <span class="op">*</span> G <span class="op">+</span> c[:, <span class="dv">1</span>]) <span class="op">*</span> G <span class="op">+</span> c[:, <span class="dv">2</span>]</span>
+<span id="cb3-147"><a href="#cb3-147" aria-hidden="true" tabindex="-1"></a>        order <span class="op">=</span> torch.argsort(cid)</span>
+<span id="cb3-148"><a href="#cb3-148" aria-hidden="true" tabindex="-1"></a>        cid_s <span class="op">=</span> cid[order]</span>
+<span id="cb3-149"><a href="#cb3-149" aria-hidden="true" tabindex="-1"></a>        uniq, counts <span class="op">=</span> torch.unique_consecutive(cid_s, return_counts<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-150"><a href="#cb3-150" aria-hidden="true" tabindex="-1"></a>        starts <span class="op">=</span> torch.cumsum(counts, <span class="dv">0</span>) <span class="op">-</span> counts</span>
+<span id="cb3-151"><a href="#cb3-151" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-152"><a href="#cb3-152" aria-hidden="true" tabindex="-1"></a>        off <span class="op">=</span> torch.tensor([[dx, dy, dz] <span class="cf">for</span> dx <span class="kw">in</span> (<span class="op">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">1</span>) <span class="cf">for</span> dy <span class="kw">in</span> (<span class="op">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">1</span>) <span class="cf">for</span> dz <span class="kw">in</span> (<span class="op">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">1</span>)],</span>
+<span id="cb3-153"><a href="#cb3-153" aria-hidden="true" tabindex="-1"></a>                           device<span class="op">=</span>dev, dtype<span class="op">=</span>torch.<span class="bu">long</span>)</span>
+<span id="cb3-154"><a href="#cb3-154" aria-hidden="true" tabindex="-1"></a>        best_d <span class="op">=</span> torch.full((n, k), <span class="fl">1e9</span>, device<span class="op">=</span>dev, dtype<span class="op">=</span>pos.dtype)</span>
+<span id="cb3-155"><a href="#cb3-155" aria-hidden="true" tabindex="-1"></a>        best_j <span class="op">=</span> torch.zeros((n, k), device<span class="op">=</span>dev, dtype<span class="op">=</span>torch.<span class="bu">long</span>)</span>
+<span id="cb3-156"><a href="#cb3-156" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> o <span class="kw">in</span> off:</span>
+<span id="cb3-157"><a href="#cb3-157" aria-hidden="true" tabindex="-1"></a>            nid <span class="op">=</span> ((c[:, <span class="dv">0</span>] <span class="op">+</span> o[<span class="dv">0</span>]) <span class="op">*</span> G <span class="op">+</span> (c[:, <span class="dv">1</span>] <span class="op">+</span> o[<span class="dv">1</span>])) <span class="op">*</span> G <span class="op">+</span> (c[:, <span class="dv">2</span>] <span class="op">+</span> o[<span class="dv">2</span>])</span>
+<span id="cb3-158"><a href="#cb3-158" aria-hidden="true" tabindex="-1"></a>            slot <span class="op">=</span> torch.searchsorted(uniq, nid).clamp(<span class="bu">max</span><span class="op">=</span>uniq.numel() <span class="op">-</span> <span class="dv">1</span>)</span>
+<span id="cb3-159"><a href="#cb3-159" aria-hidden="true" tabindex="-1"></a>            ok <span class="op">=</span> uniq[slot] <span class="op">==</span> nid</span>
+<span id="cb3-160"><a href="#cb3-160" aria-hidden="true" tabindex="-1"></a>            cnt <span class="op">=</span> torch.where(ok, counts[slot], torch.zeros_like(counts[slot]))</span>
+<span id="cb3-161"><a href="#cb3-161" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="bu">int</span>(cnt.<span class="bu">max</span>()) <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb3-162"><a href="#cb3-162" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
+<span id="cb3-163"><a href="#cb3-163" aria-hidden="true" tabindex="-1"></a>            m <span class="op">=</span> <span class="bu">int</span>(cnt.<span class="bu">max</span>())</span>
+<span id="cb3-164"><a href="#cb3-164" aria-hidden="true" tabindex="-1"></a>            <span class="co"># a fixed (n, m) candidate block per offset: m is the fullest cell, single digits here</span></span>
+<span id="cb3-165"><a href="#cb3-165" aria-hidden="true" tabindex="-1"></a>            ar <span class="op">=</span> torch.arange(m, device<span class="op">=</span>dev)[<span class="va">None</span>, :]</span>
+<span id="cb3-166"><a href="#cb3-166" aria-hidden="true" tabindex="-1"></a>            valid <span class="op">=</span> ar <span class="op">&lt;</span> cnt[:, <span class="va">None</span>]</span>
+<span id="cb3-167"><a href="#cb3-167" aria-hidden="true" tabindex="-1"></a>            idx <span class="op">=</span> (starts[slot][:, <span class="va">None</span>] <span class="op">+</span> ar).clamp(<span class="bu">max</span><span class="op">=</span>n <span class="op">-</span> <span class="dv">1</span>)</span>
+<span id="cb3-168"><a href="#cb3-168" aria-hidden="true" tabindex="-1"></a>            cand <span class="op">=</span> order[idx]</span>
+<span id="cb3-169"><a href="#cb3-169" aria-hidden="true" tabindex="-1"></a>            d <span class="op">=</span> (pos[:, <span class="va">None</span>, :] <span class="op">-</span> pos[cand]).norm(dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb3-170"><a href="#cb3-170" aria-hidden="true" tabindex="-1"></a>            d <span class="op">=</span> torch.where(valid <span class="op">&amp;</span> (cand <span class="op">!=</span> torch.arange(n, device<span class="op">=</span>dev)[:, <span class="va">None</span>]), d,</span>
+<span id="cb3-171"><a href="#cb3-171" aria-hidden="true" tabindex="-1"></a>                            torch.full_like(d, <span class="fl">1e9</span>))</span>
+<span id="cb3-172"><a href="#cb3-172" aria-hidden="true" tabindex="-1"></a>            allj <span class="op">=</span> torch.cat([best_j, cand], <span class="dv">1</span>)</span>
+<span id="cb3-173"><a href="#cb3-173" aria-hidden="true" tabindex="-1"></a>            alld <span class="op">=</span> torch.cat([best_d, d], <span class="dv">1</span>)</span>
+<span id="cb3-174"><a href="#cb3-174" aria-hidden="true" tabindex="-1"></a>            sel <span class="op">=</span> torch.topk(<span class="op">-</span>alld, k, dim<span class="op">=</span><span class="dv">1</span>).indices</span>
+<span id="cb3-175"><a href="#cb3-175" aria-hidden="true" tabindex="-1"></a>            best_d <span class="op">=</span> torch.gather(alld, <span class="dv">1</span>, sel)</span>
+<span id="cb3-176"><a href="#cb3-176" aria-hidden="true" tabindex="-1"></a>            best_j <span class="op">=</span> torch.gather(allj, <span class="dv">1</span>, sel)</span>
+<span id="cb3-177"><a href="#cb3-177" aria-hidden="true" tabindex="-1"></a>        keep <span class="op">=</span> best_d <span class="op">&lt;=</span> <span class="va">self</span>.cutoff</span>
+<span id="cb3-178"><a href="#cb3-178" aria-hidden="true" tabindex="-1"></a>        rows <span class="op">=</span> torch.arange(n, device<span class="op">=</span>dev)[:, <span class="va">None</span>].expand_as(best_j)</span>
+<span id="cb3-179"><a href="#cb3-179" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> rows[keep], best_j[keep]</span>
+<span id="cb3-180"><a href="#cb3-180" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-181"><a href="#cb3-181" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _build(<span class="va">self</span>, pos, live<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-182"><a href="#cb3-182" aria-hidden="true" tabindex="-1"></a>        <span class="co"># O(N^2) ONCE, at frame 0, in chunks. 20-40k particles is 1.6e9 pairs if done in one tensor, so</span></span>
+<span id="cb3-183"><a href="#cb3-183" aria-hidden="true" tabindex="-1"></a>        <span class="co"># it is chunked; it runs once, and the alternative (a grid hash) is more code for a cost paid</span></span>
+<span id="cb3-184"><a href="#cb3-184" aria-hidden="true" tabindex="-1"></a>        <span class="co"># a single time.</span></span>
+<span id="cb3-185"><a href="#cb3-185" aria-hidden="true" tabindex="-1"></a>        n <span class="op">=</span> pos.shape[<span class="dv">0</span>]</span>
+<span id="cb3-186"><a href="#cb3-186" aria-hidden="true" tabindex="-1"></a>        <span class="co"># COMPACT TO THE LIVE NODES FIRST, then map back. Filtering afterwards is what the pairwise path</span></span>
+<span id="cb3-187"><a href="#cb3-187" aria-hidden="true" tabindex="-1"></a>        <span class="co"># did and it was affordable there; for the cell list it is fatal. The unsecreted reserve is parked</span></span>
+<span id="cb3-188"><a href="#cb3-188" aria-hidden="true" tabindex="-1"></a>        <span class="co"># at a SINGLE POINT (the tissue centre), so with a cell the size of the cutoff that one cell holds</span></span>
+<span id="cb3-189"><a href="#cb3-189" aria-hidden="true" tabindex="-1"></a>        <span class="co"># every dormant particle -- 41,667 of them at reserve 12.5. The candidate block is sized by the</span></span>
+<span id="cb3-190"><a href="#cb3-190" aria-hidden="true" tabindex="-1"></a>        <span class="co"># fullest cell, so it became (45000, 41667, 3): a 14 GiB allocation that killed six jobs on a 22</span></span>
+<span id="cb3-191"><a href="#cb3-191" aria-hidden="true" tabindex="-1"></a>        <span class="co"># GiB card. Bonds can only ever form between live nodes, so they are the only ones to search.</span></span>
+<span id="cb3-192"><a href="#cb3-192" aria-hidden="true" tabindex="-1"></a>        idx <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb3-193"><a href="#cb3-193" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> live <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb3-194"><a href="#cb3-194" aria-hidden="true" tabindex="-1"></a>            idx <span class="op">=</span> live.nonzero(as_tuple<span class="op">=</span><span class="va">True</span>)[<span class="dv">0</span>]</span>
+<span id="cb3-195"><a href="#cb3-195" aria-hidden="true" tabindex="-1"></a>            sub <span class="op">=</span> pos[idx]</span>
+<span id="cb3-196"><a href="#cb3-196" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb3-197"><a href="#cb3-197" aria-hidden="true" tabindex="-1"></a>            sub <span class="op">=</span> pos</span>
+<span id="cb3-198"><a href="#cb3-198" aria-hidden="true" tabindex="-1"></a>        m <span class="op">=</span> sub.shape[<span class="dv">0</span>]</span>
+<span id="cb3-199"><a href="#cb3-199" aria-hidden="true" tabindex="-1"></a>        k <span class="op">=</span> <span class="bu">min</span>(<span class="va">self</span>.max_nb, <span class="bu">max</span>(m <span class="op">-</span> <span class="dv">1</span>, <span class="dv">1</span>))</span>
+<span id="cb3-200"><a href="#cb3-200" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> m <span class="op">&gt;</span> <span class="dv">20000</span>:</span>
+<span id="cb3-201"><a href="#cb3-201" aria-hidden="true" tabindex="-1"></a>            i, j <span class="op">=</span> <span class="va">self</span>._neighbours_celllist(sub, k)</span>
+<span id="cb3-202"><a href="#cb3-202" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb3-203"><a href="#cb3-203" aria-hidden="true" tabindex="-1"></a>            i, j <span class="op">=</span> <span class="va">self</span>._build_pairwise(sub, k)</span>
+<span id="cb3-204"><a href="#cb3-204" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> idx <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb3-205"><a href="#cb3-205" aria-hidden="true" tabindex="-1"></a>            i, j <span class="op">=</span> idx[i], idx[j]</span>
+<span id="cb3-206"><a href="#cb3-206" aria-hidden="true" tabindex="-1"></a>        n2 <span class="op">=</span> n <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb3-207"><a href="#cb3-207" aria-hidden="true" tabindex="-1"></a>        uk <span class="op">=</span> torch.unique(torch.minimum(i, j) <span class="op">*</span> n2 <span class="op">+</span> torch.maximum(i, j))</span>
+<span id="cb3-208"><a href="#cb3-208" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (uk <span class="op">//</span> n2).<span class="bu">long</span>(), (uk <span class="op">%</span> n2).<span class="bu">long</span>()</span>
+<span id="cb3-209"><a href="#cb3-209" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-210"><a href="#cb3-210" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _build_pairwise(<span class="va">self</span>, pos, k):</span>
+<span id="cb3-211"><a href="#cb3-211" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""The original chunked O(N^2) search, kept as the reference the cell list is checked against."""</span></span>
+<span id="cb3-212"><a href="#cb3-212" aria-hidden="true" tabindex="-1"></a>        n <span class="op">=</span> pos.shape[<span class="dv">0</span>]</span>
+<span id="cb3-213"><a href="#cb3-213" aria-hidden="true" tabindex="-1"></a>        I, J <span class="op">=</span> [], []</span>
+<span id="cb3-214"><a href="#cb3-214" aria-hidden="true" tabindex="-1"></a>        step <span class="op">=</span> <span class="bu">max</span>(<span class="dv">1</span>, <span class="dv">4096</span> <span class="op">**</span> <span class="dv">2</span> <span class="op">//</span> <span class="bu">max</span>(n, <span class="dv">1</span>))</span>
+<span id="cb3-215"><a href="#cb3-215" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> a <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">0</span>, n, step):</span>
+<span id="cb3-216"><a href="#cb3-216" aria-hidden="true" tabindex="-1"></a>            b <span class="op">=</span> <span class="bu">min</span>(n, a <span class="op">+</span> step)</span>
+<span id="cb3-217"><a href="#cb3-217" aria-hidden="true" tabindex="-1"></a>            d <span class="op">=</span> (pos[a:b, <span class="va">None</span>, :] <span class="op">-</span> pos[<span class="va">None</span>, :, :]).norm(dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb3-218"><a href="#cb3-218" aria-hidden="true" tabindex="-1"></a>            d[:, :] <span class="op">=</span> torch.where(d <span class="op">&gt;</span> <span class="dv">0</span>, d, torch.full_like(d, <span class="fl">1e9</span>))</span>
+<span id="cb3-219"><a href="#cb3-219" aria-hidden="true" tabindex="-1"></a>            near <span class="op">=</span> d <span class="op">&lt;=</span> <span class="va">self</span>.cutoff</span>
+<span id="cb3-220"><a href="#cb3-220" aria-hidden="true" tabindex="-1"></a>            k <span class="op">=</span> <span class="bu">min</span>(<span class="va">self</span>.max_nb, n <span class="op">-</span> <span class="dv">1</span>)</span>
+<span id="cb3-221"><a href="#cb3-221" aria-hidden="true" tabindex="-1"></a>            idx <span class="op">=</span> torch.topk(torch.where(near, <span class="op">-</span>d, torch.full_like(d, <span class="op">-</span><span class="fl">1e9</span>)), k, dim<span class="op">=</span><span class="dv">1</span>).indices</span>
+<span id="cb3-222"><a href="#cb3-222" aria-hidden="true" tabindex="-1"></a>            keep <span class="op">=</span> torch.gather(near, <span class="dv">1</span>, idx)</span>
+<span id="cb3-223"><a href="#cb3-223" aria-hidden="true" tabindex="-1"></a>            rows <span class="op">=</span> (torch.arange(a, b, device<span class="op">=</span>pos.device)[:, <span class="va">None</span>]).expand_as(idx)</span>
+<span id="cb3-224"><a href="#cb3-224" aria-hidden="true" tabindex="-1"></a>            I.append(rows[keep])<span class="op">;</span> J.append(idx[keep])</span>
+<span id="cb3-225"><a href="#cb3-225" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> torch.cat(I), torch.cat(J)</span>
+<span id="cb3-226"><a href="#cb3-226" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-227"><a href="#cb3-227" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-228"><a href="#cb3-228" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb3-229"><a href="#cb3-229" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)</span>
+<span id="cb3-230"><a href="#cb3-230" aria-hidden="true" tabindex="-1"></a>        dev, dt_ <span class="op">=</span> pos.device, pos.dtype</span>
+<span id="cb3-231"><a href="#cb3-231" aria-hidden="true" tabindex="-1"></a>        <span class="co"># BONDED INCREMENTALLY, NOT REBUILT. The first version recomputed the whole network whenever</span></span>
+<span id="cb3-232"><a href="#cb3-232" aria-hidden="true" tabindex="-1"></a>        <span class="co"># secretion fired, and the run stalled at frame 1: `_build` is an O(n^2) neighbour search over</span></span>
+<span id="cb3-233"><a href="#cb3-233" aria-hidden="true" tabindex="-1"></a>        <span class="co"># 30k particles, which is affordable once at seeding and not once per frame. Secretion adds a few</span></span>
+<span id="cb3-234"><a href="#cb3-234" aria-hidden="true" tabindex="-1"></a>        <span class="co"># hundred particles at a time, so only THEY need neighbours -- and bonding only the new material</span></span>
+<span id="cb3-235"><a href="#cb3-235" aria-hidden="true" tabindex="-1"></a>        <span class="co"># carries every existing rest length forward untouched, which the rebuild had to reconstruct by</span></span>
+<span id="cb3-236"><a href="#cb3-236" aria-hidden="true" tabindex="-1"></a>        <span class="co"># key just to avoid erasing the remodelling history.</span></span>
+<span id="cb3-237"><a href="#cb3-237" aria-hidden="true" tabindex="-1"></a>        <span class="co"># CROSSLINKS FORMED BY THE REWIRE OPERATOR, appended here. `bm_crosslink` decides</span></span>
+<span id="cb3-238"><a href="#cb3-238" aria-hidden="true" tabindex="-1"></a>        <span class="co"># WHICH pairs bond -- that is a change to the edge set and belongs in a `rewire` operator, beside</span></span>
+<span id="cb3-239"><a href="#cb3-239" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `bm_unbond` -- while this operator stays the owner of the bond arrays. Same</span></span>
+<span id="cb3-240"><a href="#cb3-240" aria-hidden="true" tabindex="-1"></a>        <span class="co"># split as secretion: the structural operator chooses, this one wires in.</span></span>
+<span id="cb3-241"><a href="#cb3-241" aria-hidden="true" tabindex="-1"></a>        _rb <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"membrane_rebond"</span>, <span class="va">None</span>)</span>
+<span id="cb3-242"><a href="#cb3-242" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> _rb <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="va">self</span>.i <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> _rb[<span class="dv">0</span>].numel():</span>
+<span id="cb3-243"><a href="#cb3-243" aria-hidden="true" tabindex="-1"></a>            H.membrane_rebond <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb3-244"><a href="#cb3-244" aria-hidden="true" tabindex="-1"></a>            ai, aj <span class="op">=</span> _rb</span>
+<span id="cb3-245"><a href="#cb3-245" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.i <span class="op">=</span> torch.cat([<span class="va">self</span>.i, ai])<span class="op">;</span> <span class="va">self</span>.j <span class="op">=</span> torch.cat([<span class="va">self</span>.j, aj])</span>
+<span id="cb3-246"><a href="#cb3-246" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.rest <span class="op">=</span> torch.cat([<span class="va">self</span>.rest, (pos[aj] <span class="op">-</span> pos[ai]).norm(dim<span class="op">=-</span><span class="dv">1</span>).detach().clamp_min(<span class="fl">1e-9</span>)])</span>
+<span id="cb3-247"><a href="#cb3-247" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.alive <span class="op">=</span> torch.cat([<span class="va">self</span>.alive, torch.ones(ai.numel(), dtype<span class="op">=</span>torch.<span class="bu">bool</span>, device<span class="op">=</span>dev)])</span>
+<span id="cb3-248"><a href="#cb3-248" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-249"><a href="#cb3-249" aria-hidden="true" tabindex="-1"></a>        new <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"membrane_new"</span>, <span class="va">None</span>)</span>
+<span id="cb3-250"><a href="#cb3-250" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> new <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="va">self</span>.i <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> new.numel():</span>
+<span id="cb3-251"><a href="#cb3-251" aria-hidden="true" tabindex="-1"></a>            H.membrane_new <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb3-252"><a href="#cb3-252" aria-hidden="true" tabindex="-1"></a>            live <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"membrane_alive"</span>, <span class="va">None</span>)</span>
+<span id="cb3-253"><a href="#cb3-253" aria-hidden="true" tabindex="-1"></a>            p <span class="op">=</span> pos.detach()</span>
+<span id="cb3-254"><a href="#cb3-254" aria-hidden="true" tabindex="-1"></a>            d <span class="op">=</span> (p[new][:, <span class="va">None</span>, :] <span class="op">-</span> p[<span class="va">None</span>, :, :]).norm(dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb3-255"><a href="#cb3-255" aria-hidden="true" tabindex="-1"></a>            d[torch.arange(new.numel(), device<span class="op">=</span>p.device), new] <span class="op">=</span> <span class="fl">1e9</span></span>
+<span id="cb3-256"><a href="#cb3-256" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> live <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb3-257"><a href="#cb3-257" aria-hidden="true" tabindex="-1"></a>                d <span class="op">=</span> torch.where(live[<span class="va">None</span>, :], d, torch.full_like(d, <span class="fl">1e9</span>))</span>
+<span id="cb3-258"><a href="#cb3-258" aria-hidden="true" tabindex="-1"></a>            k <span class="op">=</span> <span class="bu">min</span>(<span class="va">self</span>.max_nb, p.shape[<span class="dv">0</span>] <span class="op">-</span> <span class="dv">1</span>)</span>
+<span id="cb3-259"><a href="#cb3-259" aria-hidden="true" tabindex="-1"></a>            idx <span class="op">=</span> torch.topk(<span class="op">-</span>d, k, dim<span class="op">=</span><span class="dv">1</span>).indices</span>
+<span id="cb3-260"><a href="#cb3-260" aria-hidden="true" tabindex="-1"></a>            keep <span class="op">=</span> torch.gather(d, <span class="dv">1</span>, idx) <span class="op">&lt;=</span> <span class="va">self</span>.cutoff</span>
+<span id="cb3-261"><a href="#cb3-261" aria-hidden="true" tabindex="-1"></a>            rows <span class="op">=</span> new[:, <span class="va">None</span>].expand_as(idx)</span>
+<span id="cb3-262"><a href="#cb3-262" aria-hidden="true" tabindex="-1"></a>            ni, nj <span class="op">=</span> rows[keep], idx[keep]</span>
+<span id="cb3-263"><a href="#cb3-263" aria-hidden="true" tabindex="-1"></a>            n2 <span class="op">=</span> p.shape[<span class="dv">0</span>] <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb3-264"><a href="#cb3-264" aria-hidden="true" tabindex="-1"></a>            key_new <span class="op">=</span> torch.minimum(ni, nj) <span class="op">*</span> n2 <span class="op">+</span> torch.maximum(ni, nj)</span>
+<span id="cb3-265"><a href="#cb3-265" aria-hidden="true" tabindex="-1"></a>            key_old <span class="op">=</span> torch.minimum(<span class="va">self</span>.i, <span class="va">self</span>.j) <span class="op">*</span> n2 <span class="op">+</span> torch.maximum(<span class="va">self</span>.i, <span class="va">self</span>.j)</span>
+<span id="cb3-266"><a href="#cb3-266" aria-hidden="true" tabindex="-1"></a>            fresh <span class="op">=</span> torch.unique(key_new)</span>
+<span id="cb3-267"><a href="#cb3-267" aria-hidden="true" tabindex="-1"></a>            fresh <span class="op">=</span> fresh[<span class="op">~</span>torch.isin(fresh, key_old)]</span>
+<span id="cb3-268"><a href="#cb3-268" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> fresh.numel():</span>
+<span id="cb3-269"><a href="#cb3-269" aria-hidden="true" tabindex="-1"></a>                ai, aj <span class="op">=</span> (fresh <span class="op">//</span> n2).<span class="bu">long</span>(), (fresh <span class="op">%</span> n2).<span class="bu">long</span>()</span>
+<span id="cb3-270"><a href="#cb3-270" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>.i <span class="op">=</span> torch.cat([<span class="va">self</span>.i, ai])<span class="op">;</span> <span class="va">self</span>.j <span class="op">=</span> torch.cat([<span class="va">self</span>.j, aj])</span>
+<span id="cb3-271"><a href="#cb3-271" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>.rest <span class="op">=</span> torch.cat([<span class="va">self</span>.rest,</span>
+<span id="cb3-272"><a href="#cb3-272" aria-hidden="true" tabindex="-1"></a>                                       (p[aj] <span class="op">-</span> p[ai]).norm(dim<span class="op">=-</span><span class="dv">1</span>).clamp_min(<span class="fl">1e-9</span>)])</span>
+<span id="cb3-273"><a href="#cb3-273" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>.alive <span class="op">=</span> torch.cat([<span class="va">self</span>.alive,</span>
+<span id="cb3-274"><a href="#cb3-274" aria-hidden="true" tabindex="-1"></a>                                        torch.ones(ai.numel(), dtype<span class="op">=</span>torch.<span class="bu">bool</span>, device<span class="op">=</span>p.device)])</span>
+<span id="cb3-275"><a href="#cb3-275" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.i <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb3-276"><a href="#cb3-276" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.i, <span class="va">self</span>.j <span class="op">=</span> <span class="va">self</span>._build(pos.detach(), <span class="bu">getattr</span>(H, <span class="st">"membrane_alive"</span>, <span class="va">None</span>))</span>
+<span id="cb3-277"><a href="#cb3-277" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.rest <span class="op">=</span> (pos[<span class="va">self</span>.j] <span class="op">-</span> pos[<span class="va">self</span>.i]).norm(dim<span class="op">=-</span><span class="dv">1</span>).detach().clamp_min(<span class="fl">1e-9</span>)</span>
+<span id="cb3-278"><a href="#cb3-278" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.alive <span class="op">=</span> torch.ones_like(<span class="va">self</span>.rest, dtype<span class="op">=</span>torch.<span class="bu">bool</span>)</span>
+<span id="cb3-279"><a href="#cb3-279" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="va">self</span>.i.numel() <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb3-280"><a href="#cb3-280" aria-hidden="true" tabindex="-1"></a>                <span class="cf">raise</span> <span class="pp">RuntimeError</span>(</span>
+<span id="cb3-281"><a href="#cb3-281" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"bm_bond: ZERO bonds among </span><span class="sc">{</span>pos<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">}</span><span class="ss"> particles at cutoff "</span></span>
+<span id="cb3-282"><a href="#cb3-282" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cutoff<span class="sc">:g}</span><span class="ss">. A membrane with no crosslinks is not a membrane -- it is stiff "</span></span>
+<span id="cb3-283"><a href="#cb3-283" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"dust, and every downstream fragmentation number would be vacuous. Either the "</span></span>
+<span id="cb3-284"><a href="#cb3-284" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"shell was seeded at the wrong scale or the cutoff is below the particle spacing "</span></span>
+<span id="cb3-285"><a href="#cb3-285" aria-hidden="true" tabindex="-1"></a>                    <span class="ss">f"(~sqrt(4*pi*R^2/N))."</span>)</span>
+<span id="cb3-286"><a href="#cb3-286" aria-hidden="true" tabindex="-1"></a>            <span class="co"># LIVE nodes, not the whole set. Dividing by all 45,000 -- of which 41,000 are unsecreted</span></span>
+<span id="cb3-287"><a href="#cb3-287" aria-hidden="true" tabindex="-1"></a>            <span class="co"># reserve parked at the centre -- gave 0.42 bonds per node instead of 5.6, a ceiling 13x too</span></span>
+<span id="cb3-288"><a href="#cb3-288" aria-hidden="true" tabindex="-1"></a>            <span class="co"># high, and the guard passed a run that returned an infinite strain. A denominator that</span></span>
+<span id="cb3-289"><a href="#cb3-289" aria-hidden="true" tabindex="-1"></a>            <span class="co"># includes material which does not exist yet is not a coordination number.</span></span>
+<span id="cb3-290"><a href="#cb3-290" aria-hidden="true" tabindex="-1"></a>            _live <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"membrane_alive"</span>, <span class="va">None</span>)</span>
+<span id="cb3-291"><a href="#cb3-291" aria-hidden="true" tabindex="-1"></a>            _n <span class="op">=</span> <span class="bu">int</span>(_live.<span class="bu">sum</span>()) <span class="cf">if</span> _live <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> pos.shape[<span class="dv">0</span>]</span>
+<span id="cb3-292"><a href="#cb3-292" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._check_stability(<span class="va">self</span>.i.numel() <span class="op">/</span> <span class="bu">max</span>(_n, <span class="dv">1</span>) <span class="op">*</span> <span class="fl">2.0</span>)</span>
+<span id="cb3-293"><a href="#cb3-293" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"[bm_bond] </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>i<span class="sc">.</span>numel()<span class="sc">}</span><span class="ss"> bonds on </span><span class="sc">{</span>pos<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">}</span><span class="ss"> particles "</span></span>
+<span id="cb3-294"><a href="#cb3-294" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"(</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>i<span class="sc">.</span>numel() <span class="op">/</span> <span class="bu">max</span>(pos.shape[<span class="dv">0</span>], <span class="dv">1</span>)<span class="sc">:.1f}</span><span class="ss"> per particle), k=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>k<span class="sc">:g}</span><span class="ss">, "</span></span>
+<span id="cb3-295"><a href="#cb3-295" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"cutoff=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cutoff<span class="sc">:g}</span><span class="ss">"</span>, flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-296"><a href="#cb3-296" aria-hidden="true" tabindex="-1"></a>        d <span class="op">=</span> pos[<span class="va">self</span>.j] <span class="op">-</span> pos[<span class="va">self</span>.i]</span>
+<span id="cb3-297"><a href="#cb3-297" aria-hidden="true" tabindex="-1"></a>        L <span class="op">=</span> d.norm(dim<span class="op">=-</span><span class="dv">1</span>).clamp_min(<span class="fl">1e-9</span>)</span>
+<span id="cb3-298"><a href="#cb3-298" aria-hidden="true" tabindex="-1"></a>        strain <span class="op">=</span> (L <span class="op">-</span> <span class="va">self</span>.rest) <span class="op">/</span> <span class="va">self</span>.rest</span>
+<span id="cb3-299"><a href="#cb3-299" aria-hidden="true" tabindex="-1"></a>        <span class="co"># HOOKEAN IN THE EXTENSION, NOT IN THE STRAIN. `k * strain` is `k * (L - rest) / rest`, and</span></span>
+<span id="cb3-300"><a href="#cb3-300" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `rest` is the particle spacing -- a small number -- so writing the force that way scales</span></span>
+<span id="cb3-301"><a href="#cb3-301" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the declared stiffness by 1/rest, a factor of several hundred at a typical spacing. One</span></span>
+<span id="cb3-302"><a href="#cb3-302" aria-hidden="true" tabindex="-1"></a>        <span class="co"># percent of strain then produces an acceleration that moves a particle several times its</span></span>
+<span id="cb3-303"><a href="#cb3-303" aria-hidden="true" tabindex="-1"></a>        <span class="co"># own spacing in a frame, and the sheet overshoots, oscillates and tears itself apart</span></span>
+<span id="cb3-304"><a href="#cb3-304" aria-hidden="true" tabindex="-1"></a>        <span class="co"># before the tissue has grown into it. The BREAKING criterion stays relative, since strain</span></span>
+<span id="cb3-305"><a href="#cb3-305" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is the right dimensionless failure measure; only the force is extension-based.</span></span>
+<span id="cb3-306"><a href="#cb3-306" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE CORSET. `aniso` makes crosslinks stiffer around the girth than along the long axis, which</span></span>
+<span id="cb3-307"><a href="#cb3-307" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is the "molecular corset" idea: a sheet that resists circumferential expansion more than</span></span>
+<span id="cb3-308"><a href="#cb3-308" aria-hidden="true" tabindex="-1"></a>        <span class="co"># meridional expansion should squeeze the middle and push growth into the ends.</span></span>
+<span id="cb3-309"><a href="#cb3-309" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-310"><a href="#cb3-310" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A bond's orientation is measured against the local parallel (the circle of latitude): a bond</span></span>
+<span id="cb3-311"><a href="#cb3-311" aria-hidden="true" tabindex="-1"></a>        <span class="co"># lying along it is circumferential and gets the full factor, one lying along the meridian gets</span></span>
+<span id="cb3-312"><a href="#cb3-312" aria-hidden="true" tabindex="-1"></a>        <span class="co"># none. `aniso = 1` is isotropic and reproduces every run to date bit-for-bit.</span></span>
+<span id="cb3-313"><a href="#cb3-313" aria-hidden="true" tabindex="-1"></a>        kk <span class="op">=</span> <span class="va">self</span>.k</span>
+<span id="cb3-314"><a href="#cb3-314" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.aniso <span class="op">!=</span> <span class="fl">1.0</span>:</span>
+<span id="cb3-315"><a href="#cb3-315" aria-hidden="true" tabindex="-1"></a>            mid <span class="op">=</span> <span class="fl">0.5</span> <span class="op">*</span> (pos[<span class="va">self</span>.i] <span class="op">+</span> pos[<span class="va">self</span>.j]) <span class="op">-</span> <span class="va">self</span>.centre_t.to(pos)</span>
+<span id="cb3-316"><a href="#cb3-316" aria-hidden="true" tabindex="-1"></a>            rad <span class="op">=</span> mid <span class="op">/</span> mid.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp_min(<span class="fl">1e-12</span>)</span>
+<span id="cb3-317"><a href="#cb3-317" aria-hidden="true" tabindex="-1"></a>            axis <span class="op">=</span> torch.tensor([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>], device<span class="op">=</span>pos.device, dtype<span class="op">=</span>dt_)</span>
+<span id="cb3-318"><a href="#cb3-318" aria-hidden="true" tabindex="-1"></a>            par <span class="op">=</span> torch.cross(axis.expand_as(rad), rad, dim<span class="op">=</span><span class="dv">1</span>)          <span class="co"># local circle of latitude</span></span>
+<span id="cb3-319"><a href="#cb3-319" aria-hidden="true" tabindex="-1"></a>            <span class="co"># ITS LENGTH IS sin(colatitude), AND THAT IS PHYSICS, NOT A NORMALISATION NUISANCE. The</span></span>
+<span id="cb3-320"><a href="#cb3-320" aria-hidden="true" tabindex="-1"></a>            <span class="co"># circumferential direction is undefined at the poles, where the parallels shrink to a point.</span></span>
+<span id="cb3-321"><a href="#cb3-321" aria-hidden="true" tabindex="-1"></a>            <span class="co"># Normalising with a clamp turned that near-zero vector into a unit vector of NOISE, so polar</span></span>
+<span id="cb3-322"><a href="#cb3-322" aria-hidden="true" tabindex="-1"></a>            <span class="co"># bonds drew a random stiffness boost instead of none -- and the recorded hoop tension came</span></span>
+<span id="cb3-323"><a href="#cb3-323" aria-hidden="true" tabindex="-1"></a>            <span class="co"># out HIGHER at the poles than the equator (8.63 against 7.01), which is a corset backwards.</span></span>
+<span id="cb3-324"><a href="#cb3-324" aria-hidden="true" tabindex="-1"></a>            <span class="co">#</span></span>
+<span id="cb3-325"><a href="#cb3-325" aria-hidden="true" tabindex="-1"></a>            <span class="co"># Keeping the length as a weight makes the anisotropy vanish smoothly toward the poles, which</span></span>
+<span id="cb3-326"><a href="#cb3-326" aria-hidden="true" tabindex="-1"></a>            <span class="co"># is what a corset does: it grips the girth and nothing at the ends.</span></span>
+<span id="cb3-327"><a href="#cb3-327" aria-hidden="true" tabindex="-1"></a>            sin_th <span class="op">=</span> par.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-328"><a href="#cb3-328" aria-hidden="true" tabindex="-1"></a>            par <span class="op">=</span> par <span class="op">/</span> sin_th.clamp_min(<span class="fl">1e-12</span>)</span>
+<span id="cb3-329"><a href="#cb3-329" aria-hidden="true" tabindex="-1"></a>            circ <span class="op">=</span> ((d <span class="op">/</span> L[:, <span class="va">None</span>]) <span class="op">*</span> par).<span class="bu">sum</span>(<span class="dv">1</span>).<span class="bu">abs</span>() <span class="op">*</span> sin_th[:, <span class="dv">0</span>]</span>
+<span id="cb3-330"><a href="#cb3-330" aria-hidden="true" tabindex="-1"></a>            kk <span class="op">=</span> <span class="va">self</span>.k <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">+</span> (<span class="va">self</span>.aniso <span class="op">-</span> <span class="fl">1.0</span>) <span class="op">*</span> circ)</span>
+<span id="cb3-331"><a href="#cb3-331" aria-hidden="true" tabindex="-1"></a>        f <span class="op">=</span> (kk <span class="op">*</span> (L <span class="op">-</span> <span class="va">self</span>.rest) <span class="op">*</span> <span class="va">self</span>.alive.to(dt_))[:, <span class="va">None</span>] <span class="op">*</span> (d <span class="op">/</span> L[:, <span class="va">None</span>])</span>
+<span id="cb3-332"><a href="#cb3-332" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the sheet's own hoop tension, by direction -- this is what a corset would press with, and it is</span></span>
+<span id="cb3-333"><a href="#cb3-333" aria-hidden="true" tabindex="-1"></a>        <span class="co"># what the growth gate can read in the next pass. Without it the corset cannot reach the tissue.</span></span>
+<span id="cb3-334"><a href="#cb3-334" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.record_hoop:</span>
+<span id="cb3-335"><a href="#cb3-335" aria-hidden="true" tabindex="-1"></a>            th <span class="op">=</span> torch.acos((mid_u <span class="op">:=</span> (<span class="fl">0.5</span> <span class="op">*</span> (pos[<span class="va">self</span>.i] <span class="op">+</span> pos[<span class="va">self</span>.j]) <span class="op">-</span> <span class="va">self</span>.centre_t.to(pos)))[:, <span class="dv">2</span>]</span>
+<span id="cb3-336"><a href="#cb3-336" aria-hidden="true" tabindex="-1"></a>                            <span class="op">/</span> mid_u.norm(dim<span class="op">=</span><span class="dv">1</span>).clamp_min(<span class="fl">1e-12</span>)).clamp(<span class="dv">0</span>, math.pi)</span>
+<span id="cb3-337"><a href="#cb3-337" aria-hidden="true" tabindex="-1"></a>            nb_ <span class="op">=</span> <span class="dv">32</span></span>
+<span id="cb3-338"><a href="#cb3-338" aria-hidden="true" tabindex="-1"></a>            bin_ <span class="op">=</span> (th <span class="op">/</span> math.pi <span class="op">*</span> nb_).<span class="bu">long</span>().clamp(<span class="dv">0</span>, nb_ <span class="op">-</span> <span class="dv">1</span>)</span>
+<span id="cb3-339"><a href="#cb3-339" aria-hidden="true" tabindex="-1"></a>            ten <span class="op">=</span> (kk <span class="op">*</span> (L <span class="op">-</span> <span class="va">self</span>.rest)).clamp_min(<span class="fl">0.0</span>) <span class="op">*</span> <span class="va">self</span>.alive.to(dt_)</span>
+<span id="cb3-340"><a href="#cb3-340" aria-hidden="true" tabindex="-1"></a>            acc_ <span class="op">=</span> torch.zeros(nb_, device<span class="op">=</span>pos.device, dtype<span class="op">=</span>dt_).index_add_(<span class="dv">0</span>, bin_, ten)</span>
+<span id="cb3-341"><a href="#cb3-341" aria-hidden="true" tabindex="-1"></a>            cnt_ <span class="op">=</span> torch.zeros(nb_, device<span class="op">=</span>pos.device, dtype<span class="op">=</span>dt_).index_add_(<span class="dv">0</span>, bin_, <span class="va">self</span>.alive.to(dt_))</span>
+<span id="cb3-342"><a href="#cb3-342" aria-hidden="true" tabindex="-1"></a>            HOOP_TRACE.append((acc_ <span class="op">/</span> cnt_.clamp_min(<span class="fl">1.0</span>)).detach().cpu().numpy())</span>
+<span id="cb3-343"><a href="#cb3-343" aria-hidden="true" tabindex="-1"></a>        acc <span class="op">=</span> torch.zeros_like(pos)</span>
+<span id="cb3-344"><a href="#cb3-344" aria-hidden="true" tabindex="-1"></a>        acc.index_add_(<span class="dv">0</span>, <span class="va">self</span>.i, f)</span>
+<span id="cb3-345"><a href="#cb3-345" aria-hidden="true" tabindex="-1"></a>        acc.index_add_(<span class="dv">0</span>, <span class="va">self</span>.j, <span class="op">-</span>f)</span>
+<span id="cb3-346"><a href="#cb3-346" aria-hidden="true" tabindex="-1"></a>        <span class="co"># F/gamma, so the emitted quantity is a VELOCITY, not an acceleration. gamma = 0 leaves the</span></span>
+<span id="cb3-347"><a href="#cb3-347" aria-hidden="true" tabindex="-1"></a>        <span class="co"># inertial path untouched, so the two can be compared at the same operating point.</span></span>
+<span id="cb3-348"><a href="#cb3-348" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.gamma <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb3-349"><a href="#cb3-349" aria-hidden="true" tabindex="-1"></a>            acc <span class="op">=</span> acc <span class="op">/</span> <span class="va">self</span>.gamma</span>
+<span id="cb3-350"><a href="#cb3-350" aria-hidden="true" tabindex="-1"></a>        <span class="co"># per-particle strain for the renderer: mean |strain| over its live bonds</span></span>
+<span id="cb3-351"><a href="#cb3-351" aria-hidden="true" tabindex="-1"></a>        s_abs <span class="op">=</span> (strain.<span class="bu">abs</span>() <span class="op">*</span> <span class="va">self</span>.alive.to(dt_))</span>
+<span id="cb3-352"><a href="#cb3-352" aria-hidden="true" tabindex="-1"></a>        cnt <span class="op">=</span> torch.zeros(pos.shape[<span class="dv">0</span>], device<span class="op">=</span>dev, dtype<span class="op">=</span>dt_)</span>
+<span id="cb3-353"><a href="#cb3-353" aria-hidden="true" tabindex="-1"></a>        tot <span class="op">=</span> torch.zeros(pos.shape[<span class="dv">0</span>], device<span class="op">=</span>dev, dtype<span class="op">=</span>dt_)</span>
+<span id="cb3-354"><a href="#cb3-354" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> a, b <span class="kw">in</span> ((<span class="va">self</span>.i, <span class="va">self</span>.j), (<span class="va">self</span>.j, <span class="va">self</span>.i)):</span>
+<span id="cb3-355"><a href="#cb3-355" aria-hidden="true" tabindex="-1"></a>            cnt.index_add_(<span class="dv">0</span>, a, <span class="va">self</span>.alive.to(dt_))</span>
+<span id="cb3-356"><a href="#cb3-356" aria-hidden="true" tabindex="-1"></a>            tot.index_add_(<span class="dv">0</span>, a, s_abs)</span>
+<span id="cb3-357"><a href="#cb3-357" aria-hidden="true" tabindex="-1"></a>        MEMBRANE_STRAIN.append((tot <span class="op">/</span> cnt.clamp_min(<span class="fl">1.0</span>)).detach().to(<span class="st">"cpu"</span>, torch.float16).numpy())</span>
+<span id="cb3-358"><a href="#cb3-358" aria-hidden="true" tabindex="-1"></a>        H.membrane_bonds <span class="op">=</span> (<span class="va">self</span>.i, <span class="va">self</span>.j, <span class="va">self</span>.rest, <span class="va">self</span>.alive)     <span class="co"># for the break operator</span></span>
+<span id="cb3-359"><a href="#cb3-359" aria-hidden="true" tabindex="-1"></a>        H.__dict__[<span class="st">"_bm_bond_op"</span>] <span class="op">=</span> <span class="va">self</span>         <span class="co"># the crosslink operator reuses this neighbour search</span></span>
+<span id="cb3-360"><a href="#cb3-360" aria-hidden="true" tabindex="-1"></a>        _f <span class="op">=</span> <span class="bu">int</span>(<span class="bu">getattr</span>(H, <span class="st">"frame"</span>, <span class="op">-</span><span class="dv">1</span>) <span class="kw">or</span> <span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb3-361"><a href="#cb3-361" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.snapshot_every <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">and</span> _f <span class="op">&gt;=</span> <span class="dv">0</span> <span class="kw">and</span> _f <span class="op">%</span> <span class="va">self</span>.snapshot_every <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb3-362"><a href="#cb3-362" aria-hidden="true" tabindex="-1"></a>            _k <span class="op">=</span> <span class="va">self</span>.alive</span>
+<span id="cb3-363"><a href="#cb3-363" aria-hidden="true" tabindex="-1"></a>            BOND_SNAPSHOTS.append((_f,</span>
+<span id="cb3-364"><a href="#cb3-364" aria-hidden="true" tabindex="-1"></a>                                   <span class="va">self</span>.i[_k].detach().cpu().numpy().astype(<span class="st">"int32"</span>),</span>
+<span id="cb3-365"><a href="#cb3-365" aria-hidden="true" tabindex="-1"></a>                                   <span class="va">self</span>.j[_k].detach().cpu().numpy().astype(<span class="st">"int32"</span>),</span>
+<span id="cb3-366"><a href="#cb3-366" aria-hidden="true" tabindex="-1"></a>                                   strain[_k].detach().cpu().numpy().astype(<span class="st">"float16"</span>)))</span>
+<span id="cb3-367"><a href="#cb3-367" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {lvl.name: acc}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+
+</section>
+
+</main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) are click-to-fullscreen */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: #000; z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { width: 100%; height: 100%; max-width: 100vw; max-height: 100vh;
+  object-fit: contain; background: #000; cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .75; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+  function requestFS() {
+    try {
+      if (ov.requestFullscreen) return ov.requestFullscreen();
+      if (ov.webkitRequestFullscreen) return ov.webkitRequestFullscreen();
+      if (vv.webkitEnterFullscreen) return vv.webkitEnterFullscreen();   // iOS Safari: video only
+    } catch (e) {}
+  }
+  function exitFS() {
+    try { if (fsElement()) (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document); }
+    catch (e) {}
+  }
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+    var r = requestFS(); if (r && r.catch) r.catch(function () {});   // expand to full screen on the click gesture
+  }
+  function close() {
+    exitFS();
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc || (v.querySelector('source') && v.querySelector('source').src) || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov.classList.contains('open')) close(); });
+  function onFsChange() { if (!fsElement() && ov.classList.contains('open')) close(); }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  vv.addEventListener('webkitendfullscreen', function () { if (ov.classList.contains('open')) close(); }); // iOS exit
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Cedric Allier · Janelia Research Campus · 2026</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

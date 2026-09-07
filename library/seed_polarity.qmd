@@ -1,0 +1,138 @@
+---
+title: "seed_polarity"
+subtitle: "A unit direction per element, lying IN the substrate plane, written to `block`."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+A unit direction per element, lying IN the substrate plane, written to `block`.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `cell` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+cell -> cell: writes `polarity`, reads nothing.
+
+In the plane and not isotropic in 3D, because a polarity with a vertical component asks the
+cell to crawl into the floor or off it -- the traction below would then drive material through
+the substrate, which the wall condition resists rather than converts, and the cell would
+grind rather than move. The direction a crawling cell has is a direction ALONG its substrate.
+
+`spread` in [0, 1] interpolates between one shared heading (0, a marching population) and an
+independent draw per cell (1, a scattering one).
+
+Reference: none -- an initial condition. Plexus (this work).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `block` | state_block | "polarity" |
+| `axis` | substrate_normal_axis | 1 |
+| `spread` | heading_dispersion | 1.0 |
+| `seed` | rng_seed | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: seed_polarity, at: cell}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`polarity`]{.op-badge} [`initial_condition`]{.op-badge} [`motility`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/cell_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/cell_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("seed_polarity", family="motility", set="cell", kind="seed")
+class SeedPolarity(Seed):
+    """A unit direction per element, lying IN the substrate plane, written to `block`.
+
+    cell -> cell: writes `polarity`, reads nothing.
+
+    In the plane and not isotropic in 3D, because a polarity with a vertical component asks the
+    cell to crawl into the floor or off it -- the traction below would then drive material through
+    the substrate, which the wall condition resists rather than converts, and the cell would
+    grind rather than move. The direction a crawling cell has is a direction ALONG its substrate.
+
+    `spread` in [0, 1] interpolates between one shared heading (0, a marching population) and an
+    independent draw per cell (1, a scattering one).
+
+    Reference: none -- an initial condition. Plexus (this work).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["polarity", "initial_condition", "motility"]
+    PARAM_ROLES = {"block": "state_block", "axis": "substrate_normal_axis",
+                   "spread": "heading_dispersion", "seed": "rng_seed"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.block = str(params.get("block", "polarity"))
+        self.axis = int(params.get("axis", 1))          # the substrate's normal (up)
+        self.spread = float(params.get("spread", 1.0))
+        self.seed = int(params.get("seed", 0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        if self.block not in lvl.state_schema:
+            raise ValueError(
+                f"seed_polarity: {lvl.name!r} has no state block {self.block!r}. Declare it under "
+                f"`sets.{lvl.name}.state:` -- a direction is state the cell carries, not a "
+                f"parameter of the operator that reads it.")
+        b0, b1 = lvl.state_schema[self.block]
+        D = b1 - b0
+        g = torch.Generator(device="cpu").manual_seed(self.seed)
+        ax = [i for i in range(D) if i != self.axis]
+        th0 = float(torch.rand(1, generator=g)) * 2 * math.pi
+        th = th0 + (torch.rand(lvl.n, generator=g) - 0.5) * (2 * math.pi * self.spread)
+        v = torch.zeros(lvl.n, D)
+        v[:, ax[0]] = torch.cos(th)
+        v[:, ax[1 % len(ax)]] = torch.sin(th)
+        lvl.state[:, b0:b1] = v.to(lvl.state.device)
+        print(f"[seed_polarity] {lvl.n} heading(s) in the plane normal to axis {self.axis}, "
+              f"spread {self.spread:g}", flush=True)
+        return {}
+```

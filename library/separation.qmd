@@ -33,7 +33,7 @@ Separation, the second boids steering rule: accelerate away from close neighbour
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
 - **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `separation`  (per-type props: `separation`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

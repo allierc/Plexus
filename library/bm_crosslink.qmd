@@ -33,7 +33,7 @@ Form new crosslinks between nodes that have drifted within range of one another.
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{R}\!:E$ **Rewire**: rebuild the relation $E$ each tick.
+- **Kind** &mdash; $\mathcal{R}\!:E$ **rewire**: rebuild the relation $E$ each tick.
 - **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

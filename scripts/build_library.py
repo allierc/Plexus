@@ -38,7 +38,7 @@ KIND_INFO = {
     "exchange":   ("Exchange", "push / pull", "set &harr; field"),
     "field":      ("Field", r"$\partial_t\phi$",   "a field's own self-dynamics"),
     "rewire":     ("Rewire", r"$\mathcal{R}\!:E$", "rebuild the relation $E$ each tick"),
-    "structural": ("Structural", r"$|S|$",         "change the entities themselves &mdash; Divide, Die, grow"),
+    "structural": ("Structural", r"$|S|$",         "change the entities themselves &mdash; divide, die, grow"),
 }
 def kind_icon(kind):
     """Icon filename for an operator KIND. The field-dynamics operator (dphi/dt)
@@ -653,7 +653,7 @@ def render_operator_page(name: str, cls) -> str:
     # Role in Plexus (the contract)
     out.append("## Role in Plexus")
     out.append("")
-    out.append(f"- **Kind** &mdash; {ksym} **{klabel}**: {kgloss}.")
+    out.append(f"- **Kind** &mdash; {ksym} **{klabel.lower()}**: {kgloss}.")
     out.append(f"- **Acts on** &mdash; `{level}` (the set the operator acts on).")
     reads = ", ".join(f"`{x}`" for x in (req + rtp + rbuf)) or "&ndash;"
     out.append(f"- **Reads** &mdash; {reads}"
@@ -878,8 +878,8 @@ def render_operators() -> str:
     out = _page_header("Operators",
                        "How state moves &mdash; grouped by family, in the visual language of the operator algebra")
     out.append("Each operator belongs to one of the elementary **families** of the "
-               "[operator algebra](language.qmd) &mdash; Lateral, Aggregate, Broadcast, Exchange, "
-               "Field, Rewire, Structural (Divide and Die) and Seed; the logo marks which. The "
+               "[operator algebra](language.qmd) &mdash; lateral, aggregate, broadcast, exchange, "
+               "field, rewire, structural (divide and die) and seed; the logo marks which. The "
                "runtime also exposes a **field** kind, a field&rsquo;s own self-update.")
     out.append("")
     for kind in KIND_ORDER:

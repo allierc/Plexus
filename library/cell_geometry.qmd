@@ -33,7 +33,7 @@ Aggregate the 3D vertex mesh into per-cell scalars: the cross-scale readout the 
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\textstyle\sum_\pi$ **Aggregate**: children &rarr; parent, up the containment $\pi$.
+- **Kind** &mdash; $\textstyle\sum_\pi$ **aggregate**: children &rarr; parent, up the containment $\pi$.
 - **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -45,7 +45,7 @@ Aggregate the 3D vertex mesh into per-cell scalars: the cross-scale readout the 
 reaction-diffusion runs on.
 
 vertex -> cell: reads the half-edge table stashed on the vertex set and writes the cell set's
-centroid `cen` and area, by scatter-add over half-edges.
+centroid `centroid` and area, by scatter-add over half-edges.
 
     cen_f = (1/n_f) sum_{e in f} x_srce(e)          the face centroid
     A_f   = (1/2) | sum_{e in f} x_srce(e) x x_trgt(e) |
@@ -53,7 +53,7 @@ centroid `cen` and area, by scatter-add over half-edges.
 the second being the magnitude of the summed cross products around the face ring, which is
 twice the area of a planar polygon in 3D and needs no projection onto a normal.
 
-It is an Aggregate because it is a many-to-one map across the containment relation: many
+It is an aggregate because it is a many-to-one map across the containment relation: many
 vertices, one cell. Every operator here that speaks of a cell's position or size depends on it,
 so it is scheduled first.
 
@@ -78,7 +78,7 @@ operators:
 
 ## Related operators
 
-_&ndash;_
+Other **aggregate** operators: [`aggregate_centroid`](aggregate_centroid.qmd).
 
 ## Source
 
@@ -91,7 +91,7 @@ class CellGeometry3D(Aggregate):
     reaction-diffusion runs on.
 
     vertex -> cell: reads the half-edge table stashed on the vertex set and writes the cell set's
-    centroid `cen` and area, by scatter-add over half-edges.
+    centroid `centroid` and area, by scatter-add over half-edges.
 
         cen_f = (1/n_f) sum_{e in f} x_srce(e)          the face centroid
         A_f   = (1/2) | sum_{e in f} x_srce(e) x x_trgt(e) |
@@ -99,14 +99,14 @@ class CellGeometry3D(Aggregate):
     the second being the magnitude of the summed cross products around the face ring, which is
     twice the area of a planar polygon in 3D and needs no projection onto a normal.
 
-    It is an Aggregate because it is a many-to-one map across the containment relation: many
+    It is an aggregate because it is a many-to-one map across the containment relation: many
     vertices, one cell. Every operator here that speaks of a cell's position or size depends on it,
     so it is scheduled first.
 
     Reference: none -- a geometric readout, not a mechanism. Plexus (this work).
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
-    INPUTS = ["vertex"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["area", "cen"]
+    INPUTS = ["vertex"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["area", "centroid"]
     MECHANISM_TAGS = ["aggregate", "cell_geometry", "cross_scale"]
     REFERENCE = "Plexus (this work)."
 
@@ -120,10 +120,10 @@ class CellGeometry3D(Aggregate):
         if m is None:
             return {}
         pos = vlvl.get("pos")[:m["Nv"]]
-        area, _, cen, _ = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], m["nF"])
+        area, _, centroid, _ = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], m["nF"])
         nF = m["nF"]; st = clvl.state.clone(); sch = clvl.state_schema
-        if "cen" in sch:
-            i0, i1 = sch["cen"]; st[:nF, i0:i1] = cen.detach()
+        if "centroid" in sch:
+            i0, i1 = sch["centroid"]; st[:nF, i0:i1] = centroid.detach()
         if "area" in sch:
             i0, i1 = sch["area"]; st[:nF, i0:i1] = area.detach()[:, None]
         clvl.state = st
