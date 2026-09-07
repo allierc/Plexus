@@ -74,7 +74,10 @@ def main():
         n = n / max(np.linalg.norm(n), 1e-12)
         q0, q1 = cl.state_schema["phase"]
         ph = float(cl.state[0, q0])
-        P = torch.cat([l.get("pos").detach() for k, l in H.levels.items()
+        # LIVE POINTS ONLY. A run with a dormant monomer pool carries points that are not part of
+        # the cell yet -- they contribute no mass and no stress, and counting them in an extent
+        # measures the pool's parking spot rather than the cell.
+        P = torch.cat([l.get("pos").detach()[l.occ > 0] for k, l in H.levels.items()
                        if k.endswith("_node")], 0).cpu().numpy()
         c = P.mean(0)
         t = np.array([-n[2], 0.0, n[0]])             # the horizontal direction across the polarity
