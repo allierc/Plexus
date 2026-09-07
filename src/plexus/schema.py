@@ -270,6 +270,18 @@ def load(path: str) -> Spec:
                     f"with different lifetimes -- pre/post are a static edge list, `maps` are "
                     f"owned by the topology operators -- so a set has one or the other.")
 
+        # `entity:` -- WHICH REGISTERED KIND PROVIDES THIS SET'S STATE, when the set's own name is
+        # not that kind. Validated here because the failure is otherwise silent and late: an
+        # unregistered name falls back to the pos/vel default, no `provision` runs, and an MPM set
+        # dies several hundred lines later on a missing `F`.
+        ent = s.get("entity")
+        if ent is not None:
+            from plexus.models.registry import _ENTITY_REGISTRY
+            if ent not in _ENTITY_REGISTRY:
+                raise ValueError(
+                    f"set {sname!r} declares `entity: {ent}`, which is not a registered entity "
+                    f"(have: {', '.join(sorted(_ENTITY_REGISTRY))})")
+
         # optional `state:` block -- the set's StateSchema (the fifth primitive). Absent =>
         # the spatial pos/vel default. Each entry is a width (int) or {width, integration,
         # boundary, role, record}. Validate here so a malformed schema fails at load.

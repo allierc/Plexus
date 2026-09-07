@@ -33,6 +33,7 @@ per the migration order in SEED_MIGRATION.md. New specs should use `seed:`.
 from __future__ import annotations
 
 import contextlib
+import time
 import os
 import math
 import numpy as np
@@ -420,13 +421,22 @@ def _entity_schema(decl, dim: int) -> StateSchema | None:
     return None                                    # legacy {block: (c0, c1)} dict: a hint only
 
 
-def _entity_meta(sname: str, dim: int = 2) -> tuple[StateSchema | None, dict, int]:
+def _entity_meta(sname: str, dim: int = 2, entity: str | None = None) -> tuple[StateSchema | None, dict, int]:
     """(state_schema, render, depth) for a set name, from the entity registry. `schema` is
     None when the name is unregistered or the entity declares no honourable schema -- the
     caller then falls back to `spatial_schema(dim)`. `depth` is the hierarchy-depth integer
-    (was the overloaded `level`)."""
+    (was the overloaded `level`).
+
+    `entity` OVERRIDES THE LOOKUP BY NAME, and it exists because a set's NAME is what the set
+    IS while the entity is what PROVIDES its state. The two coincide while a model has one
+    cloud of material points, which can simply be called `mpm_particle`. They stop coinciding
+    the moment a cell is decomposed into fifteen organelles that each own their own points:
+    `mitochondrion_node` and `golgi_node` are different sets and the same KIND of thing, and
+    only four names are registered aliases of the MPM particle. Without this the fifteenth set
+    would build with the default pos/vel schema, no `provision` would run, and the first
+    `mpm_strain` would die on a missing `F` -- naming the symptom, not the cause."""
     try:
-        ent = get_entity(sname)
+        ent = get_entity(entity or sname)
         schema = _entity_schema(getattr(ent, "STATE_SCHEMA", None), dim)
         render = getattr(ent, "RENDER", None) or DEFAULT_RENDER
         depth = getattr(ent, "DEPTH", None)
@@ -473,7 +483,7 @@ def _resolve_schema(s: dict, D: int, sname: str | None = None) -> StateSchema:
     if s.get("maps"):
         return StateSchema([])
     if sname is not None:
-        ent_schema, _render, _depth = _entity_meta(sname, D)
+        ent_schema, _render, _depth = _entity_meta(sname, D, s.get("entity"))
         if ent_schema is not None:
             return ent_schema
     return spatial_schema(D)
@@ -619,13 +629,13 @@ def _build_mesh(lvl, s: dict, device: str) -> None:
     lvl.mesh_cell_set = None            # filled by `_link_mesh_maps` once every set exists
 
 
-def _entity_class(sname: str):
+def _entity_class(sname: str, entity: str | None = None):
     """The registered entity class for a set name, or None. An entity MAY define a
     `provision(lvl, parent, s, H, device)` classmethod to allocate domain-specific
     per-node buffers at build time (e.g. mpm_particle's F/C/mass/mu/la/p_vol) -- the
     contract-clean way to add new state without special-casing the engine."""
     try:
-        return get_entity(sname)
+        return get_entity(entity or sname)
     except KeyError:
         return None
 
@@ -928,7 +938,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         n = int(s["n"])
         D = H.dim
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
-        _, render, depth = _entity_meta(sname, D)      # render hints + depth from the registry
+        _, render, depth = _entity_meta(sname, D, s.get("entity"))   # render + depth from the registry
         schema = _resolve_schema(s, D, sname)          # StateSchema: `state:` block, else the entity's, else pos/vel
         dim = schema.dim
         state = torch.zeros(buffer, dim, device=device)
@@ -998,7 +1008,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         #
         # `parent=None` IS PASSED EXPLICITLY, so an entity that needs one says so itself rather
         # than being handed a stand-in. The contained path below is unchanged.
-        _ent_r = _entity_class(sname)
+        _ent_r = _entity_class(sname, s.get("entity"))
         _prov_r = getattr(_ent_r, "provision", None) if _ent_r is not None else None
         if _prov_r is not None:
             _prov_r(lvl, None, s, H, device)
@@ -1069,7 +1079,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         r_in = float(s.get("radius_inner", 0.0))
         reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for agent_grow to wake
         per_tot = None if per is None else per + reserve
-        _, render, depth = _entity_meta(sname, H.dim)  # render hints + depth from the registry
+        _, render, depth = _entity_meta(sname, H.dim, s.get("entity"))  # render + depth from the registry
         schema = _resolve_schema(s, H.dim, sname)      # StateSchema: `state:` block, else the entity's, else pos/vel
         dim = schema.dim
         has_pos = "pos" in schema                                 # spatial child: scatter in space; non-spatial (voltage,...) child: no placement
@@ -1170,7 +1180,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl.types_raw = s.get("types")
         # an entity may provision domain-specific per-node buffers (e.g. mpm_particle's
         # F/C/mass/mu/la/p_vol + block-fill) -- read off the parent's per-type config.
-        ent = _entity_class(sname)
+        ent = _entity_class(sname, s.get("entity"))
         provision = getattr(ent, "provision", None) if ent is not None else None
         if provision is not None:
             provision(lvl, parent, s, H, device)
@@ -1210,7 +1220,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
 # --------------------------------------------------------------------------- #
 #  seed: x_0 = S(theta_S), executed exactly once, before any dynamics
 # --------------------------------------------------------------------------- #
-def _capture_state(H) -> list:
+def _capture_state(H, sets=None) -> list:
     """Every tensor a substep can write. Snapshot/restore around a graph capture.
 
     Warming up and capturing both run the substep body, so the state they leave behind is not the
@@ -1218,7 +1228,9 @@ def _capture_state(H) -> list:
     advances the simulation by however many warm-up substeps were used.
     """
     seen, out = set(), []
-    for lvl in H.levels.values():
+    for _nm, lvl in H.levels.items():
+        if sets is not None and _nm not in sets:
+            continue                       # a set the captured block never touches cannot go stale
         for _n, t in lvl.named_buffers(recurse=False):
             if torch.is_tensor(t) and t.data_ptr() not in seen:
                 seen.add(t.data_ptr()); out.append(t)
@@ -1229,7 +1241,29 @@ def _capture_state(H) -> list:
     return out
 
 
-def _graph_sig(H) -> tuple:
+def _block_sets(step: dict, inst: list) -> set:
+    """The sets the operators INSIDE one substep block act on -- and every set they reach through
+    containment, since an MPM scatter reads its ancestors' deltas.
+
+    Both capture checks were global: `_capture_refusals` refused whenever ANY set in the model was
+    engine-integrated, and `_graph_sig` compared EVERY buffer of every level. That is correct and
+    far too strong once a model does something outside the MPM cycle. Measured on the per-organelle
+    cell atlas: three `radius_graph` operators, scheduled once a frame OUTSIDE the substep, rebuild
+    `edge_index` on three sets the substep never touches -- and since `edge_index` is a registered
+    buffer, its new pointer changed the signature and the captured graph was dropped on tick 2 of
+    every run. Nothing was wrong; the check was simply looking at the wrong sets.
+    """
+    names = set()
+    toks = set(step.get("steps", []) or [])
+    for nm, ob, sel, _g in inst:
+        if nm in toks:
+            names.add(sel.set)
+            names.add(getattr(ob, "at", None))
+    names.discard(None)
+    return names
+
+
+def _graph_sig(H, sets=None) -> tuple:
     """Identity of every buffer a captured graph baked in: storage address, shape, dtype.
 
     A CUDA graph replays kernels against the pointers it saw at capture. Anything that reallocates
@@ -1241,7 +1275,7 @@ def _graph_sig(H) -> tuple:
 
     Once per tick over ~30 tensors, so the cost is nil against a 15-substep frame.
     """
-    return tuple((t.data_ptr(), tuple(t.shape), t.dtype) for t in _capture_state(H))
+    return tuple((t.data_ptr(), tuple(t.shape), t.dtype) for t in _capture_state(H, sets))
 
 
 def _capture_refusals(sim: Spec, H, step: dict, inst: list) -> list[str]:
@@ -1279,8 +1313,10 @@ def _capture_refusals(sim: Spec, H, step: dict, inst: list) -> list[str]:
                     why.append(f"set {name!r} contains {label} particles; that branch of "
                                f"mpm_strain is SVD plus boolean-mask indexing and is uncapturable "
                                f"-- `implementation: warp` on mpm_strain removes this")
-    if getattr(H, "emit_order", None):
-        why.append(f"engine-integrated sets {list(H.emit_order)} -- `_integrate` rebinds lvl.state "
+    _touched = _block_sets(step, inst)
+    _ints = [n for n in (getattr(H, "emit_order", None) or {}) if n in _touched]
+    if _ints:
+        why.append(f"engine-integrated sets {_ints} -- `_integrate` rebinds lvl.state "
                    f"every tick, so a captured graph would read a stale buffer")
     # `mesh_contact` READS A SURFACE ON THE HOST EVERY FRAME. It rebuilds its direction-bin table
     # from the live vertex set -- `torch.tensor` from a python list, `int(ef.max())`,
@@ -1956,8 +1992,19 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             pass
     # the tape is OFF unless the caller asked for it (see the docstring): generation pays no
     # memory for a graph it will never traverse, and the inverse half asks explicitly.
+    frame_ms: list[float] = []
     with (contextlib.nullcontext() if grad else torch.no_grad()):
         for tick in ticks:                           # one tick = one pass of the schedule + integrate
+            # THE COST OF THE TICK, MEASURED WHERE IT IS PAID. The movie stamps a `ms/frame` and
+            # neither pass could honestly say "compute": the LIVE one times its own loop, which
+            # renders, and the REPLAY one times the renderer and says so. So a figure meant to
+            # report how expensive the physics is reported how expensive the picture was.
+            #
+            # Recorded per tick and carried into the trajectory, so the replay -- the pass that
+            # writes the movie that is kept -- can stamp the number the run actually took. It is
+            # WALL time and includes the recorder; the alternative, timing only the schedule, would
+            # report a figure no one can reproduce from the outside.
+            _t_tick = time.perf_counter()
             if tick == 1:
                 _install_compile()                   # after tick 0 has warmed every run-constant cache
             if progress and tick and hasattr(ticks, "set_postfix_str") and tick % 8 == 0:
@@ -2087,6 +2134,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                                  f"after_frame/before_frame window, so that step is absent from "
                                  f"the cycle from here on. If this is a staged run, the stage that "
                                  f"takes over is missing or its window does not start at {tick}.")
+                    _blk_sets = _block_sets(step, inst)
                     if step.get("capture", True) and _graph.get(_cap_key) is None and tick >= 1:
                         _why = _capture_refusals(sim, H, step, inst)
                         if _why or not str(device).startswith("cuda"):
@@ -2112,7 +2160,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             # operators captures cleanly once this context is right.
                             _dev_ctx = torch.cuda.device(device)
                             _dev_ctx.__enter__()
-                            _snap = _capture_state(H)
+                            _snap = _capture_state(H, _blk_sets)
                             _keep = [t.clone() for t in _snap]
                             # WARM-UP ON A SIDE STREAM is required, not hygiene: a cold capture
                             # picks up cuBLAS/cuDNN lazy initialisation and fails.
@@ -2134,13 +2182,13 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             for _t, _k in zip(_snap, _keep):
                                 _t.copy_(_k)                    # and undo the capture pass
                             _graph[_cap_key] = _gr
-                            _graph_sigs[_cap_key] = _graph_sig(H)
+                            _graph_sigs[_cap_key] = _graph_sig(H, _blk_sets)
                             _dev_ctx.__exit__(None, None, None)
                             print(f"[engine] substep captured as a CUDA graph "
                                   f"({len(step['steps'])} operators, {count} replays/frame)",
                                   flush=True)
                     _gr = _graph.get(_cap_key)
-                    if _gr and _graph_sig(H) != _graph_sigs[_cap_key]:
+                    if _gr and _graph_sig(H, _blk_sets) != _graph_sigs[_cap_key]:
                         # A BUFFER MOVED SINCE CAPTURE. Fall back rather than replay into memory
                         # nothing reads any more -- that failure is silent and produces a run that
                         # looks finished and is wrong.
@@ -2248,8 +2296,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     _op._armed = True
             if on_frame is not None:
                 on_frame(H, tick)
+            frame_ms.append((time.perf_counter() - _t_tick) * 1000.0)
 
     out = _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, rec_mesh=rec_mesh)
+    out["frame_ms"] = np.asarray(frame_ms, np.float32)   # one wall-clock reading per simulated tick
 
     if out_path is not None:
         import zarr
