@@ -48,7 +48,12 @@ def row(name, group="tissue"):
     off, foff = z["vertex__mesh_offsets"], z["vertex__mesh_face_offsets"]
     nF, Nv = z["vertex__mesh_nF"], z["vertex__mesh_Nv"]
     pos, sep = z["vertex__pos"], z["vertex__sep"]
+    # `V0f` MOVED TO THE CELL SET. It was `vertex__mesh_V0f`, a ragged per-face column cut by the
+    # face offsets; it is `cell__V0f` now, a dense [T, buffer, 1] block cut by the frame's `nF`.
+    # Both spellings are read, because trajectories from before the move are still on disk and a
+    # report that silently dropped its target column would have looked like a run with no targets.
     V0f = z["vertex__mesh_V0f"] if "vertex__mesh_V0f" in z.files else None
+    V0c = z["cell__V0f"] if "cell__V0f" in z.files else None
     T = len(nF)
 
     def at(t):
@@ -59,7 +64,8 @@ def row(name, group="tissue"):
         P = torch.as_tensor(pos[t][:n]).float(); S = torch.as_tensor(sep[t][:n]).float()
         vp, _, _, _ = apicobasal_geometry_3d(P, S, es, et, ef, f)
         v = vp.numpy()
-        v0 = None if V0f is None else V0f[int(foff[t]):int(foff[t] + f)]
+        v0 = (V0f[int(foff[t]):int(foff[t] + f)] if V0f is not None
+              else (np.asarray(V0c[t])[:f, 0] if V0c is not None else None))
         h = float(S.norm(dim=1).median()) * 2.0
         return v, v0, h, f
 

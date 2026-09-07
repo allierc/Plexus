@@ -36,16 +36,17 @@ sets:
         record: false
       A0:
         width: 1
-        record: false
       P0:
         width: 1
-        record: false
       V0f:
         width: 1
-        record: false
       alive:
         width: 1
         record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
   half_edge:
     n: 520032
     maps:
