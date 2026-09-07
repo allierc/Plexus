@@ -575,7 +575,15 @@ class MPMScatter(Exchange):
         # fixed-corotated elastic stress before the affine scatter. Default off (absent -> None ->
         # pure elastic); same units / scaling / scatter as the elastic stress. Same H side-channel
         # idiom as part_accel; it feeds the tissue through stress divergence, not a pointwise force.
-        act = getattr(H, "active_stress", None)
+        # PER-LEVEL FIRST, THEN THE GLOBAL SIDE-CHANNEL. `H.active_stress` is one tensor for the
+        # whole run, which is exactly right while a model has ONE particle cloud and unusable the
+        # moment it has fifteen: the second scatter would read a stress sized for the first. A
+        # buffer on the LEVEL is per-set by construction. Both are honoured and summed, so the
+        # existing 2D field-driven operator is untouched.
+        act = getattr(p, "act_stress", None)
+        _gact = getattr(H, "active_stress", None)
+        if _gact is not None:
+            act = _gact if act is None else act + _gact
         if act is not None:
             stress = stress + act
         # THE SAME CHANNEL, FOR A DIFFERENT MECHANISM. `extra_stress` is any additive Kirchhoff
@@ -2602,6 +2610,9 @@ class MPMScatterWarp(MPMScatter):
         _has_turg = _turg is not None
         _turg = _turg.contiguous() if _has_turg else _z
         _act = getattr(H, "active_stress", None)
+        _lact = getattr(p, "act_stress", None)          # per-set active stress; see the torch path
+        if _lact is not None:
+            _act = _lact if _act is None else (_act + _lact)
         # THE SAME ADDITIVE-STRESS SLOT CARRIES BOTH. The kernel takes one mat33 per particle, so
         # active stress and the viscous stress from `mpm_viscosity` are summed here rather than
         # given separate inputs -- they enter the momentum identically and the kernel cannot tell
@@ -4145,4 +4156,111 @@ class SeedFromSegmentation(Seed):
               f"{lvl.n} particles ({lvl.n / max(n_cells,1):.0f} per cell); "
               f"youngs {float(yc.min()):.0f}-{float(yc.max()):.0f} from {how}; "
               f"cell centres seeded: {moved_cells}", flush=True)
+        return {}
+
+
+# --------------------------------------------------------------------------- material, re-stated
+@register_operator("set_material", family="mpm", set="particle", kind="seed")
+class SetMaterial(Seed):
+    """Re-state what a body is MADE OF, once, at x_0 -- after a load, before the dynamics.
+
+    particle -> particle: rewrites `mu`, `la`, the material masks and, if a density is given,
+    `density` and `mass`. Reads nothing.
+
+    THIS IS A SEED AND THE REASON IS THE SAME AS `load_run`'S. `x_0` is not only where the material
+    is, it is also what the material IS: `MPMParticle.provision` reads `youngs`, `material` and
+    `density` off the parent's types at BUILD time, and nothing afterwards can change them. So a
+    continuation could inherit a shape and was forced to inherit the substance that produced it --
+    a cell relaxed as a soft viscoelastic jelly could not then be asked to behave as a stiffer
+    solid, which is exactly what "load this configuration and run different operators over it"
+    most often wants. Declared after `load_run` in the `seed:` section, this closes that gap.
+
+        youngs / bulk_modulus   the modulus, in the run's stress units. `bulk_modulus` is for a
+                                LIQUID, where mu = 0 makes K = lambda exactly; on a solid the two
+                                are different numbers and stating the wrong one is a quiet error,
+                                so giving `bulk_modulus` for a non-liquid is refused.
+        material                elastic | liquid | snow | viscoelastic
+        tau                     the Maxwell relaxation time, for `viscoelastic` only. Short is a
+                                material that forgets its deformation -- it spreads and stays --
+                                and long is one that returns it.
+        density                 rewrites `mass` as p_vol * density, so a re-stated density is
+                                consistent with the volumes the geometry gave.
+
+    WHAT IT DOES NOT TOUCH: `p_vol`, `F`, `C` and `Jp`. The volumes belong to the geometry that
+    seeded them, and F/C/Jp are the deformation history -- which a continuation from a trajectory
+    does not have anyway. Every buffer is written IN PLACE, so a captured CUDA graph keeps pointing
+    at the same storage.
+
+    Reference: none -- a restatement of material parameters, not a mechanism. Plexus (this work).
+    """
+
+    EMIT = None                         # writes buffers at x_0; no integrable delta
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["material", "initial_condition", "continuation"]
+    PARAM_ROLES = {"youngs": "youngs_modulus", "bulk_modulus": "liquid_bulk_modulus",
+                   "material": "constitutive_model", "tau": "maxwell_relaxation_time",
+                   "density": "mass_density", "nu": "poisson_ratio"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.youngs = params.get("youngs")
+        self.bulk = params.get("bulk_modulus")
+        self.material = params.get("material")
+        self.tau = params.get("tau")
+        self.density = params.get("density")
+        self.nu = float(params.get("nu", 0.2))
+        if self.youngs is not None and self.bulk is not None:
+            raise ValueError("set_material: give `youngs` OR `bulk_modulus`, not both -- for a "
+                             "liquid they are two routes to the same lambda, and for a solid they "
+                             "are different numbers.")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        mat = self.material
+        if self.bulk is not None and mat not in (None, "liquid"):
+            raise ValueError(
+                f"set_material: `bulk_modulus` on material {mat!r}. It is defined for a liquid, "
+                f"where mu = 0 makes K = lambda exactly; on a solid K = lambda + 2*mu/3 and "
+                f"setting lambda from it would silently be the wrong number.")
+        n = lvl.n
+        said = []
+        if self.youngs is not None or self.bulk is not None:
+            if self.bulk is not None:
+                mu = torch.zeros(n, device=lvl.state.device)
+                la = torch.full((n,), float(self.bulk), device=lvl.state.device)
+                said.append(f"K = {float(self.bulk):g} (liquid)")
+            else:
+                E = float(self.youngs)
+                mu = torch.full((n,), E / (2 * (1 + self.nu)), device=lvl.state.device)
+                la = torch.full((n,), E * self.nu / ((1 + self.nu) * (1 - 2 * self.nu)),
+                                device=lvl.state.device)
+                said.append(f"youngs {E:g} -> mu {float(mu[0]):.4g}, la {float(la[0]):.4g}")
+            if mat == "liquid" and self.bulk is None:
+                mu = torch.zeros_like(mu)       # a fluid carries no shear
+            lvl.mu.copy_(mu)
+            lvl.la.copy_(la)
+        if mat is not None:
+            for nm, on in (("is_liquid", mat == "liquid"), ("is_snow", mat == "snow"),
+                           ("is_visco", mat == "viscoelastic")):
+                b = getattr(lvl, nm, None)
+                if b is not None:
+                    b.fill_(bool(on))
+            if hasattr(lvl, "visco_tau"):
+                # 1e9 is "no relaxation", the value `provision` uses for a purely elastic point
+                lvl.visco_tau.fill_(float(self.tau) if (mat == "viscoelastic" and self.tau)
+                                    else 1e9)
+            said.append(f"material {mat}" + (f", tau {float(self.tau):g}"
+                                             if mat == "viscoelastic" and self.tau else ""))
+        if self.density is not None:
+            rho = float(self.density)
+            if hasattr(lvl, "density"):
+                lvl.density.fill_(rho)
+            if hasattr(lvl, "mass") and hasattr(lvl, "p_vol"):
+                lvl.mass.copy_(lvl.p_vol * rho)     # the volumes are the geometry's; only rho moves
+            said.append(f"density {rho:g}")
+        print(f"[set_material] {lvl.name} ({n:,} points): " + "; ".join(said or ["nothing given"]),
+              flush=True)
         return {}

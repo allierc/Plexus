@@ -522,26 +522,94 @@ class LiveMovie:
                 _a[self.up] = _b[self.up] = float(self.lo[self.up]) + _lift
                 self.p.add_mesh(pv.Line(_a, _b), color="white", line_width=4.0, lighting=False)
                 _lab = _si_length(_len_m)
-                _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.09 * float(span[self.up])  # noqa
-                # TWICE THE HEADER'S NUMBER TO GET THE SAME HEIGHT. `add_text` and
-                # `add_point_labels` do not interpret `font_size` the same way -- both set to 11 and
-                # the label renders about half the cap height of the top-left print. 22 matches it;
-                # 26 is that, a little larger, because this label is read at a glance from across a
-                # frame while the header is read once.
+                # THE LABEL IS 3D TEXT LYING ALONG THE BAR, not a screen-aligned point label.
                 #
-                # BELOW THE LINE, NOT CENTRED ON A POINT UNDER IT. `add_point_labels` anchors text
-                # at its MIDDLE, so a label placed a few percent of the span beneath the bar still
-                # crosses it once the camera tilts the bar in perspective -- which it does in every
-                # one of these scenes. `justification_vertical="top"` hangs the text from its top
-                # edge, so the gap is a gap at any camera angle instead of at one.
+                # `add_point_labels` billboards: the glyphs always face the camera, so a bar that
+                # the projection tilts -- and it tilts in every one of these scenes -- carries a
+                # horizontal caption at an angle to it, sitting further away than it looks because
+                # the gap is measured in world units along a foreshortened axis. VTK cannot rotate
+                # a point label; the only way to align text with a line in the scene is to put the
+                # text IN the scene.
                 #
-                # NOT BOLD. pyvista defaults `bold=True` here and nowhere else in this renderer;
-                # the header, the axes and the curve readouts are all regular weight, and one bold
-                # annotation in a frame reads as emphasis rather than as a unit.
-                self.p.add_point_labels([_mid], [_lab], font_size=26, text_color="white",
-                                        bold=False, shape=None, show_points=False,
-                                        always_visible=True, justification_horizontal="center",
-                                        justification_vertical="top")
+                # Built in its own plane and mapped onto the frame (bar direction, in-plane up,
+                # normal), so it reads left-to-right along the bar and upright, and is
+                # foreshortened by exactly as much as the bar is. Height is a fraction of the
+                # bar's LENGTH, so the two stay in proportion at any zoom.
+                _d = _b - _a
+                _L = float(np.linalg.norm(_d))
+                _d = _d / max(_L, 1e-12)
+                _camup = np.zeros(3); _camup[self.up] = 1.0
+                # THE IN-PLANE UP IS WORLD UP, so the glyphs stand upright rather than following
+                # whatever handedness a cross product happened to give.
+                _upv = _camup - _d * float(np.dot(_camup, _d))
+                if np.linalg.norm(_upv) < 1e-6:            # bar parallel to up: any up will do
+                    _upv = np.cross(_d, np.array([1.0, 0.0, 0.0]))
+                _upv = _upv / np.linalg.norm(_upv)
+                _nrm = np.cross(_d, _upv)
+                # AND THE TEXT MUST FACE THE CAMERA. Built from an arbitrary normal it is a 50%
+                # chance of being seen from BEHIND -- which renders as a mirror image, legible
+                # enough to look like a font bug and not like a facing one. The camera direction is
+                # not set yet at this point in the frame, so it is derived from the same elev/azim
+                # the camera block below uses; reversing the READING direction (and with it the
+                # normal) keeps the glyphs upright, where flipping the normal alone would invert
+                # them.
+                _e, _az = np.radians(elev), np.radians(azim)
+                _axh = [i for i in range(3) if i != self.up]
+                _view = np.zeros(3)
+                _view[_axh[0]] = np.cos(_e) * np.cos(_az)
+                _view[_axh[1]] = np.cos(_e) * np.sin(_az)
+                _view[self.up] = np.sin(_e)
+                if float(np.dot(_nrm, _view)) < 0.0:
+                    _d = -_d
+                    _nrm = np.cross(_d, _upv)
+                _h = float((self.style or {}).get("scale_bar_text", 0.17)) * _L
+                # THE LABEL IS A TEXTURED QUAD, NOT VECTOR TEXT.
+                #
+                # `pv.Text3D` wraps vtkVectorText, which is ASCII ONLY: it rendered "50 um" as
+                # "50 m", silently dropping the micro sign this overlay was changed to use in the
+                # first place. A wrong unit that looks like a font quirk is worse than no label.
+                # Rasterising the string with matplotlib keeps every glyph -- micro signs,
+                # superscripts, anything the header can print -- and mapping it onto a quad in the
+                # bar's own frame keeps the alignment that vector text was chosen for.
+                try:
+                    import matplotlib
+                    matplotlib.use("Agg")
+                    import matplotlib.pyplot as _plt
+                    _fig = _plt.figure(figsize=(6, 1.4), dpi=200)
+                    _fig.patch.set_alpha(0.0)
+                    _tx = _fig.text(0.5, 0.5, _lab, ha="center", va="center",
+                                    color="white", fontsize=44)
+                    _fig.canvas.draw()
+                    _bb = _tx.get_window_extent(_fig.canvas.get_renderer())
+                    _img = np.asarray(_fig.canvas.buffer_rgba())
+                    _H = _img.shape[0]
+                    _pad = 6
+                    _crop = _img[max(0, int(_H - _bb.y1) - _pad): int(_H - _bb.y0) + _pad,
+                                 max(0, int(_bb.x0) - _pad): int(_bb.x1) + _pad].copy()
+                    _plt.close(_fig)
+                    _asp = _crop.shape[1] / max(_crop.shape[0], 1)
+                    _w = _h * _asp
+                    # CLOSER THAN THE OLD 9% OF THE SPAN: two thirds of the label's own height
+                    # below the bar, so the gap scales with the label and not with the scene.
+                    _c = 0.5 * (_a + _b) - _upv * (0.66 * _h + 0.5 * _h)
+                    _hw, _hh = 0.5 * _w, 0.5 * _h
+                    _q = pv.PolyData(
+                        np.array([_c - _d * _hw - _upv * _hh, _c + _d * _hw - _upv * _hh,
+                                  _c + _d * _hw + _upv * _hh, _c - _d * _hw + _upv * _hh]),
+                        faces=np.array([4, 0, 1, 2, 3]))
+                    _q.active_texture_coordinates = np.array(
+                        [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], np.float32)
+                    self.p.add_mesh(_q, texture=pv.Texture(_crop), lighting=False,
+                                    show_scalar_bar=False)
+                except Exception as e:                     # noqa: BLE001 -- never lose the movie
+                    print(f"[live-movie] 3D scale label unavailable ({type(e).__name__}: {e}); "
+                          f"using a flat one", flush=True)
+                    _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.09 * float(span[self.up])
+                    self.p.add_point_labels([_mid], [_lab], font_size=26, text_color="white",
+                                            bold=False, shape=None, show_points=False,
+                                            always_visible=True,
+                                            justification_horizontal="center",
+                                            justification_vertical="top")
             # AIMED AT THE SCENE, NOT AT [0, world]. `0.5 * span` is the middle of the world box,
             # which is where the content is only when a wall puts it there. With `boundary: free`
             # nothing does: the okuda vesicle is built about the ORIGIN, so the camera looked at

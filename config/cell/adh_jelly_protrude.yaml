@@ -278,97 +278,97 @@ operators:
   to: mpm_grid
 - at: mpm_grid
   op: mpm_grid_update
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: plasma_membrane_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: cytoskeleton_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: nuclear_envelope_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: chromatin_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: nucleolus_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: rough_er_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: smooth_er_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: golgi_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: mitochondria_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: centriole_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: protein_a_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: protein_b_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: protein_c_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: protein_d_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: protein_e_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
   vmax: 1000000000.0
-  wall_damp: 0.7
+  wall_damp: 1.0
 - at: plasma_membrane
   child: plasma_membrane_node
   op: aggregate_centroid

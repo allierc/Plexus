@@ -40,10 +40,20 @@ def main():
     yaml_file, _pre, _name = resolve_config(args.spec)
     raw = yaml.safe_load(open(yaml_file))
     if args.divide > 1:
-        pp = raw["sets"]["mpm_particle"]["per_parent"]
-        raw["sets"]["mpm_particle"]["per_parent"] = (
-            {k: max(3, v // args.divide) for k, v in pp.items()} if isinstance(pp, dict)
-            else max(3, int(pp) // args.divide))
+        # EVERY PARTICLE SET, not one named `mpm_particle`. The per-organelle model has fifteen
+        # node sets and no set by that name, so the old lookup raised KeyError on exactly the
+        # models this tool was written to preview.
+        cut = 0
+        for nm, sv in raw["sets"].items():
+            if not isinstance(sv, dict) or "per_parent" not in sv:
+                continue
+            if not (nm == "mpm_particle" or nm.endswith("_node")):
+                continue
+            pp = sv["per_parent"]
+            sv["per_parent"] = ({k: max(3, v // args.divide) for k, v in pp.items()}
+                                if isinstance(pp, dict) else max(3, int(pp) // args.divide))
+            cut += 1
+        print(f"[still] node budgets cut by {args.divide} on {cut} set(s)", flush=True)
     if args.n_grid:
         for f in raw["fields"].values():
             if "n_grid" in f:
