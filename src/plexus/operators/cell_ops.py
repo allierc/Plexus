@@ -828,7 +828,7 @@ class AggregateCentroid(Aggregate):
     and is therefore routed to the MPM substep rather than to the engine's integrator. A parent
     that IS integrated would have this operator fighting its integrator every tick.
 
-    Reference: none -- the Aggregate family of plexus2 sec. "The operator algebra". Plexus (this work).
+    Reference: none -- the aggregate family of plexus2 sec. "The operator algebra". Plexus (this work).
     """
     KIND = "aggregate"
     EMIT = None                                   # writes the parent's state; returns no delta
@@ -1292,10 +1292,18 @@ class PhaseClock(Lateral):
 def _gate(op, H, idx):
     """The cycle's amplitude for each point, from its cell's phase -- 1 + cos, in [0, 1].
 
-    `gate: {block: phase, offset: <radians>, floor: <0..1>}` on any operator that carries a
-    per-cell direction. `offset` is what puts two operators at different points of the SAME cycle;
-    `floor` keeps a residual so a gated force never switches fully off, which matters for the
-    adhesion (a cell that releases completely does not slide back, it falls over).
+    `gate: {block: phase, offset: <radians>, floor: <0..1>, signed: <bool>}` on any operator that
+    carries a per-cell direction. `offset` is what puts two operators at different points of the
+    SAME cycle; `floor` keeps a residual so a gated force never switches fully off, which matters
+    for the adhesion (a cell that releases completely does not slide back, it falls over).
+
+    `signed: true` GIVES cos(phi + offset) ITSELF, mean ZERO over a cycle, and it exists because
+    `floor: 0` does not do what it sounds like. 1/2 (1 + cos) never goes negative: its average over
+    a cycle is 1/2, so an operator gated that way applies half its amplitude STEADILY no matter what
+    the floor is. A cell driven by it translates because it is being pushed, not because it is
+    crawling, and the movie cannot tell the two apart. With `signed: true` the force reverses every
+    half cycle and integrates to nothing on its own, so any net displacement has to come from the
+    cell's shape changing in step with it -- which is the claim being tested.
     """
     cfg = getattr(op, "gate", None)
     if not cfg:
@@ -1303,9 +1311,11 @@ def _gate(op, H, idx):
     cl = H.level(op.cell_set)
     b0, b1 = cl.state_schema[str(cfg.get("block", "phase"))]
     ph = cl.state[:, b0:b1][:, 0]
+    c = torch.cos(ph + float(cfg.get("offset", 0.0)))
+    if bool(cfg.get("signed", False)):
+        return c[idx]
     fl = float(cfg.get("floor", 0.0))
-    g = 0.5 * (1.0 + torch.cos(ph + float(cfg.get("offset", 0.0))))
-    return (fl + (1.0 - fl) * g)[idx]
+    return (fl + (1.0 - fl) * 0.5 * (1.0 + c))[idx]
 
 
 @register_operator("polar_active_stress", family="motility", set="particle", kind="lateral")
@@ -1399,4 +1409,110 @@ class PolarActiveStress(Lateral):
             p.register_buffer("act_stress", torch.zeros_like(sig))
             buf = p.act_stress
         buf.copy_(sig)
+        return {}
+
+
+@register_operator("polar_growth", family="motility", set="particle", kind="lateral")
+class PolarGrowth(Lateral):
+    """The cytoskeleton ELONGATING along the cell's polarity by a stated factor, and retracting.
+
+    particle -[containment]-> particle: reads its cell's `polarity` and `phase`; multiplies the
+    set's deformation gradient F by an incremental stretch, so the material's REST SHAPE changes.
+
+        lambda(phi) = stretch ^ s(phi),      s(phi) = 1/2 (1 - cos(phi + offset)) in [0, 1]
+        G           = I + (r - 1) n n^T + (r^-1/2 - 1) (I - n n^T),   r = lambda_now / lambda_prev
+        F           <- G F                                            once per frame
+
+    n is the cell's unit polarity, phi its phase, and `stretch` the factor of the CYTOSKELETON'S
+    OWN CURRENT LENGTH the elongation is asking for at the top of the cycle -- 5.0 means five times
+    as long. r is the increment between this frame and the last, so the operator needs no dt and no
+    frequency: it follows whatever the pacemaker does, and retracts by itself on the way down
+    because s decreasing makes r < 1.
+
+    WHY THIS AND NOT AN ACTIVE STRESS, which is the thing it replaces. A stress is a FORCE the
+    material argues with: the strain it wins is sigma / (lambda + 2 mu), and the cell measured 0.3%
+    of its own length at an amplitude of a quarter of its own modulus, because a stiff cell simply
+    does not yield to a stress it can balance. Growth is KINEMATIC. Changing the rest shape does
+    not ask the material how stiff it is; the stress that results is whatever is needed to get
+    there, and it accumulates without bound instead of settling at a balance point. A cell reaching
+    forward five times its own length is a rest-shape change, not an elastic deflection -- which is
+    also what the biology is, since the protrusion is polymerised rather than stretched.
+
+    F = F_e F_g, the multiplicative decomposition of growth. F_g is not stored: injecting G into F
+    each frame IS the incremental form of it, and the elastic part relaxes it away as the material
+    moves, which is the shape actually changing. That relaxation is why the surrounding cytoplasm
+    has to be able to FLOW -- against an elastic cytoplasm the growth is fought to a standstill in
+    exactly the way the active stress was.
+
+    CONSTANT VOLUME: r along n, r^-1/2 across it, so det G = 1 and the elongation is a
+    redistribution of the material the cell has, not an inflation.
+
+    `max_rate` caps |ln r| per frame (default 0.05, i.e. 5% of the current length per frame). A
+    coarse dt or a fast pacemaker would otherwise inject in one frame a strain no number of
+    substeps can carry, and the run would blow up rather than move.
+
+    Reference: Rodriguez, E. K., Hoger, A. & McCulloch, A. D. (1994). Stress-dependent finite
+    growth in soft elastic tissues. J. Biomech. 27:455-467.
+    """
+    EMIT = None                       # rewrites F in place; there is no integrable delta
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = False
+    REQUIRES_PARAMS = ["cell_set", "stretch"]
+    REQUIRES_BUFFERS = ["F"]
+    INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
+    READS = ["polarity", "phase"]; WRITES = []
+    MAPS = ["parent"]
+    MECHANISM_TAGS = ["growth", "motility", "protrusion", "cytoskeleton", "rest_shape"]
+    PARAM_ROLES = {"stretch": "peak_elongation_factor", "cell_set": "polarity_owner",
+                   "offset": "cycle_phase_offset", "max_rate": "per_frame_log_stretch_cap"}
+    REFERENCE = ("Rodriguez, E. K., Hoger, A. & McCulloch, A. D. (1994). J. Biomech. 27:455-467.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.cell_set = str(params["cell_set"])
+        self.block = str(params.get("block", "polarity"))
+        self.phase_block = str(params.get("phase_block", "phase"))
+        self.stretch = float(params["stretch"])
+        self.offset = float(params.get("offset", 0.0))
+        self.max_rate = float(params.get("max_rate", 0.05))
+        self._s_prev = None            # per cell, the previous frame's s(phi) -- the increment's other half
+        self._warned = False
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        cl = H.level(self.cell_set)
+        D = p.F.shape[-1]
+        b0, b1 = cl.state_schema[self.block]
+        q0, q1 = cl.state_schema[self.phase_block]
+        ph = cl.state[:, q0:q1][:, 0]
+        s = 0.5 * (1.0 - torch.cos(ph + self.offset))
+        if self._s_prev is None:                  # the first frame grows nothing: r = 1
+            self._s_prev = s.detach().clone()
+            return {}
+        ln = math.log(self.stretch) * (s - self._s_prev)
+        self._s_prev = s.detach().clone()
+        cap = torch.clamp(ln, -self.max_rate, self.max_rate)
+        if not self._warned and bool((cap != ln).any()):
+            self._warned = True
+            print(f"[polar_growth] {self.at}: the per-frame stretch hit the {self.max_rate:g} cap "
+                  f"(asked {float(ln.abs().max()):.3f} of the current length in one frame) -- the "
+                  f"elongation will lag the pacemaker. Slow the clock or raise `max_rate`.",
+                  flush=True)
+        idx = H.lift_index(p.name, self.cell_set)
+        # THE ELASTIC PART SHRINKS BY WHAT THE REST SHAPE GROWS: F = F_e F_g, so the growth F_g
+        # enters as exp(-ln r) on F_e, not exp(+ln r). The sign is the whole operator and it is easy
+        # to get backwards: F is the ELASTIC deformation, and stretching it along n makes the
+        # material feel stretched, so it pulls itself IN -- measured, the cell shortened from 28.0
+        # to 25.9 um along its polarity while asking for five times longer. Compressing F_e along n
+        # is what makes the material push out along n and actually elongate.
+        r = torch.exp(-cap)[idx]
+        n = cl.state[:, b0:b1][:, :D][idx]
+        n = n / n.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        nn = n[:, :, None] * n[:, None, :]
+        I = torch.eye(D, device=p.F.device, dtype=p.F.dtype)[None]
+        G = I + (r - 1.0)[:, None, None] * nn + (r.rsqrt() - 1.0)[:, None, None] * (I - nn)
+        if mask is not None:
+            G = torch.where(mask.bool()[:, None, None], G, I)
+        p.F.copy_(torch.bmm(G, p.F))
         return {}

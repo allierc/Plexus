@@ -838,6 +838,12 @@ class LiveMovie:
             return
         self._sname = sname                           # `_rgb` needs it to look up the type palette
         lvl = H.level(sname)
+        # THE LIVE COUNT, RE-READ EVERY FRAME. `lvl.n` is the RESERVOIR -- the table a growing set
+        # was allocated into -- and it never changes, so a tissue that divided from 396 vertices to
+        # 4,440 was labelled "25,584 nodes" from the first frame to the last: a true statement about
+        # the allocation and a wrong one about the tissue. `occ` is the present.
+        _occ = getattr(lvl, "occ", None)
+        self.n_live = int(_occ.sum()) if _occ is not None else int(lvl.n)
         if self.cloud is None:
             self.n = int(lvl.n)
             # SEEDED, AND DRAWN ONCE. A subset re-drawn each frame makes the fluid boil: every dot
@@ -991,8 +997,13 @@ class LiveMovie:
             _lut = f"\ncolour = {self.colour_by}"
         # `nodes`, NOT `particles`. What is drawn is the members of a SET -- vertices of a mesh,
         # cells, neurons -- and only one substrate in this tree calls them particles.
+        # "4,440 of 25,584 nodes" while a set is growing into its reservoir, and plainly
+        # "25,584 nodes" once it is full or was never a growing set -- so the number that moves is
+        # the one being watched, and the allocation is still visible behind it.
+        _live = getattr(self, "n_live", self.n)
+        _cnt = f"{_live:,}" if _live == self.n else f"{_live:,} of {self.n:,}"
         self.p.add_text(f"{self.name}{self._box_label}\n"
-                        f"{self.n:,} nodes{sub}{self._grid_label}\n"
+                        f"{_cnt} nodes{sub}{self._grid_label}\n"
                         f"frame {tick}/{self.n_frames}   "
                         f"{(self._fixed_ms if self._fixed_ms is not None else el / max(tick, 1) * 1000):.0f}"
                         f" ms/frame {self._rate_of}{clk}{_lut}",
