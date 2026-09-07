@@ -86,8 +86,6 @@ composition and the whole rollout stays **differentiable**.
 
 A set may be contained in another — proteins in a cell, cells in a tissue, tissues in an organism — through an explicit child → parent map. Importantly, a parent may contain several distinct sets: the same cell can contain receptors, signalling proteins, cytoskeletal elements and particles. These sets remain distinct objects, with their own state and operators, while sharing the same parent. Each level can also run at its own rate: no level is reduced to a parameter of the one above it.
 
-![](figures/fig_hier.png){width=70% fig-align="center"}
-
 Operators can act within a level or across levels. Within a cell, for example, operators may couple receptors → signalling proteins → cytoskeleton. Across the containment map, **Aggregate ↑** builds parent state from children — a cell position from its particles, or a neuron input from its synapses — while **Broadcast ↓** propagates parent state to children — a material property to every particle owned by a cell, or a constraint imposed by the parent.
 
 Fields are level-specific too. **Exchange** couples a set to a field at the appropriate level, allowing a protein concentration field, a cellular morphogen field and a tissue mechanical grid to coexist as distinct objects.
@@ -105,6 +103,8 @@ it.**
 <style>
 .sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1.1rem;margin:.6rem 0 2.4rem}
 .sim-gallery.g3{grid-template-columns:repeat(3,1fr)}
+.sim-gallery.g4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:900px){.sim-gallery.g4{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:560px){.sim-gallery.g3{grid-template-columns:repeat(2,1fr)}}
 .sim-gallery.wide{grid-template-columns:1fr;max-width:900px;margin:.6rem auto 2.4rem}
 .sim-gallery.wide .sim-card video{aspect-ratio:auto !important;height:auto !important;object-fit:contain !important}
@@ -122,9 +122,9 @@ it.**
 </style>
 
 <h3>Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">The simplest composition: cells carrying two molecular states, coupled by diffusion between neighbouring cells and by local activator–inhibitor reactions within each cell. The same biological entities participate in two mechanisms whose composition generates spatial patterning. Shown on a 2D cell disc are a striped regime, a spotted one obtained by changing a single reaction parameter, and two chemistries patterning the same cells at once — then, below, those two chemistries coupled through their reaction, and three species in cyclic competition.</p>
+<p class="opk">The simplest composition: cells carrying two molecular states, coupled by diffusion between neighbouring cells and by local activator–inhibitor reactions within each cell. The same biological entities participate in two mechanisms whose composition generates spatial patterning. Shown on a 2D cell disc are a striped regime, a spotted one obtained by changing a single reaction parameter, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
-<div class="sim-gallery g3">
+<div class="sim-gallery g4">
   <figure class="sim-card">
     <video src="gallery/turing_gs_stripes.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
@@ -249,97 +249,6 @@ plotting:
       <span class="sim-cap">the same graph, the same diffusion, F 0.034 instead of 0.05 — the only difference — and the bands break into 18 separate spots over 26% of the cells</span>
     </figcaption>
   </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_two_beta.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">two chemistries<span class="sim-spec"><pre>general:
-  name: promo_TURING_atlas_turing2d_two_beta_B
-  seed: 0
-  n_frames: 6000
-  record_cap: 602
-  dt: 1.0
-  dim: 2
-  boundary: free
-  world:
-  - 49.4
-  - 49.4
-sets:
-  cell:
-    n: 4000
-    spawn: sunflower
-    spawn_radius: 19.0
-    state:
-      pos:
-        width: 2
-        integration: none
-        boundary: free
-      chem:
-        width: 4
-        integration: first_order
-        boundary: free
-fields: {}
-operators:
-- op: cell_chem_seed
-  at: cell
-  seed: 0
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.12
-  chan: 0
-- op: cell_chem_seed
-  at: cell
-  seed: 2
-  before_frame: 3
-  mode: scatter
-  seed_frac: 0.12
-  chan: 2
-- op: radius_graph
-  at: cell
-  radius: 0.95
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
-  chan: 0
-- op: cell_chem_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.03
-  d_h: 0.16
-  chi: 1.3
-  chan: 2
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.046
-  kk: 0.062
-  rate: 1.0
-  chan: 0
-- op: cell_chem_react
-  at: cell
-  model: gray_scott
-  F: 0.026
-  kk: 0.051
-  rate: 1.0
-  chan: 2
-schedule:
-- cell_chem_seed
-- cell_chem_seed
-- radius_graph
-- cell_chem_diffuse
-- cell_chem_diffuse
-- cell_chem_react
-- cell_chem_react
-plotting:
-  background: black
-  dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">two chemistries on the same cells, each with its own seed, diffusion and reaction — two Gray–Scott systems side by side rather than one</span>
-    </figcaption>
-  </figure>
-</div>
-<div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/turing_gs_coupled_eta_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
@@ -498,127 +407,6 @@ plotting:
 <p class="opk">A more structured representation of epithelial cells and their shared junctions. Cells are polygons whose boundaries share vertices, making junction geometry itself part of the biological state. Area elasticity and junction tension couple neighbouring cells and relax the tissue toward mechanical equilibrium, while growth, division and cell death modify its organization. Here the same cellular entities therefore carry geometry, interact mechanically, and change their topology over time.</p>
 <p class="opk-ref">Reference — active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/tyssue_spheroid_gate00.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">grow &amp; divide<span class="sim-spec"><pre>general:
-  name: promo_G_gates_gate_00_spheroid_A
-  seed: 0
-  n_frames: 401
-  dt: 1.0
-  record_cap: 403
-  boundary: free
-  dim: 3
-  world:
-  - 50.0
-  - 50.0
-  - 50.0
-  units:
-    length_um: 10.0
-    time_s: 600.0
-plotting:
-  background: black
-sets:
-  vertex:
-    n: 25584
-    mesh: half_edge
-    cell_set: cell
-  cell:
-    n: 12800
-    state:
-      area:
-        width: 1
-      cen:
-        width: 3
-      chem:
-        width: 2
-        integration: first_order
-fields: {}
-operators:
-- op: mesh_seed
-  at: vertex
-  before_frame: 1
-  cell_set: cell
-  n_cells: 200
-  radius: 5.0
-  jitter: 0.18
-  p0: 3.5
-  seed: 0
-  vseed_cv: 0.15
-- op: cell_geometry
-  at: cell
-- op: cell_grow
-  at: vertex
-  cell_set: cell
-  rate: 0.003457
-  rho: 1.0
-  a_sw: 50.0
-  hill: 4.0
-  vth_frac: 2.5
-- op: junction_myosin
-  at: vertex
-  activity: 1.0
-  tau: 20.0
-  beta: 1.0
-  myo_new: 1.0
-  dt: 1.0
-  inherit: true
-  keyed_on: length
-  destabilising: true
-  k_perim: 1.0
-  lam: 0.0
-  gam: 0.0
-- op: cell_mechanics
-  at: vertex
-  K_A: 1.0
-  K_P: 1.0
-  K_V: 2.0
-  K_R: 0.4
-  Lambda: 3.0
-  Gamma: 0.4
-  p0: 3.5
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: edge_flip
-  at: vertex
-  every: 4
-  engine_clock: true
-  l_th_frac: 0.35
-  max_flips: 30
-- op: cell_divide
-  at: vertex
-  cell_set: cell
-  every: 4
-  engine_clock: true
-  factor: 2.0
-  cycle_cv: 0.15
-  min_cycle: 4
-  max_cycle: 1000000000
-  p0: 3.5
-  reset_noise: 0.12
-- op: junction_sync
-  at: vertex
-  myo_new: 1.0
-  inherit: true
-- op: topo_record
-  at: vertex
-  every: 1
-schedule:
-- mesh_seed
-- cell_geometry
-- cell_grow
-- junction_myosin
-- cell_mechanics
-- edge_flip
-- cell_divide
-- junction_sync
-- topo_record</pre></span></span>
-      <span class="sim-cap">the vertex model on its own: 200 cells grow and divide into 6,914 over 401 frames, and the shell stays round (elongation 1.01, where 1.00 is a sphere)</span>
-    </figcaption>
-  </figure>
   <figure class="sim-card">
     <video src="gallery/tyssue_apoptose.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
@@ -3054,497 +2842,2320 @@ _sculpt:
 
 
 <h3>Continuum mechanics — MLS-MPM</h3>
-<p class="opk">Plexus can make the numerical structure of a mechanism explicit when greater physical detail is required. Here a material is represented by particles coupled through an Eulerian grid, and continuum mechanics is decomposed into <b>strain, particle-to-grid transfer, grid dynamics and grid-to-particle transfer</b>. Different constitutive laws on the same structure produce elastic, fluid and granular materials. Rather than treating MLS-MPM as a monolithic simulator, Plexus exposes its material operations as composable operators.</p>
+<p class="opk">Plexus can make the numerical structure of a mechanism explicit when greater physical detail is required. Here a material is represented by particles coupled through an Eulerian grid, and continuum mechanics is decomposed into <b>strain, particle-to-grid transfer, grid dynamics and grid-to-particle transfer</b>. The eight clips below run those same operators throughout: what changes along the row is the spec — first the constitutive law, then a single material number, then a plastic law in place of a fluid one, then one added force term; then the schedule itself gains inflow and outflow, a solid is put inside the fluid, and finally only the particle count grows, from five million to a billion. Rather than treating MLS-MPM as a monolithic simulator, Plexus exposes its material operations as composable operators.</p>
 <p class="opk-ref">Reference — the MLS-MPM solver is our PyTorch port (<a href="https://github.com/saalfeldlab/MPM_pytorch">saalfeldlab/MPM_pytorch</a>) of Yuanming&nbsp;Hu’s <a href="https://github.com/yuanming-hu/taichi_mpm">taichi_mpm</a>, implementing MLS-MPM (Hu et&nbsp;al. 2018).</p>
-<div class="sim-gallery g3">
+<div class="sim-gallery g4">
   <figure class="sim-card">
-    <video src="gallery/material_multi.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/mpm2_multimaterial.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">multi-material<span class="sim-spec"><pre># mpm3d_multimaterial -- three materials side by side in one 3D box (the spirit of
-# MPM_pytorch&#x27;s multimaterial_1_3D, trimmed to three blocks for a quick inspect):
-# an elastic jelly cube, a liquid water cube and a plastic snow cube fall together.
-# Three cells, one material type each (assigned by `fraction`), each block-filled.
-# Tests multi-object / multi-material 3D in a single grid solve.
-general: {name: material_3d_multimaterial, seed: 0, n_frames: 360, dt: 0.0032, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+      <span class="sim-name" tabindex="0">three materials, one solve<span class="sim-spec"><pre>general:
+  name: sit_multimaterial
+  seed: 0
+  n_frames: 2400
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
 sets:
   cell:
     n: 3
-    start: [[0.24, 0.6, 0.5], [0.5, 0.6, 0.5], [0.76, 0.6, 0.5]]
+    start:
+    - - 0.08
+      - 0.305
+      - 0.25
+    - - 0.25
+      - 0.305
+      - 0.25
+    - - 0.42
+      - 0.305
+      - 0.25
     types:
-      jelly: {fraction: 0.3334, youngs: 260, block: [0.14, 0.50, 0.40, 0.34, 0.72, 0.60]}
+      jelly:
+        fraction: 0.3333
+        density: 1150.0
+        block:
+        - 0.03
+        - 0.25
+        - 0.2
+        - 0.13
+        - 0.36
+        - 0.3
+        bulk_modulus: 981000.0
+        material: liquid
       water:
         fraction: 0.3333
-        youngs: 200
-        block: [0.40, 0.50, 0.40, 0.60, 0.72, 0.60]
-        layers: [{frac: 1.0, youngs: 200, material: liquid}]
+        density: 1000.0
+        material: liquid
+        block:
+        - 0.16
+        - 0.25
+        - 0.16
+        - 0.34
+        - 0.36
+        - 0.34
+        bulk_modulus: 981000.0
       snow:
-        fraction: 0.3333
-        youngs: 90
-        block: [0.66, 0.50, 0.40, 0.86, 0.72, 0.60]
-        layers: [{frac: 1.0, youngs: 90, material: snow}]
-  mpm_particle: {parent: cell, per_parent: 6000, radius: 0.16, density: 1.0}
+        fraction: 0.3334
+        density: 350.0
+        material: snow
+        block:
+        - 0.37
+        - 0.25
+        - 0.2
+        - 0.47
+        - 0.36
+        - 0.3
+        youngs: 500000.0
+  mpm_particle:
+    parent: cell
+    per_parent: 870334
+    radius: 0.08
+    density: 1000.0
+    particle_mass: 2.20758e-06
 fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 64}
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 192
 operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 16.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.7}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1000000000.0}
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  vmax: 1000000000.0
+  implementation: warp
 schedule:
 - aggregate
 - gravity
-- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+- substep_dt: 2.604167e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
 plotting:
   background: black
   up_axis: 1
   camera_elev: 1.18
   camera_zoom: 0.0
   box_frame: true
-  fps: 60
-  hide_sets: [cell]
+  hide_sets:
+  - cell
   dot_size: 1.2
   render_3d: dots
   splat_size: 2.4
   splat_res: 600
   camera_turns: 0.0
-  colors: {jelly: [0.40, 0.85, 0.55], water: [0.30, 0.62, 1.0], snow: [0.95, 0.96, 1.0]}
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_mpm_particle:
-    description: Initially, three distinct clusters of particles are arranged in a linear sequence along a diagonal axis. Over time, the central blue cluster begins to expand and flatten, spreading across the bottom plane of the bounding box. The green and white clusters remain relatively stationary as the blue cluster grows to encompass the area beneath them. By the final frame, the blue particles form a large, thin sheet on the floor while the green and white clusters sit atop it.
-    objects: &#x27;There are three primary clusters of particles: one green, one blue, and one white. The green cluster is a compact, roughly spherical mass located on the left side of the scene. The white cluster is a similar compact, spherical mass located on the right side of the scene. The blue cluster starts as a compact sphere in the center but transforms into a large, flat, two-dimensional sheet that covers the bottom of the cube.&#x27;</pre></span></span>
-      <span class="sim-cap">particles + grid: one solver for many materials</span>
+  colors:
+    jelly:
+    - 0.4
+    - 0.85
+    - 0.55
+    water:
+    - 0.3
+    - 0.62
+    - 1.0
+    snow:
+    - 0.95
+    - 0.96
+    - 1.0
+  slow_motion: 4</pre></span></span>
+      <span class="sim-cap">two liquids of different density and a snow-like plastic dropped into the same 192&sup3; grid solve — 2.6&nbsp;M particles, three constitutive laws, one schedule</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/material_map.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/mpm2_viscosities.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">material map (4 quadrants)<span class="sim-spec"><pre>fields:
-  activation: {frame: grid, res: 128}
-  mpm_grid: {frame: mpm_grid, n_grid: 128}
-  stiffness_map: {frame: image, source: material/map_four_quadrants.tif}
-general: {boundary: wall, dt: 0.002, n_frames: 250, name: material_map_four_quadrants, seed: 0}
+      <span class="sim-name" tabindex="0">viscosity, swept<span class="sim-spec"><pre>general:
+  name: si_three_viscosities
+  seed: 0
+  n_frames: 1200
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.1
+  - 0.1
+  obstacles:
+  - - 0.0
+    - 0.045
+    - 0.0
+    - 0.1
+    - 0.05
+    - 0.0015
+  - - 0.0
+    - 0.045
+    - 0.00985
+    - 0.1
+    - 0.05
+    - 0.01135
+  - - 0.0
+    - 0.045
+    - 0.0197
+    - 0.1
+    - 0.05
+    - 0.0212
+  - - 0.0
+    - 0.045
+    - 0.02955
+    - 0.1
+    - 0.05
+    - 0.03105
+  - - 0.0
+    - 0.045
+    - 0.0394
+    - 0.1
+    - 0.05
+    - 0.0409
+  - - 0.0
+    - 0.045
+    - 0.04925
+    - 0.1
+    - 0.05
+    - 0.05075
+  - - 0.0
+    - 0.045
+    - 0.0591
+    - 0.1
+    - 0.05
+    - 0.0606
+  - - 0.0
+    - 0.045
+    - 0.06895
+    - 0.1
+    - 0.05
+    - 0.07045
+  - - 0.0
+    - 0.045
+    - 0.0788
+    - 0.1
+    - 0.05
+    - 0.0803
+  - - 0.0
+    - 0.045
+    - 0.08865
+    - 0.1
+    - 0.05
+    - 0.09015
+  - - 0.0
+    - 0.045
+    - 0.0985
+    - 0.1
+    - 0.05
+    - 0.1
+  - - 0.0
+    - 0.045
+    - 0.0
+    - 0.0015
+    - 0.05
+    - 0.1
+  - - 0.00985
+    - 0.045
+    - 0.0
+    - 0.01135
+    - 0.05
+    - 0.1
+  - - 0.0197
+    - 0.045
+    - 0.0
+    - 0.0212
+    - 0.05
+    - 0.1
+  - - 0.02955
+    - 0.045
+    - 0.0
+    - 0.03105
+    - 0.05
+    - 0.1
+  - - 0.0394
+    - 0.045
+    - 0.0
+    - 0.0409
+    - 0.05
+    - 0.1
+  - - 0.04925
+    - 0.045
+    - 0.0
+    - 0.05075
+    - 0.05
+    - 0.1
+  - - 0.0591
+    - 0.045
+    - 0.0
+    - 0.0606
+    - 0.05
+    - 0.1
+  - - 0.06895
+    - 0.045
+    - 0.0
+    - 0.07045
+    - 0.05
+    - 0.1
+  - - 0.0788
+    - 0.045
+    - 0.0
+    - 0.0803
+    - 0.05
+    - 0.1
+  - - 0.08865
+    - 0.045
+    - 0.0
+    - 0.09015
+    - 0.05
+    - 0.1
+  - - 0.0985
+    - 0.045
+    - 0.0
+    - 0.1
+    - 0.05
+    - 0.1
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 3
+    start:
+    - - 0.05
+      - 0.075
+      - 0.025
+    - - 0.05
+      - 0.075
+      - 0.05
+    - - 0.05
+      - 0.075
+      - 0.075
+    types:
+      water:
+        fraction: 0.3334
+        material: liquid
+        bulk_modulus: 10000.0
+        shape: ball
+        eta: 0.001
+      gel:
+        fraction: 0.3333
+        material: liquid
+        bulk_modulus: 10000.0
+        shape: ball
+        eta: 1.0
+      snow:
+        fraction: 0.3333
+        material: snow
+        youngs: 50000.0
+        shape: ball
+  mpm_particle:
+    parent: cell
+    per_parent: 100000
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 4.19006e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
 operators:
-- {at: cell, op: aggregate}
-- {op: apply_material_map, at: mpm_particle, from: stiffness_map, target: youngs, min: 20, max: 200}
-- {at: activation, duration: 30, name: beat, op: pacemaker, period: 150, phase: 0}
-- at: activation
-  center: [0.5, 0.5]
-  clock: beat
-  op: activation_pulse
-  radius: 0.12
-- {amplitude: 20.0, at: mpm_particle, from: activation, mode: inward, op: active_force}
-- {at: mpm_particle, k: 30.0, op: drag, emit: mpm_acceleration}
-- {at: mpm_particle, op: mpm_strain}
-- {a_max: 200, at: mpm_particle, drag: 0.0, op: mpm_scatter, to: mpm_grid}
-- {at: mpm_grid, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
-- {at: mpm_particle, from: mpm_grid, op: mpm_gather, wall_contact: 0.06, wall_damp: 0.5}
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  implementation: warp
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  implementation: warp
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
 schedule:
 - aggregate
-- apply_material_map
-- pacemaker
-- activation_pulse
-- active_force
-- drag
-- substep_dt: 0.0002
-  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+- gravity
+- substep_dt: 1.736111e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    water:
+    - 0.3
+    - 0.62
+    - 1.0
+    gel:
+    - 0.35
+    - 0.85
+    - 0.45
+    snow:
+    - 0.92
+    - 0.94
+    - 1.0</pre></span></span>
+      <span class="sim-cap">three balls on a perforated plate; only the viscosity &eta; differs — water at 1&nbsp;mPa&middot;s and a gel at 1&nbsp;Pa&middot;s both drain through, the snow-like plastic never does</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/mpm2_hourglass.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">granular discharge<span class="sim-spec"><pre>general:
+  name: si_hourglass
+  seed: 0
+  n_frames: 2400
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.3
+  - 0.3
+  - 0.3
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  obstacles:
+  - - 0.0
+    - 0.02
+    - 0.0
+    - 0.045
+    - 0.05
+    - 0.3
+  - - 0.255
+    - 0.02
+    - 0.0
+    - 0.3
+    - 0.05
+    - 0.3
+  - - 0.0
+    - 0.05
+    - 0.0
+    - 0.066
+    - 0.08
+    - 0.3
+  - - 0.23399999999999999
+    - 0.05
+    - 0.0
+    - 0.3
+    - 0.08
+    - 0.3
+  - - 0.0
+    - 0.08
+    - 0.0
+    - 0.087
+    - 0.11
+    - 0.3
+  - - 0.213
+    - 0.08
+    - 0.0
+    - 0.3
+    - 0.11
+    - 0.3
+  - - 0.0
+    - 0.11
+    - 0.0
+    - 0.108
+    - 0.14
+    - 0.3
+  - - 0.192
+    - 0.11
+    - 0.0
+    - 0.3
+    - 0.14
+    - 0.3
+  - - 0.0
+    - 0.15
+    - 0.0
+    - 0.126
+    - 0.19
+    - 0.3
+  - - 0.174
+    - 0.15
+    - 0.0
+    - 0.3
+    - 0.19
+    - 0.3
+  - - 0.0
+    - 0.19
+    - 0.0
+    - 0.09899999999999999
+    - 0.23
+    - 0.3
+  - - 0.201
+    - 0.19
+    - 0.0
+    - 0.3
+    - 0.23
+    - 0.3
+  - - 0.0
+    - 0.23
+    - 0.0
+    - 0.072
+    - 0.27
+    - 0.3
+  - - 0.22799999999999998
+    - 0.23
+    - 0.0
+    - 0.3
+    - 0.27
+    - 0.3
+  - - 0.0
+    - 0.27
+    - 0.0
+    - 0.044999999999999984
+    - 0.3
+    - 0.3
+  - - 0.255
+    - 0.27
+    - 0.0
+    - 0.3
+    - 0.3
+    - 0.3
 sets:
   cell:
     n: 1
-    start:
-    - [0.5, 0.5]
     types:
-      sheet:
-        block: [0.15, 0.15, 0.85, 0.85]
+      snow:
+        material: snow
+        youngs: 500000.0
+        block:
+        - 0.115
+        - 0.16
+        - 0.02
+        - 0.185
+        - 0.29
+        - 0.28
         fraction: 1.0
-        youngs: 80
-  mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_activation:
-    description: A single greyish-white circular blob appears in the center of a black background. The blob remains stationary and maintains its shape throughout the duration of the video. There is no movement, expansion, or contraction of the object over time. The scene remains static with no changes in lighting or environment.
-    objects: The scene contains a single circular object located in the center of the frame. The object is a soft-edged, greyish-white sphere or disk. It is relatively small compared to the overall black background. The object is isolated and does not interact with any other elements.
-  movie_cell:
-    description: The simulation begins with a uniform distribution of blue particles within a square boundary. Over time, a subtle inward migration occurs, causing the density of particles to increase toward the center of the frame. This central concentration creates a darker, more saturated blue region as the particles cluster together. By the final frame, the central core is noticeably denser than the surrounding periphery.
-    objects: The scene contains a large collection of small, individual blue particles. These particles are arranged in a roughly square formation with a porous, speckled texture. The color of the particles is a consistent medium blue against a white background. The size of each individual particle is very small and uniform, creating a granular appearance across the entire field.
-  movie_mpm_particle:
-    description: The simulation shows a large collection of blue particles distributed within a square boundary. Over time, the particles exhibit a subtle inward migration toward the center of the frame. The density of the particles increases slightly in the middle region as the simulation progresses. The overall distribution remains largely stochastic, with no significant structural formation or large-scale movement.
-    objects: The scene contains thousands of small, individual blue dots representing particles. These particles are arranged in a roughly uniform, two-dimensional distribution across a white background. Each particle is approximately the same size and maintains a consistent blue color throughout the sequence. The particles are not connected to one another, forming a discrete point cloud rather than a continuous field.
+  mpm_particle:
+    parent: cell
+    per_parent: 620232
+    radius: 0.5
+    density: 400.0
+    particle_mass: 1.52588e-06
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.85
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.85
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- aggregate
+- gravity
+- substep_dt: 3.333333e-05
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
 plotting:
-  background: black</pre></span></span>
-      <span class="sim-cap">material map + active contraction</span>
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    snow:
+    - 0.92
+    - 0.94
+    - 1.0</pre></span></span>
+      <span class="sim-cap">the same transfer operators with a plastic return map in place of the fluid one: 620,000 grains arch and drain through the neck</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/material_water_lots.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/mpm2_two_drops.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">water (deep pool)<span class="sim-spec"><pre># material_3d_water_lots_x10 -- 27 liquid cubes (3x3x3), per_parent=35000 -&gt; ~945000 particles,
-# each cube a DISTINCT colour (same material -&gt; colour just tags the cube so you can watch
-# them merge/mix), launched with per-cube velocity and dropped in a box -&gt; a large splash.
-general: {name: material_3d_water_lots_x10, seed: 0, n_frames: 1280, dt: 0.0036, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+      <span class="sim-name" tabindex="0">surface tension<span class="sim-spec"><pre>general:
+  name: si_two_drops3d_s144
+  seed: 0
+  n_frames: 400
+  dt: 0.006798181946504358
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.1
+  - 0.1
+  save_data: true
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 2
+    start:
+    - - 0.03900000000000001
+      - 0.05
+      - 0.05
+    - - 0.061
+      - 0.05
+      - 0.05
+    types:
+      a:
+        fraction: 0.5
+        material: liquid
+        bulk_modulus: 10000.0
+        shape: ball
+      b:
+        fraction: 0.5
+        material: liquid
+        bulk_modulus: 10000.0
+        shape: ball
+  mpm_particle:
+    parent: cell
+    per_parent: 315690
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 1.766063548900463e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 192
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 0.0
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+  surface_tension: 0.144
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- aggregate
+- gravity
+- substep_dt: 6.536713410100344e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  dot_size: 1.4
+  slow_motion: 1
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  colors:
+    a:
+    - 0.3
+    - 0.62
+    - 1.0
+    b:
+    - 1.0
+    - 0.55
+    - 0.2</pre></span></span>
+      <span class="sim-cap">one extra term in the grid update — a surface force at &sigma;&nbsp;=&nbsp;0.144&nbsp;N/m — and at zero gravity two drops of 0.6&nbsp;M particles pull themselves into one sphere</span>
+    </figcaption>
+  </figure>
+</div>
+<div class="sim-gallery g4">
+  <figure class="sim-card">
+    <video src="gallery/mpm2_buckling.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">an open system<span class="sim-spec"><pre>general:
+  name: si_buckling_mid
+  seed: 0
+  n_frames: 450
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.16
+  - 0.1
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  engine: continuous
+  obstacles:
+  - - 0.025
+    - 0.028
+    - 0.025
+    - 0.075
+    - 0.032
+    - 0.075
+sets:
+  cell:
+    n: 1
+    types:
+      water:
+        material: liquid
+        bulk_modulus: 276136.0
+        density: 1000.0
+        fraction: 1.0
+        shape: cube
+  mpm_particle:
+    parent: cell
+    per_parent: 4039999
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 1.5625000000000003e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 320
+operators:
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_emit
+  at: mpm_particle
+  face: -y
+  speed: 0.5
+  ppc: 8.0
+  patch:
+  - 0.42
+  - 0.42
+  - 0.58
+  - 0.58
+- op: mpm_drain
+  at: mpm_particle
+  face: -y
+  at_fraction: 0.02
+  sponge: 6.0
+  damp: 0.6
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 16.0
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 392.40000000000003
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  surface_tension: 0.0
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- gravity
+- mpm_emit
+- mpm_drain
+- substep_dt: 1.8601190476190478e-06
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.05
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  colors:
+    water:
+    - 1.0
+    - 0.55
+    - 0.12</pre></span></span>
+      <span class="sim-cap">the schedule gains <code>mpm_emit</code> and <code>mpm_drain</code>: a jet at 16&nbsp;Pa&middot;s, 16,000&times; the viscosity of water, is injected at the top and buckles as it piles — 4.0&nbsp;M particles</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/mpm2_ball_wake.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">a solid inside the fluid<span class="sim-spec"><pre>general:
+  name: si_ball_wake_wide
+  seed: 0
+  n_frames: 700
+  dt: 0.000178
+  boundary: wall
+  dim: 3
+  world:
+  - 0.1
+  - 0.3
+  - 0.03333333333333333
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 60
+    start:
+    - &amp;id001
+      - 0.05
+      - 0.288
+      - 0.016666666666666666
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    - *id001
+    types:
+      ball:
+        fraction: 0.016666666666666666
+        material: elastic
+        youngs: 5000000.0
+        density: 7850.0
+        shape: ball
+      water:
+        fraction: 0.9833333333333333
+        material: liquid
+        bulk_modulus: 3000000.0
+        density: 1000.0
+        eta: 0.001
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.1
+        - 0.3
+        - 0.03333333333333333
+  mpm_particle:
+    parent: cell
+    per_parent: 254237
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 6.65238e-08
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 370
+operators:
+- op: gravity
+  at: cell
+  g: 88.29
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 1800.0
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+schedule:
+- gravity
+- substep_dt: 5.741935e-06
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.3
+  slow_motion: 4
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 2
+    only: true
+    max_points: 900000
+  color_field: vorticity
+  color_range:
+  - 1.0
+  - 1000.0
+  field_log: true
+  field_cmap: turbo
+  colors:
+    ball:
+    - 0.95
+    - 0.35
+    - 0.3
+    water:
+    - 0.3
+    - 0.62
+    - 1.0</pre></span></span>
+      <span class="sim-cap">a steel-density elastic ball falls through a 15.3&nbsp;M-particle water column on one shared grid; the slice is coloured by vorticity magnitude, 1–1000&nbsp;s&#8315;&sup1; on a log scale</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/mpm2_waterfall_5m.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">5 million particles<span class="sim-spec"><pre>general:
+  name: si_waterfall_5m
+  seed: 0
+  n_frames: 2400
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+  obstacles:
+  - - 0.0
+    - 0.28
+    - 0.0
+    - 0.3
+    - 0.32
+    - 0.5
+  - - 0.0
+    - 0.16
+    - 0.0
+    - 0.44
+    - 0.2
+    - 0.5
+  - - 0.0
+    - 0.04
+    - 0.0
+    - 0.5
+    - 0.08
+    - 0.5
+sets:
+  cell:
+    n: 1
+    types:
+      water:
+        fraction: 1.0
+        material: liquid
+        bulk_modulus: 981000.0
+        block:
+        - 0.03
+        - 0.32
+        - 0.18
+        - 0.17
+        - 0.46
+        - 0.32
+  mpm_particle:
+    parent: cell
+    per_parent: 5000000
+    radius: 0.5
+    density: 1000.0
+    particle_mass: 5.488e-07
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 192
+operators:
+- op: aggregate
+  at: cell
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- aggregate
+- gravity
+- substep_dt: 3.205128e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  camera_turns: 0.0
+  box_frame: true
+  hide_sets:
+  - cell
+  render_3d: dots
+  dot_size: 1.1
+  slow_motion: 4
+  colors:
+    water:
+    - 0.3
+    - 0.62
+    - 1.0</pre></span></span>
+      <span class="sim-cap">the same water spec at 5&nbsp;M particles, cascading over three ledges on a 192&sup3; grid</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/mpm2_bench_1b.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">one billion particles<span class="sim-spec"><pre>fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 320
+general:
+  boundary: wall
+  dim: 3
+  dt: 0.0036
+  n_frames: 180
+  name: si_bench_1b
+  record_cap: 2
+  seed: 0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  save_data: false
+operators:
+- at: cell
+  g: 16.0
+  op: gravity
+- at: mpm_particle
+  implementation: warp
+  op: mpm_strain
+- a_max: 200
+  at: mpm_particle
+  drag: 0.05
+  implementation: warp
+  op: mpm_scatter
+  polar: higham
+  polar_iters: 4
+  to: mpm_grid
+- at: mpm_grid
+  csf_mass_floor: 1.7e-15
+  mass_floor: 1.7e-15
+  op: mpm_grid_update
+  surface_tension: 0.0
+  wall_damp: 0.9
+  implementation: warp
+- at: mpm_particle
+  from: mpm_grid
+  implementation: warp
+  op: mpm_gather
+  vmax: 1000000000.0
+  wall_contact: 0.04
+  wall_damp: 1.0
+plotting:
+  background: black
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  colors:
+    w00:
+    - 1.0
+    - 0.0
+    - 0.0
+    w01:
+    - 1.0
+    - 0.208
+    - 0.0
+    w02:
+    - 1.0
+    - 0.417
+    - 0.0
+    w03:
+    - 1.0
+    - 0.649
+    - 0.0
+    w04:
+    - 1.0
+    - 0.857
+    - 0.0
+    w05:
+    - 0.911
+    - 1.0
+    - 0.0
+    w06:
+    - 0.703
+    - 1.0
+    - 0.0
+    w07:
+    - 0.471
+    - 1.0
+    - 0.0
+    w08:
+    - 0.263
+    - 1.0
+    - 0.0
+    w09:
+    - 0.031
+    - 1.0
+    - 0.0
+    w10:
+    - 0.0
+    - 1.0
+    - 0.177
+    w11:
+    - 0.0
+    - 1.0
+    - 0.409
+    w12:
+    - 0.0
+    - 1.0
+    - 0.617
+    w13:
+    - 0.0
+    - 1.0
+    - 0.849
+    w14:
+    - 0.0
+    - 0.943
+    - 1.0
+    w15:
+    - 0.0
+    - 0.711
+    - 1.0
+    w16:
+    - 0.0
+    - 0.503
+    - 1.0
+    w17:
+    - 0.0
+    - 0.271
+    - 1.0
+    w18:
+    - 0.0
+    - 0.063
+    - 1.0
+    w19:
+    - 0.169
+    - 0.0
+    - 1.0
+    w20:
+    - 0.378
+    - 0.0
+    - 1.0
+    w21:
+    - 0.609
+    - 0.0
+    - 1.0
+    w22:
+    - 0.818
+    - 0.0
+    - 1.0
+    w23:
+    - 0.996
+    - 0.0
+    - 0.946
+    w24:
+    - 1.0
+    - 0.0
+    - 0.742
+    w25:
+    - 1.0
+    - 0.0
+    - 0.511
+    w26:
+    - 1.0
+    - 0.0
+    - 0.302
+  dot_size: 1.2
+  fps: 60
+  hide_sets:
+  - cell
+  render_3d: dots
+  up_axis: 1
+schedule:
+- gravity
+- capture: false
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  substep_dt: 0.0001636364
 sets:
   cell:
     n: 27
     types:
-      w00: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.11, 0.19, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w01: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.11, 0.44, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w02: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.11, 0.69, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w03: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.11, 0.19, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w04: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.11, 0.44, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w05: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.11, 0.69, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w06: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.11, 0.19, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w07: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.11, 0.44, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w08: {fraction: 0.037037, youngs: 200, block: [0.61, 0.61, 0.11, 0.69, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w09: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.36, 0.19, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w10: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.36, 0.44, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w11: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.36, 0.69, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w12: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.36, 0.19, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w13: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.36, 0.44, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w14: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.36, 0.69, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w15: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.36, 0.19, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w16: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.36, 0.44, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w17: {fraction: 0.037037, youngs: 200, block: [0.61, 0.61, 0.36, 0.69, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w18: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.61, 0.19, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w19: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.61, 0.44, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w20: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.61, 0.69, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w21: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.61, 0.19, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w22: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.61, 0.44, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w23: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.61, 0.69, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w24: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.61, 0.19, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w25: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.61, 0.44, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      w26: {fraction: 0.037038, youngs: 200, block: [0.61, 0.61, 0.61, 0.69, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-  mpm_particle: {parent: cell, per_parent: 35000, radius: 0.05, density: 1.0, vel_init: 2.5}
-fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 96}
-operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 16.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
-schedule:
-- aggregate
-- gravity
-- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
-plotting:
-  background: black
-  up_axis: 1
-  camera_elev: 1.18
-  camera_turns: 0.0
-  camera_zoom: 0.0
-  render_3d: dots
-  dot_size: 1.2
-  splat_res: 640
-  box_frame: true
-  fps: 60
-  hide_sets: [cell]
-  colors:
-    w00: [1.0, 0.0, 0.0]
-    w01: [1.0, 0.208, 0.0]
-    w02: [1.0, 0.417, 0.0]
-    w03: [1.0, 0.649, 0.0]
-    w04: [1.0, 0.857, 0.0]
-    w05: [0.911, 1.0, 0.0]
-    w06: [0.703, 1.0, 0.0]
-    w07: [0.471, 1.0, 0.0]
-    w08: [0.263, 1.0, 0.0]
-    w09: [0.031, 1.0, 0.0]
-    w10: [0.0, 1.0, 0.177]
-    w11: [0.0, 1.0, 0.409]
-    w12: [0.0, 1.0, 0.617]
-    w13: [0.0, 1.0, 0.849]
-    w14: [0.0, 0.943, 1.0]
-    w15: [0.0, 0.711, 1.0]
-    w16: [0.0, 0.503, 1.0]
-    w17: [0.0, 0.271, 1.0]
-    w18: [0.0, 0.063, 1.0]
-    w19: [0.169, 0.0, 1.0]
-    w20: [0.378, 0.0, 1.0]
-    w21: [0.609, 0.0, 1.0]
-    w22: [0.818, 0.0, 1.0]
-    w23: [0.996, 0.0, 0.946]
-    w24: [1.0, 0.0, 0.742]
-    w25: [1.0, 0.0, 0.511]
-    w26: [1.0, 0.0, 0.302]
+      w00:
+        block:
+        - 0.024
+        - 0.024
+        - 0.024
+        - 0.176
+        - 0.296
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w01:
+        block:
+        - 0.024
+        - 0.024
+        - 0.344
+        - 0.176
+        - 0.296
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w02:
+        block:
+        - 0.024
+        - 0.024
+        - 0.664
+        - 0.176
+        - 0.296
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w03:
+        block:
+        - 0.024
+        - 0.304
+        - 0.024
+        - 0.176
+        - 0.576
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w04:
+        block:
+        - 0.024
+        - 0.304
+        - 0.344
+        - 0.176
+        - 0.576
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w05:
+        block:
+        - 0.024
+        - 0.304
+        - 0.664
+        - 0.176
+        - 0.576
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w06:
+        block:
+        - 0.024
+        - 0.584
+        - 0.024
+        - 0.176
+        - 0.856
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w07:
+        block:
+        - 0.024
+        - 0.584
+        - 0.344
+        - 0.176
+        - 0.856
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w08:
+        block:
+        - 0.024
+        - 0.584
+        - 0.664
+        - 0.176
+        - 0.856
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w09:
+        block:
+        - 0.184
+        - 0.024
+        - 0.024
+        - 0.336
+        - 0.296
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w10:
+        block:
+        - 0.184
+        - 0.024
+        - 0.344
+        - 0.336
+        - 0.296
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w11:
+        block:
+        - 0.184
+        - 0.024
+        - 0.664
+        - 0.336
+        - 0.296
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w12:
+        block:
+        - 0.184
+        - 0.304
+        - 0.024
+        - 0.336
+        - 0.576
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w13:
+        block:
+        - 0.184
+        - 0.304
+        - 0.344
+        - 0.336
+        - 0.576
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w14:
+        block:
+        - 0.184
+        - 0.304
+        - 0.664
+        - 0.336
+        - 0.576
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w15:
+        block:
+        - 0.184
+        - 0.584
+        - 0.024
+        - 0.336
+        - 0.856
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w16:
+        block:
+        - 0.184
+        - 0.584
+        - 0.344
+        - 0.336
+        - 0.856
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w17:
+        block:
+        - 0.184
+        - 0.584
+        - 0.664
+        - 0.336
+        - 0.856
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w18:
+        block:
+        - 0.344
+        - 0.024
+        - 0.024
+        - 0.496
+        - 0.296
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w19:
+        block:
+        - 0.344
+        - 0.024
+        - 0.344
+        - 0.496
+        - 0.296
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w20:
+        block:
+        - 0.344
+        - 0.024
+        - 0.664
+        - 0.496
+        - 0.296
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w21:
+        block:
+        - 0.344
+        - 0.304
+        - 0.024
+        - 0.496
+        - 0.576
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w22:
+        block:
+        - 0.344
+        - 0.304
+        - 0.344
+        - 0.496
+        - 0.576
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w23:
+        block:
+        - 0.344
+        - 0.304
+        - 0.664
+        - 0.496
+        - 0.576
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w24:
+        block:
+        - 0.344
+        - 0.584
+        - 0.024
+        - 0.496
+        - 0.856
+        - 0.336
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w25:
+        block:
+        - 0.344
+        - 0.584
+        - 0.344
+        - 0.496
+        - 0.856
+        - 0.656
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+      w26:
+        block:
+        - 0.344
+        - 0.584
+        - 0.664
+        - 0.496
+        - 0.856
+        - 0.976
+        fraction: 0.037037037037037035
+        material: liquid
+        youngs: 200
+  mpm_particle:
+    density: 1.0
+    parent: cell
+    per_parent: 37037037
+    vel_init: 0.0</pre></span></span>
+      <span class="sim-cap">10&#8313; particles on a 320&sup3; grid, 100&nbsp;M of them drawn, 24.4&nbsp;s per frame — the same transfer and grid operators, unchanged</span>
+    </figcaption>
+  </figure>
+</div>
+<!-- vertex-mpm: hand-authored 2026-09-07 from graphs_data/mesh_mpm; no longer generated by discovery_okuda/ops/minisite_section.py -->
+<h3>Vertex + MPM</h3>
+<p class="opk">The previous representations can themselves be composed. A <b>triangulated surface</b> and an <b>MPM material</b> remain distinct entities, with different states and different mechanical implementations, but interact through an explicit interface that transfers contact forces in both directions. Everything is held fixed across the four clips — the same gel, the same 500,000 material points, the same penalty contact and the same travel — so what differs between the movies is the shape of the surface, and in the last one the fact that it reaches the material by growing rather than by being pushed. This is the computational pattern needed to compose heterogeneous biological structures.</p>
+<p class="opk-ref">Reference — contact:
+<a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>).</p>
+<div class="sim-gallery g4">
+  <figure class="sim-card">
+    <video src="gallery/meshmpm_sheet.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">flat plate<span class="sim-spec"><pre># MESH-MPM 00 -- the FLAT PLATE: an open planar patch pressed into an elastic gel.
+#
+# THE BASE OF THE LADDER, and the awkward case for the contact rather than the easy one. An
+# open patch has no interior for the star-shape reference to sit in, so `centre_offset` puts it
+# 0.30 above the plate, in the body of the piston -- put it IN the plate&#x27;s plane and the ray
+# cast is degenerate, put it below and the plate pushes upward. Neither crashes; both report
+# zero contacts, which reads as nothing happened.
+#
+# A FLAT PUNCH loads a fixed area from the moment it touches, and its pressure is singular at
+# the rim. That is the whole difference from the sphere: same material, same depth, a load
+# history that starts at full area instead of growing into it.
+#
+# THE LADDER&#x27;S SHARED PART, IDENTICAL IN ALL THREE RUNGS. Same gel (E = 30 stress units = 200 Pa at
+# this calibration, a 1-3 mg/ml collagen I gel), same 500,000 material points, same warp solver,
+# same penalty (`k_frac: 0.45`, 20% of the explicit ceiling), same descent. Only the TOOL differs,
+# so anything that differs between the movies is the shape of the indenter.
+#
+# THE TOOL STARTS 0.01 ABOVE THE GEL -- 10 um, two thirds of a grid cell -- and travels `by: -0.11`
+# over 320 of the 400 frames, then holds for 80. The approach used to be 0.10 of the box, i.e. half
+# the run spent watching a tool fall through empty space; contact now begins around frame 30 and the
+# rest of the movie is the thing the run is about. The hold is not padding either: it is the only
+# stretch in which the surface is at REST under load, where the friction law&#x27;s regularised branch
+# and the penalty&#x27;s steady overlap can be read without a sliding term.
+#
+# `by:` AND NOT `target:`, because `target` is an absolute coordinate of the surface&#x27;s CENTROID --
+# the low point of a flat plate, the centre of a sphere, and neither for a pyramid. Three rungs
+# meant to travel the same distance would have had to declare three different numbers.
+#
+# `centre: centroid` RIDES THE TOOL. `mesh_contact` is star-shaped: it rays from `centre` and pushes
+# anything between `centre` and the surface outward, so `centre` names the region the gel may not
+# enter. Re-read every frame it is the tool&#x27;s own middle, and `centre_offset` lifts it into the body
+# of an OPEN tool (a plate or a pyramid has no interior to sit in). Declared fixed, the standoff
+# drifts as the tool descends -- 0.30 to 0.50 on the first version of the sheet, which walked the
+# contact&#x27;s direction-bin grid from 90 rows to 150 for a geometry that never changed.
 
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_mpm_particle:
-    description: The simulation begins with a discrete set of colored hexagonal particles distributed
-      within a 3D bounding box. Over time, these particles rapidly transition into a dense, continuous
-      field of points that settle toward the bottom plane of the volume. The field exhibits complex, swirling
-      patterns and turbulent structures as it evolves. Eventually, the distribution stabilizes into a
-      layered, multi-colored sheet with distinct peaks and valleys.
-    objects: The scene contains a collection of hexagonal particles that are initially separated and scattered
-      in space. These particles are rendered in a vibrant spectrum of colors including magenta, cyan,
-      green, blue, and orange. As the simulation progresses, the individual hexagons merge into a massive,
-      interconnected cloud of tiny points. The final state shows a large, flat surface of points with
-      varying heights and intricate, nested color patterns.</pre></span></span>
-      <span class="sim-cap">water sloshes, settles and fills the tank</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_visco.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">viscoelastic vs elastic<span class="sim-spec"><pre># material_viscoelastic_vs_elastic -- two identical-stiffness balls dropped in 2D to compare
-# the NEW `viscoelastic` (Maxwell) material against pure `elastic`.
-#
-#   LEFT  ball = ELASTIC (orange): fixed-corotated spring; keeps full shape memory -&gt; bounces
-#                repeatedly (wall_damp 1.0 = ~no wall loss, so only the material decides rebound).
-#   RIGHT ball = VISCOELASTIC (purple): same youngs, but its deformation gradient F relaxes toward
-#                isotropic with time-constant `tau` -&gt; stored shear stress DECAYS -&gt; it deforms on
-#                impact, dissipates energy, and bounces lower each time (fast poke = solid, slow = flows).
-#
-# `tau` is the relaxation time (world time units). tau -&gt; inf recovers pure elastic; tau -&gt; 0 -&gt; liquid.
-# `general.dt` = sim-time per FRAME (lower for slow-mo); `substep_dt` = CFL micro-step (dt/substep_dt subs/frame).
-general: {name: material_viscoelastic_vs_elastic, seed: 0, n_frames: 6000, dt: 0.0015, boundary: wall}
-sets:
-  cell:
-    n: 2
-    start: [[0.3, 0.76], [0.7, 0.76]]         # cell 0 (left)=elastic, cell 1 (right)=viscoelastic
-    types:
-      elastic:                                 # LEFT ball -- pure elastic reference
-        fraction: 0.5
-        youngs: 400
-      visco:                                   # RIGHT ball -- viscoelastic (Maxwell), same stiffness
-        fraction: 0.5
-        youngs: 400
-        layers:
-          - {frac: 1.0, youngs: 400, material: viscoelastic, tau: 0.05}
-  mpm_particle: {parent: cell, per_parent: 3000, radius: 0.09, density: 1.0}
-fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 128}
-operators:
-  - {op: aggregate, at: cell}
-  - {op: gravity, at: cell, g: 9.0}
-  - {op: mpm_strain, at: mpm_particle}
-  - {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200}
-  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 1.0}
-  - {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
-schedule:
-  - aggregate
-  - gravity
-  - {substep_dt: 0.0001, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
-plotting:
-  background: black
-  colors: {elastic: [0.95, 0.55, 0.2], visco: [0.38, 0.10, 0.52]}   # elastic=orange, viscoelastic=DARK PURPLE
-  fps: 30                # movie playback frames/sec (NEW plotting param; lower = slower bouncing)
-  movie_max_frames: 600  # keep up to 600 recorded frames -&gt; ~20 s smooth (was 120 -&gt; ~4 s)</pre></span></span>
-      <span class="sim-cap">elastic and viscoelastic materials respond differently</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_obstacle.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">sphere obstacle<span class="sim-spec"><pre># material_3d_obstacle_sphere -- 3D MLS-MPM with fixed obstacles (no-slip box/sphere solids).
 general:
-  name: material_3d_obstacle_sphere
+  name: mesh_mpm_sheet_elastic
   seed: 0
-  n_frames: 320
-  dt: 0.0036
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
   boundary: wall
   dim: 3
-  world: [1.0, 1.0, 1.0]
-  obstacles:
-  - [0.5, 0.3, 0.5, 0.13]
-sets:
-  cell:
-    n: 1
-    types:
-      water: {fraction: 1.0, youngs: 200, block: [0.36, 0.58, 0.36, 0.64, 0.86, 0.64], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-  mpm_particle: {parent: cell, per_parent: 16000, radius: 0.05, density: 1.0}
-fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 96}
-operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 14.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.9, wall_contact: 0.04, vmax: 1000000000.0}
-schedule:
-- aggregate
-- gravity
-- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
 plotting:
+  renderer: vtk_points
   background: black
   up_axis: 1
+  box_frame: true
   camera_elev: 1.18
   camera_turns: 0.0
   camera_zoom: 0.0
-  render_3d: dots
-  dot_size: 1.2
-  splat_res: 620
-  box_frame: true
+  render_3d: surface
+  dot_size: 1.6
   fps: 60
-  hide_sets: [cell]
-  colors:
-    water: [0.30, 0.62, 1.0]
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_mpm_particle:
-    description: A blue cluster of particles initially occupies the upper half of a cubic volume. Over time, the cluster descends toward the bottom surface, gradually flattening into a thin layer. A smaller, spherical cluster of grey particles is positioned directly beneath the blue mass and is eventually enveloped by it. By the final frame, the blue particles have spread out to cover the entire bottom face of the cube.
-    objects: The primary object is a large, dense cluster of blue particles that changes shape from a cube to a flat sheet. A secondary, smaller spherical cluster of grey particles is located in the center of the cube. Both sets of particles are contained within a large, transparent white wireframe cube. The blue particles are significantly more numerous and larger in total volume than the grey particles.</pre></span></span>
-      <span class="sim-cap">material flows around an obstacle</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_two_drops.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">two drops (surface tension)<span class="sim-spec"><pre>general: {name: material_two_drops_st, seed: 0, n_frames: 4000, dt: 0.0028, boundary: wall}
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
 sets:
-  cell:
-    n: 2
-    start:
-    - [0.39, 0.5]
-    - [0.61, 0.5]
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: plate_face
+  plate_face:
+    n: 2304
+  mpm_particle:
+    n: 500000
     types:
-      a:
-        fraction: 0.5
-        youngs: 200
-        layers:
-        - {frac: 1.0, youngs: 200, material: liquid}
-      b:
-        fraction: 0.5
-        youngs: 200
-        layers:
-        - {frac: 1.0, youngs: 200, material: liquid}
-  mpm_particle: {parent: cell, per_parent: 3000, radius: 0.11, density: 1.0}
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.45
+        - 0.85
 fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 128}
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
 operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 0.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, surface_tension: 120.0, wall_damp: 1.0}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
+- op: seed_plate
+  at: vertex
+  shape: sheet
+  nq: 48
+  half_width: 0.25
+  axis: 1
+  height: 0.46
+  centre:
+  - 0.5
+  - 0.5
+  standoff: 0.3
+- op: surface_drive
+  at: vertex
+  axis: 1
+  by: -0.11
+  over: 320
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+  centre_offset:
+  - 0.0
+  - 0.3
+  - 0.0
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
 schedule:
-- aggregate
-- gravity
-- substep_dt: 0.0002
-  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+- seed_plate
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- mesh_inside</pre></span></span>
+      <span class="sim-cap">a flat triangulated patch driven 0.11 box units into 500,000 elastic gel points (E&nbsp;=&nbsp;200&nbsp;Pa, a 1–3&nbsp;mg/ml collagen&nbsp;I gel): a flat punch loads its whole area from the moment it touches</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/meshmpm_sphere.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">sphere<span class="sim-spec"><pre># MESH-MPM 01 -- the SPHERE: a closed vertex surface driven into the same elastic gel.
+#
+# THE CONTACT&#x27;S NATIVE CASE, WHICH MAKES IT THE CONTROL. For a closed star-shaped shell the
+# forbidden region IS the shell&#x27;s interior, so `centre: centroid` needs no offset: there is no
+# standoff to choose and no degenerate ray to avoid. The plate and the pyramid are the awkward
+# cases; this is the one `mesh_contact` was written for, and all three now run one code path.
+#
+# A HERTZIAN CONTACT: the patch GROWS with indentation, so the gel is loaded through a
+# different history from the flat punch&#x27;s at the same final depth. `seed_mesh` builds the shell
+# as a spherical Voronoi tessellation -- 400 faces -- which is the same seeder 461 okuda specs
+# use for an epithelium, here carrying no biology and only its geometry.
+#
+# THE LADDER&#x27;S SHARED PART, IDENTICAL IN ALL THREE RUNGS. Same gel (E = 30 stress units = 200 Pa at
+# this calibration, a 1-3 mg/ml collagen I gel), same 500,000 material points, same warp solver,
+# same penalty (`k_frac: 0.45`, 20% of the explicit ceiling), same descent. Only the TOOL differs,
+# so anything that differs between the movies is the shape of the indenter.
+#
+# THE TOOL STARTS 0.01 ABOVE THE GEL -- 10 um, two thirds of a grid cell -- and travels `by: -0.11`
+# over 320 of the 400 frames, then holds for 80. The approach used to be 0.10 of the box, i.e. half
+# the run spent watching a tool fall through empty space; contact now begins around frame 30 and the
+# rest of the movie is the thing the run is about. The hold is not padding either: it is the only
+# stretch in which the surface is at REST under load, where the friction law&#x27;s regularised branch
+# and the penalty&#x27;s steady overlap can be read without a sliding term.
+#
+# `by:` AND NOT `target:`, because `target` is an absolute coordinate of the surface&#x27;s CENTROID --
+# the low point of a flat plate, the centre of a sphere, and neither for a pyramid. Three rungs
+# meant to travel the same distance would have had to declare three different numbers.
+#
+# `centre: centroid` RIDES THE TOOL. `mesh_contact` is star-shaped: it rays from `centre` and pushes
+# anything between `centre` and the surface outward, so `centre` names the region the gel may not
+# enter. Re-read every frame it is the tool&#x27;s own middle, and `centre_offset` lifts it into the body
+# of an OPEN tool (a plate or a pyramid has no interior to sit in). Declared fixed, the standoff
+# drifts as the tool descends -- 0.30 to 0.50 on the first version of the sheet, which walked the
+# contact&#x27;s direction-bin grid from 90 rows to 150 for a geometry that never changed.
 
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_cell:
-    description: Two separate circular particles initially move toward each other from the left and right sides of the frame. They collide and begin to merge into a single, unified shape. As they fuse, the boundary between the two colors becomes irregular and complex. Finally, the two particles completely integrate into a single, multi-colored blob.
-    objects: The scene contains two primary circular particles that are initially distinct and separate. One particle is light blue and the other is light orange, both having a similar diameter. As the simulation progresses, the two circles overlap and deform into a single, larger irregular shape. The final object is a single composite blob featuring both blue and orange colors with a jagged internal boundary.
-  movie_mpm_particle:
-    description: Two separate blue and orange circular clusters of particles initially exist side-by-side. They begin to move toward each other and merge into a single, unified spherical mass. As they merge, the blue and orange particles intermix to form a composite globe-like structure. The final frames show a stable, integrated sphere where the two colors are distributed across the surface.
-    objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation progresses, the particles reorganize into a single spherical topology. The final object is a single sphere composed of both blue and orange particles of uniform size.
+general:
+  name: mesh_mpm_sphere_elastic
+  seed: 0
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
 plotting:
-  background: black</pre></span></span>
-      <span class="sim-cap">surface tension makes two drops merge</span>
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: surface
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: sphere_face
+  sphere_face:
+    n: 512
+  mpm_particle:
+    n: 500000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.45
+        - 0.85
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: mesh_seed
+  at: vertex
+  n_cells: 400
+  radius: 0.15
+  centre:
+  - 0.5
+  - 0.61
+  - 0.5
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+- op: surface_drive
+  at: vertex
+  axis: 1
+  by: -0.11
+  over: 320
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+schedule:
+- mesh_seed
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- mesh_inside</pre></span></span>
+      <span class="sim-cap">only the tool differs — same gel, same descent, same penalty contact at friction &mu;&nbsp;=&nbsp;0.4 — and the sphere grows its contact patch instead of starting at full area</span>
     </figcaption>
   </figure>
-</div>
+  <figure class="sim-card">
+    <video src="gallery/meshmpm_pyramid.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">pyramid<span class="sim-spec"><pre># MESH-MPM 02 -- the INVERTED PYRAMID: a four-sided tip, apex down, driven into the same gel.
+#
+# THE NANOINDENTER&#x27;S GEOMETRY. `profile: pyramid` displaces the same lattice `seed_plate`
+# already builds -- apex at the declared `height`, four faces rising by `profile_depth` to the
+# rim -- so the shape mask (sheet/disc/hole/grid) and the out-of-plane profile stay orthogonal
+# and a conical tip is `disc` + `cone` from the same seeder.
+#
+# 0.12 OF RISE OVER 0.25 OF HALF-WIDTH is a half-angle of 64.4 deg from the axis -- between a
+# Vickers (68) and a sharper tip, quoted as an equivalent cone. It is declared as a RISE and
+# not as an angle because the angle also depends on `half_width`, and two numbers pinning one
+# geometry is one too many; the operator prints the angle it implies.
+#
+# WHY THIS IS THE HARD RUNG. A sharp tip concentrates the whole load on the few particles at
+# the apex, so it is where a penalty contact is most likely to be seen letting material
+# through -- and where `height` meaning THE TOOL&#x27;S LOWEST POINT matters, since the apex touches
+# 0.12 before the rim would.
+#
+# THE LADDER&#x27;S SHARED PART, IDENTICAL IN ALL THREE RUNGS. Same gel (E = 30 stress units = 200 Pa at
+# this calibration, a 1-3 mg/ml collagen I gel), same 500,000 material points, same warp solver,
+# same penalty (`k_frac: 0.45`, 20% of the explicit ceiling), same descent. Only the TOOL differs,
+# so anything that differs between the movies is the shape of the indenter.
+#
+# THE TOOL STARTS 0.01 ABOVE THE GEL -- 10 um, two thirds of a grid cell -- and travels `by: -0.11`
+# over 320 of the 400 frames, then holds for 80. The approach used to be 0.10 of the box, i.e. half
+# the run spent watching a tool fall through empty space; contact now begins around frame 30 and the
+# rest of the movie is the thing the run is about. The hold is not padding either: it is the only
+# stretch in which the surface is at REST under load, where the friction law&#x27;s regularised branch
+# and the penalty&#x27;s steady overlap can be read without a sliding term.
+#
+# `by:` AND NOT `target:`, because `target` is an absolute coordinate of the surface&#x27;s CENTROID --
+# the low point of a flat plate, the centre of a sphere, and neither for a pyramid. Three rungs
+# meant to travel the same distance would have had to declare three different numbers.
+#
+# `centre: centroid` RIDES THE TOOL. `mesh_contact` is star-shaped: it rays from `centre` and pushes
+# anything between `centre` and the surface outward, so `centre` names the region the gel may not
+# enter. Re-read every frame it is the tool&#x27;s own middle, and `centre_offset` lifts it into the body
+# of an OPEN tool (a plate or a pyramid has no interior to sit in). Declared fixed, the standoff
+# drifts as the tool descends -- 0.30 to 0.50 on the first version of the sheet, which walked the
+# contact&#x27;s direction-bin grid from 90 rows to 150 for a geometry that never changed.
 
-<!-- BEGIN vertex-mpm (generated by discovery_okuda/ops/minisite_section.py) -->
-<h3>Vertex + MPM</h3>
-<p class="opk">The previous representations can themselves be composed. A <b>triangulated surface</b> and an <b>MPM material</b> remain distinct entities, with different states and different mechanical implementations, but interact through an explicit interface that transfers contact forces in both directions. Pressing, dragging and breaching therefore couple two mechanical descriptions without collapsing them into a common solver. This is the computational pattern needed to compose heterogeneous biological structures.</p>
-<p class="opk-ref">Reference — contact:
-<a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over
-grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>),
-which needs mesh and grid cells of a size ours are not; solid:
-<a href="https://doi.org/10.1145/3197517.3201293">MLS-MPM, Hu et&nbsp;al. (2018)</a>; surface: the
-vertex mesh of
-<a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018)</a>. Rig and
-operators ours (<code>discovery_okuda/ops</code>).</p>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/vertex_mpm_press.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">press<span class="sim-spec"><pre>what: particle-to-surface contact between a triangulated patch and an MPM block
-scheme: ICFEMP-style (Chen et al. 2015 CMAME 293:1); grid-node coupling (CFEMP, Lian
-  et al. 2011) needs mesh/grid size consistency, which this prototype violates
-simplification: flat axis-aligned patch, so face lookup is O(1); a general mesh needs
-  a BVH
-measures:
-- momentum residual
-- penetration depth in grid cells
-- slip with and without friction
-variant:
-  floor: null
-  hole_r: 0.0
-  which: free block
-  loading: press at 1 box units per unit time for 60% of the run, then lift at 0.7
-rig:
-  mesh_cell_over_dx: 1.6800003051757812
-  n_grid: 64
-  particles: 81202
-  k_penalty: 2.1457672119140625
+general:
+  name: mesh_mpm_pyramid_elastic
+  seed: 0
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: surface
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: plate_face
+  plate_face:
+    n: 2304
+  mpm_particle:
+    n: 500000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.45
+        - 0.85
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: seed_plate
+  at: vertex
+  shape: sheet
+  nq: 48
+  half_width: 0.25
+  axis: 1
+  height: 0.46
+  centre:
+  - 0.5
+  - 0.5
+  profile: pyramid
+  profile_depth: 0.12
+  standoff: 0.3
+- op: surface_drive
+  at: vertex
+  axis: 1
+  by: -0.11
+  over: 320
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.45
   mu: 0.4
-  dt: 0.0001</pre></span></span>
-      <span class="sim-cap">a free block, indented and released. 751 particles in contact at the deepest; momentum balances to 1.5e-07 of the applied force, and friction cuts the slip 3.2-fold against μ = 0</span>
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+  centre_offset:
+  - 0.0
+  - 0.3
+  - 0.0
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+schedule:
+- seed_plate
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- mesh_inside</pre></span></span>
+      <span class="sim-cap">and an edge rather than a face. The tool’s shape is one line of the spec; the two-way force transfer across the interface is not</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/vertex_mpm_shear.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/meshmpm_spheroid_gel.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">drag<span class="sim-spec"><pre>what: &#x27;a triangulated patch pressed into an MPM block and then DRAGGED across it:
-  the tangential half of the contact law, as a loading rather than as a number&#x27;
-scheme: ICFEMP-style particle-to-surface contact (Chen et al. 2015 CMAME 293:1), the
-  same interface as 03c; only the rim&#x27;s prescribed velocity and the grid boundary
-  conditions differ
-loading: press 2.6 grid cells, then translate 0.12 box units at constant depth
-colour: von Mises of the Kirchhoff stress -- a drag is deviatoric, so |J-1| is blank
-  where the shear band is
-rig:
-  mesh_cell_over_dx: 1.2000007629394531
-  n_grid: 64
-  particles: 93952
-  k_penalty: 5.9604644775390625
-  mu: 0.9
-  dt: 0.0001
-  floor: 0.18
-  hole_r: 0.0
-  walls: null
-measured:
-  momentum_residual_max: 1.0260407079598801e-07
-  penetration_max_cells: 1.4166336059570312
-  compression: 0.1543962709619502</pre></span></span>
-      <span class="sim-cap">pressed 5.9 cells in, then dragged 0.13 box units at that depth over a pinned base: it ploughs and shears. Von Mises, because a drag changes shape at constant volume</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/vertex_mpm_breach.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">breach<span class="sim-spec"><pre>what: &#x27;a triangulated patch with a hole pressed into a laterally CONFINED MPM block:
-  with no rim to escape through, the matrix extrudes as a plug through the breach&#x27;
-scheme: ICFEMP-style particle-to-surface contact (Chen et al. 2015 CMAME 293:1), the
-  same interface as 03c; only the rim&#x27;s prescribed velocity and the grid boundary
-  conditions differ
-loading: press at 0.5 box units per unit time throughout, box closed on x and y
-colour: &#x27;|J-1|, the volumetric strain: under a confined press the material cannot
-  leave except through the hole&#x27;
-rig:
-  mesh_cell_over_dx: 1.8400001525878906
-  n_grid: 64
-  particles: 81202
-  k_penalty: 15.258789062500004
+      <span class="sim-name" tabindex="0">a shell that grows<span class="sim-spec"><pre># MESH-MPM 05 -- THE SPHEROID INDENTS THE GEL BY GROWING. Nothing is translated.
+#
+# `mesh_mpm_sphere_elastic.yaml` WITH ONE OPERATOR LINE CHANGED: `surface_drive` scales the shell
+# about its own centroid instead of pushing it down. Same gel, same 500,000 material points, same
+# solver, same penalty -- so what differs from rung 01 is that the tool inflates rather than
+# descends, and the contact patch grows for a reason a real spheroid has.
+#
+# THE SURFACE IS PRESCRIBED, AND THAT IS THE WHOLE DESIGN. There is no `cell_grow`, no
+# `cell_mechanics`, no `cell_divide`, no `edge_flip` -- the shell is a kinematic tool, exactly as
+# the plate, the sphere and the pyramid are. The gel feels the shell; the shell feels nothing.
+#
+# WHY NOT A SOLVED EPITHELIUM, having tried it. `log/okuda_ECM/04_spheroid_ecm` is the run this
+# reproduces and it has NO vertex set at all: its only sets are the MPM parent and the material
+# points, and its surface is 200 cached meshes replayed out of
+# `_tissue/cellfix_B_new_f401_x4_c4a5698982.npz`. It worked precisely BECAUSE there was no tissue in
+# it -- a replayed surface cannot answer, so the coupling is one-way by construction. Putting a live
+# okuda vesicle in the same schedule is a different experiment, and the first attempt showed why:
+# the tissue divided about ten times too fast (2,022 faces at frame 100 against 201 for the same
+# tissue alone), which a spec-for-spec probe pinned on the presence of the MPM set and the contact
+# rather than on the boundary, the radial term&#x27;s origin or the timestep. That is an influence FROM
+# the gel TO the spheroid, and it is unresolved. This rung does not depend on it.
+#
+# THE GEOMETRY, so the comparison with rung 01 is exact. Seeded at radius 0.08 with its lower pole
+# at 0.45 -- the gel&#x27;s top -- and grown x2.4 over 320 of the 400 frames, the pole travels
+# 0.192 - 0.08 = 0.112 into the gel, against the 0.11 rung 01&#x27;s sphere is driven. The shell&#x27;s
+# TESSELLATION is unchanged by scaling, so the contact&#x27;s direction-bin grid stays at ~17 rows for
+# the whole run instead of railing at its floor the way a dividing tissue&#x27;s did.
+
+general:
+  name: mesh_mpm_spheroid_gel
+  seed: 0
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: surface
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+  - 0.0
+  - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  mesh_flat: true
+  mesh_color: &#x27;#cfd8e3&#x27;
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    cell_set: sphere_face
+  sphere_face:
+    n: 512
+  mpm_particle:
+    n: 500000
+    types:
+      gel:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        block:
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.45
+        - 0.85
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: mesh_seed
+  at: vertex
+  n_cells: 400
+  radius: 0.08
+  centre:
+  - 0.5
+  - 0.53
+  - 0.5
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+- op: surface_drive
+  at: vertex
+  grow: 2.4
+  over: 320
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.45
   mu: 0.4
-  dt: 0.0001
-  floor: 0.18
-  hole_r: 0.09
-  walls:
-  - 0.28
-  - 0.72
-measured:
-  momentum_residual_max: 1.324563153324408e-07
-  penetration_max_cells: 1.9284839630126953
-  compression: 0.22596009093189695</pre></span></span>
-      <span class="sim-cap">closed on all four sides and nearly incompressible, so the matrix leaves through the hole: a plug 3.2 cells proud of a plate that has descended 6.3</span>
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 100000.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+schedule:
+- mesh_seed
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- mesh_inside</pre></span></span>
+      <span class="sim-cap">the same sphere, inflated 2.4&times; about its own centroid rather than pushed down, so the contact patch spreads for the reason a spheroid’s does; colour is equivalent deviatoric strain, 0–0.35</span>
     </figcaption>
   </figure>
 </div>
-<!-- END vertex-mpm -->
 
 <!-- BEGIN spheroid-bm-ecm (generated by discovery_okuda/ops/minisite_section.py) -->
 <h3>Cell tissue + basement membrane + extracellular matrix</h3>
