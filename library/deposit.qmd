@@ -33,7 +33,7 @@ Each element adds to the field at the voxel it stands on.
 
 ## Role in Plexus
 
-- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
+- **Kind** &mdash; push / pull **exchange**: set &harr; field.
 - **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `to`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

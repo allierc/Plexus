@@ -4,9 +4,9 @@ subtitle: "Cell division: a septum through a face, so one cell becomes two, and 
 ---
 
 ::: {.op-head}
-![](../figures/icons/structural.png){.op-logo}
+![](../figures/icons/divide.png){.op-logo}
 
-[`structural`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+[`divide`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
 
 Cell division: a septum through a face, so one cell becomes two, and the surface gains a cell without losing its closure.
 :::
@@ -33,7 +33,7 @@ Cell division: a septum through a face, so one cell becomes two, and the surface
 
 ## Role in Plexus
 
-- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Kind** &mdash;  **divide**: .
 - **Acts on** &mdash; `vertex` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -69,12 +69,12 @@ division follows the sheet topology of Tyssue.
 |---|---|---|
 | `max_cells` | &ndash; | 0 |
 | `factor` | &ndash; | 2.0 |
+| `split_cv` | &ndash; | 0.0 |
 | `cycle_cv` | &ndash; | 0.0 |
 | `p0` | &ndash; | 3.72 |
 | `local_relax` | &ndash; | 0 |
 | `min_cycle` | &ndash; | 0 |
 | `max_cycle` | &ndash; | 10 ** 9 |
-| `cell_set` | &ndash; | None |
 | `g1_ramp` | &ndash; | False |
 | `orient_iface` | &ndash; | False |
 | `orient_asw` | &ndash; | 1.0 |
@@ -93,14 +93,14 @@ operators:
 
 ## Related operators
 
-Other **structural** operators: [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd), [`cell_exclude`](cell_exclude.qmd).
+_&ndash;_
 
 ## Source
 
 [`src/plexus/operators/vertex_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/vertex_ops.py) &mdash; the registered operator.
 
 ```python
-@register_operator("cell_divide", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", set="vertex", kind="divide", family="population")
 class Divide3D(Structural):
     """Cell division: a septum through a face, so one cell becomes two, and the surface gains a
     cell without losing its closure.
@@ -138,6 +138,27 @@ class Divide3D(Structural):
         # the rest of the run.
         self.max_cells = int(params.get("max_cells", 0) or 0)
         self.factor = float(params.get("factor", 2.0))           # divide when volume >= factor x birth volume
+        # `split_cv` -- ASYMMETRIC DIVISION, AND IT IS A PARAMETER AND NOT A MODEL. The two daughters
+        # were given `vf/2` each, exactly, at every division; real cells do not split down the
+        # middle. Cadart et al. measure the asymmetry in mammalian cells and find it small but not
+        # zero, and it matters here for the same reason `cycle_cv` does: a perfectly even split is a
+        # noise-free channel, and a size-control rule that only ever has to correct deviations IT
+        # created cannot be told apart from one that corrects deviations it did not.
+        #
+        # Randomising how a cell splits is not a different hypothesis about what a cell IS, so by
+        # AXES.md it is a value -- the same axis as `cycle_cv`, `vseed_cv` and `age_seed`, and not a
+        # `model:` of its own.
+        #
+        # WHAT IT PERTURBS IS THE TARGET, NOT THE SEPTUM, and that limit is stated rather than
+        # papered over: `divide_face_3d` still cuts the ring between the two edges furthest apart
+        # across the cell's short axis, so the GEOMETRIC halves are what they were. `split_cv` sets
+        # the two daughters' target volumes to `p*v` and `(1-p)*v`, and the mechanics then pulls the
+        # real volumes apart to match. A faithful asymmetry would move the septum itself, which is a
+        # change to `divide_face_3d` and to every spec's topology, not to a target.
+        #
+        # The fraction is drawn per division, clipped to [0.2, 0.8]: outside that a "daughter" is a
+        # fragment and the pair is not a division, it is an extrusion with extra steps.
+        self.split_cv = float(params.get("split_cv", 0.0))
         self.cycle_cv = float(params.get("cycle_cv", 0.0))       # STOCHASTIC CELL CYCLE: Gaussian CV of each daughter's
         #   cell-cycle length (fresh division threshold). >0 keeps division waves broken up (desynchronised) as the
         #   tissue proliferates -- essential at scale so max-rate division never outruns relaxation. 0 -> uniform reset_noise.
@@ -155,7 +176,7 @@ class Divide3D(Structural):
         # (a fast-growing tip cell can't divide instantly -> tighter size CV); max_cycle: force division after
         # this many calls even if volume < 2x (a stalled cell still cycles). 0/inf = pure volume-doubling.
         self.min_cycle = int(params.get("min_cycle", 0)); self.max_cycle = int(params.get("max_cycle", 10 ** 9))
-        self.cell_set = params.get("cell_set", None)             # if set, daughters inherit the mother's cell state (morphogen)
+        self._cat = params.get("cell_set")          # override only; resolved from the set in forward()
         # G1 RAMP (SimuCell3D/tyssue "birth-at-target"): set each daughter's TARGET volume v_eq to its ACTUAL
         # birth volume instead of mother_target/2. The division trigger is ACTUAL volume (vf>=2*Vbirth) but v_eq
         # is set by ramped morphogen growth, so an actively-growing tip cell has mother_V0f >> vf; halving it
@@ -212,6 +233,8 @@ class Divide3D(Structural):
         return v if n > 1 else float(v[0])
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cell_set = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         from plexus.models.topology import rings_from_flat_3d, flat_from_rings_3d, divide_face_3d
         # THE VERTEX PARENTAGE, collected here and spent below. Empty `vertex_carry` -> a no-op, so
         # every existing spec is byte-identical; the list is built regardless because it costs two
@@ -229,18 +252,74 @@ class Divide3D(Structural):
         _, _, _, vf = face_geometry_3d(torch.as_tensor(pos_np), torch.as_tensor(es),
                                        torch.as_tensor(et), torch.as_tensor(ef), nF)
         vf = vf.numpy()                                          # per-cell CURRENT wedge volume
+        # THE TRIGGER HAS TO READ THE VOLUME THE MODEL DEFENDS. `vf` above is the origin-referenced
+        # WEDGE volume -- the cone from the world origin out to the cell's mid-surface ring -- and
+        # on a mid-surface model that IS the cell, which is why every rule on this contract was
+        # written against it. Under `cell_mechanics[model: apicobasal]` it is not: the cell is a
+        # polyhedron and its volume carries the THICKNESS, which the wedge cannot see.
+        #
+        # MEASURED ON gate_ab_population, 401 frames, and it is the whole failure of that rung. With
+        # `sep` free the tissue answered `cell_grow` by getting THICKER rather than wider: median
+        # thickness 0.544 -> 1.253 and median polyhedron volume 0.786 -> 1.694, so every cell more
+        # than doubled -- while the wedge volume the trigger reads FELL, 2.32 -> 2.07, because the
+        # mid-surface did not expand. Not one cell divided in 401 frames. A sizer that cannot see
+        # the axis the tissue grew along is not a sizer.
+        #
+        # `v_ref` MOVES WITH IT OR THE COMPARISON IS MEANINGLESS. It is a seed-time median in wedge
+        # units, and `factor * v_ref` against a polyhedron volume would be two different quantities
+        # either side of an inequality. So the polyhedron reference is taken once, at the first call
+        # that sees a separation, and cached beside it.
+        # `sep` LIVES ON THE LEVEL, NOT ON THE MESH TABLE, and that is deliberate -- the apico-basal
+        # design put it there so it never touches FACE_RECORD or `snapshot()` and cannot trip the
+        # recorded-arrays rule. So it is read through `lvl.state_schema`, not through `m`.
+        _s = lvl.get("sep") if "sep" in getattr(lvl, "state_schema", {}) else None
+        if _s is not None:
+            _s = _s.detach() if hasattr(_s, "detach") else torch.as_tensor(_s)
+            _Nv = int(m["Nv"])
+            if int(_s.shape[0]) >= _Nv:
+                _vp, _, _, _ = apicobasal_geometry_3d(
+                    torch.as_tensor(pos_np, dtype=torch.float32)[:_Nv],
+                    _s[:_Nv].to(torch.float32).cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
+                    m["E_face"].cpu(), nF)
+                vf = _vp.numpy().astype(np.float64)
+                # THE REFERENCE IS THE SEED-TIME MEDIAN, THE WAY THE WEDGE ONE ALWAYS WAS -- and
+                # that is only honest because `seed_mesh` now seeds `h0` at the thickness the energy
+                # wants. It was not always so. `h0` used to be an arbitrary number: 0.4 on this spec
+                # against an equilibrium of 0.8796, 1.8 on `mech_shell_free` against 0.8001. The
+                # seeded shell then spent the opening of every run RELAXING toward a thickness
+                # nobody had asked for -- on `mech_shell_free` about 300 frames, with the mean
+                # radius drifting 5.03 -> 7.47 on the way -- and the polyhedron volume moved with
+                # it, 0.613 -> 1.229 here.
+                #
+                # Every attempt to time a measurement on that ramp produced a different population
+                # from the same spec: cache at the first call, 12,543 cells; wait for the shell to
+                # settle, 236; freeze when the median stops moving by 1% a call, 200 and flat,
+                # because once growth is uncapped it moves MORE than 1% a call and the reference
+                # simply tracked the cells -- median 17.339 against a reference of 17.339, a trigger
+                # comparing a quantity with itself. None of those numbers was wrong about what it
+                # measured. They were all measuring a shell that had not finished moving.
+                #
+                # `tools/equilibrium_h.py` measures the thickness a spec's energy settles to, and
+                # the specs now seed it. With the shell starting where it ends, the first call is a
+                # rest state and needs no window, no tolerance and no freeze.
+                if "v_ref_poly" not in m:
+                    m["v_ref_poly"] = float(np.median(vf))
+                    print(f"[cell_divide] this run carries a separation, so the trigger reads the "
+                          f"POLYHEDRON volume; reference {m['v_ref_poly']:.4f} "
+                          f"(the wedge reference is {float(m.get('v_ref', 1.0)):.4f})", flush=True)
         rings = rings_from_flat_3d(es, et, ef, nF)
         pos = [p for p in pos_np]
         A0 = m["A0"].detach().cpu().numpy().tolist()
         V0f = m["V0f"].detach().cpu().numpy().tolist()
-        Vbirth = m["Vbirth"].detach().cpu().numpy().tolist()
+        Vbirth = require_cell_block(H, self.cell_set, "Vbirth", nF, "cell_divide").tolist()
         alive = m["alive"].detach().cpu().numpy().tolist()
         rng = np.random.default_rng(12345 + self._k)
-        djit = m.get("divjit")                                   # per-cell threshold jitter -> staggered divisions
-        if djit is None:
-            djit = self._fresh_djit(np.random.default_rng(777), nF).tolist()
-        else:
-            djit = djit.detach().cpu().numpy().tolist()
+        # THE FIXED-SEED FALLBACK IS GONE WITH THE MESH COLUMN. It read: if `divjit` is absent,
+        # draw it here from `default_rng(777)`. That is a spec's missing seed answered by an
+        # invented one -- the run divided, staggered its thresholds with a jitter nobody declared,
+        # and looked entirely normal. A declared block cannot be absent by accident, so the honest
+        # answer is the refusal `require_cell_block` gives.
+        djit = require_cell_block(H, self.cell_set, "divjit", nF, "cell_divide").tolist()
         age = m.get("age")                                       # per-cell age in division-calls since birth
         age = ([0] * nF) if (age is None or age.shape[0] != nF) else (age.detach().cpu().numpy() + 1).tolist()
         # HAS THIS CELL EVER DIVIDED? `age` alone cannot answer it: it starts at 0 for every SEEDED
@@ -251,11 +330,21 @@ class Divide3D(Structural):
         ndiv = m.get("ndiv")
         ndiv = ([0] * nF) if (ndiv is None or ndiv.shape[0] != nF) else ndiv.detach().cpu().numpy().tolist()
         # volume-primary + bounded duration: divide if (2x volume AND old enough) OR (past max cycle length)
-        v_ref = float(m.get("v_ref", 1.0))                       # SEED-TIME MEDIAN cell volume
+        # THE REFERENCE IN THE SAME UNITS AS `vf` ABOVE -- polyhedron where the run has a
+        # separation, wedge where it does not. Mixing them is the defect the block above exists for.
+        v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))  # SEED-TIME MEDIAN cell volume
+        # A MODEL MAY ANSWER FROM THE TABLE INSTEAD OF FROM THE FOUR SCALARS. `_trigger` sees
+        # (v_now, v_birth, jit, age, v_ref) and that is the right interface for every rule that
+        # reads size or time -- but `model: cycle` reads a PHASE another operator owns, which is not
+        # among them. `_ready_mask` is the opt-in: a model that defines it gets one per-face boolean
+        # computed once, and every model that does not is untouched.
+        _mask = self._ready_mask(H, m, nF) if hasattr(self, "_ready_mask") else None
+
         def _ready(f):
             if rings[f] is None or len(rings[f]) < 4 or alive[f] <= 0:
                 return False
-            vol_ok = self._trigger(vf[f], Vbirth[f], djit[f], age[f], v_ref)
+            vol_ok = bool(_mask[f]) if _mask is not None else \
+                self._trigger(vf[f], Vbirth[f], djit[f], age[f], v_ref)
             return (vol_ok and age[f] >= self.min_cycle) or (age[f] >= self.max_cycle)
         cand = [f for f in range(nF) if _ready(f)]
         # THE POPULATION CEILING, and it is a HARD STOP rather than a throttle. Once the tissue has
@@ -364,16 +453,23 @@ class Divide3D(Structural):
                                  births=births)
             if res is None:
                 continue
-            half = vf[f] * 0.5                                    # each daughter is born at half the actual volume
+            # THE SPLIT FRACTION, 0.5 UNLESS `split_cv` SAYS OTHERWISE -- see __init__ for why this
+            # is a parameter and what it does and does not move.
+            _p = 0.5 if self.split_cv <= 0 else float(
+                np.clip(0.5 + self.split_cv * 0.5 * rng.standard_normal(), 0.2, 0.8))
+            half = vf[f] * _p                                     # daughter A's share of the actual volume
+            other = vf[f] * (1.0 - _p)                            # daughter B's
             if self.g1_ramp:                                     # birth-at-target: v_eq = actual birth volume (no K_V mismatch);
                 iso = A0[f] / max(V0f[f], 1e-12) ** (2.0 / 3.0)  # keep A0 isoperimetric-consistent A0 ~ v_eq^{2/3}
                 a0d = iso * half ** (2.0 / 3.0); v0d = half       # (P0 = p0*sqrt(A0) recomputed below)
+                a0e = iso * other ** (2.0 / 3.0); v0e = other
             else:
-                a0d = A0[f] * 0.5; v0d = V0f[f] * 0.5             # legacy: half the mother's targets
+                a0d = A0[f] * _p; v0d = V0f[f] * _p               # legacy: the mother's targets, split
+                a0e = A0[f] * (1.0 - _p); v0e = V0f[f] * (1.0 - _p)
             A0[f] = a0d; V0f[f] = v0d; Vbirth[f] = half           # daughter A (kept at index f)
             djit[f] = self._fresh_djit(rng); age[f] = 0           # fresh (desync'd) thresholds; reset cell-cycle age
             ndiv[f] = ndiv[f] + 1
-            A0.append(a0d); V0f.append(v0d); Vbirth.append(half); alive.append(1.0)   # daughter B
+            A0.append(a0e); V0f.append(v0e); Vbirth.append(other); alive.append(1.0)  # daughter B
             djit.append(self._fresh_djit(rng)); age.append(0); ndiv.append(ndiv[f])
             daughter_mothers.append(f)
             ndone += 1
@@ -418,12 +514,35 @@ class Divide3D(Structural):
         m["A0"] = torch.as_tensor(A0a, dtype=dt, device=dev)
         m["P0"] = torch.as_tensor(P0a, dtype=dt, device=dev)
         m["V0f"] = torch.as_tensor(V0fa, dtype=dt, device=dev)
-        m["Vbirth"] = torch.as_tensor(Vba, dtype=dt, device=dev)
-        m["divjit"] = torch.as_tensor(dja, dtype=dt, device=dev)
         m["age"] = torch.as_tensor(agea, dtype=dt, device=dev)
         m["ndiv"] = torch.as_tensor(ndva, dtype=dt, device=dev)
         m["alive"] = torch.as_tensor(alv, dtype=dt, device=dev)
-        _carry_face_state(m, keep, dt, dev)
+        # A DAUGHTER MUST BE CARRIED FROM ITS MOTHER, AND `keep` ALONE CANNOT SAY THAT.
+        #
+        # `keep[j]` is the index of new face `j` in the RINGS LIST, and `divide_face_3d` APPENDS
+        # daughter B at rings index `nF + i` while daughter A keeps the mother's index `f`. The
+        # eight explicit targets above survive that because their python lists were extended in the
+        # same order before `keep` was applied -- `A0.append(a0e)`, `age.append(0)` -- so `A0[keep]`
+        # finds a real entry at `nF + i`. A `face_carry` array is NOT extended: it is still the
+        # length-nF tensor the operator wrote last frame, and `reindex_faces` CLAMPS an out-of-range
+        # index to `nF - 1`. So every daughter B was given THE LAST CELL'S VALUE -- not its
+        # mother's, not a default, but whichever cell happened to sit at the end of the array.
+        #
+        # WHAT THAT COST, on `cycle_phases`: daughter B inherited a stranger's phase and time-in-
+        # phase, so `cell_cycle`'s reset -- which fires on "age 0 AND phase still M" -- missed it
+        # whenever that stranger was not in M, and the daughter carried on from the middle of
+        # someone else's cycle. Measured at frame 13 of 120, 17 of 217 cells held a `phase_t` that
+        # belonged to no ancestor of theirs; the worst read 56.5 frames into a phase it had never
+        # entered against the 1.0 its mother's reset should have given it.
+        #
+        # `carry` is `keep` with the appended rows redirected to the mother, which is what
+        # `reindex_faces`'s docstring has always CLAIMED the map does. Faces that merely moved are
+        # untouched, so a spec that never divides is unaffected.
+        carry = keep
+        if daughter_mothers:
+            born = {nF + i: mo for i, mo in enumerate(daughter_mothers)}
+            carry = np.array([born.get(int(o), int(o)) for o in keep], np.int64)
+        _carry_face_state(m, carry, dt, dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
         if self.local_relax > 0 and "mech" in m and Nv2 > Nv:    # heal the fresh caps in place at birth
             esT = m["E_srce"]; etT = m["E_trgt"]; efT = m["E_face"]
@@ -460,5 +579,19 @@ class Divide3D(Structural):
                 for i, mother in enumerate(daughter_mothers):
                     nt[nF + i] = nt[mother]
                 retype(clvl, nt)                                 # and put the derived buffers back
+        # LAST, BECAUSE THE INHERITANCE ABOVE COPIES THE WHOLE ROW. `cst[nF + i] = cst[mother]` is
+        # right for everything the mother and daughter share -- the morphogen, the cell type -- and
+        # WRONG for the two blocks this operator has just computed per daughter: `Vbirth` is the
+        # volume each daughter was actually born with (`half` and `other`, which differ whenever
+        # `split_cv > 0`), and `divjit` is a FRESH draw per daughter, the whole point of which is
+        # that sisters do not divide together.
+        #
+        # Written here rather than beside `m["A0"]` above, and the difference is measurable: with
+        # the writes before the copy, every daughter inherited its mother's jitter, the division
+        # stagger collapsed, and `gate_00_spheroid` finished at 6,674 cells against its pinned
+        # 6,914 with `t1_total` 1,497 against 1,499. The mesh columns never had this problem
+        # because nothing copies a mesh row wholesale.
+        set_cell_block(H, self.cell_set, "Vbirth", Vba, nF2)
+        set_cell_block(H, self.cell_set, "divjit", dja, nF2)
         return {}
 ```

@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.26">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>ecm_gate_growth – Plexus</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b758ccaa5987ceb1b75504551e579abf.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-70408cb9dc52a2002c2463371a30459f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Plexus</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../language.html"> 
+<span class="menu-text">Language</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="../library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../optimization.html"> 
+<span class="menu-text">Optimization</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../inverse.html"> 
+<span class="menu-text">Inverse problem</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+    <a href="https://github.com/allierc/Plexus" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
+  <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
+  <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
+  <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
+  <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">ecm_gate_growth</h1>
+<p class="subtitle lead">Mechanosensitive growth: the matrix’s pressure slows the CELL CYCLE where it presses hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="op-head">
+<p><img src="../figures/icons/structural.png" class="op-logo img-fluid"></p>
+<p><span class="op-badge"><code>structural</code></span> <span class="op-badge"><code>acts on: vertex</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
+<p>Mechanosensitive growth: the matrix’s pressure slows the CELL CYCLE where it presses hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.</p>
+</div>
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+<section id="role-in-plexus" class="level2">
+<h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
+<ul>
+<li><strong>Kind</strong> — <span class="math inline">\(|S|\)</span> <strong>structural</strong>: change the entities themselves — divide, die, grow.</li>
+<li><strong>Acts on</strong> — <code>vertex</code> (the set the operator acts on).</li>
+<li><strong>Reads</strong> — <code>load</code></li>
+<li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
+<li><strong>Prediction</strong> — <code>none</code>.</li>
+<li><strong>Dimensions</strong> — 3D.</li>
+</ul>
+</section>
+<section id="mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
+<p>hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.</p>
+<p>vertex -&gt; vertex: reads the per-cell growth scale and a recorded pressure map, rewrites that scale and the target area, perimeter, volume and radius derived from it.</p>
+<pre><code>s_f   &lt;- s_prev (1 + gate_f (f - 1))         the same growth, gated</code></pre>
+<p>P_f is the recorded pressure in the cell’s own direction, normalised as in <code>ecm_load</code>, and p_half the pressure at which growth is slowed halfway, in those same normalised units. n is <code>hill</code>, the dimensionless sharpness of the switch. <code>floor</code> is the minimum growth fraction a fully pressed cell retains, and it matters: at floor 0 a cell in the most stressed direction stops dividing entirely and the tissue can only grow the other way, which produces a dramatic shape for a reason closer to a wall than to mechanosensing.</p>
+<p>Gating the RATE is stronger than applying a force. <code>ecm_load</code> pushes the vertices inward, which fights the growth every frame and is bounded by how hard one dares push before cells invert. A cell whose target volume grows more slowly reaches the division threshold later and divides less often, and that difference integrates over a whole trajectory – so a few percent of pressure anisotropy becomes a visible shape anisotropy, which a force of the same size cannot produce.</p>
+<p>It is also the biology: proliferation under mechanical load is suppressed, not merely deformed.</p>
+<p>It intercepts growth without rewriting the growth operator. <code>cell_grow</code> keeps a per-cell cumulative scale and multiplies it each tick; this runs after it, remembers the scale left behind last frame, and reads the factor just applied as their ratio. Gating that ratio is exact and needs to know nothing about the growth law’s own rate or its Hill function, so the two cannot drift out of step.</p>
+<p>Reference: Helmlinger, G., Netti, P. A., Lichtenbeld, H. C., Melder, R. J. &amp; Jain, R. K. (1997). Solid stress inhibits the growth of multicellular tumor spheroids. Nat. Biotechnol. 15:778-783; Montel, F. et al.&nbsp;(2011). Stress clamp experiments on multicellular tumor spheroids. Phys. Rev.&nbsp;Lett. 107:188102.</p>
+</section>
+<section id="parameters" class="level2">
+<h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>role</th>
+<th>default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>load</code></td>
+<td>–</td>
+<td><strong>required</strong></td>
+</tr>
+<tr class="even">
+<td><code>p_half</code></td>
+<td>half_suppression_pressure</td>
+<td>“auto”</td>
+</tr>
+<tr class="odd">
+<td><code>hill</code></td>
+<td>gate_sharpness</td>
+<td>4.0</td>
+</tr>
+<tr class="even">
+<td><code>floor</code></td>
+<td>minimum_growth_fraction</td>
+<td>0.15</td>
+</tr>
+<tr class="odd">
+<td><code>smooth_frames</code></td>
+<td>–</td>
+<td>25</td>
+</tr>
+<tr class="even">
+<td><code>smooth_phi_deg</code></td>
+<td>–</td>
+<td>360.0</td>
+</tr>
+<tr class="odd">
+<td><code>rel_half</code></td>
+<td>–</td>
+<td>1.0</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="minimal-spec" class="level2">
+<h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> ecm_gate_growth</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> vertex</span><span class="kw">,</span><span class="at"> </span><span class="fu">load</span><span class="kw">:</span><span class="at"> ...</span><span class="kw">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="mechanism-search-tags" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>mechanosensitive_growth</code></span> <span class="op-badge"><code>contact_inhibition</code></span> <span class="op-badge"><code>matrix_to_cell_feedback</code></span> <span class="op-badge"><code>anisotropic_growth</code></span></p>
+</section>
+<section id="related-operators" class="level2">
+<h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
+<p>Other <strong>structural</strong> operators: <a href="../library/topo_record.html"><code>topo_record</code></a>, <a href="../library/junction_myosin.html"><code>junction_myosin</code></a>, <a href="../library/cytokinetic_ring.html"><code>cytokinetic_ring</code></a>, <a href="../library/cell_exclude.html"><code>cell_exclude</code></a>, <a href="../library/bm_secrete.html"><code>bm_secrete</code></a>, <a href="../library/integrin_track.html"><code>integrin_track</code></a>.</p>
+</section>
+<section id="source" class="level2">
+<h2 class="anchored" data-anchor-id="source">Source</h2>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/contact_ops.py"><code>src/plexus/operators/contact_ops.py</code></a> — the registered operator.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"ecm_gate_growth"</span>, family<span class="op">=</span><span class="st">"population"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"vertex"</span>, kind<span class="op">=</span><span class="st">"structural"</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ECMGrowthGate3D(Structural):</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Mechanosensitive growth: the matrix's pressure slows the CELL CYCLE where it presses</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">    hardest, so the tissue grows into an anisotropic shape instead of being deformed into one.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">    vertex -&gt; vertex: reads the per-cell growth scale and a recorded pressure map, rewrites that</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co">    scale and the target area, perimeter, volume and radius derived from it.</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co">        gate_f = floor + (1 - floor) / (1 + (P_f / p_half)^n)</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co">        f      = s_now / s_prev                      the factor growth just applied</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">        s_f   &lt;- s_prev (1 + gate_f (f - 1))         the same growth, gated</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co">    P_f is the recorded pressure in the cell's own direction, normalised as in `ecm_load`, and</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co">    p_half the pressure at which growth is slowed halfway, in those same normalised units. n is</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co">    `hill`, the dimensionless sharpness of the switch. `floor` is the minimum growth fraction a</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="co">    fully pressed cell retains, and it matters: at floor 0 a cell in the most stressed direction</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co">    stops dividing entirely and the tissue can only grow the other way, which produces a dramatic</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="co">    shape for a reason closer to a wall than to mechanosensing.</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co">    Gating the RATE is stronger than applying a force. `ecm_load` pushes the vertices inward,</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="co">    which fights the growth every frame and is bounded by how hard one dares push before cells</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="co">    invert. A cell whose target volume grows more slowly reaches the division threshold later and</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="co">    divides less often, and that difference integrates over a whole trajectory -- so a few percent</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="co">    of pressure anisotropy becomes a visible shape anisotropy, which a force of the same size</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="co">    cannot produce.</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="co">    It is also the biology: proliferation under mechanical load is suppressed, not merely</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="co">    deformed.</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="co">    It intercepts growth without rewriting the growth operator. `cell_grow` keeps a per-cell</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a><span class="co">    cumulative scale and multiplies it each tick; this runs after it, remembers the scale left</span></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a><span class="co">    behind last frame, and reads the factor just applied as their ratio. Gating that ratio is</span></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a><span class="co">    exact and needs to know nothing about the growth law's own rate or its Hill function, so the</span></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a><span class="co">    two cannot drift out of step.</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a><span class="co">    Reference: Helmlinger, G., Netti, P. A., Lichtenbeld, H. C., Melder, R. J. &amp; Jain, R. K.</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a><span class="co">    (1997). Solid stress inhibits the growth of multicellular tumor spheroids. Nat. Biotechnol.</span></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a><span class="co">    15:778-783; Montel, F. et al. (2011). Stress clamp experiments on multicellular tumor</span></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a><span class="co">    spheroids. Phys. Rev. Lett. 107:188102.</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">3</span>]</span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"load"</span>]</span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    DIFFERENTIABLE <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>    MAY_MUTATE_INTEGRATED_STATE <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"mechanosensitive_growth"</span>, <span class="st">"contact_inhibition"</span>,</span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"matrix_to_cell_feedback"</span>, <span class="st">"anisotropic_growth"</span>]</span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"p_half"</span>: <span class="st">"half_suppression_pressure"</span>, <span class="st">"hill"</span>: <span class="st">"gate_sharpness"</span>,</span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"floor"</span>: <span class="st">"minimum_growth_fraction"</span>}</span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> (<span class="st">"Helmlinger, G. et al. (1997). Solid stress inhibits the growth of "</span></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"multicellular tumor spheroids. Nat. Biotechnol. 15:778-783; Montel, F. et al. "</span></span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"(2011). Stress clamp experiments on multicellular tumor spheroids. Phys. Rev. "</span></span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"Lett. 107:188102."</span>)</span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a>        <span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"vertex"</span>)</span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>        z <span class="op">=</span> np.load(<span class="bu">str</span>(params[<span class="st">"load"</span>]))</span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>        P <span class="op">=</span> np.asarray(z[<span class="st">"pmap"</span>], np.float32)</span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>        <span class="co"># SMOOTHED, AND THIS WAS THE LAST THING IN THE WAY. The recorded map is a CONTACT LEDGER, not a</span></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>        <span class="co"># stress field: at frame 250 only 24% of its bins are nonzero, because 140,000 particles binned</span></span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>        <span class="co"># into 2,048 directions against a moving surface touch a different quarter of it every frame. A</span></span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>        <span class="co"># zero bin gates to 1.0 -- no suppression -- so three quarters of the polar cells were</span></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>        <span class="co"># unsuppressed in any given frame and a different three quarters the next, which time-averages to</span></span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>        <span class="co"># a nearly UNIFORM weak suppression. That is why a 15x instantaneous directional contrast moved</span></span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the aspect ratio by 3%: the contrast was real and it was not persistent for any given cell.</span></span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>        <span class="co"># The patchiness is a sampling artefact of the estimator, not a feature of the field, so it is</span></span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>        <span class="co"># averaged out: a running mean over `smooth_frames` and a box over `smooth_phi_deg` of longitude</span></span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>        <span class="co"># and one row of colatitude. `smooth_phi_deg = 360` makes the map AXISYMMETRIC, which is the</span></span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>        <span class="co"># right estimator when the matrix is (dense polar caps are), and is wrong the moment the</span></span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>        <span class="co"># experiment puts structure in longitude -- so it is a parameter and not a default of the code.</span></span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>        sf <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"smooth_frames"</span>, <span class="dv">25</span>))</span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>        sp <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"smooth_phi_deg"</span>, <span class="fl">360.0</span>))</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> sf <span class="op">&gt;</span> <span class="dv">1</span> <span class="kw">and</span> P.shape[<span class="dv">0</span>] <span class="op">&gt;</span> sf:</span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a>            k <span class="op">=</span> np.ones(sf, np.float32) <span class="op">/</span> sf</span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a>            flat <span class="op">=</span> P.reshape(P.shape[<span class="dv">0</span>], <span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a>            P <span class="op">=</span> np.stack([np.convolve(flat[:, j], k, mode<span class="op">=</span><span class="st">"same"</span>) <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(flat.shape[<span class="dv">1</span>])],</span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a>                         axis<span class="op">=</span><span class="dv">1</span>).reshape(P.shape).astype(np.float32)</span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> sp <span class="op">&gt;=</span> <span class="fl">359.0</span>:</span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a>            P <span class="op">=</span> np.repeat(P.mean(axis<span class="op">=</span><span class="dv">2</span>, keepdims<span class="op">=</span><span class="va">True</span>), P.shape[<span class="dv">2</span>], axis<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a>        <span class="cf">elif</span> sp <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a>            w <span class="op">=</span> <span class="bu">max</span>(<span class="dv">1</span>, <span class="bu">int</span>(<span class="bu">round</span>(sp <span class="op">/</span> <span class="fl">360.0</span> <span class="op">*</span> P.shape[<span class="dv">2</span>])))</span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a>            ker <span class="op">=</span> np.ones(w, np.float32) <span class="op">/</span> w</span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a>            P <span class="op">=</span> np.stack([[np.convolve(np.tile(P[t, i], <span class="dv">3</span>), ker, mode<span class="op">=</span><span class="st">"same"</span>)[P.shape[<span class="dv">2</span>]:<span class="dv">2</span> <span class="op">*</span> P.shape[<span class="dv">2</span>]]</span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a>                           <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(P.shape[<span class="dv">1</span>])] <span class="cf">for</span> t <span class="kw">in</span> <span class="bu">range</span>(P.shape[<span class="dv">0</span>])]).astype(np.float32)</span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a>        <span class="co"># one row of colatitude, clamped at the poles</span></span>
+<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a>        P <span class="op">=</span> (P <span class="op">+</span> np.pad(P, ((<span class="dv">0</span>, <span class="dv">0</span>), (<span class="dv">1</span>, <span class="dv">0</span>), (<span class="dv">0</span>, <span class="dv">0</span>)), mode<span class="op">=</span><span class="st">"edge"</span>)[:, :<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a>             <span class="op">+</span> np.pad(P, ((<span class="dv">0</span>, <span class="dv">0</span>), (<span class="dv">0</span>, <span class="dv">1</span>), (<span class="dv">0</span>, <span class="dv">0</span>)), mode<span class="op">=</span><span class="st">"edge"</span>)[:, <span class="dv">1</span>:]) <span class="op">/</span> <span class="fl">3.0</span></span>
+<span id="cb3-93"><a href="#cb3-93" aria-hidden="true" tabindex="-1"></a>        <span class="co"># NORMALISED so `p_half` means the same thing whatever the matrix's stiffness was -- otherwise</span></span>
+<span id="cb3-94"><a href="#cb3-94" aria-hidden="true" tabindex="-1"></a>        <span class="co"># stiffening the matrix moves both the pressure and the gate's operating point and a stiffness</span></span>
+<span id="cb3-95"><a href="#cb3-95" aria-hidden="true" tabindex="-1"></a>        <span class="co"># sweep measures two things at once.</span></span>
+<span id="cb3-96"><a href="#cb3-96" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb3-97"><a href="#cb3-97" aria-hidden="true" tabindex="-1"></a>        <span class="co"># BY THE p99 OF THE NONZERO MAP, NOT BY THE PEAK, and that was measured the hard way. The peak</span></span>
+<span id="cb3-98"><a href="#cb3-98" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is ONE bin in ONE frame: on 49_aniso_i0_fibres it is 4.0e5 while the per-axis mean pressures</span></span>
+<span id="cb3-99"><a href="#cb3-99" aria-hidden="true" tabindex="-1"></a>        <span class="co"># are 1448-2176, so peak-normalisation put the whole run at press ~0.005 and `p_half = 0.25` left</span></span>
+<span id="cb3-100"><a href="#cb3-100" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the gate at 1.000 -- an operator that ran 400 times and did nothing. Against the p99 (4.6e4)</span></span>
+<span id="cb3-101"><a href="#cb3-101" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the same run spans mean 0.007 -&gt; 0.159 with the loaded directions reaching p90 0.45, which is a</span></span>
+<span id="cb3-102"><a href="#cb3-102" aria-hidden="true" tabindex="-1"></a>        <span class="co"># range a Hill function can actually act on. Only bins that ever saw contact count: three</span></span>
+<span id="cb3-103"><a href="#cb3-103" aria-hidden="true" tabindex="-1"></a>        <span class="co"># quarters of the map is identically zero, and including it would drag the scale toward the</span></span>
+<span id="cb3-104"><a href="#cb3-104" aria-hidden="true" tabindex="-1"></a>        <span class="co"># tissue's own solid angle rather than the pressures it produced.</span></span>
+<span id="cb3-105"><a href="#cb3-105" aria-hidden="true" tabindex="-1"></a>        nz <span class="op">=</span> P[P <span class="op">&gt;</span> <span class="dv">0</span>]</span>
+<span id="cb3-106"><a href="#cb3-106" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.pk <span class="op">=</span> <span class="bu">max</span>(<span class="bu">float</span>(np.percentile(nz, <span class="dv">99</span>)) <span class="cf">if</span> nz.size <span class="cf">else</span> <span class="fl">1.0</span>, <span class="fl">1e-12</span>)</span>
+<span id="cb3-107"><a href="#cb3-107" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.P <span class="op">=</span> torch.as_tensor(P <span class="op">/</span> <span class="va">self</span>.pk, dtype<span class="op">=</span>torch.float32)</span>
+<span id="cb3-108"><a href="#cb3-108" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.T <span class="op">=</span> <span class="bu">int</span>(<span class="va">self</span>.P.shape[<span class="dv">0</span>])</span>
+<span id="cb3-109"><a href="#cb3-109" aria-hidden="true" tabindex="-1"></a>        <span class="co"># SELF-CALIBRATING OPERATING POINT. `p_half` in units of the p99 was a hand-picked number and it</span></span>
+<span id="cb3-110"><a href="#cb3-110" aria-hidden="true" tabindex="-1"></a>        <span class="co"># put the gate on the wrong part of its own curve: a real map's typical pressures sit far below</span></span>
+<span id="cb3-111"><a href="#cb3-111" aria-hidden="true" tabindex="-1"></a>        <span class="co"># its p99, which is set by a few hot contact bins. With dense polar caps giving poles 7234 and</span></span>
+<span id="cb3-112"><a href="#cb3-112" aria-hidden="true" tabindex="-1"></a>        <span class="co"># equator 2631 -- a genuine 2.75x pattern -- both landed at 0.145 and 0.053 against p_half 0.10,</span></span>
+<span id="cb3-113"><a href="#cb3-113" aria-hidden="true" tabindex="-1"></a>        <span class="co"># i.e. on the flat foot of the Hill, for a rate difference of only 1.7x where the clean synthetic</span></span>
+<span id="cb3-114"><a href="#cb3-114" aria-hidden="true" tabindex="-1"></a>        <span class="co"># map gave 5x. `auto` puts the half-suppression point at the MEDIAN of the pressure the surface</span></span>
+<span id="cb3-115"><a href="#cb3-115" aria-hidden="true" tabindex="-1"></a>        <span class="co"># actually carries late in the run, so half the loaded tissue sits either side of it and the</span></span>
+<span id="cb3-116"><a href="#cb3-116" aria-hidden="true" tabindex="-1"></a>        <span class="co"># pattern falls across the steep part of the curve instead of under it.</span></span>
+<span id="cb3-117"><a href="#cb3-117" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `relative` IS A DIFFERENT MECHANISM AND IS LABELLED ONE. The absolute gate is the physical</span></span>
+<span id="cb3-118"><a href="#cb3-118" aria-hidden="true" tabindex="-1"></a>        <span class="co"># reading -- a cell responds to the stress it carries -- and it has a timing problem that is the</span></span>
+<span id="cb3-119"><a href="#cb3-119" aria-hidden="true" tabindex="-1"></a>        <span class="co"># MATRIX's, not the gate's: the measured pressure only passes the half-point around frame 350 of</span></span>
+<span id="cb3-120"><a href="#cb3-120" aria-hidden="true" tabindex="-1"></a>        <span class="co"># 402, so a 15x directional rate difference arrives with 50 frames left to shape anything. In</span></span>
+<span id="cb3-121"><a href="#cb3-121" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `relative` mode the reference is the current frame's own mean over loaded directions, so the</span></span>
+<span id="cb3-122"><a href="#cb3-122" aria-hidden="true" tabindex="-1"></a>        <span class="co"># gate reads the PATTERN and ignores the amplitude, and it acts from first contact. That is</span></span>
+<span id="cb3-123"><a href="#cb3-123" aria-hidden="true" tabindex="-1"></a>        <span class="co"># adaptive mechanosensing (cells habituating to ambient stress and responding to the excess),</span></span>
+<span id="cb3-124"><a href="#cb3-124" aria-hidden="true" tabindex="-1"></a>        <span class="co"># which is a real mechanism and a WEAKER claim than the absolute one -- it cannot be reported as</span></span>
+<span id="cb3-125"><a href="#cb3-125" aria-hidden="true" tabindex="-1"></a>        <span class="co"># "the matrix's stress shaped the tissue" without saying which mode produced it.</span></span>
+<span id="cb3-126"><a href="#cb3-126" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.relative <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"p_half"</span>, <span class="st">""</span>)).lower() <span class="op">==</span> <span class="st">"relative"</span></span>
+<span id="cb3-127"><a href="#cb3-127" aria-hidden="true" tabindex="-1"></a>        ph <span class="op">=</span> params.get(<span class="st">"p_half"</span>, <span class="st">"auto"</span>)</span>
+<span id="cb3-128"><a href="#cb3-128" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.relative:</span>
+<span id="cb3-129"><a href="#cb3-129" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.p_half <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rel_half"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb3-130"><a href="#cb3-130" aria-hidden="true" tabindex="-1"></a>        <span class="cf">elif</span> <span class="bu">isinstance</span>(ph, <span class="bu">str</span>) <span class="kw">and</span> ph.lower() <span class="op">==</span> <span class="st">"auto"</span>:</span>
+<span id="cb3-131"><a href="#cb3-131" aria-hidden="true" tabindex="-1"></a>            late <span class="op">=</span> P[<span class="bu">int</span>(<span class="fl">0.75</span> <span class="op">*</span> P.shape[<span class="dv">0</span>]):]</span>
+<span id="cb3-132"><a href="#cb3-132" aria-hidden="true" tabindex="-1"></a>            lnz <span class="op">=</span> late[late <span class="op">&gt;</span> <span class="dv">0</span>]</span>
+<span id="cb3-133"><a href="#cb3-133" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.p_half <span class="op">=</span> <span class="bu">float</span>(np.median(lnz) <span class="op">/</span> <span class="va">self</span>.pk) <span class="cf">if</span> lnz.size <span class="cf">else</span> <span class="fl">0.10</span></span>
+<span id="cb3-134"><a href="#cb3-134" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb3-135"><a href="#cb3-135" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.p_half <span class="op">=</span> <span class="bu">float</span>(ph)</span>
+<span id="cb3-136"><a href="#cb3-136" aria-hidden="true" tabindex="-1"></a>        <span class="co"># SHARPER THAN 2, AND THAT IS A CLAIM ABOUT MECHANOSENSING, not a fitting knob. A linear-ish</span></span>
+<span id="cb3-137"><a href="#cb3-137" aria-hidden="true" tabindex="-1"></a>        <span class="co"># gate cannot turn a 2.75x stress pattern into a shape: it needs to be switch-like, which is what</span></span>
+<span id="cb3-138"><a href="#cb3-138" aria-hidden="true" tabindex="-1"></a>        <span class="co"># a Hill exponent of 4-6 is and what mechanotransduction actually looks like (a threshold, not a</span></span>
+<span id="cb3-139"><a href="#cb3-139" aria-hidden="true" tabindex="-1"></a>        <span class="co"># proportionality). Stated here because the alternative reading -- "the exponent was raised until</span></span>
+<span id="cb3-140"><a href="#cb3-140" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the picture worked" -- is the one a reader should be able to rule out from the numbers above.</span></span>
+<span id="cb3-141"><a href="#cb3-141" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.hill <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"hill"</span>, <span class="fl">4.0</span>))</span>
+<span id="cb3-142"><a href="#cb3-142" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.floor <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"floor"</span>, <span class="fl">0.15</span>))</span>
+<span id="cb3-143"><a href="#cb3-143" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._prev <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb3-144"><a href="#cb3-144" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._frame, <span class="va">self</span>._t, <span class="va">self</span>._said <span class="op">=</span> <span class="op">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="va">False</span></span>
+<span id="cb3-145"><a href="#cb3-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-146"><a href="#cb3-146" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-147"><a href="#cb3-147" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb3-148"><a href="#cb3-148" aria-hidden="true" tabindex="-1"></a>        m <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="st">"_mesh"</span>, <span class="va">None</span>)</span>
+<span id="cb3-149"><a href="#cb3-149" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> m <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="st">"mg_scale"</span> <span class="kw">not</span> <span class="kw">in</span> m:</span>
+<span id="cb3-150"><a href="#cb3-150" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}                      <span class="co"># growth has not run yet this run; nothing to gate</span></span>
+<span id="cb3-151"><a href="#cb3-151" aria-hidden="true" tabindex="-1"></a>        nF <span class="op">=</span> <span class="bu">int</span>(m[<span class="st">"nF"</span>])</span>
+<span id="cb3-152"><a href="#cb3-152" aria-hidden="true" tabindex="-1"></a>        s_now <span class="op">=</span> m[<span class="st">"mg_scale"</span>]</span>
+<span id="cb3-153"><a href="#cb3-153" aria-hidden="true" tabindex="-1"></a>        dev, dt_ <span class="op">=</span> s_now.device, s_now.dtype</span>
+<span id="cb3-154"><a href="#cb3-154" aria-hidden="true" tabindex="-1"></a>        f <span class="op">=</span> <span class="bu">int</span>(<span class="bu">getattr</span>(H, <span class="st">"frame"</span>, <span class="op">-</span><span class="dv">1</span>) <span class="kw">or</span> <span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb3-155"><a href="#cb3-155" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> f <span class="op">!=</span> <span class="va">self</span>._frame:</span>
+<span id="cb3-156"><a href="#cb3-156" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._frame <span class="op">=</span> f</span>
+<span id="cb3-157"><a href="#cb3-157" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._t <span class="op">=</span> <span class="bu">min</span>(<span class="va">self</span>.T <span class="op">-</span> <span class="dv">1</span>, <span class="bu">max</span>(<span class="dv">0</span>, f))</span>
+<span id="cb3-158"><a href="#cb3-158" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-159"><a href="#cb3-159" aria-hidden="true" tabindex="-1"></a>        <span class="co"># PER-CELL DIRECTION -&gt; PRESSURE BIN. Centroid-referenced, matching how the map was built.</span></span>
+<span id="cb3-160"><a href="#cb3-160" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)</span>
+<span id="cb3-161"><a href="#cb3-161" aria-hidden="true" tabindex="-1"></a>        es, ef <span class="op">=</span> m[<span class="st">"E_srce"</span>], m[<span class="st">"E_face"</span>]</span>
+<span id="cb3-162"><a href="#cb3-162" aria-hidden="true" tabindex="-1"></a>        live <span class="op">=</span> ef <span class="op">&lt;</span> nF</span>
+<span id="cb3-163"><a href="#cb3-163" aria-hidden="true" tabindex="-1"></a>        e_s, e_f <span class="op">=</span> es[live].<span class="bu">long</span>(), ef[live].<span class="bu">long</span>()</span>
+<span id="cb3-164"><a href="#cb3-164" aria-hidden="true" tabindex="-1"></a>        cnt <span class="op">=</span> torch.zeros(nF, device<span class="op">=</span>dev, dtype<span class="op">=</span>dt_).index_add_(</span>
+<span id="cb3-165"><a href="#cb3-165" aria-hidden="true" tabindex="-1"></a>            <span class="dv">0</span>, e_f, torch.ones_like(e_f, dtype<span class="op">=</span>dt_))</span>
+<span id="cb3-166"><a href="#cb3-166" aria-hidden="true" tabindex="-1"></a>        centroid <span class="op">=</span> torch.zeros(nF, <span class="dv">3</span>, device<span class="op">=</span>dev, dtype<span class="op">=</span>dt_).index_add_(<span class="dv">0</span>, e_f, pos[e_s].to(dt_))</span>
+<span id="cb3-167"><a href="#cb3-167" aria-hidden="true" tabindex="-1"></a>        ok <span class="op">=</span> cnt <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb3-168"><a href="#cb3-168" aria-hidden="true" tabindex="-1"></a>        centroid[ok] <span class="op">/=</span> cnt[ok, <span class="va">None</span>]</span>
+<span id="cb3-169"><a href="#cb3-169" aria-hidden="true" tabindex="-1"></a>        origin <span class="op">=</span> centroid[ok].mean(<span class="dv">0</span>) <span class="cf">if</span> ok.<span class="bu">any</span>() <span class="cf">else</span> torch.zeros(<span class="dv">3</span>, device<span class="op">=</span>dev, dtype<span class="op">=</span>dt_)</span>
+<span id="cb3-170"><a href="#cb3-170" aria-hidden="true" tabindex="-1"></a>        d <span class="op">=</span> centroid <span class="op">-</span> origin</span>
+<span id="cb3-171"><a href="#cb3-171" aria-hidden="true" tabindex="-1"></a>        r <span class="op">=</span> d.norm(dim<span class="op">=</span><span class="dv">1</span>).clamp_min(<span class="fl">1e-9</span>)</span>
+<span id="cb3-172"><a href="#cb3-172" aria-hidden="true" tabindex="-1"></a>        u <span class="op">=</span> d <span class="op">/</span> r[:, <span class="va">None</span>]</span>
+<span id="cb3-173"><a href="#cb3-173" aria-hidden="true" tabindex="-1"></a>        M <span class="op">=</span> <span class="va">self</span>.P[<span class="va">self</span>._t].to(dev, dt_)</span>
+<span id="cb3-174"><a href="#cb3-174" aria-hidden="true" tabindex="-1"></a>        nth, nph <span class="op">=</span> M.shape</span>
+<span id="cb3-175"><a href="#cb3-175" aria-hidden="true" tabindex="-1"></a>        th <span class="op">=</span> torch.acos(u[:, <span class="dv">2</span>].clamp(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>))</span>
+<span id="cb3-176"><a href="#cb3-176" aria-hidden="true" tabindex="-1"></a>        ph <span class="op">=</span> torch.atan2(u[:, <span class="dv">1</span>], u[:, <span class="dv">0</span>]) <span class="op">%</span> (<span class="dv">2</span> <span class="op">*</span> math.pi)</span>
+<span id="cb3-177"><a href="#cb3-177" aria-hidden="true" tabindex="-1"></a>        press <span class="op">=</span> M[(th <span class="op">/</span> math.pi <span class="op">*</span> nth).<span class="bu">long</span>().clamp(<span class="dv">0</span>, nth <span class="op">-</span> <span class="dv">1</span>),</span>
+<span id="cb3-178"><a href="#cb3-178" aria-hidden="true" tabindex="-1"></a>                  (ph <span class="op">/</span> (<span class="dv">2</span> <span class="op">*</span> math.pi) <span class="op">*</span> nph).<span class="bu">long</span>().clamp(<span class="dv">0</span>, nph <span class="op">-</span> <span class="dv">1</span>)]</span>
+<span id="cb3-179"><a href="#cb3-179" aria-hidden="true" tabindex="-1"></a>        press <span class="op">=</span> torch.where(ok, press, torch.zeros_like(press))</span>
+<span id="cb3-180"><a href="#cb3-180" aria-hidden="true" tabindex="-1"></a>        ref <span class="op">=</span> <span class="va">self</span>.p_half</span>
+<span id="cb3-181"><a href="#cb3-181" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.relative:</span>
+<span id="cb3-182"><a href="#cb3-182" aria-hidden="true" tabindex="-1"></a>            <span class="co"># THE CURRENT FRAME'S OWN MEAN OVER LOADED DIRECTIONS. Zero bins are excluded: three</span></span>
+<span id="cb3-183"><a href="#cb3-183" aria-hidden="true" tabindex="-1"></a>            <span class="co"># quarters of the map is untouched surface early on, and averaging that in would put the</span></span>
+<span id="cb3-184"><a href="#cb3-184" aria-hidden="true" tabindex="-1"></a>            <span class="co"># reference far below anything real and saturate the gate everywhere.</span></span>
+<span id="cb3-185"><a href="#cb3-185" aria-hidden="true" tabindex="-1"></a>            live <span class="op">=</span> M[M <span class="op">&gt;</span> <span class="dv">0</span>]</span>
+<span id="cb3-186"><a href="#cb3-186" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> live.numel() <span class="op">&lt;</span> <span class="dv">8</span>:</span>
+<span id="cb3-187"><a href="#cb3-187" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> {}                      <span class="co"># nothing in contact yet: nothing to be relative to</span></span>
+<span id="cb3-188"><a href="#cb3-188" aria-hidden="true" tabindex="-1"></a>            ref <span class="op">=</span> <span class="bu">float</span>(live.mean()) <span class="op">*</span> <span class="va">self</span>.p_half</span>
+<span id="cb3-189"><a href="#cb3-189" aria-hidden="true" tabindex="-1"></a>        gate <span class="op">=</span> <span class="va">self</span>.floor <span class="op">+</span> (<span class="fl">1.0</span> <span class="op">-</span> <span class="va">self</span>.floor) <span class="op">/</span> (</span>
+<span id="cb3-190"><a href="#cb3-190" aria-hidden="true" tabindex="-1"></a>            <span class="fl">1.0</span> <span class="op">+</span> (press <span class="op">/</span> <span class="bu">max</span>(ref, <span class="fl">1e-12</span>)).clamp_min(<span class="fl">0.0</span>) <span class="op">**</span> <span class="va">self</span>.hill)</span>
+<span id="cb3-191"><a href="#cb3-191" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-192"><a href="#cb3-192" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ---- GATE THE TARGET VOLUME, NOT `mg_scale` -------------------------------------------------</span></span>
+<span id="cb3-193"><a href="#cb3-193" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE TRAP THIS AVOIDS, MEASURED. `cell_grow` reallocates `mg_scale` to ONES and</span></span>
+<span id="cb3-194"><a href="#cb3-194" aria-hidden="true" tabindex="-1"></a>        <span class="co"># re-bases its A0_init/P0_init/V0f_init snapshots from the current values whenever `nF` changes</span></span>
+<span id="cb3-195"><a href="#cb3-195" aria-hidden="true" tabindex="-1"></a>        <span class="co"># -- and with `cell_divide` firing every 4 frames, nF changes on most frames. A gate that reads</span></span>
+<span id="cb3-196"><a href="#cb3-196" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `s_now / s_prev` therefore saw a size change almost every frame, skipped its correction, and</span></span>
+<span id="cb3-197"><a href="#cb3-197" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ran 400 times without altering anything: 5,933 cells against 5,968 ungated and the same final</span></span>
+<span id="cb3-198"><a href="#cb3-198" aria-hidden="true" tabindex="-1"></a>        <span class="co"># radius to two decimals. `V0f` is CONTINUOUS across that re-base (only its reference moves), so</span></span>
+<span id="cb3-199"><a href="#cb3-199" aria-hidden="true" tabindex="-1"></a>        <span class="co"># gating its increment works where gating the scale cannot.</span></span>
+<span id="cb3-200"><a href="#cb3-200" aria-hidden="true" tabindex="-1"></a>        V <span class="op">=</span> m[<span class="st">"V0f"</span>]</span>
+<span id="cb3-201"><a href="#cb3-201" aria-hidden="true" tabindex="-1"></a>        prev <span class="op">=</span> <span class="va">self</span>._prev</span>
+<span id="cb3-202"><a href="#cb3-202" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> prev <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> prev.shape[<span class="dv">0</span>] <span class="op">!=</span> nF:</span>
+<span id="cb3-203"><a href="#cb3-203" aria-hidden="true" tabindex="-1"></a>            p2 <span class="op">=</span> V.detach().clone()</span>
+<span id="cb3-204"><a href="#cb3-204" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> prev <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb3-205"><a href="#cb3-205" aria-hidden="true" tabindex="-1"></a>                k <span class="op">=</span> <span class="bu">min</span>(prev.shape[<span class="dv">0</span>], nF)</span>
+<span id="cb3-206"><a href="#cb3-206" aria-hidden="true" tabindex="-1"></a>                p2[:k] <span class="op">=</span> prev[:k]</span>
+<span id="cb3-207"><a href="#cb3-207" aria-hidden="true" tabindex="-1"></a>            prev <span class="op">=</span> p2</span>
+<span id="cb3-208"><a href="#cb3-208" aria-hidden="true" tabindex="-1"></a>        dV <span class="op">=</span> V <span class="op">-</span> prev</span>
+<span id="cb3-209"><a href="#cb3-209" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A DIVISION IS NOT GROWTH. A daughter's target volume is set by `cell_divide`, not by an</span></span>
+<span id="cb3-210"><a href="#cb3-210" aria-hidden="true" tabindex="-1"></a>        <span class="co"># increment, so its `dV` is a large jump in either direction; gating it would shrink or inflate a</span></span>
+<span id="cb3-211"><a href="#cb3-211" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cell that had just been created. Growth is ~0.3% per frame, so anything past 20% is a topology</span></span>
+<span id="cb3-212"><a href="#cb3-212" aria-hidden="true" tabindex="-1"></a>        <span class="co"># event and is passed through untouched -- and re-based, so the next frame gates normally.</span></span>
+<span id="cb3-213"><a href="#cb3-213" aria-hidden="true" tabindex="-1"></a>        topo <span class="op">=</span> dV.<span class="bu">abs</span>() <span class="op">&gt;</span> <span class="fl">0.2</span> <span class="op">*</span> prev.clamp_min(<span class="fl">1e-12</span>)</span>
+<span id="cb3-214"><a href="#cb3-214" aria-hidden="true" tabindex="-1"></a>        Vg <span class="op">=</span> torch.where(topo, V, prev <span class="op">+</span> gate <span class="op">*</span> dV)</span>
+<span id="cb3-215"><a href="#cb3-215" aria-hidden="true" tabindex="-1"></a>        q <span class="op">=</span> (Vg <span class="op">/</span> V.clamp_min(<span class="fl">1e-12</span>)).clamp(<span class="fl">0.2</span>, <span class="fl">1.0</span>)      <span class="co"># how much of the wanted growth was allowed</span></span>
+<span id="cb3-216"><a href="#cb3-216" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"V0f"</span>] <span class="op">=</span> V <span class="op">*</span> q</span>
+<span id="cb3-217"><a href="#cb3-217" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"V0"</span>] <span class="op">=</span> <span class="bu">float</span>(m[<span class="st">"V0f"</span>].<span class="bu">sum</span>())</span>
+<span id="cb3-218"><a href="#cb3-218" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A0 ~ R^2 and P0 ~ R with R ~ V^(1/3), so one volume ratio sets all three consistently. Applied</span></span>
+<span id="cb3-219"><a href="#cb3-219" aria-hidden="true" tabindex="-1"></a>        <span class="co"># to the CURRENT values rather than to the *_init snapshots, which is what makes this survive the</span></span>
+<span id="cb3-220"><a href="#cb3-220" aria-hidden="true" tabindex="-1"></a>        <span class="co"># re-base above.</span></span>
+<span id="cb3-221"><a href="#cb3-221" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"A0"</span>] <span class="op">=</span> m[<span class="st">"A0"</span>] <span class="op">*</span> q.<span class="bu">pow</span>(<span class="fl">2.0</span> <span class="op">/</span> <span class="fl">3.0</span>)</span>
+<span id="cb3-222"><a href="#cb3-222" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"P0"</span>] <span class="op">=</span> m[<span class="st">"P0"</span>] <span class="op">*</span> q.<span class="bu">pow</span>(<span class="fl">1.0</span> <span class="op">/</span> <span class="fl">3.0</span>)</span>
+<span id="cb3-223"><a href="#cb3-223" aria-hidden="true" tabindex="-1"></a>        m[<span class="st">"mg_scale"</span>] <span class="op">=</span> s_now <span class="op">*</span> q.<span class="bu">pow</span>(<span class="fl">1.0</span> <span class="op">/</span> <span class="fl">3.0</span>)</span>
+<span id="cb3-224"><a href="#cb3-224" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="st">"R0"</span> <span class="kw">in</span> m:</span>
+<span id="cb3-225"><a href="#cb3-225" aria-hidden="true" tabindex="-1"></a>            m[<span class="st">"R0"</span>] <span class="op">=</span> <span class="bu">float</span>((<span class="fl">3.0</span> <span class="op">*</span> <span class="bu">max</span>(m[<span class="st">"V0"</span>], <span class="fl">1e-12</span>) <span class="op">/</span> (<span class="fl">4.0</span> <span class="op">*</span> math.pi)) <span class="op">**</span> (<span class="fl">1.0</span> <span class="op">/</span> <span class="fl">3.0</span>))</span>
+<span id="cb3-226"><a href="#cb3-226" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._prev <span class="op">=</span> m[<span class="st">"V0f"</span>].detach().clone()</span>
+<span id="cb3-227"><a href="#cb3-227" aria-hidden="true" tabindex="-1"></a>        LOAD_TRACE.append((<span class="bu">int</span>((gate <span class="op">&lt;</span> <span class="fl">0.99</span>).<span class="bu">sum</span>()), <span class="bu">float</span>(gate.<span class="bu">min</span>()), <span class="bu">float</span>(press.mean())))</span>
+<span id="cb3-228"><a href="#cb3-228" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> <span class="va">self</span>._said:</span>
+<span id="cb3-229"><a href="#cb3-229" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"[ecm_gate_growth] recorded matrix load, </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>T<span class="sc">}</span><span class="ss"> frames, p99 </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>pk<span class="sc">:.4g}</span><span class="ss">; "</span></span>
+<span id="cb3-230"><a href="#cb3-230" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"p_half=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>p_half<span class="sc">}</span><span class="ss"> hill=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>hill<span class="sc">}</span><span class="ss"> floor=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>floor<span class="sc">}</span><span class="ss">; gate range "</span></span>
+<span id="cb3-231"><a href="#cb3-231" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"[</span><span class="sc">{</span><span class="bu">float</span>(gate.<span class="bu">min</span>())<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span><span class="bu">float</span>(gate.<span class="bu">max</span>())<span class="sc">:.3f}</span><span class="ss">] over </span><span class="sc">{</span>nF<span class="sc">}</span><span class="ss"> cells at frame </span><span class="sc">{</span>f<span class="sc">}</span><span class="ss">"</span>,</span>
+<span id="cb3-232"><a href="#cb3-232" aria-hidden="true" tabindex="-1"></a>                  flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-233"><a href="#cb3-233" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._said <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb3-234"><a href="#cb3-234" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+
+</section>
+
+</main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) are click-to-fullscreen */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: #000; z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { width: 100%; height: 100%; max-width: 100vw; max-height: 100vh;
+  object-fit: contain; background: #000; cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .75; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+  function requestFS() {
+    try {
+      if (ov.requestFullscreen) return ov.requestFullscreen();
+      if (ov.webkitRequestFullscreen) return ov.webkitRequestFullscreen();
+      if (vv.webkitEnterFullscreen) return vv.webkitEnterFullscreen();   // iOS Safari: video only
+    } catch (e) {}
+  }
+  function exitFS() {
+    try { if (fsElement()) (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document); }
+    catch (e) {}
+  }
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+    var r = requestFS(); if (r && r.catch) r.catch(function () {});   // expand to full screen on the click gesture
+  }
+  function close() {
+    exitFS();
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc || (v.querySelector('source') && v.querySelector('source').src) || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov.classList.contains('open')) close(); });
+  function onFsChange() { if (!fsElement() && ov.classList.contains('open')) close(); }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  vv.addEventListener('webkitendfullscreen', function () { if (ov.classList.contains('open')) close(); }); // iOS exit
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Cedric Allier · Janelia Research Campus · 2026</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

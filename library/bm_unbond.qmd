@@ -33,7 +33,7 @@ Break over-strained crosslinks: fragmentation as an emergent and measurable even
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{R}\!:E$ **Rewire**: rebuild the relation $E$ each tick.
+- **Kind** &mdash; $\mathcal{R}\!:E$ **rewire**: rebuild the relation $E$ each tick.
 - **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -52,7 +52,7 @@ break_strain is dimensionless -- the fractional extension a crosslink survives. 
 `every` frames rather than continuously, since bond failure is slow beside the mechanics.
 
 The kind is `rewire`, and that is not decoration: a broken crosslink changes the relation, which
-is exactly what a Rewire is for.
+is exactly what a rewire is for.
 
 What it reports is the thing that matters -- not how many bonds broke, but whether the sheet is
 still ONE PIECE. A membrane that has lost a third of its bonds and is still connected is not
@@ -101,7 +101,7 @@ class BasementMembraneBondBreak(Structural):
     `every` frames rather than continuously, since bond failure is slow beside the mechanics.
 
     The kind is `rewire`, and that is not decoration: a broken crosslink changes the relation, which
-    is exactly what a Rewire is for.
+    is exactly what a rewire is for.
 
     What it reports is the thing that matters -- not how many bonds broke, but whether the sheet is
     still ONE PIECE. A membrane that has lost a third of its bonds and is still connected is not

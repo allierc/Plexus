@@ -33,7 +33,7 @@ The cytokinetic ring: the myosin a division leaves on the junction it just built
 
 ## Role in Plexus
 
-- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Kind** &mdash; $|S|$ **structural**: change the entities themselves &mdash; divide, die, grow.
 - **Acts on** &mdash; `vertex` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -96,7 +96,7 @@ operators:
 
 ## Related operators
 
-Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cell_exclude`](cell_exclude.qmd).
+Other **structural** operators: [`topo_record`](topo_record.qmd), [`junction_myosin`](junction_myosin.qmd), [`cell_exclude`](cell_exclude.qmd), [`bm_secrete`](bm_secrete.qmd), [`integrin_track`](integrin_track.qmd), [`bm_sense`](bm_sense.qmd).
 
 ## Source
 

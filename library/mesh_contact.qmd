@@ -33,7 +33,7 @@ Particle-to-surface contact against a LIVE triangulated surface: the surface pus
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
 - **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `surface`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -298,14 +298,14 @@ class MeshContact(Lateral):
         # source, so a scatter-mean over `E_srce` is the polygon's centroid with no ring ordering
         # required -- and the ordering is exactly what a re-meshed tissue does not hand over.
         cnt = torch.bincount(ef, minlength=nF).clamp_min(1)
-        cen = torch.zeros(nF, 3, device=dev, dtype=dt_)
-        cen.index_add_(0, ef, V[es])
-        cen = cen / cnt[:, None].to(dt_)
+        centroid = torch.zeros(nF, 3, device=dev, dtype=dt_)
+        centroid.index_add_(0, ef, V[es])
+        centroid = centroid / cnt[:, None].to(dt_)
         # ONE TRIANGLE PER HALF-EDGE: (face centroid, source vertex, target vertex). A fan, but
         # built from the half-edge list rather than from a ring, so it is correct for a polygon of
         # any size and needs no ordering. The centroid is a VIRTUAL vertex: whatever reaction it
         # receives is handed to the face's real vertices, equally, at the end.
-        A, B, C = cen[ef], V[es], V[et]
+        A, B, C = centroid[ef], V[es], V[et]
         nrm = torch.cross(B - A, C - A, dim=1)
         nrm = nrm / nrm.norm(dim=1, keepdim=True).clamp_min(1e-20)
         # OUTWARD, DECIDED BY THE STAR-SHAPE. The mesh is centroid-referenced, so a face's own

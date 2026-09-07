@@ -1,0 +1,493 @@
+---
+title: "cell_cycle"
+subtitle: "G1 -> S -> G2 -> M as per-cell STATE, advanced by a declared rule."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: vertex`]{.op-badge} [`prediction: none`]{.op-badge}
+
+G1 -> S -> G2 -> M as per-cell STATE, advanced by a declared rule.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `vertex` (the set the operator acts on).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+WHY THIS IS ITS OWN CONTRACT AND NOT A `model:` OF `cell_divide`, by this repo's own two tests.
+`cell_divide._trigger`'s docstring says "THE ONLY THING A `model=` VARIANT OF cell_divide
+CHANGES" is the trigger, and a four-phase machine is not a trigger -- it is state, transitions
+and its own couplings. And AXES.md's second test is decisive: "a variant that needs a second SET
+or a second state BLOCK is making a different claim". A cycle needs `phase`. So it cannot live
+on that contract, and the split is the same one already drawn between `cell_grow` (what the cell
+ASKS for) and `cell_divide` (what the topology DOES): this operator says when a cell is ready,
+`cell_divide[model: cycle]` performs the division.
+
+    cycle_progress  p: the cell's continuous position through one cycle, 0 at birth, 1 at
+                    the end of M. THIS is the state; the operator returns dp/dt and the engine
+                    integrates it, like any other lateral.
+    phase           0 = G1, 1 = S, 2 = G2, 3 = M -- read off `p` by the phase boundaries, so it
+                    holds nothing `p` does not. Kept because it is what the renderer colours by
+                    and what `cell_divide[model: cycle]` triggers on.
+    phase_t         time spent in the current phase. A readout: nothing consults it any more.
+
+THE PHASE DURATIONS ARE NOT EQUAL AND THE DEFAULTS SAY SO. A mammalian cycle of about 24 h runs
+roughly G1 11 h, S 8 h, G2 4 h, M 1 h, so the defaults are in that proportion (110/80/40/10 of
+240 frames). It matters for more than realism: **G1 is where nearly all the variability lives**,
+and every model below differs ONLY in how a cell leaves G1. S, G2 and M are clocks in all of
+them, which is what the measurements report and also what makes the models comparable -- one
+transition changes, so a difference between two runs has one possible cause.
+
+WHERE THE STATE LIVES. `phase_t`, `cyc_inhib` and `cyc_vprev` are declared width-1 blocks on
+the CELL SET and must appear under `sets.<cell_set>.state` or this operator refuses to run --
+see `cell_block`. `phase` is still a column on the mesh table, because it is recorded and drawn
+and moving a recorded array renames a trajectory key; that is a separate rung.
+
+WHAT THE DAUGHTERS INHERIT, AND THE TRAP IN IT. Both stores copy the parent's value onto BOTH
+daughters -- `m["face_carry"]` through `keep`, the cell set through `cell_divide`'s
+`cst[nF + i] = cst[mother]` -- so what is carried must be INTENSIVE. `phase` (a label) and
+`phase_t` (a time) are; an inhibitor AMOUNT would not be, and would double at every division.
+That is why `inhibitor_dilution` below stores a CONCENTRATION and dilutes it by the volume
+ratio, which is also the physically right thing: halving the volume and halving the amount
+leaves the concentration where it was.
+
+RESET IS DETECTED, NOT SIGNALLED. A cell that has just divided is the one carrying `age == 0`
+while its inherited phase is still M -- `cell_divide` zeroes `age` for both daughters and the
+carry copies M onto them -- so the reset needs no second channel between the two operators and
+cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `t_g1` | G1 duration, frames | 110.0 |
+| `t_s` | S duration, frames | 80.0 |
+| `t_g2` | G2 duration, frames | 40.0 |
+| `t_m` | M duration, frames | 10.0 |
+| `g1_size` | G1 exit threshold, in units of v_ref | 1.6 |
+| `phase_cv` | per-cell CV on the phase durations | 0.0 |
+| `seed_async` | start the population spread over the cycle | True |
+| `seed` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: cell_cycle, at: vertex}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`cell_cycle`]{.op-badge} [`G1_S_G2_M`]{.op-badge} [`phase_progression`]{.op-badge} [`restriction_point`]{.op-badge} [`size_checkpoint`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/vertex_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/vertex_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("cell_cycle", set="vertex", kind="lateral", family="population")
+class CellCycle3D(Lateral):
+    """G1 -> S -> G2 -> M as per-cell STATE, advanced by a declared rule. It divides nothing.
+
+    WHY THIS IS ITS OWN CONTRACT AND NOT A `model:` OF `cell_divide`, by this repo's own two tests.
+    `cell_divide._trigger`'s docstring says "THE ONLY THING A `model=` VARIANT OF cell_divide
+    CHANGES" is the trigger, and a four-phase machine is not a trigger -- it is state, transitions
+    and its own couplings. And AXES.md's second test is decisive: "a variant that needs a second SET
+    or a second state BLOCK is making a different claim". A cycle needs `phase`. So it cannot live
+    on that contract, and the split is the same one already drawn between `cell_grow` (what the cell
+    ASKS for) and `cell_divide` (what the topology DOES): this operator says when a cell is ready,
+    `cell_divide[model: cycle]` performs the division.
+
+        cycle_progress  p: the cell's continuous position through one cycle, 0 at birth, 1 at
+                        the end of M. THIS is the state; the operator returns dp/dt and the engine
+                        integrates it, like any other lateral.
+        phase           0 = G1, 1 = S, 2 = G2, 3 = M -- read off `p` by the phase boundaries, so it
+                        holds nothing `p` does not. Kept because it is what the renderer colours by
+                        and what `cell_divide[model: cycle]` triggers on.
+        phase_t         time spent in the current phase. A readout: nothing consults it any more.
+
+    THE PHASE DURATIONS ARE NOT EQUAL AND THE DEFAULTS SAY SO. A mammalian cycle of about 24 h runs
+    roughly G1 11 h, S 8 h, G2 4 h, M 1 h, so the defaults are in that proportion (110/80/40/10 of
+    240 frames). It matters for more than realism: **G1 is where nearly all the variability lives**,
+    and every model below differs ONLY in how a cell leaves G1. S, G2 and M are clocks in all of
+    them, which is what the measurements report and also what makes the models comparable -- one
+    transition changes, so a difference between two runs has one possible cause.
+
+    WHERE THE STATE LIVES. `phase_t`, `cyc_inhib` and `cyc_vprev` are declared width-1 blocks on
+    the CELL SET and must appear under `sets.<cell_set>.state` or this operator refuses to run --
+    see `cell_block`. `phase` is still a column on the mesh table, because it is recorded and drawn
+    and moving a recorded array renames a trajectory key; that is a separate rung.
+
+    WHAT THE DAUGHTERS INHERIT, AND THE TRAP IN IT. Both stores copy the parent's value onto BOTH
+    daughters -- `m["face_carry"]` through `keep`, the cell set through `cell_divide`'s
+    `cst[nF + i] = cst[mother]` -- so what is carried must be INTENSIVE. `phase` (a label) and
+    `phase_t` (a time) are; an inhibitor AMOUNT would not be, and would double at every division.
+    That is why `inhibitor_dilution` below stores a CONCENTRATION and dilutes it by the volume
+    ratio, which is also the physically right thing: halving the volume and halving the amount
+    leaves the concentration where it was.
+
+    RESET IS DETECTED, NOT SIGNALLED. A cell that has just divided is the one carrying `age == 0`
+    while its inherited phase is still M -- `cell_divide` zeroes `age` for both daughters and the
+    carry copies M onto them -- so the reset needs no second channel between the two operators and
+    cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.
+    """
+    # `MAY_MUTATE_INTEGRATED_STATE` IS STILL TRUE AFTER S4, AND THE DYNAMICS IS NO LONGER WHY.
+    # Every per-frame quantity this operator produces -- `cycle_progress`, `phase`, `phase_t`,
+    # `cyc_inhib`, `cyc_vprev`, `cyc_rate` -- is returned as a delta on a declared block and
+    # integrated by the engine. What is left in place is ONE thing, and it happens once:
+    #
+    #     `seed_async` draws the initial spread over the cycle and, with it, rescales `V0f` and
+    #     `Vbirth` so that a cell drawn mid-cycle has the volume of a cell mid-cycle. That is an
+    #     initial condition, not a rate, and it fires on tick 0 -- exactly the tick the invariant
+    #     checks. It belongs in `seed_mesh` and moving it is its own rung.
+    #
+    # So the flag now names a seeding write rather than a dynamics one, which is a much smaller
+    # claim than the one it used to make.
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "phase_progression", "restriction_point",
+                      "size_checkpoint"]
+    REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
+                 "size. Science 348:1245075 (the G1 size checkpoint); Schmoller, K.M. et al. "
+                 "(2015). Dilution of the cell-cycle inhibitor Whi5 controls budding-yeast cell "
+                 "size. Nature 526:268-272; Zatulovskiy, E. et al. (2020). Cell growth dilutes the "
+                 "cell cycle inhibitor Rb to trigger cell division. Science 369:466-471; "
+                 "Smith, J.A. & Martin, L. (1973). Do cells cycle? PNAS 70:1263-1267.")
+    PARAM_ROLES = {"t_g1": "G1 duration, frames", "t_s": "S duration, frames",
+                   "t_g2": "G2 duration, frames", "t_m": "M duration, frames",
+                   "g1_size": "G1 exit threshold, in units of v_ref",
+                   "phase_cv": "per-cell CV on the phase durations",
+                   "seed_async": "start the population spread over the cycle"}
+    G1, S, G2, M = 0, 1, 2, 3
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
+        self.t = [float(params.get("t_g1", 110.0)), float(params.get("t_s", 80.0)),
+                  float(params.get("t_g2", 40.0)), float(params.get("t_m", 10.0))]
+        self.g1_size = float(params.get("g1_size", 1.6))
+        self.phase_cv = float(params.get("phase_cv", 0.0))
+        self.seed_async = bool(params.get("seed_async", True))
+        self.every = _engine_owns_clock(params, default=1)
+        self.seed = int(params.get("seed", 0))
+        self._rng = np.random.default_rng(self.seed + 4242)
+
+    # ------------------------------------------------------------------ the rule
+    def _g1_rate(self, ctx):
+        """dp/dt THROUGH G1. THE ONLY THING A MODEL CHANGES; the base is the size checkpoint.
+
+        A cell leaves G1 when it is big enough, not when it is old enough: this is the restriction
+        point in mammalian cells and Start in budding yeast, and it is the transition Ginzberg et al.
+        review as the one that has to be read on an ABSOLUTE scale for size control to work at all.
+        `g1_size` is therefore in units of `v_ref`, the seed-time median cell volume, exactly as
+        `cell_divide.factor` and `.delta` are.
+
+        AS A RATE, THE SIZER SAYS SOMETHING THE PREDICATE COULD NOT: progress through G1 IS volume
+        accumulated toward the checkpoint. The cell needs to add `v* - v_birth` of volume to pass,
+        it adds `dV/dt` of it per unit time, and G1 occupies the fraction `f_G1` of the cycle, so
+
+            dp/dt = f_G1 * (dV/dt) / (v* - v_birth),      v* = g1_size * v_ref
+
+        reaches exactly the G1/S boundary at exactly the moment the old predicate fired. A cell that
+        is ALREADY past `v*` -- one born large, or one whose threshold moved -- is carried over the
+        boundary within the step by the second term, which reproduces the predicate's own answer for
+        that case rather than making it wait for a volume increment it does not need.
+
+        `ctx` carries the per-cell arrays the models read: see `forward`, where it is built.
+        """
+        # THE RATE IS SIGNED, AND THAT IS NOT AN OVERSIGHT. A cell that SHRINKS moves back through
+        # G1, because the predicate this replaces read the cell's volume NOW -- `v_now >= v*` is
+        # false again the moment the cell falls back under the threshold, and progress that only
+        # ever accumulated would be a ratchet the predicate never had. Measured with the ratchet in
+        # place, the sizer's population reached 2,289 cells against the predicate's 1,493 over 401
+        # frames, because cells banked every transient inflation and never paid it back.
+        # ONE VOLUME CONVENTION, AND `Vbirth` IS NOT IN IT. `v_now` and `v_ref` are WEDGE volumes --
+        # `face_geometry_3d`'s origin-referenced cones, which is what the predicate compared -- while
+        # `Vbirth` is the POLYHEDRON volume `cell_divide` records (measured on this spec: v_ref
+        # 2.5433 against a Vbirth median of 1.6374, so `v* - Vbirth` was 2.43 where the wedge answer
+        # is 1.53, and G1 was 60% too long). The distance a cell has to cover is stated in the
+        # reference's own units instead: it must add `(g1_size - 1)` of `v_ref` to pass, which is
+        # what an absolute size checkpoint at `g1_size * v_ref` means for a cell born at `v_ref`.
+        # (The two conventions are AB_R7R8_TODO section 0a and are not settled here.)
+        v_star = self.g1_size * ctx["v_ref"]
+        need = max((self.g1_size - 1.0) * ctx["v_ref"], 1e-9)
+        r = ctx["f"][self.G1] * ctx["dv_dt"] / need
+        return np.where(ctx["v_now"] >= v_star, np.maximum(r, ctx["to_boundary"]), r)
+
+    def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
+        lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        nF = int(m["nF"]); dev = lvl.state.device; dt = lvl.state.dtype
+        _np = lambda k: (m[k].detach().cpu().numpy().astype(np.float64)     # noqa: E731
+                         if k in m and m[k] is not None else None)
+        # ALL FOUR PER-CELL ARRAYS LIVE ON THE CELL SET -- see `cell_block`. `phase` joined them at
+        # S2b, which is the rung that also renamed its recorded key from `vertex__mesh_phase` to
+        # `cell__phase` and taught both renderer paths to read it there. Nothing of this operator's
+        # state is on the mesh table any more, so `face_carry` is empty for a `cell_cycle` run and
+        # the daughter-inheritance question is answered in one place: `cell_divide` copies the
+        # mother's whole cell-set row.
+        for _b in ("phase", "phase_t", "cyc_inhib", "cyc_vprev"):
+            if cell_block(H, self.cat, _b, nF) is None:
+                raise KeyError(
+                    f"cell_cycle needs the set {self.cat!r} to declare the width-1 block {_b!r}. "
+                    f"Add it under `sets.{self.cat}.state` -- `{_b}: {{width: 1, record: false}}` "
+                    f"-- for all four of phase, phase_t, cyc_inhib, cyc_vprev. `phase` is the "
+                    f"one that is RECORDED and drawn (0 = G1, 1 = S, 2 = G2, 3 = M); the other "
+                    f"three are the operator's own bookkeeping -- time in phase, inhibitor "
+                    f"concentration, last frame's volume -- and take `record: false`. All four "
+                    f"are declared because per-cell state belongs to the cell set, where the "
+                    f"topology operators already renumber it.")
+        ph = cell_block(H, self.cat, "phase", nF)
+        pt = cell_block(H, self.cat, "phase_t", nF)
+        cc = cell_block(H, self.cat, "cyc_inhib", nF)
+        # A DELTA IS MEASURED AGAINST WHAT THE BLOCK HOLDS, NOT AGAINST A LOCAL COPY OF IT, and the
+        # difference is the whole reason the async seed and the birth reset still work. Both of them
+        # SET a value -- `seed_async` scatters the population over the cycle, division puts a
+        # daughter back at (G1, 0) -- and under the old in-place write `set_cell_block` simply stored
+        # it. An operator that returns rates cannot store anything, so a set has to be expressed as
+        # the rate that reaches it in one step: `(target - stored) / dt`. Measured against the
+        # post-seed LOCAL instead, the seed cancels itself and every cell starts at G1 with the
+        # population synchronised, which is exactly what `seed_async` exists to prevent.
+        ph_st, pt_st, cc_st = ph.copy(), pt.copy(), cc.copy()
+        _seeded = False
+        # THE SEED FIRES ON `cyc_vprev == 0`, NOT ON A MISSING `phase`. A mesh column did not exist
+        # before its first write, so `phase is None` was a sound test for "this operator has not run
+        # yet". A declared block exists from the moment the set is built and reads 0.0, which is a
+        # LEGITIMATE phase (G1) -- so the old test would never fire and the population would start
+        # every cell at (G1, phase_t 0), the synchronised culture `seed_async` exists to avoid.
+        # `cyc_vprev` is a volume: 0 is not a value any live cell can hold, and this operator is the
+        # only writer, so it is the one array whose zero unambiguously means "never written".
+        if not np.any(cell_block(H, self.cat, "cyc_vprev", nF) > 0.0):
+            _seeded = True
+            # `seed_async` -- START THE POPULATION SOMEWHERE, NOT ALL AT THE SAME PLACE. Seeding
+            # every cell at (G1, phase_t 0) makes the tissue a synchronised culture: the first
+            # generation divides in one wave, the second in a slightly broader one, and the cell
+            # count comes out a staircase rather than a curve. A real tissue in steady state has as
+            # many cells just born as about to divide.
+            #
+            # THE THREE ARE DRAWN TOGETHER BECAUSE THEY ARE ONE QUANTITY. A cell's phase, its time
+            # in that phase and its size are not independent -- a cell in G2 has been growing
+            # longer than one in G1 and is bigger for it -- so drawing them separately would give a
+            # population that is desynchronised in the clock and synchronised in size, which is not
+            # a tissue and would make `cell_grow`'s first act a correction of the seed. One uniform
+            # draw `u` per cell over the WHOLE cycle sets all three:
+            #
+            #   u ~ U(0, 1)                  where this cell is through its cycle
+            #   phase, phase_t               the phase containing u * T, and the offset into it
+            #   V0f  <-  V0f * (1 + u) / 1.5 volume grows v_b -> 2 v_b across the cycle, so a cell
+            #                                at fraction u holds v_b (1 + u); the 1.5 is the mean
+            #                                over u, which keeps the POPULATION's mean target where
+            #                                the seed put it
+            #
+            # UNIFORM ON THE CYCLE AND NOT GAUSSIAN, for the reason `age_seed` is: a phase is a
+            # position on a loop, and a bell would pile the population mid-cycle and still divide
+            # in waves, only rounder ones.
+            u = (self._rng.random(nF) if self.seed_async else np.zeros(nF))
+            tot = float(sum(self.t)) or 1.0
+            cut = np.cumsum(self.t) / tot                    # phase boundaries as fractions of T
+            ph = np.searchsorted(cut, u, side="right").astype(np.float64).clip(0, self.M)
+            lo = np.concatenate([[0.0], cut[:-1]])[ph.astype(int)]
+            pt = (u - lo) * tot                              # frames already spent in that phase
+            cc = np.ones(nF)
+            if self.seed_async and "V0f" in m and m["V0f"] is not None:
+                v0 = m["V0f"].detach().cpu().numpy().astype(np.float64)
+                if len(v0) == nF:
+                    m["V0f"] = torch.as_tensor(v0 * (1.0 + u) / 1.5, dtype=dt, device=dev)
+                    vb = cell_block(H, self.cat, "Vbirth", nF)
+                    if vb is not None and len(vb) == nF:
+                        set_cell_block(H, self.cat, "Vbirth", vb / 1.5, nF)
+                print(f"[cell_cycle] seeded {nF} cells asynchronously: "
+                      f"G1 {int((ph == 0).sum())}, S {int((ph == 1).sum())}, "
+                      f"G2 {int((ph == 2).sum())}, M {int((ph == 3).sum())}", flush=True)
+        if pt is None or len(pt) != nF:
+            pt = np.zeros(nF)
+        if cc is None or len(cc) != nF:
+            cc = np.ones(nF)
+        # DECLARED ONCE, CARRIED BY THE TOPOLOGY FROM THEN ON -- see `_carry_face_state`. Only
+        # `phase` is here now; the other three are blocks on the cell set and are carried by
+        # `Hierarchy.renumber_set` and by `cell_divide`'s mother-row copy instead.
+
+        _, _, _, vf = face_geometry_3d(lvl.get("pos")[:int(m["Nv"])].detach(),
+                                       m["E_srce"], m["E_trgt"], m["E_face"], nF)
+        v_now = vf.detach().cpu().numpy().astype(np.float64)
+        v_ref = float(m.get("v_ref", 1.0))
+        _dt = float(getattr(H, "dt", 1.0))
+        vb0 = cell_block(H, self.cat, "Vbirth", nF)
+        _rate_prev = cell_block(H, self.cat, "cyc_rate", nF)
+        if _rate_prev is None or len(_rate_prev) != nF:
+            _rate_prev = np.zeros(nF)
+        age = _np("age")
+        # THE RESET: just divided = age 0 while still carrying the mother's M. See the class note.
+        born = np.zeros(nF, bool)
+        if age is not None and len(age) == nF:
+            born = (age <= 0) & (ph >= self.M)
+            ph = np.where(born, float(self.G1), ph)
+            pt = np.where(born, 0.0, pt)
+            cc = np.where(born, 1.0, cc)
+        # DILUTION IS APPLIED TO EVERY CELL EVERY FRAME, whatever the model, because it is a
+        # statement about volume and not about the rule: a concentration in a growing cell falls.
+        #
+        # A ZERO IN `cyc_vprev` MEANS "NOT YET SET" AND MUST NOT DILUTE. On the mesh table the
+        # column simply did not exist before the first write, and `_np` returned None, so the first
+        # frame skipped the dilution. A declared block exists from the moment the set is built and
+        # reads zero, and a bare `vp / v_now` would then multiply every cell's inhibitor by 0 on
+        # frame 0 -- every cell instantly past its dilution checkpoint, which is the opposite of
+        # the model. The per-cell `vp > 0` test reproduces the old behaviour exactly: zero only
+        # ever occurs on the first frame, because a daughter inherits its mother's row and a
+        # renumbered cell keeps its own.
+        # THE INHIBITOR JUST BEFORE THE DILUTION, which is what `inhibitor_dilution` spends: taken
+        # AFTER the birth reset, so a daughter's first frame dilutes from the 1.0 it was reset to
+        # rather than from the mother's spent concentration.
+        cc0 = cc.copy()
+        vp = cell_block(H, self.cat, "cyc_vprev", nF)
+        if vp is not None and len(vp) == nF:
+            cc = cc * np.where(vp > 0.0, np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0), 1.0)
+        # `cyc_vprev` IS RETURNED AS A DELTA NOW rather than written here, and the arithmetic is
+        # unchanged by that: the engine adds `dt * (v_now - vp)/dt` to `vp`, which is `v_now`.
+
+        jit = cell_block(H, self.cat, "divjit", nF)
+        jit = np.ones(nF) if jit is None or len(jit) != nF else jit
+        cvj = (1.0 + self.phase_cv * self._rng.standard_normal(nF)).clip(0.4, 1.8) \
+            if self.phase_cv > 0 else np.ones(nF)
+
+        # ============================================================ the cycle as a rate, not a jump
+        # WHAT S4 CHANGED, in one sentence: the cycle used to be four integers and a per-phase
+        # counter advanced by a predicate, and it is now ONE continuous coordinate `p` -- position
+        # through the cycle, 0 at birth, 1 at the end of M -- whose RATE the models set. `phase` is
+        # read off `p` by the phase boundaries and no longer holds anything `p` does not.
+        #
+        # WHY IT HAD TO CHANGE. plexus2's eight families are all rate laws: an operator says how
+        # fast state moves and the engine integrates. A predicate that assigns `phase + 1` is not a
+        # rate, has no delta form, and is exactly why this operator was `kind: structural` and had
+        # to declare `MAY_MUTATE_INTEGRATED_STATE`. Every per-frame quantity below is now returned
+        # as a delta on a declared block, so the engine does the updating and the tick-0 invariant
+        # is free to check it.
+        #
+        # WHAT `p` BUYS BEYOND COMPLIANCE, which is the part worth keeping even if the algebra had
+        # not asked. Under the predicate, a cell in G1 was a cell in G1 -- there was no reading of
+        # HOW FAR through it was, because "far" was only ever elapsed frames and G1's exit does not
+        # read elapsed frames in three of the four models. `p` is that reading, and it is defined by
+        # each model's own currency: volume accumulated toward the checkpoint for the sizer,
+        # inhibitor diluted away for `inhibitor_dilution`, elapsed time for `timer`, fraction of the
+        # cell's own drawn waiting time for `transition_probability`. A population's spread in `p`
+        # is therefore comparable across the four in a way a phase histogram never was.
+        T = float(sum(self.t)) or 1.0
+        f = np.asarray(self.t, np.float64) / T                  # each phase as a fraction of the cycle
+        cut = np.cumsum(f)                                      # phase boundaries in `p`
+        p = cell_block(H, self.cat, "cycle_progress", nF)
+        if p is None:
+            raise KeyError(
+                f"cell_cycle needs the set {self.cat!r} to declare the width-1 block "
+                f"'cycle_progress' -- `cycle_progress: {{width: 1}}` under `sets.{self.cat}.state`. "
+                f"It is the cell's continuous position through the cycle (0 at birth, 1 at the end "
+                f"of M) and it is what this operator integrates; `phase` is read off it.")
+        p_st = p.copy()
+        # SEEDED FROM THE PHASES THE ASYNC DRAW ALREADY MADE, so `seed_async` keeps meaning what it
+        # meant: a cell drawn into the middle of S starts at the `p` that IS the middle of S.
+        if _seeded:
+            lo = np.concatenate([[0.0], cut[:-1]])[ph.astype(int)]
+            p = lo + pt / T                        # `pt` frames into a phase is pt/T of the cycle
+        p = np.where(born, 0.0, p) if age is not None and len(age) == nF else p
+        # dV/dt AND -dc/dt ARE THE TWO CURRENCIES THE MODELS SPEND. Both come from the frame's own
+        # volume change, which `cyc_vprev` already recorded for the dilution above.
+        dv_dt = np.where(vp > 0.0, (v_now - vp) / max(_dt, 1e-12), 0.0) \
+            if vp is not None and len(vp) == nF else np.zeros(nF)
+        _rate_draw = _rate_prev.copy()
+        ctx = dict(v_now=v_now, v_ref=v_ref, v_birth=(vb0 if vb0 is not None else v_now),
+                   rate_prev=_rate_prev, rate_draw=_rate_draw, born=born, conc_prev=cc0,
+                   dv_dt=dv_dt, conc=cc, jit=jit, cvj=cvj, f=f, T=T, p=p, dt=_dt,
+                   to_boundary=np.maximum(cut[self.G1] - p, 0.0) / max(_dt, 1e-12),
+                   rng=self._rng)
+        # OUTSIDE G1 EVERY MODEL IS THE SAME CLOCK, and that is the design of the family rather than
+        # a simplification: S, G2 and M are near-fixed in all four hypotheses, so a difference
+        # between two runs has exactly one possible cause. `1/T` in cycle units per unit time is a
+        # cycle of exactly `T` -- the phase fractions do the rest, because a phase of fraction f_k
+        # traversed at 1/T takes f_k * T, which is `t_k`.
+        rate = np.full(nF, 1.0 / T) / np.maximum(jit * cvj, 1e-9)
+        g1 = p < cut[self.G1]
+        if g1.any():
+            rate = np.where(g1, self._g1_rate(ctx), rate)
+        # M IS NOT ADVANCED. A cell leaves M by DIVIDING, which is `cell_divide[model: cycle]`'s
+        # business; advancing it here would let a tissue with no divide operator cycle for ever
+        # while never making a cell, which is a population model that silently is not one. Under
+        # the predicate that was `min(phase + 1, M)`; here it is a rate of zero, which is the same
+        # statement and is one the engine can integrate.
+        rate = np.where(p >= cut[self.G2], 0.0, rate)
+        # BACKWARD ONLY INSIDE G1. S, G2 and M are clocks in every model and a clock does not run
+        # backwards; only the G1 rules read a quantity that can fall.
+        rate = np.where((p >= cut[self.G1]) & (rate < 0.0), 0.0, rate)
+        rate = np.where(born, 0.0, rate) if age is not None and len(age) == nF else rate
+        # A CELL STOPS AT M'S DOORSTEP. `rate` is already zero once `p` is inside M, so the only
+        # way past is the single step that crosses -- and an unbounded rate can carry it far past
+        # (a `transition_probability` cell whose drawn waiting time is a fraction of a frame reached
+        # p = 3.76 before this cap). `p` has no meaning beyond the start of M, because M is left by
+        # dividing and not by progressing, so the crossing step lands exactly on the boundary.
+        p_next = np.clip(p + _dt * rate, 0.0, cut[self.G2])
+        ph_next = np.searchsorted(cut, p_next, side="right").astype(np.float64).clip(0, self.M)
+        # `phase_t` IS A READOUT NOW, NOT A DRIVER. Nothing above consults it -- the models spend
+        # volume, inhibitor or a drawn waiting time, and `timer` spends `p` itself -- but it is
+        # declared by every spec that runs this operator and is what a reader means by "how long has
+        # this cell been in S", so it is kept and reset on a phase change like before.
+        pt_next = np.where(ph_next != ph, 0.0, pt + _dt)
+        return self._emit(H, nF, {
+            "cycle_progress": (p_next - p_st) / max(_dt, 1e-12),
+            "phase":          (ph_next - ph_st) / max(_dt, 1e-12),
+            "phase_t":        (pt_next - pt_st) / max(_dt, 1e-12),
+            "cyc_inhib":      (cc - cc_st) / max(_dt, 1e-12),
+            "cyc_vprev":      (v_now - (vp if vp is not None else v_now)) / max(_dt, 1e-12),
+            "cyc_rate":       (ctx["rate_draw"] - _rate_prev) / max(_dt, 1e-12),
+        })
+
+    def _emit(self, H, nF, blocks):
+        """Per-cell deltas -> full-buffer `(set, block)` deltas the engine integrates.
+
+        THE LIVE CELLS ARE A PREFIX OF THE BUFFER and `_integrate` adds a block delta to the whole
+        of `lvl.state[:, cx0:cx1]` with no mask, so a short tensor would not broadcast and a full
+        one must be zero past `nF` or the dead tail of the buffer would drift.
+        """
+        clvl = H.level(self.cat)
+        N = int(clvl.state.shape[0])
+        out = {}
+        for name, d in blocks.items():
+            if d is None or cell_block(H, self.cat, name, nF) is None:
+                continue                       # a block this spec did not declare is not written
+            z = torch.zeros(N, 1, device=clvl.state.device, dtype=clvl.state.dtype)
+            z[:nF, 0] = torch.as_tensor(np.asarray(d, np.float64),
+                                        device=clvl.state.device).to(clvl.state.dtype)
+            out[(self.cat, name)] = z
+        return out
+```

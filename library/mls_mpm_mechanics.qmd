@@ -33,7 +33,7 @@ The whole MLS-MPM cycle in ONE operator: scatter, grid solve, gather, advect, an
 
 ## Role in Plexus
 
-- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
+- **Kind** &mdash; push / pull **exchange**: set &harr; field.
 - **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `youngs`, `C`, `F`, `mass`, `mu`, `la`, `p_vol`  (per-type props: `youngs`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -248,13 +248,7 @@ class MLSMPMMechanics(Exchange):
         # force operator (e.g. gravity) returns {cell: g}; the engine accumulates it and --
         # since the cell has no EMIT -- never integrates it, so the MPM substep is free
         # to consume it here as a body force (no bespoke `H.cell_accel`).
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            a_cell = H.delta(pn)                            # [Nc,2] accumulated parent force (zeros if none)
-            a_cell = torch.nan_to_num(a_cell, posinf=self.a_max, neginf=-self.a_max).clamp(-self.a_max, self.a_max)
-            a_ext = a_cell[p.parent]                        # broadcast down  [Np,2]
-        else:
-            a_ext = torch.zeros(p.n, 2, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, 2, dev)   # broadcast down the WHOLE chain [Np,2]
         part_accel = getattr(H, "part_accel", None)        # optional per-particle external accel
         if part_accel is not None:
             a_ext = a_ext + part_accel                     # (e.g. per-cell cohesion for identity)

@@ -1,0 +1,161 @@
+---
+title: "state_diffuse"
+subtitle: "Diffusion of a scalar along a set's own relation -- the graph Laplacian, nothing more."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: compartment`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Diffusion of a scalar along a set's own relation -- the graph Laplacian, nothing more.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `compartment` (the set the operator acts on).
+- **Reads** &mdash; `block`, `D`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+set -[edge_index]-> set: reads `block` and the relation, emits d(block)/dt.
+
+    dv_i/dt = D sum_{j ~ i} (v_j - v_i) / deg(i)      normalise: true (the default)
+    dv_i/dt = D sum_{j ~ i} (v_j - v_i)               normalise: false
+
+v is the value of `block` at element i, the sum runs over its neighbours in `edge_index`, and
+D is a rate in inverse time -- the graph carries no length, so there is no length in the
+coefficient either. Dividing by the degree gives the NORMALISED Laplacian, whose eigenvalues
+lie in [-2, 0], so an explicit step is stable at any degree; without it an element that
+acquires many neighbours can overshoot in one tick, which on a relation rebuilt every frame by
+proximity is a thing that actually happens.
+
+THE RELATION IS NOT THIS OPERATOR'S BUSINESS. It reads whatever `edge_index` the set carries,
+so what the neighbours ARE is decided by the rewire scheduled before it: `radius_graph` makes
+them "everything within r", and a different rewire would make them something else without this
+operator changing. That separation is why the mechanism and the relation are two operators.
+
+Returns its delta under an explicit `(set, block)` key rather than relying on `INTEGRAND`,
+because the block is a PARAMETER here -- one class serving any scalar -- and `INTEGRAND` is
+read off the class by the integration-order check.
+
+Reference: Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86 (diffusion); Chung, F.
+(1997). Spectral Graph Theory (the normalised Laplacian).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `block` | state_block | **required** |
+| `D` | diffusion_rate | **required** |
+| `normalise` | degree_normalised | True |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: state_diffuse, at: compartment, block: ..., D: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`diffusion`]{.op-badge} [`graph_laplacian`]{.op-badge} [`signalling`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/cell_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/cell_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral")
+class StateDiffuse(Lateral):
+    """Diffusion of a scalar along a set's own relation -- the graph Laplacian, nothing more.
+
+    set -[edge_index]-> set: reads `block` and the relation, emits d(block)/dt.
+
+        dv_i/dt = D sum_{j ~ i} (v_j - v_i) / deg(i)      normalise: true (the default)
+        dv_i/dt = D sum_{j ~ i} (v_j - v_i)               normalise: false
+
+    v is the value of `block` at element i, the sum runs over its neighbours in `edge_index`, and
+    D is a rate in inverse time -- the graph carries no length, so there is no length in the
+    coefficient either. Dividing by the degree gives the NORMALISED Laplacian, whose eigenvalues
+    lie in [-2, 0], so an explicit step is stable at any degree; without it an element that
+    acquires many neighbours can overshoot in one tick, which on a relation rebuilt every frame by
+    proximity is a thing that actually happens.
+
+    THE RELATION IS NOT THIS OPERATOR'S BUSINESS. It reads whatever `edge_index` the set carries,
+    so what the neighbours ARE is decided by the rewire scheduled before it: `radius_graph` makes
+    them "everything within r", and a different rewire would make them something else without this
+    operator changing. That separation is why the mechanism and the relation are two operators.
+
+    Returns its delta under an explicit `(set, block)` key rather than relying on `INTEGRAND`,
+    because the block is a PARAMETER here -- one class serving any scalar -- and `INTEGRAND` is
+    read off the class by the integration-order check.
+
+    Reference: Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86 (diffusion); Chung, F.
+    (1997). Spectral Graph Theory (the normalised Laplacian).
+    """
+    EMIT = "velocity"
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["block", "D"]
+    INPUTS = ["set"]; OUTPUTS = ["set"]; READS = ["block"]; WRITES = ["block"]
+    MECHANISM_TAGS = ["diffusion", "graph_laplacian", "signalling"]
+    PARAM_ROLES = {"block": "state_block", "D": "diffusion_rate",
+                   "normalise": "degree_normalised"}
+    REFERENCE = ("Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; "
+                 "Chung, F. (1997). Spectral Graph Theory.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "compartment")
+        self.block = str(params["block"])
+        self.D = float(params["D"])
+        self.norm = bool(params.get("normalise", True))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        ei = getattr(lvl, "edge_index", None)
+        b0, b1 = lvl.state_schema[self.block]
+        v = lvl.state[:, b0:b1]
+        if ei is None or ei.numel() == 0:
+            return {(lvl.name, self.block): torch.zeros_like(v)}
+        i, j = ei[0], ei[1]                                  # row 0 receives, row 1 sends
+        occ = lvl.occ if getattr(lvl, "occ", None) is not None else torch.ones_like(v[:, 0])
+        live = (occ[i] > 0) & (occ[j] > 0)
+        i, j = i[live], j[live]
+        d = torch.zeros_like(v)
+        d.index_add_(0, i, v[j] - v[i])
+        if self.norm:
+            deg = torch.zeros(lvl.n, device=v.device, dtype=v.dtype)
+            deg.index_add_(0, i, torch.ones_like(i, dtype=v.dtype))
+            d = d / deg.clamp_min(1.0)[:, None]
+        return {(lvl.name, self.block): self.D * d}
+```

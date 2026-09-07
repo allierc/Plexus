@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.26">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>ecm_seed – Plexus</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b758ccaa5987ceb1b75504551e579abf.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-70408cb9dc52a2002c2463371a30459f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Plexus</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../language.html"> 
+<span class="menu-text">Language</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="../library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../optimization.html"> 
+<span class="menu-text">Optimization</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../inverse.html"> 
+<span class="menu-text">Inverse problem</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+    <a href="https://github.com/allierc/Plexus" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
+  <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
+  <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
+  <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
+  <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">ecm_seed</h1>
+<p class="subtitle lead">Lay the matrix out once, at frame 0: the box minus a cavity, filled with aligned fibres.</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="op-head">
+<p><img src="../figures/icons/seed.png" class="op-logo img-fluid"></p>
+<p><span class="op-badge"><code>seed</code></span> <span class="op-badge"><code>acts on: particle</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
+<p>Lay the matrix out once, at frame 0: the box minus a cavity, filled with aligned fibres.</p>
+</div>
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+<section id="role-in-plexus" class="level2">
+<h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
+<ul>
+<li><strong>Kind</strong> — <strong>seed</strong>: .</li>
+<li><strong>Acts on</strong> — <code>particle</code> (the set the operator acts on).</li>
+<li><strong>Reads</strong> — –</li>
+<li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
+<li><strong>Prediction</strong> — <code>none</code>.</li>
+<li><strong>Dimensions</strong> — 3D.</li>
+</ul>
+</section>
+<section id="mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
+<p>particle -&gt; particle: rewrites every position in the set, and the per-particle material, at the opening of the trajectory.</p>
+<p>The occupied region is the box minus a cylindrical cavity of radius <code>cavity_r</code> and half-height <code>cavity_h</code>, both in world units – the space the tissue will grow into. Within it, particles are laid down as <code>n_fibres</code> segments of length <code>fibre_len</code>, also in world units, whose directions are biased by <code>align</code>: 0 is isotropic and 1 fully aligned, so <code>align</code> is the dimensionless order parameter of the fibre network the tissue must push through.</p>
+<p>A structural operator rather than a set provision, because the stock provision seeds a block or a ball and the matrix is neither – it is the COMPLEMENT of a shape. Writing it as an operator also puts the cavity in the specification, beside the stiffness it is being tested against, rather than in a seeder.</p>
+<p>Particles are never PLACED in the cavity rather than deleted from it. A cut-out would leave the discarded particles occupying memory and mass, and an MPM particle with zero occupancy still costs a scatter every substep.</p>
+<p>Reference: Sulsky, D., Chen, Z. &amp; Schreyer, H. L. (1994). A particle method for history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196 (MPM).</p>
+</section>
+<section id="parameters" class="level2">
+<h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>role</th>
+<th>default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>cavity_r</code></td>
+<td>cavity_radius</td>
+<td>0.22</td>
+</tr>
+<tr class="even">
+<td><code>cavity_h</code></td>
+<td>cavity_half_height</td>
+<td>0.07</td>
+</tr>
+<tr class="odd">
+<td><code>fibre_len</code></td>
+<td>fibre_length</td>
+<td>0.16</td>
+</tr>
+<tr class="even">
+<td><code>n_fibres</code></td>
+<td>fibre_count</td>
+<td>900</td>
+</tr>
+<tr class="odd">
+<td><code>align</code></td>
+<td>fibre_alignment_strength</td>
+<td>0.0</td>
+</tr>
+<tr class="even">
+<td><code>centre</code></td>
+<td>–</td>
+<td>[0.5, 0.5, 0.5]</td>
+</tr>
+<tr class="odd">
+<td><code>axis</code></td>
+<td>–</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td><code>margin</code></td>
+<td>–</td>
+<td>0.03</td>
+</tr>
+<tr class="odd">
+<td><code>plate_half</code></td>
+<td>–</td>
+<td>None</td>
+</tr>
+<tr class="even">
+<td><code>block</code></td>
+<td>–</td>
+<td>None</td>
+</tr>
+<tr class="odd">
+<td><code>cavity_sphere</code></td>
+<td>–</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<td><code>shell_r</code></td>
+<td>–</td>
+<td>None</td>
+</tr>
+<tr class="odd">
+<td><code>dense_axis</code></td>
+<td>–</td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td><code>dense_cone_deg</code></td>
+<td>–</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td><code>dense_boost</code></td>
+<td>–</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td><code>align_dir</code></td>
+<td>–</td>
+<td>[1.0, 0.0, 0.0]</td>
+</tr>
+<tr class="odd">
+<td><code>jitter</code></td>
+<td>–</td>
+<td>0.004</td>
+</tr>
+<tr class="even">
+<td><code>seed</code></td>
+<td>–</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="minimal-spec" class="level2">
+<h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> ecm_seed</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="mechanism-search-tags" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>matrix_seeding</code></span> <span class="op-badge"><code>fibre_alignment</code></span> <span class="op-badge"><code>cavity</code></span></p>
+</section>
+<section id="related-operators" class="level2">
+<h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
+<p>Other <strong>seed</strong> operators: <a href="../library/seed_from_segmentation.html"><code>seed_from_segmentation</code></a>, <a href="../library/set_material.html"><code>set_material</code></a>, <a href="../library/seed_mesh.html"><code>seed_mesh</code></a>, <a href="../library/mesh_seed.html"><code>mesh_seed</code></a>, <a href="../library/seed_cell_chem.html"><code>seed_cell_chem</code></a>, <a href="../library/cell_chem_seed.html"><code>cell_chem_seed</code></a>.</p>
+</section>
+<section id="source" class="level2">
+<h2 class="anchored" data-anchor-id="source">Source</h2>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/ecm_ops.py"><code>src/plexus/operators/ecm_ops.py</code></a> — the registered operator.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"ecm_seed"</span>, <span class="st">"seed_ecm"</span>, family<span class="op">=</span><span class="st">"seed"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"seed"</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ECMSeed(Structural):</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Lay the matrix out once, at frame 0: the box minus a cavity, filled with aligned fibres.</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">    particle -&gt; particle: rewrites every position in the set, and the per-particle material, at</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">    the opening of the trajectory.</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">    The occupied region is the box minus a cylindrical cavity of radius `cavity_r` and half-height</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">    `cavity_h`, both in world units -- the space the tissue will grow into. Within it, particles</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">    are laid down as `n_fibres` segments of length `fibre_len`, also in world units, whose</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">    directions are biased by `align`: 0 is isotropic and 1 fully aligned, so `align` is the</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">    dimensionless order parameter of the fibre network the tissue must push through.</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">    A structural operator rather than a set provision, because the stock provision seeds a block</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">    or a ball and the matrix is neither -- it is the COMPLEMENT of a shape. Writing it as an</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">    operator also puts the cavity in the specification, beside the stiffness it is being tested</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co">    against, rather than in a seeder.</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="co">    Particles are never PLACED in the cavity rather than deleted from it. A cut-out would leave</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co">    the discarded particles occupying memory and mass, and an MPM particle with zero occupancy</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="co">    still costs a scatter every substep.</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co">    Reference: Sulsky, D., Chen, Z. &amp; Schreyer, H. L. (1994). A particle method for</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="co">    history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196 (MPM).</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span>                       <span class="co"># rewrites positions in place at frame 0; no integrable delta</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">3</span>]</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"matrix_seeding"</span>, <span class="st">"fibre_alignment"</span>, <span class="st">"cavity"</span>]</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"cavity_r"</span>: <span class="st">"cavity_radius"</span>, <span class="st">"cavity_h"</span>: <span class="st">"cavity_half_height"</span>,</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"fibre_len"</span>: <span class="st">"fibre_length"</span>, <span class="st">"n_fibres"</span>: <span class="st">"fibre_count"</span>,</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"align"</span>: <span class="st">"fibre_alignment_strength"</span>}</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> (<span class="st">"Sulsky, D., Chen, Z. &amp; Schreyer, H. L. (1994). A particle method for "</span></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"history-dependent materials. Comput. Methods Appl. Mech. Eng. 118:179-196."</span>)</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"mpm_particle"</span>)</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.centre <span class="op">=</span> [<span class="bu">float</span>(v) <span class="cf">for</span> v <span class="kw">in</span> params.get(<span class="st">"centre"</span>, [<span class="fl">0.5</span>, <span class="fl">0.5</span>, <span class="fl">0.5</span>])]</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE CAVITY IS A DISC, and its two radii are separate numbers on purpose. A sphere would</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="co"># confine the ball equally in every direction, which is the one case where the matrix</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cannot tell us anything the ball's own mechanics does not: it would stay a ball. A disc</span></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is anisotropic confinement -- free in two axes, pinched in the third -- so the shape the</span></span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="co"># tissue takes is a fact about the coupling rather than about the ball.</span></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cavity_r <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"cavity_r"</span>, <span class="fl">0.22</span>))     <span class="co"># in-plane radius</span></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cavity_h <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"cavity_h"</span>, <span class="fl">0.07</span>))     <span class="co"># half-thickness along `axis`</span></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.axis <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"axis"</span>, <span class="dv">1</span>))                  <span class="co"># the pinched axis</span></span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.margin <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"margin"</span>, <span class="fl">0.03</span>))         <span class="co"># keep clear of the domain walls</span></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        <span class="co"># SOLID BLOCKS, top and bottom: no matrix is seeded inside them. `None` = no blocks. The</span></span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        <span class="co"># blocks are the SAME object `plate_confine` holds the matrix out of during the run, so the</span></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        <span class="co"># two numbers have to agree -- pass the same `gap_half` to both, from one place in the spec.</span></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Seeding matrix into a solid and then relying on the confinement operator to evict it would</span></span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        <span class="co"># start the run with a shock the material never recovers from.</span></span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.plate_half <span class="op">=</span> params.get(<span class="st">"plate_half"</span>, <span class="va">None</span>)</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.plate_half <span class="op">=</span> <span class="va">None</span> <span class="cf">if</span> <span class="va">self</span>.plate_half <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> <span class="bu">float</span>(<span class="va">self</span>.plate_half)</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A BLOCK REGION, in the framework's own vocabulary. `MPMParticle.provision` already accepts</span></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        <span class="co"># `block: [x0,y0,z0,x1,y1,z1]` for a type that FILLS a box instead of a disc, and the stock MPM</span></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        <span class="co"># demos build their falling cubes with it. Fibres cannot use that path -- the provision places</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        <span class="co"># points and this operator places STRANDS -- so the same six numbers are accepted here and the</span></span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        <span class="co"># fibre CENTRES are drawn inside the box, inset by half a fibre so a strand stays in the cube it</span></span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        <span class="co"># belongs to. Without it the only regions this operator could seed were "the whole domain" and</span></span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        <span class="co"># "the whole domain minus a cavity", which is why a cube of matrix had to be faked with plates.</span></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.block <span class="op">=</span> params.get(<span class="st">"block"</span>, <span class="va">None</span>)</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.block <span class="op">=</span> <span class="va">None</span> <span class="cf">if</span> <span class="va">self</span>.block <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> [<span class="bu">float</span>(v) <span class="cf">for</span> v <span class="kw">in</span> <span class="va">self</span>.block]</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cavity_sphere <span class="op">=</span> <span class="bu">bool</span>(params.get(<span class="st">"cavity_sphere"</span>, <span class="va">False</span>))</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A SHELL, WHICH IS THE ONLY AFFORDABLE GEOMETRY FOR A SPHEROID IN A MATRIX. Filling the box</span></span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        <span class="co"># at a usable particle density costs a million particles (ppc 4 at dx = 1/64 is 4*64^3 per</span></span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        <span class="co"># unit volume) and spends nearly all of them on a far field that never moves. `shell_r` caps</span></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the radius a fibre CENTRE may be drawn at, so the matrix is the shell between the cavity</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        <span class="co"># and it -- a strand may still stick out by half its length, which is why this is a cap on</span></span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        <span class="co"># centres and not a clamp on particles: clamping would pile mass on the outer surface.</span></span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.shell_r <span class="op">=</span> params.get(<span class="st">"shell_r"</span>, <span class="va">None</span>)</span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.shell_r <span class="op">=</span> <span class="va">None</span> <span class="cf">if</span> <span class="va">self</span>.shell_r <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> <span class="bu">float</span>(<span class="va">self</span>.shell_r)</span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A DENSER REGION, so the matrix's ARCHITECTURE is anisotropic and not just its orientation.</span></span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Fibre alignment alone gave a 1.50x directional pressure difference (measured: 1448 along the</span></span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        <span class="co"># alignment axis against 2123 / 2176 across it) -- real, but small, because MPM interpolates</span></span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        <span class="co"># every particle onto a continuum grid and a fibrous ARRANGEMENT of an isotropic material</span></span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        <span class="co"># responds nearly isotropically. Putting MORE FIBRES in a region changes the mass and stiffness</span></span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the grid actually sees, which is a difference the continuum cannot average away.</span></span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>        <span class="co">#</span></span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>        <span class="co"># The region is the pair of cones about `dense_axis` within `dense_cone_deg` of it: dense at the</span></span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>        <span class="co"># poles, sparse around the equator. Chosen so the suppression is AXISYMMETRIC and therefore</span></span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>        <span class="co"># measurable by the semi-axes already recorded -- an off-centre dense blob makes a more striking</span></span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        <span class="co"># picture and needs a metric nobody has written.</span></span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dense_axis <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"dense_axis"</span>, <span class="dv">2</span>))</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dense_cone <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"dense_cone_deg"</span>, <span class="fl">0.0</span>))     <span class="co"># 0 = uniform</span></span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dense_boost <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"dense_boost"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.n_fibres <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"n_fibres"</span>, <span class="dv">900</span>))</span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.fibre_len <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"fibre_len"</span>, <span class="fl">0.16</span>))</span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>        <span class="co"># 0 = isotropic directions, 1 = every fibre parallel to `align_dir`. Anything between is a</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>        <span class="co"># von-Mises-like spread about it, which is what a real matrix looks like near a boundary.</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.align <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"align"</span>, <span class="fl">0.0</span>))</span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.align_dir <span class="op">=</span> [<span class="bu">float</span>(v) <span class="cf">for</span> v <span class="kw">in</span> params.get(<span class="st">"align_dir"</span>, [<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>])]</span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.jitter <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"jitter"</span>, <span class="fl">0.004</span>))        <span class="co"># across-fibre thickness</span></span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.seed <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"seed"</span>, <span class="dv">0</span>))</span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._done <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _outside_cavity(<span class="va">self</span>, pos):</span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""True where a point is IN the matrix -- outside the cavity AND outside the solid blocks."""</span></span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>        c <span class="op">=</span> torch.tensor(<span class="va">self</span>.centre, device<span class="op">=</span>pos.device, dtype<span class="op">=</span>pos.dtype)</span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>        d <span class="op">=</span> pos <span class="op">-</span> c</span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>        ax <span class="op">=</span> <span class="va">self</span>.axis</span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>        along <span class="op">=</span> d[:, ax].<span class="bu">abs</span>()</span>
+<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a>        radial <span class="op">=</span> torch.sqrt((d <span class="op">**</span> <span class="dv">2</span>).<span class="bu">sum</span>(<span class="dv">1</span>) <span class="op">-</span> d[:, ax] <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> <span class="fl">1e-12</span>)</span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A DISC BY DEFAULT, A SPHERE ON REQUEST. The disc is two numbers because anisotropic</span></span>
+<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a>        <span class="co"># confinement is the experiment the cavity was written for; a hole that a SPHEROID will occupy</span></span>
+<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a>        <span class="co"># is a sphere, and setting r = h on the disc gives a cylinder with flat ends, which is a</span></span>
+<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a>        <span class="co"># different shape wearing the right radius.</span></span>
+<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.cavity_sphere:</span>
+<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>            ok <span class="op">=</span> <span class="op">~</span>(d.norm(dim<span class="op">=</span><span class="dv">1</span>) <span class="op">&lt;</span> <span class="va">self</span>.cavity_r)</span>
+<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>            ok <span class="op">=</span> <span class="op">~</span>((radial <span class="op">&lt;</span> <span class="va">self</span>.cavity_r) <span class="op">&amp;</span> (along <span class="op">&lt;</span> <span class="va">self</span>.cavity_h))</span>
+<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.plate_half <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>            ok <span class="op">=</span> ok <span class="op">&amp;</span> (d[:, ax].<span class="bu">abs</span>() <span class="op">&lt;</span> <span class="va">self</span>.plate_half)</span>
+<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> ok</span>
+<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>._done:</span>
+<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}</span>
+<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)</span>
+<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>        n, D <span class="op">=</span> pos.shape</span>
+<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>        dev, dt_ <span class="op">=</span> pos.device, pos.dtype</span>
+<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a>        g <span class="op">=</span> torch.Generator(device<span class="op">=</span><span class="st">"cpu"</span>).manual_seed(<span class="va">self</span>.seed)</span>
+<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a>        <span class="co"># FIBRE DIRECTIONS. Isotropic by default; `align` mixes toward a chosen axis. Normalised</span></span>
+<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>        <span class="co"># AFTER mixing so a partially aligned fibre is still a unit vector.</span></span>
+<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a>        d <span class="op">=</span> torch.randn(<span class="va">self</span>.n_fibres, D, generator<span class="op">=</span>g)</span>
+<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a>        d <span class="op">=</span> d <span class="op">/</span> d.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp_min(<span class="fl">1e-9</span>)</span>
+<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.align <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a>            a <span class="op">=</span> torch.tensor(<span class="va">self</span>.align_dir, dtype<span class="op">=</span>d.dtype)</span>
+<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a>            a <span class="op">=</span> a <span class="op">/</span> a.norm().clamp_min(<span class="fl">1e-9</span>)</span>
+<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a>            d <span class="op">=</span> (<span class="fl">1.0</span> <span class="op">-</span> <span class="va">self</span>.align) <span class="op">*</span> d <span class="op">+</span> <span class="va">self</span>.align <span class="op">*</span> a</span>
+<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a>            d <span class="op">=</span> d <span class="op">/</span> d.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp_min(<span class="fl">1e-9</span>)</span>
+<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a>        <span class="co"># FIBRE CENTRES, REJECTION-SAMPLED OUT OF THE CAVITY. Rejection rather than a closed-form</span></span>
+<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a>        <span class="co"># placement because the cavity is a parameter: a formula would have to be rewritten for</span></span>
+<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a>        <span class="co"># every new cavity shape, and a rejection loop would not.</span></span>
+<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a>        lo, hi <span class="op">=</span> <span class="va">self</span>.margin, <span class="fl">1.0</span> <span class="op">-</span> <span class="va">self</span>.margin</span>
+<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.block <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a>            b <span class="op">=</span> torch.tensor(<span class="va">self</span>.block, dtype<span class="op">=</span>torch.float32).reshape(<span class="dv">2</span>, D)</span>
+<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a>            inset <span class="op">=</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">self</span>.fibre_len</span>
+<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a>            blo <span class="op">=</span> (b[<span class="dv">0</span>] <span class="op">+</span> inset).clamp(lo, hi)</span>
+<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a>            bhi <span class="op">=</span> (b[<span class="dv">1</span>] <span class="op">-</span> inset).clamp(lo, hi)</span>
+<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a>            blo, bhi <span class="op">=</span> torch.minimum(blo, bhi), torch.maximum(blo, bhi)</span>
+<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a>            <span class="co"># AND THE CAVITY STILL APPLIES INSIDE THE BLOCK. The hole is what the spheroid will</span></span>
+<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a>            <span class="co"># occupy, so it has to be absent from the matrix from frame 0 -- a fibre seeded where the</span></span>
+<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a>            <span class="co"># ball is going to be is in contact before the run starts, which is the defect the cavity</span></span>
+<span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a>            <span class="co"># exists to prevent. Rejection, as everywhere else here, because the cavity's shape is a</span></span>
+<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a>            <span class="co"># parameter and a closed form would have to be rewritten for the next one.</span></span>
+<span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a>            got <span class="op">=</span> []</span>
+<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">64</span>):</span>
+<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a>                c <span class="op">=</span> torch.rand(<span class="va">self</span>.n_fibres <span class="op">*</span> <span class="dv">2</span>, D, generator<span class="op">=</span>g) <span class="op">*</span> (bhi <span class="op">-</span> blo) <span class="op">+</span> blo</span>
+<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a>                c <span class="op">=</span> c[<span class="va">self</span>._outside_cavity(c.to(dev)).cpu()]</span>
+<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a>                got.append(c)</span>
+<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> <span class="bu">sum</span>(x.shape[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> got) <span class="op">&gt;=</span> <span class="va">self</span>.n_fibres:</span>
+<span id="cb2-157"><a href="#cb2-157" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">break</span></span>
+<span id="cb2-158"><a href="#cb2-158" aria-hidden="true" tabindex="-1"></a>            centres <span class="op">=</span> torch.cat(got)[: <span class="va">self</span>.n_fibres]</span>
+<span id="cb2-159"><a href="#cb2-159" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"[ecm_seed] block region </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>block<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>centres<span class="sc">.</span>shape[<span class="dv">0</span>]<span class="sc">}</span><span class="ss"> fibre centres inside it, "</span></span>
+<span id="cb2-160"><a href="#cb2-160" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"inset by half a fibre (</span><span class="sc">{</span>inset<span class="sc">:.3f}</span><span class="ss">), cavity r=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cavity_r<span class="sc">:g}</span><span class="ss"> h=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cavity_h<span class="sc">:g}</span><span class="ss"> "</span></span>
+<span id="cb2-161"><a href="#cb2-161" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"left empty"</span>, flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-162"><a href="#cb2-162" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-163"><a href="#cb2-163" aria-hidden="true" tabindex="-1"></a>            centres <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb2-164"><a href="#cb2-164" aria-hidden="true" tabindex="-1"></a>        keep <span class="op">=</span> []</span>
+<span id="cb2-165"><a href="#cb2-165" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">64</span>):</span>
+<span id="cb2-166"><a href="#cb2-166" aria-hidden="true" tabindex="-1"></a>            c <span class="op">=</span> torch.rand(<span class="va">self</span>.n_fibres <span class="op">*</span> <span class="dv">2</span>, D, generator<span class="op">=</span>g) <span class="op">*</span> (hi <span class="op">-</span> lo) <span class="op">+</span> lo</span>
+<span id="cb2-167"><a href="#cb2-167" aria-hidden="true" tabindex="-1"></a>            c <span class="op">=</span> c[<span class="va">self</span>._outside_cavity(c.to(dev)).cpu()]</span>
+<span id="cb2-168"><a href="#cb2-168" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="va">self</span>.shell_r <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-169"><a href="#cb2-169" aria-hidden="true" tabindex="-1"></a>                c0 <span class="op">=</span> torch.tensor(<span class="va">self</span>.centre, dtype<span class="op">=</span>c.dtype)</span>
+<span id="cb2-170"><a href="#cb2-170" aria-hidden="true" tabindex="-1"></a>                c <span class="op">=</span> c[(c <span class="op">-</span> c0).norm(dim<span class="op">=</span><span class="dv">1</span>) <span class="op">&lt;</span> <span class="va">self</span>.shell_r <span class="op">-</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">self</span>.fibre_len]</span>
+<span id="cb2-171"><a href="#cb2-171" aria-hidden="true" tabindex="-1"></a>            keep.append(c)</span>
+<span id="cb2-172"><a href="#cb2-172" aria-hidden="true" tabindex="-1"></a>            need <span class="op">=</span> <span class="va">self</span>.n_fibres <span class="op">*</span> (<span class="bu">max</span>(<span class="va">self</span>.dense_boost, <span class="fl">1.0</span>) <span class="cf">if</span> <span class="va">self</span>.dense_cone <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">else</span> <span class="fl">1.0</span>)</span>
+<span id="cb2-173"><a href="#cb2-173" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-174"><a href="#cb2-174" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="bu">sum</span>(x.shape[<span class="dv">0</span>] <span class="cf">for</span> x <span class="kw">in</span> keep) <span class="op">&gt;=</span> need:</span>
+<span id="cb2-175"><a href="#cb2-175" aria-hidden="true" tabindex="-1"></a>                <span class="cf">break</span></span>
+<span id="cb2-176"><a href="#cb2-176" aria-hidden="true" tabindex="-1"></a>        centres <span class="op">=</span> torch.cat(keep) <span class="cf">if</span> centres <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> centres</span>
+<span id="cb2-177"><a href="#cb2-177" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.block <span class="kw">is</span> <span class="va">None</span> <span class="kw">and</span> <span class="va">self</span>.dense_cone <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">and</span> <span class="va">self</span>.dense_boost <span class="op">!=</span> <span class="fl">1.0</span>:</span>
+<span id="cb2-178"><a href="#cb2-178" aria-hidden="true" tabindex="-1"></a>            <span class="co"># IMPORTANCE SAMPLING, not a second sampling pass: keep every candidate in the cone and</span></span>
+<span id="cb2-179"><a href="#cb2-179" aria-hidden="true" tabindex="-1"></a>            <span class="co"># thin the rest by 1/boost, so the ACCEPTED set has `boost` times the areal density inside</span></span>
+<span id="cb2-180"><a href="#cb2-180" aria-hidden="true" tabindex="-1"></a>            <span class="co"># the cone. The particle count is unchanged -- `per = n // n_fibres` -- so this redistributes</span></span>
+<span id="cb2-181"><a href="#cb2-181" aria-hidden="true" tabindex="-1"></a>            <span class="co"># material rather than adding it, and the sparse region really does get sparser.</span></span>
+<span id="cb2-182"><a href="#cb2-182" aria-hidden="true" tabindex="-1"></a>            c0 <span class="op">=</span> torch.tensor(<span class="va">self</span>.centre, dtype<span class="op">=</span>centres.dtype)</span>
+<span id="cb2-183"><a href="#cb2-183" aria-hidden="true" tabindex="-1"></a>            v <span class="op">=</span> centres <span class="op">-</span> c0</span>
+<span id="cb2-184"><a href="#cb2-184" aria-hidden="true" tabindex="-1"></a>            vn <span class="op">=</span> v.norm(dim<span class="op">=</span><span class="dv">1</span>).clamp_min(<span class="fl">1e-9</span>)</span>
+<span id="cb2-185"><a href="#cb2-185" aria-hidden="true" tabindex="-1"></a>            cosang <span class="op">=</span> (v[:, <span class="va">self</span>.dense_axis] <span class="op">/</span> vn).<span class="bu">abs</span>()</span>
+<span id="cb2-186"><a href="#cb2-186" aria-hidden="true" tabindex="-1"></a>            in_cone <span class="op">=</span> cosang <span class="op">&gt;</span> math.cos(math.radians(<span class="va">self</span>.dense_cone))</span>
+<span id="cb2-187"><a href="#cb2-187" aria-hidden="true" tabindex="-1"></a>            u01 <span class="op">=</span> torch.rand(centres.shape[<span class="dv">0</span>], generator<span class="op">=</span>g)</span>
+<span id="cb2-188"><a href="#cb2-188" aria-hidden="true" tabindex="-1"></a>            centres <span class="op">=</span> centres[in_cone <span class="op">|</span> (u01 <span class="op">&lt;</span> <span class="fl">1.0</span> <span class="op">/</span> <span class="va">self</span>.dense_boost)]</span>
+<span id="cb2-189"><a href="#cb2-189" aria-hidden="true" tabindex="-1"></a>        centres <span class="op">=</span> centres[: <span class="va">self</span>.n_fibres]</span>
+<span id="cb2-190"><a href="#cb2-190" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> centres.shape[<span class="dv">0</span>] <span class="op">&lt;</span> <span class="va">self</span>.n_fibres:                  <span class="co"># cavity larger than the box</span></span>
+<span id="cb2-191"><a href="#cb2-191" aria-hidden="true" tabindex="-1"></a>            centres <span class="op">=</span> centres.repeat((<span class="va">self</span>.n_fibres <span class="op">//</span> <span class="bu">max</span>(centres.shape[<span class="dv">0</span>], <span class="dv">1</span>)) <span class="op">+</span> <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb2-192"><a href="#cb2-192" aria-hidden="true" tabindex="-1"></a>            centres <span class="op">=</span> centres[: <span class="va">self</span>.n_fibres]</span>
+<span id="cb2-193"><a href="#cb2-193" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-194"><a href="#cb2-194" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A STRAND CLEARS THE CAVITY AS A WHOLE, OR IT IS NOT SEEDED THERE. The per-particle eviction</span></span>
+<span id="cb2-195"><a href="#cb2-195" aria-hidden="true" tabindex="-1"></a>        <span class="co"># below is a backstop and was doing this job: a strand whose CENTRE was outside the cavity but</span></span>
+<span id="cb2-196"><a href="#cb2-196" aria-hidden="true" tabindex="-1"></a>        <span class="co"># whose ends crossed it had those ends teleported onto the rim while the rest stayed put, so</span></span>
+<span id="cb2-197"><a href="#cb2-197" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the strand was born already torn. Measured on `04c` before this: 64 of 10,000 strands had an</span></span>
+<span id="cb2-198"><a href="#cb2-198" aria-hidden="true" tabindex="-1"></a>        <span class="co"># internal gap of up to seventeen times their own particle spacing at frame 0, and they are</span></span>
+<span id="cb2-199"><a href="#cb2-199" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the long straight streaks in the movie. The test is the distance from the cavity centre to</span></span>
+<span id="cb2-200"><a href="#cb2-200" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the SEGMENT, not to its midpoint, and a strand that fails it is pushed out along its own</span></span>
+<span id="cb2-201"><a href="#cb2-201" aria-hidden="true" tabindex="-1"></a>        <span class="co"># centre's radius until it passes -- direction and length untouched, so the seeded fibre</span></span>
+<span id="cb2-202"><a href="#cb2-202" aria-hidden="true" tabindex="-1"></a>        <span class="co"># architecture is unchanged.</span></span>
+<span id="cb2-203"><a href="#cb2-203" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.cavity_sphere <span class="kw">and</span> <span class="va">self</span>.cavity_r <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb2-204"><a href="#cb2-204" aria-hidden="true" tabindex="-1"></a>            c0 <span class="op">=</span> torch.tensor(<span class="va">self</span>.centre, dtype<span class="op">=</span>centres.dtype)</span>
+<span id="cb2-205"><a href="#cb2-205" aria-hidden="true" tabindex="-1"></a>            half <span class="op">=</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">self</span>.fibre_len</span>
+<span id="cb2-206"><a href="#cb2-206" aria-hidden="true" tabindex="-1"></a>            need_r <span class="op">=</span> <span class="va">self</span>.cavity_r <span class="op">+</span> <span class="dv">2</span> <span class="op">*</span> <span class="va">self</span>.jitter</span>
+<span id="cb2-207"><a href="#cb2-207" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">8</span>):</span>
+<span id="cb2-208"><a href="#cb2-208" aria-hidden="true" tabindex="-1"></a>                w <span class="op">=</span> c0 <span class="op">-</span> centres</span>
+<span id="cb2-209"><a href="#cb2-209" aria-hidden="true" tabindex="-1"></a>                t <span class="op">=</span> (w <span class="op">*</span> d).<span class="bu">sum</span>(<span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="op">-</span>half, half)</span>
+<span id="cb2-210"><a href="#cb2-210" aria-hidden="true" tabindex="-1"></a>                dist <span class="op">=</span> (w <span class="op">-</span> t <span class="op">*</span> d).norm(dim<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb2-211"><a href="#cb2-211" aria-hidden="true" tabindex="-1"></a>                bad <span class="op">=</span> dist <span class="op">&lt;</span> need_r</span>
+<span id="cb2-212"><a href="#cb2-212" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> <span class="kw">not</span> <span class="bu">bool</span>(bad.<span class="bu">any</span>()):</span>
+<span id="cb2-213"><a href="#cb2-213" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">break</span></span>
+<span id="cb2-214"><a href="#cb2-214" aria-hidden="true" tabindex="-1"></a>                u <span class="op">=</span> centres[bad] <span class="op">-</span> c0</span>
+<span id="cb2-215"><a href="#cb2-215" aria-hidden="true" tabindex="-1"></a>                un <span class="op">=</span> u <span class="op">/</span> u.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp_min(<span class="fl">1e-9</span>)</span>
+<span id="cb2-216"><a href="#cb2-216" aria-hidden="true" tabindex="-1"></a>                centres[bad] <span class="op">=</span> centres[bad] <span class="op">+</span> un <span class="op">*</span> (need_r <span class="op">-</span> dist[bad] <span class="op">+</span> <span class="fl">1e-4</span>)[:, <span class="va">None</span>]</span>
+<span id="cb2-217"><a href="#cb2-217" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"[ecm_seed] </span><span class="sc">{</span><span class="bu">int</span>(bad.<span class="bu">sum</span>())<span class="sc">}</span><span class="ss"> strand(s) still crossing the cavity after "</span></span>
+<span id="cb2-218"><a href="#cb2-218" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"whole-strand eviction"</span>, flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-219"><a href="#cb2-219" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-220"><a href="#cb2-220" aria-hidden="true" tabindex="-1"></a>        <span class="co"># PARTICLES ALONG THE FIBRES, evenly spaced with a little across-fibre thickness so a</span></span>
+<span id="cb2-221"><a href="#cb2-221" aria-hidden="true" tabindex="-1"></a>        <span class="co"># fibre reads as a strand rather than a line of dots.</span></span>
+<span id="cb2-222"><a href="#cb2-222" aria-hidden="true" tabindex="-1"></a>        per <span class="op">=</span> <span class="bu">max</span>(<span class="dv">1</span>, n <span class="op">//</span> <span class="va">self</span>.n_fibres)</span>
+<span id="cb2-223"><a href="#cb2-223" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> (torch.arange(per, dtype<span class="op">=</span>torch.float32) <span class="op">/</span> <span class="bu">max</span>(per <span class="op">-</span> <span class="dv">1</span>, <span class="dv">1</span>) <span class="op">-</span> <span class="fl">0.5</span>) <span class="op">*</span> <span class="va">self</span>.fibre_len</span>
+<span id="cb2-224"><a href="#cb2-224" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> (centres[:, <span class="va">None</span>, :] <span class="op">+</span> t[<span class="va">None</span>, :, <span class="va">None</span>] <span class="op">*</span> d[:, <span class="va">None</span>, :]).reshape(<span class="op">-</span><span class="dv">1</span>, D)</span>
+<span id="cb2-225"><a href="#cb2-225" aria-hidden="true" tabindex="-1"></a>        f <span class="op">=</span> d[:, <span class="va">None</span>, :].expand(<span class="op">-</span><span class="dv">1</span>, per, <span class="op">-</span><span class="dv">1</span>).reshape(<span class="op">-</span><span class="dv">1</span>, D)</span>
+<span id="cb2-226"><a href="#cb2-226" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> p.shape[<span class="dv">0</span>] <span class="op">&lt;</span> n:                                    <span class="co"># top up with whole fibres</span></span>
+<span id="cb2-227"><a href="#cb2-227" aria-hidden="true" tabindex="-1"></a>            k <span class="op">=</span> n <span class="op">-</span> p.shape[<span class="dv">0</span>]</span>
+<span id="cb2-228"><a href="#cb2-228" aria-hidden="true" tabindex="-1"></a>            p <span class="op">=</span> torch.cat([p, p[:k]])</span>
+<span id="cb2-229"><a href="#cb2-229" aria-hidden="true" tabindex="-1"></a>            f <span class="op">=</span> torch.cat([f, f[:k]])</span>
+<span id="cb2-230"><a href="#cb2-230" aria-hidden="true" tabindex="-1"></a>        p, f <span class="op">=</span> p[:n], f[:n]</span>
+<span id="cb2-231"><a href="#cb2-231" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> p <span class="op">+</span> torch.randn(p.shape, generator<span class="op">=</span>g) <span class="op">*</span> <span class="va">self</span>.jitter</span>
+<span id="cb2-232"><a href="#cb2-232" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> p.clamp(lo, hi)</span>
+<span id="cb2-233"><a href="#cb2-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-234"><a href="#cb2-234" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A FIBRE THAT CROSSES THE CAVITY IS PULLED OUT OF IT. Seeding by centres alone leaves</span></span>
+<span id="cb2-235"><a href="#cb2-235" aria-hidden="true" tabindex="-1"></a>        <span class="co"># particles inside the cavity whenever a fibre straddles the boundary -- and a single</span></span>
+<span id="cb2-236"><a href="#cb2-236" aria-hidden="true" tabindex="-1"></a>        <span class="co"># matrix particle sitting where the cell ball is about to be is not a small error: it is</span></span>
+<span id="cb2-237"><a href="#cb2-237" aria-hidden="true" tabindex="-1"></a>        <span class="co"># in contact from frame 0, so "the moment of first contact", which is the one event this</span></span>
+<span id="cb2-238"><a href="#cb2-238" aria-hidden="true" tabindex="-1"></a>        <span class="co"># experiment exists to observe, would be frame 0 for the whole run.</span></span>
+<span id="cb2-239"><a href="#cb2-239" aria-hidden="true" tabindex="-1"></a>        <span class="co"># INTO THE SLAB FIRST, THEN OUT OF THE CAVITY. A particle beyond a plate has to come back</span></span>
+<span id="cb2-240"><a href="#cb2-240" aria-hidden="true" tabindex="-1"></a>        <span class="co"># along the plate normal; a particle in the cavity has to go out through its rim. Doing the</span></span>
+<span id="cb2-241"><a href="#cb2-241" aria-hidden="true" tabindex="-1"></a>        <span class="co"># cavity push first and clamping afterwards can drop a particle straight back into the cavity.</span></span>
+<span id="cb2-242"><a href="#cb2-242" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.plate_half <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-243"><a href="#cb2-243" aria-hidden="true" tabindex="-1"></a>            lim <span class="op">=</span> <span class="va">self</span>.plate_half <span class="op">-</span> <span class="va">self</span>.jitter <span class="op">*</span> <span class="dv">2</span></span>
+<span id="cb2-244"><a href="#cb2-244" aria-hidden="true" tabindex="-1"></a>            p[:, <span class="va">self</span>.axis] <span class="op">=</span> (p[:, <span class="va">self</span>.axis] <span class="op">-</span> <span class="va">self</span>.centre[<span class="va">self</span>.axis]).clamp(<span class="op">-</span>lim, lim) <span class="op">\</span></span>
+<span id="cb2-245"><a href="#cb2-245" aria-hidden="true" tabindex="-1"></a>                <span class="op">+</span> <span class="va">self</span>.centre[<span class="va">self</span>.axis]</span>
+<span id="cb2-246"><a href="#cb2-246" aria-hidden="true" tabindex="-1"></a>        inside <span class="op">=</span> <span class="op">~</span><span class="va">self</span>._outside_cavity(p.to(dev)).cpu()</span>
+<span id="cb2-247"><a href="#cb2-247" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> inside.<span class="bu">any</span>():</span>
+<span id="cb2-248"><a href="#cb2-248" aria-hidden="true" tabindex="-1"></a>            c <span class="op">=</span> torch.tensor(<span class="va">self</span>.centre, dtype<span class="op">=</span>p.dtype)</span>
+<span id="cb2-249"><a href="#cb2-249" aria-hidden="true" tabindex="-1"></a>            v <span class="op">=</span> p[inside] <span class="op">-</span> c</span>
+<span id="cb2-250"><a href="#cb2-250" aria-hidden="true" tabindex="-1"></a>            rad <span class="op">=</span> v.clone()<span class="op">;</span> rad[:, <span class="va">self</span>.axis] <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb2-251"><a href="#cb2-251" aria-hidden="true" tabindex="-1"></a>            rn <span class="op">=</span> rad.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp_min(<span class="fl">1e-9</span>)</span>
+<span id="cb2-252"><a href="#cb2-252" aria-hidden="true" tabindex="-1"></a>            push <span class="op">=</span> torch.zeros_like(v)</span>
+<span id="cb2-253"><a href="#cb2-253" aria-hidden="true" tabindex="-1"></a>            push <span class="op">+=</span> rad <span class="op">/</span> rn <span class="op">*</span> (<span class="va">self</span>.cavity_r <span class="op">+</span> <span class="va">self</span>.jitter <span class="op">*</span> <span class="dv">2</span>)        <span class="co"># out through the rim</span></span>
+<span id="cb2-254"><a href="#cb2-254" aria-hidden="true" tabindex="-1"></a>            push[:, <span class="va">self</span>.axis] <span class="op">=</span> torch.sign(v[:, <span class="va">self</span>.axis]) <span class="op">*</span> (<span class="va">self</span>.cavity_h <span class="op">+</span> <span class="va">self</span>.jitter <span class="op">*</span> <span class="dv">2</span>)</span>
+<span id="cb2-255"><a href="#cb2-255" aria-hidden="true" tabindex="-1"></a>            p[inside] <span class="op">=</span> (c <span class="op">+</span> push).clamp(lo, hi)</span>
+<span id="cb2-256"><a href="#cb2-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-257"><a href="#cb2-257" aria-hidden="true" tabindex="-1"></a>        <span class="co"># WRITTEN THROUGH THE VIEW. `Level.get` returns a slice of the state matrix, so an</span></span>
+<span id="cb2-258"><a href="#cb2-258" aria-hidden="true" tabindex="-1"></a>        <span class="co"># in-place assignment IS the write; there is no setter, and `lvl.set(...)` does not exist.</span></span>
+<span id="cb2-259"><a href="#cb2-259" aria-hidden="true" tabindex="-1"></a>        lvl.get(<span class="st">"pos"</span>)[:] <span class="op">=</span> p.to(dev, dt_)</span>
+<span id="cb2-260"><a href="#cb2-260" aria-hidden="true" tabindex="-1"></a>        <span class="co"># THE FIBRE DIRECTIONS LIVE ON THE OPERATOR, not in the state matrix: the schema is fixed</span></span>
+<span id="cb2-261"><a href="#cb2-261" aria-hidden="true" tabindex="-1"></a>        <span class="co"># at construction and has no `fibre` block. Keeping them here means an anisotropic term</span></span>
+<span id="cb2-262"><a href="#cb2-262" aria-hidden="true" tabindex="-1"></a>        <span class="co"># can read them without a schema migration, and means they cannot be silently zeroed by</span></span>
+<span id="cb2-263"><a href="#cb2-263" aria-hidden="true" tabindex="-1"></a>        <span class="co"># something that rewrites state.</span></span>
+<span id="cb2-264"><a href="#cb2-264" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.fibre <span class="op">=</span> f.to(dev, dt_)</span>
+<span id="cb2-265"><a href="#cb2-265" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._done <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb2-266"><a href="#cb2-266" aria-hidden="true" tabindex="-1"></a>        n_in <span class="op">=</span> <span class="bu">int</span>((<span class="op">~</span><span class="va">self</span>._outside_cavity(lvl.get(<span class="st">"pos"</span>))).<span class="bu">sum</span>())</span>
+<span id="cb2-267"><a href="#cb2-267" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"[ecm_seed] </span><span class="sc">{</span>n<span class="sc">}</span><span class="ss"> particles on </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>n_fibres<span class="sc">}</span><span class="ss"> fibres; cavity r=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cavity_r<span class="sc">}</span><span class="ss"> "</span></span>
+<span id="cb2-268"><a href="#cb2-268" aria-hidden="true" tabindex="-1"></a>              <span class="ss">f"h=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>cavity_h<span class="sc">}</span><span class="ss"> about axis </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>axis<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb2-269"><a href="#cb2-269" aria-hidden="true" tabindex="-1"></a>              <span class="op">+</span> (<span class="st">""</span> <span class="cf">if</span> <span class="va">self</span>.plate_half <span class="kw">is</span> <span class="va">None</span></span>
+<span id="cb2-270"><a href="#cb2-270" aria-hidden="true" tabindex="-1"></a>                 <span class="cf">else</span> <span class="ss">f"; solid blocks beyond +/-</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>plate_half<span class="sc">:.3f}</span><span class="ss"> "</span></span>
+<span id="cb2-271"><a href="#cb2-271" aria-hidden="true" tabindex="-1"></a>                      <span class="ss">f"(</span><span class="sc">{</span><span class="dv">100</span> <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> <span class="dv">2</span> <span class="op">*</span> <span class="va">self</span>.plate_half)<span class="sc">:.0f}</span><span class="ss">% of the box)"</span>)</span>
+<span id="cb2-272"><a href="#cb2-272" aria-hidden="true" tabindex="-1"></a>              <span class="op">+</span> (<span class="st">""</span> <span class="cf">if</span> <span class="va">self</span>.dense_cone <span class="op">&lt;=</span> <span class="dv">0</span> <span class="kw">or</span> <span class="va">self</span>.dense_boost <span class="op">==</span> <span class="fl">1.0</span></span>
+<span id="cb2-273"><a href="#cb2-273" aria-hidden="true" tabindex="-1"></a>                 <span class="cf">else</span> <span class="ss">f"; density x</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>dense_boost<span class="sc">:g}</span><span class="ss"> within </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>dense_cone<span class="sc">:g}</span><span class="ss"> deg of axis "</span></span>
+<span id="cb2-274"><a href="#cb2-274" aria-hidden="true" tabindex="-1"></a>                      <span class="ss">f"</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>dense_axis<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb2-275"><a href="#cb2-275" aria-hidden="true" tabindex="-1"></a>              <span class="op">+</span> <span class="ss">f"; </span><span class="sc">{</span>n_in<span class="sc">}</span><span class="ss"> left inside the cavity or a block"</span>, flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-276"><a href="#cb2-276" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+
+</section>
+
+</main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) are click-to-fullscreen */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: #000; z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { width: 100%; height: 100%; max-width: 100vw; max-height: 100vh;
+  object-fit: contain; background: #000; cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .75; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+  function requestFS() {
+    try {
+      if (ov.requestFullscreen) return ov.requestFullscreen();
+      if (ov.webkitRequestFullscreen) return ov.webkitRequestFullscreen();
+      if (vv.webkitEnterFullscreen) return vv.webkitEnterFullscreen();   // iOS Safari: video only
+    } catch (e) {}
+  }
+  function exitFS() {
+    try { if (fsElement()) (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document); }
+    catch (e) {}
+  }
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+    var r = requestFS(); if (r && r.catch) r.catch(function () {});   // expand to full screen on the click gesture
+  }
+  function close() {
+    exitFS();
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc || (v.querySelector('source') && v.querySelector('source').src) || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov.classList.contains('open')) close(); });
+  function onFsChange() { if (!fsElement() && ov.classList.contains('open')) close(); }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  vv.addEventListener('webkitendfullscreen', function () { if (ov.classList.contains('open')) close(); }); // iOS exit
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Cedric Allier · Janelia Research Campus · 2026</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

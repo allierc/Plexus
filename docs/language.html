@@ -471,7 +471,7 @@ window.Quarto = {
 <p><img src="figures/fig_hier.png" class="img-fluid quarto-figure quarto-figure-center figure-img" style="width:70.0%"></p>
 </figure>
 </div>
-<p>Operators can act within a level or across levels. Within a cell, for example, operators may couple receptors → signalling proteins → cytoskeleton. Across the containment map, <strong>Aggregate ↑</strong> builds parent state from children — a cell position from its particles, or a neuron input from its synapses — while <strong>broadcast ↓</strong> propagates parent state to children — a material property to every particle owned by a cell, or a constraint imposed by the parent.</p>
+<p>Operators can act within a level or across levels. Within a cell, for example, operators may couple receptors → signalling proteins → cytoskeleton. Across the containment map, <strong>aggregate ↑</strong> builds parent state from children — a cell position from its particles, or a neuron input from its synapses — while <strong>broadcast ↓</strong> propagates parent state to children — a material property to every particle owned by a cell, or a constraint imposed by the parent.</p>
 <p>Fields are level-specific too. <strong>Exchange</strong> couples a set to a field at the appropriate level, allowing a protein concentration field, a cellular morphogen field and a tissue mechanical grid to coexist as distinct objects.</p>
 <p>The consequence is that proteins → cells → tissues is not a pipeline of separate simulators. It is one compositional graph: multiple sets may coexist inside each parent, operators connect them locally, and aggregate/broadcast connect the levels. The same operator kinds are reused throughout; adding another biological scale requires no new engine.</p>
 </section>
