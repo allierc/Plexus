@@ -51,7 +51,7 @@ import math
 
 import torch
 
-from plexus.models.base import Aggregate, Seed
+from plexus.models.base import Aggregate, Lateral, Seed
 from plexus.models.registry import register_entity, register_operator
 from plexus.models.state import spatial_schema
 
@@ -888,3 +888,121 @@ class AggregateCentroid(Aggregate):
             old = parent.state[:, px0:px1]
             parent.state[:, px0:px1] = torch.where(den[:, None] > 0, centroid, old)
         return {}
+
+
+# --------------------------------------------------------------------------- signalling
+#
+# TWO GENERIC OPERATORS ON A NAMED STATE BLOCK. Neither mentions a mitochondrion, and that is the
+# point: what they need is a set with a scalar block and a relation over it, which is a shape many
+# biological objects have. They exist because the alternative -- `cell_chem_diffuse` -- is welded
+# to a two-species `chem` block (`N_SPECIES = 2`) and to the cell adjacency of a vertex mesh, so
+# there was no way to diffuse ONE scalar over an ordinary `edge_index`.
+@register_operator("seed_state_random", family="seed", set="compartment", kind="seed")
+class SeedStateRandom(Seed):
+    """Fill a named state block with U(lo, hi), once, at x_0.
+
+    set -> set: writes `block`, reads nothing.
+
+    An initial condition with no structure is still an initial condition, and it has to be an
+    operator rather than a `sets:` key for the reason `seed:` exists at all: `build` seeds
+    POSITIONS from declarative placement rules, and every other block starts at zero. A network
+    of identical zeros has no dynamics to show, so the first thing any relaxation on a graph
+    needs is something to relax from.
+
+    Reference: none -- an initial condition, not a mechanism. Plexus (this work).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["block"]
+    MECHANISM_TAGS = ["initial_condition", "random_state"]
+    PARAM_ROLES = {"block": "state_block", "lo": "lower_bound", "hi": "upper_bound"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "compartment")
+        self.block = str(params["block"])
+        self.lo = float(params.get("lo", 0.0))
+        self.hi = float(params.get("hi", 1.0))
+        self.seed = int(params.get("seed", 0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        if self.block not in lvl.state_schema:
+            raise ValueError(
+                f"seed_state_random: {lvl.name!r} has no state block {self.block!r} "
+                f"(has: {', '.join(b.name for b in lvl.state_schema.blocks)}). Declare it under "
+                f"`sets.{lvl.name}.state:`.")
+        b0, b1 = lvl.state_schema[self.block]
+        g = torch.Generator(device="cpu").manual_seed(self.seed)
+        v = torch.rand(lvl.n, b1 - b0, generator=g) * (self.hi - self.lo) + self.lo
+        lvl.state[:, b0:b1] = v.to(lvl.state.device)
+        print(f"[seed_state_random] {lvl.name}.{self.block} ~ U({self.lo:g}, {self.hi:g}) "
+              f"over {lvl.n:,} elements", flush=True)
+        return {}
+
+
+@register_operator("state_diffuse", family="signalling", set="compartment", kind="lateral")
+class StateDiffuse(Lateral):
+    """Diffusion of a scalar along a set's own relation -- the graph Laplacian, nothing more.
+
+    set -[edge_index]-> set: reads `block` and the relation, emits d(block)/dt.
+
+        dv_i/dt = D sum_{j ~ i} (v_j - v_i) / deg(i)      normalise: true (the default)
+        dv_i/dt = D sum_{j ~ i} (v_j - v_i)               normalise: false
+
+    v is the value of `block` at element i, the sum runs over its neighbours in `edge_index`, and
+    D is a rate in inverse time -- the graph carries no length, so there is no length in the
+    coefficient either. Dividing by the degree gives the NORMALISED Laplacian, whose eigenvalues
+    lie in [-2, 0], so an explicit step is stable at any degree; without it an element that
+    acquires many neighbours can overshoot in one tick, which on a relation rebuilt every frame by
+    proximity is a thing that actually happens.
+
+    THE RELATION IS NOT THIS OPERATOR'S BUSINESS. It reads whatever `edge_index` the set carries,
+    so what the neighbours ARE is decided by the rewire scheduled before it: `radius_graph` makes
+    them "everything within r", and a different rewire would make them something else without this
+    operator changing. That separation is why the mechanism and the relation are two operators.
+
+    Returns its delta under an explicit `(set, block)` key rather than relying on `INTEGRAND`,
+    because the block is a PARAMETER here -- one class serving any scalar -- and `INTEGRAND` is
+    read off the class by the integration-order check.
+
+    Reference: Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86 (diffusion); Chung, F.
+    (1997). Spectral Graph Theory (the normalised Laplacian).
+    """
+    EMIT = "velocity"
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["block", "D"]
+    INPUTS = ["set"]; OUTPUTS = ["set"]; READS = ["block"]; WRITES = ["block"]
+    MECHANISM_TAGS = ["diffusion", "graph_laplacian", "signalling"]
+    PARAM_ROLES = {"block": "state_block", "D": "diffusion_rate",
+                   "normalise": "degree_normalised"}
+    REFERENCE = ("Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; "
+                 "Chung, F. (1997). Spectral Graph Theory.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "compartment")
+        self.block = str(params["block"])
+        self.D = float(params["D"])
+        self.norm = bool(params.get("normalise", True))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        ei = getattr(lvl, "edge_index", None)
+        b0, b1 = lvl.state_schema[self.block]
+        v = lvl.state[:, b0:b1]
+        if ei is None or ei.numel() == 0:
+            return {(lvl.name, self.block): torch.zeros_like(v)}
+        i, j = ei[0], ei[1]                                  # row 0 receives, row 1 sends
+        occ = lvl.occ if getattr(lvl, "occ", None) is not None else torch.ones_like(v[:, 0])
+        live = (occ[i] > 0) & (occ[j] > 0)
+        i, j = i[live], j[live]
+        d = torch.zeros_like(v)
+        d.index_add_(0, i, v[j] - v[i])
+        if self.norm:
+            deg = torch.zeros(lvl.n, device=v.device, dtype=v.dtype)
+            deg.index_add_(0, i, torch.ones_like(i, dtype=v.dtype))
+            d = d / deg.clamp_min(1.0)[:, None]
+        return {(lvl.name, self.block): self.D * d}

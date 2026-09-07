@@ -36,6 +36,33 @@ import torch
 
 FLAT = dict(render_points_as_spheres=True, lighting=False, ambient=1.0, diffuse=0.0, specular=0.0)
 _CS_AXIS = {"x": 0, "y": 1, "z": 2}
+
+# THE GREEK LETTER, AND ONE FORMATTER FOR EVERY LENGTH THE OVERLAY PRINTS. The header and the
+# scale bar each had their own, so a frame could carry `dx 0.000625 mm` above a bar reading
+# `25 um` -- two units, two conventions and an ASCII stand-in for micro, for two numbers that are
+# the same kind of thing. VTK's text renderer takes the real character.
+def _si_length(metres: float) -> str:
+    """`metres` as a value and an SI prefix, chosen so the number always reads AS A NUMBER.
+
+    `%g` was the obvious formatter and it is the wrong one: at two significant figures 160 um
+    comes out `1.6e+02 um`, an exponent on an overlay that is read at a glance. The prefix is
+    picked so the value lands in [1, 1000) and the decimals follow its magnitude, so nothing ever
+    renders in scientific notation and a trailing zero never survives.
+
+    No centimetres: for a scene spanning micrometres, `200 cm` for 2 m is a worse answer than `2 m`.
+    """
+    unit, v = "m", metres
+    for scale, u in ((1e-6, "\u00b5m"), (1e-3, "mm"), (1.0, "m"), (1e3, "km")):
+        unit, v = u, metres / scale
+        if v < 1000.0:
+            break
+    dec = 0 if v >= 100 else 1 if v >= 10 else 2 if v >= 1 else 3
+    t = f"{v:.{dec}f}"
+    # ONLY STRIP INSIDE A DECIMAL. `"160".rstrip("0")` is `"16"` -- the guard is not pedantry,
+    # it silently turned a 160 um box into a 16 um one on the overlay.
+    if "." in t:
+        t = t.rstrip("0").rstrip(".")
+    return f"{t} {unit}"
 # EVERY `plotting.color_field` THE RENDERER KNOWS. Named in one place so the check that
 # refuses an unknown one can quote the list, the way `plotting.renderer` already does.
 _FIELDS = ("vorticity", "speed", "pressure", "deformation", "strain", "volume")
@@ -101,6 +128,12 @@ class LiveMovie:
         offscreen()                                   # kill the Xlib chatter before VTK loads
         import pyvista as pv
         pv.OFF_SCREEN = True
+        # AN ACTOR THAT STARTS EMPTY IS NOT AN ERROR HERE. The graph overlay creates its line
+        # meshes up front and fills them only in the closing frames, and pyvista refuses to add a
+        # mesh with zero points -- which took the whole movie down at frame 0 rather than the one
+        # actor. The alternative, adding the actors lazily mid-run, is worse: it changes the
+        # renderer's actor list partway through a clip.
+        pv.global_theme.allow_empty_mesh = True
 
         self.pv = pv
         self.sim, self.style = sim, dict(style or {})
@@ -146,7 +179,9 @@ class LiveMovie:
             self.cs_only = bool(_cs.get("only", False))
             self.cs_cfg = _cs
         self.px_used = None
-        self._rate_of = "compute"       # `replay` sets "render": see below
+        self._curve_labels = []         # one on-panel value readout per declared curve
+        self._rate_of = "compute"       # `replay` sets "render" or "compute": see below
+        self._fixed_ms = None           # replay: the run's own median ms/tick, from the trajectory
         self.up = int(up)
         # (reset to 1 for 2D below, once the world tells us the run is planar)
         self.stride = max(1, int(np.ceil(self.n_frames / max(1, int(max_frames)))))
@@ -195,14 +230,18 @@ class LiveMovie:
                     if isinstance(fc, dict) and "n_grid" in fc), None)
         if _ng:
             _d = len(world) if world is not None else 3
-            _cells = _ng ** _d
-            _c = (f"{_cells / 1e6:.1f}M" if _cells >= 1e6 else f"{_cells / 1e3:.0f}k")
-            self._grid_label = (f"   grid {_ng}^{_d} = {_c} cells")
-            if length_um:                       # with units, the cell has a SIZE worth quoting
+            # NO CELL COUNT. The MPM background grid is made of "cells" and so is the biology, and
+            # a header reading "4.1M cells" over a picture of six of them is a collision of two
+            # meanings in the one place a reader looks first. The RESOLUTION is what the number was
+            # for, and `grid 160^3` already says it.
+            self._grid_label = f"   grid {_ng}^{_d}"
+            if length_um:                       # with units, the spacing has a SIZE worth quoting
                 _dx = float(world[1] if len(world) > 1 else world[0]) / _ng \
                     * float(length_um) / 1.0e6
-                self._grid_label += (f", dx {_dx * 1e3:.3g} mm" if _dx < 1.0
-                                     else f", dx {_dx:.3g} m")
+                # IN THE SAME UNIT THE SCALE BAR PICKS, and at two significant figures. `dx
+                # 0.000625 mm` is the same length as `0.62 um` written to be unreadable, and it
+                # disagreed with a scale bar standing right below it saying `25 um`.
+                self._grid_label += f", dx {_si_length(_dx)}"
         self._box_label = ""
         if length_um and time_s is not None:
             _m = float(length_um) / 1.0e6
@@ -211,10 +250,10 @@ class LiveMovie:
             # digits of a number the reader is being given for scale, where the point is the order
             # of magnitude and the leading figure. (The scale BAR is a chosen round number and is
             # exact; this is a measurement and is rounded.)
-            _f = (lambda v: f"{v * 1e3:.3g} mm" if v < 0.01 else f"{v * 100:.3g} cm"
-                  if v < 1.0 else f"{v:.3g} m" if v < 1000.0 else f"{v / 1000:.3g} km")
-            self._box_label = ("   box " + " x ".join(_f(v) for v in _w)
-                               if len(set(_w)) > 1 else f"   box {_f(_w[0])} cube")
+            # ONE FORMATTER FOR EVERY LENGTH ON THE OVERLAY. The box had its own ladder,
+            # so a 160 um scene was announced as "0.16 mm cube" above a bar reading "25 um".
+            self._box_label = ("   box " + " x ".join(_si_length(v) for v in _w)
+                               if len(set(_w)) > 1 else f"   box {_si_length(_w[0])} cube")
         self.speed = None
         self.fps = float(fps)          # the declared rate; both branches below refine it
         # SLOW MOTION APPLIES EITHER WAY. It lived entirely inside the real-time branch, so a spec
@@ -288,6 +327,8 @@ class LiveMovie:
         # so a run still finished, still wrote its trajectory, and silently had no movie.
         self._skin = self._surf = self._skin_sub = None
         self._skins = []                      # `render_3d: compartments`: one bound surface per type
+        self._graphs = []                     # `plotting.graph_overlay`: a relation drawn as lines
+        self._graph_ticks = {}
         self._meshes = []
         self._mesh_is_subject = False
         self._curves = []
@@ -462,7 +503,10 @@ class LiveMovie:
                 # The bar sat exactly on `lo[up]`, which is the bottom edge of the wireframe box,
                 # so at any camera elevation it renders within a few pixels of the frame's lower
                 # border and its label can fall off it. 0 is the old position.
-                _corner = str((self.style or {}).get("scale_bar_corner", "left")).lower()
+                # THE RIGHT FACE BY DEFAULT. On the bottom-left edge the bar lies along the
+                # box's near-bottom rail, where it is foreshortened by the camera and its label
+                # competes with the player's own chrome; on the right face it stands clear of both.
+                _corner = str((self.style or {}).get("scale_bar_corner", "right_face")).lower()
                 if _corner == "right_face":
                     _run, _off = _other, _ax0            # along the other horizontal, on the far face
                     _a[_run] = float(self.hi[_run]) - _len; _b[_run] = float(self.hi[_run])
@@ -477,19 +521,27 @@ class LiveMovie:
                 _lift = float((self.style or {}).get("scale_bar_lift", 0.0)) * float(span[self.up])
                 _a[self.up] = _b[self.up] = float(self.lo[self.up]) + _lift
                 self.p.add_mesh(pv.Line(_a, _b), color="white", line_width=4.0, lighting=False)
-                _v = _len_m
-                _lab = (f"{_v * 1e6:g} um" if _v < 1e-4 else f"{_v * 1e3:g} mm" if _v < 0.01
-                        else f"{_v * 100:g} cm" if _v < 1.0
-                        else f"{_v:g} m" if _v < 1000.0 else f"{_v / 1000:g} km")
-                _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.05 * float(span[self.up])  # noqa
+                _lab = _si_length(_len_m)
+                _mid = 0.5 * (_a + _b); _mid[self.up] -= 0.09 * float(span[self.up])  # noqa
                 # TWICE THE HEADER'S NUMBER TO GET THE SAME HEIGHT. `add_text` and
                 # `add_point_labels` do not interpret `font_size` the same way -- both set to 11 and
-                # the label renders about half the cap height of the top-left print. 22 matches it,
-                # and at that size the label spans roughly two thirds of the bar, which is what
-                # makes the two read as one annotation.
-                self.p.add_point_labels([_mid], [_lab], font_size=22, text_color="white",
-                                        shape=None, show_points=False, always_visible=True,
-                                        justification_horizontal="center")
+                # the label renders about half the cap height of the top-left print. 22 matches it;
+                # 26 is that, a little larger, because this label is read at a glance from across a
+                # frame while the header is read once.
+                #
+                # BELOW THE LINE, NOT CENTRED ON A POINT UNDER IT. `add_point_labels` anchors text
+                # at its MIDDLE, so a label placed a few percent of the span beneath the bar still
+                # crosses it once the camera tilts the bar in perspective -- which it does in every
+                # one of these scenes. `justification_vertical="top"` hangs the text from its top
+                # edge, so the gap is a gap at any camera angle instead of at one.
+                #
+                # NOT BOLD. pyvista defaults `bold=True` here and nowhere else in this renderer;
+                # the header, the axes and the curve readouts are all regular weight, and one bold
+                # annotation in a frame reads as emphasis rather than as a unit.
+                self.p.add_point_labels([_mid], [_lab], font_size=26, text_color="white",
+                                        bold=False, shape=None, show_points=False,
+                                        always_visible=True, justification_horizontal="center",
+                                        justification_vertical="top")
             # AIMED AT THE SCENE, NOT AT [0, world]. `0.5 * span` is the middle of the world box,
             # which is where the content is only when a wall puts it there. With `boundary: free`
             # nothing does: the okuda vesicle is built about the ORIGIN, so the camera looked at
@@ -832,12 +884,14 @@ class LiveMovie:
                 self._edge_actor(H, _l, _m, first=True)
                 break
             self._curves_setup(H, lvl)
+            self._graph_setup(H)
             self.t0 = time.perf_counter()
             return
         if tick % self.stride:
             return
         self.cloud.points = self._xyz(lvl)
         self._skin_update(H, lvl, self.cloud.points)
+        self._graph_update(H, tick)
         self._update_meshes(H)
         self._curves_update(tick)
         # A FIELD COLOUR IS A PROPERTY OF NOW, so unlike the body hue it is recomputed each frame.
@@ -867,10 +921,13 @@ class LiveMovie:
             # `colour_by` ALREADY CARRIES THE RANGE AND THE MAP -- `_rgb_field` builds it as
             # "<label> <range> (<cmap>)" -- so appending them here printed each of them twice.
             _lut = f"\ncolour = {self.colour_by}"
+        # `nodes`, NOT `particles`. What is drawn is the members of a SET -- vertices of a mesh,
+        # cells, neurons -- and only one substrate in this tree calls them particles.
         self.p.add_text(f"{self.name}{self._box_label}\n"
-                        f"{self.n:,} particles{sub}{self._grid_label}\n"
+                        f"{self.n:,} nodes{sub}{self._grid_label}\n"
                         f"frame {tick}/{self.n_frames}   "
-                        f"{el / max(tick, 1) * 1000:.0f} ms/frame {self._rate_of}{clk}{_lut}",
+                        f"{(self._fixed_ms if self._fixed_ms is not None else el / max(tick, 1) * 1000):.0f}"
+                        f" ms/frame {self._rate_of}{clk}{_lut}",
                         position="upper_left", font_size=11, color="white", name="hdr")
         if self.cs is not None:
             self._update_cross_section(H)
@@ -1137,7 +1194,19 @@ class LiveMovie:
             ch.x_axis.range = [0.0, float(S.shape[0] - 1)]
             ch.y_axis.range = [float(cfg.get("ymin", lo - pad)), float(cfg.get("ymax", hi + pad))]
             ch.x_axis.label = str(cfg.get("xlabel", "frame"))
-            ch.y_axis.label = str(cfg.get("ylabel", q))
+            # UNITS ON THE Y AXIS, DERIVED FROM THE DECLARED SCALE AND NOT TYPED IN.
+            # `general.units: length_um` is the one thing that turns a length in this model into a
+            # length in the world, so a panel may say um, um^2 or um^3 exactly when that key is
+            # present -- and must say nothing when it is absent, because an undeclared run is
+            # dimensionless and a unit on it would be a claim the spec did not make. A count and a
+            # percentage carry no length unit either way.
+            # THE REAL CHARACTERS. VTK's text renderer takes them, so `um^3` -- an ASCII
+            # transliteration of micro and a caret standing in for an exponent -- was a choice, not
+            # a limitation, and it sat two lines under a scale bar already saying `\u00b5m`.
+            _u = ({"volume": "\u00b5m\u00b3", "area": "\u00b5m\u00b2", "radius": "\u00b5m"}.get(q)
+                  if getattr(self, "length_um", None) else None)
+            _u = {"phase": "%"}.get(q, _u)
+            ch.y_axis.label = str(cfg.get("ylabel", q)) + (f"  ({_u})" if _u else "")
             # TWO SIZES, NOT ONE MINUS TWO. The axis TITLE ("cells", "frame") and the TICK NUMBERS
             # are read at different distances -- the title once, the ticks repeatedly while
             # following a line -- so they get their own keys instead of one being derived from the
@@ -1219,6 +1288,19 @@ class LiveMovie:
                 bands.append(ch.area([0.0, 0.0], [0.0, 0.0], [0.0, 0.0], color=(*c, 0.28)))
                 lines.append(ch.line([0.0, 0.0], [0.0, 0.0], color=(*c, 1.0), width=2.0))
             self.p.add_chart(ch)
+            # WHERE THE VALUE READOUT GOES, from the same `loc` and `size` the chart got rather than
+            # a second guess at them -- see `_curves_update` for what it prints.
+            _loc = tuple(cfg.get("loc", (1.0 - self._curve_col + 0.005,
+                                         0.71 - _i * (_sz[1] + 0.05))))
+            # THE READOUT SITS OVER THE PLOT AREA, NOT OVER THE AXIS LABEL. `+ 0.010` put it hard
+            # against the panel's left edge, above the y-axis title rather than above the curve it
+            # reports; `+ 0.055` centres it on the data. `fs` is the HEADER's size, because the two
+            # are the same kind of statement -- a number the reader is meant to take away -- and
+            # the tick size made this one look like an axis annotation.
+            self._curve_labels.append(dict(name=f"curveval{_i}", q=q, unit=_u,
+                                           x=float(_loc[0]) + 0.055,
+                                           y=float(_loc[1]) + float(_sz[1]) + 0.004,
+                                           fs=int(cfg.get("value_font_size", 11))))
             self._curves.append({"S": S, "bands": bands, "lines": lines, "nt": nt,
                                  "sd": bool(cfg.get("sd", q not in ("cells", "phase")))})
             print(f"[live-movie] curve {q}: {S.shape[0]} frames, {nt} "
@@ -1227,7 +1309,7 @@ class LiveMovie:
 
     def _curves_update(self, tick):
         """Reveal each series up to the current RECORDED row -- the band is mean-SD .. mean+SD."""
-        for cv in getattr(self, "_curves", []) or []:
+        for i, cv in enumerate(getattr(self, "_curves", []) or []):
             S = cv["S"]
             t = min(int(tick), S.shape[0] - 1)
             if t < 1:
@@ -1241,6 +1323,25 @@ class LiveMovie:
                 if cv["sd"]:
                     cv["bands"][j].update(x[ok], (mu - sd)[ok], (mu + sd)[ok])
                 cv["lines"][j].update(x[ok], mu[ok])
+            # THE NUMBER, ON THE PANEL. A curve gives the shape and leaves the reader squinting at
+            # an axis for the value, which is the one thing a frame of a movie should hand over
+            # directly. `cells` is a count and prints as an integer; a distribution prints as
+            # `mean +- SD` to one decimal, because a second decimal on a quantity whose SD is shown
+            # beside it is precision the picture does not have.
+            lab = (self._curve_labels[i] if i < len(getattr(self, "_curve_labels", []) or [])
+                   else None)
+            if lab is not None:
+                m0, s0 = S[t, :, 0], S[t, :, 1]
+                if lab["q"] == "cells":
+                    txt = f"{np.nansum(m0):,.0f}"
+                elif lab["q"] == "phase":
+                    txt = "  ".join(f"{v:.0f}" for v in m0) + " %"
+                else:
+                    txt = f"{np.nanmean(m0):.1f} \u00b1 {np.nanmean(s0):.1f}"
+                    if lab["unit"]:
+                        txt += f" {lab['unit']}"
+                self.p.add_text(txt, position=(lab["x"], lab["y"]), viewport=True,
+                                font_size=lab["fs"], color="white", name=lab["name"])
 
     # ---- the cloud AS a surface -----------------------------------------------------------
     #
@@ -1403,23 +1504,37 @@ class LiveMovie:
         try:
             import numpy as np
             st = self.style or {}
-            pname = getattr(lvl, "parent_name", None)
-            own = getattr(lvl, "node_type", None)
-            par = getattr(lvl, "parent", None)
-            if own is not None:
-                names = list(getattr(lvl, "type_names", []) or [])
-                tid = own[self.idx].detach().cpu().numpy()
-            elif pname and par is not None:
-                plv = H.level(pname)
-                names = list(getattr(plv, "type_names", []) or [])
-                pnt = getattr(plv, "node_type", None)
-                if pnt is None:
-                    raise ValueError(f"{pname!r} carries no node_type to partition by")
-                tid = pnt.detach().cpu().numpy()[par[self.idx].detach().cpu().numpy()]
+            # A COMPARTMENT MAY BE A SET, NOT A TYPE, and once each organelle owns its own
+            # particle set that is the only reading that works. This renderer draws ONE level --
+            # the largest that carries positions -- so a model split into fifteen node sets came
+            # out as a picture of whichever of them happened to be biggest, with the other
+            # fourteen organelles simply absent and nothing saying so (measured: "compartment
+            # surfaces: 1 of 1 reconstructed", on a cell with fifteen).
+            #
+            # `plotting.compartment_sets` names them, and each group then carries its OWN set
+            # rather than a slice of one. Everything after this branch is shared: the same
+            # isosurface, the same skinning, the same per-compartment material.
+            csets = [n for n in (st.get("compartment_sets") or []) if n in H.levels]
+            if csets:
+                names, tid = csets, None
             else:
-                raise ValueError("no type partition: the set has no types and no typed parent")
-            if not names:
-                raise ValueError("the typed set declares no `types:`, so there are no compartments")
+                pname = getattr(lvl, "parent_name", None)
+                own = getattr(lvl, "node_type", None)
+                par = getattr(lvl, "parent", None)
+                if own is not None:
+                    names = list(getattr(lvl, "type_names", []) or [])
+                    tid = own[self.idx].detach().cpu().numpy()
+                elif pname and par is not None:
+                    plv = H.level(pname)
+                    names = list(getattr(plv, "type_names", []) or [])
+                    pnt = getattr(plv, "node_type", None)
+                    if pnt is None:
+                        raise ValueError(f"{pname!r} carries no node_type to partition by")
+                    tid = pnt.detach().cpu().numpy()[par[self.idx].detach().cpu().numpy()]
+                else:
+                    raise ValueError("no type partition: no types and no typed parent")
+                if not names:
+                    raise ValueError("the typed set declares no `types:`; no compartments")
             from matplotlib.colors import to_rgb
             pal = st.get("colors") or {}
             opa = st.get("opacity") or {}
@@ -1430,7 +1545,12 @@ class LiveMovie:
                                         occlusion_ratio=0.0)
             _per = st.get("surface") or {}
             for j, nm in enumerate(names):
-                sel = np.nonzero(tid == j)[0]
+                if tid is None:                       # a SET per compartment
+                    Xg = np.asarray(H.level(nm).get("pos").detach().cpu().numpy(), np.float64)
+                    sel = np.arange(Xg.shape[0])
+                else:                                  # a TYPE per compartment, sliced out of one
+                    Xg = X
+                    sel = np.nonzero(tid == j)[0]
                 # A COMPARTMENT TOO SPARSE TO CONTOUR IS DRAWN AS DOTS, NOT DROPPED. A 50-point
                 # membrane patch has no density field worth contouring at the grid's dx, and a
                 # missing plasma membrane is a picture of a cell that has none.
@@ -1445,16 +1565,18 @@ class LiveMovie:
                 # is what a thin filament looks like, and it costs no grid at all.
                 if str((_per.get(nm) or {}).get("render", "")).lower() == "dots" \
                         or sel.size < int(st.get("surface_min_points", 400)):
-                    self._skins.append(self._dots_for(X, sel, nm, pal, opa, _dflt_op,
-                                                      (_per.get(nm) or {}).get("point_size")))
+                    self._skins.append(self._dots_for(Xg, sel, nm, pal, opa, _dflt_op,
+                                                      (_per.get(nm) or {}).get("point_size"),
+                                                      set_name=(nm if tid is None else None)))
                     continue
                 step = max(1, sel.size // max(nsub, 1))
                 sub = sel[::step]
-                surf = self._isosurface(X[sel], st, per_compartment=nm)
+                surf = self._isosurface(Xg[sel], st, per_compartment=nm)
                 if surf is None or surf.n_points == 0:
-                    self._skins.append(self._dots_for(X, sel, nm, pal, opa, _dflt_op))
+                    self._skins.append(self._dots_for(Xg, sel, nm, pal, opa, _dflt_op,
+                                                      set_name=(nm if tid is None else None)))
                     continue
-                skin = self.Skin(surf.points, X[sub], k=int(st.get("surface_k", 8)))
+                skin = self.Skin(surf.points, Xg[sub], k=int(st.get("surface_k", 8)))
                 col = to_rgb(tuple(pal[nm])) if nm in pal else (0.8, 0.8, 0.8)
                 # THE MATERIAL, NOT JUST THE ALPHA -- and it is the material that decides whether a
                 # membrane reads as GLASS or as frosted plastic. These four numbers were fixed at
@@ -1496,7 +1618,8 @@ class LiveMovie:
                     except Exception:                            # noqa: BLE001
                         _act.GetProperty().BackfaceCullingOn()
                 self._skins.append({"kind": "surface", "surf": surf, "skin": skin, "sub": sub,
-                                    "name": nm, "n": int(sel.size),
+                                    "name": nm, "n": int(sel.size), "set": (nm if tid is None
+                                                                            else None),
                                     "faces": int(surf.n_faces_strict)})
             _ns = sum(1 for s in self._skins if s and s["kind"] == "surface")
             print(f"[live-movie] compartment surfaces: {_ns} of {len(names)} reconstructed "
@@ -1510,7 +1633,7 @@ class LiveMovie:
                   f"drawing the point cloud instead", flush=True)
             return False
 
-    def _dots_for(self, X, sel, nm, pal, opa, dflt_op, point_size=None):
+    def _dots_for(self, X, sel, nm, pal, opa, dflt_op, point_size=None, set_name=None):
         """A compartment kept as points: its own PolyData, its own hue, its own opacity."""
         import numpy as np
         from matplotlib.colors import to_rgb
@@ -1523,7 +1646,8 @@ class LiveMovie:
         self.p.add_mesh(pd, color=col, opacity=float(opa.get(nm, dflt_op)),
                         render_points_as_spheres=True, point_size=_ps,
                         lighting=False, show_scalar_bar=False)
-        return {"kind": "dots", "surf": pd, "sub": sel, "name": nm, "n": int(sel.size)}
+        return {"kind": "dots", "surf": pd, "sub": sel, "name": nm, "n": int(sel.size),
+                "set": set_name}
 
     def _isosurface(self, X, st, per_compartment=""):
         """The density isosurface of one point cloud -- the same recipe `_skin_build` uses.
@@ -1570,20 +1694,114 @@ class LiveMovie:
         # would draw one of them.
         return surf.smooth_taubin(n_iter=int(st.get("surface_smooth", 20)), pass_band=0.08)
 
-    def _skins_update(self, pos):
+    def _skins_update(self, pos, H=None):
+        """Ride each compartment's surface on the points it was bound to.
+
+        A group whose `set` is None is a slice of the DRAWN level and reads `pos`; a group that
+        names a set reads THAT set's own positions, because with one particle set per organelle
+        there is no single array they all live in.
+        """
         import numpy as np
         X = np.asarray(pos, dtype=np.float64)
         for s in getattr(self, "_skins", None) or []:
             if not s:
                 continue
+            src = X
+            if s.get("set") and H is not None:
+                src = np.asarray(H.level(s["set"]).get("pos").detach().cpu().numpy(), np.float64)
             if s["kind"] == "surface":
-                s["surf"].points = s["skin"](X[s["sub"]]).astype(np.float32)
+                s["surf"].points = s["skin"](src[s["sub"]]).astype(np.float32)
             else:
-                s["surf"].points = np.asarray(X[s["sub"]], np.float32)
+                s["surf"].points = np.asarray(src[s["sub"]], np.float32)
+
+    # ---- the relation, drawn ---------------------------------------------------------------
+    #
+    # `plotting.graph_overlay: {sets: [...]}` draws each named set's `edge_index` as line segments
+    # between the positions of the elements it relates, in that set's own colour.
+    #
+    # IT RUNS AT THE END, AND ONE SET AT A TIME. A relation over a moving body is unreadable while
+    # the body is moving -- and it is not what the movie is about until the movie is over. So the
+    # last len(sets)+1 RENDERED frames are given to it: one frame per relation, then a final frame
+    # with all of them at once. The mechanics is the film; the graphs are the closing statement.
+    #
+    # THE POSITIONS COME FROM THE ORGANELLE SET, NOT FROM THE MATERIAL POINTS, which is only
+    # meaningful because `aggregate_centroid` has been keeping that set's `pos` current -- the
+    # relation is between mitochondria, and a mitochondrion's position is the centroid of the
+    # points it owns. Without that aggregate the overlay would draw a graph over frozen seed
+    # positions and look plausible while being a picture of frame 0.
+    def _graph_setup(self, H):
+        self._graphs = []
+        cfg = (self.style or {}).get("graph_overlay")
+        if not cfg:
+            return
+        cfg = {"sets": list(cfg)} if isinstance(cfg, (list, tuple)) else dict(cfg)
+        names = [n for n in (cfg.get("sets") or []) if n in H.levels]
+        if not names:
+            print("[live-movie] graph_overlay: none of its sets exist in this model", flush=True)
+            return
+        from matplotlib.colors import to_rgb
+        pal = (self.style or {}).get("colors") or {}
+        self._graph_cfg = cfg
+        rendered = list(range(self.stride, self.n_frames + 1, self.stride)) or [self.n_frames]
+        k = len(names) + 1
+        self._graph_ticks = {t: (names[:i + 1] if i < len(names) else names)
+                             for i, t in enumerate(rendered[-k:])}
+        # the LAST rendered tick shows every relation at once
+        self._graph_ticks[rendered[-1]] = names
+        for i, t in enumerate(rendered[-k:-1]):
+            self._graph_ticks[t] = [names[i]]
+        for n in names:
+            c = pal.get(n)
+            col = to_rgb(tuple(c)) if isinstance(c, (list, tuple)) else (0.9, 0.9, 0.9)
+            pd = self.pv.PolyData()
+            act = self.p.add_mesh(pd, color=col, line_width=float(cfg.get("line_width", 1.6)),
+                                  opacity=float(cfg.get("opacity", 0.95)), lighting=False,
+                                  show_scalar_bar=False)
+            act.SetVisibility(False)
+            self._graphs.append({"name": n, "pd": pd, "actor": act})
+        print(f"[live-movie] graph_overlay: {', '.join(names)} -- one per frame over the last "
+              f"{k} rendered frames, all together on the last", flush=True)
+
+    def _graph_update(self, H, tick):
+        gs = getattr(self, "_graphs", None)
+        if not gs:
+            return
+        show = getattr(self, "_graph_ticks", {}).get(tick)
+        if show is None:
+            for g in gs:
+                g["actor"].SetVisibility(False)
+            return
+        import numpy as np
+        cap = int((getattr(self, "_graph_cfg", None) or {}).get("max_edges", 40000))
+        for g in gs:
+            on = g["name"] in show
+            g["actor"].SetVisibility(on)
+            if not on:
+                continue
+            lvl = H.level(g["name"])
+            ei = getattr(lvl, "edge_index", None)
+            if ei is None or ei.numel() == 0:
+                g["actor"].SetVisibility(False)
+                continue
+            e = ei.detach().cpu().numpy()
+            keep = e[0] < e[1]                       # the relation is symmetric: draw each pair once
+            e = e[:, keep]
+            if e.shape[1] > cap:                     # a proximity graph is O(N * density); cap it
+                e = e[:, :: e.shape[1] // cap + 1]
+            P = np.asarray(lvl.get("pos").detach().cpu().numpy(), np.float32)
+            src, dst = e[0], e[1]
+            pts = np.concatenate([P[src], P[dst]], axis=0)
+            m = src.shape[0]
+            lines = np.column_stack([np.full(m, 2, np.int64),
+                                     np.arange(m, dtype=np.int64),
+                                     np.arange(m, 2 * m, dtype=np.int64)]).ravel()
+            g["pd"].points = pts
+            g["pd"].lines = lines
+            g["pd"].Modified()
 
     def _skin_update(self, H, lvl, pos):
         if getattr(self, "_skins", None):
-            self._skins_update(pos)
+            self._skins_update(pos, H)
             return
         if self._skin is None or self._surf is None:
             return
@@ -2627,7 +2845,7 @@ class LiveMovie:
             print(f"[live-movie] wrote nothing ({self.failed or 'no frames rendered'})", flush=True)
             return None
         sub = f", {self.drawn:,} of them drawn" if self.drawn < self.n else ""
-        print(f"[live-movie] {self.out}   {self.n:,} particles{sub}, {self.rendered} frames"
+        print(f"[live-movie] {self.out}   {self.n:,} nodes{sub}, {self.rendered} frames"
               f"{'' if self.stride == 1 else f' (every {self.stride}th)'}, "
               # `px_used` IS None WHENEVER THE DOTS WERE NOT DRAWN -- `render_3d: surface` never
               # calls `_dot_px` -- and `{None:.2f}` raises. It raised in `close()`, i.e. AFTER every
@@ -2998,7 +3216,20 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
                    time_s=(float(u.time_s) if dec else None),
                    length_um=(float(u.length_um) if dec else None),
                    **({"fps": float(fps)} if fps else {}))
-    lm._rate_of = "render"
+    # THE STAMP REPORTS WHAT THE RUN COST, NOT WHAT THE PICTURE COST, when the trajectory carries it.
+    #
+    # `_rate_of` was always "render" here, because a replay can only time itself -- and a figure
+    # labelled `ms/frame` on a movie of a simulation reads as the simulation's speed. `engine.run`
+    # now records one wall-clock reading per simulated tick and the writer stores it, so the number
+    # stamped is the median of THOSE. The median and not the mean: tick 0 builds every run-constant
+    # cache and a `torch.compile` or CUDA-graph capture lands on tick 1, so a mean over a short clip
+    # is dominated by warm-up that no later frame pays.
+    _fms = np.asarray(z["frame_ms"], np.float64) if "frame_ms" in z.files else None
+    if _fms is not None and _fms.size > 2:
+        lm._rate_of = "compute"
+        lm._fixed_ms = float(np.median(_fms[1:]))
+    else:
+        lm._rate_of = "render"
     if style.get("color_field"):
         print("[replay] plotting.color_field needs the per-particle C/F tensors, which a trajectory "
               "does not store -- colouring by type instead. Use the live renderer for a field.",
