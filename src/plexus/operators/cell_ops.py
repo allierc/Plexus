@@ -1642,6 +1642,7 @@ class PolymerizeTips(Structural):
     MAPS = ["parent"]
     MECHANISM_TAGS = ["polymerization", "protrusion", "motility", "cytoskeleton", "growth"]
     PARAM_ROLES = {"rate": "points_per_fibre_per_frame", "compress": "insertion_stretch",
+                   "confine": "barrier_set", "margin": "barrier_standoff",
                    "spacing": "insertion_step_length", "front_only": "leading_edge_restriction",
                    "volume_scale": "network_coarse_graining", "source": "existing_fibre_sets",
                    "cell_set": "polarity_owner", "gate": "phase_gate"}
@@ -1668,6 +1669,16 @@ class PolymerizeTips(Structural):
         # the grid cannot see as connected. Left unset it is read from the set's own p_vol.
         self.spacing = params.get("spacing")
         self.front_only = bool(params.get("front_only", True))
+        # CONFINED BY THE MEMBRANE, or the fibre simply leaves. New material laid beyond a tip that
+        # is already outside the cell extends into empty space, where it meets nothing, pushes
+        # nothing, and deforms nothing: measured, 40 um of bare fibre outside a cell whose body had
+        # not moved. `confine: plasma_membrane_node` stops a fibre once its tip has reached the
+        # membrane's own reach in the growth direction, so the material that is added has to go
+        # where there is already cell -- and an incompressible cytoplasm must then bulge. As the
+        # membrane yields the tip is allowed forward again, which is the tethered-filament picture
+        # (Mogilner & Oster) rather than a beam growing out of a cell.
+        self.confine = params.get("confine")
+        self.margin = float(params.get("margin", 0.005))
         # ONE MATERIAL POINT STANDS FOR MORE VOLUME THAN THE BARE FILAMENT IT GREW FROM, and this
         # says how much more. The atlas's filaments are 0.6 um thick, so the whole cytoskeleton is
         # 0.6% of the cell's volume: doubling it by polymerisation adds 0.6% and the cell does not
@@ -1740,6 +1751,18 @@ class PolymerizeTips(Structural):
             c0 = cl.state_schema["pos"][0]
             ahead = ((tp - cl.state[self._cell_of, c0:c0 + D]) * dP).sum(1)
             grow = grow & (ahead > 0)
+        if self.confine:
+            m = H.level(self.confine)
+            im = H.lift_index(m.name, self.cell_set)
+            Xm = m.get("pos")[:, :D]
+            lm = m.occ > 0
+            c_all = cl.state[:, cl.state_schema["pos"][0]:cl.state_schema["pos"][0] + D]
+            pm = ((Xm - c_all[im]) * n_cell[im]).sum(1)
+            reach = torch.full((cl.n,), torch.finfo(pm.dtype).min, device=Xa.device, dtype=pm.dtype)
+            reach = reach.scatter_reduce(0, im[lm], pm[lm], "amax", include_self=True)
+            p_tip = ((tp - cl.state[self._cell_of, cl.state_schema["pos"][0]:
+                                    cl.state_schema["pos"][0] + D]) * dP).sum(1)
+            grow = grow & (p_tip < reach[self._cell_of] - self.margin)
         k = torch.as_tensor(self.rate, device=Xa.device, dtype=Xa.dtype).expand(nP).clone()
         gt = _gate(self, H, self._cell_of)
         if gt is not None:
