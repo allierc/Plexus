@@ -36,6 +36,7 @@ import os
 import random
 import sys
 
+import numpy as np
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -108,6 +109,10 @@ def scatter(n, r, seed, tries=600000):
             pts.append([round(v, 5) for v in p])
     if len(pts) < n:
         raise RuntimeError(f"placed only {len(pts)}/{n} cells at radius {r}")
+    # ONE CELL HAS NO PAIRS, and `min()` of nothing raises. The separation check is a statement
+    # about a POPULATION; with a single cell there is nothing to separate it from.
+    if len(pts) < 2:
+        return pts, float("inf")
     sep = min((sum((a - b) ** 2 for a, b in zip(p, q))) ** 0.5
               for i, p in enumerate(pts) for q in pts[i + 1:])
     assert sep > 2 * r, f"{n} cells: closest {sep:.4f} < diameter {2 * r:.4f}"
@@ -163,20 +168,32 @@ def build(cells, r, length_um, n_grid, substep_dt, frames, vel, memb_thick, divi
 
     # `wall_damp` IS THE RESTITUTION AT A WALL: 1 is perfectly elastic. 0.35 is what stops a
     # spread cell peeling back off the floor it has just flattened against.
+    # the mean nearest-neighbour distance between CELL CENTRES -- for one cell there is no
+    # such distance, and the cell's own diameter is the only scale there is
+    if len(pts) > 1:
+        cell_pitch = float(np.mean([min((sum((a - b) ** 2 for a, b in zip(p, q))) ** 0.5
+                                        for j, q in enumerate(pts) if j != i)
+                                    for i, p in enumerate(pts)]))
+    else:
+        cell_pitch = 2.0 * r
     grid_up = {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 0.35}
     ops = ([{"op": "gravity", "at": "cell", "g": 1.5}] + strain + scat + [grid_up] + gath + aggr
            + [{"op": "aggregate_centroid", "at": "cell", "child": "plasma_membrane"},
               # THE SIGNALLING GRAPH: a relation rebuilt from proximity each frame, and one
               # mechanism reading it.
               #
-              # THE RADIUS SCALES WITH THE ORGANELLE'S OWN SPACING, NOT WITH THE CELL. Set from the
-              # cell radius it is meaningless: 77 mitochondria sit ~0.27 R apart, so a cutoff of
-              # 1.6 R joins every pair in the cell and several in the next one -- a COMPLETE graph,
-              # which draws as a solid red mass and carries no information at all. 1.35x the mean
-              # spacing gives each element ~8 neighbours, which is a network.
-              {"op": "radius_graph", "at": "mitochondria", "radius": round(0.37 * r, 5)},
-              {"op": "radius_graph", "at": "nuclear_envelope", "radius": round(0.11 * r, 5)},
-              {"op": "radius_graph", "at": "rough_er", "radius": round(0.57 * r, 5)}])
+              # THE RADIUS IS THE CELL-TO-CELL DISTANCE, so the relation reaches BETWEEN cells
+              # rather than only inside one. `cell_pitch` is measured from the placement, not
+              # assumed -- it is the mean nearest-neighbour separation of the cell centres.
+              #
+              # This is a deliberate reversal. An earlier version scaled the cutoff to each
+              # organelle's own spacing, which gives ~8 neighbours and a legible network INSIDE a
+              # cell; at the cell pitch the intra-cell part is near-complete and the interesting
+              # edges are the ones crossing between neighbours. Which is wanted depends on the
+              # question, and the question here is tissue-scale organisation.
+              {"op": "radius_graph", "at": "mitochondria", "radius": round(cell_pitch, 5)},
+              {"op": "radius_graph", "at": "nuclear_envelope", "radius": round(cell_pitch, 5)},
+              {"op": "radius_graph", "at": "rough_er", "radius": round(cell_pitch, 5)}])
     # NO `state_diffuse` HERE, and the reason is a cost rather than a doubt about the mechanism.
     #
     # Integrating the voltage puts `mitochondria` into `H.emit_order`, and `_capture_refusals`
@@ -237,10 +254,13 @@ def build(cells, r, length_um, n_grid, substep_dt, frames, vel, memb_thick, divi
                      # fourteen are silently absent.
                      "compartment_sets": list(surface),
                      "surface": surface, "opacity": opacity, "colors": colors,
-                     # the closing sequence: mitochondria, then nuclei, then ER, then all three
-                     "graph_overlay": {"sets": ["mitochondria", "nuclear_envelope", "rough_er"],
-                                       "line_width": 1.6, "opacity": 0.95,
-                                       "max_edges": 12000}},
+                     # THE GRAPHS ARE NOT IN THE MOVIE. They were drawn over its closing frames,
+                     # which puts a tissue-scale relation on top of a picture whose camera and
+                     # opacities were chosen for the mechanics -- seen from the side, through
+                     # fourteen other compartments. `tools/cell_graph_views.py` renders one
+                     # top-down still per relation instead, each with its own organelle brought
+                     # forward and the rest faded back.
+                     "graph_sets": ["mitochondria", "rough_er", "golgi"]},
     }
     return spec, total, sep
 

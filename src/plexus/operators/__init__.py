@@ -15,6 +15,7 @@ other is how anyone can tell which one a specification is getting.
     contact_ops          where a triangulated surface meets a continuum, both directions
     cell_ops             the cell as a composition: compartment pieces, the atlas that places
                          them, and the centroid that aggregates a level onto the one above
+    io_ops               state from outside the run: continue from a finished simulation
     mpm_ops              MLS-MPM: the grid, the four-step cycle, and the forces on it
     motion_ops           single-body motion: drag, glide, sediment, walls, gravity
     encoding_ops         fields that REPRESENT rather than simulate: hash_encoding, voxelize
@@ -57,6 +58,7 @@ from . import ecm_ops               # noqa: F401  ecm_seed/stress/from_cell, cel
 from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_*
 from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, surface_track,
 #                                                 plate_confine, bm_sense, ecm_load, ecm_gate_growth
+from . import io_ops               # noqa: F401  load_run -- x_0 from a finished run
 from . import cell_ops             # noqa: F401  compartment (entity), seed_cell_atlas,
 #                                                 aggregate_centroid
 from . import neural                # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
@@ -72,4 +74,4 @@ from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "cell_ops", "neural", "continuous_engine"]
+           "contact_ops", "cell_ops", "io_ops", "neural", "continuous_engine"]
