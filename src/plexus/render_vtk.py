@@ -227,6 +227,23 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
                  for k in z.files
                  if k.startswith(set_name + "__mesh_e_") and not k.endswith("_offsets")}
     chem = z[f"{cell_set}__chem"] if cell_set and f"{cell_set}__chem" in z.files else None
+    # PER-CELL BLOCKS FROM THE CELL SET, on the same footing as the mesh's own face columns. A face
+    # of the mesh IS a cell, so a width-1 block on that set is a per-face quantity -- and `age` and
+    # `ndiv`, which the division marks are computed from, live there now rather than as columns on
+    # the mesh table. Read by ASKING the file which blocks exist, not by naming them: this renderer
+    # already lost `e_myo` once to a list that did not mention it.
+    cell_cols = {}
+    if cell_set:
+        _skip = ("pos", "occ", "node_type", "parent", "parent_name", "chem")
+        for k in z.files:
+            if not k.startswith(f"{cell_set}__") or "__mesh_" in k:
+                continue
+            b = k[len(cell_set) + 2:]
+            if b in _skip:
+                continue
+            a_ = np.asarray(z[k])
+            if a_.ndim == 3 and a_.shape[2] == 1:
+                cell_cols[b] = a_
     out = []
     for t in range(len(nF)):
         a, b = int(off[t]), int(off[t + 1])
@@ -235,6 +252,8 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
               "nF": int(nF[t]), "Nv": int(Nv[t])}
         for c, arr in face_cols.items():
             mt[c] = arr[fa:fb]
+        for c, arr in cell_cols.items():               # cut to the frame's live faces
+            mt.setdefault(c, np.asarray(arr[t])[:int(nF[t]), 0])
         for c, (arr, eoff) in edge_cols.items():       # each column's OWN offsets -- see live_movie
             ea, eb = int(eoff[t]), int(eoff[t + 1])
             if eb > ea:

@@ -290,7 +290,11 @@ class MeshTable(dict):
     # block). `phase_t` was never here and still is not: it is the operator's own bookkeeping, it is
     # reconstructible from `phase` and the frame index, and a recorded array is a promise to keep it
     # meaningful.
-    FACE_RECORD = ("A0", "P0", "V0f", "age", "ndiv", "apop", "inhib", "myo_med")
+    # `A0`, `P0`, `V0f`, `age` and `ndiv` LEFT THIS LIST as they moved to the cell set: a proxied
+    # name is served by this table but not stored in it, and recording it here as well would put the
+    # same numbers in the trajectory twice under two names. They are still recorded and still drawn
+    # -- as `cell__*`, from the set that owns them, which both renderers now read.
+    FACE_RECORD = ("apop", "inhib", "myo_med")
 
     # THE RECORDED NAME IS NOT ALWAYS THE LIVE ONE, and two of the four colours above were lost to
     # exactly that. The operators write `m["apop_flag"]` (`cell_die`) and `m["inhib_frac"]`

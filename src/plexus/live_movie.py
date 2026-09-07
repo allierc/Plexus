@@ -2041,8 +2041,16 @@ class LiveMovie:
             # "can't convert cuda:0 device type tensor to numpy" -- and the guard below turned that
             # into a one-line warning and a uniformly grey tissue. The two paths were drawing
             # different pictures again, which is the thing this renderer was unified to stop.
-            mt = {k: (v.detach().cpu().numpy() if hasattr(v, "detach") else v)
-                  for k, v in m.items() if k in ("age", "ndiv", "apop", "inhib")}
+            # ASKED FOR BY NAME, NOT FILTERED OUT OF `items()`. `age` and `ndiv` are blocks on the
+            # CELL SET now, so they are served by the mesh view rather than stored in its dict --
+            # `items()` walks the dict and would silently drop both, and the division marks are
+            # exactly the thing that then draws nothing. Same lesson as the replay's literal
+            # four-column list, one level up.
+            mt = {}
+            for k in ("age", "ndiv", "apop", "inhib"):
+                v = m.get(k)
+                if v is not None:
+                    mt[k] = v.detach().cpu().numpy() if hasattr(v, "detach") else v
             mt["nF"] = nF
             mother, daughter, kills, _sup = _marks(mt, np.arange(nF), nF, prev_nF=prev)
             rgb = base
