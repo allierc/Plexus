@@ -170,7 +170,7 @@ plotting:
     xlabel: frame
     ylabel: '% in phase'
     ticks: 4
-  scale_bar_corner: right
+  scale_bar_corner: right_face
   scale_bar_lift: -0.07
   mesh_color_by: phase
   phase_colors:

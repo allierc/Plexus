@@ -1,5 +1,5 @@
 general:
-  name: cvd_slow
+  name: cvd2_quiet_uniform
   seed: 0
   n_frames: 801
   dt: 1.0
@@ -7,9 +7,9 @@ general:
   boundary: free
   dim: 3
   world:
-  - 20.0
-  - 20.0
-  - 20.0
+  - 50.0
+  - 50.0
+  - 50.0
   units:
     length_um: 10.0
     time_s: 600.0
@@ -56,7 +56,7 @@ operators:
   at: cell
 - op: cell_grow
   at: vertex
-  rate: 0.000289
+  rate: 0.000578
   rho: 1.0
   a_sw: 50.0
   hill: 4.0
@@ -85,11 +85,11 @@ operators:
   every: 4
   engine_clock: true
   factor: 2.0
-  cycle_cv: 0.15
+  cycle_cv: 0.0
   min_cycle: 4
   max_cycle: 1000000000
   p0: 3.5
-  reset_noise: 0.12
+  reset_noise: 0.0
 - op: topo_record
   at: vertex
   every: 1
@@ -108,9 +108,10 @@ seed:
   jitter: 0.02
   p0: 3.5
   seed: 0
-  vseed_cv: 0.15
+  vseed_cv: 0.0
   model: apicobasal
   h0: 0.88
+  v0_uniform: true
 plotting:
   renderer: vtk_points
   background: black
@@ -130,7 +131,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 15.0
+    span: 34.0
     walls: 64
     loc:
     - 0.015

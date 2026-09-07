@@ -148,5 +148,5 @@ plotting:
     xlabel: frame
     ylabel: cell volume
     ticks: 4
-  scale_bar_corner: right
+  scale_bar_corner: right_face
   scale_bar_lift: -0.07
