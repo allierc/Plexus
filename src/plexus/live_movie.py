@@ -1028,7 +1028,12 @@ class LiveMovie:
     #     quantity: myosin    mean +- SD of the junctional myosin, per type -- the only one of
     #                         these that lives on an EDGE rather than on a face, so it is grouped by
     #                         the type of the cell each half-edge belongs to.
-    _CURVE_Q = ("cells", "area", "volume", "radius", "myosin", "phase")
+    #     quantity: cycle_progress   mean +- SD of the cells' continuous position through the
+    #                         cycle, 0 at birth and 1 at the end of M. S4's state, and the one the
+    #                         `phase` panel cannot show: four fractions say how the population is
+    #                         SPLIT between phases, this says how far through it is, so a tissue
+    #                         cycling in waves and one cycling steadily are told apart by the SD.
+    _CURVE_Q = ("cells", "area", "volume", "radius", "myosin", "phase", "cycle_progress")
 
     def _curve_series(self, H, lvl, q, ntype):
         """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
@@ -1076,6 +1081,17 @@ class LiveMovie:
                                        else v, float).ravel()[:nF]).astype(int)
                 for j in range(min(nt, 4)):
                     out[t, j] = (100.0 * float(np.mean(a == j)) if a.size else np.nan, 0.0)
+                continue
+            if q == "cycle_progress":
+                v = m.get("cycle_progress")
+                if v is None:
+                    continue
+                vv = np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach") else v,
+                                float).ravel()[:nF]
+                for j in range(nt):
+                    sel = k == j
+                    if sel.any():
+                        out[t, j] = (float(np.nanmean(vv[sel])), float(np.nanstd(vv[sel])))
                 continue
             if q == "myosin":
                 v = m.get("e_myo")
@@ -3222,8 +3238,25 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
     # live path; reading it here is what lets the replay draw a per-cell block that no longer sits
     # on the mesh table -- `phase` today, `A0` and `age` later -- without scanning the trajectory
     # for a plausible-looking key.
-    _cs = {n: d.get("cell_set") for n, d in ((sim.sets or {}) if sim is not None else {}).items()
-           if isinstance(d, dict) and d.get("mesh") and d.get("cell_set")}
+    # THE PAIRING MOVED WITH S6 AND THIS READER DID NOT, which is why a replayed run drew no
+    # per-cell block at all. `sets.<s>.cell_set` was retired: `mesh:` now names a declared HALF-EDGE
+    # SET, and that set's `maps.face` names the cells -- the same chain `engine._link_mesh_maps`
+    # walks to bind `Level.mesh_cell_set`. Reading the dead key left `_cs` empty, `_cell_blocks`
+    # empty, and every per-cell quantity invisible on the replay path: `phase` fell back to height
+    # colouring and its curve panel drew nothing, and `A0`, `age` and `V0f` would have too. The live
+    # path was unaffected, so the two entry points drew different pictures of the same run.
+    _cs = {}
+    _sets = (sim.sets or {}) if sim is not None else {}
+    for n, d in _sets.items():
+        if not isinstance(d, dict) or not d.get("mesh"):
+            continue
+        h = _sets.get(d["mesh"])
+        face = (h or {}).get("maps", {}).get("face") if isinstance(h, dict) else None
+        # `cell_set:` SECOND, not first: specs predating S6 are still on disk beside their
+        # trajectories, and a replay of one should keep working.
+        face = face or d.get("cell_set")
+        if face:
+            _cs[n] = face
     H = _ReplayState(z, dev, cell_sets=_cs)
     if not H.levels:
         raise ValueError(f"{data_dir}: no set carries positions, nothing to render")

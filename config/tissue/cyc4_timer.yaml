@@ -1,5 +1,5 @@
 general:
-  name: cycle_phases
+  name: cyc4_timer
   seed: 0
   n_frames: 401
   dt: 1.0
@@ -124,6 +124,7 @@ operators:
   l_th_frac: 0.35
   max_flips: 30
 - op: cell_cycle
+  model: timer
   at: vertex
   t_g1: 110.0
   t_s: 80.0
@@ -215,3 +216,15 @@ plotting:
   - '#e8b024'
   - '#e03b2f'
   mesh_mark_division: false
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A multi-colored spherical object is positioned in the center of a large 3D bounding box.
+      Over the course of the simulation, the sphere undergoes a significant expansion in size. The expansion
+      is steady and continuous, eventually filling a large portion of the interior volume. The sphere
+      maintains its internal cellular structure and color distribution as it grows.
+    objects: The primary object is a sphere composed of a Voronoi-like cellular tessellation. The cells
+      within the sphere are colored in shades of blue, green, yellow, and orange. The sphere is centered
+      within a large, wireframe cubic bounding box that represents a 500 $\mu$m space. A small inset box
+      in the bottom-left corner provides a localized view of the corner geometry.

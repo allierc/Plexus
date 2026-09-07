@@ -2636,8 +2636,8 @@ class Divide3DTimer(Divide3D):
         return age >= self.cycle * jit
 
 
-@register_operator("cell_cycle", set="vertex", kind="structural", family="population")
-class CellCycle3D(Structural):
+@register_operator("cell_cycle", set="vertex", kind="lateral", family="population")
+class CellCycle3D(Lateral):
     """G1 -> S -> G2 -> M as per-cell STATE, advanced by a declared rule. It divides nothing.
 
     WHY THIS IS ITS OWN CONTRACT AND NOT A `model:` OF `cell_divide`, by this repo's own two tests.
@@ -2649,8 +2649,13 @@ class CellCycle3D(Structural):
     ASKS for) and `cell_divide` (what the topology DOES): this operator says when a cell is ready,
     `cell_divide[model: cycle]` performs the division.
 
-        phase    0 = G1, 1 = S, 2 = G2, 3 = M
-        phase_t  frames spent in the current phase
+        cycle_progress  p: the cell's continuous position through one cycle, 0 at birth, 1 at
+                        the end of M. THIS is the state; the operator returns dp/dt and the engine
+                        integrates it, like any other Lateral.
+        phase           0 = G1, 1 = S, 2 = G2, 3 = M -- read off `p` by the phase boundaries, so it
+                        holds nothing `p` does not. Kept because it is what the renderer colours by
+                        and what `cell_divide[model: cycle]` triggers on.
+        phase_t         time spent in the current phase. A readout: nothing consults it any more.
 
     THE PHASE DURATIONS ARE NOT EQUAL AND THE DEFAULTS SAY SO. A mammalian cycle of about 24 h runs
     roughly G1 11 h, S 8 h, G2 4 h, M 1 h, so the defaults are in that proportion (110/80/40/10 of
@@ -2677,15 +2682,18 @@ class CellCycle3D(Structural):
     carry copies M onto them -- so the reset needs no second channel between the two operators and
     cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.
     """
-    # `MAY_MUTATE_INTEGRATED_STATE` FLIPPED False -> True WHEN THE THREE ARRAYS MOVED TO THE CELL
-    # SET, AND THAT IS A DEBT MADE VISIBLE RATHER THAN A DEBT INCURRED. This operator has always
-    # written per-cell state in place. It could claim False only because the state was a column on
-    # the mesh table, where `engine._run_token`'s tick-0 invariant -- clone every set's `state`,
-    # call the operator, refuse if the tensor moved -- cannot see it. Declaring the arrays on the
-    # cell set puts them inside the tensor the engine guards, and the guard fires immediately and
-    # correctly. Setting the flag is the accurate statement of what the operator does today; S4
-    # removes both the flag and the write, by making the phase a continuous `cycle_progress` that
-    # can be RETURNED as a delta and integrated like any other Lateral.
+    # `MAY_MUTATE_INTEGRATED_STATE` IS STILL TRUE AFTER S4, AND THE DYNAMICS IS NO LONGER WHY.
+    # Every per-frame quantity this operator produces -- `cycle_progress`, `phase`, `phase_t`,
+    # `cyc_inhib`, `cyc_vprev`, `cyc_rate` -- is returned as a delta on a declared block and
+    # integrated by the engine. What is left in place is ONE thing, and it happens once:
+    #
+    #     `seed_async` draws the initial spread over the cycle and, with it, rescales `V0f` and
+    #     `Vbirth` so that a cell drawn mid-cycle has the volume of a cell mid-cycle. That is an
+    #     initial condition, not a rate, and it fires on tick 0 -- exactly the tick the invariant
+    #     checks. It belongs in `seed_mesh` and moving it is its own rung.
+    #
+    # So the flag now names a seeding write rather than a dynamics one, which is a much smaller
+    # claim than the one it used to make.
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "phase_progression", "restriction_point",
                       "size_checkpoint"]
@@ -2715,16 +2723,46 @@ class CellCycle3D(Structural):
         self._rng = np.random.default_rng(self.seed + 4242)
 
     # ------------------------------------------------------------------ the rule
-    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
-        """G1 -> S. THE ONLY TRANSITION A MODEL CHANGES; the base is the size checkpoint.
+    def _g1_rate(self, ctx):
+        """dp/dt THROUGH G1. THE ONLY THING A MODEL CHANGES; the base is the size checkpoint.
 
         A cell leaves G1 when it is big enough, not when it is old enough: this is the restriction
         point in mammalian cells and Start in budding yeast, and it is the transition Ginzberg et al.
         review as the one that has to be read on an ABSOLUTE scale for size control to work at all.
         `g1_size` is therefore in units of `v_ref`, the seed-time median cell volume, exactly as
         `cell_divide.factor` and `.delta` are.
+
+        AS A RATE, THE SIZER SAYS SOMETHING THE PREDICATE COULD NOT: progress through G1 IS volume
+        accumulated toward the checkpoint. The cell needs to add `v* - v_birth` of volume to pass,
+        it adds `dV/dt` of it per unit time, and G1 occupies the fraction `f_G1` of the cycle, so
+
+            dp/dt = f_G1 * (dV/dt) / (v* - v_birth),      v* = g1_size * v_ref
+
+        reaches exactly the G1/S boundary at exactly the moment the old predicate fired. A cell that
+        is ALREADY past `v*` -- one born large, or one whose threshold moved -- is carried over the
+        boundary within the step by the second term, which reproduces the predicate's own answer for
+        that case rather than making it wait for a volume increment it does not need.
+
+        `ctx` carries the per-cell arrays the models read: see `forward`, where it is built.
         """
-        return v_now >= self.g1_size * v_ref
+        # THE RATE IS SIGNED, AND THAT IS NOT AN OVERSIGHT. A cell that SHRINKS moves back through
+        # G1, because the predicate this replaces read the cell's volume NOW -- `v_now >= v*` is
+        # false again the moment the cell falls back under the threshold, and progress that only
+        # ever accumulated would be a ratchet the predicate never had. Measured with the ratchet in
+        # place, the sizer's population reached 2,289 cells against the predicate's 1,493 over 401
+        # frames, because cells banked every transient inflation and never paid it back.
+        # ONE VOLUME CONVENTION, AND `Vbirth` IS NOT IN IT. `v_now` and `v_ref` are WEDGE volumes --
+        # `face_geometry_3d`'s origin-referenced cones, which is what the predicate compared -- while
+        # `Vbirth` is the POLYHEDRON volume `cell_divide` records (measured on this spec: v_ref
+        # 2.5433 against a Vbirth median of 1.6374, so `v* - Vbirth` was 2.43 where the wedge answer
+        # is 1.53, and G1 was 60% too long). The distance a cell has to cover is stated in the
+        # reference's own units instead: it must add `(g1_size - 1)` of `v_ref` to pass, which is
+        # what an absolute size checkpoint at `g1_size * v_ref` means for a cell born at `v_ref`.
+        # (The two conventions are AB_R7R8_TODO section 0a and are not settled here.)
+        v_star = self.g1_size * ctx["v_ref"]
+        need = max((self.g1_size - 1.0) * ctx["v_ref"], 1e-9)
+        r = ctx["f"][self.G1] * ctx["dv_dt"] / need
+        return np.where(ctx["v_now"] >= v_star, np.maximum(r, ctx["to_boundary"]), r)
 
     def forward(self, H, mask=None):
         # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
@@ -2755,6 +2793,16 @@ class CellCycle3D(Structural):
         ph = cell_block(H, self.cat, "phase", nF)
         pt = cell_block(H, self.cat, "phase_t", nF)
         cc = cell_block(H, self.cat, "cyc_inhib", nF)
+        # A DELTA IS MEASURED AGAINST WHAT THE BLOCK HOLDS, NOT AGAINST A LOCAL COPY OF IT, and the
+        # difference is the whole reason the async seed and the birth reset still work. Both of them
+        # SET a value -- `seed_async` scatters the population over the cycle, division puts a
+        # daughter back at (G1, 0) -- and under the old in-place write `set_cell_block` simply stored
+        # it. An operator that returns rates cannot store anything, so a set has to be expressed as
+        # the rate that reaches it in one step: `(target - stored) / dt`. Measured against the
+        # post-seed LOCAL instead, the seed cancels itself and every cell starts at G1 with the
+        # population synchronised, which is exactly what `seed_async` exists to prevent.
+        ph_st, pt_st, cc_st = ph.copy(), pt.copy(), cc.copy()
+        _seeded = False
         # THE SEED FIRES ON `cyc_vprev == 0`, NOT ON A MISSING `phase`. A mesh column did not exist
         # before its first write, so `phase is None` was a sound test for "this operator has not run
         # yet". A declared block exists from the moment the set is built and reads 0.0, which is a
@@ -2763,6 +2811,7 @@ class CellCycle3D(Structural):
         # `cyc_vprev` is a volume: 0 is not a value any live cell can hold, and this operator is the
         # only writer, so it is the one array whose zero unambiguously means "never written".
         if not np.any(cell_block(H, self.cat, "cyc_vprev", nF) > 0.0):
+            _seeded = True
             # `seed_async` -- START THE POPULATION SOMEWHERE, NOT ALL AT THE SAME PLACE. Seeding
             # every cell at (G1, phase_t 0) makes the tissue a synchronised culture: the first
             # generation divides in one wave, the second in a slightly broader one, and the cell
@@ -2815,11 +2864,19 @@ class CellCycle3D(Structural):
                                        m["E_srce"], m["E_trgt"], m["E_face"], nF)
         v_now = vf.detach().cpu().numpy().astype(np.float64)
         v_ref = float(m.get("v_ref", 1.0))
+        _dt = float(getattr(H, "dt", 1.0))
+        vb0 = cell_block(H, self.cat, "Vbirth", nF)
+        _rate_prev = cell_block(H, self.cat, "cyc_rate", nF)
+        if _rate_prev is None or len(_rate_prev) != nF:
+            _rate_prev = np.zeros(nF)
         age = _np("age")
         # THE RESET: just divided = age 0 while still carrying the mother's M. See the class note.
+        born = np.zeros(nF, bool)
         if age is not None and len(age) == nF:
             born = (age <= 0) & (ph >= self.M)
-            ph[born] = self.G1; pt[born] = 0.0; cc[born] = 1.0
+            ph = np.where(born, float(self.G1), ph)
+            pt = np.where(born, 0.0, pt)
+            cc = np.where(born, 1.0, cc)
         # DILUTION IS APPLIED TO EVERY CELL EVERY FRAME, whatever the model, because it is a
         # statement about volume and not about the rule: a concentration in a growing cell falls.
         #
@@ -2831,38 +2888,131 @@ class CellCycle3D(Structural):
         # the model. The per-cell `vp > 0` test reproduces the old behaviour exactly: zero only
         # ever occurs on the first frame, because a daughter inherits its mother's row and a
         # renumbered cell keeps its own.
+        # THE INHIBITOR JUST BEFORE THE DILUTION, which is what `inhibitor_dilution` spends: taken
+        # AFTER the birth reset, so a daughter's first frame dilutes from the 1.0 it was reset to
+        # rather than from the mother's spent concentration.
+        cc0 = cc.copy()
         vp = cell_block(H, self.cat, "cyc_vprev", nF)
         if vp is not None and len(vp) == nF:
             cc = cc * np.where(vp > 0.0, np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0), 1.0)
-        set_cell_block(H, self.cat, "cyc_vprev", v_now, nF)
+        # `cyc_vprev` IS RETURNED AS A DELTA NOW rather than written here, and the arithmetic is
+        # unchanged by that: the engine adds `dt * (v_now - vp)/dt` to `vp`, which is `v_now`.
 
         jit = cell_block(H, self.cat, "divjit", nF)
         jit = np.ones(nF) if jit is None or len(jit) != nF else jit
         cvj = (1.0 + self.phase_cv * self._rng.standard_normal(nF)).clip(0.4, 1.8) \
             if self.phase_cv > 0 else np.ones(nF)
-        pt = pt + 1.0
-        adv = np.zeros(nF, bool)
-        g1 = ph <= self.G1
+
+        # ============================================================ the cycle as a rate, not a jump
+        # WHAT S4 CHANGED, in one sentence: the cycle used to be four integers and a per-phase
+        # counter advanced by a predicate, and it is now ONE continuous coordinate `p` -- position
+        # through the cycle, 0 at birth, 1 at the end of M -- whose RATE the models set. `phase` is
+        # read off `p` by the phase boundaries and no longer holds anything `p` does not.
+        #
+        # WHY IT HAD TO CHANGE. plexus2's eight families are all rate laws: an operator says how
+        # fast state moves and the engine integrates. A predicate that assigns `phase + 1` is not a
+        # rate, has no delta form, and is exactly why this operator was `kind: structural` and had
+        # to declare `MAY_MUTATE_INTEGRATED_STATE`. Every per-frame quantity below is now returned
+        # as a delta on a declared block, so the engine does the updating and the tick-0 invariant
+        # is free to check it.
+        #
+        # WHAT `p` BUYS BEYOND COMPLIANCE, which is the part worth keeping even if the algebra had
+        # not asked. Under the predicate, a cell in G1 was a cell in G1 -- there was no reading of
+        # HOW FAR through it was, because "far" was only ever elapsed frames and G1's exit does not
+        # read elapsed frames in three of the four models. `p` is that reading, and it is defined by
+        # each model's own currency: volume accumulated toward the checkpoint for the sizer,
+        # inhibitor diluted away for `inhibitor_dilution`, elapsed time for `timer`, fraction of the
+        # cell's own drawn waiting time for `transition_probability`. A population's spread in `p`
+        # is therefore comparable across the four in a way a phase histogram never was.
+        T = float(sum(self.t)) or 1.0
+        f = np.asarray(self.t, np.float64) / T                  # each phase as a fraction of the cycle
+        cut = np.cumsum(f)                                      # phase boundaries in `p`
+        p = cell_block(H, self.cat, "cycle_progress", nF)
+        if p is None:
+            raise KeyError(
+                f"cell_cycle needs the set {self.cat!r} to declare the width-1 block "
+                f"'cycle_progress' -- `cycle_progress: {{width: 1}}` under `sets.{self.cat}.state`. "
+                f"It is the cell's continuous position through the cycle (0 at birth, 1 at the end "
+                f"of M) and it is what this operator integrates; `phase` is read off it.")
+        p_st = p.copy()
+        # SEEDED FROM THE PHASES THE ASYNC DRAW ALREADY MADE, so `seed_async` keeps meaning what it
+        # meant: a cell drawn into the middle of S starts at the `p` that IS the middle of S.
+        if _seeded:
+            lo = np.concatenate([[0.0], cut[:-1]])[ph.astype(int)]
+            p = lo + pt / T                        # `pt` frames into a phase is pt/T of the cycle
+        p = np.where(born, 0.0, p) if age is not None and len(age) == nF else p
+        # dV/dt AND -dc/dt ARE THE TWO CURRENCIES THE MODELS SPEND. Both come from the frame's own
+        # volume change, which `cyc_vprev` already recorded for the dilution above.
+        dv_dt = np.where(vp > 0.0, (v_now - vp) / max(_dt, 1e-12), 0.0) \
+            if vp is not None and len(vp) == nF else np.zeros(nF)
+        _rate_draw = _rate_prev.copy()
+        ctx = dict(v_now=v_now, v_ref=v_ref, v_birth=(vb0 if vb0 is not None else v_now),
+                   rate_prev=_rate_prev, rate_draw=_rate_draw, born=born, conc_prev=cc0,
+                   dv_dt=dv_dt, conc=cc, jit=jit, cvj=cvj, f=f, T=T, p=p, dt=_dt,
+                   to_boundary=np.maximum(cut[self.G1] - p, 0.0) / max(_dt, 1e-12),
+                   rng=self._rng)
+        # OUTSIDE G1 EVERY MODEL IS THE SAME CLOCK, and that is the design of the family rather than
+        # a simplification: S, G2 and M are near-fixed in all four hypotheses, so a difference
+        # between two runs has exactly one possible cause. `1/T` in cycle units per unit time is a
+        # cycle of exactly `T` -- the phase fractions do the rest, because a phase of fraction f_k
+        # traversed at 1/T takes f_k * T, which is `t_k`.
+        rate = np.full(nF, 1.0 / T) / np.maximum(jit * cvj, 1e-9)
+        g1 = p < cut[self.G1]
         if g1.any():
-            adv[g1] = self._leave_g1(v_now[g1], v_ref, pt[g1], self.t[0] * jit[g1] * cvj[g1],
-                                     cc[g1])
-        for k in (self.S, self.G2):
-            sel = ph == k
-            if sel.any():
-                adv[sel] = pt[sel] >= self.t[k] * jit[sel] * cvj[sel]
-        # M IS NOT ADVANCED HERE. A cell leaves M by DIVIDING, which is `cell_divide[model: cycle]`'s
+            rate = np.where(g1, self._g1_rate(ctx), rate)
+        # M IS NOT ADVANCED. A cell leaves M by DIVIDING, which is `cell_divide[model: cycle]`'s
         # business; advancing it here would let a tissue with no divide operator cycle for ever
-        # while never making a cell, which is a population model that silently is not one.
-        ph = np.where(adv, np.minimum(ph + 1, self.M), ph)
-        pt = np.where(adv, 0.0, pt)
-        set_cell_block(H, self.cat, "phase", ph, nF)
-        set_cell_block(H, self.cat, "phase_t", pt, nF)
-        set_cell_block(H, self.cat, "cyc_inhib", cc, nF)
-        return {}
+        # while never making a cell, which is a population model that silently is not one. Under
+        # the predicate that was `min(phase + 1, M)`; here it is a rate of zero, which is the same
+        # statement and is one the engine can integrate.
+        rate = np.where(p >= cut[self.G2], 0.0, rate)
+        # BACKWARD ONLY INSIDE G1. S, G2 and M are clocks in every model and a clock does not run
+        # backwards; only the G1 rules read a quantity that can fall.
+        rate = np.where((p >= cut[self.G1]) & (rate < 0.0), 0.0, rate)
+        rate = np.where(born, 0.0, rate) if age is not None and len(age) == nF else rate
+        # A CELL STOPS AT M'S DOORSTEP. `rate` is already zero once `p` is inside M, so the only
+        # way past is the single step that crosses -- and an unbounded rate can carry it far past
+        # (a `transition_probability` cell whose drawn waiting time is a fraction of a frame reached
+        # p = 3.76 before this cap). `p` has no meaning beyond the start of M, because M is left by
+        # dividing and not by progressing, so the crossing step lands exactly on the boundary.
+        p_next = np.clip(p + _dt * rate, 0.0, cut[self.G2])
+        ph_next = np.searchsorted(cut, p_next, side="right").astype(np.float64).clip(0, self.M)
+        # `phase_t` IS A READOUT NOW, NOT A DRIVER. Nothing above consults it -- the models spend
+        # volume, inhibitor or a drawn waiting time, and `timer` spends `p` itself -- but it is
+        # declared by every spec that runs this operator and is what a reader means by "how long has
+        # this cell been in S", so it is kept and reset on a phase change like before.
+        pt_next = np.where(ph_next != ph, 0.0, pt + _dt)
+        return self._emit(H, nF, {
+            "cycle_progress": (p_next - p_st) / max(_dt, 1e-12),
+            "phase":          (ph_next - ph_st) / max(_dt, 1e-12),
+            "phase_t":        (pt_next - pt_st) / max(_dt, 1e-12),
+            "cyc_inhib":      (cc - cc_st) / max(_dt, 1e-12),
+            "cyc_vprev":      (v_now - (vp if vp is not None else v_now)) / max(_dt, 1e-12),
+            "cyc_rate":       (ctx["rate_draw"] - _rate_prev) / max(_dt, 1e-12),
+        })
+
+    def _emit(self, H, nF, blocks):
+        """Per-cell deltas -> full-buffer `(set, block)` deltas the engine integrates.
+
+        THE LIVE CELLS ARE A PREFIX OF THE BUFFER and `_integrate` adds a block delta to the whole
+        of `lvl.state[:, cx0:cx1]` with no mask, so a short tensor would not broadcast and a full
+        one must be zero past `nF` or the dead tail of the buffer would drift.
+        """
+        clvl = H.level(self.cat)
+        N = int(clvl.state.shape[0])
+        out = {}
+        for name, d in blocks.items():
+            if d is None or cell_block(H, self.cat, name, nF) is None:
+                continue                       # a block this spec did not declare is not written
+            z = torch.zeros(N, 1, device=clvl.state.device, dtype=clvl.state.dtype)
+            z[:nF, 0] = torch.as_tensor(np.asarray(d, np.float64),
+                                        device=clvl.state.device).to(clvl.state.dtype)
+            out[(self.cat, name)] = z
+        return out
 
 
 
-@register_operator("cell_cycle", model="timer", set="vertex", kind="structural", family="population")
+@register_operator("cell_cycle", model="timer", set="vertex", kind="lateral", family="population")
 class CellCycleTimer(CellCycle3D):
     """Every phase on a clock, G1 included: the NULL against which a checkpoint has to be an
     improvement.
@@ -2875,11 +3025,14 @@ class CellCycleTimer(CellCycle3D):
     """
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "timer", "size_independent"]
 
-    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
-        return phase_t >= tg1
+    def _g1_rate(self, ctx):
+        # THE CLOCK, WHICH IS THE SAME CLOCK THE OTHER THREE PHASES RUN ON. `1/T` in cycle units per
+        # unit time makes G1 take `f_G1 * T = t_g1`, so this model is the one whose `p` is literally
+        # elapsed time -- and that is the null the other three have to beat.
+        return np.full(np.shape(ctx["v_now"]), 1.0 / ctx["T"]) / np.maximum(ctx["jit"] * ctx["cvj"], 1e-9)
 
 
-@register_operator("cell_cycle", model="transition_probability", set="vertex", kind="structural",
+@register_operator("cell_cycle", model="transition_probability", set="vertex", kind="lateral",
                    family="population")
 class CellCycleTransitionProbability(CellCycle3D):
     """Smith & Martin: G1 is not a duration, it is a CONSTANT HAZARD of starting.
@@ -2908,11 +3061,37 @@ class CellCycleTransitionProbability(CellCycle3D):
         super().__init__(params, device)
         self.p_g1 = float(params.get("p_g1", 1.0 / max(self.t[0], 1.0)))
 
-    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
-        return self._rng.random(np.shape(v_now)) < self.p_g1
+    def _g1_rate(self, ctx):
+        """THE HAZARD, WRITTEN AS A SPEED DRAWN ONCE PER CELL, which is the same distribution.
+
+        A per-frame coin flip has no rate form -- it is a jump, and a jump is what S4 exists to
+        remove -- but the QUANTITY it defines does. A constant hazard `p_g1` means the waiting time
+        is exponential with mean `1/p_g1`; so drawing `w ~ Exp(1/p_g1)` when the cell enters G1 and
+        crossing G1 at the constant speed `f_G1 / w` produces exactly that waiting-time
+        distribution, and is memoryless in the only sense the model claims -- the draw does not read
+        how long the cell has waited, or anything else about it.
+
+        WHAT IT CHANGES, said plainly: an individual cell's exit is now decided at G1 entry rather
+        than re-rolled every frame, so a run is no longer memoryless CONDITIONAL ON THE RUN -- the
+        population's exponential tail is identical, one cell's own future is not. The alternative
+        (rate = f_G1 * Bernoulli(p_g1)/dt) reproduces the per-frame roll and is a jump wearing a
+        rate's clothes, which is the thing being retired.
+
+        `cyc_rate` HOLDS THE DRAW so it survives to the next frame and through a renumbering; it is
+        reset for the cells that just entered G1, which after S4 are exactly the ones `born` marks.
+        """
+        # THE DRAW IS FLOORED AT ONE STEP. An exponential has no lower bound, so a waiting time of
+        # 1e-4 frames is a legal draw and gives a G1 speed of `f_G1 / 1e-4` -- which carried `p` to
+        # 3.76 in the first version of this, past the end of the cycle in a single step. A cell
+        # cannot pass through G1 faster than the simulation can resolve, so `dt` is the floor.
+        w = np.maximum(self._rng.exponential(1.0 / max(self.p_g1, 1e-12), np.shape(ctx["v_now"])),
+                       ctx["dt"])
+        fresh = ctx["born"] | (ctx["rate_prev"] <= 0.0)
+        ctx["rate_draw"][:] = np.where(fresh, w, ctx["rate_prev"])
+        return ctx["f"][self.G1] / np.maximum(ctx["rate_draw"], 1e-9)
 
 
-@register_operator("cell_cycle", model="inhibitor_dilution", set="vertex", kind="structural",
+@register_operator("cell_cycle", model="inhibitor_dilution", set="vertex", kind="lateral",
                    family="population")
 class CellCycleInhibitorDilution(CellCycle3D):
     """The size checkpoint with a MECHANISM under it: an inhibitor, diluted by growth, crossing a
@@ -2953,8 +3132,24 @@ class CellCycleInhibitorDilution(CellCycle3D):
         super().__init__(params, device)
         self.inhib_thresh = float(params.get("inhib_thresh", 0.6))
 
-    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
-        return conc <= self.inhib_thresh
+    def _g1_rate(self, ctx):
+        # PROGRESS IS INHIBITOR SPENT. The cell has to dilute `c` from 1 at birth down to
+        # `inhib_thresh`, and it spends `-dc/dt` of that per unit time, so G1 is traversed exactly
+        # when the concentration arrives at the threshold:
+        #
+        #     dp/dt = f_G1 * (-dc/dt) / (1 - inhib_thresh)
+        #
+        # `-dc/dt` is the dilution the base class has already applied this frame, read back as the
+        # difference it made. A cell that is not growing does not dilute and does not progress,
+        # which is the model's own claim and was true of the predicate too.
+        # SIGNED, for the reason the sizer's rate is: a cell whose volume falls RE-CONCENTRATES its
+        # inhibitor, and the predicate `c <= inhib_thresh` goes false again when it does. Clamping
+        # the drop at zero made progress a ratchet and let the population run to 2,532 cells against
+        # the predicate's 727 over 401 frames.
+        drop = (ctx["conc_prev"] - ctx["conc"]) / max(ctx["dt"], 1e-12)
+        span = max(1.0 - self.inhib_thresh, 1e-9)
+        r = ctx["f"][self.G1] * drop / span
+        return np.where(ctx["conc"] <= self.inhib_thresh, np.maximum(r, ctx["to_boundary"]), r)
 
 
 @register_operator("cell_divide", model="cycle", set="vertex", kind="divide", family="population")

@@ -1,5 +1,5 @@
 general:
-  name: cycle_phases
+  name: cyc4_dilution
   seed: 0
   n_frames: 401
   dt: 1.0
@@ -124,6 +124,7 @@ operators:
   l_th_frac: 0.35
   max_flips: 30
 - op: cell_cycle
+  model: inhibitor_dilution
   at: vertex
   t_g1: 110.0
   t_s: 80.0
@@ -215,3 +216,16 @@ plotting:
   - '#e8b024'
   - '#e03b2f'
   mesh_mark_division: false
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A multi-colored, spherical cluster of cells expands outward from the center of a large
+      cubic domain. The cluster grows steadily in size as it occupies more of the interior space over
+      the course of the simulation. The surface of the sphere becomes increasingly complex and irregular
+      as it expands. By the final frame, the cluster has grown significantly, filling a large portion
+      of the 500 µm cube.
+    objects: The primary object is a spherical cluster composed of numerous individual polygonal cells.
+      These cells are colored in a variety of hues, including green, yellow, blue, and red. The cluster
+      is situated in the center of a large, wireframe 500 µm cube. A small scale bar in the bottom right
+      corner indicates a length of 100 µm.

@@ -1,5 +1,5 @@
 general:
-  name: cycle_phases
+  name: cyc4_hazard
   seed: 0
   n_frames: 401
   dt: 1.0
@@ -124,6 +124,7 @@ operators:
   l_th_frac: 0.35
   max_flips: 30
 - op: cell_cycle
+  model: transition_probability
   at: vertex
   t_g1: 110.0
   t_s: 80.0
@@ -215,3 +216,15 @@ plotting:
   - '#e8b024'
   - '#e03b2f'
   mesh_mark_division: false
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A multi-colored spherical object is positioned in the center of a large 3D bounding box.
+      Over the course of the simulation, the sphere gradually increases in size while maintaining its
+      central position. The expansion is steady and uniform, filling more of the interior volume of the
+      cube. By the final frame, the sphere occupies a significant portion of the 500 µm cube.
+    objects: The primary object is a sphere composed of a Voronoi-like tessellation of smaller polygonal
+      cells. These cells are colored in a variety of hues, including blue, green, yellow, and red. The
+      sphere is situated within a large, wireframe 500 µm cube that defines the simulation space. A small
+      100 µm scale bar is located in the bottom right corner to provide spatial context.
