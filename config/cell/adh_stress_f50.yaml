@@ -6,8 +6,8 @@ general:
   boundary: wall
   dim: 3
   dt: 0.002
-  n_frames: 900
-  name: adh_jelly_crawl_bc
+  n_frames: 1200
+  name: adh_stress_f50
   record_cap: 60
   save_data: null
   seed: 1
@@ -21,231 +21,200 @@ operators:
 - at: cell
   g: 4.0
   op: gravity
-- op: substrate_traction
-  at: centriole_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: chromatin_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
+- at: cell
+  block: phase
+  jitter: 0.15
+  omega: 12.6
+  op: phase_clock
+  seed: 5
+- op: polar_active_stress
   at: cytoskeleton_node
   cell_set: cell
   block: polarity
-  f: 6.0
+  phase_block: phase
+  amplitude_frac: 0.5
+  deviatoric: true
+  offset: 0.0
+- at: centriole_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: golgi_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: chromatin_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: mitochondria_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: cytoskeleton_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: nuclear_envelope_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: golgi_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: nucleolus_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: mitochondria_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: plasma_membrane_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: nuclear_envelope_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: protein_a_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: nucleolus_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: protein_b_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: plasma_membrane_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: protein_c_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: protein_a_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: protein_d_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: protein_b_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: protein_e_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: protein_c_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: rough_er_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: protein_d_node
   axis: 1
-  floor: 0.0
-  contact: 0.035
-- op: substrate_traction
-  at: smooth_er_node
-  cell_set: cell
   block: polarity
+  cell_set: cell
+  contact: 0.035
   f: 6.0
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: protein_e_node
   axis: 1
-  floor: 0.0
+  block: polarity
+  cell_set: cell
   contact: 0.035
-- op: protrusion
-  at: centriole_node
-  cell_set: cell
-  block: polarity
   f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: chromatin_node
-  cell_set: cell
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: rough_er_node
+  axis: 1
   block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: cytoskeleton_node
   cell_set: cell
-  block: polarity
+  contact: 0.035
   f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: golgi_node
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
+- at: smooth_er_node
+  axis: 1
+  block: polarity
   cell_set: cell
-  block: polarity
+  contact: 0.035
   f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: mitochondria_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: nuclear_envelope_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: nucleolus_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: plasma_membrane_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: protein_a_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: protein_b_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: protein_c_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: protein_d_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: protein_e_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: rough_er_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
-- op: protrusion
-  at: smooth_er_node
-  cell_set: cell
-  block: polarity
-  f: 6.0
-  radius: 0.1
-  width: 0.45
+  floor: 0.0
+  gate:
+    block: phase
+    floor: 0.0
+    offset: 3.14159
+  op: substrate_traction
 - at: plasma_membrane_node
   implementation: warp
   op: mpm_strain
@@ -748,6 +717,8 @@ plotting:
   up_axis: 1
 schedule:
 - gravity
+- phase_clock
+- polar_active_stress
 - substrate_traction
 - substrate_traction
 - substrate_traction
@@ -763,21 +734,6 @@ schedule:
 - substrate_traction
 - substrate_traction
 - substrate_traction
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
-- protrusion
 - steps:
   - mpm_strain
   - mpm_strain
@@ -934,12 +890,46 @@ seed:
   frame: -1
   op: load_run
   run: cell/adh_jelly_x10
-- op: seed_polarity
-  at: cell
-  block: polarity
+- at: protein_a_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+- at: protein_b_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+- at: protein_c_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+- at: protein_d_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+- at: protein_e_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+- at: plasma_membrane_node
+  material: elastic
+  op: set_material
+  youngs: 200.0
+- at: cytoskeleton_node
+  material: elastic
+  op: set_material
+  youngs: 300.0
+- at: cell
   axis: 1
-  spread: 1.0
+  block: polarity
+  op: seed_polarity
   seed: 3
+  spread: 1.0
+- at: cell
+  block: phase
+  hi: 6.2832
+  lo: 0.0
+  op: seed_state_random
+  seed: 11
 sets:
   cell:
     n: 1
@@ -948,19 +938,23 @@ sets:
       - 0.42
       - 0.5
     state:
-      pos:
-        width: 3
+      phase:
+        integration: first_order
         role: coordinate
-        integration: second_order_coordinate
-        boundary: world
-      vel:
+        width: 1
+      polarity:
+        integration: none
         width: 3
-        role: rate
+      pos:
+        boundary: world
+        integration: second_order_coordinate
+        role: coordinate
+        width: 3
+      vel:
         integration: second_order_rate
         record: false
-      polarity:
+        role: rate
         width: 3
-        integration: none
   centriole:
     parent: cell
     per_parent: 2

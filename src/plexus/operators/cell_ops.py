@@ -1006,3 +1006,397 @@ class StateDiffuse(Lateral):
             deg.index_add_(0, i, torch.ones_like(i, dtype=v.dtype))
             d = d / deg.clamp_min(1.0)[:, None]
         return {(lvl.name, self.block): self.D * d}
+
+
+# --------------------------------------------------------------------------- motility
+#
+# HOW AN ADHERENT CELL MOVES: by gripping the substrate and pulling, not by being pushed.
+#
+#     seed_polarity        seed     a unit direction per cell, in the substrate plane
+#     substrate_traction   lateral  a tangential force on the material that TOUCHES the floor
+#     protrusion           lateral  an active push at the leading edge, pull at the rear
+#
+# WHY NOT A BODY FORCE ON THE WHOLE CELL. The cheap way to move a cell is `gravity` with a
+# sideways vector, and it is wrong in a way that matters: every material point feels it equally,
+# so the cell translates as a blob and its speed has no relationship to its shape, its contact
+# area, or how well it adheres. A cell that spreads twice as far moves at the same speed, which
+# makes the adhesion mechanics decorative.
+#
+# Both operators below tie the force to WHERE the material is -- near the floor for traction,
+# along the polarity axis for protrusion -- so speed emerges from the mechanics instead of being
+# set. They compose: traction is the grip, protrusion is the step.
+
+@register_operator("seed_polarity", family="motility", set="cell", kind="seed")
+class SeedPolarity(Seed):
+    """A unit direction per element, lying IN the substrate plane, written to `block`.
+
+    cell -> cell: writes `polarity`, reads nothing.
+
+    In the plane and not isotropic in 3D, because a polarity with a vertical component asks the
+    cell to crawl into the floor or off it -- the traction below would then drive material through
+    the substrate, which the wall condition resists rather than converts, and the cell would
+    grind rather than move. The direction a crawling cell has is a direction ALONG its substrate.
+
+    `spread` in [0, 1] interpolates between one shared heading (0, a marching population) and an
+    independent draw per cell (1, a scattering one).
+
+    Reference: none -- an initial condition. Plexus (this work).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["polarity", "initial_condition", "motility"]
+    PARAM_ROLES = {"block": "state_block", "axis": "substrate_normal_axis",
+                   "spread": "heading_dispersion", "seed": "rng_seed"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.block = str(params.get("block", "polarity"))
+        self.axis = int(params.get("axis", 1))          # the substrate's normal (up)
+        self.spread = float(params.get("spread", 1.0))
+        self.seed = int(params.get("seed", 0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        if self.block not in lvl.state_schema:
+            raise ValueError(
+                f"seed_polarity: {lvl.name!r} has no state block {self.block!r}. Declare it under "
+                f"`sets.{lvl.name}.state:` -- a direction is state the cell carries, not a "
+                f"parameter of the operator that reads it.")
+        b0, b1 = lvl.state_schema[self.block]
+        D = b1 - b0
+        g = torch.Generator(device="cpu").manual_seed(self.seed)
+        ax = [i for i in range(D) if i != self.axis]
+        th0 = float(torch.rand(1, generator=g)) * 2 * math.pi
+        th = th0 + (torch.rand(lvl.n, generator=g) - 0.5) * (2 * math.pi * self.spread)
+        v = torch.zeros(lvl.n, D)
+        v[:, ax[0]] = torch.cos(th)
+        v[:, ax[1 % len(ax)]] = torch.sin(th)
+        lvl.state[:, b0:b1] = v.to(lvl.state.device)
+        print(f"[seed_polarity] {lvl.n} heading(s) in the plane normal to axis {self.axis}, "
+              f"spread {self.spread:g}", flush=True)
+        return {}
+
+
+@register_operator("substrate_traction", family="motility", set="particle", kind="lateral")
+class SubstrateTraction(Lateral):
+    """A tangential acceleration on the material within a contact layer of the substrate.
+
+    particle -[containment]-> particle: reads `pos` and its cell's `polarity`; emits an
+    acceleration the MPM substep consumes as a body force.
+
+        a_i = f * w(h_i) * p_{c(i)},        w(h) = 1 - clamp(h / d, 0, 1)
+
+    with h_i the height of point i above the substrate, d the contact-layer thickness in world
+    units, f the traction per unit mass (world units per time squared), p the unit polarity of the
+    CELL that owns the point, and c(i) the composition of the containment maps from the point up
+    to its cell -- two hops here, and `H.lift_index` is what makes that one gather.
+
+    `w` IS A RAMP AND NOT A STEP. A hard cutoff makes the traction discontinuous in the one
+    coordinate the cell is actively changing as it spreads, so the total force jumps whenever a
+    point crosses the threshold and the cell judders at the frequency of its own surface
+    roughness. The ramp makes the total traction a smooth function of how much material is near
+    the floor -- which IS the quantity the model is claiming matters.
+
+    EMITS `mpm_acceleration`, so it is routed to the substep as `a_ext` exactly like gravity and
+    is never integrated on the set directly.
+
+    Reference: the traction-based picture of adherent motility -- e.g. Barnhart, E. L. et al.
+    (2011). An adhesion-dependent switch between mechanisms that determine motile cell shape.
+    PLoS Biol. 9:e1001059. The implementation is not theirs.
+    """
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["f", "cell_set"]
+    INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
+    READS = ["pos", "polarity"]; WRITES = []
+    MAPS = ["parent"]
+    MECHANISM_TAGS = ["motility", "traction", "adhesion", "substrate"]
+    PARAM_ROLES = {"f": "traction_per_unit_mass", "contact": "contact_layer_thickness",
+                   "gate": "phase_gate",
+                   "floor": "substrate_height", "axis": "substrate_normal_axis",
+                   "cell_set": "polarity_owner", "block": "polarity_block"}
+    REFERENCE = ("Barnhart, E. L., Lee, K.-C., Keren, K., Mogilner, A. & Theriot, J. A. (2011). "
+                 "PLoS Biol. 9:e1001059.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.f = float(params["f"])
+        self.cell_set = str(params["cell_set"])
+        self.block = str(params.get("block", "polarity"))
+        self.axis = int(params.get("axis", 1))
+        self.floor = float(params.get("floor", 0.0))
+        self.contact = float(params.get("contact", 0.01))
+        self.gate = params.get("gate")
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        X = p.get("pos")
+        h = X[:, self.axis] - self.floor
+        w = (1.0 - (h / max(self.contact, 1e-9)).clamp(0.0, 1.0)).clamp(min=0.0)
+        cl = H.level(self.cell_set)
+        b0, b1 = cl.state_schema[self.block]
+        pol = cl.state[:, b0:b1]
+        idx = H.lift_index(p.name, self.cell_set)      # point -> ... -> cell, one composed gather
+        a = pol[idx] * (self.f * w)[:, None]
+        gt = _gate(self, H, idx)
+        if gt is not None:
+            a = a * gt[:, None]
+        if mask is not None:
+            a = a * mask.float()[:, None]
+        return {p.name: a}
+
+
+@register_operator("protrusion", family="motility", set="particle", kind="lateral")
+class Protrusion(Lateral):
+    """An active push at the leading edge and a pull at the rear -- the step, not the grip.
+
+    particle -[containment]-> particle: reads `pos`, its cell's centroid and its cell's
+    `polarity`; emits an acceleration the MPM substep consumes as a body force.
+
+        s_i = (x_i - x_c) . p_c / R,                     where along the cell i sits, in [-1, 1]
+        a_i = f * ( tanh(s_i / width) ) * p_c            forward at the front, back at the rear
+
+    x_c is the centroid of the cell that owns point i (kept current by `aggregate_centroid`), p_c
+    its unit polarity, R the cell radius in world units, f the drive per unit mass and `width` the
+    softness of the front/rear split -- small is two sharp lobes, large is nearly uniform.
+
+    THE FORCE SUMS TO ZERO OVER A SYMMETRIC CELL, which is the point and the difference from a
+    body force. `tanh` is odd, so a cell whose material is distributed symmetrically about its
+    centroid receives no net push: it EXTENDS forward and retracts behind instead of accelerating.
+    Motion then comes from that extension being anchored by `substrate_traction` -- the cell
+    reaches, grips, and pulls itself over the new contact. Without traction, protrusion alone
+    stretches a cell that goes nowhere, which is the correct behaviour of a cell on a frictionless
+    surface and a useful control.
+
+    Reference: the protrusion-adhesion-contraction picture of crawling -- e.g. Mogilner, A. (2009).
+    Mathematics of cell motility. J. Math. Biol. 58:105-134. The implementation is not his.
+    """
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["f", "cell_set", "radius"]
+    INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
+    READS = ["pos", "polarity"]; WRITES = []
+    MAPS = ["parent"]
+    MECHANISM_TAGS = ["motility", "protrusion", "active_stress"]
+    PARAM_ROLES = {"f": "drive_per_unit_mass", "radius": "cell_radius_world",
+                   "gate": "phase_gate",
+                   "width": "front_rear_softness", "cell_set": "polarity_owner"}
+    REFERENCE = "Mogilner, A. (2009). Mathematics of cell motility. J. Math. Biol. 58:105-134."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.f = float(params["f"])
+        self.cell_set = str(params["cell_set"])
+        self.block = str(params.get("block", "polarity"))
+        self.radius = float(params["radius"])
+        self.width = float(params.get("width", 0.45))
+        self.gate = params.get("gate")
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        X = p.get("pos")
+        cl = H.level(self.cell_set)
+        b0, b1 = cl.state_schema[self.block]
+        pol = cl.state[:, b0:b1]
+        cen = cl.get("pos")
+        idx = H.lift_index(p.name, self.cell_set)
+        pol_i, cen_i = pol[idx], cen[idx][:, : X.shape[1]]
+        s = ((X - cen_i) * pol_i).sum(1) / max(self.radius, 1e-9)
+        a = pol_i * (self.f * torch.tanh(s / max(self.width, 1e-6)))[:, None]
+        gt = _gate(self, H, idx)
+        if gt is not None:
+            a = a * gt[:, None]
+        if mask is not None:
+            a = a * mask.float()[:, None]
+        return {p.name: a}
+
+
+# --------------------------------------------------------------------------- the crawl cycle
+#
+# A CLOCK PER CELL, AND TWO OPERATORS READING IT AT DIFFERENT PHASES.
+#
+#     phase_clock   lateral   dphi/dt = omega, per cell -- the frequency source, as STATE
+#     `gate:` on protrusion and substrate_traction reads that phase
+#
+# WHY NET MOTION NEEDS TWO PHASES AND NOT ONE MECHANISM. `protrusion` is odd about the cell's
+# centroid, so it extends the front and retracts the rear and sums to zero: driven by a symmetric
+# cycle with a CONSTANT grip, the cell reaches out and is pulled straight back, and returns exactly
+# where it started. That is not a tuning failure, it is reciprocity -- the same argument as the
+# scallop theorem, and no amount of amplitude fixes it. What breaks it is gripping at one part of
+# the cycle and releasing at another: extend while anchored, retract while free. So the adhesion
+# has to be modulated OUT OF PHASE with the protrusion, which is why the clock is a separate thing
+# both of them read rather than a parameter inside either.
+#
+# WHY THE PHASE IS PER-CELL STATE AND NOT THE GLOBAL `pacemaker`. `field_ops.pacemaker` publishes
+# one periodic scalar per tick under `H.signals`, which is the right object when a whole tissue
+# beats together and the wrong one here: every cell would extend and grip in lockstep, which is an
+# artefact a reader has to be told to ignore. As a `phase` block on the cell set, each cell carries
+# its own angle, the spread of angles is an initial condition, `omega` can vary from cell to cell,
+# and the phase is recorded -- so "are they synchronised?" becomes a question about the data
+# instead of about the code.
+@register_operator("phase_clock", family="motility", set="cell", kind="lateral")
+class PhaseClock(Lateral):
+    """Advance a per-element phase at a fixed rate: the frequency source, as state.
+
+    cell -> cell: reads `block`, emits d(block)/dt.
+
+        dphi_i/dt = omega_i,        omega_i = omega * (1 + jitter * u_i),  u_i ~ U(-1, 1)
+
+    omega is in radians per unit time, so the period is 2*pi/omega in the run's own time units.
+    `jitter` disperses the RATES, which is what makes a population drift apart rather than merely
+    start apart: two cells seeded at different phases but identical omega stay exactly that far
+    apart forever, which is a rotation of a synchronised population and not a desynchronised one.
+
+    The phase is not wrapped. A angle that grows without bound is what the readers want -- `sin`
+    and `cos` are periodic anyway -- and wrapping would put a discontinuity into an integrated
+    block, which the engine would then integrate across.
+
+    Reference: none -- a linear phase is a modelling choice, not a published law. Plexus (this work).
+    """
+    EMIT = "velocity"
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["omega"]
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["phase"]; WRITES = ["phase"]
+    MECHANISM_TAGS = ["clock", "oscillator", "motility"]
+    PARAM_ROLES = {"omega": "angular_frequency", "jitter": "rate_dispersion",
+                   "block": "phase_block"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.block = str(params.get("block", "phase"))
+        self.omega = float(params["omega"])
+        self.jitter = float(params.get("jitter", 0.0))
+        self.seed = int(params.get("seed", 0))
+        self._w = None
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        b0, b1 = lvl.state_schema[self.block]
+        if self._w is None:
+            g = torch.Generator(device="cpu").manual_seed(self.seed)
+            u = (torch.rand(lvl.n, b1 - b0, generator=g) * 2.0 - 1.0)
+            self._w = (self.omega * (1.0 + self.jitter * u)).to(lvl.state.device)
+        return {(lvl.name, self.block): self._w}
+
+
+def _gate(op, H, idx):
+    """The cycle's amplitude for each point, from its cell's phase -- 1 + cos, in [0, 1].
+
+    `gate: {block: phase, offset: <radians>, floor: <0..1>}` on any operator that carries a
+    per-cell direction. `offset` is what puts two operators at different points of the SAME cycle;
+    `floor` keeps a residual so a gated force never switches fully off, which matters for the
+    adhesion (a cell that releases completely does not slide back, it falls over).
+    """
+    cfg = getattr(op, "gate", None)
+    if not cfg:
+        return None
+    cl = H.level(op.cell_set)
+    b0, b1 = cl.state_schema[str(cfg.get("block", "phase"))]
+    ph = cl.state[:, b0:b1][:, 0]
+    fl = float(cfg.get("floor", 0.0))
+    g = 0.5 * (1.0 + torch.cos(ph + float(cfg.get("offset", 0.0))))
+    return (fl + (1.0 - fl) * g)[idx]
+
+
+@register_operator("polar_active_stress", family="motility", set="particle", kind="lateral")
+class PolarActiveStress(Lateral):
+    """The cytoskeleton extending and retracting along the cell's polarity, as a STRESS.
+
+    particle -[containment]-> particle: reads its cell's `polarity` and `phase`; writes a
+    per-particle active stress that `mpm_scatter` adds to the elastic Kirchhoff stress.
+
+        sigma_act = A cos(phi_c + offset) (n n^T - I/3)
+
+    n is the cell's unit polarity, phi_c its phase, and A the amplitude in the run's stress units.
+    Over one cycle the sign REVERSES: half of it is extensile along n and half contractile, which
+    is the extend-then-retract the cycle is for. A body force cannot do this -- it can only push --
+    which is why the active element had to become a stress.
+
+    A STRESS RATHER THAN A FORCE, and the difference is not stylistic. A stress enters the momentum
+    balance as a DIVERGENCE, so it is transmitted through the material and conserves momentum; a
+    body force is applied pointwise and does neither. It also makes the amplitude interpretable:
+    the strain it produces is roughly A / (lambda + 2 mu), so `amplitude_frac` states the target
+    strain directly and `amplitude` is derived from the material the operator is acting on. The
+    body-force version of this needed a drive 47x larger than the one in use before its
+    deformation would have been visible at all, and there was no number in the spec that said so.
+
+    DEVIATORIC, hence CONSTANT VOLUME. `n n^T - I/3` is traceless: it elongates along n and
+    contracts across it, to first order without changing the volume. The plain `n n^T` form is
+    also a pressure along n, so a cell driven by it would breathe as well as reach -- and a real
+    cell reaching forward is not inflating, it is redistributing the material it has.
+
+    ON THE CYTOSKELETON, not on the whole cell: the set that generates the force in a real cell is
+    the one that carries it here, which is what putting every organelle in its own set bought.
+
+    Reference: Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101; Marchetti, M. C.
+    et al. (2013). Rev. Mod. Phys. 85:1143-1189 (active stress in polar/nematic gels).
+    """
+    EMIT = None                       # a stress, consumed by the substep; no integrable delta
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["cell_set"]
+    INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
+    READS = ["polarity", "phase"]; WRITES = []
+    MAPS = ["parent"]
+    MECHANISM_TAGS = ["active_stress", "motility", "protrusion", "cytoskeleton"]
+    PARAM_ROLES = {"amplitude": "active_stress", "amplitude_frac": "target_strain",
+                   "offset": "cycle_phase_offset", "cell_set": "polarity_owner",
+                   "deviatoric": "volume_preserving"}
+    REFERENCE = ("Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101; "
+                 "Marchetti, M. C. et al. (2013). Rev. Mod. Phys. 85:1143-1189.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.cell_set = str(params["cell_set"])
+        self.block = str(params.get("block", "polarity"))
+        self.phase_block = str(params.get("phase_block", "phase"))
+        self.amplitude = params.get("amplitude")
+        self.frac = params.get("amplitude_frac")
+        self.offset = float(params.get("offset", 0.0))
+        self.deviatoric = bool(params.get("deviatoric", True))
+        if (self.amplitude is None) == (self.frac is None):
+            raise ValueError("polar_active_stress: give `amplitude` (stress units) OR "
+                             "`amplitude_frac` (of the set's own lambda + 2 mu), not both and "
+                             "not neither -- the second is the one that states a target strain.")
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        X = p.get("pos")
+        D = X.shape[1]
+        cl = H.level(self.cell_set)
+        b0, b1 = cl.state_schema[self.block]
+        q0, q1 = cl.state_schema[self.phase_block]
+        idx = H.lift_index(p.name, self.cell_set)
+        n = cl.state[:, b0:b1][:, :D][idx]
+        n = n / n.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        ph = cl.state[:, q0:q1][:, 0][idx]
+        A = (torch.as_tensor(float(self.amplitude), device=X.device, dtype=X.dtype)
+             if self.amplitude is not None
+             else float(self.frac) * (p.la + 2.0 * p.mu))
+        g = A * torch.cos(ph + self.offset)
+        if mask is not None:
+            g = g * mask.float()
+        M = n[:, :, None] * n[:, None, :]
+        if self.deviatoric:
+            M = M - torch.eye(D, device=X.device, dtype=X.dtype)[None] / float(D)
+        sig = g[:, None, None] * M
+        # ALLOCATED ONCE AND WRITTEN IN PLACE. The substep is captured as a CUDA graph, which bakes
+        # in the addresses it saw; a fresh tensor per tick would leave the replay reading the one
+        # from the tick it was captured on.
+        buf = getattr(p, "act_stress", None)
+        if buf is None or buf.shape != sig.shape:
+            p.register_buffer("act_stress", torch.zeros_like(sig))
+            buf = p.act_stress
+        buf.copy_(sig)
+        return {}

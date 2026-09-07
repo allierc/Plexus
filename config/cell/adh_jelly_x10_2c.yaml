@@ -1,5 +1,5 @@
 general:
-  name: adh_jelly_15c
+  name: adh_jelly_x10_2c
   seed: 1
   n_frames: 900
   dt: 0.002
@@ -11,61 +11,22 @@ general:
   - 1.0
   save_data: null
   units:
-    length_um: 200.0
+    length_um: 100.0
   record_cap: 60
 sets:
   cell:
-    n: 15
+    n: 2
     start:
-    - - 0.17244
-      - 0.34302
-      - 0.18184
-    - - 0.16521
-      - 0.35072
-      - 0.38864
-    - - 0.16479
-      - 0.35015
-      - 0.5942
-    - - 0.17559
-      - 0.3414
-      - 0.81073
-    - - 0.39033
-      - 0.35654
-      - 0.16668
-    - - 0.38454
-      - 0.35255
-      - 0.40537
-    - - 0.39472
-      - 0.34793
-      - 0.62119
-    - - 0.37946
-      - 0.35717
-      - 0.81645
-    - - 0.59727
-      - 0.34236
-      - 0.17199
-    - - 0.61659
-      - 0.34361
-      - 0.39485
-    - - 0.61149
-      - 0.34745
-      - 0.60887
-    - - 0.59493
-      - 0.34119
-      - 0.81405
-    - - 0.82769
-      - 0.34855
-      - 0.17216
-    - - 0.82496
-      - 0.34906
-      - 0.38674
-    - - 0.83096
-      - 0.35398
-      - 0.60014
+    - - 0.22212
+      - 0.76405
+      - 0.70047
+    - - 0.31385
+      - 0.49653
+      - 0.46161
   plasma_membrane:
     parent: cell
     per_parent: 421
-    radius: 0.05
+    radius: 0.1
     types:
       plasma_membrane:
         fraction: 1.0
@@ -76,13 +37,13 @@ sets:
   plasma_membrane_node:
     parent: plasma_membrane
     per_parent: 300
-    radius: 0.05
+    radius: 0.1
     density: 1.0
     entity: mpm_particle
   cytoskeleton:
     parent: cell
     per_parent: 400
-    radius: 0.05
+    radius: 0.1
     types:
       cytoskeleton:
         fraction: 1.0
@@ -93,13 +54,13 @@ sets:
   cytoskeleton_node:
     parent: cytoskeleton
     per_parent: 600
-    radius: 0.05
+    radius: 0.1
     density: 1.0
     entity: mpm_particle
   nuclear_envelope:
     parent: cell
     per_parent: 138
-    radius: 0.05
+    radius: 0.1
     types:
       nucleus:
         fraction: 1.0
@@ -109,13 +70,13 @@ sets:
   nuclear_envelope_node:
     parent: nuclear_envelope
     per_parent: 5000
-    radius: 0.05
+    radius: 0.1
     density: 1.1
     entity: mpm_particle
   chromatin:
     parent: cell
     per_parent: 31
-    radius: 0.05
+    radius: 0.1
     types:
       chromatin:
         fraction: 1.0
@@ -126,13 +87,13 @@ sets:
   chromatin_node:
     parent: chromatin
     per_parent: 1250
-    radius: 0.05
+    radius: 0.1
     density: 1.2
     entity: mpm_particle
   nucleolus:
     parent: cell
     per_parent: 2
-    radius: 0.05
+    radius: 0.1
     types:
       nucleolus:
         fraction: 1.0
@@ -143,13 +104,13 @@ sets:
   nucleolus_node:
     parent: nucleolus
     per_parent: 1250
-    radius: 0.05
+    radius: 0.1
     density: 1.3
     entity: mpm_particle
   rough_er:
     parent: cell
     per_parent: 11
-    radius: 0.05
+    radius: 0.1
     types:
       rough_er:
         fraction: 1.0
@@ -160,13 +121,13 @@ sets:
   rough_er_node:
     parent: rough_er
     per_parent: 12500
-    radius: 0.05
+    radius: 0.1
     density: 1.0
     entity: mpm_particle
   smooth_er:
     parent: cell
     per_parent: 3
-    radius: 0.05
+    radius: 0.1
     types:
       smooth_er:
         fraction: 1.0
@@ -177,13 +138,13 @@ sets:
   smooth_er_node:
     parent: smooth_er
     per_parent: 12500
-    radius: 0.05
+    radius: 0.1
     density: 1.0
     entity: mpm_particle
   golgi:
     parent: cell
     per_parent: 14
-    radius: 0.05
+    radius: 0.1
     types:
       golgi:
         fraction: 1.0
@@ -194,13 +155,13 @@ sets:
   golgi_node:
     parent: golgi
     per_parent: 1250
-    radius: 0.05
+    radius: 0.1
     density: 1.0
     entity: mpm_particle
   mitochondria:
     parent: cell
     per_parent: 77
-    radius: 0.05
+    radius: 0.1
     types:
       mitochondria:
         fraction: 1.0
@@ -226,13 +187,13 @@ sets:
   mitochondria_node:
     parent: mitochondria
     per_parent: 1250
-    radius: 0.05
+    radius: 0.1
     density: 1.1
     entity: mpm_particle
   centriole:
     parent: cell
     per_parent: 2
-    radius: 0.05
+    radius: 0.1
     types:
       centriole:
         fraction: 1.0
@@ -243,13 +204,13 @@ sets:
   centriole_node:
     parent: centriole
     per_parent: 1250
-    radius: 0.05
+    radius: 0.1
     density: 1.1
     entity: mpm_particle
   protein_a:
     parent: cell
     per_parent: 1
-    radius: 0.05
+    radius: 0.1
     types:
       protein_a:
         fraction: 1.0
@@ -260,13 +221,13 @@ sets:
   protein_a_node:
     parent: protein_a
     per_parent: 125000
-    radius: 0.05
+    radius: 0.1
     density: 0.6
     entity: mpm_particle
   protein_b:
     parent: cell
     per_parent: 1
-    radius: 0.05
+    radius: 0.1
     types:
       protein_b:
         fraction: 1.0
@@ -277,13 +238,13 @@ sets:
   protein_b_node:
     parent: protein_b
     per_parent: 125000
-    radius: 0.05
+    radius: 0.1
     density: 0.6
     entity: mpm_particle
   protein_c:
     parent: cell
     per_parent: 1
-    radius: 0.05
+    radius: 0.1
     types:
       protein_c:
         fraction: 1.0
@@ -294,13 +255,13 @@ sets:
   protein_c_node:
     parent: protein_c
     per_parent: 125000
-    radius: 0.05
+    radius: 0.1
     density: 0.6
     entity: mpm_particle
   protein_d:
     parent: cell
     per_parent: 1
-    radius: 0.05
+    radius: 0.1
     types:
       protein_d:
         fraction: 1.0
@@ -311,13 +272,13 @@ sets:
   protein_d_node:
     parent: protein_d
     per_parent: 125000
-    radius: 0.05
+    radius: 0.1
     density: 0.6
     entity: mpm_particle
   protein_e:
     parent: cell
     per_parent: 1
-    radius: 0.05
+    radius: 0.1
     types:
       protein_e:
         fraction: 1.0
@@ -328,18 +289,18 @@ sets:
   protein_e_node:
     parent: protein_e
     per_parent: 125000
-    radius: 0.05
+    radius: 0.1
     density: 0.6
     entity: mpm_particle
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 384
+    n_grid: 320
 seed:
 - op: seed_cell_atlas
   at: plasma_membrane
   particles: plasma_membrane_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
   geometry:
     plasma_membrane:
@@ -347,72 +308,72 @@ seed:
 - op: seed_cell_atlas
   at: cytoskeleton
   particles: cytoskeleton_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: nuclear_envelope
   particles: nuclear_envelope_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: chromatin
   particles: chromatin_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: nucleolus
   particles: nucleolus_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: rough_er
   particles: rough_er_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: smooth_er
   particles: smooth_er_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: golgi
   particles: golgi_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: mitochondria
   particles: mitochondria_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: centriole
   particles: centriole_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_a
   particles: protein_a_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_b
   particles: protein_b_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_c
   particles: protein_c_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_d
   particles: protein_d_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_e
   particles: protein_e_node
-  cell_radius: 0.05
+  cell_radius: 0.1
   vel_init: 0.0
 - op: seed_state_random
   at: mitochondria
@@ -717,16 +678,16 @@ operators:
   child: plasma_membrane
 - op: radius_graph
   at: mitochondria
-  radius: 0.27018
+  radius: 0.37018
 - op: radius_graph
   at: nuclear_envelope
-  radius: 0.27018
+  radius: 0.37018
 - op: radius_graph
   at: rough_er
-  radius: 0.27018
+  radius: 0.37018
 schedule:
 - gravity
-- substep_dt: 2.898551e-05
+- substep_dt: 3.174603e-05
   steps:
   - mpm_strain
   - mpm_strain
@@ -842,7 +803,7 @@ plotting:
   - protein_e_node
   surface:
     plasma_membrane_node:
-      spacing: 0.00238
+      spacing: 0.00476
       blur: 1.4
       smooth: 40
       ambient: 0.12
@@ -854,7 +815,7 @@ plotting:
       render: dots
       point_size: 0.9
     nuclear_envelope_node:
-      spacing: 0.00179
+      spacing: 0.00357
       blur: 1.2
       smooth: 30
     chromatin_node:

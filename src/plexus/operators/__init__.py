@@ -60,7 +60,8 @@ from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, sur
 #                                                 plate_confine, bm_sense, ecm_load, ecm_gate_growth
 from . import io_ops               # noqa: F401  load_run -- x_0 from a finished run
 from . import cell_ops             # noqa: F401  compartment (entity), seed_cell_atlas,
-#                                                 aggregate_centroid
+#                                                 aggregate_centroid, state_diffuse, and the
+#                                                 motility pair: substrate_traction, protrusion
 from . import neural                # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
 #                                                 (psi: shared | type_pre | type_pairwise),
 #                                                 neuron_field_input (Omega)
