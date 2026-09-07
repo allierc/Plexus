@@ -133,8 +133,13 @@ class MeshTable(dict):
             return dict.__setitem__(self, k, v)
         import torch as _t
         col = self._cell.get(k)
-        n = min(int(dict.get(self, "nF", 0)), int(col.shape[0]))
         w = v if _t.is_tensor(v) else _t.as_tensor(_np.asarray(v))
+        # THE ARRAY'S OWN LENGTH IS THE AUTHORITY, not `nF`, because the two disagree by design at
+        # the moment of a topology edit. `cell_die` writes the rebuilt `apop_flag` -- one entry per
+        # SURVIVING face -- several lines BEFORE it sets `m["nF"] = nF2`, so slicing the write by
+        # `nF` asked for 296 rows from a 295-long array. Storing exactly what was handed over is
+        # also what the dict did, so no caller changes meaning.
+        n = min(int(w.shape[0]), int(col.shape[0]))
         col[:n, 0] = w[:n].to(dtype=col.dtype, device=col.device)
 
     def __contains__(self, k):
@@ -294,7 +299,7 @@ class MeshTable(dict):
     # name is served by this table but not stored in it, and recording it here as well would put the
     # same numbers in the trajectory twice under two names. They are still recorded and still drawn
     # -- as `cell__*`, from the set that owns them, which both renderers now read.
-    FACE_RECORD = ("apop", "inhib", "myo_med")
+    FACE_RECORD = ("myo_med",)
 
     # THE RECORDED NAME IS NOT ALWAYS THE LIVE ONE, and two of the four colours above were lost to
     # exactly that. The operators write `m["apop_flag"]` (`cell_die`) and `m["inhib_frac"]`
@@ -309,7 +314,15 @@ class MeshTable(dict):
     # An alias rather than a rename because both live names are load-bearing: `apop_flag` is
     # carried across renumbering by `cell_die` and `edge_flip`, and `ecm_gate_growth`'s entry
     # condition is a key TEST on this table, so the namespace is not free to be tidied.
-    FACE_ALIAS = {"apop": "apop_flag", "inhib": "inhib_frac"}
+    # THE ALIAS RETIRES WITH THE COLUMNS. It existed because the RECORDED name differed from the
+    # LIVE one -- operators write `m["apop_flag"]` and `m["inhib_frac"]`, `FACE_RECORD` called them
+    # `apop` and `inhib`, and `snapshot`'s bare `self.get(nm)` returned None for both, so the core
+    # recorded NEITHER the dying-cell flag NOR the growth inhibitor, ever. Once they are declared
+    # blocks on the cell set the block name IS the recorded name (`cell__apop_flag`), so there are
+    # no longer two names to bridge. Kept as an empty mapping rather than deleted, because
+    # `snapshot` and every offline reader still consult it and an absent attribute is a different
+    # failure from an empty one.
+    FACE_ALIAS: dict = {}
 
     # THE OPERATORS' OWN COUNTERS, which are scalars on the table and not per-face arrays -- so
     # `FACE_RECORD` cannot carry them, and without them a gate has to INFER what an operator already

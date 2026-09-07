@@ -563,7 +563,8 @@ def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
 # rung rather than a flag day.
 MESH_CELL_STATE = ("A0", "P0", "V0f", "alive", "age", "ndiv",
                    "Vbirth", "divjit", "phase", "phase_t", "cyc_inhib", "cyc_vprev",
-                   "mg_scale", "A0_init", "P0_init", "V0f_init", "apop_flag", "elong")
+                   "mg_scale", "A0_init", "P0_init", "V0f_init",
+                   "apop_flag", "inhib_frac", "elong")
 
 
 def _link_mesh_maps(H, sim) -> None:

@@ -94,6 +94,15 @@ def _carry_face_state(m, keep, dt, dev):
         m[nm] = a.to(dev)[idx.clamp(max=max(a.shape[0] - 1, 0))].to(dt)
 
 
+def _as_np(v, dtype=np.float64):
+    """A per-cell array as numpy, whether it arrived as a tensor or was already an array."""
+    if v is None:
+        return None
+    if hasattr(v, "detach"):
+        return v.detach().cpu().numpy().astype(dtype)
+    return np.asarray(v, dtype).copy()
+
+
 def resolve_cell_set(H, at, override=None):
     """The set this mesh's faces ARE -- read from the mesh's own declaration, not from a parameter.
 
@@ -168,6 +177,30 @@ def set_cell_block(H, cat, name, values, nF):
     col = lvl.get(name)
     col[:nF, 0] = torch.as_tensor(np.asarray(values), dtype=lvl.state.dtype,
                                   device=lvl.state.device)
+
+
+def cell_block_t(H, cat, name, nF):
+    """The live rows of a declared width-1 cell block AS A TENSOR, in the set's own dtype.
+
+    THE FLOAT64 ROUND-TRIP IN `cell_block` IS NOT FREE. That one returns float64 numpy because its
+    first callers already worked in numpy and compared against thresholds coarse enough not to
+    care. The energy's targets are not like that: `A0`, `P0` and `V0f` go straight into
+    `cell_mechanics`, which turns them into vertex positions, and `edge_flip` reconnects on an
+    edge-length comparison -- so a single mantissa bit moves one flip and the run diverges from
+    there. Staying in the state tensor's dtype is what makes moving these arrays a MOVE, testable
+    by byte-identity, rather than a change that merely looks like one.
+    """
+    lvl = H.level(cat) if cat else None
+    if lvl is None or getattr(lvl, "state", None) is None or name not in lvl.state_schema:
+        return None
+    return lvl.get(name)[:nF, 0]
+
+
+def set_cell_block_t(H, cat, name, values, nF):
+    """Write a tensor into the first nF rows of a declared width-1 cell block, no dtype detour."""
+    lvl = H.level(cat)
+    v = values if torch.is_tensor(values) else torch.as_tensor(np.asarray(values))
+    lvl.get(name)[:nF, 0] = v.to(dtype=lvl.state.dtype, device=lvl.state.device)
 
 
 def require_cell_block(H, cat, name, nF, who):
@@ -2171,7 +2204,15 @@ class Apoptosis3D(Structural):
         # DIFFERENT cell after each death: marking one cell killed seven in the first smoke run,
         # a cascade down the index space. The flag rides the same `keep` map as `alive` and `age`,
         # so a cell stays the cell it was.
+        # AS NUMPY, BECAUSE THIS OPERATOR IS NUMPY. `apop_flag` was a float64 numpy array on the
+        # mesh table -- `m["apop_flag"] = np.asarray(...)` a few hundred lines down -- and the whole
+        # marking path is written in numpy: `np.where`, fancy indexing, set arithmetic. On the cell
+        # set it is a float32 CUDA tensor like every other declared block, so it is converted once
+        # here rather than each of the six places that assume an array. The values are a 0/1 flag,
+        # so float64 -> float32 -> float64 is exact and the run stays byte-identical.
         flag = m.get("apop_flag")
+        if flag is not None and hasattr(flag, "detach"):
+            flag = flag.detach().cpu().numpy().astype(np.float64)
         if flag is None or len(flag) != nF:
             base = np.zeros(nF, np.float64)
             if flag is not None:                       # carried across a topology change already
@@ -3106,8 +3147,10 @@ class TopoSnapshot3D(Structural):
             # a dying cell is drawn exactly like a living one, the sheet closes over the gap, and
             # the mechanism is invisible in the movie -- which is what happened: a 293-cell patch
             # dying at the north pole could not be seen even looking straight down at it.
-            apop=(np.asarray(m["apop_flag"]).copy()
-                  if isinstance(m.get("apop_flag"), np.ndarray) else None),
+            # EITHER TYPE. The flag is a declared block on the cell set now, so it arrives as a
+            # tensor; a spec that has not moved it still has the numpy column. An `isinstance`
+            # check on one of the two silently recorded None for the other.
+            apop=_as_np(m.get("apop_flag")),
             buf_full=bool(m.get("buf_full"))))
         return {}
 
@@ -3445,7 +3488,10 @@ class ReconnectT1_3D(Rewire):
                     _a = m[_nm].detach().cpu().numpy()
                     m[_nm] = torch.as_tensor(np.asarray([_a[i] for i in keep]),
                                              dtype=m[_nm].dtype, device=m[_nm].device)
-            if isinstance(m.get("apop_flag"), np.ndarray):
+            # ONLY WHILE IT IS STILL A MESH COLUMN. Declared on the cell set it is permuted by
+            # `H.renumber_set` below, with the same `keep`; carrying it here as well would permute
+            # it twice.
+            if isinstance(dict.get(m, "apop_flag", None), np.ndarray):
                 m["apop_flag"] = np.asarray([m["apop_flag"][i] for i in keep], np.float64)
             # AND THE OPEN NAMES, which this branch has never carried. The tuple above is the
             # CLOSED list every topology operator knows; `face_carry` is the open one an operator

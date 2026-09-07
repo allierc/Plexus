@@ -2047,10 +2047,17 @@ class LiveMovie:
             # exactly the thing that then draws nothing. Same lesson as the replay's literal
             # four-column list, one level up.
             mt = {}
-            for k in ("age", "ndiv", "apop", "inhib"):
+            # THE BLOCK NAME FIRST, THE RETIRED ALIAS SECOND. `apop_flag` and `inhib_frac` are
+            # declared blocks now and are recorded under their own names; a trajectory written
+            # before the move still carries `apop`/`inhib`, and a reader that knew only one of the
+            # two spellings would draw nothing on half the runs on disk.
+            for k, old in (("age", None), ("ndiv", None),
+                           ("apop_flag", "apop"), ("inhib_frac", "inhib")):
                 v = m.get(k)
+                if v is None and old is not None:
+                    v = m.get(old)
                 if v is not None:
-                    mt[k] = v.detach().cpu().numpy() if hasattr(v, "detach") else v
+                    mt[old or k] = v.detach().cpu().numpy() if hasattr(v, "detach") else v
             mt["nF"] = nF
             mother, daughter, kills, _sup = _marks(mt, np.arange(nF), nF, prev_nF=prev)
             rgb = base
