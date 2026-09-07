@@ -69,6 +69,8 @@ sets:
       V0f_init:
         width: 1
         record: false
+      inhib_frac:
+        width: 1
       phase:
         width: 1
       phase_t:

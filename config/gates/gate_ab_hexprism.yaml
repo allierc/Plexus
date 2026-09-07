@@ -39,6 +39,17 @@ sets:
       divjit:
         width: 1
         record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
   half_edge:
     n: 64
     maps:

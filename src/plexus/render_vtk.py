@@ -473,7 +473,9 @@ def _marks(mt, idx, nF, prev_nF=None):
         new = np.asarray(idx, int) >= int(prev_nF)
         daughter = new
         mother = (div & ~new) if div is not None else None
-    kills, sup = col("apop"), col("inhib")
+    # the declared block name first, the retired `FACE_ALIAS` spelling second -- see live_movie
+    kills = col("apop_flag") if col("apop_flag") is not None else col("apop")
+    sup = col("inhib_frac") if col("inhib_frac") is not None else col("inhib")
     return (mother, daughter,
             (None if kills is None else kills > 0), (None if sup is None else sup > 0))
 

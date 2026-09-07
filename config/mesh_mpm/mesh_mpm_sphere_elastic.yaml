@@ -55,6 +55,24 @@ sets:
     mesh: half_edge
   sphere_face:
     n: 512
+    state:
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
   mpm_particle:
     n: 500000
     types:

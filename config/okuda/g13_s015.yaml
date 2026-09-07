@@ -28,6 +28,25 @@ sets:
         width: 3
       area:
         width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      apop_flag:
+        width: 1
   half_edge:
     n: 32000
     maps:
