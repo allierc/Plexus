@@ -99,6 +99,12 @@ language. Each clip below is a single `spec.yaml` over the identical operators a
 schedule grammar — **hover (or tab to) a title to read the exact spec that generated
 it.**
 
+Every caption reads the same way, in the terms above: **the sets and how many entities
+they hold · the operator kinds the schedule composes · what that composition makes.**
+The only numbers are counts of entities. Where two clips sit side by side, the caption
+names *which* number in the spec changed and not what it changed to — because the point
+of the pair is that the sets, the operators and the schedule did not move.
+
 ```{=html}
 <style>
 /* Four clips per row everywhere. `g3` is kept as an alias of `g4` rather than deleted from the
@@ -131,7 +137,7 @@ it.**
   <figure class="sim-card">
     <video src="gallery/turing_gs_stripes.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">stripes (F = 0.05)<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one set, two states<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_kappa_B
   seed: 0
   n_frames: 6000
@@ -187,13 +193,13 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">one Gray–Scott chemistry diffusing over the cell–cell graph: the pattern settles into 4 winding activator bands covering 45% of the 4,000 cells</span>
+      <span class="sim-cap">one set of 4,000 cells, two chemical states each · Seed, Rewire, then diffusion and reaction in one schedule · the bands are the composition, not an operator</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_gs_spots.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">spots (F = 0.034)<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one constant apart<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_eta_B
   seed: 0
   n_frames: 6000
@@ -249,13 +255,13 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">the same graph, the same diffusion, F 0.034 instead of 0.05 — the only difference — and the bands break into 18 separate spots over 26% of the cells</span>
+      <span class="sim-cap">the same set, the same four operators · one reaction constant differs and nothing else · the bands break into spots</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_gs_coupled_eta_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">two chemistries, coupled<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">two chemistries, one schedule<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_coupled_eta_B
   seed: 0
   n_frames: 12000
@@ -333,13 +339,13 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">the same two Gray–Scott systems, now <b>coupled through the reaction term</b> (γ = 0.2) rather than run side by side: they exclude one another, 0 of the 4,000 cells carrying both against 238 when the coupling is removed</span>
+      <span class="sim-cap">the same 4,000 cells, now carrying two chemistries · two diffusion and two reaction operators in one schedule · the patterns exclude one another</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_rps_a2p0_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">cyclic competition<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">three species, cyclically coupled<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_rps_a2p0_B
   seed: 0
   n_frames: 4000
@@ -401,7 +407,7 @@ plotting:
   - &#x27;#ff0000&#x27;
   - &#x27;#00ff00&#x27;
   - &#x27;#0000ff&#x27;</pre></span></span>
-      <span class="sim-cap">three species, each suppressing the next and none dominating: they partition the disc into 10, 6 and 8 domains and never settle — the field still moves 300× faster at the last frame than the coupled run beside it</span>
+      <span class="sim-cap">4,000 cells, three species each suppressing the next · the same operators, cyclically coupled · domains that never settle</span>
     </figcaption>
   </figure>
 </div>
@@ -413,7 +419,7 @@ plotting:
   <figure class="sim-card">
     <video src="gallery/tyssue_apoptose.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">apoptosis<span class="sim-spec"><pre>general:   # run-level settings
+      <span class="sim-name" tabindex="0">a death inside mechanics<span class="sim-spec"><pre>general:   # run-level settings
   name: tyssue_apop_apoptose   # run name (-&gt; archive/&lt;name&gt;/)
   seed: 0   # RNG seed
   n_frames: 150   # number of simulation frames
@@ -471,13 +477,13 @@ schedule:   # the order the operators run each frame
 - apoptosis
 - t1_transition
 - topo_snapshot</pre></span></span>
-      <span class="sim-cap">cell death creates a local gap that closes</span>
+      <span class="sim-cap">one set of 142 vertices sharing junctions · a Lateral shape energy, a Structural death, a Rewire that flips the junction · the sheet closes over the gap</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/tyssue_morphogen_bulge.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">morphogen bulge<span class="sim-spec"><pre>general:   # run-level settings
+      <span class="sim-name" tabindex="0">two levels, one schedule<span class="sim-spec"><pre>general:   # run-level settings
   name: tyssue_cell_morphogen_bulge   # run name (-&gt; archive/&lt;name&gt;/)
   seed: 0   # RNG seed
   n_frames: 120   # number of simulation frames
@@ -552,7 +558,7 @@ schedule:   # the order the operators run each frame
 - cell_morphogen
 - morphogen_growth
 - shape_energy</pre></span></span>
-      <span class="sim-cap">local growth produces a tissue bulge</span>
+      <span class="sim-cap">two levels: 222 cells over 503 shared vertices · Exchange carries the morphogen, growth answers it, mechanics relaxes · a bulge where it sits</span>
     </figcaption>
   </figure>
 </div>
@@ -564,7 +570,7 @@ schedule:   # the order the operators run each frame
   <figure class="sim-card">
     <video src="gallery/apop_patch_big_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a dying big patch<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">a patch of deaths<span class="sim-spec"><pre>general:
   name: apop_patch_big
   seed: 0
   n_frames: 900
@@ -654,13 +660,13 @@ _basis:
   why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">seen from the pole: 293 cells (blue) are marked to die, and the surface is drawn <b>inward</b> where they go — an invagination, the one deformation growth cannot make</span>
+      <span class="sim-cap">two levels, cells over shared vertices; 293 marked to die · a Structural death inside a mechanical schedule · the surface is drawn inward</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/apop_rings9_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">nine dying rings<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">nine bands of deaths<span class="sim-spec"><pre>general:
   name: apop_rings9
   seed: 0
   n_frames: 600
@@ -751,13 +757,13 @@ _basis:
   why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">895 deaths in nine bands: the vesicle does not fall apart, it closes over every gap and shrinks</span>
+      <span class="sim-cap">the same two levels, 895 deaths in nine bands · the same Structural and Rewire operators · every gap closes and the vesicle shrinks</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/apop_half_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">half the sheet<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">half the set removed<span class="sim-spec"><pre>general:
   name: apopgeo_half
   seed: 0
   n_frames: 600
@@ -847,7 +853,7 @@ _apopgeo:
     n_bands: 1
   why: death is the only mechanism in this composition, so the cell count can only
     fall and n_apop must equal 400 - cells_final exactly</pre></span></span>
-      <span class="sim-cap">285 of 400 cells extruded — the topology survives, and what is left is an ellipsoid pulled from a sphere</span>
+      <span class="sim-cap">285 of 400 cells extruded · the same schedule, a different seeded pattern of deaths · a sphere pulled into an ellipsoid</span>
     </figcaption>
   </figure>
 </div>
@@ -862,7 +868,7 @@ _apopgeo:
   <figure class="sim-card">
     <video src="gallery/turing_grow_divide_v4.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">grow &amp; divide<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">growth and division compose<span class="sim-spec"><pre>general:
   name: grow_divide
   seed: 0
   n_frames: 1800
@@ -963,13 +969,13 @@ schedule:
 - cell_grow
 - cell_divide
 - topo_record</pre></span></span>
-      <span class="sim-cap">growth that no morphogen gates, and division following it: 2,000 cells to 25,079, and the shell stays a sphere (reduced volume 1.00)</span>
+      <span class="sim-cap">2,000 cells to 25,079 over shared vertices · Structural growth and division inside the mechanical schedule · the shell stays a sphere</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_coral_v4.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">chemistry rides the growth<span class="sim-spec"><pre>general:
   name: r021_12
   seed: 0
   n_frames: 1800
@@ -1109,13 +1115,13 @@ _basis:
   why: chemistry=gs, material=gated, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">a Gray–Scott pattern riding a growing shell: red stripes wander across 4,199 cells and the shell stays round (protrusion peak 1.03)</span>
+      <span class="sim-cap">4,199 cells, two chemical states each · chemistry and Structural growth on the same set, one schedule · stripes ride a growing shell</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_morphogen_v6.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">morphogen + growth<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">geometry feeds the chemistry<span class="sim-spec"><pre>general:
   name: r005_06
   seed: 0
   n_frames: 1800
@@ -1306,14 +1312,14 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">activator-gated growth creates arms</span>
+      <span class="sim-cap">cells over a shared vertex mesh · Exchange ties the chemistry to the geometry that carries it · arms grow where the activator sits</span>
     </figcaption>
   </figure>
 
 <figure class="sim-card">
     <video src="gallery/turing_flower_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">purse-string, k = 0.062<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">a Lateral tension added<span class="sim-spec"><pre>general:
   name: r013_05
   seed: 0
   n_frames: 1800
@@ -1504,13 +1510,13 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">eight arms from one activator: 12,201 cells, protrusion peak 1.41</span>
+      <span class="sim-cap">12,201 cells · a Lateral interface tension added to the same schedule · eight arms</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_lobes_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">purse-string, k = 0.031<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one constant halved<span class="sim-spec"><pre>general:
   name: r016_01
   seed: 0
   n_frames: 1800
@@ -1701,13 +1707,13 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">the same graph at half the Gray–Scott k, and it lobes and branches instead: 22,231 cells</span>
+      <span class="sim-cap">22,231 cells · the same sets and the same schedule, one reaction constant halved · it lobes and branches instead</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_noline_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">no purse-string<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">the tension taken out<span class="sim-spec"><pre>general:
   name: r017_00_ctrl
   seed: 0
   n_frames: 1800
@@ -1884,14 +1890,14 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">the interface tension removed, so growth acts alone: 5,511 cells and the longest arms of the three, peak 1.83</span>
+      <span class="sim-cap">5,511 cells · the same schedule with the interface tension taken out · growth acts alone, and the arms are longest</span>
     </figcaption>
   </figure>
 
 <figure class="sim-card">
     <video src="gallery/turing_folds_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">reaction rate 0.75<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">chemistry faster than growth<span class="sim-spec"><pre>general:
   name: r020_01
   seed: 0
   n_frames: 1800
@@ -2068,13 +2074,13 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">chemistry fast against growth: the shell folds rather than forming arms, and carries 24,661 cells</span>
+      <span class="sim-cap">24,661 cells · the same operators, the chemistry faster against the growth · the shell folds instead of arming</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_arms_r020ctrl.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">rate 0.5, purse-string on<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">the tension put back<span class="sim-spec"><pre>general:
   name: r020_00_ctrl
   seed: 851651
   n_frames: 1800
@@ -2274,13 +2280,13 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">the same reaction rate with the purse-string on: 12,223 cells drawn into 13 arms, protrusion peak 1.79</span>
+      <span class="sim-cap">12,223 cells · the same operators with the interface tension back in the schedule · thirteen arms</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_spikes_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">rate 0.25, growth doubled<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">growth faster than chemistry<span class="sim-spec"><pre>general:
   name: r021_06
   seed: 1006
   n_frames: 1800
@@ -2457,14 +2463,14 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">slower still, with growth doubled: five long thin arms, 21,832 cells. This one reseeds as well, so it is the ratio that compares and not the shape</span>
+      <span class="sim-cap">21,832 cells · the same operators, chemistry slower and growth faster · five long thin arms</span>
     </figcaption>
   </figure>
 
 <figure class="sim-card">
     <video src="gallery/turing_death_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">cell death<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">growth and death together<span class="sim-spec"><pre>general:
   name: tsd_max
   seed: 0
   n_frames: 1800
@@ -2656,13 +2662,13 @@ _two_species:
     one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species
     run cannot put growth and death in different places, because every operator reads
     the same field.</pre></span></span>
-      <span class="sim-cap">the second field marks cells to die instead, from frame 180 — under half the cells the inhibited run keeps, from the same growth law. 2,895 cells from 2,000 seeded</span>
+      <span class="sim-cap">2,895 cells from 2,000 seeded · a second chemical state drives a Structural death beside the growth · both mechanisms, one schedule</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_antiphase_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one field, in antiphase<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one state drives both<span class="sim-spec"><pre>general:
   name: sc_antiphase
   seed: 0
   n_frames: 1800
@@ -2827,7 +2833,7 @@ _sculpt:
   k_purse: null
   asks: &#x27;the finger hypothesis: grow at the spots, remove the flanks, and a bulge
     should sharpen&#x27;</pre></span></span>
-      <span class="sim-cap">one field: death fires where growth's own chemical is low, so it can only land between the spots. Top view, where the network is. 2,387 cells from 2,000 seeded</span>
+      <span class="sim-cap">2,387 cells from 2,000 seeded · one chemical state drives growth and death at once · death can only land between the spots</span>
     </figcaption>
   </figure>
 </div>
@@ -2838,7 +2844,7 @@ _sculpt:
   <figure class="sim-card">
     <video src="gallery/mpm2_multimaterial.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">three materials, one solve<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one parent, three materials<span class="sim-spec"><pre>general:
   name: sit_multimaterial
   seed: 0
   n_frames: 2400
@@ -2982,13 +2988,13 @@ plotting:
     - 0.96
     - 1.0
   slow_motion: 4</pre></span></span>
-      <span class="sim-cap">two liquids of different density and a snow-like plastic dropped into the same 192&sup3; grid solve — 2.6&nbsp;M particles, three constitutive laws, one schedule</span>
+      <span class="sim-cap">3 parent cells owning 2.6 M particles, one grid field · Aggregate ↑, then Exchange to the grid and back · three materials, one solve</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/mpm2_viscosities.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">viscosity, swept<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one number apart<span class="sim-spec"><pre>general:
   name: si_three_viscosities
   seed: 0
   n_frames: 1200
@@ -3244,13 +3250,13 @@ plotting:
     - 0.92
     - 0.94
     - 1.0</pre></span></span>
-      <span class="sim-cap">three balls on a perforated plate; only the viscosity &eta; differs — water at 1&nbsp;mPa&middot;s and a gel at 1&nbsp;Pa&middot;s both drain through, the snow-like plastic never does</span>
+      <span class="sim-cap">3 parent cells owning 300,000 particles · the same sets, the same schedule · only the viscosity differs, and one material never drains</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/mpm2_two_drops.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">surface tension<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one term added<span class="sim-spec"><pre>general:
   name: si_two_drops3d_s144
   seed: 0
   n_frames: 400
@@ -3358,13 +3364,13 @@ plotting:
     - 1.0
     - 0.55
     - 0.2</pre></span></span>
-      <span class="sim-cap">one extra term in the grid update — a surface force at &sigma;&nbsp;=&nbsp;0.144&nbsp;N/m — and at zero gravity two drops of 0.6&nbsp;M particles pull themselves into one sphere</span>
+      <span class="sim-cap">2 parent cells owning 631,380 particles · one term added to the field’s own dynamics · the drops pull themselves into one sphere</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/mpm2_crown.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a crown splash<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">nothing added at all<span class="sim-spec"><pre>general:
   name: si_crown_drop
   seed: 0
   n_frames: 2400
@@ -3478,7 +3484,7 @@ plotting:
     - 1.0
     - 0.55
     - 0.2</pre></span></span>
-      <span class="sim-cap">the same surface force with inertia behind it: a drop falls into a shallow film of its own liquid and throws a crown, its jets and its secondary droplets — none of which any operator names. 1.1&nbsp;M particles in a 3&nbsp;cm box</span>
+      <span class="sim-cap">one parent cell owning 1.1 M particles · the same operators, nothing added · the crown, its jets and its droplets are in no operator</span>
     </figcaption>
   </figure>
 </div>
@@ -3486,7 +3492,7 @@ plotting:
   <figure class="sim-card">
     <video src="gallery/mpm2_pillar_forest.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">nine pillars<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">obstacles in the spec<span class="sim-spec"><pre>general:
   name: si_pillar_forest
   seed: 0
   n_frames: 2400
@@ -3640,13 +3646,13 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap">the obstacle geometry is spec-level too: 1.3&nbsp;M particles of water thread nine fixed pillars and leave a wake behind each</span>
+      <span class="sim-cap">one parent cell owning 1.3 M particles · the same operators, the obstacles declared in the spec · a wake behind each pillar</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/mpm2_waterfall_5m.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">5 million particles<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">only the child set grows<span class="sim-spec"><pre>general:
   name: si_waterfall_5m
   seed: 0
   n_frames: 2400
@@ -3764,13 +3770,13 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap">the same water spec at 5&nbsp;M particles, cascading over three ledges on a 192&sup3; grid</span>
+      <span class="sim-cap">one parent cell owning 5 M particles · the same operators again · only the size of the child set changed</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/mpm2_ball_wake.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">15 million, and one is a solid<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one grid, two materials<span class="sim-spec"><pre>general:
   name: si_ball_wake_wide
   seed: 0
   n_frames: 700
@@ -3951,13 +3957,13 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap">a steel-density elastic ball falls through a 15.3&nbsp;M-particle water column on one shared grid; the slice is coloured by vorticity magnitude, 1–1000&nbsp;s&#8315;&sup1; on a log scale</span>
+      <span class="sim-cap">60 parent cells owning 15.3 M particles · one grid field carries a solid and a fluid together · the solid leaves a wake behind it</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/mpm2_bench_1b.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one billion particles<span class="sim-spec"><pre>fields:
+      <span class="sim-name" tabindex="0">scale is a spec number<span class="sim-spec"><pre>fields:
   mpm_grid:
     frame: mpm_grid
     n_grid: 320
@@ -4439,7 +4445,7 @@ sets:
     parent: cell
     per_parent: 37037037
     vel_init: 0.0</pre></span></span>
-      <span class="sim-cap">10&#8313; particles on a 320&sup3; grid, 100&nbsp;M of them drawn, 24.4&nbsp;s per frame — the same transfer and grid operators, unchanged</span>
+      <span class="sim-cap">27 parent cells owning 10⁹ particles · the same operators, unchanged · scale is a number in the spec, not a rewrite of the engine</span>
     </figcaption>
   </figure>
 </div>
@@ -4452,7 +4458,7 @@ sets:
   <figure class="sim-card">
     <video src="gallery/meshmpm_sheet.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">flat plate<span class="sim-spec"><pre># MESH-MPM 00 -- the FLAT PLATE: an open planar patch pressed into an elastic gel.
+      <span class="sim-name" tabindex="0">two sets, one interface<span class="sim-spec"><pre># MESH-MPM 00 -- the FLAT PLATE: an open planar patch pressed into an elastic gel.
 #
 # THE BASE OF THE LADDER, and the awkward case for the contact rather than the easy one. An
 # open patch has no interior for the star-shape reference to sit in, so `centre_offset` puts it
@@ -4612,13 +4618,13 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap">a flat triangulated patch driven 0.11 box units into 500,000 elastic gel points (E&nbsp;=&nbsp;200&nbsp;Pa, a 1–3&nbsp;mg/ml collagen&nbsp;I gel): a flat punch loads its whole area from the moment it touches</span>
+      <span class="sim-cap">two sets kept distinct: a 4,096-vertex mesh and 500,000 material points · an Exchange carries force both ways · a flat tool loads its whole face at once</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/meshmpm_sphere.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">sphere<span class="sim-spec"><pre># MESH-MPM 01 -- the SPHERE: a closed vertex surface driven into the same elastic gel.
+      <span class="sim-name" tabindex="0">only the mesh differs<span class="sim-spec"><pre># MESH-MPM 01 -- the SPHERE: a closed vertex surface driven into the same elastic gel.
 #
 # THE CONTACT&#x27;S NATIVE CASE, WHICH MAKES IT THE CONTROL. For a closed star-shaped shell the
 # forbidden region IS the shell&#x27;s interior, so `centre: centroid` needs no offset: there is no
@@ -4774,13 +4780,13 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap">only the tool differs — same gel, same descent, same penalty contact at friction &mu;&nbsp;=&nbsp;0.4 — and the sphere grows its contact patch instead of starting at full area</span>
+      <span class="sim-cap">the same two sets, the same schedule · only the mesh differs · the contact patch grows instead of starting whole</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/meshmpm_pyramid.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">pyramid<span class="sim-spec"><pre># MESH-MPM 02 -- the INVERTED PYRAMID: a four-sided tip, apex down, driven into the same gel.
+      <span class="sim-name" tabindex="0">an edge, not a face<span class="sim-spec"><pre># MESH-MPM 02 -- the INVERTED PYRAMID: a four-sided tip, apex down, driven into the same gel.
 #
 # THE NANOINDENTER&#x27;S GEOMETRY. `profile: pyramid` displaces the same lattice `seed_plate`
 # already builds -- apex at the declared `height`, four faces rising by `profile_depth` to the
@@ -4947,13 +4953,13 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap">and an edge rather than a face. The tool’s shape is one line of the spec; the two-way force transfer across the interface is not</span>
+      <span class="sim-cap">the same two sets, the same schedule · an edge rather than a face · the strain in the material follows the tool</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/meshmpm_spheroid_gel.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a shell that grows<span class="sim-spec"><pre># MESH-MPM 05 -- THE SPHEROID INDENTS THE GEL BY GROWING. Nothing is translated.
+      <span class="sim-name" tabindex="0">the tool grows instead<span class="sim-spec"><pre># MESH-MPM 05 -- THE SPHEROID INDENTS THE GEL BY GROWING. Nothing is translated.
 #
 # `mesh_mpm_sphere_elastic.yaml` WITH ONE OPERATOR LINE CHANGED: `surface_drive` scales the shell
 # about its own centroid instead of pushing it down. Same gel, same 500,000 material points, same
@@ -5106,7 +5112,7 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap">the same sphere, inflated 2.4&times; about its own centroid rather than pushed down, so the contact patch spreads for the reason a spheroid’s does — and the strain it drives into the gel reaches the same 0.35 the pressed tools do</span>
+      <span class="sim-cap">the same two sets · the mesh now reaches the material by growing, not by being pushed · one interface, either way</span>
     </figcaption>
   </figure>
 </div>
@@ -5125,7 +5131,7 @@ protease network, <a href="https://doi.org/10.1074/jbc.M403627200">Karagiannis &
   <figure class="sim-card">
     <video src="gallery/spheroid_bm_ecm_07i2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">from tissue to cells to proteins<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">three levels at once<span class="sim-spec"><pre>general:
   name: 07i_ramp
   rig: Rig07i
   module: __main__
@@ -5194,13 +5200,13 @@ run:
   N0: 12
   split_budget: 150
   splits: 102944</pre></span></span>
-      <span class="sim-cap">cells, basement membrane and matrix grow together</span>
+      <span class="sim-cap">three levels at once: epithelial cells, 163,842 membrane nodes, matrix plaques · Aggregate ↑ and Broadcast ↓ connect them · they grow together</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/bm_07k_breach_hole.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">small holes in the membrane<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">proteins remove their faces<span class="sim-spec"><pre>general:
   name: 07k_breach_hole
   rig: Rig07k
   module: __main__
@@ -5306,13 +5312,13 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 100.0
   what: the rate whose hole did not stop</pre></span></span>
-      <span class="sim-cap">the sheet perforates wherever the enzyme sits: 7.7% of its faces gone by frame 187, through 54 separate openings, the first at frame 40</span>
+      <span class="sim-cap">the same three levels · a protein state on the membrane removes its own faces · fifty-four separate openings</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/bm_07j_hole_tiny.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">larger hole in the membrane<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one source, fewer openings<span class="sim-spec"><pre>general:
   name: 07j_hole_tiny
   rig: Rig07j
   module: __main__
@@ -5416,13 +5422,13 @@ run:
   splits: 100524
   twin_of: 06_hole_tiny
   mt1_field: single Gaussian cap, theta 20.0 deg</pre></span></span>
-      <span class="sim-cap">one localised source instead: 2.0% of the faces gone, but through only 6 openings — 2.3x as much of the sheet per opening as the card at left</span>
+      <span class="sim-cap">the same three levels and the same schedule · one localised protein source instead of many · six openings, not fifty-four</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/bm_07k_breach_torn.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">membrane tears apart<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">removal running unopposed<span class="sim-spec"><pre>general:
   name: 07k_breach_torn
   rig: Rig07k
   module: __main__
@@ -5528,7 +5534,7 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 300.0
   what: the rate that destroyed the membrane</pre></span></span>
-      <span class="sim-cap">the same chemistry with nothing holding it: 87% of the faces gone by frame 201, the first as early as frame 14, and still tearing at the end</span>
+      <span class="sim-cap">the same three levels with nothing holding the membrane · the Structural removal runs unopposed · the sheet is still tearing at the end</span>
     </figcaption>
   </figure>
 </div>
@@ -5541,7 +5547,7 @@ run:
   <figure class="sim-card">
     <video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">slime (default)<span class="sim-spec"><pre># slime_default -- one species, the canonical Physarum transport network.
+      <span class="sim-name" tabindex="0">a set and a field<span class="sim-spec"><pre># slime_default -- one species, the canonical Physarum transport network.
 # The monolithic `slime` operator decomposed into 5 primitives over 1 set + 1 scalar
 # field: deposit (set-&gt;field) | diffuse, decay (field-&gt;field) | sense (field-&gt;set,
 # turns the heading) | glide (self-propelled move). Agents spawn in a central disc;
@@ -5591,13 +5597,13 @@ descriptions:
       internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
       outward in all directions. All objects are a consistent teal-green color and are set against a solid
       black background.</pre></span></span>
-      <span class="sim-cap">deposit, sense and steer form a self-organizing network</span>
+      <span class="sim-cap">12,000 agents and one scalar field · Exchange both ways, Field diffusion and decay, a move · a set and a field composing into a network</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/slime_curly.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">curly<span class="sim-spec"><pre># slime_curly -- one species, high turn rate + short sensors -&gt; tight curly filaments
+      <span class="sim-name" tabindex="0">the same five operators<span class="sim-spec"><pre># slime_curly -- one species, high turn rate + short sensors -&gt; tight curly filaments
 # (a fine, meandering network). Same 5 operators; only the `types:` scalars change.
 general: {name: slime_curly, seed: 1, n_frames: 400, dt: 1.0, boundary: wall}
 sets:
@@ -5644,13 +5650,13 @@ descriptions:
       a neural network or a microscopic biological structure. Surrounding this central mass are several
       thin, faint blue lines that radiate outward like spokes. The color of the filaments is a consistent
       medium blue, contrasting sharply against the solid black background.</pre></span></span>
-      <span class="sim-cap">tighter turning produces curled trails</span>
+      <span class="sim-cap">the same agents, the same five operators · the turn rate and the sensor geometry differ · the trails curl</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/slime_filaments.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">filaments<span class="sim-spec"><pre># slime_filaments -- ported from prototype/slime to the decomposed src operators:
+      <span class="sim-name" tabindex="0">one turn rate lower<span class="sim-spec"><pre># slime_filaments -- ported from prototype/slime to the decomposed src operators:
 # deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
 general: {name: slime_filaments, seed: 0, n_frames: 450, dt: 1.0, boundary: wall}
 sets:
@@ -5700,7 +5706,7 @@ descriptions:
       in a spherical topology, transitioning from a random distribution to a structured lattice. The filaments
       are thin, elongated, and interconnected, forming a dense mesh in the center. The overall structure
       is large relative to the frame, occupying most of the central space with radiating extensions.</pre></span></span>
-      <span class="sim-cap">low turning produces radiating filaments</span>
+      <span class="sim-cap">13,000 agents, the same five operators · a lower turn rate · filaments radiate instead of braiding</span>
     </figcaption>
   </figure>
 </div>
@@ -5712,7 +5718,7 @@ descriptions:
   <figure class="sim-card">
     <video src="gallery/slime_four.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">four species<span class="sim-spec"><pre># slime_four -- ported from prototype/slime to the decomposed src operators:
+      <span class="sim-name" tabindex="0">four types, four channels<span class="sim-spec"><pre># slime_four -- ported from prototype/slime to the decomposed src operators:
 # deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
 general: {name: slime_four, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
 sets:
@@ -5766,13 +5772,13 @@ descriptions:
       lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a
       uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected
       in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.</pre></span></span>
-      <span class="sim-cap">four types share four trail channels</span>
+      <span class="sim-cap">14,000 agents over four trail channels · the same five operators, one channel per type · four networks segregate</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/slime_six.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">six species<span class="sim-spec"><pre># slime_six -- ported from prototype/slime to the decomposed src operators:
+      <span class="sim-name" tabindex="0">six types, cross-inhibited<span class="sim-spec"><pre># slime_six -- ported from prototype/slime to the decomposed src operators:
 # deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
 general: {name: slime_six, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
 sets:
@@ -5830,13 +5836,13 @@ descriptions:
       These lines are colored in a vibrant palette of pink, orange, yellow, and cyan. Each line follows
       a winding, non-linear path, creating a complex web-like topology. The lines are uniform in thickness
       and are distributed evenly across the entire field of view.</pre></span></span>
-      <span class="sim-cap">cross-inhibition produces richer networks</span>
+      <span class="sim-cap">18,000 agents over six channels · the same operators, cross-inhibited · a richer web</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/slime_eight.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">eight species<span class="sim-spec"><pre># slime_eight -- ported from prototype/slime to the decomposed src operators:
+      <span class="sim-name" tabindex="0">eight types, one plane<span class="sim-spec"><pre># slime_eight -- ported from prototype/slime to the decomposed src operators:
 # deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
 general: {name: slime_eight, seed: 0, n_frames: 440, dt: 1.0, boundary: wall}
 sets:
@@ -5900,7 +5906,7 @@ descriptions:
       loops. The filaments exhibit a vibrant color palette including shades of cyan, magenta, yellow,
       and orange. Each individual filament is very small in width but spans across large portions of the
       frame, creating a high-frequency texture.</pre></span></span>
-      <span class="sim-cap">eight types produce a fine channelled web</span>
+      <span class="sim-cap">24,000 agents over eight channels · the same operators once more · the plane fills and stays partitioned</span>
     </figcaption>
   </figure>
 </div>
@@ -5912,7 +5918,7 @@ descriptions:
   <figure class="sim-card">
     <video src="gallery/attractor_lorenz.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Lorenz<span class="sim-spec"><pre># lorenz attractor -- Lorenz (1963) convection: THE butterfly, two spiralling lobes.
+      <span class="sim-name" tabindex="0">one operator: Lorenz<span class="sim-spec"><pre># lorenz attractor -- Lorenz (1963) convection: THE butterfly, two spiralling lobes.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -5948,13 +5954,13 @@ plotting:
   camera_elev: 0.95
   camera_elev_end: 1.4
   camera_turns: 0.08</pre></span></span>
-      <span class="sim-cap">Lorenz flow</span>
+      <span class="sim-cap">one set of 60,000 points, no relations between them · a single operator riding the flow · the seed unfolds into the attractor</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_halvorsen.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Halvorsen<span class="sim-spec"><pre># halvorsen attractor -- cyclically-symmetric (x-&gt;y-&gt;z) quadratic flow: a fat three-armed folded knot.
+      <span class="sim-name" tabindex="0">the same operator: Halvorsen<span class="sim-spec"><pre># halvorsen attractor -- cyclically-symmetric (x-&gt;y-&gt;z) quadratic flow: a fat three-armed folded knot.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -5990,13 +5996,13 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">Halvorsen flow</span>
+      <span class="sim-cap">the same set, the same single operator · only the flow named in the spec differs · Halvorsen</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_aizawa.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Aizawa<span class="sim-spec"><pre># aizawa attractor -- a torus with an axial spike drilling through a sphere.
+      <span class="sim-name" tabindex="0">the same operator: Aizawa<span class="sim-spec"><pre># aizawa attractor -- a torus with an axial spike drilling through a sphere.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -6032,13 +6038,13 @@ plotting:
   camera_elev: 0.9
   camera_elev_end: 1.3
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">Aizawa flow</span>
+      <span class="sim-cap">the same set, the same single operator · only the flow named in the spec differs · Aizawa</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_sprott_b.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Sprott B<span class="sim-spec"><pre># sprott_b attractor -- Sprott (1994) case B: one of the algebraically simplest chaotic flows.
+      <span class="sim-name" tabindex="0">the same operator: Sprott B<span class="sim-spec"><pre># sprott_b attractor -- Sprott (1994) case B: one of the algebraically simplest chaotic flows.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -6074,13 +6080,13 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">Sprott B flow</span>
+      <span class="sim-cap">the same set, the same single operator · only the flow named in the spec differs · Sprott B</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_dadras.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Dadras<span class="sim-spec"><pre># dadras attractor -- Dadras-Momeni (2009): a swooping multi-wing bird.
+      <span class="sim-name" tabindex="0">the same operator: Dadras<span class="sim-spec"><pre># dadras attractor -- Dadras-Momeni (2009): a swooping multi-wing bird.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -6116,13 +6122,13 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">Dadras flow</span>
+      <span class="sim-cap">the same set, the same single operator · only the flow named in the spec differs · Dadras</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_thomas.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Thomas<span class="sim-spec"><pre># thomas attractor -- Thomas&#x27; cyclically-symmetric attractor: a woven cage of interlinked loops.
+      <span class="sim-name" tabindex="0">the same operator: Thomas<span class="sim-spec"><pre># thomas attractor -- Thomas&#x27; cyclically-symmetric attractor: a woven cage of interlinked loops.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -6158,7 +6164,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.5</pre></span></span>
-      <span class="sim-cap">Thomas flow</span>
+      <span class="sim-cap">the same set, the same single operator · only the flow named in the spec differs · Thomas</span>
     </figcaption>
   </figure>
 </div>
@@ -6170,7 +6176,7 @@ plotting:
   <figure class="sim-card">
     <video src="gallery/attraction.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">attraction–repulsion<span class="sim-spec"><pre># Full match to ParticleGraph arbitrary_3_1: 3 types, 30000 particles, sigma=0.005,
+      <span class="sim-name" tabindex="0">Rewire, then a force<span class="sim-spec"><pre># Full match to ParticleGraph arbitrary_3_1: 3 types, 30000 particles, sigma=0.005,
 # max_radius=0.075, periodic, first_derivative, dt=0.1, 250 frames. Now feasible
 # because attraction_repulsion runs on a radius neighbour graph (O(E)), not dense.
 general:
@@ -6213,13 +6219,13 @@ descriptions:
       particles are initially scattered randomly but eventually form large, circular clusters. Each cluster
       features a dark, empty center surrounded by a dense ring of multicolored particles. The final topology
       consists of a repeating, honeycomb-like pattern of these interconnected circular structures.</pre></span></span>
-      <span class="sim-cap">per-type interaction sorts particles into cells</span>
+      <span class="sim-cap">one set of 30,000 particles · Rewire builds a radius graph, a Lateral force acts along it · per-type forces sort them into cells</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/boids.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">boids<span class="sim-spec"><pre># Exact reproduction of ParticleGraph boids reference graphs_data/boids/boids:
+      <span class="sim-name" tabindex="0">three operators make flocking<span class="sim-spec"><pre># Exact reproduction of ParticleGraph boids reference graphs_data/boids/boids:
 # 1792 particles, 16 types (112 each), 4000 frames, min_radius=0.001,
 # max_radius=0.04, dt=0.5, periodic, 2nd_derivative, mean aggregation.
 # Per-type p = [cohesion, alignment, separation].
@@ -6375,13 +6381,13 @@ descriptions:
       are colored in a variety of hues, including white, red, blue, green, orange, and pink. Initially,
       the particles are arranged in a random, scattered topology across the entire frame. As the simulation
       progresses, they form dense, concentric circular clusters that stand out against the black background.</pre></span></span>
-      <span class="sim-cap">cohesion + alignment + separation produce flocking</span>
+      <span class="sim-cap">1,792 particles in sixteen types · three Lateral operators on the same graph · flocking is their composition, not an operator</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/active_matter.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">active matter (Vicsek)<span class="sim-spec"><pre># vicsek_flock -- Vicsek active matter (radius_graph + alignment + cruise): low noise -&gt; polar order (phi-&gt;1)
+      <span class="sim-name" tabindex="0">alignment on one graph<span class="sim-spec"><pre># vicsek_flock -- Vicsek active matter (radius_graph + alignment + cruise): low noise -&gt; polar order (phi-&gt;1)
 # Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
 # The Well (Ohana et al., NeurIPS 2024). Ordered flock.
 general: {name: vicsek_flock, seed: 0, n_frames: 1200, dt: 0.25, boundary: periodic}
@@ -6414,7 +6420,7 @@ descriptions:
       a flow field. Each individual triangle is uniform in size and color, providing a consistent visual
       representation of the data. The topology of the objects changes as they aggregate into dense regions
       and disperse into more scattered formations.</pre></span></span>
-      <span class="sim-cap">alignment orders self-propelled agents into a swarm</span>
+      <span class="sim-cap">2,000 particles · alignment and self-propulsion on the same radius graph · an ordered swarm</span>
     </figcaption>
   </figure>
 </div>
@@ -6426,7 +6432,7 @@ descriptions:
   <figure class="sim-card">
     <video src="gallery/inverse_square.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">galaxy (2D)<span class="sim-spec"><pre># spiral_galaxy (2D) -- a rotating self-gravitating disk on `squared_law` (law: gravity, all_pairs).
+      <span class="sim-name" tabindex="0">one operator, every pair<span class="sim-spec"><pre># spiral_galaxy (2D) -- a rotating self-gravitating disk on `squared_law` (law: gravity, all_pairs).
 # Initialization is a SPEC concern (no operator): `spawn: disc` places the disc, and
 # `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds v = spin*sqrt(G*M(&lt;r)/r)
 # from the enclosed mass, plus an optional central point mass (`central_mass`). This replaces the
@@ -6461,13 +6467,13 @@ descriptions:
       sphere. As the simulation progresses, the particles separate into elongated, curved streams and
       wispy filaments that radiate from the center. The background is a solid black void, providing high
       contrast for the evolving white particle field.</pre></span></span>
-      <span class="sim-cap">self-gravity condenses a disc into a galaxy</span>
+      <span class="sim-cap">one set of 25,000 stars · a single Lateral operator summed over every pair · a disc condenses into a galaxy</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/spiral_galaxy_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">galaxy (3D)<span class="sim-spec"><pre># spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS on
+      <span class="sim-name" tabindex="0">the same operator, in 3D<span class="sim-spec"><pre># spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS on
 # `squared_law` (law: gravity, all_pairs). Initialization is a SPEC concern (no operator):
 # `spawn: disk` places a FLAT xy disc with out-of-plane `spawn_thickness` scatter, and
 # `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds from the enclosed mass
@@ -6508,13 +6514,13 @@ descriptions:
       circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
       irregular cloud with trailing filaments. The size of the individual particles remains constant,
       but the overall volume occupied by the group increases dramatically over time.</pre></span></span>
-      <span class="sim-cap">the same gravity field in 3D</span>
+      <span class="sim-cap">the same 25,000 stars, the same single operator · three dimensions instead of two · the composition does not change</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/galaxy3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">massive core<span class="sim-spec"><pre># spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS on
+      <span class="sim-name" tabindex="0">one mass declared heavier<span class="sim-spec"><pre># spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS on
 # `squared_law` (law: gravity, all_pairs). Initialization is a SPEC concern (no operator):
 # `spawn: disk` places a FLAT xy disc with out-of-plane `spawn_thickness` scatter, and
 # `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds from the enclosed mass
@@ -6555,13 +6561,13 @@ descriptions:
       circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
       irregular cloud with trailing filaments. The size of the individual particles remains constant,
       but the overall volume occupied by the group increases dramatically over time.</pre></span></span>
-      <span class="sim-cap">a heavier central mass reshapes the disc</span>
+      <span class="sim-cap">25,000 stars · the same operator, a heavier central mass declared in the spec · the disc is reshaped around it</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/nbody_cluster.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">N-body cluster<span class="sim-spec"><pre># nbody_cluster -- gravitational N-body collapse via the unified `squared_law` operator
+      <span class="sim-name" tabindex="0">one set, four clumps<span class="sim-spec"><pre># nbody_cluster -- gravitational N-body collapse via the unified `squared_law` operator
 # (law: gravity, all_pairs). After Philip Mocz, "Create Your Own N-body Simulation
 # (With Python)" (2020), vendored at papers/nbody-python/ (MIT).
 # N=10000 stars (dense), total mass ~20 (mass/star = 0.002), softened Newtonian gravity
@@ -6596,13 +6602,13 @@ descriptions:
       simulation progresses, the particles move closer together, changing the topology from a multi-peaked
       chain to a single unified cluster. The size of each individual particle remains constant throughout
       the entire sequence.</pre></span></span>
-      <span class="sim-cap">mutual gravity merges four clumps into one cluster</span>
+      <span class="sim-cap">10,000 stars in four clumps, all in one set · one operator over the whole set · they merge into a single cluster</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/galaxy_collision_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">two galaxies, grazing<span class="sim-spec"><pre># galaxy_collision_3d -- TWO 3D galaxies on a grazing prograde passage. The same `squared_law`
+      <span class="sim-name" tabindex="0">two discs, one set<span class="sim-spec"><pre># galaxy_collision_3d -- TWO 3D galaxies on a grazing prograde passage. The same `squared_law`
 # (law: gravity, all_pairs) that holds one disc together is what pulls the two discs into each
 # other: the pair is ONE set with two types, not two sets, and that is the point -- an all-pairs
 # law sums over the whole set, so mutual gravity between the galaxies is not a second operator.
@@ -6675,13 +6681,13 @@ descriptions:
       both sets transform into elongated, spiral-shaped structures that maintain their respective colors.
       By the end of the sequence, the particles are distributed in a dense, overlapping cluster where
       the red and blue points are intermingled.</pre></span></span>
-      <span class="sim-cap">two galaxies interact and form tidal tails</span>
+      <span class="sim-cap">25,000 stars, two discs inside one set · the same single operator · they raise tidal tails in one another</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/galaxy_merger_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">two galaxies, head-on<span class="sim-spec"><pre># galaxy_merger_3d -- the SAME two galaxies, head-on: one knob apart from `galaxy_collision_3d`
+      <span class="sim-name" tabindex="0">the same set, head-on<span class="sim-spec"><pre># galaxy_merger_3d -- the SAME two galaxies, head-on: one knob apart from `galaxy_collision_3d`
 # (`swirl: 0.26` -&gt; `0.0`), and that knob is the encounter&#x27;s angular momentum. L = 0 makes the
 # orbit radial, so the pericentre is 0 instead of 2.0 disc radii: the two discs fall straight
 # through each other, the cores sink and merge on the first passage, and what is left is one
@@ -6745,7 +6751,7 @@ descriptions:
       Initially, the red particles are clustered into a single, large, spherical mass. The blue particles
       start as a smaller, slightly elongated oval shape. As the simulation progresses, both sets of particles
       disperse into thousands of tiny, individual points that occupy a shared three-dimensional space.</pre></span></span>
-      <span class="sim-cap">one knob apart — the encounter's angular momentum set to zero, so the discs fall straight through each other at t&nbsp;=&nbsp;5.7: no tails, one remnant, red and blue mixed evenly through its core, and 48% of the stars thrown out into a halo</span>
+      <span class="sim-cap">25,000 stars, two discs in one set · the same operator, the encounter head-on · they fall through each other and leave one remnant</span>
     </figcaption>
   </figure>
 </div>
