@@ -1,0 +1,169 @@
+---
+title: "substrate_traction"
+subtitle: "A tangential acceleration on the material within a contact layer of the substrate."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+A tangential acceleration on the material within a contact layer of the substrate.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `f`, `cell_set`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+particle -[containment]-> particle: reads `pos` and its cell's `polarity`; emits an
+acceleration the MPM substep consumes as a body force.
+
+    a_i = f * w(h_i) * p_{c(i)},        w(h) = 1 - clamp(h / d, 0, 1)
+
+with h_i the height of point i above the substrate, d the contact-layer thickness in world
+units, f the traction per unit mass (world units per time squared), p the unit polarity of the
+CELL that owns the point, and c(i) the composition of the containment maps from the point up
+to its cell -- two hops here, and `H.lift_index` is what makes that one gather.
+
+`w` IS A RAMP AND NOT A STEP. A hard cutoff makes the traction discontinuous in the one
+coordinate the cell is actively changing as it spreads, so the total force jumps whenever a
+point crosses the threshold and the cell judders at the frequency of its own surface
+roughness. The ramp makes the total traction a smooth function of how much material is near
+the floor -- which IS the quantity the model is claiming matters.
+
+EMITS `mpm_acceleration`, so it is routed to the substep as `a_ext` exactly like gravity and
+is never integrated on the set directly.
+
+Reference: the traction-based picture of adherent motility -- e.g. Barnhart, E. L. et al.
+(2011). An adhesion-dependent switch between mechanisms that determine motile cell shape.
+PLoS Biol. 9:e1001059. The implementation is not theirs.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `f` | traction_per_unit_mass | **required** |
+| `cell_set` | polarity_owner | **required** |
+| `contact` | contact_layer_thickness | 0.01 |
+| `gate` | phase_gate | &ndash; |
+| `floor` | substrate_height | 0.0 |
+| `axis` | substrate_normal_axis | 1 |
+| `block` | polarity_block | "polarity" |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: substrate_traction, at: particle, f: ..., cell_set: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`motility`]{.op-badge} [`traction`]{.op-badge} [`adhesion`]{.op-badge} [`substrate`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/cell_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/cell_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("substrate_traction", family="motility", set="particle", kind="lateral")
+class SubstrateTraction(Lateral):
+    """A tangential acceleration on the material within a contact layer of the substrate.
+
+    particle -[containment]-> particle: reads `pos` and its cell's `polarity`; emits an
+    acceleration the MPM substep consumes as a body force.
+
+        a_i = f * w(h_i) * p_{c(i)},        w(h) = 1 - clamp(h / d, 0, 1)
+
+    with h_i the height of point i above the substrate, d the contact-layer thickness in world
+    units, f the traction per unit mass (world units per time squared), p the unit polarity of the
+    CELL that owns the point, and c(i) the composition of the containment maps from the point up
+    to its cell -- two hops here, and `H.lift_index` is what makes that one gather.
+
+    `w` IS A RAMP AND NOT A STEP. A hard cutoff makes the traction discontinuous in the one
+    coordinate the cell is actively changing as it spreads, so the total force jumps whenever a
+    point crosses the threshold and the cell judders at the frequency of its own surface
+    roughness. The ramp makes the total traction a smooth function of how much material is near
+    the floor -- which IS the quantity the model is claiming matters.
+
+    EMITS `mpm_acceleration`, so it is routed to the substep as `a_ext` exactly like gravity and
+    is never integrated on the set directly.
+
+    Reference: the traction-based picture of adherent motility -- e.g. Barnhart, E. L. et al.
+    (2011). An adhesion-dependent switch between mechanisms that determine motile cell shape.
+    PLoS Biol. 9:e1001059. The implementation is not theirs.
+    """
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["f", "cell_set"]
+    INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
+    READS = ["pos", "polarity"]; WRITES = []
+    MAPS = ["parent"]
+    MECHANISM_TAGS = ["motility", "traction", "adhesion", "substrate"]
+    PARAM_ROLES = {"f": "traction_per_unit_mass", "contact": "contact_layer_thickness",
+                   "gate": "phase_gate",
+                   "floor": "substrate_height", "axis": "substrate_normal_axis",
+                   "cell_set": "polarity_owner", "block": "polarity_block"}
+    REFERENCE = ("Barnhart, E. L., Lee, K.-C., Keren, K., Mogilner, A. & Theriot, J. A. (2011). "
+                 "PLoS Biol. 9:e1001059.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.f = float(params["f"])
+        self.cell_set = str(params["cell_set"])
+        self.block = str(params.get("block", "polarity"))
+        self.axis = int(params.get("axis", 1))
+        self.floor = float(params.get("floor", 0.0))
+        self.contact = float(params.get("contact", 0.01))
+        self.gate = params.get("gate")
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        X = p.get("pos")
+        h = X[:, self.axis] - self.floor
+        w = (1.0 - (h / max(self.contact, 1e-9)).clamp(0.0, 1.0)).clamp(min=0.0)
+        cl = H.level(self.cell_set)
+        b0, b1 = cl.state_schema[self.block]
+        pol = cl.state[:, b0:b1]
+        idx = H.lift_index(p.name, self.cell_set)      # point -> ... -> cell, one composed gather
+        a = pol[idx] * (self.f * w)[:, None]
+        gt = _gate(self, H, idx)
+        if gt is not None:
+            a = a * gt[:, None]
+        if mask is not None:
+            a = a * mask.float()[:, None]
+        return {p.name: a}
+```

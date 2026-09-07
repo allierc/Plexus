@@ -111,7 +111,7 @@ class CellGeometry3D(Aggregate):
     the second being the magnitude of the summed cross products around the face ring, which is
     twice the area of a planar polygon in 3D and needs no projection onto a normal.
 
-    It is an Aggregate because it is a many-to-one map across the containment relation: many
+    It is an aggregate because it is a many-to-one map across the containment relation: many
     vertices, one cell. Every operator here that speaks of a cell's position or size depends on it,
     so it is scheduled first.
 

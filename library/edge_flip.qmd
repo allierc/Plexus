@@ -33,7 +33,7 @@ The T1 transition: a reversible neighbour exchange, and the ingredient that make
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{R}\!:E$ **Rewire**: rebuild the relation $E$ each tick.
+- **Kind** &mdash; $\mathcal{R}\!:E$ **rewire**: rebuild the relation $E$ each tick.
 - **Acts on** &mdash; `vertex` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -132,6 +132,7 @@ class ReconnectT1_3D(Rewire):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
+        self._cat = params.get("cell_set")          # override only; the SET declares the pairing
         self.l_th = float(params.get("l_th", 0.0))           # absolute; <=0 -> l_th_frac x mean edge
         self.l_th_frac = float(params.get("l_th_frac", 0.15))
         self.max_flips = int(params.get("max_flips", 20))
@@ -197,12 +198,17 @@ class ReconnectT1_3D(Rewire):
             print(f"[edge_flip] a flip left {nF - nF2} face(s) below three sides -- "
                   f"reindexing {nF} -> {nF2}. Per-face targets follow the mesh; a cell was lost "
                   f"to topology, not to biology.", flush=True)
-            for _nm in ("A0", "P0", "V0f", "Vbirth", "divjit", "age", "ndiv", "alive"):
+            # `Vbirth` and `divjit` are gone from this list for the reason `cell_die`'s note
+            # gives: they are cell-set blocks and `renumber_set` below already permutes them.
+            for _nm in ("A0", "P0", "V0f", "age", "ndiv", "alive"):
                 if _nm in m:
                     _a = m[_nm].detach().cpu().numpy()
                     m[_nm] = torch.as_tensor(np.asarray([_a[i] for i in keep]),
                                              dtype=m[_nm].dtype, device=m[_nm].device)
-            if isinstance(m.get("apop_flag"), np.ndarray):
+            # ONLY WHILE IT IS STILL A MESH COLUMN. Declared on the cell set it is permuted by
+            # `H.renumber_set` below, with the same `keep`; carrying it here as well would permute
+            # it twice.
+            if isinstance(dict.get(m, "apop_flag", None), np.ndarray):
                 m["apop_flag"] = np.asarray([m["apop_flag"][i] for i in keep], np.float64)
             # AND THE OPEN NAMES, which this branch has never carried. The tuple above is the
             # CLOSED list every topology operator knows; `face_carry` is the open one an operator
@@ -238,7 +244,10 @@ class ReconnectT1_3D(Rewire):
             #
             # `edge_flip` declares no `cell_set`, so the cell level is looked up by name and a model
             # without one simply skips: `renumber_set` returns False rather than raising.
-            _cat = getattr(self, "cat", None) or "cell"
+            # NOT `getattr(self, "cat", None) or "cell"`. This operator has no `cat`, so that
+            # expression WAS the literal `"cell"` every time -- `edge_flip` renumbering a set it
+            # never declared it needed, which is the case `resolve_cell_set`'s note names.
+            _cat = resolve_cell_set(H, self.at, self._cat)
             if not H.renumber_set(_cat, keep, n_new=nF2):
                 m["renumber_failed"] = int(m.get("renumber_failed", 0)) + 1
                 print(f"[edge_flip] renumber_set({_cat!r}) DID NOT ACT after a face drop -- the "

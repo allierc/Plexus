@@ -33,7 +33,7 @@ The relation the reaction-diffusion runs on: two cells are neighbours if and onl
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{R}\!:E$ **Rewire**: rebuild the relation $E$ each tick.
+- **Kind** &mdash; $\mathcal{R}\!:E$ **rewire**: rebuild the relation $E$ each tick.
 - **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

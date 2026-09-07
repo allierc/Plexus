@@ -33,7 +33,7 @@ Mechanosensitive growth: the matrix's pressure slows the CELL CYCLE where it pre
 
 ## Role in Plexus
 
-- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Kind** &mdash; $|S|$ **structural**: change the entities themselves &mdash; divide, die, grow.
 - **Acts on** &mdash; `vertex` (the set the operator acts on).
 - **Reads** &mdash; `load`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -102,7 +102,7 @@ operators:
 
 ## Related operators
 
-Other **structural** operators: [`cell_divide`](cell_divide.qmd), [`cell_die`](cell_die.qmd), [`topo_record`](topo_record.qmd), [`cell_grow`](cell_grow.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd).
+Other **structural** operators: [`topo_record`](topo_record.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd), [`cell_exclude`](cell_exclude.qmd), [`bm_secrete`](bm_secrete.qmd), [`integrin_track`](integrin_track.qmd).
 
 ## Source
 
@@ -274,11 +274,11 @@ class ECMGrowthGate3D(Structural):
         e_s, e_f = es[live].long(), ef[live].long()
         cnt = torch.zeros(nF, device=dev, dtype=dt_).index_add_(
             0, e_f, torch.ones_like(e_f, dtype=dt_))
-        cen = torch.zeros(nF, 3, device=dev, dtype=dt_).index_add_(0, e_f, pos[e_s].to(dt_))
+        centroid = torch.zeros(nF, 3, device=dev, dtype=dt_).index_add_(0, e_f, pos[e_s].to(dt_))
         ok = cnt > 0
-        cen[ok] /= cnt[ok, None]
-        origin = cen[ok].mean(0) if ok.any() else torch.zeros(3, device=dev, dtype=dt_)
-        d = cen - origin
+        centroid[ok] /= cnt[ok, None]
+        origin = centroid[ok].mean(0) if ok.any() else torch.zeros(3, device=dev, dtype=dt_)
+        d = centroid - origin
         r = d.norm(dim=1).clamp_min(1e-9)
         u = d / r[:, None]
         M = self.P[self._t].to(dev, dt_)

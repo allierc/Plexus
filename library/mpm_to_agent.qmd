@@ -33,7 +33,7 @@ Agent_gather (was mpm_to_agent) (mpm_grid -> agent set): the material drags the 
 
 ## Role in Plexus
 
-- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
+- **Kind** &mdash; push / pull **exchange**: set &harr; field.
 - **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `from`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

@@ -74,10 +74,12 @@ Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644.
 | `seed` | &ndash; | 0 |
 | `centre` | &ndash; | [0.0, 0.0, 0.0] |
 | `shape` | &ndash; | "sphere" |
+| `width` | &ndash; | 0.5 |
 | `type_layout` | &ndash; | "random" |
-| `cell_set` | &ndash; | "cell" |
 | `a0_scale` | &ndash; | 1.0 |
+| `v0_uniform` | &ndash; | False |
 | `vseed_cv` | &ndash; | 0.0 |
+| `age_seed` | &ndash; | 0.0 |
 
 ## Minimal spec
 
@@ -92,7 +94,7 @@ operators:
 
 ## Related operators
 
-Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`seed_mesh`](seed_mesh.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd).
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`seed_mesh`](seed_mesh.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd).
 
 ## Source
 
@@ -154,8 +156,14 @@ class SeedMesh3D(Structural):
         # `build_hexagon_mesh`. It is a value for the same reason `disc` is -- the same hypothesis
         # about the tissue, seeded into a geometry chosen so a closed form is reachable.
         self.shape = str(params.get("shape", "sphere")).lower()
-        if self.shape not in ("sphere", "disc", "hexagon"):
-            raise ValueError(f"mesh_seed: shape must be 'sphere', 'disc' or 'hexagon', "
+        # `plane`, `ribbon` and `moebius` are three more VALUES on the same axis, for the reason
+        # `disc` is one: the same hypothesis about the tissue, seeded into a different geometry.
+        # See `build_strip_mesh` -- and note that `moebius` is the one seed on which "apical" is not
+        # globally definable, which is what makes it a test rather than a picture.
+        self.strip_width = float(params.get("width", 0.5))
+        if self.shape not in ("sphere", "disc", "hexagon", "plane", "ribbon", "moebius"):
+            raise ValueError(f"mesh_seed: shape must be 'sphere', 'disc', 'hexagon', 'plane', "
+                             f"'ribbon' or 'moebius', "
                              f"got {self.shape!r}")
         # PARTITION THE TYPES BY POSITION, NOT AT RANDOM. `type_layout` on a SET is applied at build
         # (engine.py), over that set's own coordinates -- which a mesh cell does not have yet: the
@@ -164,7 +172,7 @@ class SeedMesh3D(Structural):
         # the shell at the equator of the axis named, tiling the declared `fraction`s along it, at
         # the moment the faces first have centroids.
         self.type_layout = str(params.get("type_layout", "random")).lower()
-        self.cell_set = params.get("cell_set", "cell")
+        self._cat = params.get("cell_set")          # override only; the SET declares the pairing
         # THE PREFERRED AREA, SET APART FROM THE GEOMETRY. `A0` was always `mean(area)` of the mesh
         # just built, so every run started exactly at its target and the ONLY direction it could go
         # was down, under whatever line tension the mechanics carried: a sweep of six specs that all
@@ -178,16 +186,39 @@ class SeedMesh3D(Structural):
         # and the paper's own words become the gate: a tissue "free to expand so that its total area
         # was larger by a factor g" must settle at A = g x its seeded area.
         self.a0_scale = float(params.get("a0_scale", 1.0))
+        self.v0_uniform = bool(params.get("v0_uniform", False))   # one target volume for every cell
         if self.a0_scale <= 0:
             raise ValueError(f"mesh_seed: a0_scale must be > 0, got {self.a0_scale}")
         self.vseed_cv = float(params.get("vseed_cv", 0.0))       # STOCHASTIC VOLUME SEED: per-cell random cell-cycle
         #   phase at t=0 (spread of the initial division threshold) -> desynchronises the FIRST division wave
+        # `age_seed` -- THE OTHER WAY TO DESYNCHRONISE, AND THE ONLY ONE A CLOCK CAN USE. `vseed_cv`
+        # spreads the THRESHOLD (`divjit`), which is a phase only for a rule that reads size:
+        # `cell_divide[timer]` fires on `age >= cycle * jit` and every cell is seeded with age 0, so
+        # a clock-driven tissue divides in ONE frame however wide `vseed_cv` is -- measured on
+        # ab_06_population: 1279 of 1280 cells divided at frame 480 and on no other frame.
+        #
+        # AND SPREADING THE THRESHOLD IS THE WRONG KNOB WHEN THE CELLS MUST COME OUT THE SAME SIZE.
+        # Paired with `cell_grow[model: timer]`, which drives every cell to one target volume in
+        # `cycle_frames`, a cell that divides early divides SMALL: threshold noise buys sparseness
+        # by spending size uniformity. Spreading the initial AGE instead leaves every cell the same
+        # cycle length -- so they all reach the same size at division -- and merely offsets them in
+        # time. Uniform volumes and sparse division are then not in tension.
+        #
+        # In DIVISION-CALLS, the unit `cycle`, `min_cycle` and `max_cycle` use; set it to `cycle` to
+        # spread the population evenly over one generation. 0 (the default) seeds age 0 as before.
+        self.age_seed = float(params.get("age_seed", 0.0))
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cell_set = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         lvl = H.level(self.at); dev = lvl.state.device; dt = lvl.state.dtype
-        _build = {"sphere": build_sphere_mesh, "disc": build_disc_mesh,
-                  "hexagon": build_hexagon_mesh}[self.shape]
-        verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
+        if self.shape in ("plane", "ribbon", "moebius"):
+            verts, es, et, ef, nF = build_strip_mesh(self.n, self.R, self.jitter, self.seed,
+                                                     kind=self.shape, width=self.strip_width)
+        else:
+            _build = {"sphere": build_sphere_mesh, "disc": build_disc_mesh,
+                      "hexagon": build_hexagon_mesh}[self.shape]
+            verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
         Nv = verts.shape[0]; Nbuf = lvl.state.shape[0]
         if Nv > Nbuf:
             raise ValueError(f"sphere mesh has {Nv} vertices but buffer n={Nbuf}")
@@ -200,7 +231,7 @@ class SeedMesh3D(Structural):
             occ = torch.zeros(Nbuf, device=dev); occ[:Nv] = 1.0; lvl.occ = occ
         est = torch.as_tensor(es, device=dev); ett = torch.as_tensor(et, device=dev)
         eft = torch.as_tensor(ef, device=dev)
-        area, perim, cen, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
+        area, perim, centroid, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
         A_seed = float(area.mean())
         A0 = A_seed * self.a0_scale; P0 = self.p0 * (A0 ** 0.5)
         if self.a0_scale != 1.0:
@@ -212,6 +243,12 @@ class SeedMesh3D(Structural):
             dj = np.clip(1.0 + self.vseed_cv * np.random.default_rng(self.seed + 101).standard_normal(nF), 0.4, 1.8)
         else:
             dj = np.ones(nF)                                     # all cells born in phase (synchronised)
+        # UNIFORM AND NOT GAUSSIAN, because this is a PHASE and a phase is uniform on its cycle: a
+        # tissue in steady state has as many cells just born as just about to divide. A Gaussian
+        # would pile the population at the middle of the cycle and still give a division wave, only
+        # a rounder one. See `age_seed` in __init__ for why the phase and not the threshold.
+        ag = (np.random.default_rng(self.seed + 202).random(nF) * self.age_seed
+              if self.age_seed > 0 else np.zeros(nF))
         # A `MeshTable`, WHICH IS A `dict` -- see `plexus.models.mesh`. Every reader is unchanged
         # by construction: the type still passes `isinstance(m, dict)` (which the D4 acted-ledger
         # tests, and whose failure would score every mesh-only operator as inert), still iterates,
@@ -235,7 +272,7 @@ class SeedMesh3D(Structural):
                 print(f"[mesh_seed] type_layout={self.type_layout} ignored: set "
                       f"{self.cell_set!r} declares fewer than two types", flush=True)
             else:
-                order = torch.argsort(cen[:, _ax])              # faces, sorted along the axis
+                order = torch.argsort(centroid[:, _ax])              # faces, sorted along the axis
                 nt = torch.zeros(int(_cl.n), dtype=torch.long, device=dev)
                 cuts = (torch.cumsum(_fr / _fr.sum(), 0) * nF).round().long().tolist()
                 lo = 0
@@ -252,7 +289,7 @@ class SeedMesh3D(Structural):
                          A0=torch.full((nF,), A0, dtype=dt, device=dev),
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
-                         divjit=torch.as_tensor(dj, dtype=dt, device=dev),   # per-cell division-threshold multiplier
+                         age=torch.as_tensor(ag, dtype=dt, device=dev),      # per-cell cell-cycle PHASE at t=0
                          # THE VOLUME AND RADIUS TARGETS FOLLOW `a0_scale`, on the isotropic rescale
                          # it implies: a preferred AREA g times larger is a preferred LENGTH sqrt(g)
                          # larger, hence a volume g^1.5 larger. Leaving V0f at the seeded value would
@@ -261,8 +298,17 @@ class SeedMesh3D(Structural):
                          # constraint the paper's 2D model does not even have. `Vbirth` follows V0f
                          # for the same reason: a cell must still divide at twice its OWN target,
                          # not at twice a volume it was never meant to hold.
-                         V0f=vf.detach().clone() * self.a0_scale ** 1.5,   # PER-CELL target wedge volume (v_eq per cell)
-                         Vbirth=vf.detach().clone() * self.a0_scale ** 1.5,   # volume at birth -> cell divides when it doubles
+                         # `v0_uniform` -- EVERY CELL ASKS FOR THE SAME VOLUME, which is the
+                         # control this seed could not express. `A0` and `P0` are already scalars
+                         # here (`torch.full`), so the target AREA is uniform and only the target
+                         # VOLUME is per-cell, taken from each cell's own seeded wedge. That
+                         # asymmetry is invisible until you want to ask whether the mechanics
+                         # equalises cell volume on its own: with per-cell targets it cannot, because
+                         # every cell is already at the size it was asked for, and the answer would
+                         # be about the seed rather than about the energy. Setting them all to the
+                         # MEDIAN makes the question well posed.
+                         V0f=(torch.full_like(vf, float(vf.median())) if self.v0_uniform
+                              else vf.detach().clone()) * self.a0_scale ** 1.5,
                          V0=float(vf.sum()) * self.a0_scale ** 1.5,
                          v_ref=float(vf.median()) * self.a0_scale ** 1.5,   # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
                          #   morphogen growth caps v_eq at (4/3)v_ref, cells cycle in [2/3,4/3]v_ref centred on v_ref
@@ -273,5 +319,15 @@ class SeedMesh3D(Structural):
             m.clear(); m.update(seeded)          # the engine's table, filled in place
         else:
             lvl._mesh = MeshTable(**seeded)      # spec has no `mesh:` declaration yet
+        # THE PER-CELL BLOCKS GO ON THE CELL SET, not into `seeded`. `Vbirth` is the volume this
+        # cell was born holding and `divjit` its personal multiplier on the division threshold;
+        # both are one number per cell, so plexus2 puts them on the set whose members are cells,
+        # where `Hierarchy.renumber_set` carries them through every topology edit without any
+        # operator naming them. A spec that declares neither gets a clear refusal rather than a
+        # silent zero -- which is what the mesh table gave, and what `divjit`'s fixed-seed fallback
+        # was papering over.
+        _seed_cell_blocks(H, self.cell_set, nF, dt, dev,
+                          Vbirth=vf.detach().cpu().numpy() * self.a0_scale ** 1.5,
+                          divjit=np.asarray(dj, np.float64))
         return {}
 ```
