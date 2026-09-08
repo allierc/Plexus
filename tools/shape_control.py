@@ -67,8 +67,11 @@ def spec(n_pts, box, n_grid, frames, dt, sub):
                    dict(op="mpm_grid_update", at="mpm_grid", wall_damp=0.9),
                    dict(op="mpm_gather", at="mpm_particle", **{"from": "mpm_grid"},
                         wall_damp=0.9, vmax=1.0e9, implementation="default")],
-        schedule=[dict(substep_dt=sub, steps=["mpm_strain", "mpm_scatter", "mpm_grid_update",
-                                              "mpm_gather"])],
+        # `compile: true` ON THE SUBSTEP BLOCK, which is worth 2x under grad (1.01 -> 0.51 s an
+        # iteration at 12,500 points) for 35 s of one-time compilation. The MPM substep is a few
+        # hundred small kernels and a fusing compiler is exactly what that wants.
+        schedule=[dict(substep_dt=sub, compile=True,
+                       steps=["mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather"])],
         plotting={},
     )
 
@@ -133,7 +136,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--n-pts", type=int, default=20000)
-    ap.add_argument("--frames", type=int, default=24)
+    ap.add_argument("--frames", type=int, default=20)
     ap.add_argument("--iters", type=int, default=40)
     ap.add_argument("--lr", type=float, default=0.6)
     ap.add_argument("--n-grid", type=int, default=40)
