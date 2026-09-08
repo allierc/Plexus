@@ -1,0 +1,175 @@
+general:
+  name: ab_tissue_mpm_still
+  seed: 0
+  n_frames: 3
+  dt: 0.002
+  record_cap: 3
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 100.0
+sets:
+  vertex:
+    n: 4096
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  cell:
+    n: 24
+    state:
+      area:
+        width: 1
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      centroid:
+        width: 3
+      alive:
+        width: 1
+        record: false
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      pos:
+        width: 3
+  half_edge:
+    n: 4096
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+  cyto:
+    n: 72000
+    entity: mpm_particle
+    parent: cell
+    per_parent: 3000
+    density: 1.0
+    radius: 0.02
+    types:
+      cytoplasm:
+        fraction: 1.0
+        youngs: 90.0
+        density: 1.0
+        material: elastic
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 128
+seed:
+- op: seed_mesh
+  model: apicobasal
+  at: vertex
+  n_cells: 24
+  radius: 0.15
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+  h0: 0.3
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+- op: seed_mpm_in_cells
+  at: cyto
+  surface: vertex
+  inset: 0.9
+  density: 1.0
+operators:
+- op: cell_geometry
+  at: cell
+- op: mpm_strain
+  at: cyto
+  implementation: warp
+- op: mpm_scatter
+  at: cyto
+  to: mpm_grid
+  drag: 0.5
+  a_max: 200.0
+  implementation: warp
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: cyto
+  from: mpm_grid
+  wall_damp: 0.7
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- cell_geometry
+- substep_dt: 4.0e-05
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: points
+  dot_size: 1.4
+  fps: 30
+  mesh_style: surface
+  mesh_opacity: 0.2
+  mesh_edges: false
+  mesh_color: '#9fd0f0'
+  render_px: 1400
+descriptions:
+  movie:
+    description: The simulation begins with a dense cluster of multicolored particles
+      located in the bottom-right corner of a large cubic domain. Over time, these
+      particles begin to disperse and move outward from their initial concentrated
+      position. The movement appears somewhat chaotic as the particles spread into
+      the surrounding empty space. By the final frame, the cluster has expanded significantly,
+      though it remains primarily concentrated in the lower-right quadrant.
+    objects: The primary objects are thousands of small, multicolored particles that
+      form a dense, irregular cluster. These particles are arranged in a roughly spherical
+      but jagged grouping at the base of the cube. The colors of the particles vary
+      across a spectrum of cyan, magenta, yellow, and green. A large, semi-transparent
+      grey sphere is also present, partially overlapping the particle cluster in the
+      bottom-right corner.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a collection of multi-colored particles clustered in a spherical
+      formation within a 3D bounding box. Over the course of the video, the particles exhibit subtle internal
+      movements and fluctuations in density. The overall spherical structure remains stable and centered
+      within the cubic volume. The visualization provides a snapshot of a microscopic physical process
+      at a specific time step.
+    objects: The scene contains a dense cluster of small particles arranged in a roughly spherical shape.
+      These particles are colored in various hues, including red, orange, blue, green, and purple. The
+      cluster is positioned in the center of a large, wireframe cubic bounding box. A scale bar in the
+      bottom left corner indicates a physical dimension of 25 micrometers.
