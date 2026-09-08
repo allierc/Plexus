@@ -2072,6 +2072,14 @@ class LiveMovie:
             # own far side through its near side, so every cell is read through another cell.
             opac = float(st.get("mesh_opacity",
                                 1.0 if (style == "wireframe" or self._mesh_is_subject) else 0.55))
+            # A FULLY TRANSPARENT SURFACE IS NOT DRAWN AT ALL. `mesh_opacity: 0` reads as "leave the
+            # surface out", and adding the actor anyway is not the same thing: with depth peeling on,
+            # a transparent occluder in front of the material blanked the entire scene -- measured,
+            # two specs differing ONLY in mesh_opacity (0.0 against 0.22) gave an empty box and a
+            # correct picture of 690,000 nodes.
+            if opac <= 0.0:
+                self._meshes = []
+                return
             for name, lvl, m in self._mesh_levels(H):
                 nv = int(m["Nv"])
                 sc, ct = self._mesh_map(name)
