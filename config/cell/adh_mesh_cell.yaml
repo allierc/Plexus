@@ -6,8 +6,8 @@ general:
   boundary: wall
   dim: 3
   dt: 0.002
-  n_frames: 1200
-  name: adh_poly_press
+  n_frames: 600
+  name: adh_mesh_cell
   record_cap: 60
   save_data: null
   seed: 1
@@ -18,6 +18,24 @@ general:
   - 1.0
   - 1.0
 operators:
+- op: cell_geometry
+  at: membrane_face
+- op: cell_mechanics
+  at: vertex
+  p0: 3.5
+  k_v: 4.0
+  kappa_s: 0.1
+  gamma: 0.0
+  Lambda: 0.0
+  K_R: 0.0
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  sep_mu: 1.0
+- op: gravity
+  at: vertex
+  g: 4.0
 - at: cell
   g: 4.0
   op: gravity
@@ -30,14 +48,13 @@ operators:
   compress: 0.85
   front_only: true
   volume_scale: 300.0
-  confine: plasma_membrane_node
   margin: 0.005
   direction: fiber
 - op: mpm_density_pressure
   at: protein_a_node
   grid: mpm_grid
   stiffness: 600.0
-  sets: &id001
+  sets:
   - centriole_node
   - chromatin_node
   - cytoskeleton_node
@@ -45,7 +62,6 @@ operators:
   - mitochondria_node
   - nuclear_envelope_node
   - nucleolus_node
-  - plasma_membrane_node
   - protein_a_node
   - protein_b_node
   - protein_c_node
@@ -60,54 +76,197 @@ operators:
   at: protein_b_node
   grid: mpm_grid
   stiffness: 600.0
-  sets: *id001
+  sets:
+  - centriole_node
+  - chromatin_node
+  - cytoskeleton_node
+  - golgi_node
+  - mitochondria_node
+  - nuclear_envelope_node
+  - nucleolus_node
+  - protein_a_node
+  - protein_b_node
+  - protein_c_node
+  - protein_d_node
+  - protein_e_node
+  - rough_er_node
+  - smooth_er_node
+  - cytoskeleton_new_node
   max_pressure: 300.0
   coarsen: 4
 - op: mpm_density_pressure
   at: protein_c_node
   grid: mpm_grid
   stiffness: 600.0
-  sets: *id001
+  sets:
+  - centriole_node
+  - chromatin_node
+  - cytoskeleton_node
+  - golgi_node
+  - mitochondria_node
+  - nuclear_envelope_node
+  - nucleolus_node
+  - protein_a_node
+  - protein_b_node
+  - protein_c_node
+  - protein_d_node
+  - protein_e_node
+  - rough_er_node
+  - smooth_er_node
+  - cytoskeleton_new_node
   max_pressure: 300.0
   coarsen: 4
 - op: mpm_density_pressure
   at: protein_d_node
   grid: mpm_grid
   stiffness: 600.0
-  sets: *id001
+  sets:
+  - centriole_node
+  - chromatin_node
+  - cytoskeleton_node
+  - golgi_node
+  - mitochondria_node
+  - nuclear_envelope_node
+  - nucleolus_node
+  - protein_a_node
+  - protein_b_node
+  - protein_c_node
+  - protein_d_node
+  - protein_e_node
+  - rough_er_node
+  - smooth_er_node
+  - cytoskeleton_new_node
   max_pressure: 300.0
   coarsen: 4
 - op: mpm_density_pressure
   at: protein_e_node
   grid: mpm_grid
   stiffness: 600.0
-  sets: *id001
+  sets:
+  - centriole_node
+  - chromatin_node
+  - cytoskeleton_node
+  - golgi_node
+  - mitochondria_node
+  - nuclear_envelope_node
+  - nucleolus_node
+  - protein_a_node
+  - protein_b_node
+  - protein_c_node
+  - protein_d_node
+  - protein_e_node
+  - rough_er_node
+  - smooth_er_node
+  - cytoskeleton_new_node
   max_pressure: 300.0
   coarsen: 4
 - op: mpm_density_pressure
   at: cytoskeleton_node
   grid: mpm_grid
   stiffness: 600.0
-  sets: *id001
+  sets:
+  - centriole_node
+  - chromatin_node
+  - cytoskeleton_node
+  - golgi_node
+  - mitochondria_node
+  - nuclear_envelope_node
+  - nucleolus_node
+  - protein_a_node
+  - protein_b_node
+  - protein_c_node
+  - protein_d_node
+  - protein_e_node
+  - rough_er_node
+  - smooth_er_node
+  - cytoskeleton_new_node
   max_pressure: 300.0
   coarsen: 4
 - op: mpm_density_pressure
   at: cytoskeleton_new_node
   grid: mpm_grid
   stiffness: 600.0
-  sets: *id001
+  sets:
+  - centriole_node
+  - chromatin_node
+  - cytoskeleton_node
+  - golgi_node
+  - mitochondria_node
+  - nuclear_envelope_node
+  - nucleolus_node
+  - protein_a_node
+  - protein_b_node
+  - protein_c_node
+  - protein_d_node
+  - protein_e_node
+  - rough_er_node
+  - smooth_er_node
+  - cytoskeleton_new_node
   max_pressure: 300.0
   coarsen: 4
-- op: mpm_density_pressure
-  at: plasma_membrane_node
-  grid: mpm_grid
-  stiffness: 600.0
-  sets: *id001
-  max_pressure: 300.0
-  coarsen: 4
-- at: plasma_membrane_node
-  implementation: warp
-  op: mpm_strain
+- op: mesh_contact
+  at: cytoskeleton_node
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.002
+  n_grid: 320
+  a_max: 200.0
+  centre: centroid
+- op: mesh_contact
+  at: protein_a_node
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.002
+  n_grid: 320
+  a_max: 200.0
+  centre: centroid
+- op: mesh_contact
+  at: protein_b_node
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.002
+  n_grid: 320
+  a_max: 200.0
+  centre: centroid
+- op: mesh_contact
+  at: protein_c_node
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.002
+  n_grid: 320
+  a_max: 200.0
+  centre: centroid
+- op: mesh_contact
+  at: protein_d_node
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.002
+  n_grid: 320
+  a_max: 200.0
+  centre: centroid
+- op: mesh_contact
+  at: protein_e_node
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.002
+  n_grid: 320
+  a_max: 200.0
+  centre: centroid
+- op: mesh_contact
+  at: cytoskeleton_new_node
+  surface: vertex
+  k_frac: 0.45
+  mu: 0.4
+  dt: 0.002
+  n_grid: 320
+  a_max: 200.0
+  centre: centroid
 - at: cytoskeleton_node
   implementation: warp
   op: mpm_strain
@@ -153,13 +312,6 @@ operators:
 - op: mpm_strain
   at: cytoskeleton_new_node
   implementation: warp
-- a_max: 200.0
-  at: plasma_membrane_node
-  drag: 2.0
-  implementation: warp
-  op: mpm_scatter
-  polar: higham
-  to: mpm_grid
 - a_max: 200.0
   at: cytoskeleton_node
   drag: 2.0
@@ -268,12 +420,6 @@ operators:
 - at: mpm_grid
   op: mpm_grid_update
   wall_damp: 1.0
-- at: plasma_membrane_node
-  from: mpm_grid
-  implementation: warp
-  op: mpm_gather
-  vmax: 1.0
-  wall_damp: 1.0
 - at: cytoskeleton_node
   from: mpm_grid
   implementation: warp
@@ -364,9 +510,6 @@ operators:
   from: mpm_grid
   wall_damp: 1.0
   vmax: 1.0
-- at: plasma_membrane
-  child: plasma_membrane_node
-  op: aggregate_centroid
 - at: cytoskeleton
   child: cytoskeleton_node
   op: aggregate_centroid
@@ -409,9 +552,6 @@ operators:
 - at: protein_e
   child: protein_e_node
   op: aggregate_centroid
-- at: cell
-  child: plasma_membrane
-  op: aggregate_centroid
 - at: mitochondria
   op: radius_graph
   radius: 0.037
@@ -428,84 +568,83 @@ plotting:
   camera_turns: 0.0
   camera_zoom: 0.0
   colors:
-    centriole: &id002
+    centriole: &id001
     - 0.85
     - 1.0
     - 0.15
-    centriole_node: *id002
-    chromatin: &id003
+    centriole_node: *id001
+    chromatin: &id002
     - 0.52
     - 0.36
     - 0.74
-    chromatin_node: *id003
-    cytoskeleton: &id004
+    chromatin_node: *id002
+    cytoskeleton: &id003
     - 0.3
     - 0.85
     - 0.4
-    cytoskeleton_node: *id004
-    golgi: &id005
+    cytoskeleton_node: *id003
+    golgi: &id004
     - 0.96
     - 0.62
     - 0.2
-    golgi_node: *id005
-    mitochondria: &id006
+    golgi_node: *id004
+    mitochondria: &id005
     - 0.9
     - 0.16
     - 0.12
-    mitochondria_node: *id006
-    nuclear_envelope: &id007
+    mitochondria_node: *id005
+    nuclear_envelope: &id006
     - 0.74
     - 0.62
     - 0.88
-    nuclear_envelope_node: *id007
-    nucleolus: &id008
+    nuclear_envelope_node: *id006
+    nucleolus: &id007
     - 0.92
     - 0.38
     - 0.66
-    nucleolus_node: *id008
-    plasma_membrane: &id009
+    nucleolus_node: *id007
+    plasma_membrane: &id008
     - 0.62
     - 0.82
     - 0.96
-    plasma_membrane_node: *id009
-    protein_a: &id010
+    plasma_membrane_node: *id008
+    protein_a: &id009
     - 0.95
     - 0.78
     - 0.25
-    protein_a_node: *id010
-    protein_b: &id011
+    protein_a_node: *id009
+    protein_b: &id010
     - 0.45
     - 0.78
     - 0.98
-    protein_b_node: *id011
-    protein_c: &id012
+    protein_b_node: *id010
+    protein_c: &id011
     - 0.98
     - 0.45
     - 0.62
-    protein_c_node: *id012
-    protein_d: &id013
+    protein_c_node: *id011
+    protein_d: &id012
     - 0.66
     - 0.48
     - 0.96
-    protein_d_node: *id013
-    protein_e: &id014
+    protein_d_node: *id012
+    protein_e: &id013
     - 0.55
     - 0.95
     - 0.82
-    protein_e_node: *id014
-    rough_er: &id015
+    protein_e_node: *id013
+    rough_er: &id014
     - 0.16
     - 0.52
     - 0.56
-    rough_er_node: *id015
-    smooth_er: &id016
+    rough_er_node: *id014
+    smooth_er: &id015
     - 0.36
     - 0.78
     - 0.72
-    smooth_er_node: *id016
-    cytoskeleton_new_node: *id004
+    smooth_er_node: *id015
+    cytoskeleton_new_node: *id003
   compartment_sets:
-  - plasma_membrane_node
   - cytoskeleton_node
   - nuclear_envelope_node
   - chromatin_node
@@ -628,6 +767,15 @@ plotting:
   surface_sample: 60000
   up_axis: 1
 schedule:
+- cell_geometry
+- cell_mechanics
+- mesh_contact
+- mesh_contact
+- mesh_contact
+- mesh_contact
+- mesh_contact
+- mesh_contact
+- mesh_contact
 - gravity
 - polymerize_tips
 - mpm_density_pressure
@@ -709,14 +857,13 @@ schedule:
 - radius_graph
 - radius_graph
 seed:
-- at: plasma_membrane
-  cell_radius: 0.1
-  geometry:
-    plasma_membrane:
-      thickness: 0.1
-  op: seed_cell_atlas
-  particles: plasma_membrane_node
-  vel_init: 0.0
+- op: seed_mesh
+  at: vertex
+  n_cells: 2400
+  radius: 0.14
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
 - at: cytoskeleton
   cell_radius: 0.1
   op: seed_cell_atlas
@@ -798,13 +945,21 @@ seed:
   lo: 0.0
   op: seed_state_random
   seed: 1
-- at: plasma_membrane_node
-  frame: -1
-  op: load_run
-  run: cell/adh_jelly_x10
 - op: park_reserve
   at: cytoskeleton_new_node
   fraction: 1.0
+- op: load_run
+  at: cytoskeleton_node
+  run: cell/adh_jelly_x10
+  frame: -1
+- op: mesh_from_run
+  at: vertex
+  run: cell/adh_jelly_x10
+  set: plasma_membrane_node
+  frame: -1
+  fit: support
+  scale: 1.05
+  round: 0.5
 - at: protein_a_node
   material: elastic
   op: set_material
@@ -829,11 +984,6 @@ seed:
   material: elastic
   op: set_material
   youngs: 90.0
-  nu: 0.45
-- at: plasma_membrane_node
-  material: elastic
-  op: set_material
-  youngs: 200.0
   nu: 0.45
 - at: cytoskeleton_node
   material: elastic
@@ -1015,23 +1165,6 @@ sets:
     parent: nucleolus
     per_parent: 1250
     radius: 0.1
-  plasma_membrane:
-    parent: cell
-    per_parent: 421
-    radius: 0.1
-    types:
-      plasma_membrane:
-        density: 1.0
-        fraction: 1.0
-        material: viscoelastic
-        tau: 0.05
-        youngs: 20.0
-  plasma_membrane_node:
-    density: 1.0
-    entity: mpm_particle
-    parent: plasma_membrane
-    per_parent: 300
-    radius: 0.1
   protein_a:
     parent: cell
     per_parent: 1
@@ -1157,3 +1290,50 @@ sets:
     parent: cytoskeleton
     per_parent: 1200
     radius: 0.1
+  vertex:
+    n: 32768
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  membrane_face:
+    n: 4096
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      age:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+  half_edge:
+    n: 32768
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: membrane_face
