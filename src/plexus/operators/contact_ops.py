@@ -177,6 +177,14 @@ class MeshContact(Lateral):
         self.band_cells = float(params.get("band_cells", 3.0))   # prefilter width, in grid cells
         self.n_grid = int(params.get("n_grid", 64))
         self.cap_rows = int(params.get("cap_rows", 2))
+        # WHICH SIDE OF THE SURFACE IS FORBIDDEN. `outside` (the default, and what every indenter
+        # spec means) treats the surface's INTERIOR as solid and pushes material out of it. `inside`
+        # is the membrane's reading: the material belongs in the interior and the surface pushes
+        # back anything that has left. The two differ by the sign of the penetration and of the
+        # direction it is corrected along, and by nothing else -- but running a cell with the wrong
+        # one expels its own cytoplasm, which is what it did: 26 um of cytoplasm became 62 in five
+        # frames while the membrane it had been pushed through collapsed from 13 um to 6.
+        self.side = str(params.get("side", "outside"))
         self.map_theta = int(params.get("map_theta", 32))        # the pressure map's own resolution
         self.map_phi = int(params.get("map_phi", 64))
         self.verbose = bool(params.get("verbose", True))
@@ -453,7 +461,8 @@ class MeshContact(Lateral):
         idx, tri, t, w = idx[hit], tri[hit], t[hit], w[hit]
         n_hat = M["nrm"][tri]
         xs = c + t[:, None] * u[idx]                       # the point on the surface, on the ray
-        depth = ((xs - pos[idx]) * n_hat).sum(1).clamp_min(0.0)
+        _sgn = -1.0 if self.side == "inside" else 1.0
+        depth = (_sgn * ((xs - pos[idx]) * n_hat).sum(1)).clamp_min(0.0)
         inside = depth > 0
         idx, tri, w, n_hat, depth = idx[inside], tri[inside], w[inside], n_hat[inside], depth[inside]
         if idx.numel() == 0:
@@ -477,7 +486,7 @@ class MeshContact(Lateral):
         # REGULARISED COULOMB: saturates at mu*a_n, linear below `eps_v`, so a resting contact does
         # not chatter. `eps_v` is a slip velocity and not a fudge factor.
         a_t = torch.minimum(self.mu * a_n, self.mu * a_n * speed / self.eps_v)
-        a_par = a_n[:, None] * n_hat - a_t[:, None] * dv_t / speed.clamp_min(1e-12)[:, None]
+        a_par = (_sgn * a_n[:, None]) * n_hat - a_t[:, None] * dv_t / speed.clamp_min(1e-12)[:, None]
         # THE CLAMP IS HERE, not in the scatter, so what is recorded as the reaction is what acts.
         mag = a_par.norm(dim=1)
         a_par = a_par * (self.a_max / mag.clamp_min(1e-20)).clamp(max=1.0)[:, None]
@@ -1833,3 +1842,176 @@ class ECMGrowthGate3D(Structural):
             self._said = True
         return {}
 
+
+
+@register_operator("mesh_contact", model="centre", family="boundary", set="particle",
+                   kind="lateral")
+class MeshContactCentre(MeshContact):
+    """`mesh_contact` as it has always worked, named: the surface indexed by DIRECTION from a centre.
+
+    The lookup bins directions on a reduced (theta, phi) grid and asks a particle's own direction
+    bin and its eight neighbours. It is exact and cheap while a face spans at most one bin, which
+    holds when every part of the surface is a similar distance from the centre -- a sphere, a
+    spheroid, an epithelial shell, the indenters this operator was written for.
+
+    It is the default, and it is now also a NAME, because the alternative has different semantics
+    rather than merely a different data structure and a specification should have to say which one
+    it is asking for. See `model: spatial_hash`.
+    """
+
+
+@register_operator("mesh_contact", model="spatial_hash", family="boundary", set="particle",
+                   kind="lateral")
+class MeshContactHash(MeshContact):
+    """The same contact, with candidates found by POSITION instead of by direction.
+
+    WHY: the direction grid's premise is that a face spans at most one bin, and its resolution is
+    set by the largest angular size any face has -- so it is decided by whichever part of the
+    surface is CLOSEST to the centre. An adherent cell is 28 um across and 12 um tall, so its
+    surface runs from 3.2 um to 14.7 um from its own centroid: measured on that geometry the grid
+    collapsed to 13 rows over 38,388 sub-triangles and the query asked for 144 GB. Sixteen times the
+    faces moved it from 8 rows to 13, and blending the shape halfway back to a ball still left
+    48 GB. Nothing about that is a tuning problem -- a flat surface simply has no good direction
+    grid, and every knob that fixes the index removes the flatness.
+
+    A UNIFORM GRID IN SPACE has no such coupling. Its cell is sized by the largest triangle EDGE, a
+    length rather than an angle, so a flat surface and a round one index equally well and the cost
+    follows the number of triangles rather than the aspect ratio of the body. On the cell above it
+    is 27 candidates per particle against the direction grid's 8,352.
+
+    WHAT CHANGES BESIDES THE INDEX, stated because it is a change of MEANING and that is what the
+    `model:` axis is for. The centre model rays from the centre through the particle and finds the
+    OUTERMOST face on that ray, so it knows the surface's radius in that direction however deep
+    inside the particle sits -- the whole interior is the forbidden region. This model gathers the
+    faces NEAR THE PARTICLE, so a particle deep in the interior finds nothing and is left alone: it
+    is a contact in a BAND around the surface, of the grid's own cell width. For a membrane holding
+    organelles in, that is the wanted reading; for an indenter driven through a gel, the centre
+    model is, and it stays the default.
+
+    Reference: Ericson, C. (2005). Real-Time Collision Detection, ch. 7 (uniform grids and
+    hashing); Teschner, M. et al. (2003). Optimized spatial hashing for collision detection of
+    deformable objects. VMV 2003:47-54.
+    """
+
+    def _build_from(self, V, es, et, ef, Vv, dev, dt_):
+        M = super()._build_from(V, es, et, ef, Vv, dev, dt_)
+        A, B, C = M["A"], M["B"], M["C"]
+        # THE CELL IS THE TYPICAL TRIANGLE AND EACH TRIANGLE GOES INTO EVERY CELL ITS BOUNDING BOX
+        # TOUCHES, which is the pair of choices that makes this index work where the direction grid
+        # does not. Sizing the cell by the LARGEST triangle -- the 99.9th percentile edge, as the
+        # direction grid sizes its rows -- gave 4.4 um cells on a 28 um cell, an 11x7x11 grid and
+        # 2,551 triangles in one of them: a coarse index is a coarse index whatever it is indexed
+        # by. The median edge sizes the grid to the mesh's own resolution, and inserting by bounding
+        # box rather than by the three corners is what keeps that legal for the few triangles that
+        # are much larger than the median -- a corner registration would leave the middle of such a
+        # triangle in no cell at all.
+        edge = torch.maximum((B - A).norm(dim=1),
+                             torch.maximum((C - A).norm(dim=1), (C - B).norm(dim=1)))
+        h = max(float(edge.median()), 1e-6)
+        P3 = torch.cat([A, B, C])
+        lo = P3.min(0).values - 2.0 * h
+        hi = P3.max(0).values + 2.0 * h
+        tlo = torch.minimum(torch.minimum(A, B), C)
+        thi = torch.maximum(torch.maximum(A, B), C)
+        for _ in range(8):                       # coarsen until the insert list is affordable
+            dims = ((hi - lo) / h).ceil().long().clamp_min(1)
+            ilo = ((tlo - lo) / h).long().clamp_min(0)
+            ihi = ((thi - lo) / h).long()
+            ihi = torch.minimum(ihi, (dims - 1)[None, :])
+            span = (ihi - ilo + 1).clamp_min(1)
+            if int(span.prod(1).sum()) <= 20_000_000:
+                break
+            h *= 1.6
+        nx, ny, nz = (int(dims[0]), int(dims[1]), int(dims[2]))
+        nb = nx * ny * nz
+        sx, sy, sz = span[:, 0], span[:, 1], span[:, 2]
+        cnt3 = sx * sy * sz
+        tri3 = torch.repeat_interleave(torch.arange(A.shape[0], device=dev), cnt3)
+        base = torch.cumsum(cnt3, 0) - cnt3
+        k = torch.arange(int(cnt3.sum()), device=dev) - base[tri3]
+        kz = k % sz[tri3]
+        ky = (k // sz[tri3]) % sy[tri3]
+        kx = k // (sz[tri3] * sy[tri3])
+        cx = ilo[tri3, 0] + kx
+        cy = ilo[tri3, 1] + ky
+        cz = ilo[tri3, 2] + kz
+        b3 = (cx * ny + cy) * nz + cz
+        order = torch.argsort(b3 * (A.shape[0] + 1) + tri3)     # deterministic, as in the parent
+        b3, tri3 = b3[order], tri3[order]
+        counts = torch.bincount(b3, minlength=nb)
+        Kh = int(counts.max())
+        first = torch.zeros(nb + 1, dtype=torch.long, device=dev)
+        first[1:] = torch.cumsum(counts, 0)
+        slot = torch.arange(b3.shape[0], device=dev) - first[b3]
+        htable = torch.full((nb, Kh), -1, dtype=torch.long, device=dev)
+        htable[b3, slot] = tri3
+        # THE PREFILTER IS THE GRID ITSELF, so the inherited direction-bin prefilter must let
+        # everything through: `rmax` is what `forward` compares a particle's radius against, and a
+        # spatial model has no opinion about radius.
+        M["rmax"] = torch.full_like(M["rmax"], float("inf"))
+        M.update(h=h, lo=lo, hdims=(nx, ny, nz), htable=htable, hcounts=counts, Kh=Kh)
+        if not getattr(self, "_said_hash", False):
+            self._said_hash = True
+            print(f"[mesh_contact/spatial_hash] {M['n_tri']:,} sub-triangles in a "
+                  f"{nx}x{ny}x{nz} grid of {h:.4g} cells, up to {Kh} per cell -- "
+                  f"{27 * Kh} candidates a particle", flush=True)
+        return M
+
+    def _query(self, M, x, u, r):
+        dev = x.device
+        n = x.shape[0]
+        nx, ny, nz = M["hdims"]
+        h, lo = M["h"], M["lo"]
+        c = ((x - lo) / h).long()
+        c[:, 0].clamp_(0, nx - 1); c[:, 1].clamp_(0, ny - 1); c[:, 2].clamp_(0, nz - 1)
+        o = torch.tensor([-1, 0, 1], device=dev)
+        off = torch.stack(torch.meshgrid(o, o, o, indexing="ij"), -1).reshape(-1, 3)   # [27,3]
+        nb = c[:, None, :] + off[None]                                                 # [n,27,3]
+        nb[..., 0].clamp_(0, nx - 1); nb[..., 1].clamp_(0, ny - 1); nb[..., 2].clamp_(0, nz - 1)
+        bi = (nb[..., 0] * ny + nb[..., 1]) * nz + nb[..., 2]                          # [n,27]
+        # ONLY THE PARTICLES WITH A FACE NEAR THEM. Everything else is interior (or outside the
+        # band) and is never gathered, which is what keeps the [m, 27K] tensor small.
+        have = M["hcounts"][bi].sum(1) > 0
+        hit = torch.zeros(n, dtype=torch.bool, device=dev)
+        tri = torch.zeros(n, dtype=torch.long, device=dev)
+        tb = torch.zeros(n, device=dev, dtype=x.dtype)
+        w = torch.zeros(n, 3, device=dev, dtype=x.dtype)
+        if not bool(have.any()):
+            return hit, tri, tb, w
+        sel = torch.nonzero(have).squeeze(1)
+        _cap = float(os.environ.get("PLEXUS_CONTACT_MAX_ENTRIES", "5.0e7"))
+        _need = float(sel.numel()) * 27.0 * float(M["Kh"])
+        if _need > _cap:
+            raise ValueError(
+                f"mesh_contact[spatial_hash]: {sel.numel():,} particles are within a cell of the "
+                f"surface and the grid holds up to {M['Kh']} triangles a cell, so the lookup would "
+                f"allocate {_need:.3g} entries. Either the surface is far finer than the material "
+                f"it touches, or the band is thick with particles. "
+                f"(PLEXUS_CONTACT_MAX_ENTRIES overrides; expect the memory.)")
+        cand = M["htable"][bi[sel]].reshape(sel.numel(), -1)                           # [m, 27Kh]
+        ok = cand >= 0
+        ci = cand.clamp_min(0)
+        A = M["A"][ci]; B = M["B"][ci]; C = M["C"][ci]
+        # THE SAME MOLLER-TRUMBORE AS THE CENTRE MODEL, so `t` keeps its meaning -- the radius of
+        # the surface along the particle's own ray -- and everything downstream is untouched. Only
+        # the set of triangles it is asked about is different.
+        e1, e2 = B - A, C - A
+        uu = u[sel][:, None, :]
+        p = torch.cross(uu.expand_as(e2), e2, dim=2)
+        det = (e1 * p).sum(2)
+        inv = 1.0 / torch.where(det.abs() < 1e-20, torch.full_like(det, 1e-20), det)
+        s = -A
+        w1 = (s * p).sum(2) * inv
+        q = torch.cross(s, e1, dim=2)
+        w2 = (uu * q).sum(2) * inv
+        t = (e2 * q).sum(2) * inv
+        tol = 1e-6
+        good = ok & (det.abs() > 1e-20) & (w1 >= -tol) & (w2 >= -tol) & (w1 + w2 <= 1 + tol) & (t > 0)
+        tt = torch.where(good, t, torch.full_like(t, -1.0))
+        best = tt.argmax(dim=1)
+        ar = torch.arange(sel.numel(), device=dev)
+        hit[sel] = good[ar, best]
+        tri[sel] = ci[ar, best]
+        tb[sel] = t[ar, best]
+        w[sel] = torch.stack([1.0 - w1[ar, best] - w2[ar, best], w1[ar, best], w2[ar, best]], 1)
+        return hit, tri, tb, w

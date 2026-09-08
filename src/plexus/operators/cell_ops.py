@@ -1812,7 +1812,19 @@ class PolymerizeTips(Structural):
         env = None                                   # the envelope a new point must land inside
         if self.confine:
             m = H.level(self.confine)
-            im = H.lift_index(m.name, self.cell_set)
+            # THE BARRIER MAY BE A SURFACE RATHER THAN AN ORGANELLE, and a surface is not contained
+            # in the cell -- a mesh's vertices have no parent to lift through. With one cell in the
+            # model they all belong to it; with several, a barrier set must be contained, and saying
+            # so here is better than a lift that silently indexes the wrong cell.
+            try:
+                im = H.lift_index(m.name, self.cell_set)
+            except Exception:
+                if cl.n != 1:
+                    raise ValueError(
+                        f"polymerize_tips: `confine: {self.confine}` is not contained in "
+                        f"{self.cell_set!r}, and this model has {cl.n} cells, so there is no way to "
+                        f"tell which cell each barrier point belongs to.")
+                im = torch.zeros(m.n, dtype=torch.long, device=Xa.device)
             Xm = m.get("pos")[:, :D]
             lm = m.occ > 0
             c_all = cl.state[:, cl.state_schema["pos"][0]:cl.state_schema["pos"][0] + D]
@@ -2218,6 +2230,15 @@ class MeshFromRun(Seed):
         # than a ball. It is a concession to the contact operator's data structure and it is stated
         # here rather than hidden in a spec's numbers.
         self.round = float(params.get("round", 0.0))
+        # THE FACES' TARGETS ARE THE SPHERE'S UNTIL THEY ARE RESET. `seed_mesh` writes each face's
+        # preferred area, perimeter and volume from the shell it just built; moving the vertices onto
+        # a settled cell leaves every one of them far from a target belonging to a different shape,
+        # and `cell_mechanics` answers that with a force proportional to the mismatch -- measured, the
+        # mesh tore a spike to the box corner within two frames. `retarget` names the face set whose
+        # A0 / P0 / V0f are to be recomputed from the geometry the mesh now has, so the fitted shape
+        # is the rest shape.
+        self.retarget = params.get("retarget")
+        self.p0 = float(params.get("p0", 3.5))
 
     def forward(self, H, mask=None):
         import numpy as np
@@ -2234,7 +2255,14 @@ class MeshFromRun(Seed):
         rad = np.linalg.norm(d, axis=1)
         v = H.level(self.at)
         p0, p1 = v.state_schema["pos"]
-        X = v.state[:, p0:p1]
+        # THE LIVE MESH, NOT THE RESERVOIR. A vertex set is declared at the size the tissue may
+        # grow to -- 16,384 slots for a 3,196-vertex sphere -- and the unused tail sits at the
+        # origin. Its rows dragged the centroid a fifth of the way to the box corner, and since
+        # every vertex takes its support radius BY ITS DIRECTION from that centroid, each was given
+        # the reach of a direction it does not point in: the mesh kept its size and grew a spike to
+        # the corner. Only the first Nv rows are the surface.
+        nv = int(getattr(v, "_mesh", {}).get("Nv", 0)) or int(v.n)
+        X = v.state[:nv, p0:p1]
         U = (X - X.mean(0))
         U = (U / U.norm(dim=1, keepdim=True).clamp_min(1e-12)).detach().cpu().numpy()
 
@@ -2278,11 +2306,150 @@ class MeshFromRun(Seed):
                 r_vert = np.exp((1.0 - self.round) * np.log(np.maximum(r_vert, 1e-9))
                                 + self.round * np.log(max(rmed, 1e-9)))
 
-        Xn = torch.as_tensor(c, device=X.device, dtype=X.dtype) + \
-            torch.as_tensor(U * r_vert[:, None], device=X.device, dtype=X.dtype)
-        X.copy_(Xn)
-        print(f"[mesh_from_run] {self.at}: {v.n:,} vertices put on {self.set} of {self.run} "
+        cT = torch.as_tensor(c, device=X.device, dtype=X.dtype)
+        X.copy_(cT + torch.as_tensor(U * r_vert[:, None], device=X.device, dtype=X.dtype))
+        if nv < int(v.n):                      # the reservoir tail, parked where it is harmless
+            v.state[nv:, p0:p1] = cT
+        if self.retarget:
+            from plexus.operators.vertex_ops import face_geometry_3d
+            m = getattr(v, "_mesh", None)
+            if m is None:
+                raise ValueError(f"mesh_from_run: `retarget: {self.retarget}` but {self.at!r} "
+                                 f"carries no half-edge mesh to measure.")
+            es, et, ef, nF = m["E_srce"], m["E_trgt"], m["E_face"], int(m["nF"])
+            area, perim, _cen, vf = face_geometry_3d(v.state[:, p0:p1], es, et, ef, nF)
+            fl = H.level(self.retarget)
+            for blk, val in (("A0", area), ("P0", self.p0 * area.clamp_min(1e-20).sqrt()),
+                             ("V0f", vf.abs())):
+                if blk in fl.state_schema:
+                    q0, q1 = fl.state_schema[blk]
+                    fl.state[:nF, q0:q1] = val[:nF, None]
+            print(f"[mesh_from_run] retargeted {nF:,} faces on {self.retarget!r}: the fitted shape "
+                  f"is the rest shape now (mean area {float(area[:nF].mean()):.3e}, "
+                  f"mean wedge volume {float(vf[:nF].abs().mean()):.3e}, p0 {self.p0:g})", flush=True)
+        print(f"[mesh_from_run] {self.at}: {nv:,} live vertices put on {self.set} of {self.run} "
               f"({self.fit}) -- centre ({c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f}), reach "
               f"{float(r_vert.min()):.4f} to {float(r_vert.max()):.4f} "
               f"({self.scale:g}x the membrane's own)", flush=True)
+        return {}
+
+
+@register_operator("seed_mpm_in_cells", family="cell", set="particle", kind="seed")
+class SeedMPMInCells(Seed):
+    """Fill every cell of an apico-basal epithelium with material points.
+
+    particle -[containment]-> vertex: reads the half-edge mesh on a vertex set, and places each
+    particle inside the PRISM of the cell it belongs to -- the volume between that cell's basal ring
+    at `pos - sep/2` and its apical ring at `pos + sep/2`.
+
+    HOW A POINT IS PUT INSIDE A CELL, given that a cell is a polygon and not a shape with a formula.
+    The cell's ring is fanned into triangles from its own centroid, one per half-edge, which is the
+    same fan `face_geometry_3d` integrates its area over -- so the sampling and the geometry agree by
+    construction. A particle draws a half-edge of its cell in proportion to that triangle's area, a
+    point in the triangle by the square-root barycentric rule (uniform, unlike raw barycentrics,
+    which crowd the centroid), and a height uniformly across the thickness. The three together are
+    uniform in the prism.
+
+        x = (1-u) c_j + u [(1-v) s_h + v t_h] + (w - 1/2) sep(x)
+
+    with c_j the cell's centroid, s_h and t_h the half-edge's own two vertices, u = sqrt(a) for
+    a ~ U(0,1), v ~ U(0,1), w ~ U(0,1), and sep interpolated the same way as the position.
+
+    WHICH CELL A PARTICLE BELONGS TO is not decided here: it is the containment map the spec already
+    declares, `parent: <the cell set>` with `per_parent: <n>`, so a spec that wants 2,000 points in
+    each of twelve cells says so once and this operator reads it. That is also what makes the result
+    a HIERARCHY rather than a cloud that happens to sit inside a mesh -- `aggregate_centroid` will
+    give each cell its material's centre of mass, and every organelle-level operator in this library
+    keeps working.
+
+    `p_vol` AND `mass` ARE REWRITTEN from the cell's own volume divided by the number of points in
+    it, for the reason `seed_cell_atlas` does the same: the entity provisions every point with an
+    identical volume, and cells of a tissue are not identical.
+
+    Reference: Plexus (this work); the prism geometry is `seed_mesh[apicobasal]`'s own
+    (Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["initial_condition", "epithelium", "encapsulation"]
+    PARAM_ROLES = {"surface": "vertex_set", "sep_block": "thickness_state",
+                   "inset": "fraction_kept_from_the_wall", "density": "material_density"}
+    REFERENCE = "Plexus (this work); Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.surface = str(params["surface"])
+        self.sep_block = str(params.get("sep_block", "sep"))
+        # A MARGIN OFF THE WALL, because a point exactly on a face is in contact with it from the
+        # first frame: 0.9 keeps the material to nine tenths of the cell's own cross-section.
+        self.inset = float(params.get("inset", 0.9))
+        self.density = float(params.get("density", 1.0))
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        v = H.level(self.surface)
+        m = getattr(v, "_mesh", None)
+        if m is None or not int(m.get("Nv", 0)):
+            raise ValueError(f"seed_mpm_in_cells: {self.surface!r} carries no half-edge mesh. "
+                             f"Declare `mesh: half_edge` on it and seed it first.")
+        es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]
+        nF = int(m["nF"])
+        dev = p.state.device
+        P0, P1 = v.state_schema["pos"]
+        X = v.state[:, P0:P1]
+        S0, S1 = v.state_schema[self.sep_block]
+        SEP = v.state[:, S0:S1]
+
+        # the fan: one triangle per half-edge, (centroid, srce, trgt), and its area
+        cnt = torch.bincount(ef, minlength=nF).clamp_min(1)
+        cen = torch.zeros(nF, 3, device=dev, dtype=X.dtype).index_add(0, ef, X[es]) / cnt[:, None]
+        A, B, C = cen[ef], X[es], X[et]
+        area = 0.5 * torch.linalg.cross(B - A, C - A, dim=1).norm(dim=1)
+
+        par = p.parent
+        nP = int(par.max()) + 1
+        if nP > nF:
+            raise ValueError(f"seed_mpm_in_cells: the particle set is contained in {nP} parents but "
+                             f"the surface has {nF} cells.")
+        # A HALF-EDGE OF ITS OWN CELL, PER PARTICLE. The builder keeps each cell's half-edges
+        # contiguous and in ring order, so a cell's fibre is the slice [first[j], first[j+1]) and
+        # drawing one is an offset into that run -- no search, and no per-cell list. Uniform over the
+        # ring rather than weighted by triangle area: a cell whose ring has one long edge is then
+        # slightly over-sampled near its short ones, which is a bias of a few percent in where the
+        # points sit and none at all in how many each cell gets.
+        counts = torch.bincount(ef, minlength=nF)
+        first = torch.zeros(nF + 1, dtype=torch.long, device=dev)
+        first[1:] = torch.cumsum(counts, 0)
+        pick = (torch.rand(p.n, device=dev) * counts[par].to(X.dtype)).long()
+        pick = torch.minimum(pick, (counts[par] - 1).clamp_min(0))
+        h = first[par] + pick
+        a = torch.rand(p.n, device=dev, dtype=X.dtype).sqrt()
+        b = torch.rand(p.n, device=dev, dtype=X.dtype)
+        w = torch.rand(p.n, device=dev, dtype=X.dtype) - 0.5
+        ca, cb, cc = cen[par], X[es[h]], X[et[h]]
+        base_pt = ca + self.inset * (a[:, None] * ((1 - b)[:, None] * (cb - ca)
+                                                   + b[:, None] * (cc - ca)))
+        sep_c = torch.zeros(nF, 3, device=dev, dtype=X.dtype).index_add(0, ef, SEP[es]) / cnt[:, None]
+        sep_pt = sep_c[par] + self.inset * (a[:, None] * ((1 - b)[:, None] * (SEP[es[h]] - sep_c[par])
+                                                          + b[:, None] * (SEP[et[h]] - sep_c[par])))
+        pos = base_pt + w[:, None] * sep_pt
+        p.state[:, p.state_schema["pos"][0]:p.state_schema["pos"][1]] = pos
+        if "vel" in p.state_schema:
+            v0, v1 = p.state_schema["vel"]
+            p.state[:, v0:v1] = 0.0
+
+        # the cell's own volume, shared out among the points that are in it
+        vol = torch.zeros(nF, device=dev, dtype=X.dtype).index_add(
+            0, ef, area * sep_pt.new_zeros(1).expand(area.shape[0]) if False else
+            area * SEP[es].norm(dim=1))
+        per = torch.bincount(par, minlength=nF).clamp_min(1)
+        if hasattr(p, "p_vol"):
+            p.p_vol.copy_((vol[par] / per[par].to(X.dtype)).clamp_min(1e-20))
+            if hasattr(p, "mass"):
+                p.mass.copy_(p.p_vol * self.density)
+        print(f"[seed_mpm_in_cells] {p.n:,} material points into {nP} of {nF} cells "
+              f"({p.n // max(nP,1):,} each), prisms of mean volume {float(vol[:nP].mean()):.3e}, "
+              f"inset {self.inset:g}", flush=True)
         return {}
