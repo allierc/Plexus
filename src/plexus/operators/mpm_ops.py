@@ -146,6 +146,10 @@ class MPMGrid(Field):
     first offender is n = 49 -- so the reciprocal round-trip is exact only by luck at the n_grid
     values in use (48, 64, 96, 128, 192). Deriving it from the integer directly keeps byte-identity
     on the corpus, and keeps it for a spec that picks n_grid = 49 tomorrow.
+
+    Reference: the grid, the quadratic B-spline kernel and the CFL ceiling dt < dx / sqrt(E/rho)
+    are those of Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994).
+    Comput. Methods Appl. Mech. Eng. 118:179-196.
     """
 
     RECORD = False                                   # transient scratch -- not recorded/rendered
@@ -1624,6 +1628,10 @@ class MPMTurgor(Lateral):
     the pressure, is what a van 't Hoff term would have to carry; that form is a strictly larger
     operator and is deliberately not built until something needs a cell to shrink in hypertonic
     medium.
+
+    Reference: van 't Hoff, J. H. (1887). Die Rolle des osmotischen Druckes in der Analogie
+    zwischen Losungen und Gasen. Z. Phys. Chem. 1:481-508 (the osmotic pressure a turgor is);
+    the balance against the cortex is Young-Laplace, P = 2 gamma / R.
     """
 
     EMIT = None                 # particle->particle: writes the `turgor` buffer in place; no delta
@@ -1891,10 +1899,16 @@ class MPMSpin(Lateral):
 
 @register_field("image", frame="image")
 class ImageField(Field):
-    """A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1].
-    A STATIC map (no dynamics): it holds only its grid `[1, nx, ny]` and the
-    world<->pixel geometry, sampled by `apply_material_map`. Same orientation
-    convention as `PrescribedField` (flip vertical so image-top maps to domain-top)."""
+    """A 1-channel scalar map read from a 2D image (TIFF/PNG), normalised to [0, 1].
+
+    Pure state and no dynamics: it holds its grid `[1, nx, ny]` and the world-to-pixel geometry,
+    and `apply_material_map` samples it. Normalising to [0, 1] is what makes the image carry the
+    PATTERN and the operator reading it carry the units. Same orientation convention as
+    `PrescribedField` -- flipped vertically, so image-top maps to domain-top and a gradient read
+    from it does not point the wrong way.
+
+    Reference: none -- a measured map is data, not a model.
+    """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu",
                  normalize=True, **kw):
@@ -1925,10 +1939,16 @@ class ImageField(Field):
 
 @register_field("vector_grid", frame="vector_grid")
 class VectorGrid(Field):
-    """A 2-channel UNIT-VECTOR field d(x) = (dx, dy) read from a TIFF -- the contraction
-    DIRECTION / active-stress-orientation map. A 2-channel TIFF `[ny,nx,2]` is read as
-    (dx, dy); a 1-channel TIFF as an angle theta in [0,1]->[0,2pi) -> (cos, sin). Every
-    vector is normalised to unit length. Same vertical-flip convention as ImageField."""
+    """A 2-channel UNIT-VECTOR map d(x) = (dx, dy) read from a TIFF: the contraction direction,
+    or the active-stress orientation.
+
+    A 2-channel TIFF `[ny, nx, 2]` is read as (dx, dy); a 1-channel one as an angle, theta in
+    [0, 1] rescaled to [0, 2pi) and converted to (cos theta, sin theta). Every vector is
+    normalised to unit length, so the map carries a DIRECTION only and the operator reading it
+    carries the magnitude. Same vertical flip as `ImageField`.
+
+    Reference: none -- a measured orientation map is data, not a model.
+    """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu", **kw):
         super().__init__(name)
@@ -1957,10 +1977,27 @@ class VectorGrid(Field):
 
 @register_operator("apply_material_map", family="mpm", set="particle", kind="exchange")
 class ApplyMaterialMap(Exchange):
-    """field -> set: sample the map at each particle and write a per-particle material
-    parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the
-    Lame buffers mu/la (the MPM stress law reads them); any other `target` is written as
-    a per-particle buffer of that name. Mutates per-particle buffers, returns {}."""
+    """Paint a material parameter onto the particles from an image: the map says what each
+    region is made of, so heterogeneity is measured rather than declared per type.
+
+    field -> particle: samples the `from:` field at each particle's position, writes a
+    per-particle material buffer in place.
+
+        v_i      = lo + c(x_i) (hi - lo),        c(x_i) in [0, 1], bilinear from the map
+        mu_i     = E_i / (2 (1 + nu))            when target: youngs
+        lambda_i = E_i nu / ((1 + nu)(1 - 2 nu))
+
+    c is the map intensity, normalised to [0, 1] on load, so `min` and `max` carry the units and
+    the image carries only the pattern -- which is what lets one map drive a stiffness in one
+    specification and a density in another. With `target: youngs` the sampled value is Young's
+    modulus in the run's stress units and the two Lame parameters follow from it at the shared
+    Poisson ratio nu; any other `target` is written straight through as a per-particle buffer of
+    that name.
+
+    Reference: Hu, Y. et al. (2018). A moving least squares material point method with
+    displacement discontinuity and two-way rigid body coupling. ACM Trans. Graph. 37(4):150 (the
+    material model whose mu and lambda this writes).
+    """
 
     EMIT = None                              # sets material, emits no force
     REQUIRES_PARAMS = ["from", "target"]
@@ -2461,7 +2498,7 @@ if HAVE_WARP:
         R = polar_R(Fp, iters)
         # SNOW HARDENS AS IT PACKS, and this kernel did not know it. `mpm_strain` accumulates the
         # plastic volume ratio Jp, and the DEFAULT scatter scales both Lame parameters by
-        # exp(10(1-Jp)) -- Jp<1 (packed) stiffens, Jp>1 softens (mpm_ops.py:322). Omitting it left
+        # exp(10(1-Jp)) -- Jp<1 (packed) stiffens, Jp>1 softens (see `mpm_strain`). Omitting it left
         # snow with its virgin stiffness no matter how compacted it got, so a snow block compressed
         # without limit into a flat pancake instead of holding a packed shape.
         #
@@ -3864,9 +3901,14 @@ class ActiveForceDirectional(ActiveForce):
     activation the default produces no force at all and this one produces its full magnitude, so
     they are not two ways of computing one thing.
 
-        F_i = amplitude * a(x_i) * d(x_i)
+            F_i = amplitude * a(x_i) * d(x_i)
 
-    It also READS A SECOND FIELD, which the typed signature now records per variant (R1(c)).
+    a is the activation at the particle, dimensionless, and d the unit direction read from the
+    `direction_from` vector field, so `amplitude` alone carries the units. It reads a SECOND
+    field, which the typed signature records per model.
+
+    Reference: Marchetti, M. C. et al. (2013). Hydrodynamics of soft active matter. Rev. Mod.
+    Phys. 85:1143-1189.
     """
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -3974,11 +4016,13 @@ class ActiveStress(Exchange):
 # ----------------------------------------------------------------------------------------------
 @register_field("label_image", frame="label_image")
 class LabelImageField(Field):
-    """An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.
+    """An integer instance map read from a TIFF: NOT normalised, and NEVER interpolated.
 
-    The one job it has that `image` cannot do: return the id that is actually there. Bilinear
-    weights between label 7 and label 12 are a number that means nothing and points at a cell that
+    The one thing it does that `image` cannot is return the id that is actually there. A bilinear
+    weight between label 7 and label 12 is a number that means nothing and points at a cell that
     may not exist, so `sample_label` indexes rather than interpolates.
+
+    Reference: none -- a measured segmentation is data, not a model.
     """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu", **kw):
@@ -4010,14 +4054,30 @@ class LabelImageField(Field):
 
 @register_operator("seed_from_segmentation", family="seed", set="particle", kind="seed")
 class SeedFromSegmentation(Seed):
-    """Populate tissue -> cell -> particle from a measured instance segmentation. Runs once.
+    """Build a hierarchy from a measured instance segmentation: the cells are the ones in the
+    image, not a lattice, and each carries its own material.
 
-    Was `kind="exchange"` (an `Exchange` subclass reusing the field-sampling machinery for
-    its numerics) with a `family="seed"` tag that already said what it actually was; the
-    mismatch let it masquerade as ordinary dynamics and skip the seed lifecycle guarantees
-    (never scheduled, runs once, before frame 0) -- exactly the case `Seed` exists to rule
-    out. The numerics (reading a field, scattering onto particles) are unchanged; only the
-    lifecycle classification is corrected.
+    label_image -> (cell, particle): reads an integer label map, writes the particle positions,
+    their cell assignment, and each cell's Lame parameters. Runs once, at x_0.
+
+        cell j     = the pixels carrying label j
+        x_i        ~ uniform over the pixels of the cell that owns i
+        E_j        = y_lo + f_j (y_hi - y_lo),      f_j in [0, 1], one per cell
+        mu_j, la_j from E_j at the shared Poisson ratio
+
+    y_lo and y_hi are `youngs_min` and `youngs_max`, in the run's stress units, so f_j is the only
+    dimensionless quantity and it is what the measurement supplies. Given a `props` file, f_j
+    comes from the recording -- a cell that moved little in it is stiff, one that moved a lot is
+    compliant -- and without one it is drawn at random, `jitter` setting how far cells may differ.
+    The label map is INDEXED and never interpolated, a bilinear weight between two labels being a
+    number that means nothing.
+
+    It is a `seed` and not an `exchange`, though its numerics are a field sample and a scatter: it
+    establishes x_0, so it must carry the seed lifecycle -- never scheduled, run once, before
+    frame 0 -- which is what that kind guarantees and a dynamics kind does not.
+
+    Reference: the segmentation is measured, not modelled. The material model whose mu and lambda
+    this writes is Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150.
     """
 
     EMIT = None
@@ -4185,6 +4245,9 @@ class SetMaterial(Seed):
                                 and long is one that returns it.
         density                 rewrites `mass` as p_vol * density, so a re-stated density is
                                 consistent with the volumes the geometry gave.
+
+        mu     = E / (2 (1 + nu))
+        lambda = E nu / ((1 + nu)(1 - 2 nu))        or lambda = K directly, for a liquid
 
     WHAT IT DOES NOT TOUCH: `p_vol`, `F`, `C` and `Jp`. The volumes belong to the geometry that
     seeded them, and F/C/Jp are the deformation history -- which a continuation from a trajectory
