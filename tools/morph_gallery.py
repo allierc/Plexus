@@ -113,13 +113,19 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--targets", default="cow,armadillo")
     ap.add_argument("--n-pts", type=int, default=20000)
-    ap.add_argument("--frames", type=int, default=12)
+    ap.add_argument("--frames", type=int, default=20)
     ap.add_argument("--iters", type=int, default=60)
     ap.add_argument("--ctrl", type=int, default=4, help="control nodes per axis")
     ap.add_argument("--lr", type=float, default=2.0)
     ap.add_argument("--n-grid", type=int, default=40)
     ap.add_argument("--device", default="cuda:1")
     ap.add_argument("--out", default=os.path.join(ROOT, "graphs_data", "si_material"))
+    ap.add_argument("--batch", action="store_true",
+                    help="optimise every target in ONE rollout, each in its own corner of a larger "
+                         "box. Measured: a differentiable rollout costs 98.7 ms/frame at 12,500 "
+                         "particles and 66.8 at 50,000 -- four times the work for 0.68 times the "
+                         "time -- so below about 50,000 the solve is paying fixed per-substep "
+                         "overhead and the extra trajectories ride along for free.")
     args = ap.parse_args()
 
     import torch

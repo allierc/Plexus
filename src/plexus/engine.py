@@ -2071,26 +2071,36 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     # delta, e.g. gravity, persists across the loop and is seen identically by every
                     # substep) and makes an inner-schedule force what it reads as: recomputed at the
                     # substep's own positions, applied once per substep.
+                    # THE PERSISTENT DELTA BUFFERS ARE FOR CAPTURE AND COMPILE, AND THEY ARE
+                    # IN-PLACE. Under grad they are the wrong thing twice over: `copy_` into a
+                    # static buffer overwrites a tensor a later backward needs (measured: a
+                    # [12500, 3] at version 78 against an expected 1), and there is no captured
+                    # graph to hold addresses for in the first place, since capture is off whenever
+                    # a tape is being kept. The snapshot/restore below still runs -- it is what
+                    # makes a frame-level delta persist across the substep loop -- it just uses the
+                    # clones directly instead of installing them into reused storage.
+                    _static_ok = not torch.is_grad_enabled()
                     _d0 = {k: v.clone() for k, v in H._delta.items()}
                     _b0 = {k: {b: t.clone() for b, t in d.items()}
                            for k, d in H._delta_blocks.items()}
                     # install the persistent buffers, refilled from this tick's snapshot
-                    for _k, _v in _d0.items():
+                    for _k, _v in (_d0.items() if _static_ok else ()):
                         _t = _static_d.get(_k)
                         if _t is None or _t.shape != _v.shape or _t.device != _v.device:
                             _t = _static_d[_k] = torch.empty_like(_v)
                         _t.copy_(_v)
                     for _k in [k for k in _static_d if k not in _d0]:
                         del _static_d[_k]                       # a set that stopped emitting
-                    for _k, _d in _b0.items():
+                    for _k, _d in (_b0.items() if _static_ok else ()):
                         _sb = _static_b.setdefault(_k, {})
                         for _b, _t2 in _d.items():
                             _c = _sb.get(_b)
                             if _c is None or _c.shape != _t2.shape or _c.device != _t2.device:
                                 _c = _sb[_b] = torch.empty_like(_t2)
                             _c.copy_(_t2)
-                    H._delta = _static_d
-                    H._delta_blocks = _static_b
+                    if _static_ok:
+                        H._delta = _static_d
+                        H._delta_blocks = _static_b
                     # ------------------------------------------------ CUDA graph capture, opt-in
                     # THE SUBSTEP IS 415 KERNEL LAUNCHES AND ~30 us OF GPU WORK PER LAUNCH-BOUND
                     # FRAME. Profiling says the GPU is idle 60% of the wall clock waiting for the
@@ -2251,13 +2261,20 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                         if _s:
                             # REFILL, DO NOT REBIND. Same values as the clone this replaces; the
                             # storage survives, which is what a captured graph requires.
-                            for _k, _v in _d0.items():
+                            if not _static_ok:
+                                # under grad: restore by REBINDING the clones. `copy_` into reused
+                                # storage is what a backward two substeps later finds moved.
+                                H._delta = {k: v.clone() for k, v in _d0.items()}
+                                H._delta_blocks = {k: {b: t.clone() for b, t in d.items()}
+                                                   for k, d in _b0.items()}
+                            for _k, _v in (_d0.items() if _static_ok else ()):
                                 _static_d[_k].copy_(_v)
-                            for _k, _d in _b0.items():
+                            for _k, _d in (_b0.items() if _static_ok else ()):
                                 for _b, _t2 in _d.items():
                                     _static_b[_k][_b].copy_(_t2)
-                            H._delta = _static_d
-                            H._delta_blocks = _static_b
+                            if _static_ok:
+                                H._delta = _static_d
+                                H._delta_blocks = _static_b
                         if _gr:
                             _gr.replay()        # the whole substep, one launch
                         else:
