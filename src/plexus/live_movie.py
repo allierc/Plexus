@@ -1670,8 +1670,16 @@ class LiveMovie:
             _per = st.get("surface") or {}
             for j, nm in enumerate(names):
                 if tid is None:                       # a SET per compartment
-                    Xg = np.asarray(H.level(nm).get("pos").detach().cpu().numpy(), np.float64)
-                    sel = np.arange(Xg.shape[0])
+                    _lv = H.level(nm)
+                    Xg = np.asarray(_lv.get("pos").detach().cpu().numpy(), np.float64)
+                    # LIVE POINTS ONLY. A dormant point -- a monomer pool waiting to be
+                    # polymerised -- has no mass, no stress and no part in the cell, but it has a
+                    # position, and drawing it puts a cloud of the pool's own colour wherever it
+                    # was parked: measured, a green haze 40 um above a cell whose cytoskeleton is
+                    # green. `occ` is what says which rows are the compartment.
+                    _oc = getattr(_lv, "occ", None)
+                    sel = (np.nonzero(np.asarray(_oc.detach().cpu().numpy()) > 0)[0]
+                           if _oc is not None else np.arange(Xg.shape[0]))
                 else:                                  # a TYPE per compartment, sliced out of one
                     Xg = X
                     sel = np.nonzero(tid == j)[0]

@@ -91,7 +91,7 @@ seed:
   p0: 3.5
   seed: 0
   vseed_cv: 0.15
-  h0: 0.3
+  h0: 0.012
   centre:
   - 0.5
   - 0.5
@@ -148,28 +148,28 @@ plotting:
   render_px: 1400
 descriptions:
   movie:
-    description: The simulation begins with a dense cluster of multicolored particles
-      located in the bottom-right corner of a large cubic domain. Over time, these
-      particles begin to disperse and move outward from their initial concentrated
-      position. The movement appears somewhat chaotic as the particles spread into
-      the surrounding empty space. By the final frame, the cluster has expanded significantly,
-      though it remains primarily concentrated in the lower-right quadrant.
-    objects: The primary objects are thousands of small, multicolored particles that
-      form a dense, irregular cluster. These particles are arranged in a roughly spherical
-      but jagged grouping at the base of the cube. The colors of the particles vary
-      across a spectrum of cyan, magenta, yellow, and green. A large, semi-transparent
-      grey sphere is also present, partially overlapping the particle cluster in the
-      bottom-right corner.
+    description: The simulation shows a collection of multi-colored particles clustered
+      in a spherical formation within a 3D bounding box. Over the course of the video,
+      the particles exhibit subtle internal movements and fluctuations in density.
+      The overall spherical structure remains stable and centered within the cubic
+      volume. The visualization provides a snapshot of a microscopic physical process
+      at a specific time step.
+    objects: The scene contains a dense cluster of small particles arranged in a roughly
+      spherical shape. These particles are colored in various hues, including red,
+      orange, blue, green, and purple. The cluster is positioned in the center of
+      a large, wireframe cubic bounding box. A scale bar in the bottom left corner
+      indicates a physical dimension of 25 micrometers.
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
-    description: The simulation shows a collection of multi-colored particles clustered in a spherical
-      formation within a 3D bounding box. Over the course of the video, the particles exhibit subtle internal
-      movements and fluctuations in density. The overall spherical structure remains stable and centered
-      within the cubic volume. The visualization provides a snapshot of a microscopic physical process
-      at a specific time step.
-    objects: The scene contains a dense cluster of small particles arranged in a roughly spherical shape.
-      These particles are colored in various hues, including red, orange, blue, green, and purple. The
-      cluster is positioned in the center of a large, wireframe cubic bounding box. A scale bar in the
-      bottom left corner indicates a physical dimension of 25 micrometers.
+    description: The simulation shows a static snapshot of a multi-colored, multi-faceted object centered
+      within a large cubic domain. The object appears to be a single, complex geometric entity composed
+      of various smaller, interconnected segments. There is no visible motion or change between the frames
+      provided, as they represent a single point in time. The surrounding space remains empty, highlighting
+      the central structure's position and scale.
+    objects: The central object is a complex, roughly spherical shape composed of numerous smaller, faceted
+      segments. These segments are colored in a variety of hues, including blue, green, red, orange, and
+      purple. The object is situated in the center of a large, wireframe cube that represents a 100 $\mu$m
+      spatial domain. A scale bar in the bottom left corner indicates a length of 25 $\mu$m, showing the
+      object is approximately 25-30 $\mu$m in diameter.
