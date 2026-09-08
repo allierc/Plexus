@@ -75,6 +75,9 @@ class Compartment:
     `depth=1` is the same scale hint `cell` carries, and that is not a contradiction: depth is a
     hint used only in `Level.__repr__`, while the containment chain that the engine and the
     operators actually traverse is `parent`/`parent_name`. Nothing dispatches on depth.
+
+    Reference: the piece counts are those of the cell atlas in `figures/cell_atlas.png`; the
+    level itself is plexus2 sec. Hierarchy, a parent holding several distinct sets at once.
     """
 
 
@@ -574,7 +577,7 @@ class SeedCellAtlas(Seed):
 
         if shape == "mito":
             # A BENT CAPSULE WITH CRISTAE. The centre line is an arc of angle `bend` * pi in the
-            # (e3, e1) plane, so `bend: 0` is the straight rod this used to be and `bend: 1` is a
+            # (e3, e1) plane, so `bend: 0` is a straight rod and `bend: 1` is a
             # half-circle. `crista_frac` of the points are placed on transverse LAMELLAE -- discs
             # normal to the centre line at `cristae` evenly spaced stations, filling 0.8 of the
             # local radius -- and the rest fill the outer membrane shell. That split is why a
@@ -881,10 +884,9 @@ class AggregateCentroid(Aggregate):
             # THE FORWARD PATH WRITES IN PLACE, AND MUST. Reassigning `parent.state` allocates a
             # new tensor, and the engine's graph signature is the set of buffer ADDRESSES the
             # captured substep baked in: one reassignment anywhere in the tick invalidates the
-            # capture and the run finishes eager. Measured on the 48,780-point smoke test, the
-            # clone path printed "a state buffer was reallocated after the substep was captured;
-            # dropping the CUDA graph" on the first tick -- for a write to `compartment`, a set
-            # the substep never touches.
+            # capture and the run finishes eager. The clone path drops the graph on the FIRST
+            # tick, reporting a state buffer reallocated after the substep was captured -- for a
+            # write to `compartment`, a set the substep never touches.
             old = parent.state[:, px0:px1]
             parent.state[:, px0:px1] = torch.where(den[:, None] > 0, centroid, old)
         return {}
@@ -899,9 +901,15 @@ class AggregateCentroid(Aggregate):
 # there was no way to diffuse ONE scalar over an ordinary `edge_index`.
 @register_operator("seed_state_random", family="seed", set="compartment", kind="seed")
 class SeedStateRandom(Seed):
-    """Fill a named state block with U(lo, hi), once, at x_0.
+    """Fill a named state block with independent uniform noise, once, at x_0.
 
     set -> set: writes `block`, reads nothing.
+
+        v_i ~ U(lo, hi),   independently per element and per component of the block
+
+    lo and hi are in the units of whatever `block` holds, so this operator has no units of its
+    own; `seed` fixes the draw, on the CPU, so the same specification gives the same x_0 on any
+    device.
 
     An initial condition with no structure is still an initial condition, and it has to be an
     operator rather than a `sets:` key for the reason `seed:` exists at all: `build` seeds
@@ -1031,6 +1039,12 @@ class SeedPolarity(Seed):
     """A unit direction per element, lying IN the substrate plane, written to `block`.
 
     cell -> cell: writes `polarity`, reads nothing.
+
+        theta_i = theta_0 + spread * pi * u_i,        u_i ~ U(-1, 1)
+        p_i     = cos(theta_i) e_a + sin(theta_i) e_b
+
+    e_a and e_b are the two axes perpendicular to `axis`, the substrate normal, so p_i is a unit
+    vector in the plane by construction. theta_0 is one shared heading drawn per run.
 
     In the plane and not isotropic in 3D, because a polarity with a vertical component asks the
     cell to crawl into the floor or off it -- the traction below would then drive material through
@@ -1525,6 +1539,13 @@ class ParkReserve(Seed):
     particle -> particle: sets `occ = 0` and `mass = 0` on the last `fraction` of each parent's
     block, keeping what it took away in a `mass_rest` buffer so waking a point restores the mass
     the atlas computed for it rather than a guess.
+
+        for each parent, the last  round(fraction * n_p)  of its points:
+            mass_rest_i <- mass_i,   then   occ_i <- 0,  mass_i <- 0
+
+    `fraction` is dimensionless, in [0, 1): the share of each piece's points held back. It is
+    taken from the END of the parent's block so the live points stay contiguous from the start,
+    which is what lets a waking operator take the next dormant index rather than search.
 
     THE RESERVOIR IS SPARE CAPACITY IN A SET, not a new mechanism. Every level is already allocated
     at a fixed buffer size with an occupancy `occ` marking the live subset, and the whole MPM path
