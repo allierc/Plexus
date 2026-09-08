@@ -1308,7 +1308,7 @@ class Divide3D(Structural):
         # created cannot be told apart from one that corrects deviations it did not.
         #
         # Randomising how a cell splits is not a different hypothesis about what a cell IS, so by
-        # AXES.md it is a value -- the same axis as `cycle_cv`, `vseed_cv` and `age_seed`, and not a
+        # by the axis test it is a value -- the same axis as `cycle_cv`, `vseed_cv` and `age_seed`, not a
         # `model:` of its own.
         #
         # WHAT IT PERTURBS IS THE TARGET, NOT THE SEPTUM, and that limit is stated rather than
@@ -1446,7 +1446,7 @@ class Divide3D(Structural):
                 vf = _vp.numpy().astype(np.float64)
                 # THE REFERENCE IS THE SEED-TIME MEDIAN, THE WAY THE WEDGE ONE ALWAYS WAS -- and
                 # that is only honest because `seed_mesh` now seeds `h0` at the thickness the energy
-                # wants. It was not always so. `h0` used to be an arbitrary number: 0.4 on this spec
+                # wants, and it is not free. Left as an arbitrary number, `h0` would be 0.4 on this spec
                 # against an equilibrium of 0.8796, 1.8 on `mech_shell_free` against 0.8001. The
                 # seeded shell then spent the opening of every run RELAXING toward a thickness
                 # nobody had asked for -- on `mech_shell_free` about 300 frames, with the mean
@@ -2513,10 +2513,22 @@ class Apoptosis3D(Structural):
 @register_operator("cell_die", model="competition", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DCompetition(Apoptosis3D):
-    """`competition` MODEL of cell_die -- grows slower than its neighbours -- the Myc-style loser.
+    """`competition` model of cell_die: a cell growing more slowly than its neighbours is
+    out-proliferated and removed -- the Myc-style loser of cell competition.
+
+        mark j   when   g_j  <  stall_frac * mean_(k ~ j) g_k     and   mean_k g_k > stall_margin
+
+    g_j is the cell's fractional growth SINCE BIRTH, V0f_j / Vbirth_j, dimensionless.
+    A LOCAL comparison, against this cell's own neighbours on the mesh -- so `stall_frac` is a
+    fraction OF THE NEIGHBOUR MEAN and carries no units of its own. The neighbours must also be
+    above `stall_margin`, or a uniformly quiet patch culls itself from the inside.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Morata, G. & Ripoll, P. (1975). Minutes: mutants of Drosophila autonomously
+    affected in cell division rate. Dev. Biol. 42:211-221; de la Cova, C. et al. (2004).
+    Drosophila Myc regulates organ size by inducing cell competition. Cell 117:107-116.
     """
     DEATH = "competition"
 
@@ -2524,10 +2536,21 @@ class Apoptosis3DCompetition(Apoptosis3D):
 @register_operator("cell_die", model="smaller", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DSmaller(Apoptosis3D):
-    """`smaller` MODEL of cell_die -- smaller than its neighbours: squeezed out by a fitter crowd.
+    """`smaller` model of cell_die: a cell smaller than its neighbours is squeezed out by a
+    tissue that can no longer accommodate it.
+
+        mark j   when   v_j  <  stall_frac * mean_(k ~ j) v_k     and   mean_k v_k > stall_margin
+
+    v_j is the cell's target volume V0f, in world units cubed.
+    A LOCAL comparison, against this cell's own neighbours on the mesh -- so `stall_frac` is a
+    fraction OF THE NEIGHBOUR MEAN and carries no units of its own. The neighbours must also be
+    above `stall_margin`, or a uniformly quiet patch culls itself from the inside.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Marinari, E. et al. (2012). Live-cell delamination counterbalances epithelial
+    growth to limit tissue overcrowding. Nature 484:542-545.
     """
     DEATH = "smaller"
 
@@ -2535,10 +2558,22 @@ class Apoptosis3DSmaller(Apoptosis3D):
 @register_operator("cell_die", model="dimmer", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DDimmer(Apoptosis3D):
-    """`dimmer` MODEL of cell_die -- less activator than its neighbours -- the LOCAL chemical loser.
+    """`dimmer` model of cell_die: a cell carrying less activator than its neighbours -- the
+    LOCAL form of `chem_low`, which compares against the whole tissue instead.
+
+        mark j   when   a_j  <  stall_frac * mean_(k ~ j) a_k     and   mean_k a_k > stall_margin
+
+    a_j is the cell's activator concentration, dimensionless.
+    A LOCAL comparison, against this cell's own neighbours on the mesh -- so `stall_frac` is a
+    fraction OF THE NEIGHBOUR MEAN and carries no units of its own. The neighbours must also be
+    above `stall_margin`, or a uniformly quiet patch culls itself from the inside. That is what makes it survive
+    a weakening pattern, where a global threshold marks the entire tissue at once.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Morata, G. & Ripoll, P. (1975). Dev. Biol. 42:211-221 (competition on a
+    cell-autonomous signal).
     """
     DEATH = "dimmer"
 
@@ -2546,10 +2581,18 @@ class Apoptosis3DDimmer(Apoptosis3D):
 @register_operator("cell_die", model="older", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DOlder(Apoptosis3D):
-    """`older` MODEL of cell_die -- has gone longer without dividing than its neighbours.
+    """`older` model of cell_die: a cell that has gone longer without dividing than its
+    neighbours -- one that has stopped cycling while the tissue around it has not.
+
+        mark j   when   age_j  >  mean_(k ~ j) age_k / stall_frac
+
+    age_j is the number of division calls since the cell was born, in frames. The comparison is
+    inverted relative to the other local models, because here losing means being ABOVE.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Morata, G. & Ripoll, P. (1975). Dev. Biol. 42:211-221.
     """
     DEATH = "older"
 
@@ -2557,10 +2600,20 @@ class Apoptosis3DOlder(Apoptosis3D):
 @register_operator("cell_die", model="crowded", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DCrowded(Apoptosis3D):
-    """`crowded` MODEL of cell_die -- has more neighbours than its neighbours do -- density-driven extrusion.
+    """`crowded` model of cell_die: a cell with more neighbours than a trivalent sheet should
+    give it -- density-driven extrusion.
+
+        mark j   when   deg(j)  >=  n_max     and   age_j >= min_age
+
+    deg(j) is the number of cells sharing an edge with j, which on a closed trivalent surface
+    averages about six -- so `n_max` is read against that, not against a lattice coordination.
+    It fires where division has packed a region.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Eisenhoffer, G. T. et al. (2012). Crowding induces live cell extrusion to maintain
+    homeostatic cell numbers in epithelia. Nature 484:546-549.
     """
     DEATH = "crowded"
 
@@ -2568,10 +2621,20 @@ class Apoptosis3DCrowded(Apoptosis3D):
 @register_operator("cell_die", model="lonely", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DLonely(Apoptosis3D):
-    """`lonely` MODEL of cell_die -- has fewer -- the tissue closes over a gap.
+    """`lonely` model of cell_die: a cell with fewer neighbours than a sheet should give it, so
+    the tissue closes over a gap.
+
+        mark j   when   0 < deg(j) <= n_min     and   age_j >= min_age
+
+    deg(j) is the number of cells sharing an edge with j. Since a closed trivalent sheet gives
+    every cell about six, this can only fire once deaths have already thinned a region -- which
+    makes it a rule about how a WOUND spreads or heals, and worth having for that alone.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Plexus (this work); the neighbour-count rule of Conway's Game of Life, taken to the
+    real adjacency rather than a lattice.
     """
     DEATH = "lonely"
 
@@ -2579,10 +2642,21 @@ class Apoptosis3DLonely(Apoptosis3D):
 @register_operator("cell_die", model="small", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DSmall(Apoptosis3D):
-    """`small` MODEL of cell_die -- below an ABSOLUTE volume threshold, not a relative one.
+    """`small` model of cell_die: below an ABSOLUTE volume threshold, not a relative one -- the
+    one selection that is genuinely about the cell's own state and not about where it sits.
+
+        mark j   when   v_j  <  small_frac * v_ref
+
+    v_j is the cell's target volume V0f and v_ref the seed-time MEDIAN cell volume, both in world
+    units cubed, so `small_frac` is a dimensionless fraction of a typical cell at the start. A
+    cell arrives in this set by shrinking rather than by being pushed, so it is re-evaluated every
+    frame.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Marinari, E. et al. (2012). Nature 484:542-545 (delamination of the smallest
+    cells).
     """
     DEATH = "small"
 
@@ -2590,10 +2664,19 @@ class Apoptosis3DSmall(Apoptosis3D):
 @register_operator("cell_die", model="stalled", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DStalled(Apoptosis3D):
-    """`stalled` MODEL of cell_die -- below an absolute GROWTH-RATE threshold.
+    """`stalled` model of cell_die: below an absolute GROWTH-RATE threshold -- a cell that has
+    stopped growing, judged against a number rather than against its neighbours.
+
+        mark j   when   g_j  <  stall_frac_abs
+
+    g_j is the cell's fractional growth since birth, dimensionless. Absolute where `competition`
+    is relative, so the two disagree exactly when the whole tissue slows down: this one then marks
+    everything, and that one marks nothing.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Morata, G. & Ripoll, P. (1975). Dev. Biol. 42:211-221.
     """
     DEATH = "stalled"
 
@@ -2601,10 +2684,21 @@ class Apoptosis3DStalled(Apoptosis3D):
 @register_operator("cell_die", model="chem_low", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DChemLow(Apoptosis3D):
-    """`chem_low` MODEL of cell_die -- below an absolute activator threshold -- dies BETWEEN the spots.
+    """`chem_low` model of cell_die: below an absolute activator threshold, so cells die BETWEEN
+    the spots of a pattern.
+
+        mark j   when   a_j  <  a_sw * max_k a_k
+
+    a_j is the cell's activator concentration and the maximum runs over the whole tissue, so
+    `a_sw` is a dimensionless fraction of the pattern's own peak rather than of a neighbourhood.
+    That global reference is the difference from `dimmer`, and its weakness: when the pattern
+    weakens, the maximum falls with it and the threshold marks the entire tissue at once.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Plexus (this work); death keyed to a morphogen the reaction-diffusion operators
+    write.
     """
     DEATH = "chem_low"
 
@@ -2612,32 +2706,44 @@ class Apoptosis3DChemLow(Apoptosis3D):
 @register_operator("cell_die", model="prescribed", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DPrescribed(Apoptosis3D):
-    """`prescribed` MODEL of cell_die -- the EXPERIMENTER ablates a patch; the tissue did not choose.
+    """`prescribed` model of cell_die: the EXPERIMENTER ablates a patch, and the tissue did not
+    choose it. A control, and the way to ask what a wound does.
 
-    ONE MODEL, THREE GEOMETRIES, and the geometry is a VALUE. `region: list | band | cone` names a
-    set of cells (explicit indices), a set of latitude rings, or one contiguous cap. All three make
-    the same claim -- "these cells are removed from outside" -- applied to different shapes, which is
-    the `mesh_seed.shape: sphere | disc` case: "the same hypothesis about the tissue seeded into two
-    different geometries". Splitting them into three models would have claimed three hypotheses where
-    there is one.
+        mark j   when   j is in the named region
 
-    IT IS NOT A MECHANISM AND SHOULD NOT BE READ AS ONE. Every other model of this operator answers
-    "what makes a cell die"; this one answers "which cells did we kill", which is a protocol.
+    ONE MODEL, THREE GEOMETRIES, and the geometry is a VALUE. `region: list | band | cone` names
+    a set of cells by index, a set of latitude rings, or one contiguous cap. All three make the
+    same claim -- "these cells are removed from outside" -- applied to different shapes, which is
+    what makes them values on one model rather than three models.
+
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Plexus (this work); laser ablation as an experimental protocol.
     """
     DEATH = "prescribed"
 
 
 @register_operator("cell_die", model="field", set="vertex", kind="die", family="population")
 class Apoptosis3DField(Apoptosis3D):
-    """`field` MODEL of cell_die -- death keyed to a per-cell quantity SOME OTHER OPERATOR published.
+    """`field` model of cell_die: death keyed to a per-cell quantity SOME OTHER operator
+    published, so a new measurement needs no new branch here.
 
-    The generic one, and the base class already says why it exists: these "carry no criterion of
-    their own; `field` names a per-cell quantity some other operator measured and published on the
-    mesh, and `field_frac` is the multiple of its live MEDIAN that counts as qualifying. Death stops
-    needing a new branch for every new measurement."
+        mark j   when   q_j  <  frac * median_k q_k        compare: low
+        mark j   when   q_j  >  frac * median_k q_k        compare: high
 
-    `compare: high | low` is a VALUE, not two models: which tail of one distribution qualifies is a
-    threshold direction, not a different claim about the tissue.
+    q is the field named by `field`, whatever an operator such as `cell_shape_probe` wrote onto
+    the mesh. The reference is the MEDIAN of the live cells and not the maximum, so one runaway
+    cell cannot set the scale of the quantity that exists to find it -- and `frac` then means the
+    same thing on a shape index near 3.7 as on an aspect ratio near 1.5. An UNPUBLISHED field
+    marks nothing: no probe ran, so nothing is known, and killing none is the only honest reading.
+
+    `compare: high | low` is a VALUE, not two models: which tail qualifies.
+
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Plexus (this work); the generic form of the measured criteria above.
     """
     DEATH = "field"
 
@@ -2688,7 +2794,7 @@ class CellCycle3D(Lateral):
     WHY THIS IS ITS OWN CONTRACT AND NOT A `model:` OF `cell_divide`, by this repo's own two tests.
     `cell_divide._trigger`'s docstring says "THE ONLY THING A `model=` VARIANT OF cell_divide
     CHANGES" is the trigger, and a four-phase machine is not a trigger -- it is state, transitions
-    and its own couplings. And AXES.md's second test is decisive: "a variant that needs a second SET
+    and its own couplings. And the axis test's second question is decisive: a variant that needs a second SET
     or a second state BLOCK is making a different claim". A cycle needs `phase`. So it cannot live
     on that contract, and the split is the same one already drawn between `cell_grow` (what the cell
     ASKS for) and `cell_divide` (what the topology DOES): this operator says when a cell is ready,
@@ -2949,7 +3055,7 @@ class CellCycle3D(Lateral):
             if self.phase_cv > 0 else np.ones(nF)
 
         # ============================================================ the cycle as a rate, not a jump
-        # WHAT S4 CHANGED, in one sentence: the cycle used to be four integers and a per-phase
+        # THE CYCLE IS STATE, NOT A COUNTER. Rather than four integers and a per-phase
         # counter advanced by a predicate, and it is now ONE continuous coordinate `p` -- position
         # through the cycle, 0 at birth, 1 at the end of M -- whose RATE the models set. `phase` is
         # read off `p` by the phase boundaries and no longer holds anything `p` does not.
@@ -3960,10 +4066,10 @@ def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
     v6 = v6.index_add(0, ef, tri(a_s, b_t, a_t))                                 # wall, triangle 2
     v_f = v6 / 6.0
     # THE CAP'S AREA IS MEASURED ON THE SURFACE ITS VOLUME IS MEASURED ON -- the SAME centroid fan,
-    # summed as true triangle areas. It used to be the Newell magnitude ||1/2 sum a_s x a_t||, chosen
-    # so that on a right prism the caps were the same arithmetic as the monolayer's and AB-C1 was an
-    # identity rather than a near miss. IT BOUGHT THAT IDENTITY WITH A NULL SPACE, and the null space
-    # is the whole failure mode of the free separation.
+    # summed as true triangle areas, NOT the Newell magnitude ||1/2 sum a_s x a_t||. The Newell
+    # form makes the caps the same arithmetic as the monolayer's on a right prism, so AB-C1 comes
+    # out an identity rather than a near miss -- but IT BUYS THAT IDENTITY WITH A NULL SPACE, and
+    # the null space is the whole failure mode of the free separation.
     #
     # The Newell magnitude is the area of the ring's PLANAR PROJECTION, so a crumpled cap and a flat
     # one of the same outline measure the SAME, and the area is stationary to first order when one
@@ -4070,8 +4176,12 @@ class MonolayerShapeEnergy3D(Lateral):
     capped at cap_frac x mean edge). EMIT=velocity. Selected by {op: cell_mechanics, model:
     monolayer} -- `model:`, because giving every cell its own 3D volume is a different HYPOTHESIS
     about the tissue, not the same one computed differently; `implementation: monolayer` is refused
-    by the schema, and this docstring said it for months. Emergent bending (thin undulate / thick straight) falls out of the vertex-normal offset;
-    no explicit K_bend. See monolayer_design.md."""
+    by the schema. Emergent bending -- thin sheets undulate, thick ones stay straight -- falls out
+    of the vertex-normal offset, with no explicit bending modulus.
+
+    Reference: Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces
+    autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386, Eq. 3 (the per-cell
+    apical, basal and lateral surfaces this sums)."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
@@ -4802,5 +4912,7 @@ class ShapeEnergy3DWarp(ShapeEnergy3D):
     derivative is a backend choice, not a model, so there is no longer an `autograd` variant to
     select in the other direction -- `_grad` uses the warp kernels wherever they apply and falls
     back to `torch.autograd` where they do not, saying so once.
+
+    Reference: same contract and same energy -- see `cell_mechanics` for the citation.
     """
     MECHANISM_TAGS = ShapeEnergy3D.MECHANISM_TAGS + ["warp"]
