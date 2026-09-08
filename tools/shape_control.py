@@ -61,12 +61,16 @@ def spec(n_pts, box, n_grid, frames, dt, sub):
             fraction=1.0, youngs=90.0, density=1.0,
             block=[0.4 * box, 0.4 * box, 0.4 * box, 0.6 * box, 0.6 * box, 0.6 * box])})},
         fields=dict(mpm_grid=dict(frame="mpm_grid", n_grid=n_grid)),
-        operators=[dict(op="mpm_strain", at="mpm_particle", implementation="default"),
+        # `implementation: differentiable` ON ALL FOUR. The default bodies write in place, which is
+        # what a captured graph needs and what autograd cannot have; these compute the same numbers
+        # and rebind instead. Named in the SPEC, so a run can say which physics it got.
+        operators=[dict(op="mpm_strain", at="mpm_particle", implementation="differentiable"),
                    dict(op="mpm_scatter", at="mpm_particle", to="mpm_grid", drag=0.5,
-                        a_max=200.0, implementation="default"),
-                   dict(op="mpm_grid_update", at="mpm_grid", wall_damp=0.9),
+                        a_max=200.0, implementation="differentiable"),
+                   dict(op="mpm_grid_update", at="mpm_grid", wall_damp=0.9,
+                        implementation="differentiable"),
                    dict(op="mpm_gather", at="mpm_particle", **{"from": "mpm_grid"},
-                        wall_damp=0.9, vmax=1.0e9, implementation="default")],
+                        wall_damp=0.9, vmax=1.0e9, implementation="differentiable")],
         # `compile: true` ON THE SUBSTEP BLOCK, which is worth 2x under grad (1.01 -> 0.51 s an
         # iteration at 12,500 points) for 35 s of one-time compilation. The MPM substep is a few
         # hundred small kernels and a fusing compiler is exactly what that wants.
