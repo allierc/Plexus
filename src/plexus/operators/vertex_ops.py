@@ -300,6 +300,106 @@ def build_hexagon_mesh(n=1, r=1.0, jitter=0.0, seed=0):
     return verts, es, et, np.zeros(6, np.int64), 1
 
 
+def build_prism_mesh(n, r=1.0, jitter=0.0, seed=0, height=None):
+    """ONE apico-basal cell as a closed surface: an apical cap, a basal cap, and n lateral walls.
+
+    Returns the same four things every builder here returns -- vertices [Nv,3], E_srce/E_trgt/E_face,
+    nF -- so it drops into `seed_mesh` beside the sphere and the disc, and everything downstream
+    (mesh_contact, the renderer, the geometry operators) works on it unchanged.
+
+    WHY A PRISM AND NOT A MID-SURFACE WITH `sep`. Plexus's apico-basal representation is a mid-
+    surface mesh plus a per-vertex half-separation, with apical at `pos + sep`, basal at `pos - sep`
+    and the lateral walls REBUILT on every call rather than stored. That is the right representation
+    to compute with and the wrong one to DRAW or to put material inside: a single cell in it is one
+    polygon, which renders as a flat disc and encloses nothing. This builder emits the surface that
+    polygon stands for -- the apical ring at +h/2, the basal ring at -h/2, one quad per side -- so a
+    single cell is a closed, orientable, star-shaped surface with an inside.
+
+        Nv = 2n     nF = n + 2       nH = 2n (the two caps) + 4n (the walls) = 6n
+        V - E + F = 2n - 3n + (n + 2) = 2, as a closed surface must be
+
+    `n` is the number of SIDES, `r` the circumradius of the caps and `height` their separation --
+    the cell's own apico-basal axis, along y, which is the up axis everywhere in this library.
+
+    Reference: the prism is the cell of Okuda, S. et al. (2013), Biomech. Model. Mechanobiol.
+    12:627-644, drawn rather than integrated.
+    """
+    n = max(3, int(n))
+    h = float(height if height is not None else 2.0 * r)
+    g = np.random.default_rng(seed)
+    th = 2.0 * np.pi * np.arange(n) / n
+    rr = r * (1.0 + jitter * (g.random(n) - 0.5))
+    apical = np.stack([rr * np.cos(th), np.full(n, 0.5 * h), rr * np.sin(th)], 1)
+    basal = np.stack([rr * np.cos(th), np.full(n, -0.5 * h), rr * np.sin(th)], 1)
+    V = np.concatenate([apical, basal], 0)
+    rings = [list(range(n)), list(range(2 * n - 1, n - 1, -1))]          # the two caps
+    for k in range(n):                                                   # one wall per side
+        k1 = (k + 1) % n
+        rings.append([k, k1, n + k1, n + k])
+    # ORIENTED CCW SEEN FROM OUTSIDE, by the same Newell test `build_sphere_mesh` uses: a face whose
+    # normal points back toward the body is reversed. That is what makes every directed edge appear
+    # exactly once, which the topology operators and `mesh_contact`'s star-shape both rely on.
+    c = V.mean(0)
+    for i, rr_ in enumerate(rings):
+        P = V[rr_]
+        N = np.cross(P - c, np.roll(P, -1, 0) - c).sum(0)
+        if float(np.dot(N, P.mean(0) - c)) < 0:
+            rings[i] = rr_[::-1]
+    es, et, ef = [], [], []
+    for f, rr_ in enumerate(rings):
+        k = len(rr_)
+        for i in range(k):
+            es.append(int(rr_[i])); et.append(int(rr_[(i + 1) % k])); ef.append(f)
+    return (V.astype(np.float64), np.array(es, np.int64), np.array(et, np.int64),
+            np.array(ef, np.int64), len(rings))
+
+
+def build_prisms_mesh(n, r=1.0, jitter=0.0, seed=0, height=None):
+    """`n` ADJACENT apico-basal cells: hexagonal prisms on the lattice that tiles the plane.
+
+    The single-cell `build_prism_mesh` repeated over the first `n` sites of a hexagonal lattice,
+    which is the packing an epithelium actually has -- flat-top hexagons of circumradius `r` sit at
+    a centre-to-centre distance of sqrt(3) r, so neighbouring cells share a full wall rather than
+    touching along a line. Each cell is its OWN closed surface: the shared wall is two coincident
+    faces, one belonging to each cell.
+
+    THAT IS DELIBERATE AND IT IS THE DIFFERENCE FROM `seed_mesh[apicobasal]`. A tissue in the
+    apico-basal representation is ONE mid-surface whose faces are the cells, so a wall is a single
+    face and the cells cannot be separated. Here each cell is a closed volume of its own, which is
+    what is needed to put material INSIDE one -- a containment map wants a cell to have an inside,
+    and a shared wall would make "which cell is this point in" ambiguous exactly at the wall.
+
+        per cell   Nv = 2m,  nF = m + 2,  nH = 6m       (m = 6 sides)
+        n cells    the same, n times, with no shared vertices
+
+    Reference: Honda, H. (1978). J. Theor. Biol. 72:523-543 (the hexagonal packing of an
+    epithelium); the prism itself is Okuda, S. et al. (2013), Biomech. Model. Mechanobiol.
+    12:627-644.
+    """
+    n = max(1, int(n))
+    m = 6
+    d = float(np.sqrt(3.0)) * float(r)                       # centre-to-centre of adjacent hexagons
+    # THE ORDER OF THE SITES IS A PICTURE DECISION AND NOTHING ELSE. A compact rhombus is the
+    # tightest packing and the worst thing to look at: two of its four cells sit directly behind the
+    # other two in any axis-aligned view, so a four-cell patch renders as two. This walk spreads the
+    # first few sites across the plane while keeping every one of them adjacent to the previous.
+    ax = [(0, 0), (1, 0), (1, -1), (2, -1), (0, 1), (-1, 1), (-1, 0), (0, -1),
+          (2, 0), (1, 1), (0, 2), (-1, 2), (-2, 2), (-2, 1), (-2, 0)]
+    if n > len(ax):
+        raise ValueError(f"build_prisms_mesh: {n} cells asked for, {len(ax)} lattice sites known")
+    centres = [(d * (q + 0.5 * rr), 0.0, d * float(np.sqrt(3.0)) / 2.0 * rr)
+               for q, rr in ax[:n]]
+    Vs, ess, ets, efs = [], [], [], []
+    nv0, nf0 = 0, 0
+    for cx, cy, cz in centres:
+        V, es, et, ef, nF = build_prism_mesh(m, r, jitter, seed, height=height)
+        Vs.append(V + np.array([cx, cy, cz], V.dtype))
+        ess.append(es + nv0); ets.append(et + nv0); efs.append(ef + nf0)
+        nv0 += V.shape[0]; nf0 += nF
+    return (np.concatenate(Vs, 0), np.concatenate(ess), np.concatenate(ets),
+            np.concatenate(efs), nf0)
+
+
 def build_disc_mesh(n, r=1.0, jitter=0.0, seed=0):
     """A FLAT Voronoi patch as an open half-edge mesh: vertices [Nv,3] (z=0), E_srce/E_trgt/E_face, nF.
 
@@ -674,12 +774,19 @@ class SeedMesh3D(Structural):
         # `build_hexagon_mesh`. It is a value for the same reason `disc` is -- the same hypothesis
         # about the tissue, seeded into a geometry chosen so a closed form is reachable.
         self.shape = str(params.get("shape", "sphere")).lower()
+        # THE APICO-BASAL AXIS OF A `prism`: the separation between its apical and its basal cap, in
+        # world units. Unset, a prism is as tall as it is wide -- which is a cuboidal cell, not a
+        # claim that height does not matter.
+        self.height = params.get("height")
+        if self.height is not None:
+            self.height = float(self.height)
         # `plane`, `ribbon` and `moebius` are three more VALUES on the same axis, for the reason
         # `disc` is one: the same hypothesis about the tissue, seeded into a different geometry.
         # See `build_strip_mesh` -- and note that `moebius` is the one seed on which "apical" is not
         # globally definable, which is what makes it a test rather than a picture.
         self.strip_width = float(params.get("width", 0.5))
-        if self.shape not in ("sphere", "disc", "hexagon", "plane", "ribbon", "moebius"):
+        if self.shape not in ("sphere", "disc", "hexagon", "plane", "ribbon", "moebius",
+                              "prism", "prisms"):
             raise ValueError(f"mesh_seed: shape must be 'sphere', 'disc', 'hexagon', 'plane', "
                              f"'ribbon' or 'moebius', "
                              f"got {self.shape!r}")
@@ -735,8 +842,12 @@ class SeedMesh3D(Structural):
                                                      kind=self.shape, width=self.strip_width)
         else:
             _build = {"sphere": build_sphere_mesh, "disc": build_disc_mesh,
-                      "hexagon": build_hexagon_mesh}[self.shape]
-            verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
+                      "hexagon": build_hexagon_mesh,
+                      "prism": build_prism_mesh,
+                      "prisms": build_prisms_mesh}[self.shape]
+            _kw = {"height": self.height} if (self.shape in ("prism", "prisms")
+                                              and self.height is not None) else {}
+            verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed, **_kw)
         Nv = verts.shape[0]; Nbuf = lvl.state.shape[0]
         if Nv > Nbuf:
             raise ValueError(f"sphere mesh has {Nv} vertices but buffer n={Nbuf}")
