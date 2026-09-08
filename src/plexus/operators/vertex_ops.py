@@ -1007,7 +1007,12 @@ class ShapeEnergy3D(Lateral):
     K_V is a PER-CELL volume elasticity on each cell's wedge volume v_f (Turing_vertex Eq.3 / tyssue
     ClosedMonolayer), not a single global lumen term: it keeps every cell inflated and resists local
     buckling, so growth (ramping v_eq per cell) inflates the shell smoothly. Force = -grad E by one 3D
-    autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity."""
+    autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity.
+
+    Reference: Farhadifar, R., Roper, J.-C., Aigouy, B., Eaton, S. & Julicher, F. (2007). The
+    influence of cell mechanics, cell-cell interactions, and proliferation on epithelial packing.
+    Curr. Biol. 17:2095-2104 (the area, perimeter and line-tension energy); Okuda, S. et al.
+    (2013). Biomech. Model. Mechanobiol. 12(4):627-644 (its 3D form on a closed surface)."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["p0"]
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
@@ -2757,6 +2762,9 @@ class Divide3DDoubler(Divide3D):
     Under exponential growth this is a TIMER wearing a sizer's clothes: doubling from any birth
     volume takes the same time, so it never consults size in any way that could correct one. The
     review is direct about the consequence: size disparities are amplified, not constrained.
+
+    Reference: Ginzberg, M. B., Kafri, R. & Kirschner, M. W. (2015). On being the right (cell)
+    size. Science 348:1245075.
     """
     MECHANISM_TAGS = ["division", "volume_doubling", "relative_threshold", "no_size_control"]
 
@@ -2776,6 +2784,9 @@ class Divide3DTimer(Divide3D):
     the upper bound the sizer and the balance model should be read against.
 
     `cycle` is in DIVISION-CALLS, the same unit as `min_cycle` and `max_cycle`, not frames.
+
+    Reference: Ginzberg, M. B., Kafri, R. & Kirschner, M. W. (2015). Science 348:1245075 (the
+    timer, and why it is the weakest rule alone and the strongest when paired).
     """
     MECHANISM_TAGS = ["division", "timer", "cell_cycle_clock", "size_independent"]
 
@@ -2832,6 +2843,10 @@ class CellCycle3D(Lateral):
     while its inherited phase is still M -- `cell_divide` zeroes `age` for both daughters and the
     carry copies M onto them -- so the reset needs no second channel between the two operators and
     cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.
+
+    Reference: Howard, A. & Pelc, S. R. (1953). Synthesis of desoxyribonucleic acid in normal and
+    irradiated cells and its relation to chromosome breakage. Heredity 6(suppl.):261-273 (the
+    G1-S-G2-M division of the cycle this carries as state).
     """
     # `MAY_MUTATE_INTEGRATED_STATE` IS STILL TRUE AFTER S4, AND THE DYNAMICS IS NO LONGER WHY.
     # Every per-frame quantity this operator produces -- `cycle_progress`, `phase`, `phase_t`,
@@ -3173,6 +3188,9 @@ class CellCycleTimer(CellCycle3D):
     is: paired with a growth rule that guarantees size, it is the strongest homeostasis available,
     and alone it is the weakest. Which of the two it is depends entirely on what else is scheduled,
     and that is worth being able to say out loud in a spec.
+
+    Reference: Ginzberg, M. B., Kafri, R. & Kirschner, M. W. (2015). Science 348:1245075 (the
+    timer as the null a sizer has to beat).
     """
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "timer", "size_independent"]
 
@@ -3202,6 +3220,9 @@ class CellCycleTransitionProbability(CellCycle3D):
 
     Drawn from this operator's own generator, so a run is reproducible under
     `PLEXUS_STRICT_DETERMINISM` for a given `seed`.
+
+    Reference: Smith, J. A. & Martin, L. (1973). Do cells cycle? PNAS 70:1263-1267 (G1 as a
+    constant hazard, and the exponential tail that is its evidence).
     """
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "transition_probability", "memoryless",
                       "stochastic_start"]
@@ -3269,6 +3290,9 @@ class CellCycleInhibitorDilution(CellCycle3D):
     idea collapses into the sizer, because a fixed amount diluted to a fixed threshold is just a
     constant absolute volume. It only becomes a distinct hypothesis once something owns the
     inhibitor across the cycle, which is what this operator does.
+
+    Reference: Schmoller, K. M., Turner, J. J., Koivomagi, M. & Skotheim, J. M. (2015). Dilution
+    of the cell-cycle inhibitor Whi5 controls budding-yeast cell size. Nature 526:268-272.
     """
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "inhibitor_dilution", "size_control",
                       "restriction_point", "mechanistic_sizer"]
@@ -3313,6 +3337,9 @@ class Divide3DCycle(Divide3D):
     without `cell_cycle` divides nothing at all -- there is no `phase` on the table and the trigger
     is false for every cell -- which is the honest failure for a spec that asked for a cycle-driven
     tissue and did not schedule the cycle.
+
+    Reference: none of its own -- the hypothesis lives in whichever `cell_cycle` model is
+    scheduled, and this reads only its answer. Plexus (this work).
     """
     MECHANISM_TAGS = ["division", "cell_cycle", "mitosis", "phase_gated"]
 
@@ -3355,6 +3382,10 @@ class Divide3DAdder(Divide3D):
     is deliberate: the two rules then differ only in what the threshold is measured FROM, so a spec
     can be moved between them without retuning, and `delta: 1.0` puts the steady state at the same
     place `factor: 2.0` does for a population that starts uniform.
+
+    Reference: Campos, M. et al. (2014). A constant size extension drives bacterial cell size
+    homeostasis. Cell 159:1433-1446; Taheri-Araghi, S. et al. (2015). Cell-size control and
+    homeostasis in bacteria. Curr. Biol. 25:385-391.
     """
     MECHANISM_TAGS = ["division", "adder", "size_control", "incremental_threshold",
                       "absolute_increment"]
@@ -3393,6 +3424,9 @@ class Divide3DConcerted(Divide3D):
     model contains both as limits and a sweep over one parameter moves continuously between them.
     That is the reason to have it as well as them and not instead of them: the endpoints stay
     available under their own names, with their own docstrings and their own citations.
+
+    Reference: Ginzberg, M. B., Kafri, R. & Kirschner, M. W. (2015). Science 348:1245075 (the
+    sizer and the timer this interpolates between).
     """
     MECHANISM_TAGS = ["division", "size_control", "concerted", "growth_rate_modulation",
                       "cycle_duration_modulation"]
@@ -4394,6 +4428,9 @@ class ApicoBasalShapeEnergy3D(Lateral):
     enforces its sign, because a normalisation of another operator's state is not a mechanism. The
     cost of that decision is gate row AB-B1, which counts the vertices whose span has inverted, and
     that cost is paid in the table rather than hidden in a clamp.
+
+    Reference: Okuda, S. et al. (2018). Sci. Rep. 8:2386, Eq. 3 (the per-cell volume and surface
+    this writes on the doubled degrees of freedom).
     """
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos", "sep"]; WRITES = ["pos", "sep"]
@@ -4619,6 +4656,10 @@ class ShapeEnergy3DMarinari(ShapeEnergy3D):
     area, and their T2 removes a cell at exactly 3 junctions and area < A0/4. This operator is the
     force law alone; on the inherited overdamped-descent mover it will relax to a minimum of W rather
     than fluctuate through it, so it reproduces their ENERGY and not yet their PHENOMENON.
+
+    Reference: Marinari, E. et al. (2012). Live-cell delamination counterbalances epithelial
+    growth to limit tissue overcrowding. Nature 484:542-545, Supplementary p.1 (the work function
+    this implements).
     """
 
     def __init__(self, params, device="cpu"):
