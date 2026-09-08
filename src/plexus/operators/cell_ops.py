@@ -48,6 +48,7 @@ CELL'S RADIUS".
 from __future__ import annotations
 
 import math
+import os
 
 import torch
 
@@ -1664,6 +1665,7 @@ class PolymerizeTips(Structural):
     MECHANISM_TAGS = ["polymerization", "protrusion", "motility", "cytoskeleton", "growth"]
     PARAM_ROLES = {"rate": "points_per_fibre_per_frame", "compress": "insertion_stretch",
                    "confine": "barrier_set", "margin": "barrier_standoff",
+                   "direction": "growth_axis", "front_lo": "leading_region_extent",
                    "spacing": "insertion_step_length", "front_only": "leading_edge_restriction",
                    "volume_scale": "network_coarse_graining", "source": "existing_fibre_sets",
                    "cell_set": "polarity_owner", "gate": "phase_gate"}
@@ -1702,6 +1704,15 @@ class PolymerizeTips(Structural):
         # how far back the leading region reaches, as a fraction of the cell's own forward reach:
         # 0.1 fills nearly the whole front half, 0.7 only the tip zone
         self.front_lo = float(params.get("front_lo", 0.15))
+        # WHICH WAY A FIBRE GROWS. `polarity` lays every new point along the CELL's polarity, which
+        # is seeded in the plane of the substrate -- so all of it comes out parallel to the floor, a
+        # flat yellow sheet through the middle of the cell, which is not what a cytoskeleton looks
+        # like and not how a filament elongates. `fiber` (the default now) takes each fibre's OWN
+        # axis, tip minus its own centroid: the filament gets longer along itself, in whatever
+        # direction it already points, and the new material is indistinguishable in orientation from
+        # the network it grew from. The polarity still decides WHICH fibres grow -- the leading half
+        # -- it just no longer decides which way they point.
+        self.direction = str(params.get("direction", "fiber"))
         self.margin = float(params.get("margin", 0.005))
         # ONE MATERIAL POINT STANDS FOR MORE VOLUME THAN THE BARE FILAMENT IT GREW FROM, and this
         # says how much more. The atlas's filaments are 0.6 um thick, so the whole cytoskeleton is
@@ -1751,7 +1762,7 @@ class PolymerizeTips(Structural):
         b0, b1 = cl.state_schema[self.block]
         n_cell = cl.state[:, b0:b1][:, :D]
         n_cell = n_cell / n_cell.norm(dim=1, keepdim=True).clamp_min(1e-12)
-        dP = n_cell[self._cell_of]                             # growth direction, per fibre
+        dP = n_cell[self._cell_of]                             # the cell's polarity, per fibre
 
         # ---- each fibre's TIP, over the fibre AND everything polymerised onto it so far ----
         Xs, Vs, ps, ls = [], [], [], []
@@ -1768,12 +1779,25 @@ class PolymerizeTips(Structural):
         tip = torch.full((nP,), -1, dtype=torch.long, device=Xa.device)
         tip[pa[is_tip]] = torch.arange(Xa.shape[0], device=Xa.device)[is_tip]
 
-        # ---- which fibres grow: the leading edge, and the half of the cycle that extends ----
         grow = tip >= 0
         tp = Xa[tip.clamp_min(0)]
+        nP_pol = dP
+        if self.direction == "fiber":
+            # each fibre's own axis: its tip minus the centroid of its own live points
+            cen = torch.zeros(nP, D, device=Xa.device, dtype=Xa.dtype)
+            cnt = torch.zeros(nP, device=Xa.device, dtype=Xa.dtype)
+            cen.index_add_(0, pa[la], Xa[la])
+            cnt.index_add_(0, pa[la], torch.ones_like(proj[la]))
+            cen = cen / cnt.clamp_min(1.0)[:, None]
+            ax = tp - cen
+            nrm = ax.norm(dim=1, keepdim=True)
+            # a fibre too short to have an axis of its own keeps the cell's polarity
+            dP = torch.where(nrm > 1e-6, ax / nrm.clamp_min(1e-12), dP)
+
+        # ---- which fibres grow: the leading edge, and the half of the cycle that extends ----
         if self.front_only:
             c0 = cl.state_schema["pos"][0]
-            ahead = ((tp - cl.state[self._cell_of, c0:c0 + D]) * dP).sum(1)
+            ahead = ((tp - cl.state[self._cell_of, c0:c0 + D]) * nP_pol).sum(1)
             grow = grow & (ahead > 0)
         # A BLOCKED TIP BRANCHES, IT DOES NOT STOP. Refusing to grow at the barrier looks careful
         # and is the reason the first version did nothing: every front fibre reached the membrane
@@ -1796,7 +1820,7 @@ class PolymerizeTips(Structural):
             reach = torch.full((cl.n,), torch.finfo(pm.dtype).min, device=Xa.device, dtype=pm.dtype)
             reach = reach.scatter_reduce(0, im[lm], pm[lm], "amax", include_self=True)
             p_tip = ((tp - cl.state[self._cell_of, cl.state_schema["pos"][0]:
-                                    cl.state_schema["pos"][0] + D]) * dP).sum(1)
+                                    cl.state_schema["pos"][0] + D]) * nP_pol).sum(1)
             blocked = p_tip >= reach[self._cell_of] - self.margin
             # AND THE INSERTION IS CLAMPED INTO THE CELL, not merely refused when the tip is out.
             # Blocking the tip is not enough: once a single point gets outside -- and one always
@@ -1857,10 +1881,14 @@ class PolymerizeTips(Structural):
             ang = 2.0 * math.pi * torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype)
             rad = torch.sqrt(torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype)) * \
                 0.9 * (half[ci] - self.margin).clamp_min(0.0)
-            e1 = torch.stack([-d[:, 2], torch.zeros_like(d[:, 0]), d[:, 0]], 1)
+            # WHERE the material goes is the CELL's leading region, in the cell's own frame; which
+            # WAY the filament that carries it points is the fibre's business. Using the fibre axis
+            # for both would scatter the fill over a different region for every fibre.
+            dc = nP_pol[f]
+            e1 = torch.stack([-dc[:, 2], torch.zeros_like(dc[:, 0]), dc[:, 0]], 1)
             e1 = e1 / e1.norm(dim=1, keepdim=True).clamp_min(1e-12)
-            e2 = torch.linalg.cross(d, e1)
-            X_fill = cpos + ax[:, None] * d + (rad * torch.cos(ang))[:, None] * e1 \
+            e2 = torch.linalg.cross(dc, e1)
+            X_fill = cpos + ax[:, None] * dc + (rad * torch.cos(ang))[:, None] * e1 \
                 + (rad * torch.sin(ang))[:, None] * e2
             X_fill[:, 1] = (ylo[ci] + self.margin +
                             (yhi[ci] - ylo[ci] - 2 * self.margin).clamp_min(0.0) *
@@ -2122,4 +2150,139 @@ class CorticalTension(Lateral):
             print(f"[cortical_tension] {self.at}: gamma {self.tension:g} on a cortex of radius "
                   f"{r:.4g} -- it balances an interior pressure of "
                   f"{2 * self.tension / max(r, 1e-9):.3g}", flush=True)
+        return {}
+
+
+@register_operator("mesh_from_run", family="cell", set="vertex", kind="seed")
+class MeshFromRun(Seed):
+    """Put the membrane mesh ON the membrane a finished run actually had -- its shape, not a ball.
+
+    vertex -> vertex: reads a recorded set's positions from another run's `trajectory.npz` and
+    moves this hierarchy's already-seeded mesh onto that surface, keeping its topology untouched.
+
+        fit: support        the membrane's own SHAPE. Each recorded point is expressed as a
+                            direction from the cloud's centroid and a distance along it; those
+                            distances are binned on a latitude-longitude grid of directions and
+                            reduced to a high percentile per bin, giving a support radius r(theta,
+                            phi) -- how far the membrane reaches THAT way. Every mesh vertex is then
+                            put at c + r(its own direction) times its own direction.
+        fit: sphere         one radius for every direction: the median distance. Kept because it is
+                            the honest fallback when a cloud is not star-shaped about its centre.
+
+    WHY A PROJECTION AND NOT A REBUILD. Contouring the cloud and decimating it would give a mesh of
+    the same shape, and a DIFFERENT one: different vertex count, different faces, and a half-edge
+    table that would have to be rewritten -- srce, trgt, face, the offsets, all of it -- for a set
+    whose size the spec has already declared. Moving the vertices of the sphere `seed_mesh` built
+    changes no topology at all, so nothing downstream has to know this happened. It works because a
+    settled cell is star-shaped about its own centre: a flattened dome on a plane has exactly one
+    surface point in every direction, which is the condition a support radius needs and the reason
+    this is a projection rather than an approximation.
+
+    WHY A PERCENTILE AND NOT A MAXIMUM per direction bin: one point that has drifted off the
+    membrane would otherwise pull a vertex out with it, which is the same failure the renderer's
+    surface had. The 90th percentile of a bin holding hundreds of points is the membrane.
+
+    Declaration order: `seed_mesh` first (it builds the topology), then `load_run`, then this --
+    which only moves vertices and so disturbs neither.
+
+    Reference: Plexus (this work).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["run"]
+    MECHANISM_TAGS = ["initial_condition", "mesh_fitting", "checkpoint", "support_function"]
+    PARAM_ROLES = {"run": "source_run", "set": "set_to_fit", "frame": "recorded_frame_index",
+                   "fit": "fit_form", "scale": "radius_scale", "bins": "direction_grid",
+                   "round": "flattening_kept"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.run = str(params["run"])
+        self.set = str(params.get("set", "plasma_membrane_node"))
+        self.frame = int(params.get("frame", -1))
+        self.fit = str(params.get("fit", "support"))
+        # A LITTLE OUTSIDE the membrane it replaces: the mesh has to CONTAIN the organelles, and a
+        # surface through the membrane points themselves starts in contact with all of them at once.
+        self.scale = float(params.get("scale", 1.05))
+        self.bins = int(params.get("bins", 48))          # latitude bins; longitude gets twice as many
+        self.pct = float(params.get("percentile", 0.90))
+        # HOW MUCH OF THE FLATTENING TO KEEP, from 0 (the membrane's own shape) to 1 (a ball). It
+        # exists because `mesh_contact` indexes its surface by DIRECTION from a centre and assumes a
+        # face spans at most one direction bin -- a premise a flat surface 3.2 um from that centre
+        # cannot meet when the same surface reaches 14.7 um sideways. The settled cell's 4.6:1
+        # radius ratio gave 13 bin rows over 38,388 sub-triangles and a 144 GB lookup, and sixteen
+        # times the faces moved it only from 8 rows to 13. Blending toward the median radius in LOG
+        # space at 0.5 halves the ratio to 2.1 while leaving the cell visibly a spread dome rather
+        # than a ball. It is a concession to the contact operator's data structure and it is stated
+        # here rather than hidden in a spec's numbers.
+        self.round = float(params.get("round", 0.0))
+
+    def forward(self, H, mask=None):
+        import numpy as np
+        from plexus.paths import resolve_run
+        path = os.path.join(resolve_run(self.run), "trajectory.npz")
+        z = np.load(path)
+        key = f"{self.set}__pos"
+        if key not in z.files:
+            raise KeyError(f"mesh_from_run: {path} has no `{self.set}` positions "
+                           f"(it has {sorted(k[:-5] for k in z.files if k.endswith('__pos'))[:8]})")
+        P = np.asarray(z[key][self.frame], np.float64)
+        c = P.mean(0)
+        d = P - c
+        rad = np.linalg.norm(d, axis=1)
+        v = H.level(self.at)
+        p0, p1 = v.state_schema["pos"]
+        X = v.state[:, p0:p1]
+        U = (X - X.mean(0))
+        U = (U / U.norm(dim=1, keepdim=True).clamp_min(1e-12)).detach().cpu().numpy()
+
+        if self.fit == "sphere":
+            r_vert = np.full(U.shape[0], float(np.median(rad)) * self.scale)
+        else:
+            nt, npg = self.bins, 2 * self.bins
+            u = d / np.maximum(rad, 1e-12)[:, None]
+            ti = np.clip(((np.arccos(np.clip(u[:, 1], -1, 1)) / np.pi) * nt).astype(int), 0, nt - 1)
+            pi = np.clip((((np.arctan2(u[:, 2], u[:, 0]) + np.pi) / (2 * np.pi)) * npg).astype(int),
+                         0, npg - 1)
+            flat = ti * npg + pi
+            order = np.lexsort((rad, flat))
+            fs, rs = flat[order], rad[order]
+            start = np.searchsorted(fs, np.arange(nt * npg), "left")
+            end = np.searchsorted(fs, np.arange(nt * npg), "right")
+            cnt = end - start
+            R = np.zeros(nt * npg)
+            has = cnt > 0
+            idx = start[has] + np.minimum((cnt[has] * self.pct).astype(int), cnt[has] - 1)
+            R[has] = rs[idx]
+            R = R.reshape(nt, npg)
+            # AN EMPTY BIN IS A DIRECTION THE MEMBRANE HAS NO POINT IN, which happens at the poles
+            # and anywhere the cloud is thin. Filling it from the ring's own mean keeps the surface
+            # closed instead of collapsing those vertices onto the centre.
+            occ = has.reshape(nt, npg)
+            for k in range(nt):
+                if occ[k].any():
+                    R[k, ~occ[k]] = R[k, occ[k]].mean()
+            miss = ~occ.any(1)
+            if miss.any():
+                R[miss] = float(np.median(rad))
+            # smoothed once around each ring, so the mesh is not faceted by the binning
+            R = 0.25 * (np.roll(R, 1, 1) + 2 * R + np.roll(R, -1, 1))
+            tv = np.clip(((np.arccos(np.clip(U[:, 1], -1, 1)) / np.pi) * nt).astype(int), 0, nt - 1)
+            pv = np.clip((((np.arctan2(U[:, 2], U[:, 0]) + np.pi) / (2 * np.pi)) * npg).astype(int),
+                         0, npg - 1)
+            r_vert = R[tv, pv] * self.scale
+            if self.round > 0.0:
+                rmed = float(np.median(rad)) * self.scale
+                r_vert = np.exp((1.0 - self.round) * np.log(np.maximum(r_vert, 1e-9))
+                                + self.round * np.log(max(rmed, 1e-9)))
+
+        Xn = torch.as_tensor(c, device=X.device, dtype=X.dtype) + \
+            torch.as_tensor(U * r_vert[:, None], device=X.device, dtype=X.dtype)
+        X.copy_(Xn)
+        print(f"[mesh_from_run] {self.at}: {v.n:,} vertices put on {self.set} of {self.run} "
+              f"({self.fit}) -- centre ({c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f}), reach "
+              f"{float(r_vert.min()):.4f} to {float(r_vert.max()):.4f} "
+              f"({self.scale:g}x the membrane's own)", flush=True)
         return {}
