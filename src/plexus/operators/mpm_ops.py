@@ -519,7 +519,9 @@ class MPMScatter(Exchange):
         a_ext = _hand_body_force_to_grid(self, H, a_ext, dev, D)
         V = V + dt * (a_ext - self.drag * V)                       # body force + Stokes drag (local; G2P resets V)
 
-        F, C, mass = p.F, p.C, p.mass
+        # mass CLONED AT THE POINT IT IS FIRST READ, not later: the momentum line below holds
+        # `mass[:, None, None]`, and a clone taken after that has already let the view into the tape.
+        F, C, mass = p.F, p.C, (p.mass.clone() if torch.is_grad_enabled() else p.mass)
         # RESIDUAL STRESS / PRESTRESS (optional, default OFF): compute the fixed-corotated stress
         # relative to a non-identity per-particle REST tensor F_res (multiplicative morphoelastic split
         # F = Fe . F_res, so Fe = F @ F_res_inv is the elastic part). At the mesh rest state F=I this
@@ -536,7 +538,12 @@ class MPMScatter(Exchange):
             J = a * d - b * c
         else:
             J = torch.linalg.det(F)
-        mu, la = p.mu, p.la
+        # THE MATERIAL CONSTANTS THROUGH CLONES WHILE A TAPE IS KEPT. mu, la, p_vol and mass are
+        # buffers a seed operator is allowed to rewrite (`set_material` does), and a version counter
+        # that moves after a forward has read the buffer is what autograd reports as "[N, 1, 1] is
+        # at version 2; expected version 1" -- from a line that did nothing wrong. One vector each,
+        # per substep, and only under grad.
+        mu, la = (p.mu.clone(), p.la.clone()) if torch.is_grad_enabled() else (p.mu, p.la)
         snow = getattr(p, "is_snow", None)
         if _const_any(self, "_c_snow", snow):                      # snow hardening from the plastic ratio Jp
             h = torch.exp((10.0 * (1.0 - p.Jp)).clamp(-6.0, 6.0))
@@ -619,7 +626,11 @@ class MPMScatter(Exchange):
             if getattr(p, "sigma", None) is None or p.sigma.shape != sig.shape:
                 p.register_buffer("sigma", torch.zeros_like(sig))
             p.sigma.copy_(sig.detach())
-        stress = (-dt * 4 * inv_dx * inv_dx) * p.p_vol[:, None, None] * stress
+        # p_vol THROUGH A CLONE UNDER GRAD, for the same reason as `mass` in the scatter: it is a
+        # buffer a seed may rewrite, and its version counter moving after this line is read is what
+        # a backward reports as "[4000, 1, 1] is at version 2; expected version 1".
+        _pv = p.p_vol.clone() if torch.is_grad_enabled() else p.p_vol
+        stress = (-dt * 4 * inv_dx * inv_dx) * _pv[:, None, None] * stress
         affine = stress + mass[:, None, None] * C
 
         fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
@@ -664,6 +675,45 @@ class MPMScatter(Exchange):
         # graph holds the address it saw at capture time, so the replay silently writes somewhere
         # the rest of the run no longer reads. Measured: capture SUCCEEDS with this left as it was,
         # raises nothing, and produces a 6-tick checksum of 22816.79 against the correct 22132.22.
+        # FUNCTIONAL UNDER GRAD, IN PLACE OTHERWISE, and the two are the same numbers. The
+        # in-place form exists for CUDA-graph capture, which holds the addresses it saw -- and
+        # capture is off under `grad=True` by construction, since the warp bodies register no
+        # backward. Autograd cannot use it either way: the grid is zeroed and re-accumulated every
+        # substep, so the tensor a later substep needs for its backward has already been
+        # overwritten, and an inverse rollout dies with "a variable needed for gradient computation
+        # has been modified by an inplace operation ... [40, 40, 40]". Rebinding fresh tensors is
+        # what makes deformation-gradient control possible at all; it costs one grid allocation a
+        # substep, and only while a tape is being kept.
+        #
+        # WHAT IT IS FOR: papers/Xu_2024_mpm_shape_morphing.pdf makes the per-particle F the CONTROL
+        # variable of an optimisation and takes the loss on this grid's own nodal mass rather than on
+        # particle positions -- a target shape has no particle correspondence, so a position loss has
+        # nothing to match against exactly where the two shapes differ. Every line of that needs the
+        # rollout to be differentiable, and the rollout is not differentiable while the grid is
+        # rebuilt in place. See tools/shape_control.py for the smallest instance of the loop.
+        # Xu, M., Song, C. Y., Levin, D. I. W. & Hyde, D. (2025). A Differentiable Material Point
+        # Method Framework for Shape Morphing. IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746);
+        # Xu, M. & Levin, D. I. W. (2023). Deformation Gradient Control of Physically Simulated
+        # Amorphous Solids. SCA '23, doi 10.1145/3606037.3606840; the render-guided variant is
+        # papers/Song_2025_physmorph_gs.pdf.
+        if torch.is_grad_enabled():
+            # THE MATERIAL CONSTANTS ARE READ THROUGH A CLONE while a tape is kept. `mass`, `p_vol`,
+            # `mu` and `la` are buffers a seed operator may rewrite (`set_material` does exactly
+            # that), and a backward that runs after such a write finds the version counter moved
+            # under it -- reported as "[4000, 1] is at version 2; expected version 1" against the
+            # `mass[:, None]` of this very line. Cloning costs one vector a substep and removes a
+            # whole class of that failure.
+            gm = torch.zeros_like(g.m) if _fresh else g.m
+            gmv = torch.zeros_like(g.mv) if _fresh else g.mv
+            gc = torch.zeros_like(g.c) if _fresh else g.c
+            gm = gm.index_add(0, flat, (weight * mass[:, None]).reshape(-1))
+            gmv = gmv.index_add(0, flat, (weight[..., None] * mom).reshape(-1, D))
+            _liq = getattr(p, "is_liquid", None)
+            if _const_any(self, "_c_liquid", _liq):
+                gc = gc.index_add(0, flat, (weight * (mass * _liq.to(mass.dtype))[:, None])
+                                  .reshape(-1))
+            g.m, g.mv, g.c = gm, gmv, gc
+            return {}
         gm, gmv, gc = g.m, g.mv, g.c
         if _fresh:
             gm.zero_(); gmv.zero_(); gc.zero_()
@@ -1160,23 +1210,38 @@ class MPMGridUpdate(FieldUpdate):
             if not periodic:
                 shape = g.shape; bnd = 3
                 gv = gv.view(*shape, D)
+                # THE COMPONENTS AS A LIST UNDER GRAD, and the same numbers either way. The values
+                # are already computed with `torch.where`; it is writing them back with
+                # `gv[..., k] = ck` that autograd cannot take -- an in-place index_put into a VIEW,
+                # which is the AsStridedBackward an inverse rollout dies on. Keeping the three
+                # components as separate tensors and stacking them at the end is the same
+                # arithmetic in the same order: each axis clamps its own component, then damps the
+                # others, reading whatever the previous axis left.
+                _grad = torch.is_grad_enabled()
+                comps = [gv[..., k] for k in range(D)] if _grad else None
                 for k in range(D):
                     n_k = shape[k]
                     idx = torch.arange(n_k, device=dev)
                     shp = [1] * D; shp[k] = n_k
                     lo_m = (idx < bnd).view(shp); hi_m = (idx > n_k - bnd).view(shp)
-                    ck = gv[..., k]
+                    ck = comps[k] if _grad else gv[..., k]
                     ck = torch.where(lo_m, ck.clamp(min=0), ck)     # don't penetrate the wall
                     ck = torch.where(hi_m, ck.clamp(max=0), ck)
-                    gv[..., k] = ck
+                    if _grad:
+                        comps[k] = ck
+                    else:
+                        gv[..., k] = ck
                     if wd != 1.0:                                   # tangential friction on the wall slabs
                         slab = lo_m | hi_m
                         for j in range(D):
                             if j == k:
                                 continue
-                            cj = gv[..., j]
-                            gv[..., j] = torch.where(slab, cj * wd, cj)
-                gv = gv.view(g.n_cells, D)
+                            cj = comps[j] if _grad else gv[..., j]
+                            if _grad:
+                                comps[j] = torch.where(slab, cj * wd, cj)
+                            else:
+                                gv[..., j] = torch.where(slab, cj * wd, cj)
+                gv = (torch.stack(comps, -1) if _grad else gv).view(g.n_cells, D)
             if self.plate_axis is not None and self.plate_gap_half > 0.0:
                 gv = self._plate_bc(H, g, gv, dev, dt)
             walls = self._walls3d(H, g, dev)                        # solid 3D obstacles (box / sphere)
@@ -1227,7 +1292,10 @@ class MPMGridUpdate(FieldUpdate):
                 self._dir_key = _key
             _dir = self._dir_cache
             gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
-        g.v.copy_(gv)                       # in place: a captured graph holds this address
+        if torch.is_grad_enabled():
+            g.v = gv                        # functional: see the scatter's own note
+        else:
+            g.v.copy_(gv)                   # in place: a captured graph holds this address
         return {}
 
 
@@ -1439,6 +1507,13 @@ class MPMGather(Exchange):
         # MAY_MUTATE_INTEGRATED_STATE, so the engine's tick-0 integration-invariant guard does not
         # apply to it. The clone-and-rebind it replaces gave `p.state` a new address every substep.
         pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
+        if torch.is_grad_enabled():
+            S = p.state.clone()
+            S[:, pa:pb] = Xn
+            S[:, va:vb] = new_V
+            p.state = S                     # one clone a substep, and only while a tape is kept
+            p.C = new_C
+            return {}
         p.state[:, pa:pb] = Xn
         p.state[:, va:vb] = new_V
         p.C.copy_(new_C)
@@ -1573,7 +1648,10 @@ class MPMStrain(Lateral):
                 F = F.clone(); F[sm] = U @ torch.diag_embed(sig_c) @ Vh
                 ratio = sig.prod(-1) / sig_c.prod(-1).clamp(min=1e-6)
                 Jp = p.Jp.clone(); Jp[sm] = (Jp[sm] * ratio).clamp(0.6, 20.0)
-                p.Jp.copy_(Jp)
+                if torch.is_grad_enabled():
+                    p.Jp = Jp               # functional: see the scatter's note on the grid
+                else:
+                    p.Jp.copy_(Jp)
         # DORMANT PARTICLES DO NOT DEFORM. `mpm_scatter` masks its weights by occupancy and
         # `mpm_gather` freezes occ==0 rather than advecting it, but this operator integrated F for the
         # reserve regardless -- so a particle waiting to be spawned accumulated an arbitrary deformation
@@ -1583,7 +1661,10 @@ class MPMStrain(Lateral):
         if occ is not None:
             live = (occ > 0)[:, None, None]
             F = torch.where(live, F, p.F)
-        p.F.copy_(F)                        # in place; every read of p.F above precedes it
+        if torch.is_grad_enabled():
+            p.F = F                         # functional: F is an inverse run's control variable
+        else:
+            p.F.copy_(F)                    # in place; every read of p.F above precedes it
         return {}
 
 
@@ -3803,6 +3884,13 @@ class MPMGatherLoop27(MPMGather):
             new_V = torch.where(live[:, None], new_V, V)
             new_C = torch.where(live[:, None, None], new_C, p.C)
         pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
+        if torch.is_grad_enabled():
+            S = p.state.clone()
+            S[:, pa:pb] = Xn
+            S[:, va:vb] = new_V
+            p.state = S                     # one clone a substep, and only while a tape is kept
+            p.C = new_C
+            return {}
         p.state[:, pa:pb] = Xn
         p.state[:, va:vb] = new_V
         p.C.copy_(new_C)
