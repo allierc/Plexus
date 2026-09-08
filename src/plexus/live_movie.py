@@ -96,6 +96,35 @@ def _biggest_particle_set(H):
     return best
 
 
+def _no_strays(P, k=3.0):
+    """The bound points, with any that have left the body pulled back onto its edge.
+
+    A skinned surface RIDES the particles it was bound to at build time, so one particle that
+    escapes later drags its surface vertices with it: at frame 267 of adh_poly_press a single
+    membrane point near a box corner turned the cell into a long thin triangle reaching into that
+    corner, while frame 135 of the same run was clean. The cell had not changed shape -- one point
+    had left it, and the renderer drew the convex hull of a lie.
+
+    Escapees are found ROBUSTLY, by distance from the median point rather than from the mean, and
+    against the 99th percentile of that distance rather than its maximum: a genuinely elongated cell
+    has a large 99th percentile and survives, while a point at `k` times it cannot be part of the
+    same body. They are clamped to the edge rather than dropped, because the skin's vertex-to-point
+    binding is fixed at build time and a missing row would misalign every vertex after it.
+    """
+    import numpy as np
+    c = np.median(P, axis=0)
+    d = np.linalg.norm(P - c, axis=1)
+    lim = k * float(np.quantile(d, 0.99))
+    if lim <= 0 or not np.isfinite(lim):
+        return P
+    bad = d > lim
+    if not bad.any():
+        return P
+    Q = P.copy()
+    Q[bad] = c + (P[bad] - c) * (lim / d[bad])[:, None]
+    return Q
+
+
 class LiveMovie:
     """An `on_frame(H, tick)` hook that writes one mp4 for the whole run.
 
@@ -1805,7 +1834,7 @@ class LiveMovie:
             if s.get("set") and H is not None:
                 src = np.asarray(H.level(s["set"]).get("pos").detach().cpu().numpy(), np.float64)
             if s["kind"] == "surface":
-                s["surf"].points = s["skin"](src[s["sub"]]).astype(np.float32)
+                s["surf"].points = s["skin"](_no_strays(src[s["sub"]])).astype(np.float32)
             else:
                 s["surf"].points = np.asarray(src[s["sub"]], np.float32)
 

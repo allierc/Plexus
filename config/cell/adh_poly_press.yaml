@@ -6,7 +6,7 @@ general:
   boundary: wall
   dim: 3
   dt: 0.002
-  n_frames: 1600
+  n_frames: 1200
   name: adh_poly_press
   record_cap: 60
   save_data: null
@@ -1157,5 +1157,5 @@ sets:
     density: 1.0
     entity: mpm_particle
     parent: cytoskeleton
-    per_parent: 2000
+    per_parent: 1200
     radius: 0.1
