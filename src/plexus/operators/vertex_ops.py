@@ -889,6 +889,12 @@ class SeedMeshApicoBasal(SeedMesh3D):
         super().__init__(params, device)
         self.h0 = float(params.get("h0", 0.4))                 # FULL thickness; sep is h0/2
         self.sep_block = str(params.get("sep_block", "sep"))
+        # WHICH VOLUME THE CELL'S TARGET IS EXPRESSED IN -- see the block at the end of `forward`.
+        # `wedge` is the default and is what every archived apicobasal run used.
+        self.v0_from = str(params.get("v0_from", "wedge")).lower()
+        if self.v0_from not in ("wedge", "polyhedron"):
+            raise ValueError(f"seed_mesh[apicobasal]: v0_from must be wedge|polyhedron, "
+                             f"not {self.v0_from!r}")
 
     def forward(self, H, mask=None):
         out = super().forward(H, mask)                         # pos, occ and the mesh table
@@ -942,6 +948,45 @@ class SeedMeshApicoBasal(SeedMesh3D):
         print(f"[seed_mesh:apicobasal] {Nv} vertices carry an apico-basal separation of "
               f"h0/2 = {0.5 * self.h0:g} along the vertex normal (cell thickness {self.h0:g})",
               flush=True)
+        # `v0_from: polyhedron` -- SEED THE TARGET IN THE CONVENTION THE ENERGY MEASURES.
+        #
+        # THE DEFECT IT REMOVES. The parent seeds `V0f` and `v_ref` from `face_geometry_3d`'s WEDGE
+        # volume -- a sum of origin-referenced cones over the mid-surface ring -- because that is
+        # what the mid-surface model's `K_V` integrates. An apico-basal cell is not that solid: it
+        # is the polyhedron of two caps and one wall per ring edge, and `cell_mechanics[apicobasal]`
+        # pulls THAT volume toward `V0f` with `k_v`. The two differ by a fixed factor for the same
+        # cell -- measured on the reference spheroid, wedge 2.5433 against polyhedron 1.3508 -- so
+        # every cell is born asking for a volume it does not have, and the tissue inflates until the
+        # polyhedron reaches a wedge-sized target.
+        #
+        # MEASURED, WITH NO GROWTH OPERATOR SCHEDULED AT ALL: `apop2_ab_half` runs its mean radius
+        # from 5.03 to 6.06 in 300 frames, a swelling of 1.20x that no operator in the spec asks
+        # for. It also masks the mechanism the spec exists to show -- killing 691 of 2000 cells
+        # holds the radius at 1.02x of its seed, where the same deaths on the mid-surface sheet
+        # contract it to 0.85x.
+        #
+        # DEFAULT False, so no archived apicobasal run changes meaning. It is a seed-time choice
+        # and belongs here: `v_ref` is read by `cell_die`'s extrusion threshold and `cell_grow`'s
+        # ceiling, so setting both from one convention is what makes those thresholds mean the size
+        # they say. (The wider reconciliation -- one volume for growth, division, death AND the
+        # energy -- is AB_R7R8_TODO section 0a and is not settled here.)
+        if self.v0_from == "polyhedron":
+            _wedge = float(m.get("v_ref", 0.0))     # what the mid-surface model would have used
+            vp, _ap, _cp, _hp = apicobasal_geometry_3d(
+                lvl.get("pos")[:Nv].detach(), lvl.get(self.sep_block)[:Nv].detach(),
+                m["E_srce"], m["E_trgt"], m["E_face"], nF)
+            vp = vp.detach().to(device=m["V0f"].device, dtype=m["V0f"].dtype)
+            m["V0f"] = (torch.full_like(vp, float(vp.median())) if self.v0_uniform else vp.clone())
+            m["V0"] = float(m["V0f"].sum())
+            m["v_ref"] = float(vp.median())
+            vb = cell_block(H, resolve_cell_set(H, self.at), "Vbirth", nF)
+            if vb is not None:
+                set_cell_block(H, resolve_cell_set(H, self.at), "Vbirth",
+                               m["V0f"].detach().cpu().numpy().astype(np.float64), nF)
+            print(f"[seed_mesh:apicobasal] V0f and v_ref seeded from the POLYHEDRON volume "
+                  f"(median {float(vp.median()):.4f}) rather than the wedge volume "
+                  f"({_wedge:.4f}) -- the target is now in the convention `k_v` measures",
+                  flush=True)
         return out
 
 
