@@ -35,6 +35,7 @@ import argparse
 import os
 import sys
 import tempfile
+import time
 
 import numpy as np
 import yaml
@@ -120,6 +121,16 @@ def main():
     ap.add_argument("--n-grid", type=int, default=40)
     ap.add_argument("--device", default="cuda:1")
     ap.add_argument("--out", default=os.path.join(ROOT, "graphs_data", "si_material"))
+    ap.add_argument("--control", default="grid", choices=["grid", "ngp"],
+                    help="`grid`: a cube of rates, trilinear. `ngp`: the multiresolution hash "
+                         "encoding this repo already has (plexus.models.hashgrid) plus a small "
+                         "head -- A(X0) = MLP(hash(X0)). Multi-resolution BY CONSTRUCTION, so the "
+                         "coarse levels find the silhouette in the first iterations and the fine "
+                         "ones add detail later, without anyone choosing a grid size.")
+    ap.add_argument("--stages", default="",
+                    help="coarse-to-fine, as `pts:grid:iters,pts:grid:iters,...`. The control is a "
+                         "function of MATERIAL coordinates, so it transfers between stages exactly "
+                         "-- a cheap stage buys the same parameters a dear one would have.")
     ap.add_argument("--batch", action="store_true",
                     help="optimise every target in ONE rollout, each in its own corner of a larger "
                          "box. Measured: a differentiable rollout costs 98.7 ms/frame at 12,500 "
@@ -146,6 +157,21 @@ def main():
     X0 = torch.as_tensor(X0n, dtype=torch.float32, device=dev)
     one = torch.ones(args.n_pts, device=dev)
 
+    # THE CONTROL, EITHER WAY, IS A FUNCTION OF THE MATERIAL COORDINATE -- the particle's position
+    # at t = 0, never its current one. Lagrangian: a point carries its own instruction as it moves.
+    # That is also what lets a coarse-to-fine schedule work at all, since the parameters mean the
+    # same thing at 5,000 points as at 50,000.
+    def ngp_control(dev):
+        from plexus.models.hashgrid import MultiResHashGrid
+        grid = MultiResHashGrid(n_input_dims=3, n_levels=8, n_features_per_level=2,
+                                log2_hashmap_size=15, base_resolution=4,
+                                per_level_scale=1.6).to(dev)
+        head = torch.nn.Sequential(torch.nn.Linear(8 * 2, 32), torch.nn.GELU(),
+                                   torch.nn.Linear(32, 6)).to(dev)
+        with torch.no_grad():                        # start from no deformation at all
+            head[-1].weight.mul_(0.0); head[-1].bias.mul_(0.0)
+        return grid, head
+
     # trilinear weights of every particle in the CONTROL cube, from its MATERIAL coordinate
     K = args.ctrl
     u = np.clip((X0n - (c - R)) / (2 * R) * (K - 1), 0, K - 1.001)
@@ -164,82 +190,112 @@ def main():
                 wts.append(torch.as_tensor(w, dtype=torch.float32, device=dev))
 
     os.makedirs(args.out, exist_ok=True)
+    # COARSE TO FINE. `pts:grid:iters` per stage; the default is a single stage at the flags given.
+    # A stage is cheaper than the next one in BOTH of the things that cost -- particles and grid
+    # nodes -- and buys parameters the next stage starts from, because the control is a function of
+    # the material coordinate and means the same thing at any resolution.
+    stages = ([tuple(int(v) for v in st.split(":")) for st in args.stages.split(",")]
+              if args.stages else [(args.n_pts, args.n_grid, args.iters)])
+
     for name in [t.strip() for t in args.targets.split(",") if t.strip()]:
         path = os.path.join(MODELS, f"{name}.obj")
-        tgt_np = sample_inside(path, args.n_pts, c, 2.6 * R, rng)
-        tgt = torch.as_tensor(tgt_np, dtype=torch.float32, device=dev)
-        with torch.no_grad():
-            rho_t = mass_grid(tgt, one, BOX, args.n_grid, dev, torch)
-        theta = torch.zeros(K ** 3, 6, device=dev, requires_grad=True)
-        opt = torch.optim.Adam([theta], lr=args.lr)
-        # A DECAYING STEP, because the two halves of this optimisation want different ones. The
-        # first iterations move a ball most of the way to a silhouette and want a large step; the
-        # last ones are placing a limb against a target that is already nearly met, and the same
-        # step overshoots it every time -- the loss stops falling and starts rattling. Cosine from
-        # `lr` to a twentieth of it over the run.
-        sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.iters,
-                                                           eta_min=args.lr / 20.0)
-        eye = torch.eye(3, device=dev)
-        dt = float(sim.dt)
-        print(f"\n  {name}: {args.n_pts:,} points, control {K}^3 x 6 = {K**3*6} numbers, "
-              f"{args.iters} iterations", flush=True)
+        theta = grid_enc = head = None
+        print(f"\n  {name}: {len(stages)} stage(s), control {args.control}", flush=True)
+        for si, (n_pts, n_grid, iters) in enumerate(stages):
+            raw = spec(n_pts, BOX, n_grid, args.frames, 0.002, 3.4e-4)
+            f = os.path.join(tempfile.mkdtemp(prefix="morph_"), "spec.yaml")
+            yaml.safe_dump(raw, open(f, "w"), sort_keys=False)
+            sim = load(f)
+            X0n = ball(n_pts, c, R, rng)
+            X0 = torch.as_tensor(X0n, dtype=torch.float32, device=dev)
+            one = torch.ones(n_pts, device=dev)
+            tgt_np = sample_inside(path, n_pts, c, 2.6 * R, rng)
+            tgt = torch.as_tensor(tgt_np, dtype=torch.float32, device=dev)
+            with torch.no_grad():
+                rho_t = mass_grid(tgt, one, BOX, n_grid, dev, torch)
+            Xm = torch.as_tensor(np.clip((X0n - (c - R)) / (2 * R), 0, 1),
+                                 dtype=torch.float32, device=dev)
 
-        for it in range(args.iters):
-            opt.zero_grad()
-            a = sum(w[:, None] * theta[i] for i, w in zip(idx, wts))      # [N,6] per particle
-            A = torch.zeros(args.n_pts, 3, 3, device=dev)
-            A = A + torch.diag_embed(a[:, :3])
-            A[:, 0, 1] = A[:, 1, 0] = a[:, 3]
-            A[:, 0, 2] = A[:, 2, 0] = a[:, 4]
-            A[:, 1, 2] = A[:, 2, 1] = a[:, 5]
-            # SECOND ORDER, NOT `matrix_exp`, on [N,3,3]: A dt is small by construction and the
-            # series is exact to the order that matters, differentiable and ~40x cheaper.
-            Adt = -A * dt
-            G = eye + Adt + 0.5 * (Adt @ Adt)
+            if args.control == "ngp":
+                if grid_enc is None:
+                    grid_enc, head = ngp_control(dev)
+                params = list(grid_enc.parameters()) + list(head.parameters())
+            else:
+                K = args.ctrl
+                u = np.clip((X0n - (c - R)) / (2 * R) * (K - 1), 0, K - 1.001)
+                bb = np.floor(u).astype(int); ff = u - bb
+                idx, wts = [], []
+                for dx in (0, 1):
+                    for dy in (0, 1):
+                        for dz in (0, 1):
+                            w = (((1 - ff[:, 0]) if dx == 0 else ff[:, 0])
+                                 * ((1 - ff[:, 1]) if dy == 0 else ff[:, 1])
+                                 * ((1 - ff[:, 2]) if dz == 0 else ff[:, 2]))
+                            i = ((bb[:, 0] + dx).clip(0, K - 1) * K
+                                 + (bb[:, 1] + dy).clip(0, K - 1)) * K + (bb[:, 2] + dz).clip(0, K - 1)
+                            idx.append(torch.as_tensor(i, device=dev))
+                            wts.append(torch.as_tensor(w, dtype=torch.float32, device=dev))
+                if theta is None:
+                    theta = torch.zeros(K ** 3, 6, device=dev, requires_grad=True)
+                params = [theta]
 
-            def on_frame(Hh, tick, G=G):
-                q = Hh.level("mpm_particle")
-                if tick == 0:
-                    p0, p1 = q.state_schema["pos"]
-                    with torch.no_grad():
-                        q.state[:, p0:p1] = X0
-                    return
-                q.F = torch.bmm(G, q.F)
+            opt = torch.optim.Adam(params, lr=args.lr)
+            sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(iters, 1),
+                                                               eta_min=args.lr / 20.0)
+            eye = torch.eye(3, device=dev)
+            dt = float(sim.dt)
+            t_stage = time.time()
 
-            Hh, _ = engine.run(sim, device=args.device, on_frame=on_frame, progress=False,
-                               grad=True)
-            Xs = Hh.level("mpm_particle").get("pos")
-            loss = ((torch.log1p(mass_grid(Xs, one, BOX, args.n_grid, dev, torch))
-                     - torch.log1p(rho_t)) ** 2).mean()
-            loss.backward()
-            opt.step()
-            sched.step()
-            if it % 10 == 0 or it == args.iters - 1:
-                e = ((Xs.max(0).values - Xs.min(0).values) * 100).tolist()
-                et = ((tgt.max(0).values - tgt.min(0).values) * 100).tolist()
-                print(f"    iter {it:3d}  loss {float(loss):.6f}  "
-                      f"lr {sched.get_last_lr()[0]:.3f}  "
-                      f"shape {e[0]:5.1f} x {e[1]:5.1f} x {e[2]:5.1f}  "
-                      f"target {et[0]:5.1f} x {et[1]:5.1f} x {et[2]:5.1f} um", flush=True)
+            def rates():
+                if args.control == "ngp":
+                    return head(grid_enc(Xm))
+                return sum(w[:, None] * theta[i] for i, w in zip(idx, wts))
 
-        # the final rollout, kept frame by frame, and the target beside it
+            def rollout(keep=None):
+                a6 = rates()
+                A = torch.zeros(a6.shape[0], 3, 3, device=dev) + torch.diag_embed(a6[:, :3])
+                A[:, 0, 1] = A[:, 1, 0] = a6[:, 3]
+                A[:, 0, 2] = A[:, 2, 0] = a6[:, 4]
+                A[:, 1, 2] = A[:, 2, 1] = a6[:, 5]
+                Adt = -A * dt
+                G = eye + Adt + 0.5 * (Adt @ Adt)     # 2nd order: A dt is small, and 40x cheaper
+                def cb(Hh, tick, G=G):
+                    q = Hh.level("mpm_particle")
+                    if tick == 0:
+                        q0, q1 = q.state_schema["pos"]
+                        with torch.no_grad():
+                            q.state[:, q0:q1] = X0
+                    else:
+                        q.F = torch.bmm(G, q.F)
+                    if keep is not None:
+                        keep.append(q.get("pos").detach().cpu().numpy().copy())
+                Hh, _ = engine.run(sim, device=args.device, on_frame=cb, progress=False,
+                                   grad=(keep is None))
+                return Hh.level("mpm_particle").get("pos")
+
+            for it in range(iters):
+                opt.zero_grad()
+                Xs = rollout()
+                loss = ((torch.log1p(mass_grid(Xs, one, BOX, n_grid, dev, torch))
+                         - torch.log1p(rho_t)) ** 2).mean()
+                loss.backward()
+                opt.step(); sched.step()
+                if it % 20 == 0 or it == iters - 1:
+                    e = ((Xs.max(0).values - Xs.min(0).values) * 100).tolist()
+                    et = ((tgt.max(0).values - tgt.min(0).values) * 100).tolist()
+                    print(f"    stage {si} ({n_pts:,} pts, grid {n_grid}) iter {it:3d}  "
+                          f"loss {float(loss):.6f}  shape {e[0]:5.1f} x {e[1]:5.1f} x {e[2]:5.1f}  "
+                          f"target {et[0]:5.1f} x {et[1]:5.1f} x {et[2]:5.1f} um", flush=True)
+            print(f"    stage {si}: {iters} iterations in {(time.time()-t_stage)/60:.1f} min "
+                  f"({(time.time()-t_stage)/max(iters,1):.2f} s an iteration)", flush=True)
+
         with torch.no_grad():
             frames = []
-
-            def keep(Hh, tick, G=G):
-                q = Hh.level("mpm_particle")
-                if tick == 0:
-                    p0, p1 = q.state_schema["pos"]
-                    q.state[:, p0:p1] = X0
-                else:
-                    q.F = torch.bmm(G, q.F)
-                frames.append(q.get("pos").detach().cpu().numpy().copy())
-
-            engine.run(sim, device=args.device, on_frame=keep, progress=False)
+            rollout(keep=frames)
         d = os.path.join(args.out, f"morph_{name}")
         os.makedirs(d, exist_ok=True)
-        np.savez_compressed(os.path.join(d, "morph.npz"), frames=np.stack(frames),
-                            target=tgt_np, control=theta.detach().cpu().numpy(), box=BOX)
+        np.savez_compressed(os.path.join(d, "morph.npz"), frames=np.stack(frames), target=tgt_np,
+                            box=BOX)
         render(d, np.stack(frames), tgt_np, BOX, name)
         print(f"    -> {os.path.relpath(d, ROOT)}  ({len(frames)} frames)", flush=True)
 
