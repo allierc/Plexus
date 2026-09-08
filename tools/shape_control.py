@@ -80,6 +80,22 @@ def ball(n, c, r, rng):
     return c + u * (r * rng.random((n, 1)) ** (1.0 / 3.0))
 
 
+def target_points(kind, n, c, rng):
+    """The shape being asked for. Three, because one is an anecdote: a morph that reaches a flat
+    disc says nothing about whether the loop can also make a column, and the two need OPPOSITE
+    signs on the same rate."""
+    if kind == "disc":                       # squashed: wide and flat
+        return prism(n, c, 0.075, 0.050, rng, sides=32)
+    if kind == "column":                     # the other way: narrow and tall
+        return prism(n, c, 0.035, 0.180, rng, sides=32)
+    if kind == "prism":                      # the epithelial cell of this repo's own scenes
+        return prism(n, c, 0.075, 0.050, rng, sides=6)
+    if kind == "bar":                        # anisotropic in the plane: long in x, thin in z
+        p = rng.random((n, 3)) * np.array([0.170, 0.070, 0.045]) - np.array([0.085, 0.035, 0.0225])
+        return p + c
+    raise ValueError(f"unknown target {kind!r}")
+
+
 def prism(n, c, r, h, rng, sides=6):
     """n points uniform in a hexagonal prism -- the shape it is asked to become."""
     out = []
@@ -122,7 +138,10 @@ def main():
     ap.add_argument("--lr", type=float, default=0.6)
     ap.add_argument("--n-grid", type=int, default=40)
     ap.add_argument("--device", default="cuda:1")
-    ap.add_argument("--out", default=os.path.join(ROOT, "graphs_data", "cell", "shape_control.png"))
+    ap.add_argument("--target", default="disc", choices=["disc", "column", "prism", "bar"])
+    ap.add_argument("--write-spec", action="store_true",
+                    help="write config/cell/morph_<target>.yaml with the optimised rate as a "
+                         "`deform_control` operator, so the answer is a runnable model")
     args = ap.parse_args()
 
     import torch
@@ -140,7 +159,8 @@ def main():
 
     c = np.array([C, C, C])
     X0 = torch.as_tensor(ball(args.n_pts, c, R, rng), dtype=torch.float32, device=dev)
-    tgt = torch.as_tensor(prism(args.n_pts, c, 0.075, HP, rng), dtype=torch.float32, device=dev)
+    tgt = torch.as_tensor(target_points(args.target, args.n_pts, c, rng),
+                          dtype=torch.float32, device=dev)
 
     # SIX NUMBERS: the symmetric part of a rate. A rotation would move the shape without changing
     # it, so the antisymmetric part is not a control and is not given one.
@@ -199,8 +219,28 @@ def main():
             break
 
     tw = ((tgt.max(0).values - tgt.min(0).values) * 100).tolist()
-    print(f"\n  target {tw[0]:.1f} x {tw[1]:.1f} x {tw[2]:.1f} um; "
+    print(f"\n  target {args.target}: {tw[0]:.1f} x {tw[1]:.1f} x {tw[2]:.1f} um; "
           f"loss {hist[0][1]:.6f} -> {hist[-1][1]:.6f}", flush=True)
+    if args.write_spec:
+        # THE OPTIMISATION'S ANSWER AS A MODEL, not as a number in a log: the rate goes into a
+        # `deform_control` operator and the spec runs through Plexus_Main like anything else, so the
+        # morph can be watched rather than believed.
+        raw2 = spec(args.n_pts, BOX, args.n_grid, args.frames * 3, 0.002, 2.5e-4)
+        raw2["general"]["name"] = f"morph_{args.target}"
+        raw2["general"]["record_cap"] = 60
+        raw2["sets"]["mpm_particle"]["types"]["cyto"]["block"] = [
+            C - R, C - R, C - R, C + R, C + R, C + R]
+        raw2["operators"] = [dict(op="deform_control", at="mpm_particle",
+                                  rate=[round(float(v), 5) for v in theta.detach()],
+                                  over=args.frames)] + raw2["operators"]
+        raw2["schedule"] = ["deform_control"] + raw2["schedule"]
+        raw2["plotting"] = dict(renderer="vtk_points", background="black", up_axis=1,
+                                box_frame=True, render_3d="points", dot_size=1.6, fps=30,
+                                slow_motion=2)
+        f2 = os.path.join(ROOT, "config", "cell", f"morph_{args.target}.yaml")
+        yaml.safe_dump(raw2, open(f2, "w"), sort_keys=False)
+        print(f"  -> {os.path.relpath(f2, ROOT)}  "
+              f"(rate {[round(float(v), 4) for v in theta.detach()]})", flush=True)
 
 
 if __name__ == "__main__":

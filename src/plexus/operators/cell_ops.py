@@ -2460,3 +2460,73 @@ class SeedMPMInCells(Seed):
               f"({p.n // max(nP,1):,} each), prisms of mean volume {float(vol[:nP].mean()):.3e}, "
               f"inset {self.inset:g}", flush=True)
         return {}
+
+
+@register_operator("deform_control", family="motility", set="particle", kind="lateral")
+class DeformControl(Lateral):
+    """A declared rate of rest-shape change: the control variable of a shape-morphing optimisation.
+
+    particle -> particle: multiplies the deformation gradient by G = expm(-A dt) every frame, with
+    A a symmetric 3x3 rate given as six numbers.
+
+        A = [[a_xx, a_xy, a_xz], [a_xy, a_yy, a_yz], [a_xz, a_yz, a_zz]]
+        F <- G F,     G = expm(-A dt)
+
+    `polar_growth` is this with A constrained to a stretch along one direction; this is the general
+    linear rate, and it exists because it is what an OPTIMISER produces. `tools/shape_control.py`
+    differentiates a rollout with respect to these six numbers against a target shape, and writes
+    the answer into a spec as this operator -- so the optimisation's result is a runnable model
+    rather than a number in a log.
+
+    SYMMETRIC, because the antisymmetric part is a rotation: it moves the material without changing
+    its shape, so it is not a control and is not given one.
+
+    THE SIGN IS THE ONE `polar_growth` DOCUMENTS. F is the ELASTIC deformation, so the growth F_g
+    enters as its inverse -- expm(-A dt) rather than expm(+A dt) -- and a positive a_xx makes the
+    material get LONGER in x rather than shorter.
+
+    Reference: Xu, M., Song, C. Y., Levin, D. I. W. & Hyde, D. (2025). A Differentiable Material
+    Point Method Framework for Shape Morphing. IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746);
+    papers/Xu_2024_mpm_shape_morphing.pdf. Rodriguez, E. K. et al. (1994). J. Biomech. 27:455-467
+    for the multiplicative split itself.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["rate"]
+    REQUIRES_BUFFERS = ["F"]
+    MECHANISM_TAGS = ["shape_control", "growth", "rest_shape", "inverse_design"]
+    PARAM_ROLES = {"rate": "symmetric_3x3_rate_as_six_numbers", "over": "frames_of_action"}
+    REFERENCE = ("Xu, M. et al. (2025). IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746); "
+                 "Rodriguez, E. K. et al. (1994). J. Biomech. 27:455-467.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        r = [float(v) for v in params["rate"]]
+        if len(r) != 6:
+            raise ValueError("deform_control: `rate` is six numbers -- the diagonal a_xx, a_yy, "
+                             f"a_zz then the off-diagonals a_xy, a_xz, a_yz -- got {len(r)}")
+        self.r = r
+        # HOW LONG IT ACTS. Unset, forever; a morph that reached its target and then kept going
+        # would be a different answer from the one that was optimised.
+        self.over = int(params.get("over", 0))
+        self._G = None
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        if self.over and int(getattr(H, "frame", 0) or 0) >= self.over:
+            return {}
+        if self._G is None:
+            a = self.r
+            A = torch.tensor([[a[0], a[3], a[4]], [a[3], a[1], a[5]], [a[4], a[5], a[2]]],
+                             device=p.F.device, dtype=p.F.dtype)
+            self._G = torch.matrix_exp(-A * float(getattr(H, "dt", 0.002)))
+            print(f"[deform_control] {self.at}: rate {a}, acting for "
+                  f"{self.over or 'the whole run'} frames", flush=True)
+        F = torch.matmul(self._G, p.F)
+        if torch.is_grad_enabled():
+            p.F = F
+        else:
+            p.F.copy_(F)
+        return {}

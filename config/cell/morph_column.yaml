@@ -1,0 +1,91 @@
+general:
+  name: morph_column
+  seed: 0
+  n_frames: 30
+  dt: 0.002
+  record_cap: 60
+  boundary: wall
+  dim: 3
+  world:
+  - 0.35
+  - 0.35
+  - 0.35
+  units:
+    length_um: 100.0
+sets:
+  mpm_particle:
+    n: 6000
+    types:
+      cyto:
+        fraction: 1.0
+        youngs: 90.0
+        density: 1.0
+        block:
+        - 0.12
+        - 0.12
+        - 0.12
+        - 0.22999999999999998
+        - 0.22999999999999998
+        - 0.22999999999999998
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 40
+operators:
+- op: deform_control
+  at: mpm_particle
+  rate:
+  - -11.83586
+  - 12.06236
+  - -11.8989
+  - -0.42219
+  - 0.01807
+  - 0.45631
+  over: 10
+- op: mpm_strain
+  at: mpm_particle
+  implementation: default
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.5
+  a_max: 200.0
+  implementation: default
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.9
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.9
+  vmax: 1000000000.0
+  implementation: default
+schedule:
+- deform_control
+- substep_dt: 0.00025
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  render_3d: points
+  dot_size: 1.6
+  fps: 30
+  slow_motion: 2
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A cluster of particles is centered within a large 3D bounding box. The particles exhibit
+      a slight vertical expansion and shift as time progresses. The overall shape of the cluster remains
+      relatively stable throughout the sequence. The simulation shows a steady state with minimal structural
+      deformation over the observed interval.
+    objects: The scene contains a dense cloud of small particles clustered in the center. These particles
+      are colored in a gradient of blue at the top and reddish-pink at the bottom. They are arranged in
+      a roughly cylindrical or columnar shape. The bounding box provides a spatial reference with a scale
+      bar indicating a 10 $\mu$m dimension.
