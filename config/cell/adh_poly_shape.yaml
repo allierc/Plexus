@@ -26,10 +26,10 @@ operators:
   source: cytoskeleton_node
   cell_set: cell
   block: polarity
-  rate: 1.0
-  compress: 0.6
+  rate: 3.0
+  compress: 0.85
   front_only: true
-  volume_scale: 20.0
+  volume_scale: 75.0
   confine: plasma_membrane_node
   margin: 0.005
 - at: plasma_membrane_node
@@ -199,98 +199,98 @@ operators:
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: cytoskeleton_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: nuclear_envelope_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: chromatin_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: nucleolus_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: rough_er_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: smooth_er_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: golgi_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: mitochondria_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: centriole_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: protein_a_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: protein_b_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: protein_c_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: protein_d_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - at: protein_e_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1000000000.0
+  vmax: 1.0
   wall_damp: 1.0
 - op: mpm_gather
   at: cytoskeleton_new_node
   implementation: warp
   from: mpm_grid
   wall_damp: 1.0
-  vmax: 1000000000.0
+  vmax: 1.0
 - at: plasma_membrane
   child: plasma_membrane_node
   op: aggregate_centroid
@@ -728,42 +728,45 @@ seed:
   at: cytoskeleton_new_node
   fraction: 1.0
 - at: protein_a_node
-  material: viscoelastic
+  material: elastic
   op: set_material
   youngs: 90.0
-  tau: 0.05
+  nu: 0.45
 - at: protein_b_node
-  material: viscoelastic
+  material: elastic
   op: set_material
   youngs: 90.0
-  tau: 0.05
+  nu: 0.45
 - at: protein_c_node
-  material: viscoelastic
+  material: elastic
   op: set_material
   youngs: 90.0
-  tau: 0.05
+  nu: 0.45
 - at: protein_d_node
-  material: viscoelastic
+  material: elastic
   op: set_material
   youngs: 90.0
-  tau: 0.05
+  nu: 0.45
 - at: protein_e_node
-  material: viscoelastic
+  material: elastic
   op: set_material
   youngs: 90.0
-  tau: 0.05
+  nu: 0.45
 - at: plasma_membrane_node
   material: elastic
   op: set_material
   youngs: 200.0
+  nu: 0.45
 - at: cytoskeleton_node
   material: elastic
   op: set_material
   youngs: 300.0
+  nu: 0.45
 - op: set_material
   at: cytoskeleton_new_node
   material: elastic
   youngs: 300.0
+  nu: 0.45
 - at: cell
   axis: 1
   block: polarity
@@ -1074,5 +1077,5 @@ sets:
     density: 1.0
     entity: mpm_particle
     parent: cytoskeleton
-    per_parent: 600
+    per_parent: 1200
     radius: 0.1
