@@ -7,7 +7,7 @@ general:
   dim: 3
   dt: 0.002
   n_frames: 1200
-  name: adh_poly_shape_big
+  name: adh_poly_flow
   record_cap: 60
   save_data: null
   seed: 1
@@ -26,12 +26,42 @@ operators:
   source: cytoskeleton_node
   cell_set: cell
   block: polarity
-  rate: 3.0
+  rate: 0.277
   compress: 0.85
   front_only: true
-  volume_scale: 150.0
+  volume_scale: 400.0
   confine: plasma_membrane_node
   margin: 0.005
+- op: depolymerize
+  at: protein_a_node
+  cell_set: cell
+  block: polarity
+  volume_rate: 5.0e-07
+  behind: 0.0
+- op: depolymerize
+  at: protein_b_node
+  cell_set: cell
+  block: polarity
+  volume_rate: 5.0e-07
+  behind: 0.0
+- op: depolymerize
+  at: protein_c_node
+  cell_set: cell
+  block: polarity
+  volume_rate: 5.0e-07
+  behind: 0.0
+- op: depolymerize
+  at: protein_d_node
+  cell_set: cell
+  block: polarity
+  volume_rate: 5.0e-07
+  behind: 0.0
+- op: depolymerize
+  at: protein_e_node
+  cell_set: cell
+  block: polarity
+  volume_rate: 5.0e-07
+  behind: 0.0
 - at: plasma_membrane_node
   implementation: warp
   op: mpm_strain
@@ -560,6 +590,11 @@ plotting:
 schedule:
 - gravity
 - polymerize_tips
+- depolymerize
+- depolymerize
+- depolymerize
+- depolymerize
+- depolymerize
 - steps:
   - mpm_strain
   - mpm_strain

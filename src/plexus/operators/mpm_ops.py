@@ -4264,3 +4264,150 @@ class SetMaterial(Seed):
         print(f"[set_material] {lvl.name} ({n:,} points): " + "; ".join(said or ["nothing given"]),
               flush=True)
         return {}
+
+
+@register_operator("mpm_density_pressure", family="mpm", set="particle", kind="lateral")
+class MPMDensityPressure(Lateral):
+    """Pressure from the LOCAL DENSITY on the grid, so that material added anywhere has to make room.
+
+    particle -[grid]-> particle: scatters every listed set's mass onto the grid with the solver's own
+    B-spline weights, gathers the density back at each point, and writes
+
+        P = k max(rho / rho_0 - 1, 0)
+
+    into the `turgor` buffer, which `mpm_scatter` already subtracts from the Kirchhoff stress as an
+    isotropic outward push. rho is the density the grid sees at that point, rho_0 the density the
+    same point saw on the first frame, and k the stiffness of the response, in the run's stress
+    units -- comparable to the material's own lambda is the sensible scale.
+
+    WHY THIS EXISTS, AND IT IS THE WHOLE REASON POLYMERISATION DID NOTHING. In MLS-MPM a point's
+    stress is a function of its OWN deformation gradient F and of nothing else. Two points may sit
+    at exactly the same place with F = I each and neither feels the other: the material is twice as
+    dense there and the constitutive law cannot tell. So adding material to a cell -- waking points
+    from a pool, however many, however compressed on arrival -- produces one transient push per
+    point as it relaxes and then nothing at all. Measured: 1,019 um^3 added to a 3,833 um^3 cell,
+    27% of its volume, moved the cell's length by 0.22 um and stopped moving it after 75 frames.
+
+    Density is the state that is missing, and the grid is the only place it exists. Reading it back
+    as a pressure closes the loop: the added mass raises rho where it was added, the excess pressure
+    pushes the neighbourhood apart, and it keeps pushing until rho has fallen back to rho_0 -- which
+    happens exactly when the cell has expanded by the volume that was inserted. The material's own
+    elasticity is untouched; this is one extra term, isotropic, and zero everywhere the density is
+    at rest.
+
+    NOT SYMMETRIC IN SIGN, by choice: `max(., 0)` means the term pushes when material is crowded and
+    does nothing when it is sparse. A negative branch would have removed points PULL, which is
+    tempting -- it would let depolymerisation thin a flank -- and wrong for the same reason a gas
+    does not pull: a rarefied region in a solid is held open by the solid, not closed by a suction.
+    A flank that must come in needs a contractile stress, not a hole.
+
+    THE SETS ARE SHARED, THE PRESSURE IS NOT. `sets:` lists every set whose mass counts toward the
+    density -- the whole cell, since all of them scatter into the same grid and all of them displace
+    each other -- while `at:` is the one set this instance writes the pressure on. The density grid
+    is built ONCE per frame and cached on the hierarchy, so N instances cost one scatter, not N.
+
+    Reference: Monaghan, J. J. (1994). Simulating free surface flows with SPH. J. Comput. Phys.
+    110:399-406 (weakly compressible equation of state); Macklin, M. & Muller, M. (2013). Position
+    based fluids. ACM Trans. Graph. 32:104 (density constraint from a kernel-smoothed count).
+    """
+    EMIT = None                       # writes the `turgor` buffer in place; no integrable delta
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["stiffness", "grid"]
+    REQUIRES_BUFFERS = ["mass"]
+    MECHANISM_TAGS = ["density_pressure", "equation_of_state", "volume_source", "crowding"]
+    PARAM_ROLES = {"stiffness": "pressure_per_relative_overdensity", "grid": "density_grid",
+                   "coarsen": "density_grid_coarsening",
+                   "sets": "sets_contributing_mass", "max_pressure": "clamp"}
+    REFERENCE = ("Monaghan, J. J. (1994). J. Comput. Phys. 110:399-406; "
+                 "Macklin, M. & Muller, M. (2013). ACM Trans. Graph. 32:104.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.grid = str(params["grid"])
+        self.k = float(params["stiffness"])
+        self.sets = [str(x) for x in (params.get("sets") or [])] or None
+        self.max_p = float(params.get("max_pressure", 1e9))
+        # THE DENSITY IS READ ON A COARSER GRID THAN THE ONE THE SOLVER RUNS ON, and that is what
+        # lets the stiffness be large enough to matter. The pressure has to beat the material's own
+        # bulk modulus -- at stiffness 600 against a cytoplasm lambda of 279, only 34% of the volume
+        # added ever appeared, the rest going into compression -- but a stiffness ten times larger
+        # applied to a density measured at the solver's own dx turns every single insertion into a
+        # spike, because one point lands in one cell. Coarsening by 4 makes a cell 1.25 um across,
+        # about a tenth of the cell's own width: an insertion is then a fraction of a percent of the
+        # local density while the cell-scale crowding, which is the thing being resisted, is
+        # unchanged. Big pressure, no spikes.
+        self.coarsen = int(params.get("coarsen", 1))
+        self._said = False
+
+    def _grid(self, g, D):
+        """(inv_dx, shape, dx) of the density grid -- the solver's, coarsened by `coarsen`."""
+        c = max(1, self.coarsen)
+        shape = tuple(max(2, (int(k) + c - 1) // c) for k in g.shape)
+        return g.inv_dx / c, shape, g.dx * c
+
+    def _density(self, H, g, D, dev):
+        """Mass per unit volume at every grid node, from every contributing set. Cached per frame."""
+        tag = (int(getattr(H, "frame", 0) or 0), self.coarsen)
+        cache = getattr(H, "_dens_cache", None)
+        if cache is not None and cache[0] == tag:
+            return cache[1]
+        names = self.sets or [self.at]
+        offsets = stencil_offsets(D, dev)
+        periodic = bool(getattr(H, "periodic", False))
+        inv_dx, shape, dx = self._grid(g, D)
+        n_nodes = 1
+        for k in shape:
+            n_nodes *= int(k)
+        acc = torch.zeros(n_nodes, device=dev)
+        for nm in names:
+            q = H.level(nm)
+            X = q.get("pos")[:, :D]
+            m = q.mass
+            occ = getattr(q, "occ", None)
+            if occ is not None:
+                m = m * (occ > 0).to(m.dtype)
+            _fx, w, flat = bspline(X, inv_dx, offsets, shape, periodic)
+            acc.index_add_(0, flat, (w * m[:, None]).reshape(-1))
+        return acc / (dx ** D)
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        g = H.field(self.grid)
+        dev = p.state.device
+        D = p.F.shape[-1]
+        rho_g = self._density(H, g, D, dev)
+        H._dens_cache = ((int(getattr(H, "frame", 0) or 0), self.coarsen), rho_g)
+        offsets = stencil_offsets(D, dev)
+        inv_dx, shape, _dx = self._grid(g, D)
+        _fx, w, flat = bspline(p.get("pos")[:, :D], inv_dx, offsets, shape,
+                               bool(getattr(H, "periodic", False)))
+        rho = (w * rho_g[flat].reshape(w.shape)).sum(1)
+        if not hasattr(p, "rho0"):
+            # THE REST DENSITY IS THE ONE THIS RUN STARTED AT, not a declared constant: the atlas
+            # gives every compartment its own point volume, so a single number would be wrong for
+            # fourteen of the fifteen sets. A point woken later inherits the set's median, because
+            # its own "rest" was never observed.
+            p.register_buffer("rho0", rho.detach().clone().clamp_min(1e-12))
+            live = (p.occ > 0) if getattr(p, "occ", None) is not None else None
+            med = float(rho[live].median()) if live is not None and bool(live.any()) \
+                else float(rho.median())
+            p.rho0[(rho <= 0) | (~live if live is not None else torch.zeros_like(rho, dtype=torch.bool))] = med
+            print(f"[mpm_density_pressure] {self.at}: rest density {float(p.rho0.median()):.4g}, "
+                  f"stiffness {self.k:g} -- a 10% crowding is worth {0.1 * self.k:.3g} of pressure",
+                  flush=True)
+        P = (self.k * (rho / p.rho0 - 1.0)).clamp(0.0, self.max_p)
+        if mask is not None:
+            P = P * mask.float()
+        buf = getattr(p, "turgor", None)
+        if buf is None or buf.shape != P.shape:
+            p.register_buffer("turgor", torch.zeros_like(P))
+            buf = p.turgor
+        buf.copy_(P)
+        if not self._said:
+            self._said = True
+            print(f"[mpm_density_pressure] {self.at}: max crowding "
+                  f"{float((rho / p.rho0).max()):.2f}x rest, pressure up to {float(P.max()):.3g}",
+                  flush=True)
+        return {}

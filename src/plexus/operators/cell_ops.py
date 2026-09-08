@@ -1678,6 +1678,9 @@ class PolymerizeTips(Structural):
         # membrane yields the tip is allowed forward again, which is the tethered-filament picture
         # (Mogilner & Oster) rather than a beam growing out of a cell.
         self.confine = params.get("confine")
+        # how far back the leading region reaches, as a fraction of the cell's own forward reach:
+        # 0.1 fills nearly the whole front half, 0.7 only the tip zone
+        self.front_lo = float(params.get("front_lo", 0.15))
         self.margin = float(params.get("margin", 0.005))
         # ONE MATERIAL POINT STANDS FOR MORE VOLUME THAN THE BARE FILAMENT IT GREW FROM, and this
         # says how much more. The atlas's filaments are 0.6 um thick, so the whole cytoskeleton is
@@ -1751,6 +1754,17 @@ class PolymerizeTips(Structural):
             c0 = cl.state_schema["pos"][0]
             ahead = ((tp - cl.state[self._cell_of, c0:c0 + D]) * dP).sum(1)
             grow = grow & (ahead > 0)
+        # A BLOCKED TIP BRANCHES, IT DOES NOT STOP. Refusing to grow at the barrier looks careful
+        # and is the reason the first version did nothing: every front fibre reached the membrane
+        # within about a hundred frames and never resumed, so 5% of the pool was ever spent, 0.7%
+        # of the cell's volume was added, and the front advanced 0.16 um over a cell that was
+        # polymerising nothing at all. A real leading edge does not idle when a filament touches the
+        # membrane -- Arp2/3 nucleates a daughter filament off its side and the NETWORK thickens
+        # behind the edge. So a blocked fibre lays its material just behind its own tip with a
+        # sideways offset, where there is already cell, and a near-incompressible cytoplasm has to
+        # take it somewhere.
+        blocked = torch.zeros(nP, dtype=torch.bool, device=Xa.device)
+        env = None                                   # the envelope a new point must land inside
         if self.confine:
             m = H.level(self.confine)
             im = H.lift_index(m.name, self.cell_set)
@@ -1762,7 +1776,24 @@ class PolymerizeTips(Structural):
             reach = reach.scatter_reduce(0, im[lm], pm[lm], "amax", include_self=True)
             p_tip = ((tp - cl.state[self._cell_of, cl.state_schema["pos"][0]:
                                     cl.state_schema["pos"][0] + D]) * dP).sum(1)
-            grow = grow & (p_tip < reach[self._cell_of] - self.margin)
+            blocked = p_tip >= reach[self._cell_of] - self.margin
+            # AND THE INSERTION IS CLAMPED INTO THE CELL, not merely refused when the tip is out.
+            # Blocking the tip is not enough: once a single point gets outside -- and one always
+            # does, because the membrane moves -- it becomes the tip its own fibre grows from, and
+            # every point after it is laid further out still. Measured, that is the spray of
+            # material across the whole box. So the envelope of the membrane is computed here, per
+            # cell, and every new position is clamped inside it below. A point that cannot be put
+            # inside the cell is not polymerised at all.
+            lat = ((Xm - c_all[im]) - pm[:, None] * n_cell[im]).clone()
+            lat[:, 1] = 0.0
+            rad = lat.norm(dim=1)
+            half = torch.zeros(cl.n, device=Xa.device, dtype=pm.dtype).scatter_reduce(
+                0, im[lm], rad[lm], "amax", include_self=True)
+            ylo = torch.full((cl.n,), float("inf"), device=Xa.device, dtype=pm.dtype)
+            yhi = torch.full((cl.n,), -float("inf"), device=Xa.device, dtype=pm.dtype)
+            ylo = ylo.scatter_reduce(0, im[lm], Xm[lm, 1], "amin", include_self=True)
+            yhi = yhi.scatter_reduce(0, im[lm], Xm[lm, 1], "amax", include_self=True)
+            env = (reach, half, ylo, yhi)
         k = torch.as_tensor(self.rate, device=Xa.device, dtype=Xa.dtype).expand(nP).clone()
         gt = _gate(self, H, self._cell_of)
         if gt is not None:
@@ -1788,7 +1819,45 @@ class PolymerizeTips(Structural):
         slot = self._start[f] + self._cursor[f] + j
         self._cursor = self._cursor + n_new
         d = dP[f]
-        p.state[slot, :D] = tp[f] + (j + 1).to(Xa.dtype)[:, None] * self.spacing * d
+        X_new = tp[f] + (j + 1).to(Xa.dtype)[:, None] * self.spacing * d
+        if bool(blocked.any()) and env is not None:
+            # A BLOCKED FIBRE FILLS THE LEADING REGION, it does not pile up at its own tip. Laying
+            # the material just behind a tip that is pinned against the membrane puts every frame's
+            # points in the same few hundred spots: measured, those spots reach the pressure cap and
+            # stop pushing while the cytoplasm around them never crowds at all -- turgor on the
+            # cytoplasm was a mean of 4.7 and FALLING while 71,616 points arrived. A branched network
+            # fills the volume behind the leading edge, and a pressure that is to move a front has to
+            # be raised over that whole volume rather than at a few points in it.
+            reach, half, ylo, yhi = env
+            ci = self._cell_of[f]
+            cpos = cl.state[ci, cl.state_schema["pos"][0]:cl.state_schema["pos"][0] + D]
+            u = torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype)
+            ax = (self.front_lo + (0.95 - self.front_lo) * u) * (reach[ci] - self.margin)
+            ang = 2.0 * math.pi * torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype)
+            rad = torch.sqrt(torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype)) * \
+                0.9 * (half[ci] - self.margin).clamp_min(0.0)
+            e1 = torch.stack([-d[:, 2], torch.zeros_like(d[:, 0]), d[:, 0]], 1)
+            e1 = e1 / e1.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            e2 = torch.linalg.cross(d, e1)
+            X_fill = cpos + ax[:, None] * d + (rad * torch.cos(ang))[:, None] * e1 \
+                + (rad * torch.sin(ang))[:, None] * e2
+            X_fill[:, 1] = (ylo[ci] + self.margin +
+                            (yhi[ci] - ylo[ci] - 2 * self.margin).clamp_min(0.0) *
+                            torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype))
+            X_new = torch.where(blocked[f][:, None], X_fill, X_new)
+        if env is not None:
+            reach, half, ylo, yhi = env
+            ci = self._cell_of[f]
+            cpos = cl.state[ci, cl.state_schema["pos"][0]:cl.state_schema["pos"][0] + D]
+            rel = X_new - cpos
+            ax = (rel * d).sum(1).clamp(max=(reach[ci] - self.margin))
+            side = rel - (rel * d).sum(1)[:, None] * d
+            side = side.clone(); side[:, 1] = 0.0
+            sr = side.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            side = side * (sr.clamp(max=(half[ci] - self.margin).clamp_min(0.0)[:, None]) / sr)
+            X_new = cpos + ax[:, None] * d + side
+            X_new[:, 1] = X_new[:, 1].clamp(min=ylo[ci] + self.margin, max=yhi[ci] - self.margin)
+        p.state[slot, :D] = X_new
         v0, v1 = p.state_schema["vel"]
         p.state[slot, v0:v1] = Va[tip[f]][:, : v1 - v0]        # arrives moving with the tip
         eye = torch.eye(D, device=Xa.device, dtype=p.F.dtype)
@@ -1799,4 +1868,117 @@ class PolymerizeTips(Structural):
         if hasattr(p, "mass_rest"):
             p.mass[slot] = p.mass_rest[slot]
         p.occ[slot] = 1.0
+        return {}
+
+
+@register_operator("depolymerize", family="motility", set="particle", kind="structural")
+class Depolymerize(Structural):
+    """Take material off where the cell is NOT growing, at a stated volume rate.
+
+    particle -[containment]-> particle: retires live points behind the cell's leading edge --
+    `occ = 0`, `mass = 0` -- until the volume retired this frame reaches `volume_rate`.
+
+    WHY POLYMERISATION NEEDS THIS TO REACH A REAL SHAPE CHANGE, which is the whole argument for the
+    operator and is arithmetic rather than taste. Measured on `adh_grow_all`, the deformation being
+    aimed at is a length swing of 28.0 -> 64.6 um -- 2.85x -- with the width going the OTHER WAY,
+    27.9 -> 19.3 um, and the height 12.2 -> 10.3 um. The material volume there is exactly constant,
+    because a deviatoric growth cannot change it. So the target is a REDISTRIBUTION.
+
+    Adding 36.6 um of length onto a cell whose material cross-section is about 136 um^2 takes some
+    5,000 um^3, which is 1.3 times the cell's own 3,833 um^3. Polymerisation alone therefore reaches
+    that length only by ending up at 2.3x its own volume -- a balloon pushed forward, not the
+    thinned cell that was measured. Taking the same 5,000 um^3 off the girth and the rear as it goes
+    on at the front keeps the volume where it started, thins the cell exactly as the target does,
+    and lets a finite pool supply an unbounded deformation.
+
+    `volume_rate` is in WORLD VOLUME UNITS PER FRAME, and it is meant to be set equal to what the
+    polymeriser is adding: `rate` x (fibres growing) x (p_vol of a pool point). Stating it as a
+    volume rather than as a count is what makes the two comparable at all -- the sets being added
+    to and taken from have different points with different volumes, and matching counts would
+    match nothing.
+
+    `behind` selects the region, as a fraction of the cell's own reach along its polarity: 0.0 is
+    the back half, -0.5 reaches further forward, 0.5 only the far rear. Within the region the points
+    retired are drawn at random rather than from the extreme rear, so the cell thins rather than
+    losing a face.
+
+    Reference: Pollard, T. D. & Borisy, G. G. (2003). Cellular motility driven by assembly and
+    disassembly of actin filaments. Cell 112:453-465 (treadmilling: assembly at the barbed end,
+    disassembly at the pointed end, at equal rates).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    REQUIRES_PARAMS = ["cell_set", "volume_rate"]
+    REQUIRES_BUFFERS = ["occ"]
+    INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
+    READS = ["polarity"]; WRITES = []
+    MAPS = ["parent"]
+    MECHANISM_TAGS = ["depolymerization", "treadmilling", "volume_conservation", "motility"]
+    PARAM_ROLES = {"volume_rate": "world_volume_per_frame", "behind": "region_along_polarity",
+                   "region": "removal_region", "lateral": "girth_inner_radius",
+                   "mid": "girth_axial_extent",
+                   "cell_set": "polarity_owner"}
+    REFERENCE = "Pollard, T. D. & Borisy, G. G. (2003). Cell 112:453-465."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.cell_set = str(params["cell_set"])
+        self.block = str(params.get("block", "polarity"))
+        self.volume_rate = float(params["volume_rate"])
+        self.behind = float(params.get("behind", 0.0))
+        # WHERE THE MATERIAL COMES OFF DECIDES WHETHER THE CELL MOVES OR CHANGES SHAPE, and that is
+        # not a detail. Taking it off the BACK and putting it at the front is a treadmill: the cell
+        # keeps its shape and translates, which is exactly what was measured -- length 28.0 -> 28.9
+        # um for 507 um^3 transported, with the front reach FALLING because the centroid had moved
+        # forward. Taking it off the GIRTH -- the flanks, near the mid-body -- is the only way the
+        # waist can narrow, and a cell that narrows at constant volume has to lengthen. The target
+        # (adh_grow_all: 28.0 -> 64.6 um long WHILE 27.9 -> 19.3 um wide) is a girth-to-tip
+        # transport, so `region: lateral` is what that target asks for.
+        self.region = str(params.get("region", "behind"))
+        self.lateral = float(params.get("lateral", 0.45))
+        self.mid = float(params.get("mid", 0.7))
+        self._said = False
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        cl = H.level(self.cell_set)
+        D = int(getattr(H, "dim", 3))
+        idx = H.lift_index(p.name, self.cell_set)
+        b0, b1 = cl.state_schema[self.block]
+        n = cl.state[:, b0:b1][:, :D]
+        n = n / n.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        c0 = cl.state_schema["pos"][0]
+        X = p.get("pos")[:, :D]
+        pr = ((X - cl.state[idx, c0:c0 + D]) * n[idx]).sum(1)
+        live = p.occ > 0
+        reach = torch.zeros_like(pr).scatter_reduce(0, idx[live], pr[live].abs(), "amax",
+                                                    include_self=True).max().clamp_min(1e-9)
+        if self.region == "lateral":
+            off = (X - cl.state[idx, c0:c0 + D]) - pr[:, None] * n[idx]
+            off = off.clone(); off[:, 1] = 0.0                 # the girth, in the substrate plane
+            rad = off.norm(dim=1)
+            half = torch.zeros_like(rad).scatter_reduce(0, idx[live], rad[live], "amax",
+                                                        include_self=True).max().clamp_min(1e-9)
+            elig = live & (rad > self.lateral * half) & (pr.abs() < self.mid * reach)
+        else:
+            elig = live & (pr < self.behind * reach)
+        if not bool(elig.any()):
+            return {}
+        e = elig.nonzero(as_tuple=True)[0]
+        e = e[torch.randperm(e.numel(), device=e.device)]
+        cum = torch.cumsum(p.p_vol[e], 0)
+        k = int(torch.searchsorted(cum, torch.as_tensor(self.volume_rate, device=cum.device,
+                                                        dtype=cum.dtype)).item()) + 1
+        k = min(k, e.numel())
+        vic = e[:k]
+        p.occ[vic] = 0.0
+        p.mass[vic] = 0.0
+        if not self._said:
+            self._said = True
+            print(f"[depolymerize] {self.at}: retiring {k:,} points a frame from the "
+                  f"{self.region} region -- {float(p.p_vol[vic].sum()):.3e} of "
+                  f"volume, against a pool of {int(live.sum()):,} live points", flush=True)
         return {}

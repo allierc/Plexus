@@ -7,7 +7,7 @@ general:
   dim: 3
   dt: 0.002
   n_frames: 1200
-  name: adh_poly_shape_big
+  name: adh_grow_org
   record_cap: 60
   save_data: null
   seed: 1
@@ -21,17 +21,76 @@ operators:
 - at: cell
   g: 4.0
   op: gravity
-- op: polymerize_tips
-  at: cytoskeleton_new_node
-  source: cytoskeleton_node
+- at: cell
+  block: phase
+  jitter: 0.15
+  omega: 3.1416
+  op: phase_clock
+  seed: 5
+- op: polar_growth
+  at: centriole_node
   cell_set: cell
   block: polarity
-  rate: 3.0
-  compress: 0.85
-  front_only: true
-  volume_scale: 150.0
-  confine: plasma_membrane_node
-  margin: 0.005
+  phase_block: phase
+  stretch: 3.0
+  offset: 0.0
+  max_rate: 0.05
+- op: polar_growth
+  at: cytoskeleton_node
+  cell_set: cell
+  block: polarity
+  phase_block: phase
+  stretch: 3.0
+  offset: 0.0
+  max_rate: 0.05
+- op: polar_growth
+  at: plasma_membrane_node
+  cell_set: cell
+  block: polarity
+  phase_block: phase
+  stretch: 3.0
+  offset: 0.0
+  max_rate: 0.05
+- op: polar_growth
+  at: protein_a_node
+  cell_set: cell
+  block: polarity
+  phase_block: phase
+  stretch: 3.0
+  offset: 0.0
+  max_rate: 0.05
+- op: polar_growth
+  at: protein_b_node
+  cell_set: cell
+  block: polarity
+  phase_block: phase
+  stretch: 3.0
+  offset: 0.0
+  max_rate: 0.05
+- op: polar_growth
+  at: protein_c_node
+  cell_set: cell
+  block: polarity
+  phase_block: phase
+  stretch: 3.0
+  offset: 0.0
+  max_rate: 0.05
+- op: polar_growth
+  at: protein_d_node
+  cell_set: cell
+  block: polarity
+  phase_block: phase
+  stretch: 3.0
+  offset: 0.0
+  max_rate: 0.05
+- op: polar_growth
+  at: protein_e_node
+  cell_set: cell
+  block: polarity
+  phase_block: phase
+  stretch: 3.0
+  offset: 0.0
+  max_rate: 0.05
 - at: plasma_membrane_node
   implementation: warp
   op: mpm_strain
@@ -77,9 +136,6 @@ operators:
 - at: protein_e_node
   implementation: warp
   op: mpm_strain
-- op: mpm_strain
-  at: cytoskeleton_new_node
-  implementation: warp
 - a_max: 200.0
   at: plasma_membrane_node
   drag: 2.0
@@ -185,13 +241,6 @@ operators:
   op: mpm_scatter
   polar: higham
   to: mpm_grid
-- op: mpm_scatter
-  at: cytoskeleton_new_node
-  implementation: warp
-  to: mpm_grid
-  drag: 2.0
-  a_max: 200.0
-  polar: higham
 - at: mpm_grid
   op: mpm_grid_update
   wall_damp: 1.0
@@ -199,98 +248,92 @@ operators:
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: cytoskeleton_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: nuclear_envelope_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: chromatin_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: nucleolus_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: rough_er_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: smooth_er_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: golgi_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: mitochondria_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: centriole_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: protein_a_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: protein_b_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: protein_c_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: protein_d_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
 - at: protein_e_node
   from: mpm_grid
   implementation: warp
   op: mpm_gather
-  vmax: 1.0
+  vmax: 1000000000.0
   wall_damp: 1.0
-- op: mpm_gather
-  at: cytoskeleton_new_node
-  implementation: warp
-  from: mpm_grid
-  wall_damp: 1.0
-  vmax: 1.0
 - at: plasma_membrane
   child: plasma_membrane_node
   op: aggregate_centroid
@@ -430,10 +473,6 @@ plotting:
     - 0.78
     - 0.72
     smooth_er_node: *id015
-    cytoskeleton_new_node:
-    - 1.0
-    - 0.95
-    - 0.3
   compartment_sets:
   - plasma_membrane_node
   - cytoskeleton_node
@@ -450,7 +489,6 @@ plotting:
   - protein_c_node
   - protein_d_node
   - protein_e_node
-  - cytoskeleton_new_node
   dot_size: 0.9
   fps: 60
   graph_overlay:
@@ -494,7 +532,6 @@ plotting:
     protein_e_node: 0.08
     rough_er_node: 0.196
     smooth_er_node: 0.196
-    cytoskeleton_new_node: 0.95
   render_3d: compartments
   renderer: vtk_points
   slow_motion: 2
@@ -551,15 +588,20 @@ plotting:
     smooth_er_node:
       point_size: 0.9
       render: dots
-    cytoskeleton_new_node:
-      render: dots
-      point_size: 1.4
   surface_max_cells: 80000000
   surface_sample: 60000
   up_axis: 1
 schedule:
 - gravity
-- polymerize_tips
+- phase_clock
+- polar_growth
+- polar_growth
+- polar_growth
+- polar_growth
+- polar_growth
+- polar_growth
+- polar_growth
+- polar_growth
 - steps:
   - mpm_strain
   - mpm_strain
@@ -576,8 +618,6 @@ schedule:
   - mpm_strain
   - mpm_strain
   - mpm_strain
-  - mpm_strain
-  - mpm_scatter
   - mpm_scatter
   - mpm_scatter
   - mpm_scatter
@@ -594,7 +634,6 @@ schedule:
   - mpm_scatter
   - mpm_scatter
   - mpm_grid_update
-  - mpm_gather
   - mpm_gather
   - mpm_gather
   - mpm_gather
@@ -643,11 +682,6 @@ seed:
   cell_radius: 0.1
   op: seed_cell_atlas
   particles: cytoskeleton_node
-  vel_init: 0.0
-- op: seed_cell_atlas
-  at: cytoskeleton
-  particles: cytoskeleton_new_node
-  cell_radius: 0.1
   vel_init: 0.0
 - at: nuclear_envelope
   cell_radius: 0.1
@@ -724,49 +758,34 @@ seed:
   frame: -1
   op: load_run
   run: cell/adh_jelly_x10
-- op: park_reserve
-  at: cytoskeleton_new_node
-  fraction: 1.0
 - at: protein_a_node
   material: elastic
   op: set_material
   youngs: 90.0
-  nu: 0.45
 - at: protein_b_node
   material: elastic
   op: set_material
   youngs: 90.0
-  nu: 0.45
 - at: protein_c_node
   material: elastic
   op: set_material
   youngs: 90.0
-  nu: 0.45
 - at: protein_d_node
   material: elastic
   op: set_material
   youngs: 90.0
-  nu: 0.45
 - at: protein_e_node
   material: elastic
   op: set_material
   youngs: 90.0
-  nu: 0.45
 - at: plasma_membrane_node
   material: elastic
   op: set_material
   youngs: 200.0
-  nu: 0.45
 - at: cytoskeleton_node
   material: elastic
   op: set_material
   youngs: 300.0
-  nu: 0.45
-- op: set_material
-  at: cytoskeleton_new_node
-  material: elastic
-  youngs: 300.0
-  nu: 0.45
 - at: cell
   axis: 1
   block: polarity
@@ -1072,10 +1091,4 @@ sets:
     entity: mpm_particle
     parent: smooth_er
     per_parent: 12500
-    radius: 0.1
-  cytoskeleton_new_node:
-    density: 1.0
-    entity: mpm_particle
-    parent: cytoskeleton
-    per_parent: 1200
     radius: 0.1
