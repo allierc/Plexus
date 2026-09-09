@@ -1890,14 +1890,14 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">5,511 cells. The interface tension taken out. Growth acts alone, and the arms are longest.</span>
+      <span class="sim-cap">Same chemistry, <code>interface_tension</code> deleted from the schedule. Growth alone: the longest arms.</span>
     </figcaption>
   </figure>
 
 <figure class="sim-card">
     <video src="gallery/turing_folds_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">chemistry faster than growth<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">reaction faster than growth<span class="sim-spec"><pre>general:
   name: r020_01
   seed: 0
   n_frames: 1800
@@ -2074,7 +2074,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">24,661 cells. The reaction rate raised against the growth. The shell folds instead of arming.</span>
+      <span class="sim-cap"><code>rate: 0.25 → 0.75</code>. The shell folds instead of arming.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2280,13 +2280,13 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">12,223 cells. The same reaction rate with the interface tension back in. Thirteen arms.</span>
+      <span class="sim-cap"><code>interface_tension</code> restored, reaction at 0.5. Thirteen arms.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_spikes_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">growth faster than chemistry<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">growth faster than reaction<span class="sim-spec"><pre>general:
   name: r021_06
   seed: 1006
   n_frames: 1800
@@ -2463,14 +2463,14 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">21,832 cells. Reaction slower, growth faster. Five long thin arms.</span>
+      <span class="sim-cap"><code>cell_grow</code> rate doubled, reaction at 0.25. Five long thin arms.</span>
     </figcaption>
   </figure>
 
 <figure class="sim-card">
     <video src="gallery/turing_death_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">growth and death together<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">a second chemistry drives death<span class="sim-spec"><pre>general:
   name: tsd_max
   seed: 0
   n_frames: 1800
@@ -2662,13 +2662,13 @@ _two_species:
     one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species
     run cannot put growth and death in different places, because every operator reads
     the same field.</pre></span></span>
-      <span class="sim-cap">2,895 cells from 2,000 seeded. A second chemistry drives a death (structural) beside the growth. Under half the cells the inhibited run keeps.</span>
+      <span class="sim-cap">Four chemical states: species A gates growth, species B gates <code>cell_die</code>. Growth and death land in different places.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_antiphase_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one state drives both<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one chemistry drives both<span class="sim-spec"><pre>general:
   name: sc_antiphase
   seed: 0
   n_frames: 1800
@@ -2833,18 +2833,18 @@ _sculpt:
   k_purse: null
   asks: &#x27;the finger hypothesis: grow at the spots, remove the flanks, and a bulge
     should sharpen&#x27;</pre></span></span>
-      <span class="sim-cap">2,387 cells from 2,000 seeded. One chemistry drives growth and death at once. Death can only land between the spots.</span>
+      <span class="sim-cap">The same activator gates growth where it is high and death where it is low. Death can only fall between the spots.</span>
     </figcaption>
   </figure>
 </div>
 <h3>Continuum mechanics — MLS-MPM</h3>
-<p class="opk">Material-point simulations have been decomposed into six operators over two sets and one field: the particles are children of a cell, an aggregate builds the cell from them, a constitutive law turns each particle’s deformation into a stress, an exchange scatters that to the grid, the grid advances under its own dynamics (field), and a second exchange gathers the result back to the particles. By composing these with different constitutive laws, different material constants and different numbers of particles we can build elastic, fluid and granular matter without changing anything beneath the spec. Shown across the first row is what the spec changes — three materials in one solve, the viscosity swept, a surface force added, and then nothing added at all — and across the second, only the size, from 1.3&nbsp;million particles to a billion.</p>
+<p class="opk">MLS-MPM decomposed into six operators over two sets and one field: particles are children of a cell, an aggregate builds the cell from them, a constitutive law turns each particle’s deformation into a stress, an exchange scatters it to the grid, the grid advances under its own dynamics (field), and a second exchange gathers the result back. Elastic, fluid and granular matter are constitutive laws named in the spec. First row: what one line of the spec changes. Second row: only the size, from 1.3&nbsp;million particles to a billion.</p>
 <p class="opk-ref">Reference — the MLS-MPM solver is our PyTorch port (<a href="https://github.com/saalfeldlab/MPM_pytorch">saalfeldlab/MPM_pytorch</a>) of Yuanming&nbsp;Hu’s <a href="https://github.com/yuanming-hu/taichi_mpm">taichi_mpm</a>, implementing MLS-MPM (Hu et&nbsp;al. 2018).</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
     <video src="gallery/mpm2_multimaterial.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one parent, three materials<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">two sets and a field<span class="sim-spec"><pre>general:
   name: sit_multimaterial
   seed: 0
   n_frames: 2400
@@ -2988,7 +2988,7 @@ plotting:
     - 0.96
     - 1.0
   slow_motion: 4</pre></span></span>
-      <span class="sim-cap">3 parent cells owning 2.6&nbsp;M particles, and one grid field. Six operators: the cell built from its particles (aggregate), a constitutive law, a scatter out and a gather back (exchange), and the grid’s own solve (field).</span>
+      <span class="sim-cap">3 cells owning 2.6&nbsp;M particles, one grid. Aggregate, a constitutive law, scatter and gather (exchange), the grid’s own solve (field). Jelly, water, snow.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3250,7 +3250,7 @@ plotting:
     - 0.92
     - 0.94
     - 1.0</pre></span></span>
-      <span class="sim-cap">3 parent cells owning 300,000 particles. Only the viscosity differs. One material never drains through the plate.</span>
+      <span class="sim-cap">Three balls of 100,000 particles; only <code>eta</code> differs. One never drains through the plate.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3364,13 +3364,13 @@ plotting:
     - 1.0
     - 0.55
     - 0.2</pre></span></span>
-      <span class="sim-cap">2 parent cells owning 631,380 particles. One term added to the grid’s own dynamics. The drops pull themselves into one sphere.</span>
+      <span class="sim-cap"><code>surface_tension: 0.144</code> on the grid update, gravity off. Two drops pull into one sphere.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/mpm2_crown.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">nothing added at all<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">nothing added<span class="sim-spec"><pre>general:
   name: si_crown_drop
   seed: 0
   n_frames: 2400
@@ -3484,7 +3484,7 @@ plotting:
     - 1.0
     - 0.55
     - 0.2</pre></span></span>
-      <span class="sim-cap">One parent cell owning 1.1&nbsp;M particles. The same operators, nothing added. The crown, its jets and its droplets belong to none of them.</span>
+      <span class="sim-cap">1.1&nbsp;M particles, the same six operators. The crown, its jets and its droplets are written in none of them.</span>
     </figcaption>
   </figure>
 </div>
@@ -3646,7 +3646,7 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap">One parent cell owning 1.3&nbsp;M particles. The obstacles are declared in the spec, not built into an operator. A wake behind each pillar.</span>
+      <span class="sim-cap">Nine pillars declared under <code>general</code>, not inside any operator. A wake behind each.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3770,13 +3770,13 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap">One parent cell owning 5&nbsp;M particles. Only the size of the child set changed.</span>
+      <span class="sim-cap"><code>per_parent: 5,000,000</code>. Nothing else changed.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/mpm2_ball_wake.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one grid, two materials<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">two laws, one grid<span class="sim-spec"><pre>general:
   name: si_ball_wake_wide
   seed: 0
   n_frames: 700
@@ -3957,7 +3957,7 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap">60 parent cells owning 15.3&nbsp;M particles. Two constitutive laws sharing one grid field. The solid leaves a wake in the fluid.</span>
+      <span class="sim-cap">An elastic ball and 15&nbsp;M particles of water sharing one grid field. Coloured by vorticity: the solid leaves a wake.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4445,20 +4445,20 @@ sets:
     parent: cell
     per_parent: 37037037
     vel_init: 0.0</pre></span></span>
-      <span class="sim-cap">27 parent cells owning 10&#8313; particles. The same operators, unchanged. Scale is a number in the spec.</span>
+      <span class="sim-cap">27 cells × 37&nbsp;M particles = 10&#8313;. The same operators, unchanged.</span>
     </figcaption>
   </figure>
 </div>
 <!-- vertex-mpm: hand-authored 2026-09-07 from graphs_data/mesh_mpm; no longer generated by discovery_okuda/ops/minisite_section.py -->
 <h3>Vertex + MPM</h3>
-<p class="opk">Two of the decompositions above, side by side: a triangulated surface with its own vertices, and a material with its own particles and grid, kept as distinct sets carrying distinct states. One operator joins them — an exchange that carries contact force across the interface in both directions — so neither has to become the other to interact with it. By composing that interface with different surfaces we get different loadings of one material: shown here are a flat plate, a sphere, a pyramid, and a shell that reaches the material by growing rather than by being pressed. All four are coloured by the equivalent deviatoric strain in the material, so the load each surface puts in can be read off the clip.</p>
+<p class="opk">A vertex surface and a material point continuum, kept as two sets with their own states. One operator joins them — an exchange carrying contact force across the interface in both directions — so neither has to become the other to touch it. Only the surface differs between clips: a plate, a sphere, a pyramid, and a shell that reaches the material by growing. All four are coloured by deviatoric strain in the material, so the load each surface puts in can be read off the clip.</p>
 <p class="opk-ref">Reference — contact:
 <a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>).</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
     <video src="gallery/meshmpm_sheet.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">two sets, one interface<span class="sim-spec"><pre># MESH-MPM 00 -- the FLAT PLATE: an open planar patch pressed into an elastic gel.
+      <span class="sim-name" tabindex="0">two sets, one exchange<span class="sim-spec"><pre># MESH-MPM 00 -- the FLAT PLATE: an open planar patch pressed into an elastic gel.
 #
 # THE BASE OF THE LADDER, and the awkward case for the contact rather than the easy one. An
 # open patch has no interior for the star-shape reference to sit in, so `centre_offset` puts it
@@ -4618,13 +4618,13 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap">A 4,096-vertex mesh and 500,000 material points, kept as two sets. One operator joins them: contact force across the interface, both ways (exchange). A flat surface loads its whole face from the moment it touches.</span>
+      <span class="sim-cap">A 4,096-vertex mesh and 500,000 material points. <code>mesh_contact</code> carries force both ways; nothing else joins them. A flat punch loads its whole face at once.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/meshmpm_sphere.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">only the mesh differs<span class="sim-spec"><pre># MESH-MPM 01 -- the SPHERE: a closed vertex surface driven into the same elastic gel.
+      <span class="sim-name" tabindex="0">only the seed differs<span class="sim-spec"><pre># MESH-MPM 01 -- the SPHERE: a closed vertex surface driven into the same elastic gel.
 #
 # THE CONTACT&#x27;S NATIVE CASE, WHICH MAKES IT THE CONTROL. For a closed star-shaped shell the
 # forbidden region IS the shell&#x27;s interior, so `centre: centroid` needs no offset: there is no
@@ -4780,13 +4780,13 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap">The same two sets and the same operators. Only the mesh differs. The contact patch grows instead of starting whole.</span>
+      <span class="sim-cap"><code>mesh_seed</code> in place of <code>seed_plate</code>. The contact patch grows with depth.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/meshmpm_pyramid.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">an edge, not a face<span class="sim-spec"><pre># MESH-MPM 02 -- the INVERTED PYRAMID: a four-sided tip, apex down, driven into the same gel.
+      <span class="sim-name" tabindex="0">one profile line added<span class="sim-spec"><pre># MESH-MPM 02 -- the INVERTED PYRAMID: a four-sided tip, apex down, driven into the same gel.
 #
 # THE NANOINDENTER&#x27;S GEOMETRY. `profile: pyramid` displaces the same lattice `seed_plate`
 # already builds -- apex at the declared `height`, four faces rising by `profile_depth` to the
@@ -4953,7 +4953,7 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap">The same two sets and the same operators. An edge rather than a face. The strain in the material follows the surface.</span>
+      <span class="sim-cap"><code>seed_plate</code> with <code>profile: pyramid</code>. A tip, not a face; the strain follows it.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -5112,14 +5112,14 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap">The same two sets. The mesh reaches the material by growing rather than by being pressed.</span>
+      <span class="sim-cap"><code>surface_drive grow: 2.4</code> in place of <code>by: −0.11</code>. The shell reaches the gel by inflating.</span>
     </figcaption>
   </figure>
 </div>
 
 <!-- BEGIN spheroid-bm-ecm (generated by discovery_okuda/ops/minisite_section.py) -->
 <h3>Cell tissue + basement membrane + extracellular matrix</h3>
-<p class="opk">The pieces recomposed into one hierarchical model: epithelial cells, a basement membrane with its own nodes and faces, a matrix of plaques, and the proteins carried on them — four sets across three levels, joined by aggregates upward and broadcasts downward. Operators act within a level and across levels, and no set gives up its own representation in order to take part. By composing them with different protein sources we get different fates for the membrane: shown here are the three levels growing together, many small openings, one localised opening, and a membrane with nothing holding it.</p>
+<p class="opk">The pieces recomposed into one hierarchy: epithelial cells, a basement membrane with its own nodes and faces, adhesion plaques, and the proteins carried on the membrane — four sets across three levels, joined by aggregates upward and broadcasts downward. No set gives up its own representation to take part. Between clips only the protease chemistry differs: absent, many sources, one source, and degradation left unopposed.</p>
 <p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
@@ -5131,7 +5131,7 @@ protease network, <a href="https://doi.org/10.1074/jbc.M403627200">Karagiannis &
   <figure class="sim-card">
     <video src="gallery/spheroid_bm_ecm_07i2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">three levels at once<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">three levels, four sets<span class="sim-spec"><pre>general:
   name: 07i_ramp
   rig: Rig07i
   module: __main__
@@ -5200,13 +5200,13 @@ run:
   N0: 12
   split_budget: 150
   splits: 102944</pre></span></span>
-      <span class="sim-cap">Epithelial cells, 163,842 membrane nodes and matrix plaques — four sets across three levels. Aggregates upward and broadcasts downward join them. They grow together.</span>
+      <span class="sim-cap">Epithelium, 163,842 membrane nodes and faces, adhesion plaques. Aggregates up, broadcasts down. They grow together.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/bm_07k_breach_hole.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">proteins remove their faces<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">six operators added: proteases<span class="sim-spec"><pre>general:
   name: 07k_breach_hole
   rig: Rig07k
   module: __main__
@@ -5312,13 +5312,13 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 100.0
   what: the rate whose hole did not stop</pre></span></span>
-      <span class="sim-cap">The same three levels. A protein state on the membrane removes its own faces (structural). Fifty-four separate openings.</span>
+      <span class="sim-cap">Secrete, diffuse, activate, inhibit, degrade, tear. Where MMP2 outruns its inhibitor the membrane removes its own faces (structural). Fifty-four openings.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/bm_07j_hole_tiny.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one source, fewer openings<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one source instead of many<span class="sim-spec"><pre>general:
   name: 07j_hole_tiny
   rig: Rig07j
   module: __main__
@@ -5422,13 +5422,13 @@ run:
   splits: 100524
   twin_of: 06_hole_tiny
   mt1_field: single Gaussian cap, theta 20.0 deg</pre></span></span>
-      <span class="sim-cap">The same three levels and the same operators. One localised protein source instead of many. Six openings, not fifty-four.</span>
+      <span class="sim-cap">The MT1-MMP field is a single cap instead of six random modes. Six openings, not fifty-four.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/bm_07k_breach_torn.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">removal running unopposed<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">degradation unopposed<span class="sim-spec"><pre>general:
   name: 07k_breach_torn
   rig: Rig07k
   module: __main__
@@ -5534,14 +5534,14 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 300.0
   what: the rate that destroyed the membrane</pre></span></span>
-      <span class="sim-cap">The same three levels, with nothing holding the membrane. The removal runs unopposed, and the sheet is still tearing at the end.</span>
+      <span class="sim-cap"><code>k_deg: 300</code>, three times the first breach. Removal outruns the inhibitor; the sheet is still tearing at the end.</span>
     </figcaption>
   </figure>
 </div>
 <!-- END spheroid-bm-ecm -->
 
 <h3>Other</h3>
-<p class="opk">Four more families, decomposed the same way and shown in full on the <a href="other.html">other models</a> page: stigmergy as five operators over one set and one field, a chaotic flow as a single operator on a cloud whose points never touch, agent interaction as a rewire and the laterals that run along it, and gravity as one lateral summed over every pair. By composing the same kinds over sets that are not tissue we get transport networks, attractors, flocks and galaxies. One clip from each is shown here.</p>
+<p class="opk">Four more families, decomposed the same way and shown in full on the <a href="other.html">other models</a> page: stigmergy as five operators over a set and a field, a chaotic flow as one operator on a cloud, agent sorting as a rewire and a lateral along it, and gravity as one lateral over every pair. The same eight kinds, over sets that are not tissue.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
     <video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -5596,13 +5596,13 @@ descriptions:
       internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
       outward in all directions. All objects are a consistent teal-green color and are set against a solid
       black background.</pre></span></span>
-      <span class="sim-cap">12,000 agents and one scalar field. Five operators: a trail deposited and sensed back (exchange), diffusion and decay (field), and a move along the heading.</span>
+      <span class="sim-cap">12,000 agents, one scalar field. Deposit and sense (exchange), diffuse and decay (field), glide. A transport network.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attraction.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Rewire, then a force<span class="sim-spec"><pre># Full match to ParticleGraph arbitrary_3_1: 3 types, 30000 particles, sigma=0.005,
+      <span class="sim-name" tabindex="0">a rewire, then a lateral<span class="sim-spec"><pre># Full match to ParticleGraph arbitrary_3_1: 3 types, 30000 particles, sigma=0.005,
 # max_radius=0.075, periodic, first_derivative, dt=0.1, 250 frames. Now feasible
 # because attraction_repulsion runs on a radius neighbour graph (O(E)), not dense.
 general:
@@ -5645,13 +5645,13 @@ descriptions:
       particles are initially scattered randomly but eventually form large, circular clusters. Each cluster
       features a dark, empty center surrounded by a dense ring of multicolored particles. The final topology
       consists of a repeating, honeycomb-like pattern of these interconnected circular structures.</pre></span></span>
-      <span class="sim-cap">30,000 particles in one set. Two operators: a radius neighbour graph rebuilt from the positions (rewire) and a per-type force along it (lateral). They sort themselves into cells.</span>
+      <span class="sim-cap">30,000 particles. A radius graph rebuilt each step (rewire) and a per-type force along it (lateral). They sort into cells.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_halvorsen.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the same operator: Halvorsen<span class="sim-spec"><pre># halvorsen attractor -- cyclically-symmetric (x-&gt;y-&gt;z) quadratic flow: a fat three-armed folded knot.
+      <span class="sim-name" tabindex="0">one operator, one name<span class="sim-spec"><pre># halvorsen attractor -- cyclically-symmetric (x-&gt;y-&gt;z) quadratic flow: a fat three-armed folded knot.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -5687,7 +5687,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">The same set and the same one operator. Only the flow named in the spec differs. Halvorsen.</span>
+      <span class="sim-cap">The same set and the same operator; only the flow named in the spec differs. Halvorsen.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -5766,7 +5766,7 @@ descriptions:
       both sets transform into elongated, spiral-shaped structures that maintain their respective colors.
       By the end of the sequence, the particles are distributed in a dense, overlapping cluster where
       the red and blue points are intermingled.</pre></span></span>
-      <span class="sim-cap">25,000 stars, two discs inside one set. The same one operator. They raise tidal tails in one another.</span>
+      <span class="sim-cap">25,000 stars under one pairwise lateral. They raise tidal tails in one another.</span>
     </figcaption>
   </figure>
 </div>
