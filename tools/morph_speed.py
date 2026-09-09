@@ -52,21 +52,33 @@ DEFAULTS = dict(
 )
 
 
-def _spec(n_pts, world, n_grid, frames, dt, dt_sub, compile_mode, polar_iters):
-    """The four differentiable MPM operators, the identical schedule shape_control.spec builds --
-    a private copy so this file does not import (and cannot be blamed for editing) shape_control.py.
+def _spec(n_pts, world, n_grid, frames, dt, dt_sub, compile_mode, polar_iters, diff=True):
+    """The four MPM operators, the identical schedule shape_control.spec builds -- a private copy
+    so this file does not import (and cannot be blamed for editing) shape_control.py.
+
+    `diff=True` (the default, and the only mode every SPEED number in this file uses) names
+    `implementation: differentiable` on all four, which is what keeps the autograd tape and is
+    what every optimiser-iteration timing in this file is measuring.
+
+    `diff=False` names NO implementation at all, which is a different thing on purpose: with
+    `grad=False` on a 3D CUDA non-periodic run, `engine._resolve_default_impl` then fills in
+    `implementation: warp` for all four automatically (with CUDA-graph capture, its own default)
+    -- the fast production path this repo already ships, unreachable from the differentiable path
+    because warp registers no backward. This is for the ONE-OFF, no-gradient, post-training
+    rollout-and-render pass (`long_rollout`), never for anything timed as an optimiser iteration.
     """
+    impl = dict(implementation="differentiable") if diff else {}
     ops = [
-        dict(op="mpm_strain", at="mpm_particle", implementation="differentiable"),
+        dict(op="mpm_strain", at="mpm_particle", **impl),
         dict(op="mpm_scatter", at="mpm_particle", to="mpm_grid", drag=0.5, a_max=200.0,
-             implementation="differentiable", dt_sub=dt_sub, polar_iters=polar_iters),
-        dict(op="mpm_grid_update", at="mpm_grid", wall_damp=0.9, implementation="differentiable"),
+             dt_sub=dt_sub, polar_iters=polar_iters, **impl),
+        dict(op="mpm_grid_update", at="mpm_grid", wall_damp=0.9, **impl),
         dict(op="mpm_gather", at="mpm_particle", **{"from": "mpm_grid"}, wall_damp=0.9,
-             vmax=1.0e9, implementation="differentiable"),
+             vmax=1.0e9, **impl),
     ]
     sched = dict(substep_dt=dt_sub,
                  steps=["mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather"])
-    if compile_mode and compile_mode != "off":
+    if diff and compile_mode and compile_mode != "off":
         sched["compile"] = True
         sched["compile_mode"] = compile_mode
         sched["compile_recompile_limit"] = 128
@@ -148,10 +160,16 @@ def _control_weights(X0n, lo, hi, K, dev, torch):
     return idx, wts
 
 
-def build_problem(cfg, dev, torch):
+def build_problem(cfg, dev, torch, diff=True):
     """Everything an iteration needs: the compiled sim, the initial/target positions, the control
     parameters and a `rollout()` / `loss_fn()` pair. One call per experiment -- a fresh Spec and a
-    fresh set of operator instances, so torch.compile's cache never straddles two configs."""
+    fresh set of operator instances, so torch.compile's cache never straddles two configs.
+
+    `diff=False` is for a clean, separable question -- NOT a change to any speed number in this
+    file's optimisation timings, all of which keep `diff=True` -- whether the FINAL, no-gradient
+    forward pass (rendering a trained control, needing no tape) is faster on warp than on the
+    differentiable torch path it must train on. See `_spec` and `warp_forward_check`.
+    """
     from shape_control import ball, target_points
 
     cellbox = 0.35
@@ -162,7 +180,7 @@ def build_problem(cfg, dev, torch):
     dt_sub = cfg["dt"] / cfg["substeps"]
 
     raw = _spec(n_total, world, cfg["n_grid"], cfg["frames"], cfg["dt"], dt_sub,
-                cfg["compile"], cfg["polar_iters"])
+                cfg["compile"], cfg["polar_iters"], diff=diff)
     tmp = os.path.join(tempfile.mkdtemp(prefix="mspeed_"), "spec.yaml")
     yaml.safe_dump(raw, open(tmp, "w"), sort_keys=False)
     from plexus.schema import load
@@ -221,6 +239,62 @@ def build_problem(cfg, dev, torch):
         return ((torch.log1p(rho_s) - torch.log1p(rho_t)) ** 2).mean()
 
     return sim, theta, rollout, loss_fn, n_total, tgt_np, world
+
+
+def warp_forward_check(cfg, dev, torch, n_meas=8, warmup=2):
+    """A clean, separable question, NOT a change to any optimisation-speed number in this file:
+    once a control is trained (which needs the differentiable torch path -- warp registers no
+    backward), the FINAL forward-only rollout that renders it needs no tape at all. Is it faster
+    on warp?
+
+    Trains nothing: both sides get theta = 0 (the untrained, all-zero-rate control every rollout
+    starts from), because the question is the forward pass's own cost, not the shape it draws.
+    `diff=True` here is `implementation: differentiable`, forced even though grad=False, so the
+    comparison is apples-to-apples against exactly the operators `measure()`'s `forward_only_s`
+    already times; `diff=False` lets `engine._resolve_default_impl` fill in `implementation: warp`
+    (the only way to reach it, since naming it directly is not this file's or shape_control.py's
+    convention). Positions are compared too: warp is NOT bit-identical to the torch bodies (the
+    engine's own docstring: reassociated sums, non-deterministic atomics, ulp-level drift), so a
+    max relative difference is reported rather than an equality assertion.
+    """
+    torch.backends.cuda.matmul.allow_tf32 = bool(cfg["tf32"])
+    torch.backends.cudnn.allow_tf32 = bool(cfg["tf32"])
+    torch.set_float32_matmul_precision(cfg["matmul_precision"])
+
+    def timed(diff):
+        sim, theta, rollout, loss_fn, n_total, tgt_np, world = build_problem(cfg, dev, torch,
+                                                                             diff=diff)
+        with torch.no_grad():
+            for _ in range(warmup):
+                Xs = rollout(grad=False)
+            torch.cuda.synchronize(dev)
+            times = []
+            for _ in range(n_meas):
+                torch.cuda.synchronize(dev)
+                t0 = time.time()
+                Xs = rollout(grad=False)
+                torch.cuda.synchronize(dev)
+                times.append(time.time() - t0)
+        peak = torch.cuda.max_memory_allocated(dev) / 2**30
+        return statistics.median(times), Xs.detach().clone(), peak
+
+    torch.cuda.reset_peak_memory_stats(dev)
+    t_torch, X_torch, mem_torch = timed(diff=True)
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats(dev)
+    t_warp, X_warp, mem_warp = timed(diff=False)
+
+    # ABSOLUTE, not relative: positions live in a bounded ~0.35-unit box and cross zero, so a
+    # relative difference blows up on coordinates near the origin for reasons that have nothing to
+    # do with warp -- an absolute difference in the same length unit as the box is the honest one.
+    abs_diff = (X_warp - X_torch).abs()
+    return dict(
+        s_per_forward_torch=t_torch, s_per_forward_warp=t_warp,
+        speedup=t_torch / t_warp if t_warp > 0 else float("nan"),
+        peak_mem_gib_torch=mem_torch, peak_mem_gib_warp=mem_warp,
+        pos_max_abs_diff=float(abs_diff.max()), pos_mean_abs_diff=float(abs_diff.mean()),
+        n_total_particles=X_torch.shape[0], gpu=torch.cuda.get_device_name(dev),
+    )
 
 
 def measure(cfg, dev, torch):
@@ -481,6 +555,12 @@ def main():
                          "trajectory) -- for a variant being compared against a baseline picture "
                          "rather than watched end to end")
     ap.add_argument("--render-iters", type=int, default=60)
+    ap.add_argument("--warp-check", default="",
+                    help="comma list of SUITE keys to run through warp_forward_check() -- the "
+                         "no-gradient, no-training forward-only pass, torch (differentiable "
+                         "implementation, forced) vs warp (engine auto-picks it for an "
+                         "unspecified-implementation grad=False 3D CUDA run). Not an optimisation "
+                         "timing; recorded under doc['warp_forward_check']")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -548,6 +628,23 @@ def main():
         update_results(json_path, "renders", rname, dict(
             name=rname, kind=kind, config=cfg, png=png_path, mp4=mp4_path,
             loss_first=loss_hist[0], loss_last=loss_hist[-1], iters=args.render_iters))
+        torch.cuda.empty_cache()
+
+    for wname in [n.strip() for n in args.warp_check.split(",") if n.strip()]:
+        cfg = {**DEFAULTS, **SUITE[wname]}
+        print(f"\n=== warp_forward_check: {wname}  {cfg} ===", flush=True)
+        try:
+            r = warp_forward_check(cfg, dev, torch)
+            rec = dict(name=wname, config=cfg, result=r, ok=True)
+            print(f"    forward/frame: torch {r['s_per_forward_torch']:.4f}s  warp "
+                  f"{r['s_per_forward_warp']:.4f}s  speedup {r['speedup']:.2f}x  "
+                  f"pos max|diff| {r['pos_max_abs_diff']:.2e}", flush=True)
+        except Exception as e:
+            import traceback
+            rec = dict(name=wname, config=cfg, ok=False, error=f"{type(e).__name__}: {e}",
+                       traceback=traceback.format_exc())
+            print(f"    FAILED: {type(e).__name__}: {e}", flush=True)
+        update_results(json_path, "warp_forward_check", wname, rec)
         torch.cuda.empty_cache()
 
     print(f"\n-> {json_path}", flush=True)
