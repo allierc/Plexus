@@ -368,6 +368,10 @@ window.Quarto = {
 </header>
 
 
+<blockquote class="blockquote">
+<p><em>What I cannot create, I do not understand.</em> <br><span style="font-size:.85em;color:#888">— Richard Feynman, on his blackboard at Caltech, 1988</span></p>
+</blockquote>
+<p>Feynman’s line makes creation the test of understanding. Plexus adds a condition: the creation has to be written in a language that can be read back. A simulator is a creation whose mechanisms are fused to its numerics; a Plexus spec is the same creation with the mechanisms left legible — every operator named, every difference between two models visible as a difference between two files.</p>
 <p>We introduce <strong>Plexus</strong>, a typed intermediate representation for biological mechanisms. Rather than defining yet another simulator, Plexus defines a common language whose primary objects are <strong>biological operators</strong>. Every operator specifies the biological entities it acts upon, the states it requires, the relations between these entities, and one or more numerical implementations. The Plexus research program has three objectives. First, to define an <strong>algebra of biological operators</strong>. Second, to <strong>decompose the existing corpus</strong> of simulation models into this common language. Third, to construct <strong>differentiable implementations</strong> of these operators so that mechanistic models can be directly inferred from biological data.</p>
 <p>Biological systems must be decomposed not only into operators, but also into the entities on which those operators act. These entities are heterogeneous — receptors, signalling proteins, cells, extracellular matrices, tissues, fields — and are organized across biological levels. Plexus makes this organization explicit as a compositional hierarchy: each level carries its own entities and states, operators act between entities within a level, and <strong>aggregate ↑</strong> and <strong>broadcast ↓</strong> connect levels by mapping state upward and downward. Decomposition therefore does not flatten biology into a single collection of variables; it preserves the organization through which mechanisms at one level are composed with mechanisms at another.</p>
 <p>The purpose of this decomposition is ultimately recomposition: to construct complete mechanistic models from reusable entities and operators. Making such compositions executable requires strong structural choices. Plexus separates the language that specifies the biological model from the code that interprets and executes it. The language declares entities, states, relations, hierarchy and operators; the interpreter resolves this description into concrete numerical implementations and schedules their execution.</p>
@@ -406,7 +410,7 @@ window.Quarto = {
 </section>
 <section id="examples" class="level2">
 <h2 class="anchored" data-anchor-id="examples">Examples</h2>
-<p>Hover (or tab to) a title to read the exact spec that generated it.</p>
+<p>Every clip below was generated from the spec shown when you hover (or tab to) its title. Within each family the first card is the decomposition; every card after it differs from its neighbour by a line of that spec — an operator added or removed, a constant changed, a set enlarged — and the caption says which line and what it did.</p>
 <style>
 /* Four clips per row everywhere. `g3` is kept as an alias of `g4` rather than deleted from the
    markup, because three of the galleries below are rewritten wholesale by
@@ -432,13 +436,13 @@ window.Quarto = {
 </style>
 
 <h3 class="anchored">Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">Reaction-diffusion simulations have been decomposed into four operators: one seed for initialisation (cell positions, numbers, states), one rewire (the cell graph) and two laterals, reaction and diffusion. By composing these with different number of reactions, entities and states we can build different variants of reaction-diffusion simulations. Shown on a 2D disc of cells are a striped regime, a spotted one obtained by changing a single reaction parameter, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
+<p class="opk">Reaction–diffusion decomposed into four operators over one set: a seed (positions, numbers, states), a rewire (the cell graph) and two laterals, diffusion and reaction. Changing the number of states, the reaction named, or one of its constants changes the pattern; nothing beneath the spec changes. Shown on a disc of 4,000 cells: stripes, spots one constant away, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card figure">
     <video src="gallery/turing_gs_stripes.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one set, two states<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one set, two states, four operators<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_kappa_B
   seed: 0
   n_frames: 6000
@@ -494,13 +498,13 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">4,000 cells, two chemical states each. Four operators: one initialisation (seed), the cell graph (rewire), diffusion and reaction (lateral).</span>
+      <span class="sim-cap">4,000 cells carrying two concentrations. A seed, the neighbour graph (rewire), diffusion and reaction (lateral). Stripes.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/turing_gs_spots.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one constant apart<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one constant changed<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_eta_B
   seed: 0
   n_frames: 6000
@@ -556,13 +560,13 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">One reaction constant differs and nothing else. The bands break into spots.</span>
+      <span class="sim-cap">The same spec with <code>F: 0.05 → 0.034</code>. Stripes break into spots.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/turing_gs_coupled_eta_10.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">two chemistries, coupled<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">a second chemistry added<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_gs_coupled_eta_B
   seed: 0
   n_frames: 12000
@@ -640,13 +644,13 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">The same 4,000 cells, now carrying two chemistries. Two diffusion and two reaction operators (lateral), the reactions coupled to one another. Neither pattern shares a cell with the other.</span>
+      <span class="sim-cap">Four states instead of two, a second diffusion–reaction pair, the reactions coupled (<code>gamma: 0.2</code>). Two patterns, no shared cell.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/turing_rps_a2p0_10.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">three species, cyclically coupled<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">three species, one reaction<span class="sim-spec"><pre>general:
   name: promo_TURING_atlas_turing2d_rps_a2p0_B
   seed: 0
   n_frames: 4000
@@ -708,13 +712,13 @@ plotting:
   - '#ff0000'
   - '#00ff00'
   - '#0000ff'</pre></span></span>
-      <span class="sim-cap">4,000 cells, three species each suppressing the next. Three reaction operators, cyclically coupled.</span>
+      <span class="sim-cap">Three states and one cyclic reaction, each species suppressing the next. Spirals.</span>
     </figcaption>
   </figure>
 </div>
 
 <h3 class="anchored">Epithelial mechanics — a vertex model</h3>
-<p class="opk">Vertex models of epithelia have been decomposed into six operators: two seeds for initialisation (the vertices, and the cells that own them), one aggregate that builds each cell’s area and perimeter from the vertices on its boundary, one lateral shape energy that returns a force to those vertices, one rewire that flips a junction between neighbours, and one structural that removes a cell. Because two sets share a containment map, junction geometry is state held once rather than copied into every cell that touches it, and by composing these operators with different energies, different triggers and different numbers of cells we can build different variants of vertex model. Shown here are a cell dying while the sheet closes over it, and a morphogen carried to the cells by an exchange, with growth answering where it sits.</p>
+<p class="opk">A vertex model decomposed into six operators over two sets: seeds for the vertices and for the cells that own them, an aggregate that builds each cell’s area and perimeter from its vertices, a lateral shape energy that returns a force to those vertices, a rewire that flips a junction, and a structural that removes a cell. Because the two sets share a containment map, a junction is state held once, not copied into every cell that touches it. Shown: a cell dying while the sheet closes over it, and a morphogen reaching the cells through an exchange.</p>
 <p class="opk-ref">Reference — active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
@@ -778,13 +782,13 @@ schedule:   # the order the operators run each frame
 - apoptosis
 - t1_transition
 - topo_snapshot</pre></span></span>
-      <span class="sim-cap">142 vertices sharing junctions. Four operators: initialisation (seed), a shape energy (lateral), a junction flip (rewire), a cell removed (structural).</span>
+      <span class="sim-cap">142 vertices, one set. Seed, shape energy (lateral), T1 flip (rewire), apoptosis (structural). The sheet closes over the dying cell.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/tyssue_morphogen_bulge.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">two levels, one exchange<span class="sim-spec"><pre>general:   # run-level settings
+      <span class="sim-name" tabindex="0">a cell level above the vertices<span class="sim-spec"><pre>general:   # run-level settings
   name: tyssue_cell_morphogen_bulge   # run name (-&gt; archive/&lt;name&gt;/)
   seed: 0   # RNG seed
   n_frames: 120   # number of simulation frames
@@ -859,19 +863,19 @@ schedule:   # the order the operators run each frame
 - cell_morphogen
 - morphogen_growth
 - shape_energy</pre></span></span>
-      <span class="sim-cap">222 cells over 503 shared vertices. Six operators: two initialisations (seed), each cell’s geometry from its vertices (aggregate), a morphogen carried to the cells (exchange), and growth answering it beside the shape energy (lateral).</span>
+      <span class="sim-cap">222 cells over 503 vertices. Area and perimeter aggregated up; a morphogen (exchange) gates growth beside the shape energy. The sheet bulges where it sits.</span>
     </figcaption>
   </figure>
 </div>
 
 <h3 class="anchored">Cell death — sculpting an epithelial surface</h3>
-<p class="opk">The same operators as above, with one added: a structural death. A cell it marks shrinks, loses neighbours through the rewire until it leaves the set, and the lateral mechanics closes the surface behind it — nothing in the growth or the mechanics is told that death exists. By composing that one operator with different seeded patterns of dying cells we get different sculptures of the same vesicle: shown here are a dying patch drawn inward into an invagination, nine dying bands closed over one by one, and half the sheet removed.</p>
+<p class="opk">The vertex model above with one operator added: a structural death. A marked cell shrinks, loses its junctions through the rewire until it leaves the set, and the lateral mechanics closes the surface behind it — the mechanics is never told that death exists. Only the seeded pattern of deaths differs between the three clips: a patch pulled into an invagination, nine bands closed over one by one, and half the sheet removed.</p>
 <p class="opk-ref">Reference — apoptotic force driving epithelial folding after Monier et&nbsp;al., <i>Nature</i> <b>518</b>:245 (2015).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/apop_patch_big_v5.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a patch of deaths<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">one operator added: die<span class="sim-spec"><pre>general:
   name: apop_patch_big
   seed: 0
   n_frames: 900
@@ -961,13 +965,13 @@ _basis:
   why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">Cells over shared vertices, 293 of them marked to die. The same operators with one added, the death (structural). The surface is drawn inward where they go.</span>
+      <span class="sim-cap">The vertex model plus <code>cell_die</code>. 293 cells marked in a cone; the surface invaginates where they leave.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/apop_rings9_v5.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">nine bands of deaths<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">the same, in nine bands<span class="sim-spec"><pre>general:
   name: apop_rings9
   seed: 0
   n_frames: 600
@@ -1058,13 +1062,13 @@ _basis:
   why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">895 deaths in nine bands, on the same two sets. Every gap closes and the vesicle shrinks.</span>
+      <span class="sim-cap">Only <code>mode: band, n_bands: 9</code> differs. 895 deaths; every gap closes and the vesicle shrinks.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/apop_half_v5.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">half the set removed<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">half the set<span class="sim-spec"><pre>general:
   name: apopgeo_half
   seed: 0
   n_frames: 600
@@ -1154,7 +1158,7 @@ _apopgeo:
     n_bands: 1
   why: death is the only mechanism in this composition, so the cell count can only
     fall and n_apop must equal 400 - cells_final exactly</pre></span></span>
-      <span class="sim-cap">285 of 400 cells extruded. Only the seeded pattern of deaths differs. A sphere pulled into an ellipsoid.</span>
+      <span class="sim-cap">One 45° band; 285 of 400 cells leave. A sphere becomes an ellipsoid.</span>
     </figcaption>
   </figure>
 </div>
@@ -1163,13 +1167,13 @@ _apopgeo:
      the three generated blocks (shapes / rate / second-field) each opened their own grid and
      drew a short row. No longer regenerated by discovery_okuda/ops/minisite_section.py. -->
 <h3 class="anchored">Growing tissue + Turing pattern</h3>
-<p class="opk">The two decompositions above, composed. The reaction–diffusion operators of the first now act on the cells of the second, which grow, divide and die under their own mechanics, and nothing had to be added to make them meet: growth and division rewire the very graph diffusion runs over, while the chemistry decides which cells grow, so the coupling runs both ways and neither side is a post-processing pass. By composing them with different reaction constants, different growth rates and an added lateral interface tension we get the shapes shown here — arms, lobes, folds and spikes — and in the last two a second chemistry that marks cells to die instead of to grow.</p>
+<p class="opk">The two decompositions above, composed. The reaction–diffusion operators now act on cells that grow, divide and die under their own mechanics, and nothing had to be added to make them meet: division rewires the graph diffusion runs over, and the chemistry gates which cells grow, so the coupling runs both ways. Each clip differs from its neighbour by one line — a constant, a rate, a lateral tension added or removed — and in the last two a second gate that sends cells to die instead of to grow.</p>
 <p class="opk-ref">Reference — this is the experiment of <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018), <i>Sci. Rep.</i> 8:2386</a> — Turing patterning on a 3D vertex model — rebuilt as Plexus operators on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> mesh; the chemistry is the Gray–Scott system cited in the Turing section above.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card figure">
     <video src="gallery/turing_grow_divide_v4.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">growth and division compose<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">grow and divide, no chemistry<span class="sim-spec"><pre>general:
   name: grow_divide
   seed: 0
   n_frames: 1800
@@ -1270,13 +1274,13 @@ schedule:
 - cell_grow
 - cell_divide
 - topo_record</pre></span></span>
-      <span class="sim-cap">2,000 cells to 25,079 over shared vertices. Growth and division (structural) composed with the mechanics (lateral) and the junction flips (rewire). The shell stays a sphere.</span>
+      <span class="sim-cap">2,000 → 25,079 cells. Growth and division (structural) beside mechanics (lateral) and edge flips (rewire). A sphere that stays a sphere.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/turing_coral_v4.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">chemistry rides the growth<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">the Turing operators added<span class="sim-spec"><pre>general:
   name: r021_12
   seed: 0
   n_frames: 1800
@@ -1416,13 +1420,13 @@ _basis:
   why: chemistry=gs, material=gated, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">4,199 cells, two chemical states each. The reaction and diffusion operators now act on cells that grow and divide. Stripes ride a growing shell.</span>
+      <span class="sim-cap">Diffusion and reaction now run on the cell graph that division keeps rewiring. Stripes ride a growing shell.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/turing_morphogen_v6.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">geometry feeds the chemistry<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">chemistry gates growth<span class="sim-spec"><pre>general:
   name: r005_06
   seed: 0
   n_frames: 1800
@@ -1613,14 +1617,14 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">Cells over a shared vertex mesh. One more operator ties the chemistry to the geometry carrying it (exchange). Arms grow where the activator sits.</span>
+      <span class="sim-cap">One exchange ties the reaction to curvature, and the activator gates <code>cell_grow</code>. Arms where the activator sits.</span>
     </figcaption>
   </figure>
 
 <figure class="sim-card figure">
     <video src="gallery/turing_flower_v3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a lateral tension added<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">an interface tension added<span class="sim-spec"><pre>general:
   name: r013_05
   seed: 0
   n_frames: 1800
@@ -1811,7 +1815,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">12,201 cells. One more lateral, an interface tension. Eight arms.</span>
+      <span class="sim-cap">One more lateral, <code>interface_tension</code>, at the activator sites. 12,201 cells; eight arms.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -2008,13 +2012,13 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">22,231 cells. One reaction constant halved and nothing else. It lobes and branches instead.</span>
+      <span class="sim-cap"><code>kk: 0.062 → 0.031</code>, the reaction rate with it. Lobes and branches instead of arms.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/turing_noline_v3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the tension taken out<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">the tension removed<span class="sim-spec"><pre>general:
   name: r017_00_ctrl
   seed: 0
   n_frames: 1800
