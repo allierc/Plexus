@@ -51,34 +51,90 @@ sets:
         fraction: 0.125
         youngs: 15.0
         density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
       s1:
         fraction: 0.125
         youngs: 15.0
         density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
       s2:
         fraction: 0.125
         youngs: 15.0
         density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
       s3:
         fraction: 0.125
         youngs: 15.0
         density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
       s4:
         fraction: 0.125
         youngs: 15.0
         density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
       s5:
         fraction: 0.125
         youngs: 15.0
         density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
       s6:
         fraction: 0.125
         youngs: 15.0
         density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
       s7:
         fraction: 0.125
         youngs: 15.0
         density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
 fields:
   mpm_grid:
     frame: mpm_grid
