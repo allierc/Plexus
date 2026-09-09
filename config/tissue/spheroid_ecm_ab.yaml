@@ -21,18 +21,24 @@ sets:
     state:
       pos:
         width: 3
-        role: geometry
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
       vel:
         width: 3
         role: rate
+        integration: second_order_rate
         record: false
       sep:
-        width: 1
+        width: 3
+        integration: first_order
   cell:
     n: 12000
     state:
       area:
         width: 1
+      centroid:
+        width: 3
       A0:
         width: 1
       P0:
@@ -42,6 +48,32 @@ sets:
       alive:
         width: 1
         record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
   half_edge:
     n: 96000
     maps:
@@ -256,36 +288,7 @@ plotting:
   mesh_opacity: 1.0
   mesh_flat: true
   mesh_color: '#cfd8e3'
-  colors:
-    s0:
-    - 0.169
-    - 0.102
-    - 0.369
-    s1:
-    - 0.294
-    - 0.165
-    - 0.541
-    s2:
-    - 0.427
-    - 0.204
-    - 0.659
-    s3:
-    - 0.58
-    - 0.22
-    - 0.659
-    s4:
-    - 0.753
-    - 0.227
-    - 0.557
-    s5:
-    - 0.878
-    - 0.353
-    - 0.353
-    s6:
-    - 0.941
-    - 0.529
-    - 0.227
-    s7:
-    - 1.0
-    - 0.761
-    - 0.259
+  color_field: strain
+  color_range:
+  - 0.0
+  - 0.5
