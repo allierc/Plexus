@@ -749,6 +749,12 @@ class SeedMesh3D(Structural):
     # `n_cells` is a count. Anything not named here is UNDECLARED and therefore silent.
     PARAM_UNITS = {"radius": "length", "h0": "length", "p0": "fraction",
                    "vseed_cv": "fraction", "n_cells": "count", "seed": "count"}
+    # WHICH VOLUME THE SEEDED TARGET IS. `V0f` and `v_ref` come from `face_geometry_3d`, the WEDGE
+    # volume: a sum of origin-referenced cones over the cell's mid-surface ring. Everything
+    # downstream inherits that convention unless something re-seeds it, which is what the
+    # apicobasal seed's `v0_from: polyhedron` exists to do.
+    BLOCK_UNITS = {"V0f": "volume[wedge]", "Vbirth": "volume[wedge]",
+                   "A0": "area[midsurface]", "P0": "length"}
     MECHANISM_TAGS = ["vesicle", "epithelial_shell", "spherical", "half_edge_mesh", "initial_condition"]
     REFERENCE = "Okuda, S. et al. (2013). Reversible network reconnection model for simulating large deformation in 3D tissues. Biomech. Model. Mechanobiol. 12:627-644; tyssue (DamCB)."
 
@@ -1138,6 +1144,10 @@ class ShapeEnergy3D(Lateral):
                    "Lambda": "line_tension", "Gamma": "tension",
                    "p0": "fraction", "mu": "mobility", "eta": "fraction",
                    "cap_frac": "fraction", "relax_iters": "count"}
+    # THE MID-SURFACE MODEL DEFENDS THE WEDGE VOLUME, as this class's own docstring says: "K_V is a
+    # PER-CELL volume elasticity on each cell's wedge volume v_f". So `V0f` here IS a wedge volume,
+    # and that is consistent with the seed.
+    BLOCK_UNITS = {"V0f": "volume[wedge]", "A0": "area[midsurface]", "P0": "length"}
     REQUIRES_PARAMS = ["p0"]
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
@@ -1422,6 +1432,14 @@ class Divide3D(Structural):
     PARAM_UNITS = {"factor": "fraction", "delta": "fraction", "p0": "fraction",
                    "cycle_cv": "fraction", "split_cv": "fraction", "reset_noise": "fraction",
                    "min_cycle": "count", "max_cycle": "count"}
+    # `V0f` IS DELIBERATELY UNDECLARED HERE, and this is the clearest case in the tree for why
+    # UNKNOWN had to exist. The division trigger reads the POLYHEDRON volume when the run carries a
+    # separation and the WEDGE volume when it does not -- the operator prints which on every run
+    # ("this run carries a separation, so the trigger reads the POLYHEDRON volume; reference 1.3550
+    # (the wedge reference is 2.5462)"). One block, two conventions, selected by the composition
+    # rather than by a parameter. A class attribute cannot express that, and declaring either would
+    # be wrong on half the specs in `config/tissue`.
+    BLOCK_UNITS = {"Vbirth": "volume[wedge]"}
     MECHANISM_TAGS = ["division", "cell_division", "vesicle", "proliferation", "volume_doubling"]
     REFERENCE = "Hertwig, O. (1884) (long-axis division rule); tyssue cell_division (DamCB)."
 
@@ -1930,6 +1948,12 @@ class Apoptosis3D(Structural):
                    "max_mark_frac": "fraction", "frac": "fraction", "field_frac": "fraction",
                    "band_deg": "angle", "cone_deg": "angle",
                    "n_max": "count", "min_age": "count", "p0": "fraction"}
+    # DEATH READS THE WEDGE. The extrusion test is `V0f < critical_frac * v_ref` and both sides come
+    # from the seed's wedge convention, so on an apicobasal run this threshold is stated in a
+    # volume the cell does not have. It still extrudes -- the pathway works on both geometries --
+    # but the SIZE at which it fires means something different there, and that is what the warning
+    # is for.
+    BLOCK_UNITS = {"V0f": "volume[wedge]", "A0": "area[midsurface]"}
     MECHANISM_TAGS = ["apoptosis", "cell_elimination", "extrusion", "delamination", "die"]
     REFERENCE = ("Monier, B. et al. (2015). Apico-basal forces exerted by apoptotic cells drive "
                  "epithelium folding. Nature 518:245-248; tyssue B-Apoptosis (DamCB).")
@@ -3007,6 +3031,10 @@ class CellCycle3D(Lateral):
     PARAM_UNITS = {"t_g1": "time", "t_s": "time", "t_g2": "time", "t_m": "time",
                    "p_g1": "rate", "g1_size": "fraction", "phase_cv": "fraction",
                    "inhib_thresh": "fraction"}
+    # `cyc_vprev` HOLDS LAST FRAME'S VOLUME AND IT IS THE WEDGE ONE, from `face_geometry_3d` in
+    # `forward`. It is what the dilution model spends and what the sizer's dV/dt is built from, so
+    # the convention matters even though nothing outside this operator reads the block.
+    BLOCK_UNITS = {"cyc_vprev": "volume[wedge]"}
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "phase_progression", "restriction_point",
                       "size_checkpoint"]
     REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
@@ -4587,6 +4615,17 @@ class ApicoBasalShapeEnergy3D(Lateral):
                    "Lambda": "line_tension", "K_R": "F/L", "mu": "mobility",
                    "sep_mu": "fraction", "eta": "fraction", "cap_frac": "fraction",
                    "relax_iters": "count"}
+    # AND THIS ONE DEFENDS THE POLYHEDRON, WHICH IS THE WHOLE FINDING. `_apicobasal_energy_core`
+    # evaluates `1/2 k_v (V_j - V_eq_j)^2` with `V_j` from `apicobasal_geometry_3d` -- two caps and
+    # one wall per ring edge, by the divergence theorem -- while `V_eq_j` is the `V0f` the seed
+    # filled with a WEDGE volume. Measured on the reference spheroid those two read 1.3508 and
+    # 2.5433 for the same cell.
+    #
+    # DECLARING IT IS NOT FIXING IT. The tissue stays half-converted; what changes is that the
+    # loader now says so on every apicobasal spec instead of the fact living in one gate's prose
+    # (`gate_ab_population`'s doubling-time row). Reconciling the two -- one volume for growth,
+    # division, death AND the energy -- is AB_R7R8_TODO section 0a and is deliberately out of scope.
+    BLOCK_UNITS = {"V0f": "volume[polyhedron]"}
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos", "sep"]; WRITES = ["pos", "sep"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["vertex_model", "apicobasal", "cell_polyhedron", "cell_3d_volume",

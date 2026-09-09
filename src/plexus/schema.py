@@ -589,17 +589,19 @@ def load(path: str) -> Spec:
     # line and nothing else. See `plexus/units_check.py` for what it can and cannot see.
     try:
         from plexus.units_check import check as _units_check
+        # THE VARIANT MAP, NOT `get_operator`. `OpSpec.impl` is `(model or implementation)` -- the
+        # axis the variant was selected on is not kept -- so calling `get_operator(name, impl, impl)`
+        # passes one string as BOTH axes and resolves nothing for every `model:` variant, which is
+        # `cell_mechanics[apicobasal]`, `cell_die[prescribed]` and `seed_mesh[apicobasal]` on one
+        # tissue spec alone. `contract.implementations` is keyed by variant name across both axes,
+        # so one lookup covers them, with the contract's own default when a line names no variant.
         _classes = {}
         for _o in list(ops) + list(seed_ops):
             try:
-                _classes[_o.op] = registry.get_operator(
-                    _o.op, (_o.impl or None), (_o.impl or None))
+                _c = registry.get_contract(_o.op)
+                _classes[_o.op] = _c.implementations.get(_o.impl or _c.default)
             except Exception:                    # noqa: BLE001
-                try:
-                    _classes[_o.op] = registry.get_contract(_o.op).implementations.get(
-                        registry.get_contract(_o.op).default)
-                except Exception:                # noqa: BLE001
-                    pass
+                pass
         _units_check(_spec, _classes)
     except Exception as _e:                      # noqa: BLE001
         print(f"[units] check skipped ({type(_e).__name__}: {_e})", flush=True)
