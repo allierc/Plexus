@@ -151,8 +151,11 @@ def main():
     u_vec = Pf - P0
     ur_p = np.einsum('ij,ij->i', u_vec, (P0 - c) / np.maximum(r0, 1e-12)[:, None])
     e_tt_p = ur_p / np.maximum(r0, 1e-12)
-    slab = np.abs(P0[:, 2] - c[2]) < 0.012
-    sc = axD.scatter((P0[slab, 0] - c[0]) * 1000, (P0[slab, 1] - c[1]) * 1000,
+    # PLOTTED WHERE THE MATERIAL NOW IS, not where it started. Painting strain on the
+    # undeformed configuration while drawing the CURRENT surface makes the matrix look frozen --
+    # the hole never opens, because the coordinate it is drawn in never moves.
+    slab = np.abs(Pf[:, 2] - c[2]) < 0.012
+    sc = axD.scatter((Pf[slab, 0] - c[0]) * 1000, (Pf[slab, 1] - c[1]) * 1000,
                      c=e_tt_p[slab], s=1.1, cmap="magma",
                      vmin=0.0, vmax=float(np.nanpercentile(e_tt_p[slab], 99)))
     rv = np.linalg.norm(V[frames[-1]][Vocc[frames[-1]]] - c, axis=1).max()
@@ -184,11 +187,11 @@ def write_movie(P, occ, V, Vocc, keep, c, args, out):
 
     P0 = P[0][keep].astype(np.float64)
     r0 = np.linalg.norm(P0 - c, axis=1)
-    slab = np.abs(P0[:, 2] - c[2]) < 0.012
     # ONE RANGE FOR THE WHOLE CLIP, taken from the last frame.
     uN = np.einsum('ij,ij->i', P[-1][keep].astype(np.float64) - P0,
                    (P0 - c) / np.maximum(r0, 1e-12)[:, None])
-    vmax = float(np.nanpercentile((uN / np.maximum(r0, 1e-12))[slab], 99))
+    slabN = np.abs(P[-1][keep][:, 2] - c[2]) < 0.012
+    vmax = float(np.nanpercentile((uN / np.maximum(r0, 1e-12))[slabN], 99))
     rb_N, ur_N, _ = radial_profile(P0, P[-1][keep].astype(np.float64), c)
     y_hi = float(np.nanmax(ur_N) * 1000 * 1.08)
 
@@ -197,6 +200,7 @@ def write_movie(P, occ, V, Vocc, keep, c, args, out):
         Pf = P[f][keep].astype(np.float64)
         ur = np.einsum('ij,ij->i', Pf - P0, (P0 - c) / np.maximum(r0, 1e-12)[:, None])
         e_tt = ur / np.maximum(r0, 1e-12)
+        slab = np.abs(Pf[:, 2] - c[2]) < 0.012      # the slab follows the material
         fig = plt.figure(figsize=(11.4, 5.3), facecolor="black")
         ax0 = fig.add_subplot(1, 2, 1); ax1 = fig.add_subplot(1, 2, 2)
         for ax in (ax0, ax1):
@@ -205,7 +209,7 @@ def write_movie(P, occ, V, Vocc, keep, c, args, out):
                 sp.set_color("#888888")
             ax.tick_params(colors="#cccccc", labelsize=8)
             ax.xaxis.label.set_color("white"); ax.yaxis.label.set_color("white")
-        sc = ax0.scatter((P0[slab, 0] - c[0]) * 1000, (P0[slab, 1] - c[1]) * 1000,
+        sc = ax0.scatter((Pf[slab, 0] - c[0]) * 1000, (Pf[slab, 1] - c[1]) * 1000,
                          c=e_tt[slab], s=1.1, cmap="magma", vmin=0.0, vmax=vmax)
         vf = V[f][Vocc[f]]
         rv = np.linalg.norm(vf - c, axis=1).max()
