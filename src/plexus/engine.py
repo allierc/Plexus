@@ -885,6 +885,14 @@ def _resolve_default_impl(sim, device: str, grad: bool = False) -> list[str]:
     for o in sim.operators:
         if o.op not in MPM_WARP_DEFAULT or o.impl is not None or id(o) in _forced:
             continue
+        # `store_stress` IS ANOTHER THING THE WARP BODY GENUINELY CANNOT DO, so it belongs on this
+        # list beside cpu and periodic rather than in every spec that asks for it. The warp scatter
+        # accumulates momentum into the grid with atomics and never forms the per-particle Cauchy
+        # stress the default body caches to `sigma`. Picked silently, the loss surfaced two
+        # operators away -- `ecm_stress[measure: vonmises]` found no buffer and fell back to |J-1|,
+        # a different quantity drawn in the same colours, on a run whose subject is stress.
+        if o.op == "mpm_scatter" and bool(o.params.get("store_stress", False)):
+            continue
         if o.op == "mpm_grid_update":
             q = o.params
             _st = float(q.get("surface_tension", 0.0) or 0.0)

@@ -202,6 +202,20 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         if render_vtk.available():
             from plexus import live_movie
             st = sim.plotting or {}
+            # A REPLAY CANNOT DRAW A DEFORMATION COLOUR AND MUST NOT OVERWRITE ONE THAT WAS DRAWN.
+            # `trajectory.npz` stores positions, occupancy and the mesh; F and C are solver state
+            # and are not recorded, so `_field` finds no gradient and the cloud falls back to the
+            # height ramp fixed at t = 0. This pass runs after `-o generate` whenever a caption is
+            # wanted, so a run that rendered its strain correctly during the simulation had that
+            # movie replaced, in the same file, by a static gradient that looks exactly like data.
+            # The live pass already wrote the right one; leave it alone.
+            _cf = str(st.get("color_field", "") or "").lower()
+            if _cf in ("deformation", "strain", "volume", "pressure", "vorticity") \
+                    and os.path.isfile(os.path.join(data_dir, "movie.mp4")):
+                print(f"[plot] movie.mp4 KEPT as the live pass rendered it: plotting.color_field "
+                      f"is {_cf!r}, which needs the per-particle deformation gradient a trajectory "
+                      f"does not store. Replaying would redraw it as a height ramp.", flush=True)
+                return data_dir
             live_movie.replay(data_dir, sim,
                               max_frames=int(st.get("movie_max_frames", 300)),
                               render_n=int(st.get("render_n", 500_000_000)),

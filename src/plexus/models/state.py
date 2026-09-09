@@ -56,6 +56,11 @@ class Block:
     integration: str = NONE             # one of INTEGRATIONS -- how the engine advances it in time
     boundary: Optional[str] = None      # BOUNDARY_WORLD | BOUNDARY_FREE | None
     record: bool = True                 # store this block in the trajectory
+    # WHAT THIS BLOCK'S NUMBERS ARE -- a `plexus.units` quantity string such as `"volume"`,
+    # `"1/T"` or `"volume[polyhedron]"`. `None` means UNDECLARED, which is silent: it is the
+    # absence of a claim, not a claim of dimensionlessness, and every block in every spec written
+    # before this key existed is in that state. See `plexus/units.py` and `UNITS_REFACTOR.md`.
+    unit: Optional[str] = None
 
     def __post_init__(self):
         if self.integration not in INTEGRATIONS:
@@ -153,10 +158,11 @@ class StateSchema:
         for name, (c0, c1) in items:
             w = c1 - c0
             if name == "pos":
-                blocks.append(Block("pos", w, role="coordinate",
+                blocks.append(Block("pos", w, role="coordinate", unit="length",
                                     integration=SECOND_ORDER_COORDINATE, boundary=BOUNDARY_WORLD))
             elif name == "vel":
-                blocks.append(Block("vel", w, role="rate", integration=SECOND_ORDER_RATE))
+                blocks.append(Block("vel", w, role="rate", unit="velocity",
+                                    integration=SECOND_ORDER_RATE))
             else:
                 blocks.append(Block(name, w, integration=NONE))
         return cls(blocks)
@@ -168,10 +174,11 @@ def spatial_schema(dim: int) -> StateSchema:
     the world box; ``vel`` is its rate. Byte-identical replacement for the old
     ``{'pos': (0, D), 'vel': (D, 2D)}`` dict from ``engine._dim_schema``."""
     return StateSchema([
-        Block("pos", dim, role="coordinate", integration=SECOND_ORDER_COORDINATE, boundary=BOUNDARY_WORLD),
+        Block("pos", dim, role="coordinate", unit="length",
+              integration=SECOND_ORDER_COORDINATE, boundary=BOUNDARY_WORLD),
         # vel is NOT recorded: the trajectory has always stored pos only, so recording vel
         # would add a state/vel group and break byte-identical output on every spatial spec.
-        Block("vel", dim, role="rate", integration=SECOND_ORDER_RATE, record=False),
+        Block("vel", dim, role="rate", unit="velocity", integration=SECOND_ORDER_RATE, record=False),
     ])
 
 
@@ -189,13 +196,31 @@ def schema_from_spec(state_decl: dict) -> StateSchema:
     for name, decl in state_decl.items():
         if isinstance(decl, dict):
             w = int(decl.get("width", 1))
+            role = decl.get("role")
             blocks.append(Block(
                 name, w,
-                role=decl.get("role"),
+                role=role,
                 integration=decl.get("integration", FIRST_ORDER),
                 boundary=decl.get("boundary", BOUNDARY_FREE),
                 record=bool(decl.get("record", True)),
+                unit=decl.get("unit", _unit_from_role(role)),
             ))
         else:
             blocks.append(Block(name, int(decl), integration=FIRST_ORDER, boundary=BOUNDARY_FREE))
     return StateSchema(blocks)
+
+
+# THE TWO ROLES THAT ALREADY SAY THEIR OWN DIMENSION, and no more than two. `role: coordinate` means
+# a position in the world box and `role: rate` means its time derivative -- the engine already reads
+# both to decide how to integrate, so the dimension is not a second declaration that could disagree
+# with the first, it is the same one spelled out.
+#
+# NOTHING ELSE IS GUESSED. A block called `chem` or `sep` or `V0f` gets `None` -- undeclared, and
+# silent -- because inferring from a NAME is how you end up asserting that `area` is a length
+# squared on the one set where it happens to be a count. A name is a hint for a reader; the spec or
+# the operator has to say it for a checker.
+_ROLE_UNITS = {"coordinate": "length", "rate": "velocity"}
+
+
+def _unit_from_role(role):
+    return _ROLE_UNITS.get(role)

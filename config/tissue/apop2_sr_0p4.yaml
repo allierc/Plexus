@@ -1,5 +1,5 @@
 general:
-  name: apop2_ab_one
+  name: apop2_sr_0p4
   seed: 0
   n_frames: 600
   dt: 1.0
@@ -111,10 +111,11 @@ operators:
   at: vertex
   p0: 3.5
   model: prescribed
-  region: list
-  cells:
-  - 900
-  shrink_rate: 0.05
+  region: band
+  band_deg: 45.0
+  n_bands: 1
+  min_age: 0
+  shrink_rate: 0.4
   critical_frac: 0.15
 - op: edge_flip
   at: vertex
