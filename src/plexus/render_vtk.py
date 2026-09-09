@@ -73,7 +73,7 @@ EV_FPS = 12                # ~60 recorded frames -> a 5 s clip
 NEURAL_FPS = 96
 
 # HOW MANY FRAMES AN `evolve` CLIP DRAWS, AND WHY IT IS CAPPED. okuda's archive keeps ~60 of a run's
-# rows; the core's trajectory keeps every one -- 1,801 on `r023_07`. Uncapped, the two sides of a
+# rows; the core's trajectory keeps every one, which can be thousands. Uncapped, the two sides of a
 # promotion pair produce a 5-second clip and a 2.5-minute one of the same run, which cannot be
 # compared frame for frame by the eye they are for, and the core side takes twenty minutes to draw.
 # Capped, both sides subsample the same way (`linspace`, first and last always in) and land on the
@@ -113,8 +113,8 @@ KILL = (0, 153, 255)       # electric blue: a cell sentenced to die
 # Grey says the same thing honestly and gives the electric blue something to read against.
 BODY_GREY = (176, 176, 176)
 
-# THE DIVISION PAIR, AS TWO COLOURS RATHER THAN ONE. A just-divided cell used to be tinted green --
-# which says "a division happened here" and cannot say WHICH TWO CELLS it produced. On a sheet where
+# THE DIVISION PAIR, AS TWO COLOURS RATHER THAN ONE. Tinting a just-divided cell green
+# says "a division happened here" and cannot say WHICH TWO CELLS it produced. On a sheet where
 # several cells divide in the same four-frame window the green patches merge and the pairing is
 # unreadable, and the pairing is the thing: a division that hands its daughter the wrong share of
 # the mother's area, or puts the septum in the wrong place, looks exactly like a healthy one until
@@ -193,8 +193,8 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
         cc = [k[:-len("__chem")] for k in z.files if k.endswith("__chem")]
         cell_set = cc[0] if cc else None
     # EVERY ARRAY IS READ ONCE. `np.load` returns an NpzFile whose `z[key]` DECOMPRESSES THE WHOLE
-    # ARRAY on every access, so reading one row inside a loop over 1,801 rows re-reads the entire
-    # column 1,801 times. On `r023_07`'s 6.7 GB trajectory that is terabytes of decompression and the
+    # ARRAY on every access, so reading one row inside a loop over N rows re-reads the entire
+    # column N times. On a multi-gigabyte trajectory that is terabytes of decompression and the
     # render never finishes -- it is the same defect `gate_measures._Lazy` exists for, and it was
     # here too.
     pos = z[f"{set_name}__pos"]
@@ -532,7 +532,7 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None, chem=No
     #
     # AN ALL-NaN FRAME IS NOT FLAT. It has to keep reaching the colormap branch, because that is
     # where `rgb[~ok] = magenta` marks "not a cell any more" -- and a run going non-finite is
-    # exactly what that mark exists to make visible (`r023_07` was half NaN from frame 889). So
+    # exactly what that mark exists to make visible. So
     # "flat" requires that finite values EXIST and are all zero, not merely that none is nonzero.
     _a = None if act is None else np.asarray(act, float)[:nF][idx]
     _fin = None if _a is None else np.isfinite(_a)
@@ -610,10 +610,9 @@ def add(p, m, style):
     """Add the shell and RETURN THE ACTOR, which is the whole reason this is not `p.clear()`.
 
     `Plotter.clear()` removes every actor AND every light: measured 5 lights before, 0 after. So
-    `evolve` rendered its first frame lit and all fifty-nine others with no light source at all --
-    mean brightness 195.6 -> 238.9 and shading contrast 47.5 -> 33.5, a washed-out white body.
-    Cedric spotted it as "the last frame is different from the first, the first is better with
-    shading", which is exactly the frame-1-only-is-lit signature. Removing the one actor we added
+    `evolve` would render its first frame lit and every other one with no light source at all --
+    mean brightness 195.6 -> 238.9 and shading contrast 47.5 -> 33.5, a washed-out white body, with
+    "the first frame is better shaded than the last" as the signature. Removing the one actor we added
     leaves the lighting rig alone.
     """
     return p.add_mesh(m, scalars="rgb", rgb=True, lighting=True,
@@ -638,12 +637,24 @@ def aim(p, L, azim=None, elev=None, fill=1.0):
     edge to edge and reads as a close-up. Same rule, different subject; the fraction is what makes
     two such cards the same size on a page.
     """
-    e = np.radians(CAM["elev"] if elev is None else elev)
-    a = np.radians(CAM["azim"] if azim is None else azim)
+    # `plotting.camera: {elev, azim}` in degrees, the spec's own view of the run. Until now the
+    # camera was this module's CAM constant and nothing in a spec could reach it, so a flat disc --
+    # a sheet seeded in z = 0 -- was always drawn from 18 degrees above its plane, as a sliver.
+    # A sheet wants a top view (elev 90), and the same clip beside a spheroid wants the oblique
+    # default; that is a per-spec choice, so it lives in the spec. The explicit arguments (the
+    # turntable's sweep) still win over the spec, which still wins over CAM.
+    _cam = (_PLOT_OVERRIDE or {}).get("camera") or {}
+    elev = float(_cam.get("elev", CAM["elev"])) if elev is None else elev
+    azim = float(_cam.get("azim", CAM["azim"])) if azim is None else azim
+    e = np.radians(elev)
+    a = np.radians(azim)
     d = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
     p.camera.position = tuple(d * L * 3.2)
     p.camera.focal_point = (0, 0, 0)
-    p.camera.up = (0, 0, 1)
+    # LOOKING STRAIGHT DOWN, +z IS THE VIEW DIRECTION AND CANNOT ALSO BE "UP". VTK then picks an
+    # arbitrary roll and the sheet spins between frames. Within 5 degrees of the pole, screen-up
+    # is world +y instead, so a top view is a map: x to the right, y up, every frame the same.
+    p.camera.up = (0, 1, 0) if abs(elev) > 85.0 else (0, 0, 1)
     p.camera.parallel_projection = True
     p.camera.parallel_scale = L * 1.05 / max(fill, 1e-3)
 
@@ -850,8 +861,7 @@ def compare(dir_a, dir_b, out, style="mesh", fill=1.0, labels=("A", "B"), title=
             max_frames=None):
     """A and B SIDE BY SIDE in one clip, stepped together. This is the comparison artefact.
 
-    WHY IT IS NEEDED AT ALL, given both sides already have their own movie. Cedric: "I do not see
-    the comparison folder". Two directories each holding a movie is not a comparison -- it is two
+    WHY IT IS NEEDED AT ALL, given both sides already have their own movie. Two directories each holding a movie is not a comparison -- it is two
     movies, and telling them apart means opening both, scrubbing to the same moment, and holding one
     in your head. A digest says whether they agree; this says WHERE and HOW they differ when they do,
     which is the question a digest cannot answer and the only reason to keep the pixels at all.
@@ -1443,8 +1453,8 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
                   soma=True, volume=True, cmap="viridis", line_width=1.0,
                   neurites=True, neurite_opacity=0.30, neurite_stride=8,
                   # None MEANS "USE THE MEASURED PER-NEURON RADIUS". fish2 records no soma size
-                  # (`somaRadius` is 0 on all 177,513 bodies), so this used to be one literature
-                  # constant drawn on every cell alike; `compute_soma_radii` now sizes each
+                  # (`somaRadius` is 0 on every body), so the alternative is one literature
+                  # constant drawn on every cell alike; `compute_soma_radii` instead sizes each
                   # soma from the ball around it that no other neuron's neurite enters, and the
                   # renderer scales each glyph by its own value. Pass a float to force a
                   # constant instead -- which is what a size sweep wants, and the fallback when

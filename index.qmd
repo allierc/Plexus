@@ -127,10 +127,10 @@ Every clip below was generated from the spec shown when you hover (or tab to) it
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
-    <video src="gallery/turing_gs_stripes.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing2d_gs_kappa.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">one set, two states, four operators<span class="sim-spec"><pre>general:
-  name: promo_TURING_atlas_turing2d_gs_kappa_B
+  name: turing2d_gs_kappa
   seed: 0
   n_frames: 6000
   record_cap: 602
@@ -155,13 +155,12 @@ sets:
         integration: first_order
         boundary: free
 fields: {}
-operators:
-- op: cell_chem_seed
+seed:
+- op: seed_cell_chem
   at: cell
   seed: 0
-  before_frame: 3
-  mode: scatter
   seed_frac: 0.12
+operators:
 - op: radius_graph
   at: cell
   radius: 0.95
@@ -178,21 +177,21 @@ operators:
   kk: 0.063
   rate: 1.0
 schedule:
-- cell_chem_seed
 - radius_graph
 - cell_chem_diffuse
 - cell_chem_react
 plotting:
+  renderer: mpl2d
   background: black
   dot_fill: 0.9</pre></span></span>
       <span class="sim-cap">4,000 cells carrying two concentrations. A seed, the neighbour graph (rewire), diffusion and reaction (lateral). Stripes.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_gs_spots.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing2d_gs_eta.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">one constant changed<span class="sim-spec"><pre>general:
-  name: promo_TURING_atlas_turing2d_gs_eta_B
+  name: turing2d_gs_eta
   seed: 0
   n_frames: 6000
   record_cap: 602
@@ -217,13 +216,12 @@ sets:
         integration: first_order
         boundary: free
 fields: {}
-operators:
-- op: cell_chem_seed
+seed:
+- op: seed_cell_chem
   at: cell
   seed: 0
-  before_frame: 3
-  mode: scatter
   seed_frac: 0.12
+operators:
 - op: radius_graph
   at: cell
   radius: 0.95
@@ -240,21 +238,21 @@ operators:
   kk: 0.063
   rate: 1.0
 schedule:
-- cell_chem_seed
 - radius_graph
 - cell_chem_diffuse
 - cell_chem_react
 plotting:
+  renderer: mpl2d
   background: black
   dot_fill: 0.9</pre></span></span>
       <span class="sim-cap">The same spec with the feed rate <code>F: 0.05 → 0.034</code>. Stripes break into spots.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_gs_coupled_eta_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing2d_coupled.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">a second chemistry added<span class="sim-spec"><pre>general:
-  name: promo_TURING_atlas_turing2d_gs_coupled_eta_B
+  name: turing2d_coupled
   seed: 0
   n_frames: 12000
   record_cap: 602
@@ -279,21 +277,18 @@ sets:
         integration: first_order
         boundary: free
 fields: {}
-operators:
-- op: cell_chem_seed
+seed:
+- op: seed_cell_chem
   at: cell
   seed: 0
-  before_frame: 3
-  mode: scatter
   seed_frac: 0.12
   chan: 0
-- op: cell_chem_seed
+- op: seed_cell_chem
   at: cell
   seed: 2
-  before_frame: 3
-  mode: scatter
   seed_frac: 0.12
   chan: 2
+operators:
 - op: radius_graph
   at: cell
   radius: 0.95
@@ -322,23 +317,22 @@ operators:
   gamma: 0.2
   rate: 1.0
 schedule:
-- cell_chem_seed
-- cell_chem_seed
 - radius_graph
 - cell_chem_diffuse
 - cell_chem_diffuse
 - cell_chem_react
 plotting:
+  renderer: mpl2d
   background: black
   dot_fill: 0.9</pre></span></span>
       <span class="sim-cap">Four states instead of two, a second diffusion–reaction pair, the reactions coupled by a cross term of strength <code>gamma: 0.2</code>. Two patterns, no shared cell.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_rps_a2p0_10.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing2d_rps.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">three species, one reaction<span class="sim-spec"><pre>general:
-  name: promo_TURING_atlas_turing2d_rps_a2p0_B
+  name: turing2d_rps
   seed: 0
   n_frames: 4000
   record_cap: 602
@@ -363,13 +357,13 @@ sets:
         integration: first_order
         boundary: free
 fields: {}
-operators:
-- op: cell_chem_seed
+seed:
+- op: seed_cell_chem
   at: cell
+  model: simplex
   seed: 0
-  before_frame: 3
-  mode: simplex
   n_species: 3
+operators:
 - op: radius_graph
   at: cell
   radius: 0.95
@@ -387,11 +381,11 @@ operators:
   a: 2.0
   rate: 0.05
 schedule:
-- cell_chem_seed
 - radius_graph
 - cell_chem_diffuse
 - cell_chem_react
 plotting:
+  renderer: mpl2d
   background: black
   dot_fill: 0.9
   blend: additive
@@ -405,204 +399,105 @@ plotting:
 </div>
 
 <h3>Epithelial mechanics — a vertex model</h3>
-<p class="opk">A vertex model decomposed into six operators over two sets: seeds for the vertices and for the cells that own them, an aggregate that builds each cell’s area and perimeter from its vertices, a lateral shape energy that returns a force to those vertices, a rewire that flips a junction, and a structural that removes a cell. Because the two sets share a containment map, a junction is state held once, not copied into every cell that touches it. Shown: a cell dying while the sheet closes over it, and a morphogen reaching the cells through an exchange.</p>
+<p class="opk">A vertex model decomposed into six operators over two sets: seeds for the vertices and for the cells that own them, an aggregate that builds each cell’s area and perimeter from its vertices, a lateral shape energy that returns a force to those vertices, a rewire that flips a junction, and a structural that removes a cell. Because the two sets share a containment map, a junction is state held once, not copied into every cell that touches it. Shown on a flat disc of 374 cells: one cell dying while the sheet closes over it, a morphogen gating growth where it is high, the sheet growing and dividing until it outgrows its plane, and the same growth with one bending stiffness added.</p>
 <p class="opk-ref">Reference — active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/tyssue_apoptose.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/sheet_die.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a death inside mechanics<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_apop_apoptose   # run name (-&gt; archive/&lt;name&gt;/)
-  seed: 0   # RNG seed
-  n_frames: 150   # number of simulation frames
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
-  dim: 2   # spatial dimension
-  world:   # world box size
-  - 13.0
-  - 14.0
-sets:   # the biological SETS (Levels) of the model
-  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
-    n: 142   # buffer size (max elements)
-fields: {}   # continuous fields
-operators:   # the operators to instantiate (each realises one mechanism)
-- op: mesh_seed   # build the honeycomb half-edge mesh on the vertex set (frame 0)
-  at: vertex   # the set this operator acts on
-  nx: 9   # lattice columns (cell centres)
-  ny: 10   # lattice rows
-  a: 1.0   # cell spacing (sets the base cell size)
-  border: 1   # rings of border cells to drop (their vertices are pinned)
-  jitter: 0.12   # initial positional disorder
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  seed: 0   # RNG seed
-  before_frame: 1   # run this operator once, before the given frame
-- op: shape_energy   # AVM shape-energy force on the vertices (bounded Euler); reads target area a0 from the cell set
-  at: vertex   # the set this operator acts on
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  K_A: 1.0   # area-elasticity stiffness
-  K_P: 1.0   # perimeter-elasticity stiffness
-  Lambda: 0.12
-  Gamma: 0.05
-  mu: 1.0   # mobility (overdamped)
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 8   # inner bounded-Euler relaxation steps per frame
-  eta: 0.08   # relaxation step size
-  cap_frac: 0.15   # max per-step move as a fraction of mean edge (the stability cap)
-- op: apoptosis
-  at: vertex   # the set this operator acts on
-  cells:
-  - 24
-  shrink_rate: 0.03
-  critical_frac: 0.45
-  a0_base: 0.8660254037844386   # base target area (the reset value after division)
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-- op: t1_transition   # reversible T1 neighbour swaps: reconnect edges shorter than l_th
-  at: vertex   # the set this operator acts on
-  l_th: 0.16   # T1 threshold: an edge shorter than this reconnects
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  every: 2   # run this operator every N frames
-- op: topo_snapshot   # record the per-tick topology so a movie can be rendered
-  at: vertex   # the set this operator acts on
-schedule:   # the order the operators run each frame
-- mesh_seed
-- shape_energy
-- apoptosis
-- t1_transition
-- topo_snapshot</pre></span></span>
-      <span class="sim-cap">142 vertices, one set. Seed, shape energy (lateral), T1 flip (rewire), apoptosis (structural). The sheet closes over the dying cell.</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/tyssue_morphogen_bulge.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">a cell level above the vertices<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_cell_morphogen_bulge   # run name (-&gt; archive/&lt;name&gt;/)
-  seed: 0   # RNG seed
-  n_frames: 120   # number of simulation frames
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
-  dim: 2   # spatial dimension
-  world:   # world box size
-  - 20.0
-  - 22.0
-sets:   # the biological SETS (Levels) of the model
-  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
-    n: 503   # buffer size (max elements)
-  cell:   # CELL set: per-cell biological state (the plexus2 two-level hierarchy)
-    n: 222   # buffer size (max elements)
-    state:   # per-element state blocks (name: {width, integration})
-      a0:   # target cell area (biological state; drives shape_energy)
-        width: 1   # number of scalar columns in this state block
-      chem:
-        width: 2   # number of scalar columns in this state block
-      ctype:   # cell type / fate (0 = wild-type, 1 = clone)
-        width: 1   # number of scalar columns in this state block
-      area:   # cell area (aggregate readout from vertices)
-        width: 1   # number of scalar columns in this state block
-      perim:   # cell perimeter (aggregate readout)
-        width: 1   # number of scalar columns in this state block
-      cen:   # cell centroid (aggregate readout)
-        width: 2   # number of scalar columns in this state block
-fields: {}   # continuous fields
-operators:   # the operators to instantiate (each realises one mechanism)
-- op: mesh_seed   # build the honeycomb half-edge mesh on the vertex set (frame 0)
-  at: vertex   # the set this operator acts on
-  nx: 16   # lattice columns (cell centres)
-  ny: 18   # lattice rows
-  a: 1.0   # cell spacing (sets the base cell size)
-  border: 1   # rings of border cells to drop (their vertices are pinned)
-  jitter: 0.1   # initial positional disorder
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  seed: 0   # RNG seed
-  before_frame: 1   # run this operator once, before the given frame
-- op: cell_seed   # init the cell set from the mesh: one live cell/face, a0=base, type=0
-  at: cell   # the set this operator acts on
-  a: 1.0   # cell spacing (sets the base cell size)
-  before_frame: 1   # run this operator once, before the given frame
-- op: cell_geometry   # AGGREGATE vertices -&gt; per-cell area / perimeter / centroid (readouts)
-  at: cell   # the set this operator acts on
-- op: cell_morphogen
-  at: cell   # the set this operator acts on
-  amp: 1.0
-  sigma: 1.5
-  before_frame: 3   # run this operator once, before the given frame
-- op: morphogen_growth
-  at: cell   # the set this operator acts on
-  g: 1.6
-  rho: 1.0
-  a_sw: 0.4
-  hill_n: 4.0
-  a0_base: 0.8660254037844386   # base target area (the reset value after division)
-- op: shape_energy   # AVM shape-energy force on the vertices (bounded Euler); reads target area a0 from the cell set
-  at: vertex   # the set this operator acts on
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  K_A: 1.0   # area-elasticity stiffness
-  K_P: 1.0   # perimeter-elasticity stiffness
-  mu: 1.0   # mobility (overdamped)
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 8   # inner bounded-Euler relaxation steps per frame
-  eta: 0.08   # relaxation step size
-  cap_frac: 0.15   # max per-step move as a fraction of mean edge (the stability cap)
-schedule:   # the order the operators run each frame
-- mesh_seed
-- cell_seed
-- cell_geometry
-- cell_morphogen
-- morphogen_growth
-- shape_energy</pre></span></span>
-      <span class="sim-cap">222 cells over 503 vertices. Area and perimeter aggregated up; a morphogen (exchange) gates growth beside the shape energy. The sheet bulges where it sits.</span>
-    </figcaption>
-  </figure>
-</div>
-
-<h3>Cell death — sculpting an epithelial surface</h3>
-<p class="opk">The vertex model above with one operator added: a structural death. A marked cell shrinks, loses its junctions through the rewire until it leaves the set, and the lateral mechanics closes the surface behind it — the mechanics is never told that death exists. Only the seeded pattern of deaths differs between the three clips: a patch pulled into an invagination, nine bands closed over one by one, and half the sheet removed.</p>
-<p class="opk-ref">Reference — apoptotic force driving epithelial folding after Monier et&nbsp;al., <i>Nature</i> <b>518</b>:245 (2015).</p>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/apop_patch_big_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">one operator added: die<span class="sim-spec"><pre>general:
-  name: apop_patch_big
+      <span class="sim-name" tabindex="0">a death inside mechanics<span class="sim-spec"><pre>general:
+  name: sheet_die
   seed: 0
-  n_frames: 900
+  n_frames: 400
   dt: 1.0
-  record_cap: 902
-  record_every: 1
+  record_cap: 402
   boundary: free
   dim: 3
   world:
-  - 80.0
-  - 80.0
-  - 80.0
-_run:
-  target_cells: 60000
-  seed_cells: 2000
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
 sets:
   vertex:
-    n: 120000
-  cell:
-    n: 60000
+    n: 4000
+    mesh: half_edge
     state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 2000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
       chem:
         width: 2
         integration: first_order
-      cen:
-        width: 3
-      area:
-        width: 1
+  half_edge:
+    n: 16000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
-operators:
+seed:
 - op: seed_mesh
   at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 2000
-  seed: 0
-  vseed_cv: 0.15
+  shape: disc
+  n_cells: 400
   radius: 5.0
   jitter: 0.15
   p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
 - op: cell_geometry
   at: cell
 - op: cell_mechanics
@@ -615,7 +510,6 @@ operators:
   Gamma: 0.4
   p0: 3.5
   mu: 1.0
-  dt: 1.0
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
@@ -623,9 +517,639 @@ operators:
   K_lumen: 0.0
 - op: cell_die
   at: vertex
-  cell_set: cell
   p0: 3.5
-  mode: cone
+  model: prescribed
+  region: list
+  cells:
+  - 173
+  shrink_rate: 0.05
+  critical_frac: 0.15
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_mechanics
+- cell_die
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_mark_division: true
+  mesh_apop_color: &#x27;#e8c33a&#x27;
+  camera:
+    elev: 90.0
+    azim: 0.0</pre></span></span>
+      <span class="sim-cap">374 cells on a flat disc, two sets. Seed, shape energy (lateral), junction flips (rewire), one cell marked to die (structural). It shrinks to nothing and the sheet closes over it.</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/sheet_morphogen.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">chemistry gates growth<span class="sim-spec"><pre>general:
+  name: sheet_morphogen
+  seed: 0
+  n_frames: 400
+  dt: 1.0
+  record_cap: 402
+  boundary: free
+  dim: 3
+  world:
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 4000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 2000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+      chem:
+        width: 2
+        integration: first_order
+  half_edge:
+    n: 16000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  shape: disc
+  n_cells: 400
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+- op: seed_cell_chem
+  at: cell
+  seed: 0
+  seed_frac: 0.03
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_neighbours
+  at: cell
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.3
+- op: cell_chem_react
+  at: cell
+  model: gray_scott
+  F: 0.046
+  kk: 0.062
+  rate: 1.0
+- op: cell_grow
+  at: vertex
+  rate: 0.002
+  a_sw: 0.35
+  hill: 4.0
+  rho: 0.0
+  vth_frac: 2.5
+  conserve_amount: false
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_neighbours
+- cell_chem_diffuse
+- cell_chem_react
+- cell_grow
+- cell_mechanics
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_mark_division: true
+  mesh_apop_color: &#x27;#e8c33a&#x27;
+  camera:
+    elev: 90.0
+    azim: 0.0</pre></span></span>
+      <span class="sim-cap">The same disc carrying two chemical states. Diffusion and reaction (lateral) on the cell graph, and <code>cell_grow</code> gated by the activator. Cells enlarge where it is high.</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/sheet_divide.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">growth and division added<span class="sim-spec"><pre>general:
+  name: sheet_divide
+  seed: 0
+  n_frames: 400
+  dt: 1.0
+  record_cap: 402
+  boundary: free
+  dim: 3
+  world:
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 4000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 2000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+      chem:
+        width: 2
+        integration: first_order
+  half_edge:
+    n: 16000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  shape: disc
+  n_cells: 400
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  rate: 0.002
+  a_sw: 0.0
+  hill: 4.0
+  rho: 1.0
+  vth_frac: 2.5
+  conserve_amount: false
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: cell_divide
+  at: vertex
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  p0: 3.5
+  every: 4
+  engine_clock: true
+  reset_noise: 0.12
+  max_cycle: 1000000000
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_grow
+- cell_mechanics
+- cell_divide
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_mark_division: true
+  mesh_apop_color: &#x27;#e8c33a&#x27;
+  camera:
+    elev: 90.0
+    azim: 0.0</pre></span></span>
+      <span class="sim-cap"><code>cell_grow</code> ungated and <code>cell_divide</code> (structural) on the same disc. 374 → 1,364 cells; the sheet outgrows its plane and crumples.</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/sheet_divide_stiff.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">one constant: bending stiffness<span class="sim-spec"><pre>general:
+  name: sheet_divide_stiff
+  seed: 0
+  n_frames: 400
+  dt: 1.0
+  record_cap: 402
+  boundary: free
+  dim: 3
+  world:
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 4000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 2000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+      chem:
+        width: 2
+        integration: first_order
+  half_edge:
+    n: 16000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  shape: disc
+  n_cells: 400
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  rate: 0.002
+  a_sw: 0.0
+  hill: 4.0
+  rho: 1.0
+  vth_frac: 2.5
+  conserve_amount: false
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.05
+  K_lumen: 0.0
+- op: cell_divide
+  at: vertex
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  p0: 3.5
+  every: 4
+  engine_clock: true
+  reset_noise: 0.12
+  max_cycle: 1000000000
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_grow
+- cell_mechanics
+- cell_divide
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_mark_division: true
+  mesh_apop_color: &#x27;#e8c33a&#x27;
+  camera:
+    elev: 90.0
+    azim: 0.0</pre></span></span>
+      <span class="sim-cap">The same run with <code>K_bend: 0 → 0.05</code> in the shape energy. 374 → 1,364 cells again, and the sheet stays flat.</span>
+    </figcaption>
+  </figure>
+</div>
+
+<h3>Cell death — sculpting an epithelial surface</h3>
+<p class="opk">The vertex model above with one operator added: a structural death. A marked cell shrinks, loses its junctions through the rewire until it leaves the set, and the lateral mechanics closes the surface behind it — the mechanics is never told that death exists. Only the seeded pattern of deaths differs between the three clips: a patch pulled into an invagination, nine bands closed over one by one, and half the sheet removed.</p>
+<p class="opk-ref">Reference — apoptotic force driving epithelial folding after Monier et&nbsp;al., <i>Nature</i> <b>518</b>:245 (2015).</p>
+<div class="sim-gallery g3">
+  <figure class="sim-card">
+    <video src="gallery/apop2_patch.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">one operator added: die<span class="sim-spec"><pre>general:
+  name: apop2_sheet_patch
+  seed: 0
+  n_frames: 600
+  dt: 1.0
+  record_cap: 602
+  boundary: free
+  dim: 3
+  world:
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 120000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 60000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+  half_edge:
+    n: 480000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  n_cells: 2000
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: cell_die
+  at: vertex
+  p0: 3.5
+  model: prescribed
+  region: cone
   cone_deg: 45.0
   shrink_rate: 0.05
   critical_frac: 0.15
@@ -638,67 +1162,147 @@ operators:
   at: vertex
   every: 1
 schedule:
-- seed_mesh
 - cell_geometry
 - cell_mechanics
 - cell_die
 - edge_flip
 - topo_record
-_basis:
-  chem: none
-  mat: static
-  mech: plain
-  grid: 4 chemistry x 2 material x 2 mechanics
-  why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
-    written by make_basis.py; every value not on an axis is shared with the other
-    fifteen.</pre></span></span>
-      <span class="sim-cap">The vertex model plus <code>cell_die</code>. 293 cells marked in a cone; the surface invaginates where they leave.</span>
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: &#x27;#cfd8e3&#x27;
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 2.0
+    span: 12.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: &#x27;#e8e8e8&#x27;
+    mid: true
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: volume
+    xlabel: frame
+    ylabel: cell volume
+    ticks: 4
+  scale_bar_corner: right_face
+  scale_bar_lift: -0.07
+  mesh_mark_division: true
+  mesh_apop_color: &#x27;#e8c33a&#x27;</pre></span></span>
+      <span class="sim-cap">The vertex model plus <code>cell_die</code>, a 45° cone of cells marked. 2,000 → 1,841; the surface invaginates where they leave.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/apop_rings9_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/apop2_rings9.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">the same, in nine bands<span class="sim-spec"><pre>general:
-  name: apop_rings9
+  name: apop2_sheet_rings9
   seed: 0
   n_frames: 600
   dt: 1.0
   record_cap: 602
-  record_every: 1
   boundary: free
   dim: 3
   world:
-  - 80.0
-  - 80.0
-  - 80.0
-_run:
-  target_cells: 60000
-  seed_cells: 2000
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
 sets:
   vertex:
     n: 120000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
   cell:
     n: 60000
     state:
-      chem:
-        width: 2
-        integration: first_order
-      cen:
-        width: 3
       area:
         width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+  half_edge:
+    n: 480000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
-operators:
+seed:
 - op: seed_mesh
   at: vertex
-  cell_set: cell
-  before_frame: 1
   n_cells: 2000
-  seed: 0
-  vseed_cv: 0.15
   radius: 5.0
   jitter: 0.15
   p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
 - op: cell_geometry
   at: cell
 - op: cell_mechanics
@@ -711,7 +1315,6 @@ operators:
   Gamma: 0.4
   p0: 3.5
   mu: 1.0
-  dt: 1.0
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
@@ -719,13 +1322,13 @@ operators:
   K_lumen: 0.0
 - op: cell_die
   at: vertex
-  cell_set: cell
   p0: 3.5
-  mode: band
+  model: prescribed
+  region: band
   band_deg: 4.0
+  n_bands: 9
   shrink_rate: 0.05
   critical_frac: 0.15
-  n_bands: 9
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -735,79 +1338,149 @@ operators:
   at: vertex
   every: 1
 schedule:
-- seed_mesh
 - cell_geometry
 - cell_mechanics
 - cell_die
 - edge_flip
 - topo_record
-_basis:
-  chem: none
-  mat: static
-  mech: plain
-  grid: 4 chemistry x 2 material x 2 mechanics
-  why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
-    written by make_basis.py; every value not on an axis is shared with the other
-    fifteen.</pre></span></span>
-      <span class="sim-cap">Only <code>mode: band, n_bands: 9</code> differs. 895 deaths; every gap closes and the vesicle shrinks.</span>
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: &#x27;#cfd8e3&#x27;
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 2.0
+    span: 12.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: &#x27;#e8e8e8&#x27;
+    mid: true
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: volume
+    xlabel: frame
+    ylabel: cell volume
+    ticks: 4
+  scale_bar_corner: right_face
+  scale_bar_lift: -0.07
+  mesh_mark_division: true
+  mesh_apop_color: &#x27;#e8c33a&#x27;</pre></span></span>
+      <span class="sim-cap">Only <code>region: band, n_bands: 9</code> differs. 2,000 → 1,416; every gap closes and the vesicle shrinks.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/apop_half_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/apop2_half.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">half the set<span class="sim-spec"><pre>general:
-  name: apopgeo_half
+  name: apop2_sheet_half
   seed: 0
   n_frames: 600
   dt: 1.0
   record_cap: 602
-  record_every: 1
   boundary: free
   dim: 3
   world:
-  - 80.0
-  - 80.0
-  - 80.0
-_run:
-  target_cells: 4000
-  seed_cells: 400
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
 sets:
   vertex:
-    n: 8000
-  cell:
-    n: 4000
+    n: 120000
+    mesh: half_edge
     state:
-      chem:
-        width: 2
-        integration: first_order
-      cen:
+      pos:
         width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 60000
+    state:
       area:
         width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+  half_edge:
+    n: 480000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
-operators:
+seed:
 - op: seed_mesh
   at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 400
-  seed: 0
-  vseed_cv: 0.15
+  n_cells: 2000
   radius: 5.0
   jitter: 0.15
   p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
 - op: cell_geometry
   at: cell
-- op: cell_die
-  at: vertex
-  cell_set: cell
-  p0: 3.5
-  shrink_rate: 0.05
-  critical_frac: 0.15
-  min_age: 0
-  mode: band
-  band_deg: 45.0
-  n_bands: 1
 - op: cell_mechanics
   at: vertex
   K_A: 1.0
@@ -818,10 +1491,21 @@ operators:
   Gamma: 0.4
   p0: 3.5
   mu: 1.0
-  dt: 1.0
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: cell_die
+  at: vertex
+  p0: 3.5
+  model: prescribed
+  region: band
+  band_deg: 45.0
+  n_bands: 1
+  min_age: 0
+  shrink_rate: 0.05
+  critical_frac: 0.15
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -831,21 +1515,53 @@ operators:
   at: vertex
   every: 1
 schedule:
-- seed_mesh
 - cell_geometry
-- cell_die
 - cell_mechanics
+- cell_die
 - edge_flip
 - topo_record
-_apopgeo:
-  geometry: half
-  selector:
-    mode: band
-    band_deg: 45.0
-    n_bands: 1
-  why: death is the only mechanism in this composition, so the cell count can only
-    fall and n_apop must equal 400 - cells_final exactly</pre></span></span>
-      <span class="sim-cap">One 45° band; 285 of 400 cells leave. A sphere becomes an ellipsoid.</span>
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: &#x27;#cfd8e3&#x27;
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 2.0
+    span: 12.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: &#x27;#e8e8e8&#x27;
+    mid: true
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: volume
+    xlabel: frame
+    ylabel: cell volume
+    ticks: 4
+  scale_bar_corner: right_face
+  scale_bar_lift: -0.07
+  mesh_mark_division: true
+  mesh_apop_color: &#x27;#e8c33a&#x27;</pre></span></span>
+      <span class="sim-cap">One 45° band. 2,000 → 1,243; a sphere becomes an ellipsoid.</span>
     </figcaption>
   </figure>
 </div>
