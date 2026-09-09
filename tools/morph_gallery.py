@@ -5,7 +5,7 @@ a morph can reach. Six global numbers are a single linear rate: they can flatten
 or draw it into a column -- measured, both, in opposite directions -- and they cannot put a leg on
 it, because every material point gets the same instruction. The published method
 (papers/Xu_2024_mpm_shape_morphing.pdf) optimises a control PER PARTICLE at many timesteps. Here the
-control is a coarse grid of symmetric rates, read at each particle's MATERIAL coordinate:
+control is a coarse grid of rates, read at each particle's MATERIAL coordinate:
 
     A_p = sum_i w_i(X0_p) A_i           w = trilinear weights on a `--ctrl` cube of nodes
     F_p <- expm(-A_p dt) F_p            once a frame, as `deform_control` does globally
@@ -124,6 +124,15 @@ def main():
                          "only the sampling changes -- a morph optimised over 20 frames rendered at "
                          "100 is the same trajectory seen five times more finely, not five times "
                          "more of it.")
+    ap.add_argument("--control-dof", type=int, default=6, choices=[6, 9],
+                    help="components per control node. 6 stores a SYMMETRIC rate tensor A, so "
+                         "expm(-A dt) is a pure stretch along principal axes: every material point "
+                         "may lengthen and thin, but its rest configuration can never turn. 9 "
+                         "stores the full 3x3, whose antisymmetric part is a rotation rate, letting "
+                         "the control turn material in place. This is not gauge: the elastic energy "
+                         "reads F_e = F F_g^-1, so a rotation inside F_g survives into F_e^T F_e "
+                         "and does real work. Appendages that must sweep out sideways -- a spout, a "
+                         "handle, a limb -- are what 6 cannot reach.")
     ap.add_argument("--control", default="grid", choices=["grid", "ngp"],
                     help="`grid`: a cube of rates, trilinear. `ngp`: the multiresolution hash "
                          "encoding this repo already has (plexus.models.hashgrid) plus a small "
@@ -170,13 +179,15 @@ def main():
     # at t = 0, never its current one. Lagrangian: a point carries its own instruction as it moves.
     # That is also what lets a coarse-to-fine schedule work at all, since the parameters mean the
     # same thing at 5,000 points as at 50,000.
+    DOF = args.control_dof
+
     def ngp_control(dev):
         from plexus.models.hashgrid import MultiResHashGrid
         grid = MultiResHashGrid(n_input_dims=3, n_levels=8, n_features_per_level=2,
                                 log2_hashmap_size=15, base_resolution=4,
                                 per_level_scale=1.6).to(dev)
         head = torch.nn.Sequential(torch.nn.Linear(8 * 2, 32), torch.nn.GELU(),
-                                   torch.nn.Linear(32, 6)).to(dev)
+                                   torch.nn.Linear(32, DOF)).to(dev)
         with torch.no_grad():                        # start from no deformation at all
             head[-1].weight.mul_(0.0); head[-1].bias.mul_(0.0)
         return grid, head
@@ -246,7 +257,7 @@ def main():
                             idx.append(torch.as_tensor(i, device=dev))
                             wts.append(torch.as_tensor(w, dtype=torch.float32, device=dev))
                 if theta is None:
-                    theta = torch.zeros(K ** 3, 6, device=dev, requires_grad=True)
+                    theta = torch.zeros(K ** 3, DOF, device=dev, requires_grad=True)
                 params = [theta]
 
             opt = torch.optim.Adam(params, lr=args.lr)
@@ -262,11 +273,17 @@ def main():
                 return sum(w[:, None] * theta[i] for i, w in zip(idx, wts))
 
             def rollout(keep=None):
-                a6 = rates()
-                A = torch.zeros(a6.shape[0], 3, 3, device=dev) + torch.diag_embed(a6[:, :3])
-                A[:, 0, 1] = A[:, 1, 0] = a6[:, 3]
-                A[:, 0, 2] = A[:, 2, 0] = a6[:, 4]
-                A[:, 1, 2] = A[:, 2, 1] = a6[:, 5]
+                a = rates()
+                if DOF == 9:
+                    # THE OFF-DIAGONALS ARE NOW INDEPENDENT, so A splits into a symmetric stretch
+                    # and an antisymmetric spin. expm(-A dt) is a general invertible map rather than
+                    # a positive-definite one, and material can turn in place.
+                    A = a.reshape(-1, 3, 3)
+                else:
+                    A = torch.zeros(a.shape[0], 3, 3, device=dev) + torch.diag_embed(a[:, :3])
+                    A[:, 0, 1] = A[:, 1, 0] = a[:, 3]
+                    A[:, 0, 2] = A[:, 2, 0] = a[:, 4]
+                    A[:, 1, 2] = A[:, 2, 1] = a[:, 5]
                 Adt = -A * dt
                 G = eye + Adt + 0.5 * (Adt @ Adt)     # 2nd order: A dt is small, and 40x cheaper
                 def cb(Hh, tick, G=G):
@@ -334,6 +351,7 @@ def main():
         # everything needed to reproduce this morph: the kind, K, the cube's extent in world
         # coordinates, the rollout the control was optimised for, and the material.
         meta = dict(control_kind=args.control, ctrl_K=(args.ctrl if theta is not None else 0),
+                    control_dof=DOF, vol_weight=args.vol_weight, iters=args.iters, lr=args.lr,
                     extent=[C, C, C, R], opt_frames=args.frames, render_frames=len(frames),
                     dt=0.002, n_pts=n_pts, n_grid=n_grid, target=name,
                     ngp=dict(n_levels=8, n_features_per_level=2, log2_hashmap_size=15,
