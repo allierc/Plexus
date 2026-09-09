@@ -599,7 +599,8 @@ def load(path: str) -> Spec:
         for _o in list(ops) + list(seed_ops):
             try:
                 _c = registry.get_contract(_o.op)
-                _classes[_o.op] = _c.implementations.get(_o.impl or _c.default)
+                _classes[_o.op] = (_c.implementations.get(_o.impl or _c.default),
+                                   dict(_o.params or {}))
             except Exception:                    # noqa: BLE001
                 pass
         _units_check(_spec, _classes)

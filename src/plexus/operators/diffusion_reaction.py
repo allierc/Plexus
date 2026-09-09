@@ -939,11 +939,11 @@ class Grow3D(Lateral):
                    "vth_frac": "fraction", "a_live": "fraction", "inhib_sw": "fraction",
                    "inhib_hill": "fraction", "size_gain": "fraction", "f_max": "fraction",
                    "k_syn": "fraction", "k_deg": "fraction", "cycle_frames": "time"}
-    # GROWTH SCALES THE SEED'S TARGETS, so it inherits the seed's convention: `V0f` is a WEDGE
-    # volume and `vth_frac` is a multiple of a wedge `v_ref`. On an apicobasal run that is the
-    # other half of the same half-conversion the energy declares -- see
-    # `ApicoBasalShapeEnergy3D.BLOCK_UNITS`.
-    BLOCK_UNITS = {"V0f": "volume[wedge]", "A0": "area[midsurface]", "P0": "length"}
+    # `V0f` IS UNDECLARED FOR THE SAME REASON `cell_die`'s IS: growth SCALES the seed's target and
+    # never chooses its convention. `vth_frac` is a multiple of whichever `v_ref` matches it, which
+    # `cell_size` now supplies. The pair the checker should compare is the SEED against the ENERGY,
+    # and those two both declare.
+    BLOCK_UNITS = {"A0": "area[midsurface]", "P0": "length"}
     MECHANISM_TAGS = ["growth", "morphogen_driven", "budding", "cross_scale"]
     REFERENCE = "Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386."
 
@@ -1105,7 +1105,11 @@ class Grow3D(Lateral):
                 hillv = hillv * (1.0 - inh)
                 self._inhib_applied = float(inh.mean())
         s_prev = m["mg_scale"]                                    # per-cell scale BEFORE this tick (for the dilution rate)
-        v_ref = float(m.get("v_ref", 1.0))                        # SEED-TIME MEDIAN cell volume (mesh_ops:220)
+        # THE REFERENCE IN THE CONVENTION THE CELL IS ACTUALLY MEASURED IN -- polyhedron where the
+        # run carries a separation, wedge where it does not. See `vertex_ops.cell_size`. `vth_frac`
+        # is a multiple of this, so on an apicobasal run the growth ceiling used to be stated in a
+        # volume the cell does not have.
+        v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))
         dt = float(getattr(H, "dt", 1.0))
         ds = self._rate(s_prev, hillv, m, v_ref)                  # <-- the rate law; models override THIS only
         # THE CEILING IS FOR A TISSUE WITH NO DIVIDER, AND ONLY FOR ONE.
