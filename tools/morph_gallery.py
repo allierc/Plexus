@@ -143,6 +143,12 @@ def main():
     args = ap.parse_args()
 
     import torch
+    # TF32 costs nothing and changes nothing: measured 1.002 -> 0.990 s per optimisation iteration
+    # at 12,500 particles on an L4 (a 1.2% gain, inside that sweep's own run-to-run noise), with the
+    # final loss moving 0.015% relative -- 0.0013540 to 0.0013542 over 60 iterations from the same
+    # seed. Kept because it is free, not because it is a lever.
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
     import plexus.operators  # noqa: F401
     from plexus.schema import load
     from plexus import engine

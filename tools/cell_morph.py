@@ -117,13 +117,28 @@ MEMBRANE_MAT = dict(ambient=0.12, diffuse=0.62, specular=0.55, specular_power=60
                     backface_culling=True)
 
 
-def build_spec(target, control_npz, divide=1, n_grid=320, substep_dt=3.174603e-05,
-              dt=0.002, frames_active=20, frames_relax=11, cell_radius=0.1,
-              cell_centre=(0.5, 0.5, 0.5), seed=1):
-    """The cell_morph spec, as a dict -- see the module docstring for what is and is not in it."""
-    over = frames_active - 1                 # see TIMING above
+def build_spec(target, control_npz=None, rate=None, over=None, divide=1, n_grid=320,
+              substep_dt=3.174603e-05, dt=0.002, frames_active=20, frames_relax=11,
+              cell_radius=0.1, cell_centre=(0.5, 0.5, 0.5), seed=1, rigid_sets=None):
+    """The cell_morph spec, as a dict -- see the module docstring for what is and is not in it.
+
+    TWO CONTROL FORMS, mutually exclusive. `control_npz` is the K^3 x 6 field (deform_control's
+    `field:` mode); `rate` is six numbers applied identically to every controlled particle
+    (`rate:` mode) -- the right choice for a target with no spatial structure to it (a disc or a
+    column is the SAME affine map everywhere), and the one that needs no `extent:` at all, since
+    there is no cube to map material coordinates into.
+    """
+    if (control_npz is None) == (rate is None):
+        raise ValueError("build_spec: give exactly one of `control_npz` (field mode) or `rate` "
+                         "(global six-number mode), not both and not neither")
+    if over is None:
+        over = frames_active - 1              # see TIMING above -- the field-mode default
     n_frames = frames_active + frames_relax
     extent = [cell_centre[0], cell_centre[1], cell_centre[2], cell_radius]
+    # WHICH SETS ARE LEFT OUT OF THE CONTROL. Defaults to the whole karyoplasm (RIGID_NUCLEUS);
+    # `rigid_sets=[]` frees it -- every one of the 15 gets `deform_control` -- to test whether an
+    # undeformable inclusion, not the control itself, is what caps how far the cell can follow it.
+    rigid = RIGID_NUCLEUS if rigid_sets is None else list(rigid_sets)
 
     sets = {"cell": {"n": 1, "start": [list(cell_centre)],
                      "state": {
@@ -161,15 +176,19 @@ def build_spec(target, control_npz, divide=1, n_grid=320, substep_dt=3.174603e-0
         gath.append({"op": "mpm_gather", "at": nname, "from": "mpm_grid", "wall_damp": 1.0,
                     "vmax": 1.0, "implementation": "warp"})
         aggr.append({"op": "aggregate_centroid", "at": oname, "child": nname})
-        if nname not in RIGID_NUCLEUS:
-            # `rate: [0]*6` IS DEAD WEIGHT, NEVER READ: `DeformControl.forward` branches to
-            # `_field_forward` and never touches `self.r` whenever `field:` is set. It is here
-            # only because `schema.py::resolve_op_line` checks `REQUIRES_PARAMS` against the RAW
-            # operator line's keys before the operator is even constructed, so a field-mode line
-            # missing `rate:` is refused before `DeformControl.__init__` ever runs its own (correct)
-            # `field is not None` exemption. See the report for the one-line schema fix this wants.
-            deform.append({"op": "deform_control", "at": nname, "field": control_npz,
-                          "extent": extent, "over": over, "rate": [0.0] * 6})
+        if nname not in rigid:
+            if control_npz is not None:
+                # `rate: [0]*6` IS DEAD WEIGHT, NEVER READ: `DeformControl.forward` branches to
+                # `_field_forward` and never touches `self.r` whenever `field:` is set. It is here
+                # only because `schema.py::resolve_op_line` checks `REQUIRES_PARAMS` against the RAW
+                # operator line's keys before the operator is constructed, so a field-mode line
+                # missing `rate:` is refused before `DeformControl.__init__` runs its own (correct)
+                # `field is not None` exemption. See the report for the one-line schema fix this wants.
+                deform.append({"op": "deform_control", "at": nname, "field": control_npz,
+                              "extent": extent, "over": over, "rate": [0.0] * 6})
+            else:
+                deform.append({"op": "deform_control", "at": nname,
+                              "rate": [round(float(v), 6) for v in rate], "over": over})
 
     seeds.append({"op": "seed_state_random", "at": "mitochondria", "block": "voltage",
                  "lo": 0.0, "hi": 1.0, "seed": seed})
@@ -247,15 +266,6 @@ def local_bbox_check(spec):
     nuc_lo, nuc_hi, nuc_n = bbox(RIGID_NUCLEUS)
     all_lo, all_hi, all_n = bbox([f"{o[0]}_node" for o in ORGANELLES])
 
-    cx, cy, cz, half = spec["operators"][0]["extent"]
-    centre = np.array([cx, cy, cz])
-    r_all = np.linalg.norm(
-        torch.cat([H.level(f"{o[0]}_node").get("pos").detach() for o in ORGANELLES],
-                  dim=0).numpy() - centre, axis=1)
-    frac_outside = float((np.abs(
-        torch.cat([H.level(f"{o[0]}_node").get("pos").detach() for o in ORGANELLES],
-                  dim=0).numpy() - centre).max(axis=1) > half).mean())
-
     report = {
         "cell_bbox_lo_t0": cell_lo.tolist(), "cell_bbox_hi_t0": cell_hi.tolist(),
         "cell_n_membrane_points": cell_n,
@@ -263,17 +273,34 @@ def local_bbox_check(spec):
         "nucleus_n_points": nuc_n,
         "whole_cell_bbox_lo_t0": all_lo.tolist(), "whole_cell_bbox_hi_t0": all_hi.tolist(),
         "whole_cell_n_points": all_n,
-        "control_extent": [cx, cy, cz, half],
-        "max_radial_extent_t0": float(r_all.max()),
-        "fraction_points_outside_extent_cube": frac_outside,
     }
     print(f"[cell_morph] t=0 bboxes:")
     print(f"  cell (plasma_membrane_node)     lo={cell_lo} hi={cell_hi}  ({cell_n:,} pts)")
     print(f"  nucleus (envelope+chromatin+nucleolus) lo={nuc_lo} hi={nuc_hi}  ({nuc_n:,} pts)")
     print(f"  whole cell (all 15 organelles)  lo={all_lo} hi={all_hi}  ({all_n:,} pts)")
-    print(f"  control extent [cx,cy,cz,half] = {[cx, cy, cz, half]}; "
-          f"max radial extent at t=0 = {r_all.max():.5f}; "
-          f"{100*frac_outside:.3f}% of points fall outside the control cube (clamped to its edge)")
+
+    # THE EXTENT CHECK ONLY APPLIES TO FIELD MODE -- a `rate:`-mode line has no `extent:` to be
+    # wrong about, since the same six numbers reach every controlled particle regardless of where
+    # it started.
+    first_deform = next((o for o in spec["operators"] if o["op"] == "deform_control"), None)
+    if first_deform is not None and "extent" in first_deform:
+        cx, cy, cz, half = first_deform["extent"]
+        centre = np.array([cx, cy, cz])
+        pts_all = torch.cat([H.level(f"{o[0]}_node").get("pos").detach()
+                             for o in ORGANELLES], dim=0).numpy()
+        r_all = np.linalg.norm(pts_all - centre, axis=1)
+        frac_outside = float((np.abs(pts_all - centre).max(axis=1) > half).mean())
+        report.update({"control_extent": [cx, cy, cz, half],
+                       "max_radial_extent_t0": float(r_all.max()),
+                       "fraction_points_outside_extent_cube": frac_outside})
+        print(f"  control extent [cx,cy,cz,half] = {[cx, cy, cz, half]}; "
+              f"max radial extent at t=0 = {r_all.max():.5f}; "
+              f"{100*frac_outside:.3f}% of points fall outside the control cube (clamped to its edge)")
+    elif first_deform is not None:
+        report["control_rate"] = first_deform["rate"]
+        report["control_over"] = first_deform["over"]
+        print(f"  control: global rate {first_deform['rate']}, over {first_deform['over']} frames "
+              f"(rate mode -- no extent to check, applies identically everywhere)")
     return report
 
 
@@ -303,28 +330,75 @@ def _append_results(entry):
 
 
 def cmd_build(a):
-    control_npz = os.path.abspath(a.control)
-    if not os.path.exists(control_npz):
-        raise FileNotFoundError(
-            f"{control_npz} does not exist -- train it first with jobs/cell_morph.sh train "
-            f"{a.target} (wraps tools/morph_gallery.py --control grid)")
-    z = np.load(control_npz)
-    if "control" not in z.files:
-        raise ValueError(
-            f"{control_npz} has no `control` key (files: {z.files}) -- deform_control's `field:` "
-            f"mode needs the K^3 x 6 rate cube tools/morph_gallery.py writes under that key. This "
-            f"npz looks like it was written by a different/older tool.")
-    K = round(float(z["control"].shape[0]) ** (1.0 / 3.0))
-    control_npz_cluster = _cluster_path(control_npz)
-    print(f"[cell_morph] control field: {control_npz}  ({z['control'].shape[0]} = {K}^3 nodes, "
-          f"6 rates each)")
-    if control_npz_cluster != control_npz:
-        print(f"[cell_morph] spec will reference the CLUSTER path: {control_npz_cluster}")
+    if bool(a.control) == bool(a.rate):
+        raise ValueError("cell_morph build: give exactly one of --control (field npz) or "
+                         "--rate (six numbers, rate mode)")
+    extra = {}
+    if a.control:
+        control_npz = os.path.abspath(a.control)
+        if not os.path.exists(control_npz):
+            raise FileNotFoundError(
+                f"{control_npz} does not exist -- train it first with jobs/cell_morph.sh train "
+                f"{a.target} (wraps tools/morph_gallery.py --control grid)")
+        z = np.load(control_npz)
+        if "control" not in z.files:
+            raise ValueError(
+                f"{control_npz} has no `control` key (files: {z.files}) -- deform_control's "
+                f"`field:` mode needs the K^3 x 6 rate cube tools/morph_gallery.py writes under "
+                f"that key. This npz looks like it was written by a different/older tool.")
+        K = round(float(z["control"].shape[0]) ** (1.0 / 3.0))
+        control_npz_cluster = _cluster_path(control_npz)
+        print(f"[cell_morph] control field: {control_npz}  ({z['control'].shape[0]} = {K}^3 "
+              f"nodes, 6 rates each)")
+        if control_npz_cluster != control_npz:
+            print(f"[cell_morph] spec will reference the CLUSTER path: {control_npz_cluster}")
+        meta = None
+        over = a.over
+        if "meta" in z.files:
+            meta = json.loads(str(z["meta"]))
+            print(f"[cell_morph] npz meta: {meta}")
+            if meta.get("ctrl_K") and int(meta["ctrl_K"]) != K:
+                raise ValueError(f"meta says ctrl_K={meta['ctrl_K']} but control.shape implies "
+                                 f"K={K} -- the npz is internally inconsistent")
+            # `opt_frames - 1`: the SAME tick-0 exclusion as the TIMING note above, now read from
+            # the file's own record instead of assumed from a CLI convention that has to match.
+            if over is None and "opt_frames" in meta:
+                over = int(meta["opt_frames"]) - 1
+                print(f"[cell_morph] `over` defaulted from meta.opt_frames={meta['opt_frames']} "
+                      f"- 1 = {over}")
+        kw = dict(control_npz=control_npz_cluster, over=over)
+        extra = {"control_npz_local": control_npz, "control_npz_cluster": control_npz_cluster,
+                "control_K": K, "control_meta": meta}
+        run_cmd_extra = ""
+    else:
+        rate = [float(v) for v in a.rate.split(",")]
+        if len(rate) != 6:
+            raise ValueError(f"--rate needs six comma-separated numbers, got {len(rate)}")
+        if a.over is None:
+            raise ValueError("--rate mode needs an explicit --over (the number of frames this "
+                             "rate was fitted/reported to act for in its source spec)")
+        print(f"[cell_morph] global rate {rate}, over {a.over} frames "
+              f"(rate x{a.rate_scale:g} on top before writing)" if a.rate_scale != 1.0 else
+              f"[cell_morph] global rate {rate}, over {a.over} frames")
+        over_eff = a.over
+        rate_eff = rate
+        if a.rate_scale != 1.0:
+            # SCALE `over`, NOT THE RATE. G^n = expm(-A n dt) for a CONSTANT A, so extending the
+            # number of frames the rate acts for accumulates exactly the same total deformation a
+            # `rate_scale`x stronger A would over the original `over` -- and it reuses the fitted
+            # numbers unchanged, which is one fewer thing that can be gotten wrong transcribing them.
+            over_eff = max(1, round(a.over * a.rate_scale))
+        kw = dict(rate=rate_eff, over=over_eff)
+        extra = {"control_rate_source": rate, "rate_scale": a.rate_scale,
+                "over_source": a.over, "over_effective": over_eff}
+        run_cmd_extra = ""
 
-    spec, total, over = build_spec(a.target, control_npz_cluster, divide=a.divide, n_grid=a.n_grid,
+    rigid_sets = [] if a.free_nucleus else RIGID_NUCLEUS
+    spec, total, over = build_spec(a.target, divide=a.divide, n_grid=a.n_grid,
                                    substep_dt=a.substep_dt, dt=a.dt,
                                    frames_active=a.frames_active, frames_relax=a.frames_relax,
-                                   cell_radius=a.cell_radius, seed=a.seed)
+                                   cell_radius=a.cell_radius, seed=a.seed, rigid_sets=rigid_sets,
+                                   **kw)
     out = os.path.join(ROOT, "config", "cell", f"cell_morph_{a.target}.yaml")
     with open(out, "w") as f:
         yaml.safe_dump(spec, f, sort_keys=False, default_flow_style=False)
@@ -332,27 +406,28 @@ def cmd_build(a):
     print(f"[cell_morph] wrote {out}")
     print(f"  {total:,} material points (divide={a.divide}), {n_sets} sets, "
           f"{len(spec['operators'])} operators, n_frames={spec['general']['n_frames']}, "
-          f"over={over} (deform_control active on frames 0..{over-1})")
-    print(f"  rigid (no deform_control): {RIGID_NUCLEUS}")
-    print(f"  controlled ({len([o for o in ORGANELLES if f'{o[0]}_node' not in RIGID_NUCLEUS])} "
-          f"sets): {[f'{o[0]}_node' for o in ORGANELLES if f'{o[0]}_node' not in RIGID_NUCLEUS]}")
+          f"over={over}")
+    print(f"  rigid (no deform_control): {rigid_sets}")
+    print(f"  controlled ({len([o for o in ORGANELLES if f'{o[0]}_node' not in rigid_sets])} "
+          f"sets): {[f'{o[0]}_node' for o in ORGANELLES if f'{o[0]}_node' not in rigid_sets]}")
 
     bboxes = local_bbox_check(spec)
     _append_results({
         "target": a.target, "spec": os.path.relpath(out, ROOT),
-        "control_npz_local": control_npz, "control_npz_cluster": control_npz_cluster,
-        "control_K": K, "divide": a.divide, "n_grid": a.n_grid, "substep_dt": a.substep_dt,
+        "divide": a.divide, "n_grid": a.n_grid, "substep_dt": a.substep_dt,
         "dt": a.dt, "n_frames": spec["general"]["n_frames"], "over": over,
         "total_points": total, "cell_radius": a.cell_radius,
-        "rigid_sets": RIGID_NUCLEUS,
+        "rigid_sets": rigid_sets,
         "controlled_sets": [f"{o[0]}_node" for o in ORGANELLES
-                           if f"{o[0]}_node" not in RIGID_NUCLEUS],
+                           if f"{o[0]}_node" not in rigid_sets],
         "t0_bboxes": bboxes,
         "commands": {
             "build": " ".join(sys.argv),
             "run": f"conda run -n connectome-gnn python Plexus_Main.py -o generate "
-                  f"cell/cell_morph_{a.target} --device cuda:0 --force",
+                  f"cell/cell_morph_{a.target} --device cuda:0 --force --keep-stills "
+                  f"--render-stills 8",
         },
+        **extra,
     })
 
 
@@ -461,7 +536,17 @@ def main():
 
     b = sub.add_parser("build", help="write config/cell/cell_morph_<target>.yaml and check bboxes")
     b.add_argument("--target", required=True)
-    b.add_argument("--control", required=True, help="path to a morph.npz with a `control` key")
+    b.add_argument("--control", default=None, help="path to a morph.npz with a `control` key "
+                  "(field mode). Give this OR --rate, not both.")
+    b.add_argument("--rate", default=None, help="six comma-separated numbers (rate mode): the "
+                  "SAME global rate applied to every controlled particle, no field/extent -- the "
+                  "right form for a target with no spatial structure (a disc, a column).")
+    b.add_argument("--over", type=int, default=None, help="frames the control acts for. Field "
+                  "mode defaults to --frames-active - 1; rate mode has no default and must be "
+                  "given (the number of frames the source rate was fitted/reported against).")
+    b.add_argument("--rate-scale", type=float, default=1.0, help="rate mode only: extend `over` "
+                  "by this factor (same total accumulated deformation as scaling the rate itself, "
+                  "for a constant A) -- how much harder to drive the SAME control.")
     b.add_argument("--divide", type=int, default=1, help="cut every organelle's node budget by this")
     b.add_argument("--n-grid", type=int, default=320)
     b.add_argument("--substep-dt", type=float, default=3.174603e-05)
