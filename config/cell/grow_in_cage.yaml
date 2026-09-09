@@ -461,7 +461,7 @@ operators:
   at: protein_e_node
   pressure: 20.0
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: plasma_membrane_node
   surface: vertex
   side: inside
@@ -472,7 +472,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: cytoskeleton_node
   surface: vertex
   side: inside
@@ -483,7 +483,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: nuclear_envelope_node
   surface: vertex
   side: inside
@@ -494,7 +494,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: chromatin_node
   surface: vertex
   side: inside
@@ -505,7 +505,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: nucleolus_node
   surface: vertex
   side: inside
@@ -516,7 +516,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: rough_er_node
   surface: vertex
   side: inside
@@ -527,7 +527,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: smooth_er_node
   surface: vertex
   side: inside
@@ -538,7 +538,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: golgi_node
   surface: vertex
   side: inside
@@ -549,7 +549,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: mitochondria_node
   surface: vertex
   side: inside
@@ -560,7 +560,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: centriole_node
   surface: vertex
   side: inside
@@ -571,7 +571,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: protein_a_node
   surface: vertex
   side: inside
@@ -582,7 +582,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: protein_b_node
   surface: vertex
   side: inside
@@ -593,7 +593,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: protein_c_node
   surface: vertex
   side: inside
@@ -604,7 +604,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: protein_d_node
   surface: vertex
   side: inside
@@ -615,7 +615,7 @@ operators:
   a_max: 200.0
   centre: centroid
 - op: mesh_contact
-  model: spatial_hash
+  model: centre
   at: protein_e_node
   surface: vertex
   side: inside
@@ -933,7 +933,7 @@ schedule:
 - mpm_turgor
 - mpm_turgor
 - mpm_turgor
-- substep_dt: 3.125000e-05
+- substep_dt: 3.125e-05
   steps:
   - mesh_contact
   - mesh_contact
@@ -1215,3 +1215,15 @@ plotting:
   mesh_edges: false
   mesh_opacity: 0.2
   mesh_color: '#9fd0f0'
+descriptions:
+  movie:
+    description: A cluster of particles is centered within a large cubic simulation
+      domain. Over the course of the sequence, the central cluster undergoes a subtle
+      expansion and internal reorganization. The particles maintain a roughly spherical
+      distribution while exhibiting slight fluctuations in density. The overall structure
+      remains stable and centered throughout the observed time interval.
+    objects: The primary object is a dense, spherical cluster of small particles located
+      at the center of the frame. These particles appear in shades of blue, cyan,
+      and faint purple, creating a glowing effect. The cluster is contained within
+      a large, transparent wireframe cube that represents the simulation boundary.
+      A scale bar in the bottom left corner indicates a physical dimension of 10 micrometers.
