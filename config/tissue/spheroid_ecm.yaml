@@ -179,7 +179,6 @@ operators:
 - op: mesh_contact
   at: mpm_particle
   surface: vertex
-  model: spatial_hash
   k_frac: 0.15
   mu: 0.4
   dt: 0.0032
