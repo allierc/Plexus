@@ -4450,7 +4450,13 @@ def _apicobasal_energy_core(pos, sep, es, et, ef, nF, V_eq, alive, k_v, kappa_s,
     if Lam != 0.0:
         E = E + Lam * ((ring[et] - ring[es]).norm(dim=-1) * eocc).sum()
     if K_R != 0.0:
-        E = E + K_R * (((ring.norm(dim=1) - R0) ** 2) * vocc).sum()
+        # THE RADIUS IS MEASURED FROM THE TISSUE'S OWN CENTRE, weighted by occupancy so dead
+        # buffer rows do not pull it. |x| is the same thing only for a vesicle at the origin;
+        # seeded at a wall box's centre the spring pulled every vertex toward the corner. See
+        # ApicoBasalShapeEnergy3D._calibrate for the measurement.
+        _w = vocc.to(ring.dtype).reshape(-1, 1)
+        _c = (ring * _w).sum(dim=0, keepdim=True) / _w.sum().clamp(min=1.0)
+        E = E + K_R * ((((ring - _c).norm(dim=1) - R0) ** 2) * vocc).sum()
     return E
 
 
@@ -4467,7 +4473,10 @@ def _monolayer_energy_core(pos, es, et, ef, nF, h_cell, V_eq, alive, k_v, kappa_
     if Lam != 0.0:
         E = E + Lam * ((pos[et] - pos[es]).norm(dim=-1) * eocc).sum()
     if K_R != 0.0:
-        E = E + K_R * (((pos.norm(dim=1) - R0) ** 2) * vocc).sum()
+        # from the tissue's own centre, as in _apicobasal_energy_core above
+        _w = vocc.to(pos.dtype).reshape(-1, 1)
+        _c = (pos * _w).sum(dim=0, keepdim=True) / _w.sum().clamp(min=1.0)
+        E = E + K_R * ((((pos - _c).norm(dim=1) - R0) ** 2) * vocc).sum()
     return E
 
 
@@ -4563,12 +4572,22 @@ class MonolayerShapeEnergy3D(Lateral):
         what pins the answer: it asks for the offset whose equilibrium radius IS the seed radius,
         rather than whatever radius the relaxation happens to wander to.
         """
-        R_target = x0.norm(dim=1).mean().clamp(min=1e-9)
+        # ABOUT THE VESICLE'S OWN CENTRE, NOT THE ORIGIN. Every radius here was |x|, which is the
+        # same thing only for a vesicle seeded at (0, 0, 0). Seeded at the centre of a wall box, a
+        # 5.0-radius shell sat 43 from the origin: R_target became 43, `u` pointed along (1, 1, 1)
+        # for every vertex, and the rescale at the end of the loop squeezed the whole tissue along
+        # that diagonal while dragging it toward the corner -- measured as a mid-radius of 7.16
+        # against 5.00 from the same seed, and a centroid drifting 0.35 a frame, before the first
+        # frame was drawn. The centroid is weighted by occupancy so dead buffer rows do not pull it.
+        def _ctr(y):
+            w = vocc.to(y.dtype).reshape(-1, 1)
+            return (y * w).sum(dim=0, keepdim=True) / w.sum().clamp(min=1.0)
+        R_target = (x0 - _ctr(x0)).norm(dim=1).mean().clamp(min=1e-9)
         delta = torch.zeros((), dtype=x0.dtype, device=x0.device)
         x = x0.clone()
         for _ in range(8):
             V_eq = (V_eq0 + delta).clamp(min=1e-9)
-            u = x / x.norm(dim=1, keepdim=True).clamp(min=1e-9)         # outward radial direction
+            u = (x - _ctr(x)) / (x - _ctr(x)).norm(dim=1, keepdim=True).clamp(min=1e-9)         # outward radial direction
             g0 = self._grad(x, es, et, ef, nF, h, V_eq, alive, R0t, eocc, vocc)
             with torch.enable_grad():                                   # grad of TOTAL cell volume
                 xg = x.detach().requires_grad_(True)
@@ -4590,7 +4609,8 @@ class MonolayerShapeEnergy3D(Lateral):
                 s = -(self.eta * self.mu) * self._grad(x, es, et, ef, nF, h, V_eq, alive,
                                                        R0t, eocc, vocc)
                 x = x + s * torch.clamp(cap / (s.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
-            x = x * (R_target / x.norm(dim=1).mean().clamp(min=1e-9))
+            c = _ctr(x)
+            x = c + (x - c) * (R_target / (x - c).norm(dim=1).mean().clamp(min=1e-9))
         return delta.detach()
 
     def _grad(self, x, es, et, ef, nF, h, V_eq, alive, R0t, eocc, vocc):
@@ -4793,12 +4813,22 @@ class ApicoBasalShapeEnergy3D(Lateral):
         is which target volume puts the MID-SURFACE at radius R; letting the thickness relax inside
         the calibration would answer it with a different tissue than the one that then runs.
         """
-        R_target = x0.norm(dim=1).mean().clamp(min=1e-9)
+        # ABOUT THE VESICLE'S OWN CENTRE, NOT THE ORIGIN. Every radius here was |x|, which is the
+        # same thing only for a vesicle seeded at (0, 0, 0). Seeded at the centre of a wall box, a
+        # 5.0-radius shell sat 43 from the origin: R_target became 43, `u` pointed along (1, 1, 1)
+        # for every vertex, and the rescale at the end of the loop squeezed the whole tissue along
+        # that diagonal while dragging it toward the corner -- measured as a mid-radius of 7.16
+        # against 5.00 from the same seed, and a centroid drifting 0.35 a frame, before the first
+        # frame was drawn. The centroid is weighted by occupancy so dead buffer rows do not pull it.
+        def _ctr(y):
+            w = vocc.to(y.dtype).reshape(-1, 1)
+            return (y * w).sum(dim=0, keepdim=True) / w.sum().clamp(min=1.0)
+        R_target = (x0 - _ctr(x0)).norm(dim=1).mean().clamp(min=1e-9)
         delta = torch.zeros((), dtype=x0.dtype, device=x0.device)
         x = x0.clone()
         for _ in range(8):
             V_eq = (V_eq0 + delta).clamp(min=1e-9)
-            u = x / x.norm(dim=1, keepdim=True).clamp(min=1e-9)
+            u = (x - _ctr(x)) / (x - _ctr(x)).norm(dim=1, keepdim=True).clamp(min=1e-9)
             g0, _ = self._grad(x, s0, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc, False)
             with torch.enable_grad():
                 xg = x.detach().requires_grad_(True)
@@ -4818,7 +4848,8 @@ class ApicoBasalShapeEnergy3D(Lateral):
                 gx, _ = self._grad(x, s0, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc, False)
                 st = -(self.eta * self.mu) * gx
                 x = x + st * torch.clamp(cap / (st.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
-            x = x * (R_target / x.norm(dim=1).mean().clamp(min=1e-9))
+            c = _ctr(x)
+            x = c + (x - c) * (R_target / (x - c).norm(dim=1).mean().clamp(min=1e-9))
         return delta.detach()
 
     # ---------------------------------------------------------------- forward
