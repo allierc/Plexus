@@ -1,0 +1,166 @@
+general:
+  name: sheet_die
+  seed: 0
+  n_frames: 400
+  dt: 1.0
+  record_cap: 402
+  boundary: free
+  dim: 3
+  world:
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 4000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 2000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+      chem:
+        width: 2
+        integration: first_order
+  half_edge:
+    n: 16000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  shape: disc
+  n_cells: 400
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: cell_die
+  at: vertex
+  p0: 3.5
+  model: prescribed
+  region: list
+  cells:
+  - 173
+  shrink_rate: 0.05
+  critical_frac: 0.15
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_mechanics
+- cell_die
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_mark_division: true
+  mesh_apop_color: '#e8c33a'
+  camera:
+    elev: 90.0
+    azim: 0.0
+descriptions:
+  movie:
+    description: A blue particle is initially located at the center of a large, flat,
+      elliptical mesh of grey cells. As the simulation progresses, the blue particle
+      rapidly moves outward from the center toward the right edge of the mesh. The
+      mesh itself remains stationary and maintains its shape throughout the entire
+      duration of the video. By the final frame, the blue particle has reached the
+      outer boundary of the grey cell structure.
+    objects: The primary object is a large, elliptical mesh composed of hundreds of
+      small, interconnected grey cells. These cells are arranged in a dense, repeating
+      pattern to form a flat, disc-like surface. A single, small blue particle is
+      positioned at the center of this mesh at the start of the sequence. The blue
+      particle is significantly smaller than the individual grey cells and moves independently
+      across the surface.
+  movie_kburns:
+    description: The simulation shows a collection of hexagonal cells forming a flat,
+      elliptical sheet. Over time, the sheet undergoes a subtle expansion and slight
+      deformation in its overall shape. The internal structure of the mesh remains
+      consistent as the cells shift slightly to accommodate the growth. The final
+      frames show a slightly larger and more elongated version of the initial mesh.
+    objects: The scene contains a large, elliptical mesh composed of numerous small
+      hexagonal cells. These cells are arranged in a dense, interlocking honeycomb
+      pattern to form a continuous surface. The mesh is colored in a light grey or
+      off-white shade against a solid black background. Each individual hexagon is
+      uniform in size and shape, creating a repetitive geometric texture.
