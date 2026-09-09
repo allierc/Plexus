@@ -1,7 +1,7 @@
 general:
-  name: squeeze_prism
+  name: compress_cage
   seed: 1
-  n_frames: 400
+  n_frames: 500
   dt: 0.002
   boundary: wall
   dim: 3
@@ -12,7 +12,7 @@ general:
   save_data: null
   units:
     length_um: 100.0
-  record_cap: 120
+  record_cap: 125
 sets:
   cell:
     n: 1
@@ -23,7 +23,7 @@ sets:
   plasma_membrane:
     parent: cell
     per_parent: 421
-    radius: 0.075
+    radius: 0.045
     types:
       plasma_membrane:
         fraction: 1.0
@@ -33,13 +33,13 @@ sets:
   plasma_membrane_node:
     parent: plasma_membrane
     per_parent: 15
-    radius: 0.075
+    radius: 0.045
     density: 1.0
     entity: mpm_particle
   cytoskeleton:
     parent: cell
     per_parent: 400
-    radius: 0.075
+    radius: 0.045
     types:
       cytoskeleton:
         fraction: 1.0
@@ -49,13 +49,13 @@ sets:
   cytoskeleton_node:
     parent: cytoskeleton
     per_parent: 30
-    radius: 0.075
+    radius: 0.045
     density: 1.0
     entity: mpm_particle
   nuclear_envelope:
     parent: cell
     per_parent: 138
-    radius: 0.075
+    radius: 0.045
     types:
       nucleus:
         fraction: 1.0
@@ -65,13 +65,13 @@ sets:
   nuclear_envelope_node:
     parent: nuclear_envelope
     per_parent: 250
-    radius: 0.075
+    radius: 0.045
     density: 1.1
     entity: mpm_particle
   chromatin:
     parent: cell
     per_parent: 31
-    radius: 0.075
+    radius: 0.045
     types:
       chromatin:
         fraction: 1.0
@@ -81,13 +81,13 @@ sets:
   chromatin_node:
     parent: chromatin
     per_parent: 62
-    radius: 0.075
+    radius: 0.045
     density: 1.2
     entity: mpm_particle
   nucleolus:
     parent: cell
     per_parent: 2
-    radius: 0.075
+    radius: 0.045
     types:
       nucleolus:
         fraction: 1.0
@@ -97,13 +97,13 @@ sets:
   nucleolus_node:
     parent: nucleolus
     per_parent: 62
-    radius: 0.075
+    radius: 0.045
     density: 1.3
     entity: mpm_particle
   rough_er:
     parent: cell
     per_parent: 11
-    radius: 0.075
+    radius: 0.045
     types:
       rough_er:
         fraction: 1.0
@@ -113,13 +113,13 @@ sets:
   rough_er_node:
     parent: rough_er
     per_parent: 625
-    radius: 0.075
+    radius: 0.045
     density: 1.0
     entity: mpm_particle
   smooth_er:
     parent: cell
     per_parent: 3
-    radius: 0.075
+    radius: 0.045
     types:
       smooth_er:
         fraction: 1.0
@@ -129,13 +129,13 @@ sets:
   smooth_er_node:
     parent: smooth_er
     per_parent: 625
-    radius: 0.075
+    radius: 0.045
     density: 1.0
     entity: mpm_particle
   golgi:
     parent: cell
     per_parent: 14
-    radius: 0.075
+    radius: 0.045
     types:
       golgi:
         fraction: 1.0
@@ -145,13 +145,13 @@ sets:
   golgi_node:
     parent: golgi
     per_parent: 62
-    radius: 0.075
+    radius: 0.045
     density: 1.0
     entity: mpm_particle
   mitochondria:
     parent: cell
     per_parent: 77
-    radius: 0.075
+    radius: 0.045
     types:
       mitochondria:
         fraction: 1.0
@@ -176,13 +176,13 @@ sets:
   mitochondria_node:
     parent: mitochondria
     per_parent: 62
-    radius: 0.075
+    radius: 0.045
     density: 1.1
     entity: mpm_particle
   centriole:
     parent: cell
     per_parent: 2
-    radius: 0.075
+    radius: 0.045
     types:
       centriole:
         fraction: 1.0
@@ -192,13 +192,13 @@ sets:
   centriole_node:
     parent: centriole
     per_parent: 62
-    radius: 0.075
+    radius: 0.045
     density: 1.1
     entity: mpm_particle
   protein_a:
     parent: cell
     per_parent: 1
-    radius: 0.075
+    radius: 0.045
     types:
       protein_a:
         fraction: 1.0
@@ -209,13 +209,13 @@ sets:
   protein_a_node:
     parent: protein_a
     per_parent: 6250
-    radius: 0.075
+    radius: 0.045
     density: 0.6
     entity: mpm_particle
   protein_b:
     parent: cell
     per_parent: 1
-    radius: 0.075
+    radius: 0.045
     types:
       protein_b:
         fraction: 1.0
@@ -226,13 +226,13 @@ sets:
   protein_b_node:
     parent: protein_b
     per_parent: 6250
-    radius: 0.075
+    radius: 0.045
     density: 0.6
     entity: mpm_particle
   protein_c:
     parent: cell
     per_parent: 1
-    radius: 0.075
+    radius: 0.045
     types:
       protein_c:
         fraction: 1.0
@@ -243,13 +243,13 @@ sets:
   protein_c_node:
     parent: protein_c
     per_parent: 6250
-    radius: 0.075
+    radius: 0.045
     density: 0.6
     entity: mpm_particle
   protein_d:
     parent: cell
     per_parent: 1
-    radius: 0.075
+    radius: 0.045
     types:
       protein_d:
         fraction: 1.0
@@ -260,13 +260,13 @@ sets:
   protein_d_node:
     parent: protein_d
     per_parent: 6250
-    radius: 0.075
+    radius: 0.045
     density: 0.6
     entity: mpm_particle
   protein_e:
     parent: cell
     per_parent: 1
-    radius: 0.075
+    radius: 0.045
     types:
       protein_e:
         fraction: 1.0
@@ -277,7 +277,7 @@ sets:
   protein_e_node:
     parent: protein_e
     per_parent: 6250
-    radius: 0.075
+    radius: 0.045
     density: 0.6
     entity: mpm_particle
   vertex:
@@ -336,8 +336,8 @@ seed:
   at: vertex
   shape: prism
   n_cells: 12
-  radius: 0.07
-  height: 0.075
+  radius: 0.085
+  height: 0.105
   centre:
   - 0.175
   - 0.175
@@ -348,7 +348,7 @@ seed:
 - op: seed_cell_atlas
   at: plasma_membrane
   particles: plasma_membrane_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
   geometry:
     plasma_membrane:
@@ -356,72 +356,72 @@ seed:
 - op: seed_cell_atlas
   at: cytoskeleton
   particles: cytoskeleton_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: nuclear_envelope
   particles: nuclear_envelope_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: chromatin
   particles: chromatin_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: nucleolus
   particles: nucleolus_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: rough_er
   particles: rough_er_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: smooth_er
   particles: smooth_er_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: golgi
   particles: golgi_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: mitochondria
   particles: mitochondria_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: centriole
   particles: centriole_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_a
   particles: protein_a_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_b
   particles: protein_b_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_c
   particles: protein_c_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_d
   particles: protein_d_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_cell_atlas
   at: protein_e
   particles: protein_e_node
-  cell_radius: 0.075
+  cell_radius: 0.045
   vel_init: 0.0
 - op: seed_state_random
   at: mitochondria
@@ -430,6 +430,12 @@ seed:
   hi: 1.0
   seed: 1
 operators:
+- op: surface_drive
+  at: vertex
+  grow: 0.45
+  over: 350
+  hold: 25
+  rigid: true
 - op: mesh_contact
   model: centre
   at: plasma_membrane_node
@@ -888,14 +894,15 @@ operators:
   child: plasma_membrane
 - op: radius_graph
   at: mitochondria
-  radius: 0.15
+  radius: 0.09
 - op: radius_graph
   at: nuclear_envelope
-  radius: 0.15
+  radius: 0.09
 - op: radius_graph
   at: rough_er
-  radius: 0.15
+  radius: 0.09
 schedule:
+- surface_drive
 - substep_dt: 3.125e-05
   steps:
   - mesh_contact
@@ -1027,7 +1034,7 @@ plotting:
   - protein_e_node
   surface:
     plasma_membrane_node:
-      spacing: 0.00357
+      spacing: 0.00214
       blur: 1.4
       smooth: 40
       ambient: 0.12
@@ -1039,7 +1046,7 @@ plotting:
       render: dots
       point_size: 0.9
     nuclear_envelope_node:
-      spacing: 0.00268
+      spacing: 0.00161
       blur: 1.2
       smooth: 30
     chromatin_node:
@@ -1180,28 +1187,26 @@ plotting:
   mesh_color: '#9fd0f0'
 descriptions:
   movie:
-    description: The simulation shows a spherical object containing a complex internal
-      structure of particles and fields. Over the course of the sequence, the internal
-      distribution of these elements remains relatively stable within the sphere.
-      The surrounding bounding box and scale bar provide a fixed spatial reference
-      for the simulation. The overall scene depicts a steady-state or slow-evolving
-      microscopic physical process.
-    objects: A large, translucent blue sphere occupies the center of a 3D bounding
-      box. Inside the sphere, there is a dense cluster of purple and cyan particles
-      forming a central core. A dark, irregular void or cavity is visible on the right
-      side of the internal structure. The entire scene is contained within a wireframe
-      cube with a 10 $\mu$m scale bar in the bottom left corner.
+    description: A cluster of particles is centered within a large cubic simulation
+      domain. Over the course of the sequence, the central cluster undergoes a subtle
+      expansion and internal reorganization. The particles maintain a roughly spherical
+      distribution while exhibiting slight fluctuations in density. The overall structure
+      remains stable and centered throughout the observed time interval.
+    objects: The primary object is a dense, spherical cluster of small particles located
+      at the center of the frame. These particles appear in shades of blue, cyan,
+      and faint purple, creating a glowing effect. The cluster is contained within
+      a large, transparent wireframe cube that represents the simulation boundary.
+      A scale bar in the bottom left corner indicates a physical dimension of 10 micrometers.
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
-    description: The simulation shows a complex, multi-layered structure evolving within a 3D bounding
-      box. The central core maintains a relatively stable, rounded shape while the surrounding translucent
-      layers exhibit subtle fluctuations. There is a slight shift in the internal density and surface
-      contours as the simulation progresses through the frames. The overall volume remains contained within
-      the defined spatial grid throughout the sequence.
-    objects: The primary object is a large, roughly spherical multi-layered structure centered in the
-      frame. It features a dense, light-blue core surrounded by several concentric, semi-transparent greyish-blue
-      shells. The outer shell has an irregular, slightly lobed topology with visible surface textures.
-      The entire structure is approximately 20 micrometers in diameter, situated within a 35 micrometer
-      cubic simulation box.
+    description: A spherical cluster of particles is initially surrounded by a larger, translucent shell.
+      Over time, the outer shell contracts inward toward the center of the simulation box. The internal
+      cluster of particles becomes more densely packed and concentrated as the volume decreases. By the
+      final frame, the outer shell has almost entirely collapsed onto the central core.
+    objects: The primary object is a spherical cluster of small, multi-colored particles located at the
+      center of a 35 $\mu$m cube. This cluster is enclosed within a larger, semi-transparent blue shell
+      that occupies a significant portion of the central space. The particles within the core appear to
+      be arranged in a chaotic, cloud-like distribution. A scale bar in the bottom left corner indicates
+      a length of 10 $\mu$m for reference.

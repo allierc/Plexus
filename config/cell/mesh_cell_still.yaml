@@ -784,12 +784,11 @@ descriptions:
 descriptions:
   movie:
     description: The simulation shows a multi-colored, textured object resting on the bottom surface of
-      a large cubic domain. A secondary, faint, spherical cloud of particles is suspended in the center
-      of the cube. Over the course of the frames, the primary object remains stationary while the surrounding
-      environment stays constant. There is no visible movement or evolution of the objects between the
-      provided keyframes.
-    objects: The primary object is a flattened, dome-shaped structure with a complex, fibrous internal
-      texture. It features a vibrant color gradient ranging from red and yellow in the center to cyan
-      and green at the edges. A smaller, sparse cluster of dark grey particles forms a spherical shape
-      in the middle of the cube. The entire scene is contained within a large, wireframe cube with a scale
-      bar indicating a dimension of 25 micrometers.
+      a large cubic domain. Over the course of the video, the object remains stationary in its position
+      while its internal colors and patterns shift slightly. The surrounding environment is a dark, empty
+      void defined by a white wireframe cube. No external forces or large-scale movements occur within
+      the 100 $\mu$m box.
+    objects: A single, flattened, dome-shaped object sits at the center of the bottom plane. It features
+      a complex internal texture with a mix of cyan, green, red, and yellow colors. The object is relatively
+      small, measuring approximately 25 $\mu$m in width according to the provided scale bar. The scene
+      is enclosed within a large, white wireframe cube representing a 100 $\mu$m simulation box.
