@@ -341,7 +341,7 @@ window.Quarto = {
   <li><a href="#the-language" id="toc-the-language" class="nav-link active" data-scroll-target="#the-language">The language</a></li>
   <li><a href="#composing-mechanisms" id="toc-composing-mechanisms" class="nav-link" data-scroll-target="#composing-mechanisms">Composing mechanisms</a></li>
   <li><a href="#composing-hierarchy" id="toc-composing-hierarchy" class="nav-link" data-scroll-target="#composing-hierarchy">Composing hierarchy</a></li>
-  <li><a href="#the-corpus-decomposed" id="toc-the-corpus-decomposed" class="nav-link" data-scroll-target="#the-corpus-decomposed">The corpus, decomposed</a></li>
+  <li><a href="#examples" id="toc-examples" class="nav-link" data-scroll-target="#examples">Examples</a></li>
   <li><a href="#read-the-blueprint" id="toc-read-the-blueprint" class="nav-link" data-scroll-target="#read-the-blueprint">Read the blueprint</a></li>
   </ul>
 </nav>
@@ -405,9 +405,9 @@ window.Quarto = {
 <p>Fields are level-specific too. <strong>Exchange</strong> couples a set to a field at the appropriate level, allowing a protein concentration field, a cellular morphogen field and a tissue mechanical grid to coexist as distinct objects.</p>
 <p>The consequence is that proteins → cells → tissues is not a pipeline of separate simulators. It is one compositional graph: multiple sets may coexist inside each parent, operators connect them locally, and aggregate/broadcast connect the levels. The same operator kinds are reused throughout; adding another biological scale requires no new engine.</p>
 </section>
-<section id="the-corpus-decomposed" class="level2">
-<h2 class="anchored" data-anchor-id="the-corpus-decomposed">The corpus, decomposed</h2>
-<p>This is the second objective at work: published models taken apart into the same operator kinds and put back together as schedules. Each clip below is one <code>spec.yaml</code> and no per-model code, so what differs between any two of them is a set, an operator or a number — never the engine. The sections climb from single mechanisms, to mechanisms composed on the same entities, to models that span levels; hover (or tab to) a title to read the exact spec that generated it.</p>
+<section id="examples" class="level2">
+<h2 class="anchored" data-anchor-id="examples">Examples</h2>
+<p>Hover (or tab to) a title to read the exact spec that generated it.</p>
 <style>
 /* Four clips per row everywhere. `g3` is kept as an alias of `g4` rather than deleted from the
    markup, because three of the galleries below are rewritten wholesale by
@@ -433,7 +433,7 @@ window.Quarto = {
 </style>
 
 <h3 class="anchored">Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">The simplest composition: cells carrying two molecular states, coupled by diffusion between neighbouring cells and by local activator–inhibitor reactions within each cell. The same biological entities participate in two mechanisms whose composition generates spatial patterning. Shown on a 2D cell disc are a striped regime, a spotted one obtained by changing a single reaction parameter, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
+<p class="opk">Reaction-diffusion simulations have been decomposed into four operators: one seed for initialisation (cell positions, numbers, states), one rewire (the cell graph) and two laterals, reaction and diffusion. By composing these with different number of reactions, entities and states we can build different variants of reaction-diffusion simulations. Shown on a 2D disc of cells are a striped regime, a spotted one obtained by changing a single reaction parameter, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card figure">
@@ -495,7 +495,7 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">One set of 4,000 cells, two chemical states each. Seed, rewire (the cell graph), then diffusion and reaction in one schedule. The bands are the composition, not an operator.</span>
+      <span class="sim-cap">4,000 cells, two chemical states each. Four operators: one initialisation (seed), the cell graph (rewire), diffusion and reaction (lateral).</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -557,7 +557,7 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">The same set, the same four operators. One reaction constant differs and nothing else. The bands break into spots.</span>
+      <span class="sim-cap">One reaction constant differs and nothing else. The bands break into spots.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -641,7 +641,7 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">The same 4,000 cells, now carrying two chemistries. Two diffusion and two reaction operators in one schedule. The patterns exclude one another.</span>
+      <span class="sim-cap">The same 4,000 cells, now carrying two chemistries. Two diffusion and two reaction operators. The patterns exclude one another.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -709,7 +709,7 @@ plotting:
   - '#ff0000'
   - '#00ff00'
   - '#0000ff'</pre></span></span>
-      <span class="sim-cap">4,000 cells, three species each suppressing the next. The same operators, cyclically coupled. Domains that never settle.</span>
+      <span class="sim-cap">4,000 cells, three species each suppressing the next. Three reaction operators, cyclically coupled.</span>
     </figcaption>
   </figure>
 </div>
