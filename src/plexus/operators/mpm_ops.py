@@ -2690,6 +2690,20 @@ class MPMScatterWarp(MPMScatter):
     def forward(self, H, mask=None):
         if not HAVE_WARP:
             raise RuntimeError("mpm_scatter[warp] needs warp-lang; none importable")
+        # `store_stress` IS A TORCH-BODY FEATURE AND SAYING SO IS THE WHOLE POINT. The kernel below
+        # accumulates momentum straight into the grid with atomics and never materialises the
+        # per-particle Cauchy stress the default body caches to `sigma`. Asking for it here used to
+        # do nothing at all, and the failure surfaced two operators away: `ecm_stress[measure:
+        # vonmises]` found no buffer, said so, and fell back to |J-1| -- a DIFFERENT quantity, drawn
+        # in the same colours, on a run whose subject is stress. A silently ignored declaration is
+        # worse than an unsupported one.
+        if getattr(self, "store_stress", False):
+            raise ValueError(
+                "mpm_scatter[warp]: `store_stress: true` is not implemented on the warp body, "
+                "which never forms the per-particle stress it would cache. Drop "
+                "`implementation: warp` on this operator to use the default body, which does, or "
+                "drop `store_stress` and accept that anything reading `sigma` (such as "
+                "`ecm_stress[measure: vonmises]`) will fall back to a different quantity.")
         from plexus.operators.mpm_ops import sub_dt
         p = H.level(self.at); g = H.field(self.to); dev = p.state.device
         D = p.F.shape[-1]
