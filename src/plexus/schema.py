@@ -284,7 +284,12 @@ def load(path: str) -> Spec:
 
         # optional `state:` block -- the set's StateSchema (the fifth primitive). Absent =>
         # the spatial pos/vel default. Each entry is a width (int) or {width, integration,
-        # boundary, role, record}. Validate here so a malformed schema fails at load.
+        # boundary, role, record, unit}. Validate here so a malformed schema fails at load.
+        #
+        # `unit:` IS NOT VALIDATED HERE, AND THAT IS THE POINT. It is a `plexus.units` quantity
+        # string -- "volume", "1/T", "volume[polyhedron]" -- and an unreadable one parses to
+        # UNKNOWN rather than raising, because the units layer is WARN-ONLY: a typo in an
+        # annotation must never stop a run. The checker reports it; the loader does not refuse it.
         st = s.get("state")
         if st is not None:
             if not isinstance(st, dict) or not st:
