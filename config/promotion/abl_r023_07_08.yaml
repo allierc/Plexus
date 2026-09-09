@@ -25,22 +25,62 @@ sets:
   vertex:
     n: 130004
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 65004
     state:
       chem:
         width: 2
         integration: first_order
-      cen:
+      centroid:
         width: 3
       area:
         width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+      elong:
+        width: 1
+        record: false
+  half_edge:
+    n: 520032
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     before_frame: 1
     n_cells: 2000
     radius: 5.0
@@ -85,7 +125,6 @@ operators:
     field: elong
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.001732
     a_sw: 0.35
     hill: 8.0
@@ -95,7 +134,6 @@ operators:
     conserve_amount: false
   - op: cell_die
     at: vertex
-    cell_set: cell
     p0: 3.5
     max_mark_frac: 0.005
     min_age: 4

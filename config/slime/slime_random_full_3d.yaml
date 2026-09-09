@@ -56,21 +56,6 @@ schedule:
 - sense
 - bounce
 - glide
-plotting:
-  renderer: vtk_points
-  colors:
-    a:
-    - 0.2
-    - 0.95
-    - 0.65
-  background: black
-  splat_size: 2.4
-  splat_sharpness: 0.85
-  splat_transparency: 0.14
-  splat_fog: 0.5
-  camera_azim: 0.7
-  camera_elev: 0.5
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -92,3 +77,18 @@ descriptions:
       are densely packed in the center and become more sparse toward the outer boundaries. The cluster
       maintains a roughly diamond-shaped topology as it evolves. The green color remains consistent throughout
       the entire duration of the simulation.
+
+plotting:
+  renderer: vtk_points
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5

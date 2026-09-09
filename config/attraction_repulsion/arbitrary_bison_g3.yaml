@@ -25,13 +25,6 @@ operators:
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
   - {op: chemotax,           at: particle, from: bison, gain: 0.0004}
 schedule: [playback, radius_graph, attraction_repulsion, chemotax]
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab10
-  point_size: 4.0
-  gamma: 0.8
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_bison:
@@ -56,3 +49,10 @@ descriptions:
       into elongated, thread-like chains. The colors are distributed relatively evenly, though some clusters
       show a higher concentration of a single hue. Each individual particle is uniform in size, creating
       a granular texture across the entire frame.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab10
+  point_size: 4.0
+  gamma: 0.8

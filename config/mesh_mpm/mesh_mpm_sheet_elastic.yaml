@@ -49,32 +49,10 @@ general:
   units:
     length_um: 1000.0
     force_nN: 6666.666666666667
-plotting:
-  renderer: vtk_points
-  background: black
-  up_axis: 1
-  box_frame: true
-  camera_elev: 1.18
-  camera_turns: 0.0
-  camera_zoom: 0.0
-  render_3d: surface
-  dot_size: 1.6
-  fps: 60
-  slow_motion: 4
-  color_field: deformation
-  color_range:
-    - 0.0
-    - 0.35
-  cross_section:
-    axis: z
-    at: 0.5
-    thickness: 6
-    max_points: 6000
 sets:
   vertex:
     n: 4096
     mesh: half_edge
-    cell_set: plate_face
   plate_face:
     n: 2304
   mpm_particle:
@@ -85,12 +63,18 @@ sets:
         youngs: 30.0
         density: 1.0
         block:
-          - 0.15
-          - 0.05
-          - 0.15
-          - 0.85
-          - 0.45
-          - 0.85
+        - 0.15
+        - 0.05
+        - 0.15
+        - 0.85
+        - 0.45
+        - 0.85
+  half_edge:
+    n: 18432
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: plate_face
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -165,3 +149,25 @@ descriptions:
   movie_mpm_particle:
     description: A large cube of particles undergoes a deformation process over time. The particles shift from a uniform blue state to a gradient of red and purple. The overall shape of the particle mass compresses and tilts slightly as the simulation progresses. The movement appears smooth and continuous, representing an elastic deformation of a 1 mm cube.
     objects: The primary object is a large, dense collection of particles forming a roughly cubic shape. These particles transition from a solid blue color to a gradient of red at the bottom and purple at the top. A smaller, static blue cube is shown in an inset box in the upper left corner for reference. The entire simulation is contained within a wireframe bounding box with a scale bar indicating 0.25 mm.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: surface
+  dot_size: 1.6
+  fps: 60
+  slow_motion: 4
+  color_field: deformation
+  color_range:
+    - 0.0
+    - 0.35
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000

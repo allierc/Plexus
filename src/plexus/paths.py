@@ -213,6 +213,32 @@ def add_pre_folder(config_name: str) -> tuple[str, str]:
         f"'<type>/{config_name}', or add a rule in plexus.paths._PRE_FOLDER_RULES.")
 
 
+def resolve_run(name: str) -> str:
+    """Where a FINISHED run's outputs live: `cell/adh_jelly_x10` -> its `graphs_data` directory.
+
+    The mirror of `resolve_config`, and it exists for the same reason: a spec should name a run the
+    way it names a config -- `<type>/<name>` -- and not carry an absolute path that is true on one
+    machine. Accepts the same three forms:
+
+        an absolute or relative directory      taken as-is
+        `<pre_folder>/<name>`                  the folder is named explicitly
+        `<name>`                               the folder is inferred, as for a config
+
+    Raises rather than returning a missing directory, because a spec that loads a run which is not
+    there should fail at load and not several hundred frames into a simulation of nothing.
+    """
+    if os.path.isdir(name):
+        return os.path.abspath(name)
+    rel, _pre = add_pre_folder(name) if "/" not in name else (name, None)
+    path = graphs_data_path(*rel.split("/"))
+    if not os.path.isdir(path):
+        raise FileNotFoundError(
+            f"run {name!r} is not at {path}. `resolve_run` looks under "
+            f"{get_data_root()}/graphs_data; pass an absolute directory, or set --output_root / "
+            f"$PLEXUS_OUTPUT_ROOT to the root that holds it.")
+    return path
+
+
 def resolve_config(config_name: str) -> tuple[str, str, str]:
     """Resolve a CLI config argument to (yaml_file, pre_folder, name).
 

@@ -25,13 +25,6 @@ operators:
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
   - {op: chemotax,           at: particle, from: bison, gain: 0.00012}
 schedule: [playback, radius_graph, attraction_repulsion, chemotax]
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab10
-  point_size: 4.0
-  gamma: 0.8
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_bison:
@@ -55,3 +48,10 @@ descriptions:
       are blue, orange, and green, which are scattered throughout the space. The particles are arranged
       in a mostly random distribution, though some small clusters and linear chains occasionally form.
       Each individual point is uniform in size and maintains a consistent appearance across the sequence.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab10
+  point_size: 4.0
+  gamma: 0.8

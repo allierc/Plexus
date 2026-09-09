@@ -47,38 +47,63 @@ general:
 
 # TOP LEVEL, not under `general:`. `schema.load` reads `raw.get("plotting", {})` directly, so a
 # `plotting:` nested under `general:` is parsed, ignored and silently lost.
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
-    # 6396 x 4. At the reference 6396 the run refuses 1,723 divisions for want of vertex buffer and
-    # the tissue coasts to the end at a fixed 3,170 cells -- the last quarter of the movie shows an
-    # epithelium that stopped proliferating because of an ARRAY, not because of its biology.
-    # `buffer_x` is a memory allocation: it changes what the run is ALLOWED to do, not what it tries.
     n: 25584
-    # MANDATORY, and not decoration. `engine._setup_recording` builds `rec_mesh` from
-    # `lvl.mesh is not None` BEFORE the first tick, so without these two keys the trajectory carries
-    # no `vertex__mesh_*` arrays at all and eleven of the rows below become uncomputable rather than
-    # failing. Verified dynamics-neutral: `seed_mesh` fills the engine's table in place
-    # (`m.clear(); m.update(seeded)`) rather than rebinding a new one.
     mesh: half_edge
-    cell_set: cell
   cell:
-    n: 12800                      # 3200 x 4
+    n: 12800
     state:
-      area: {width: 1}
-      cen: {width: 3}
-      # INERT HERE and kept for layout fidelity with the reference: no chemistry operator is in this
-      # schedule, so `chem` stays identically zero. `cell_grow` does not need it -- it has an explicit
-      # no-chemistry branch, because no chemistry means UNIFORM growth, not no growth.
-      chem: {width: 2, integration: first_order}
-
+      area:
+        width: 1
+      centroid:
+        width: 3
+      chem:
+        width: 2
+        integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      inhib_frac:
+        width: 1
+  half_edge:
+    n: 102400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}                        # required key; the loader raises without it
 
 seed:
-  - {op: mesh_seed, at: vertex, cell_set: cell, n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15}
+  - {op: mesh_seed, at: vertex, n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15}
 operators:
   # `kind: seed` declared under `operators:` is the DEPRECATED spelling and the loader says so. It
   # stays here rather than moving to a `seed:` section because migrating it is a behaviour change
@@ -86,7 +111,7 @@ operators:
   # for. `before_frame: 1` is redundant today (the window defaults to 1) and is a real guard: the
   # window is the MAX over every declared seed, so a future co-seed would widen this one's.
   - {op: cell_geometry, at: cell}
-  - {op: cell_grow, at: vertex, cell_set: cell, rate: 0.003457, rho: 1.0, a_sw: 50.0, hill: 4.0, vth_frac: 2.5}
+  - {op: cell_grow, at: vertex, rate: 0.003457, rho: 1.0, a_sw: 50.0, hill: 4.0, vth_frac: 2.5}
   # BEFORE `cell_mechanics`, because the energy reads `m["myo"]` in the frame it is written. After it,
   # the relaxation would use the previous frame's myosin -- on a 20-frame timescale, a lag nobody
   # would notice and everybody would inherit.
@@ -102,7 +127,7 @@ operators:
   # thirds of the run's flips. Gated explicitly by `t1_rail_fraction` below rather than left for a
   # reader to discover, because a T1 rate measured against a cap is a property of the cap.
   - {op: edge_flip, at: vertex, every: 4, engine_clock: true, l_th_frac: 0.35, max_flips: 30}
-  - {op: cell_divide, at: vertex, cell_set: cell, every: 4, engine_clock: true, factor: 2.0, cycle_cv: 0.15, min_cycle: 4, max_cycle: 1000000000, p0: 3.5, reset_noise: 0.12}
+  - {op: cell_divide, at: vertex, every: 4, engine_clock: true, factor: 2.0, cycle_cv: 0.15, min_cycle: 4, max_cycle: 1000000000, p0: 3.5, reset_noise: 0.12}
   # AFTER the topology operators. `edge_flip` rewires the half-edge arrays and `cell_divide` lengthens
   # them, both after `junction_myosin` wrote `m["myo"]` for the arrays as they were -- so without this
   # the record holds this frame's edges beside last writing's myosin. Measured on the 401-frame
@@ -367,10 +392,10 @@ descriptions:
       in individual size. By the final frame, the sphere is densely packed with thousands of small cells,
       many of which have changed color to red or blue.
     objects: The primary object is a spherical mesh composed of interconnected polygonal cells. The cells
-      are primarily white, but some transition to red or blue as the simulation progresses. The size of
-      the individual cells decreases significantly as the total cell count grows from 200 to 6914. The
-      cells are arranged in a tessellated pattern that maintains a consistent spherical topology throughout
-      the sequence.
+      are initially large and white, but they become smaller and more numerous as the simulation progresses.
+      Some cells transition from white to distinct red or blue colors, appearing in clusters across the
+      surface. The overall structure maintains a spherical topology while the internal mesh becomes increasingly
+      complex and refined.
   movie_kburns:
     description: The video shows a static, unchanging mesh of a spheroid. There is no movement or evolution
       of particles, agents, or fields over the time sequence. The geometry remains perfectly still throughout
@@ -380,23 +405,7 @@ descriptions:
       These cells are arranged in a dense, interlocking Voronoi pattern across the entire surface of the
       sphere. The mesh is rendered in a neutral grey color with black outlines defining the edges of each
       polygon. The individual cells are uniform in size, creating a highly regular and symmetric texture.
-  vtk_evolve_mesh:
-    description: The simulation shows a spherical mesh structure that expands in size as the number of
-      cells increases over time. Initially, the sphere is small with a low cell count and very few green-colored
-      cells. As the frames progress, the sphere grows significantly larger and the number of cells multiplies
-      rapidly. By the final frame, the sphere is much larger and densely populated with a high concentration
-      of green cells distributed across its surface.
-    objects: The primary object is a spherical mesh composed of many interconnected polygonal cells. The
-      cells are primarily white or light gray, with a subset of cells colored green. The size of the sphere
-      increases progressively from the first frame to the last. The individual cells remain relatively
-      small and uniform in size, but their total number increases from 200 to 6914.
-  vtk_kburns_mesh:
-    description: The video shows a static mesh of a spheroid with a Voronoi-like cellular pattern. There
-      is no visible movement or evolution of the particles or fields over the sequence of frames. The
-      geometry remains perfectly still throughout the entire duration of the simulation. The image serves
-      as a baseline or a steady-state representation of the mesh structure.
-    objects: The scene contains a single large spheroid mesh composed of numerous small polygonal cells.
-      These cells are arranged in a dense, interlocking tessellation that covers the entire surface of
-      the sphere. The mesh is rendered in a light gray or off-white color with thin black outlines defining
-      the edges of each cell. The individual cells vary slightly in size and shape, creating a naturalistic,
-      organic appearance across the curved surface.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

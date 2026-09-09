@@ -8,29 +8,58 @@ general:
   dim: 3
   world: [50.0, 50.0, 50.0]
 
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 4096
     mesh: half_edge
-    cell_set: cell
     state:
-      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
-      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
-      sep: {width: 3, integration: first_order}
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
   cell:
     n: 1024
     state:
-      area: {width: 1}
-      cen:  {width: 3}
-
+      area:
+        width: 1
+      centroid:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+  half_edge:
+    n: 8192
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 
 seed:
-  - {op: seed_mesh, model: apicobasal, at: vertex, cell_set: cell,
+  - {op: seed_mesh, model: apicobasal, at: vertex,
      n_cells: 320, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, h0: 0.4}
 
 operators:
@@ -199,21 +228,23 @@ _gate:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
-    description: The simulation shows a static spherical mesh composed of 320 cells. The geometry of the
-      cells remains constant throughout the entire sequence of frames. There is no visible movement, deformation,
-      or evolution of the mesh over time. The lighting and shading on the sphere also remain perfectly
-      stationary across all frames.
-    objects: The scene contains a single large sphere composed of a Voronoi-like tessellation. The cells
-      are primarily hexagonal in shape, with some pentagonal cells to accommodate the spherical curvature.
-      The mesh is rendered in a light gray or off-white color with thin black outlines defining the cell
-      boundaries. The sphere is centered in a black void, occupying a significant portion of the frame.
+    description: The simulation shows a static spherical mesh composed of 320 cells. There is no visible
+      movement or evolution of the geometry across the provided frames. The mesh maintains a consistent
+      structure throughout the entire sequence. The lighting and shading on the sphere remain constant
+      from frame 1 to frame 21.
+    objects: The primary object is a large sphere covered in a Voronoi-like tessellation of hexagonal
+      and pentagonal cells. The cells are interconnected to form a continuous, curved surface mesh. The
+      sphere is rendered in a light gray color with subtle shading to indicate its three-dimensional volume.
+      Each individual cell is small and uniform in size, contributing to a smooth overall curvature.
   movie_kburns:
-    description: The video shows a static 3D mesh of a sphere with a hexagonal tiling pattern. There is
-      no movement or evolution of particles, agents, or fields over the sequence of frames. The lighting
-      and shading on the surface remain constant throughout the duration. The mesh structure is perfectly
-      stationary in all provided keyframes.
-    objects: The scene contains a single spherical mesh object centered in the frame. The surface is composed
-      of a network of interconnected polygons, primarily hexagons with some pentagons to accommodate the
-      curvature. The mesh is rendered in a light gray color with dark gray outlines defining the edges
-      of each cell. The sphere occupies a significant portion of the frame, appearing as a large, uniform
-      geometric structure.
+    description: The video shows a static 3D mesh of a sphere with a hexagonal pattern. There is no movement
+      or evolution of particles, agents, or fields over time. The geometry remains perfectly still throughout
+      the entire sequence. The lighting and shading on the surface are constant across all frames.
+    objects: The scene contains a single spherical mesh object with a grey surface. The mesh is composed
+      of a Voronoi-like pattern of irregular hexagons and pentagons. The lines of the mesh are thin and
+      black, defining the individual cells. The sphere is large relative to the frame and centered against
+      a solid black background.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

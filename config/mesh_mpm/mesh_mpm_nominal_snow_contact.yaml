@@ -41,62 +41,53 @@ general:
     length_um: 1172.3329425556858
     force_nN: 9162.430188008488
   record_every: 4
-plotting:
-  renderer: vtk_points
-  background: black
-  up_axis: 2
-  box_frame: true
-  camera_elev: 1.18
-  camera_turns: 0.0
-  camera_zoom: 0.0
-  fps: 60
-  mesh_color: '#cfd8e3'
-  real_time: false
-  slow_motion: 2
-  curve:
-    - quantity: cells
-      xlabel: frame
-      ylabel: cells
-      ticks: 4
-    - quantity: area
-      xlabel: frame
-      ylabel: cell area
-      ticks: 4
-    - quantity: radius
-      xlabel: frame
-      ylabel: shell radius
-      ticks: 4
-  render_3d: surface
-  color_field: deformation
-  color_range:
-    - 0.0
-    - 0.35
-  mesh_style: surface
-  mesh_edges: true
-  mesh_opacity: 1.0
-  mesh_flat: true
-  surface_opacity: 1.0
-  surface_color: '#cfd8e3'
-  cross_section:
-    axis: y
-    at: 0.5
-    thickness: 6
-    max_points: 8000
 sets:
   vertex:
     n: 524288
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 262144
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       chem:
         width: 2
         integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      inhib_frac:
+        width: 1
   mpm_particle:
     n: 500000
     types:
@@ -106,12 +97,18 @@ sets:
         density: 0.35
         material: snow
         block:
-          - 0.05
-          - 0.05
-          - 0.05
-          - 0.95
-          - 0.95
-          - 0.472
+        - 0.05
+        - 0.05
+        - 0.05
+        - 0.95
+        - 0.95
+        - 0.472
+  half_edge:
+    n: 2097152
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -119,7 +116,6 @@ fields:
 seed:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 200
     radius: 5.0
     jitter: 0.18
@@ -131,8 +127,11 @@ operators:
     at: cell
   - op: cell_grow
     at: vertex
-    cell_set: cell
-    rate: 0.003457
+    # PER UNIT TIME, NOT PER FRAME. `cell_grow` used to apply `rate` once per call regardless
+    # of `dt`; it now emits a rate the engine integrates as `s += dt * ds`. This spec runs
+    # `general.dt: 0.0032`, so the per-frame growth it had is `0.003457 / 0.0032` per unit of
+    # simulation time -- the number below -- and the run is unchanged.
+    rate: 1.0803125
     rho: 1.0
     a_sw: 50.0
     hill: 4.0
@@ -207,7 +206,6 @@ operators:
     max_flips: 30
   - op: cell_divide
     at: vertex
-    cell_set: cell
     every: 4
     engine_clock: true
     factor: 2.0
@@ -240,3 +238,45 @@ schedule:
   - junction_sync
   - topo_record
   - mesh_inside
+
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  fps: 60
+  mesh_color: '#cfd8e3'
+  real_time: false
+  slow_motion: 2
+  curve:
+    - quantity: cells
+      xlabel: frame
+      ylabel: cells
+      ticks: 4
+    - quantity: area
+      xlabel: frame
+      ylabel: cell area
+      ticks: 4
+    - quantity: radius
+      xlabel: frame
+      ylabel: shell radius
+      ticks: 4
+  render_3d: surface
+  color_field: deformation
+  color_range:
+    - 0.0
+    - 0.35
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  mesh_flat: true
+  surface_opacity: 1.0
+  surface_color: '#cfd8e3'
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    max_points: 8000

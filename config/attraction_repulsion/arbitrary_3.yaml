@@ -24,12 +24,6 @@ operators:
 
 schedule: [radius_graph, attraction_repulsion]
 
-plotting:                      # render STYLE (read by plexus.plot; engine ignores it)
-  renderer: mpl2d
-  background: black
-  colormap: tab10
-  point_size: 2.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -42,3 +36,9 @@ descriptions:
       particles are initially scattered randomly but eventually form large, circular clusters. Each cluster
       features a dark, empty center surrounded by a dense ring of multicolored particles. The final topology
       consists of a repeating, honeycomb-like pattern of these interconnected circular structures.
+
+plotting:                      # render STYLE (read by plexus.plot; engine ignores it)
+  renderer: mpl2d
+  background: black
+  colormap: tab10
+  point_size: 2.0

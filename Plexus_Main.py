@@ -163,7 +163,22 @@ def main():
         # million particles eager, 0.42 with capture -- capture's private pool stays resident, which
         # is where the ~39% comes from.
         if not args.no_viz and args.device.startswith("cuda"):
-            _npart = sum(int(v.get("per_parent", 0)) * int(sim.sets.get(v.get("parent"), {}).get("n", 1))
+            # `per_parent` MAY BE A MAPPING from the parent's type name to a count (a cell atlas
+            # gives a membrane patch 50 points and a nuclear-envelope patch 50,000), so the total
+            # is the sum over types of count x per-type budget rather than one product. Getting
+            # this wrong is not cosmetic: the number feeds the VRAM projection below, which is what
+            # warns before a capture stalls the card.
+            def _child_total(v):
+                pp = v.get("per_parent", 0)
+                par = sim.sets.get(v.get("parent"), {}) or {}
+                ptypes = par.get("types") or {}
+                if isinstance(pp, dict):
+                    npar = int(par.get("n", par.get("per_parent", 1)) or 1)
+                    return sum(int(pp.get(tn, 0)) * int(t.get("count", 0) or
+                                                        round(float(t.get("fraction", 0.0)) * npar))
+                               for tn, t in ptypes.items())
+                return int(pp) * int(par.get("n", 1))
+            _npart = sum(_child_total(v)
                          for v in sim.sets.values() if isinstance(v, dict) and "per_parent" in v)
             _cap_on = any(isinstance(x, dict) and x.get("capture") for x in sim.schedule)
             if _npart and _cap_on:

@@ -16,13 +16,6 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -43,3 +36,10 @@ descriptions:
       are colored in a vibrant teal or cyan hue against a black background. The topology is a complex,
       non-linear mesh where individual strands branch and merge into a continuous web. Each filament is
       relatively thin and uniform in width, creating a porous, sponge-like appearance.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

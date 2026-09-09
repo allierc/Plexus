@@ -1,0 +1,781 @@
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 320
+general:
+  boundary: wall
+  dim: 3
+  dt: 0.002
+  n_frames: 3
+  name: onecell_A_mesh_only
+  record_cap: 3
+  save_data: null
+  seed: 1
+  units:
+    length_um: 100.0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+operators:
+- at: cytoskeleton
+  child: cytoskeleton_node
+  op: aggregate_centroid
+- at: nuclear_envelope
+  child: nuclear_envelope_node
+  op: aggregate_centroid
+- at: chromatin
+  child: chromatin_node
+  op: aggregate_centroid
+- at: nucleolus
+  child: nucleolus_node
+  op: aggregate_centroid
+- at: rough_er
+  child: rough_er_node
+  op: aggregate_centroid
+- at: smooth_er
+  child: smooth_er_node
+  op: aggregate_centroid
+- at: golgi
+  child: golgi_node
+  op: aggregate_centroid
+- at: mitochondria
+  child: mitochondria_node
+  op: aggregate_centroid
+- at: centriole
+  child: centriole_node
+  op: aggregate_centroid
+- at: protein_a
+  child: protein_a_node
+  op: aggregate_centroid
+- at: protein_b
+  child: protein_b_node
+  op: aggregate_centroid
+- at: protein_c
+  child: protein_c_node
+  op: aggregate_centroid
+- at: protein_d
+  child: protein_d_node
+  op: aggregate_centroid
+- at: protein_e
+  child: protein_e_node
+  op: aggregate_centroid
+plotting:
+  background: black
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  colors:
+    centriole: &id001
+    - 0.85
+    - 1.0
+    - 0.15
+    centriole_node: *id001
+    chromatin: &id002
+    - 0.52
+    - 0.36
+    - 0.74
+    chromatin_node: *id002
+    cytoskeleton: &id003
+    - 0.3
+    - 0.85
+    - 0.4
+    cytoskeleton_node: *id003
+    golgi: &id004
+    - 0.96
+    - 0.62
+    - 0.2
+    golgi_node: *id004
+    mitochondria: &id005
+    - 0.9
+    - 0.16
+    - 0.12
+    mitochondria_node: *id005
+    nuclear_envelope: &id006
+    - 0.74
+    - 0.62
+    - 0.88
+    nuclear_envelope_node: *id006
+    nucleolus: &id007
+    - 0.92
+    - 0.38
+    - 0.66
+    nucleolus_node: *id007
+    plasma_membrane: &id008
+    - 0.62
+    - 0.82
+    - 0.96
+    plasma_membrane_node: *id008
+    protein_a: &id009
+    - 0.95
+    - 0.78
+    - 0.25
+    protein_a_node: *id009
+    protein_b: &id010
+    - 0.45
+    - 0.78
+    - 0.98
+    protein_b_node: *id010
+    protein_c: &id011
+    - 0.98
+    - 0.45
+    - 0.62
+    protein_c_node: *id011
+    protein_d: &id012
+    - 0.66
+    - 0.48
+    - 0.96
+    protein_d_node: *id012
+    protein_e: &id013
+    - 0.55
+    - 0.95
+    - 0.82
+    protein_e_node: *id013
+    rough_er: &id014
+    - 0.16
+    - 0.52
+    - 0.56
+    rough_er_node: *id014
+    smooth_er: &id015
+    - 0.36
+    - 0.78
+    - 0.72
+    smooth_er_node: *id015
+    cytoskeleton_new_node: *id003
+  compartment_sets:
+  - cytoskeleton_node
+  - nuclear_envelope_node
+  - chromatin_node
+  - nucleolus_node
+  - rough_er_node
+  - smooth_er_node
+  - golgi_node
+  - mitochondria_node
+  - centriole_node
+  - protein_a_node
+  - protein_b_node
+  - protein_c_node
+  - protein_d_node
+  - protein_e_node
+  - cytoskeleton_new_node
+  dot_size: 0.9
+  fps: 60
+  graph_overlay:
+    line_width: 1.6
+    max_edges: 12000
+    opacity: 0.95
+    sets:
+    - mitochondria
+    - nuclear_envelope
+    - rough_er
+  hide_sets:
+  - cell
+  - plasma_membrane
+  - cytoskeleton
+  - nuclear_envelope
+  - chromatin
+  - nucleolus
+  - rough_er
+  - smooth_er
+  - golgi
+  - mitochondria
+  - centriole
+  - protein_a
+  - protein_b
+  - protein_c
+  - protein_d
+  - protein_e
+  opacity:
+    centriole_node: 0.0
+    chromatin_node: 0.0
+    cytoskeleton_node: 0.0
+    golgi_node: 0.0
+    mitochondria_node: 0.0
+    nuclear_envelope_node: 0.0
+    nucleolus_node: 0.0
+    protein_a_node: 0.0
+    protein_b_node: 0.0
+    protein_c_node: 0.0
+    protein_d_node: 0.0
+    protein_e_node: 0.0
+    rough_er_node: 0.0
+    smooth_er_node: 0.0
+    cytoskeleton_new_node: 0.0
+  render_3d: compartments
+  renderer: vtk_points
+  slow_motion: 2
+  surface:
+    centriole_node:
+      point_size: 0.9
+      render: dots
+    chromatin_node:
+      point_size: 0.9
+      render: dots
+    cytoskeleton_node:
+      point_size: 0.9
+      render: dots
+    golgi_node:
+      point_size: 0.9
+      render: dots
+    mitochondria_node:
+      point_size: 0.9
+      render: dots
+    nuclear_envelope_node:
+      blur: 1.2
+      smooth: 30
+      spacing: 0.00357
+    nucleolus_node:
+      point_size: 0.9
+      render: dots
+    plasma_membrane_node:
+      ambient: 0.12
+      backface_culling: true
+      blur: 1.4
+      diffuse: 0.62
+      smooth: 40
+      spacing: 0.00476
+      specular: 0.55
+      specular_power: 60
+    protein_a_node:
+      point_size: 0.9
+      render: dots
+    protein_b_node:
+      point_size: 0.9
+      render: dots
+    protein_c_node:
+      point_size: 0.9
+      render: dots
+    protein_d_node:
+      point_size: 0.9
+      render: dots
+    protein_e_node:
+      point_size: 0.9
+      render: dots
+    rough_er_node:
+      point_size: 0.9
+      render: dots
+    smooth_er_node:
+      point_size: 0.9
+      render: dots
+    cytoskeleton_new_node:
+      render: dots
+      point_size: 1.4
+  surface_max_cells: 80000000
+  surface_sample: 60000
+  up_axis: 1
+  mesh_style: surface
+  mesh_opacity: 1.0
+  mesh_edges: false
+  mesh_color: '#9fd0f0'
+  surface_opacity: 0.0
+schedule:
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+seed:
+- op: seed_mesh
+  at: vertex
+  n_cells: 400
+  radius: 0.14
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+  centre: &id016
+  - 0.5
+  - 0.5
+  - 0.5
+- at: cytoskeleton
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: cytoskeleton_node
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: cytoskeleton
+  particles: cytoskeleton_new_node
+  cell_radius: 0.115
+  vel_init: 0.0
+- at: nuclear_envelope
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: nuclear_envelope_node
+  vel_init: 0.0
+- at: chromatin
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: chromatin_node
+  vel_init: 0.0
+- at: nucleolus
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: nucleolus_node
+  vel_init: 0.0
+- at: rough_er
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: rough_er_node
+  vel_init: 0.0
+- at: smooth_er
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: smooth_er_node
+  vel_init: 0.0
+- at: golgi
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: golgi_node
+  vel_init: 0.0
+- at: mitochondria
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: mitochondria_node
+  vel_init: 0.0
+- at: centriole
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: centriole_node
+  vel_init: 0.0
+- at: protein_a
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: protein_a_node
+  vel_init: 0.0
+- at: protein_b
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: protein_b_node
+  vel_init: 0.0
+- at: protein_c
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: protein_c_node
+  vel_init: 0.0
+- at: protein_d
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: protein_d_node
+  vel_init: 0.0
+- at: protein_e
+  cell_radius: 0.115
+  op: seed_cell_atlas
+  particles: protein_e_node
+  vel_init: 0.0
+- at: mitochondria
+  block: voltage
+  hi: 1.0
+  lo: 0.0
+  op: seed_state_random
+  seed: 1
+- op: park_reserve
+  at: cytoskeleton_new_node
+  fraction: 1.0
+- at: protein_a_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+  nu: 0.45
+- at: protein_b_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+  nu: 0.45
+- at: protein_c_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+  nu: 0.45
+- at: protein_d_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+  nu: 0.45
+- at: protein_e_node
+  material: elastic
+  op: set_material
+  youngs: 90.0
+  nu: 0.45
+- at: cytoskeleton_node
+  material: elastic
+  op: set_material
+  youngs: 300.0
+  nu: 0.45
+- op: set_material
+  at: cytoskeleton_new_node
+  material: elastic
+  youngs: 300.0
+  nu: 0.45
+- at: cell
+  axis: 1
+  block: polarity
+  op: seed_polarity
+  seed: 3
+  spread: 1.0
+- at: cell
+  block: phase
+  hi: 6.2832
+  lo: 0.0
+  op: seed_state_random
+  seed: 11
+sets:
+  cell:
+    n: 1
+    start:
+    - *id016
+    state:
+      phase:
+        integration: first_order
+        role: coordinate
+        width: 1
+      polarity:
+        integration: none
+        width: 3
+      pos:
+        boundary: world
+        integration: second_order_coordinate
+        role: coordinate
+        width: 3
+      vel:
+        integration: second_order_rate
+        record: false
+        role: rate
+        width: 3
+  centriole:
+    parent: cell
+    per_parent: 2
+    radius: 0.1
+    types:
+      centriole:
+        density: 1.1
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.05
+        youngs: 200.0
+  centriole_node:
+    density: 1.1
+    entity: mpm_particle
+    parent: centriole
+    per_parent: 1250
+    radius: 0.1
+  chromatin:
+    parent: cell
+    per_parent: 31
+    radius: 0.1
+    types:
+      chromatin:
+        density: 1.2
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.05
+        youngs: 150.0
+  chromatin_node:
+    density: 1.2
+    entity: mpm_particle
+    parent: chromatin
+    per_parent: 1250
+    radius: 0.1
+  cytoskeleton:
+    parent: cell
+    per_parent: 400
+    radius: 0.1
+    types:
+      cytoskeleton:
+        density: 1.0
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.05
+        youngs: 75.0
+  cytoskeleton_node:
+    density: 1.0
+    entity: mpm_particle
+    parent: cytoskeleton
+    per_parent: 600
+    radius: 0.1
+  golgi:
+    parent: cell
+    per_parent: 14
+    radius: 0.1
+    types:
+      golgi:
+        density: 1.0
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.05
+        youngs: 27.5
+  golgi_node:
+    density: 1.0
+    entity: mpm_particle
+    parent: golgi
+    per_parent: 1250
+    radius: 0.1
+  mitochondria:
+    parent: cell
+    per_parent: 77
+    radius: 0.1
+    state:
+      pos:
+        boundary: world
+        integration: none
+        role: geometry
+        width: 3
+      vel:
+        integration: none
+        record: false
+        role: rate
+        width: 3
+      voltage:
+        integration: first_order
+        role: coordinate
+        width: 1
+    types:
+      mitochondria:
+        density: 1.1
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.05
+        youngs: 45.0
+  mitochondria_node:
+    density: 1.1
+    entity: mpm_particle
+    parent: mitochondria
+    per_parent: 1250
+    radius: 0.1
+  nuclear_envelope:
+    parent: cell
+    per_parent: 138
+    radius: 0.1
+    types:
+      nucleus:
+        density: 1.1
+        fraction: 1.0
+        material: elastic
+        youngs: 1200.0
+  nuclear_envelope_node:
+    density: 1.1
+    entity: mpm_particle
+    parent: nuclear_envelope
+    per_parent: 5000
+    radius: 0.1
+  nucleolus:
+    parent: cell
+    per_parent: 2
+    radius: 0.1
+    types:
+      nucleolus:
+        density: 1.3
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.05
+        youngs: 300.0
+  nucleolus_node:
+    density: 1.3
+    entity: mpm_particle
+    parent: nucleolus
+    per_parent: 1250
+    radius: 0.1
+  protein_a:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_a:
+        density: 0.6
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.02
+        youngs: 5.0
+  protein_a_node:
+    density: 0.6
+    entity: mpm_particle
+    parent: protein_a
+    per_parent: 125000
+    radius: 0.1
+  protein_b:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_b:
+        density: 0.6
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.02
+        youngs: 5.0
+  protein_b_node:
+    density: 0.6
+    entity: mpm_particle
+    parent: protein_b
+    per_parent: 125000
+    radius: 0.1
+  protein_c:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_c:
+        density: 0.6
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.02
+        youngs: 5.0
+  protein_c_node:
+    density: 0.6
+    entity: mpm_particle
+    parent: protein_c
+    per_parent: 125000
+    radius: 0.1
+  protein_d:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_d:
+        density: 0.6
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.02
+        youngs: 5.0
+  protein_d_node:
+    density: 0.6
+    entity: mpm_particle
+    parent: protein_d
+    per_parent: 125000
+    radius: 0.1
+  protein_e:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_e:
+        density: 0.6
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.02
+        youngs: 5.0
+  protein_e_node:
+    density: 0.6
+    entity: mpm_particle
+    parent: protein_e
+    per_parent: 125000
+    radius: 0.1
+  rough_er:
+    parent: cell
+    per_parent: 11
+    radius: 0.1
+    types:
+      rough_er:
+        density: 1.0
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.05
+        youngs: 30.0
+  rough_er_node:
+    density: 1.0
+    entity: mpm_particle
+    parent: rough_er
+    per_parent: 12500
+    radius: 0.1
+  smooth_er:
+    parent: cell
+    per_parent: 3
+    radius: 0.1
+    types:
+      smooth_er:
+        density: 1.0
+        fraction: 1.0
+        material: viscoelastic
+        tau: 0.05
+        youngs: 25.0
+  smooth_er_node:
+    density: 1.0
+    entity: mpm_particle
+    parent: smooth_er
+    per_parent: 12500
+    radius: 0.1
+  cytoskeleton_new_node:
+    density: 1.0
+    entity: mpm_particle
+    parent: cytoskeleton
+    per_parent: 1200
+    radius: 0.1
+  vertex:
+    n: 4096
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  membrane_face:
+    n: 512
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      age:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+  half_edge:
+    n: 4096
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: membrane_face
+descriptions:
+  movie:
+    description: The simulation shows a multi-colored, textured object resting on
+      the bottom surface of a large cubic domain. Over the course of the video, the
+      object remains stationary in its position while its internal colors and patterns
+      shift slightly. The surrounding environment is a dark, empty void defined by
+      a white wireframe cube. No external forces or large-scale movements occur within
+      the 100 $\mu$m box.
+    objects: A single, flattened, dome-shaped object sits at the center of the bottom
+      plane. It features a complex internal texture with a mix of cyan, green, red,
+      and yellow colors. The object is relatively small, measuring approximately 25
+      $\mu$m in width according to the provided scale bar. The scene is enclosed within
+      a large, white wireframe cube representing a 100 $\mu$m simulation box.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a single spherical particle centered within a cubic domain. The
+      particle remains stationary in the center of the box throughout the entire sequence. There is no
+      visible movement or deformation of the sphere or the surrounding space. The scene remains static
+      across all provided frames.
+    objects: A single light blue sphere is positioned at the center of the scene. The sphere has a faceted,
+      polygonal surface texture. It is contained within a large, black cubic wireframe box. A scale bar
+      in the bottom left corner indicates a length of 25 micrometers.

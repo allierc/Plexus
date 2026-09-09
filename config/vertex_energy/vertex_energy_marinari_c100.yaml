@@ -13,38 +13,47 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_points
-  background: black
-  real_time: false
-  fps: 20
-  movie_max_frames: 300
-  mesh_edges: true
-  curve:
-    - quantity: area
-      ticks: 4
-    - quantity: radius
-      ticks: 4
 sets:
   vertex:
     n: 25584
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 12800
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       chem:
         width: 2
         integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+  half_edge:
+    n: 102400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 seed:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 200
     radius: 4.55
     jitter: 0.8
@@ -82,3 +91,16 @@ schedule:
   - cell_mechanics
   - edge_flip
   - topo_record
+
+plotting:
+  renderer: vtk_points
+  background: black
+  real_time: false
+  fps: 20
+  movie_max_frames: 300
+  mesh_edges: true
+  curve:
+    - quantity: area
+      ticks: 4
+    - quantity: radius
+      ticks: 4

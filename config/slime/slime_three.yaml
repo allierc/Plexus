@@ -21,12 +21,6 @@ operators:
 - {op: bounce,  at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors: {a: [0.2, 0.95, 0.65], b: [1.0, 0.35, 0.45], c: [0.45, 0.6, 1.0]}
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -51,3 +45,9 @@ descriptions:
       and cool blue. Each filament is of a similar thickness and length, creating a uniform texture across
       the entire frame. The objects are densely packed and overlap frequently, creating a multi-layered,
       three-dimensional appearance against a black background.
+
+plotting:
+  renderer: mpl2d
+  colors: {a: [0.2, 0.95, 0.65], b: [1.0, 0.35, 0.45], c: [0.45, 0.6, 1.0]}
+  background: black
+  gamma: 0.7

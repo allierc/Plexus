@@ -21,29 +21,63 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_mesh
-  background: black
 sets:
   vertex:
     n: 25584
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 12800
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       chem:
         width: 2
         integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      inhib_frac:
+        width: 1
+  half_edge:
+    n: 102400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 seed:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 200
     radius: 5.0
     jitter: 0.18
@@ -55,7 +89,6 @@ operators:
     at: cell
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.003457
     rho: 1.0
     a_sw: 50.0
@@ -96,7 +129,6 @@ operators:
     max_flips: 30
   - op: cell_divide
     at: vertex
-    cell_set: cell
     every: 4
     engine_clock: true
     factor: 2.0
@@ -351,3 +383,30 @@ _gate:
         scale of an hour or more, so at 600 s a frame the frame-to-frame survival must be high --
         below 0.90 the tissue is remodelling every contact within ten minutes, which no epithelium
         does. Only sayable because `units:` declares 1 frame = 600 s.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a spherical surface undergoing a dynamic cellular division process.
+      Over time, the initial large cells split into progressively smaller units, significantly increasing
+      the total cell count. Red and blue colored cells appear and multiply, eventually populating a large
+      portion of the sphere's surface. By the final frame, the sphere is covered in a dense, complex network
+      of thousands of small, multi-colored cells.
+    objects: The primary objects are polygonal cells arranged in a continuous, tessellated mesh on a spherical
+      surface. Most cells are light grey or white, while a subset of cells are colored bright red or blue.
+      The size of the individual cells decreases rapidly as the simulation progresses from frame 1 to
+      frame 60. The cells maintain a connected topology, sharing edges to form a seamless, expanding cellular
+      structure.
+  movie_kburns:
+    description: The video shows a static spherical mesh that does not change over time. The geometric
+      pattern remains perfectly still throughout the entire sequence. There is no movement, deformation,
+      or evolution of the underlying structure. The scene is a constant representation of a Voronoi-like
+      tessellation on a sphere.
+    objects: The primary object is a large sphere covered in a dense, irregular polygonal mesh. The mesh
+      consists of small, grey-colored cells with black outlines, resembling a Voronoi diagram. These cells
+      are interconnected to form a continuous, seamless surface across the entire sphere. The overall
+      structure is uniform in size and distribution, creating a consistent texture.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

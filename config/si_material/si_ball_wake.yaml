@@ -107,6 +107,29 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A dense cluster of particles at the bottom of a vertical tube begins to move upward as
+      a cohesive mass. As the mass rises, it encounters a resistance that causes it to elongate and eventually
+      break into a distinct, spherical bubble-like structure. This bubble travels toward the top of the
+      tube while leaving a trail of dispersed particles in its wake. Finally, the bubble reaches the upper
+      boundary and begins to dissipate or merge with the surrounding field.
+    objects: The primary objects are thousands of small, point-like particles arranged in a vertical,
+      cylindrical column. These particles transition in color from a bright cyan and green at the bottom
+      to a darker blue and red as they form a concentrated sphere. The central sphere is approximately
+      1 cm in diameter and is surrounded by a diffuse cloud of smaller particles. The entire simulation
+      is contained within a transparent, rectangular bounding box with a scale bar indicating a 1 cm width.
+  movie_mpm_particle:
+    description: The video shows a static, three-dimensional blue rectangular prism. There is no movement
+      or change in the object's position, orientation, or shape throughout the sequence. The lighting
+      and shading on the prism remain constant across all frames. The background remains a solid black
+      color for the entire duration.
+    objects: The scene contains a single, tall rectangular prism. It is colored in a gradient of blue,
+      with lighter shades on the front faces and darker shades on the side faces. The object is oriented
+      vertically and occupies the center of the frame. It has a large height relative to its narrow width
+      and depth.
+
 plotting:
   renderer: vtk_points
   background: black
@@ -141,26 +164,3 @@ plotting:
   - 1000.0
   field_cmap: turbo
   field_log: true
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie:
-    description: A dense cluster of particles at the bottom of a vertical tube begins to move upward as
-      a cohesive mass. As the mass rises, it encounters a resistance that causes it to elongate and eventually
-      break into a distinct, spherical bubble-like structure. This bubble travels toward the top of the
-      tube while leaving a trail of dispersed particles in its wake. Finally, the bubble reaches the upper
-      boundary and begins to dissipate or merge with the surrounding field.
-    objects: The primary objects are thousands of small, point-like particles arranged in a vertical,
-      cylindrical column. These particles transition in color from a bright cyan and green at the bottom
-      to a darker blue and red as they form a concentrated sphere. The central sphere is approximately
-      1 cm in diameter and is surrounded by a diffuse cloud of smaller particles. The entire simulation
-      is contained within a transparent, rectangular bounding box with a scale bar indicating a 1 cm width.
-  movie_mpm_particle:
-    description: The video shows a static, three-dimensional blue rectangular prism. There is no movement
-      or change in the object's position, orientation, or shape throughout the sequence. The lighting
-      and shading on the prism remain constant across all frames. The background remains a solid black
-      color for the entire duration.
-    objects: The scene contains a single, tall rectangular prism. It is colored in a gradient of blue,
-      with lighter shades on the front faces and darker shades on the side faces. The object is oriented
-      vertically and occupies the center of the frame. It has a large height relative to its narrow width
-      and depth.

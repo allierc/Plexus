@@ -41,8 +41,6 @@ operators:
   - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
       sigma: 6.0, normalize: none}
 schedule: [neuron_update, neuron_signal, voxelize]
-plotting: {renderer: vtk_points, background: black, point_size: 4.0}
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_assembly:
@@ -84,3 +82,5 @@ descriptions:
       are positioned diagonally and overlap in the center of the frame. Each individual particle is tiny
       and appears as a single blue dot against the black background. The overall topology consists of
       two dense, semi-transparent volumes of points.
+
+plotting: {renderer: vtk_points, background: black, point_size: 4.0}

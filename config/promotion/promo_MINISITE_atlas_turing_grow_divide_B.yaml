@@ -13,30 +13,64 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_mesh
-  background: black
 sets:
   vertex:
     n: 120000
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 60000
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       chem:
         width: 2
         integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      inhib_frac:
+        width: 1
+  half_edge:
+    n: 480000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 operators:
   - op: mesh_seed
     at: vertex
     before_frame: 1
-    cell_set: cell
     n_cells: 2000
     radius: 5.0
     jitter: 0.18
@@ -74,7 +108,6 @@ operators:
     at: cell
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.000866
     rho: 0.1
     a_sw: 0.35
@@ -104,7 +137,6 @@ operators:
     max_flips: 30
   - op: cell_divide
     at: vertex
-    cell_set: cell
     every: 4
     engine_clock: true
     factor: 2.0
@@ -130,3 +162,7 @@ schedule:
   - edge_flip
   - cell_divide
   - topo_record
+
+plotting:
+  renderer: vtk_mesh
+  background: black

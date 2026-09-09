@@ -129,13 +129,13 @@ class MPMGrid(Field):
     [.,dim]). Pure scratch: p2g zeroes + scatters into it each substep, grid_update
     solves on it, g2p reads it back.
 
-    THE CELL SIZE COMES FROM THE WORLD, which it did not before. This used to read
-    `dx = 1.0 / n_grid` with axes 1.. assumed to span [0,1] and only axis 0 scaled by `width`, so
-    `n_grid` meant "cells per unit length". On a box that is not 1 unit across -- a 0.1 m water
-    scene, say -- that puts a 1.0-wide grid on a 0.1-wide world: the cell is 10x too large, only
-    ~10 of 96 cells per axis carry any mass, and the failure is not subtle. `MPMGather` clamps
-    positions into [2*dx, box[k] - 2*dx] with `box` correct and `dx` wrong, which crushes a 0.1 m
-    cube into a 0.058 m slab on the first substep.
+    THE CELL SIZE COMES FROM THE WORLD: dx = world_size[1] / n_grid, so `n_grid` is CELLS ACROSS
+    AXIS 1 and not cells per unit length. The two readings agree only on a box one unit across.
+    Deriving dx from a fixed 1.0 instead would put a unit-wide grid on whatever world the
+    specification declared: on a box a tenth of a unit across the cell is ten times too large,
+    a tenth of the cells per axis carry any mass, and `mpm_gather` -- which clamps positions into
+    [2 dx, box - 2 dx] -- would be clamping with a correct box and a wrong dx, crushing the body
+    into a slab on the first substep.
 
     `n_grid` means CELLS ACROSS AXIS 1, not cells per unit length. The two readings coincide when
     the world is one unit across on that axis, which is the default, so a specification that does
@@ -146,6 +146,10 @@ class MPMGrid(Field):
     first offender is n = 49 -- so the reciprocal round-trip is exact only by luck at the n_grid
     values in use (48, 64, 96, 128, 192). Deriving it from the integer directly keeps byte-identity
     on the corpus, and keeps it for a spec that picks n_grid = 49 tomorrow.
+
+    Reference: the grid, the quadratic B-spline kernel and the CFL ceiling dt < dx / sqrt(E/rho)
+    are those of Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994).
+    Comput. Methods Appl. Mech. Eng. 118:179-196.
     """
 
     RECORD = False                                   # transient scratch -- not recorded/rendered
@@ -308,6 +312,42 @@ def _scale_constant(name, dx, rho=1.0):
     return v0 * (float(rho) / _REF_RHO) ** a * (float(dx) / _REF_DX) ** b
 
 
+def _ancestor_accel(H, p, a_max, D, dev):
+    """The body acceleration reaching these material points from EVERY level above them.
+
+    `[Np, D]`, the sum over the containment chain of each ancestor's accumulated delta, broadcast
+    down the composed containment map:
+
+        a_ext = sum_{L in ancestors(p)}  delta_L [ pi_L (p) ]
+
+    with pi_L the composition of the parent maps from the particle set up to L (`H.lift_index`).
+
+    WHY IT IS A SUM OVER THE CHAIN AND NOT ONE HOP. Every one of the five MPM scatter bodies
+    used to read `H.delta(p.parent_name)[p.parent]`, which is Broadcast across exactly one
+    containment map. That is correct and complete for the two-level models the corpus is made of
+    -- `cell -> mpm_particle` -- and silently wrong the moment a model has three:
+    `cell -> compartment -> mpm_particle` with `gravity at: cell` builds, validates, runs, and
+    the cell does not fall, because the delta sits on a set no reader ever reaches. Nothing
+    raises, because a body force of zero is a legal body force.
+
+    Summing over the whole chain is also the right SEMANTICS and not just the reachable one:
+    gravity declared on the organism, a pressure declared on the tissue and a drag declared on
+    the cell are three body forces on the same material point, and superposing them is what
+    forces do. Each level's delta is clamped as before, once, at the level it was written.
+    """
+    a_ext = None
+    for anc in H.ancestors(p.name):
+        d = H.delta(anc)
+        if d is None or d.numel() == 0:
+            continue
+        d = torch.nan_to_num(d, posinf=a_max, neginf=-a_max).clamp(-a_max, a_max)
+        if d.shape[1] != D:
+            continue                        # a non-spatial ancestor (voltage, chemistry): not a body force
+        term = d[H.lift_index(p.name, anc)]
+        a_ext = term if a_ext is None else a_ext + term
+    return torch.zeros(p.n, D, device=dev) if a_ext is None else a_ext
+
+
 def _hand_body_force_to_grid(op, H, a_ext, dev, D):
     """WHERE A BODY FORCE BELONGS. Canonical MLS-MPM applies gravity ON THE GRID, as an
     acceleration, AFTER the momentum has been divided by nodal mass -- Taichi's mpm88/mpm99 read
@@ -358,8 +398,41 @@ def _hand_body_force_to_grid(op, H, a_ext, dev, D):
     return a_ext - op._bf_buf                # particle keeps only what the grid cannot carry
 
 
+
+
+class MPMWrites:
+    # ---- the write hooks -------------------------------------------------------------------
+    # THE ONLY THING AN `implementation: differentiable` HAS TO CHANGE. Everything above computes
+    # the same numbers either way; what autograd cannot take is the WRITE -- a grid zeroed and
+    # re-accumulated in place, a slice assignment into a view, a copy_ into a buffer a later
+    # substep reads. Each is one line, each is behind a method, and the alternative implementation
+    # overrides the methods rather than restating the physics. `FUNCTIONAL` is a class flag and not
+    # `torch.is_grad_enabled()`, so which body runs is a property of the SPECIFICATION -- a run says
+    # `implementation: differentiable` and gets it -- rather than of an ambient context.
+    FUNCTIONAL = False
+
+    def _const_read(self, t):
+        """A material constant, read. A seed may rewrite these buffers, and under a tape that write
+        moves a version counter the backward is holding -- so the differentiable body clones."""
+        return t
+
+    def _write_v(self, g, gv):
+        g.v.copy_(gv)
+
+    def _write_F(self, p, F):
+        p.F.copy_(F)
+
+    def _write_Jp(self, p, Jp):
+        p.Jp.copy_(Jp)
+
+    def _write_particles(self, p, pa, pb, va, vb, Xn, new_V, new_C):
+        p.state[:, pa:pb] = Xn
+        p.state[:, va:vb] = new_V
+        p.C.copy_(new_C)
+
+
 @register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
-class MPMScatter(Exchange):                
+class MPMScatter(MPMWrites, Exchange):                
     """Particle to grid: the first step of the MLS-MPM cycle. Every particle deposits its mass,
     its momentum, and the impulse of its own internal stress onto the grid nodes around it.
 
@@ -469,13 +542,7 @@ class MPMScatter(Exchange):
         offsets = stencil_offsets(D, dev)
         X, V = p.get("pos"), p.get("vel")
         # external per-cell acceleration from the parent set's accumulated delta (gravity)
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            a_cell = H.delta(pn)
-            a_cell = torch.nan_to_num(a_cell, posinf=self.a_max, neginf=-self.a_max).clamp(-self.a_max, self.a_max)
-            a_ext = a_cell[p.parent]
-        else:
-            a_ext = torch.zeros(p.n, D, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, D, dev)
         part_accel = getattr(H, "part_accel", None)
         if part_accel is not None:
             a_ext = a_ext + part_accel
@@ -485,7 +552,9 @@ class MPMScatter(Exchange):
         a_ext = _hand_body_force_to_grid(self, H, a_ext, dev, D)
         V = V + dt * (a_ext - self.drag * V)                       # body force + Stokes drag (local; G2P resets V)
 
-        F, C, mass = p.F, p.C, p.mass
+        # mass CLONED AT THE POINT IT IS FIRST READ, not later: the momentum line below holds
+        # `mass[:, None, None]`, and a clone taken after that has already let the view into the tape.
+        F, C, mass = p.F, p.C, self._const_read(p.mass)
         # RESIDUAL STRESS / PRESTRESS (optional, default OFF): compute the fixed-corotated stress
         # relative to a non-identity per-particle REST tensor F_res (multiplicative morphoelastic split
         # F = Fe . F_res, so Fe = F @ F_res_inv is the elastic part). At the mesh rest state F=I this
@@ -502,7 +571,12 @@ class MPMScatter(Exchange):
             J = a * d - b * c
         else:
             J = torch.linalg.det(F)
-        mu, la = p.mu, p.la
+        # THE MATERIAL CONSTANTS THROUGH CLONES WHILE A TAPE IS KEPT. mu, la, p_vol and mass are
+        # buffers a seed operator is allowed to rewrite (`set_material` does), and a version counter
+        # that moves after a forward has read the buffer is what autograd reports as "[N, 1, 1] is
+        # at version 2; expected version 1" -- from a line that did nothing wrong. One vector each,
+        # per substep, and only under grad.
+        mu, la = self._const_read(p.mu), self._const_read(p.la)
         snow = getattr(p, "is_snow", None)
         if _const_any(self, "_c_snow", snow):                      # snow hardening from the plastic ratio Jp
             h = torch.exp((10.0 * (1.0 - p.Jp)).clamp(-6.0, 6.0))
@@ -545,7 +619,15 @@ class MPMScatter(Exchange):
         # fixed-corotated elastic stress before the affine scatter. Default off (absent -> None ->
         # pure elastic); same units / scaling / scatter as the elastic stress. Same H side-channel
         # idiom as part_accel; it feeds the tissue through stress divergence, not a pointwise force.
-        act = getattr(H, "active_stress", None)
+        # PER-LEVEL FIRST, THEN THE GLOBAL SIDE-CHANNEL. `H.active_stress` is one tensor for the
+        # whole run, which is exactly right while a model has ONE particle cloud and unusable the
+        # moment it has fifteen: the second scatter would read a stress sized for the first. A
+        # buffer on the LEVEL is per-set by construction. Both are honoured and summed, so the
+        # existing 2D field-driven operator is untouched.
+        act = getattr(p, "act_stress", None)
+        _gact = getattr(H, "active_stress", None)
+        if _gact is not None:
+            act = _gact if act is None else act + _gact
         if act is not None:
             stress = stress + act
         # THE SAME CHANNEL, FOR A DIFFERENT MECHANISM. `extra_stress` is any additive Kirchhoff
@@ -577,7 +659,11 @@ class MPMScatter(Exchange):
             if getattr(p, "sigma", None) is None or p.sigma.shape != sig.shape:
                 p.register_buffer("sigma", torch.zeros_like(sig))
             p.sigma.copy_(sig.detach())
-        stress = (-dt * 4 * inv_dx * inv_dx) * p.p_vol[:, None, None] * stress
+        # p_vol THROUGH A CLONE UNDER GRAD, for the same reason as `mass` in the scatter: it is a
+        # buffer a seed may rewrite, and its version counter moving after this line is read is what
+        # a backward reports as "[4000, 1, 1] is at version 2; expected version 1".
+        _pv = self._const_read(p.p_vol)
+        stress = (-dt * 4 * inv_dx * inv_dx) * _pv[:, None, None] * stress
         affine = stress + mass[:, None, None] * C
 
         fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
@@ -609,11 +695,11 @@ class MPMScatter(Exchange):
         # scatter). Multi-SET MPM is what the composed cell introduced, and it is the only thing
         # this ever affected. With one set the stamp is always stale and the zeros are always
         # fresh, so single-set runs stay bit-identical.
-        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. This used to read
-        # `H.micro`, a python int the engine advances every substep, and compare it to a stamp on
-        # the field. That works, but it is a per-substep side effect no CUDA-graph replay can
-        # reproduce -- and it made dynamo recompile on every substep, because it specialises on
-        # integer attributes of an nn.Module. The engine binds the i-th OCCURRENCE of a token to
+        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. Deciding it from
+        # a per-substep counter -- a python int the engine advances, compared against a stamp on
+        # the field -- works, and it is a side effect no CUDA-graph replay can reproduce; it also
+        # makes dynamo recompile every substep, since it specialises on integer attributes of an
+        # nn.Module. The engine binds the i-th OCCURRENCE of a token to
         # the i-th INSTANCE, so occurrence 0 of `mpm_scatter` for a given grid is ALWAYS the first
         # one in a substep: the engine stamps `_zeroes_grid` on it when `inst` is built.
         _fresh = getattr(self, "_zeroes_grid", True)
@@ -622,20 +708,48 @@ class MPMScatter(Exchange):
         # graph holds the address it saw at capture time, so the replay silently writes somewhere
         # the rest of the run no longer reads. Measured: capture SUCCEEDS with this left as it was,
         # raises nothing, and produces a 6-tick checksum of 22816.79 against the correct 22132.22.
+        # FUNCTIONAL UNDER GRAD, IN PLACE OTHERWISE, and the two are the same numbers. The
+        # in-place form exists for CUDA-graph capture, which holds the addresses it saw -- and
+        # capture is off under `grad=True` by construction, since the warp bodies register no
+        # backward. Autograd cannot use it either way: the grid is zeroed and re-accumulated every
+        # substep, so the tensor a later substep needs for its backward has already been
+        # overwritten, and an inverse rollout dies with "a variable needed for gradient computation
+        # has been modified by an inplace operation ... [40, 40, 40]". Rebinding fresh tensors is
+        # what makes deformation-gradient control possible at all; it costs one grid allocation a
+        # substep, and only while a tape is being kept.
+        #
+        # WHAT IT IS FOR: papers/Xu_2024_mpm_shape_morphing.pdf makes the per-particle F the CONTROL
+        # variable of an optimisation and takes the loss on this grid's own nodal mass rather than on
+        # particle positions -- a target shape has no particle correspondence, so a position loss has
+        # nothing to match against exactly where the two shapes differ. Every line of that needs the
+        # rollout to be differentiable, and the rollout is not differentiable while the grid is
+        # rebuilt in place. See tools/shape_control.py for the smallest instance of the loop.
+        # Xu, M., Song, C. Y., Levin, D. I. W. & Hyde, D. (2025). A Differentiable Material Point
+        # Method Framework for Shape Morphing. IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746);
+        # Xu, M. & Levin, D. I. W. (2023). Deformation Gradient Control of Physically Simulated
+        # Amorphous Solids. SCA '23, doi 10.1145/3606037.3606840; the render-guided variant is
+        # papers/Song_2025_physmorph_gs.pdf.
         gm, gmv, gc = g.m, g.mv, g.c
-        if _fresh:
+        liquid = getattr(p, "is_liquid", None)
+        lw = ((weight * (mass * liquid.to(mass.dtype))[:, None]).reshape(-1)
+              if _const_any(self, "_c_liquid", liquid) else None)
+        # THE DEPOSIT IS A HOOK, so an alternative IMPLEMENTATION can make it functional without
+        # this body changing at all -- see MPMScatterDiff. In place here, as it has always been.
+        self._deposit(g, gm, gmv, gc, flat, weight, mass, mom, D, _fresh, lw)
+        return {}
+
+    def _deposit(self, g, gm, gmv, gc, flat, weight, mass, mom, D, fresh, lw):
+        """Zero (if this is the substep's first scatter) and accumulate, IN PLACE."""
+        if fresh:
             gm.zero_(); gmv.zero_(); gc.zero_()
         gm.index_add_(0, flat, (weight * mass[:, None]).reshape(-1))
         gmv.index_add_(0, flat, (weight[..., None] * mom).reshape(-1, D))
-        liquid = getattr(p, "is_liquid", None)
-        if _const_any(self, "_c_liquid", liquid):                  # liquid colour for the CSF surface tension
-            lw = (weight * (mass * liquid.to(mass.dtype))[:, None]).reshape(-1)
+        if lw is not None:
             gc.index_add_(0, flat, lw)
-        return {}
 
 
 @register_operator("mpm_grid_update", family="mpm", set="field", kind="field")
-class MPMGridUpdate(FieldUpdate):
+class MPMGridUpdate(MPMWrites, FieldUpdate):
     """The grid solve: the second step of the MLS-MPM cycle, and the only place the whole system
     is coupled. Momentum becomes velocity, body forces are added, and the walls are imposed.
 
@@ -1118,23 +1232,38 @@ class MPMGridUpdate(FieldUpdate):
             if not periodic:
                 shape = g.shape; bnd = 3
                 gv = gv.view(*shape, D)
+                # THE COMPONENTS AS A LIST UNDER GRAD, and the same numbers either way. The values
+                # are already computed with `torch.where`; it is writing them back with
+                # `gv[..., k] = ck` that autograd cannot take -- an in-place index_put into a VIEW,
+                # which is the AsStridedBackward an inverse rollout dies on. Keeping the three
+                # components as separate tensors and stacking them at the end is the same
+                # arithmetic in the same order: each axis clamps its own component, then damps the
+                # others, reading whatever the previous axis left.
+                _grad = self.FUNCTIONAL          # an implementation flag, not a mode
+                comps = [gv[..., k] for k in range(D)] if _grad else None
                 for k in range(D):
                     n_k = shape[k]
                     idx = torch.arange(n_k, device=dev)
                     shp = [1] * D; shp[k] = n_k
                     lo_m = (idx < bnd).view(shp); hi_m = (idx > n_k - bnd).view(shp)
-                    ck = gv[..., k]
+                    ck = comps[k] if _grad else gv[..., k]
                     ck = torch.where(lo_m, ck.clamp(min=0), ck)     # don't penetrate the wall
                     ck = torch.where(hi_m, ck.clamp(max=0), ck)
-                    gv[..., k] = ck
+                    if _grad:
+                        comps[k] = ck
+                    else:
+                        gv[..., k] = ck
                     if wd != 1.0:                                   # tangential friction on the wall slabs
                         slab = lo_m | hi_m
                         for j in range(D):
                             if j == k:
                                 continue
-                            cj = gv[..., j]
-                            gv[..., j] = torch.where(slab, cj * wd, cj)
-                gv = gv.view(g.n_cells, D)
+                            cj = comps[j] if _grad else gv[..., j]
+                            if _grad:
+                                comps[j] = torch.where(slab, cj * wd, cj)
+                            else:
+                                gv[..., j] = torch.where(slab, cj * wd, cj)
+                gv = (torch.stack(comps, -1) if _grad else gv).view(g.n_cells, D)
             if self.plate_axis is not None and self.plate_gap_half > 0.0:
                 gv = self._plate_bc(H, g, gv, dev, dt)
             walls = self._walls3d(H, g, dev)                        # solid 3D obstacles (box / sphere)
@@ -1175,17 +1304,16 @@ class MPMGridUpdate(FieldUpdate):
                         _v[_i] = float(_x)
                 else:
                     # DOWN IS WHEREVER GRAVITY SAYS IT IS, and `gravity` says -y: it defaults to
-                    # `gy = -g, gz = 0` in 3D as well as in 2D. This line used to read -z in 3D, so
-                    # on every 3D spec buoyancy pushed at RIGHT ANGLES to the weight it is supposed
-                    # to oppose -- a bubble drifting sideways rather than rising. One shipped spec
-                    # would push at right angles to the weight it opposes. `buoyancy_dir`
-                    # overrides the default axis for a specification that needs another.
+                    # `gy = -g, gz = 0` in 3D as well as in 2D. Buoyancy must use the SAME axis or
+                    # it pushes at right angles to the weight it is meant to oppose, and a bubble
+                    # drifts sideways instead of rising. `buoyancy_dir` overrides the axis for a
+                    # specification that needs another.
                     _v[1] = -1.0
                 self._dir_cache = torch.tensor(_v, device=dev, dtype=gv.dtype)
                 self._dir_key = _key
             _dir = self._dir_cache
             gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
-        g.v.copy_(gv)                       # in place: a captured graph holds this address
+        self._write_v(g, gv)            # in place: a captured graph holds this address
         return {}
 
 
@@ -1244,7 +1372,7 @@ class MPMGridUpdateNoSync(MPMGridUpdate):
 
 
 @register_operator("mpm_gather", "g2p", family="mpm", set="particle", kind="exchange")
-class MPMGather(Exchange):                 
+class MPMGather(MPMWrites, Exchange):                 
     """Grid to particle: the third step of the MLS-MPM cycle. Each particle reads back a
     velocity and a velocity GRADIENT from the nodes around it, and is advected.
 
@@ -1397,14 +1525,12 @@ class MPMGather(Exchange):
         # MAY_MUTATE_INTEGRATED_STATE, so the engine's tick-0 integration-invariant guard does not
         # apply to it. The clone-and-rebind it replaces gave `p.state` a new address every substep.
         pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
-        p.state[:, pa:pb] = Xn
-        p.state[:, va:vb] = new_V
-        p.C.copy_(new_C)
+        self._write_particles(p, pa, pb, va, vb, Xn, new_V, new_C)
         return {}
 
 
 @register_operator("mpm_strain", family="mpm", set="particle", kind="lateral")
-class MPMStrain(Lateral):
+class MPMStrain(MPMWrites, Lateral):
     """The material update: the fourth step of the MLS-MPM cycle. Each particle advances its own
     deformation gradient from the velocity gradient it just gathered, then applies its material law.
 
@@ -1531,7 +1657,7 @@ class MPMStrain(Lateral):
                 F = F.clone(); F[sm] = U @ torch.diag_embed(sig_c) @ Vh
                 ratio = sig.prod(-1) / sig_c.prod(-1).clamp(min=1e-6)
                 Jp = p.Jp.clone(); Jp[sm] = (Jp[sm] * ratio).clamp(0.6, 20.0)
-                p.Jp.copy_(Jp)
+                self._write_Jp(p, Jp)
         # DORMANT PARTICLES DO NOT DEFORM. `mpm_scatter` masks its weights by occupancy and
         # `mpm_gather` freezes occ==0 rather than advecting it, but this operator integrated F for the
         # reserve regardless -- so a particle waiting to be spawned accumulated an arbitrary deformation
@@ -1541,7 +1667,7 @@ class MPMStrain(Lateral):
         if occ is not None:
             live = (occ > 0)[:, None, None]
             F = torch.where(live, F, p.F)
-        p.F.copy_(F)                        # in place; every read of p.F above precedes it
+        self._write_F(p, F)             # in place; every read of p.F above precedes it
         return {}
 
 
@@ -1586,6 +1712,10 @@ class MPMTurgor(Lateral):
     the pressure, is what a van 't Hoff term would have to carry; that form is a strictly larger
     operator and is deliberately not built until something needs a cell to shrink in hypertonic
     medium.
+
+    Reference: van 't Hoff, J. H. (1887). Die Rolle des osmotischen Druckes in der Analogie
+    zwischen Losungen und Gasen. Z. Phys. Chem. 1:481-508 (the osmotic pressure a turgor is);
+    the balance against the cortex is Young-Laplace, P = 2 gamma / R.
     """
 
     EMIT = None                 # particle->particle: writes the `turgor` buffer in place; no delta
@@ -1853,10 +1983,16 @@ class MPMSpin(Lateral):
 
 @register_field("image", frame="image")
 class ImageField(Field):
-    """A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1].
-    A STATIC map (no dynamics): it holds only its grid `[1, nx, ny]` and the
-    world<->pixel geometry, sampled by `apply_material_map`. Same orientation
-    convention as `PrescribedField` (flip vertical so image-top maps to domain-top)."""
+    """A 1-channel scalar map read from a 2D image (TIFF/PNG), normalised to [0, 1].
+
+    Pure state and no dynamics: it holds its grid `[1, nx, ny]` and the world-to-pixel geometry,
+    and `apply_material_map` samples it. Normalising to [0, 1] is what makes the image carry the
+    PATTERN and the operator reading it carry the units. Same orientation convention as
+    `PrescribedField` -- flipped vertically, so image-top maps to domain-top and a gradient read
+    from it does not point the wrong way.
+
+    Reference: none -- a measured map is data, not a model.
+    """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu",
                  normalize=True, **kw):
@@ -1887,10 +2023,16 @@ class ImageField(Field):
 
 @register_field("vector_grid", frame="vector_grid")
 class VectorGrid(Field):
-    """A 2-channel UNIT-VECTOR field d(x) = (dx, dy) read from a TIFF -- the contraction
-    DIRECTION / active-stress-orientation map. A 2-channel TIFF `[ny,nx,2]` is read as
-    (dx, dy); a 1-channel TIFF as an angle theta in [0,1]->[0,2pi) -> (cos, sin). Every
-    vector is normalised to unit length. Same vertical-flip convention as ImageField."""
+    """A 2-channel UNIT-VECTOR map d(x) = (dx, dy) read from a TIFF: the contraction direction,
+    or the active-stress orientation.
+
+    A 2-channel TIFF `[ny, nx, 2]` is read as (dx, dy); a 1-channel one as an angle, theta in
+    [0, 1] rescaled to [0, 2pi) and converted to (cos theta, sin theta). Every vector is
+    normalised to unit length, so the map carries a DIRECTION only and the operator reading it
+    carries the magnitude. Same vertical flip as `ImageField`.
+
+    Reference: none -- a measured orientation map is data, not a model.
+    """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu", **kw):
         super().__init__(name)
@@ -1919,10 +2061,27 @@ class VectorGrid(Field):
 
 @register_operator("apply_material_map", family="mpm", set="particle", kind="exchange")
 class ApplyMaterialMap(Exchange):
-    """field -> set: sample the map at each particle and write a per-particle material
-    parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the
-    Lame buffers mu/la (the MPM stress law reads them); any other `target` is written as
-    a per-particle buffer of that name. Mutates per-particle buffers, returns {}."""
+    """Paint a material parameter onto the particles from an image: the map says what each
+    region is made of, so heterogeneity is measured rather than declared per type.
+
+    field -> particle: samples the `from:` field at each particle's position, writes a
+    per-particle material buffer in place.
+
+        v_i      = lo + c(x_i) (hi - lo),        c(x_i) in [0, 1], bilinear from the map
+        mu_i     = E_i / (2 (1 + nu))            when target: youngs
+        lambda_i = E_i nu / ((1 + nu)(1 - 2 nu))
+
+    c is the map intensity, normalised to [0, 1] on load, so `min` and `max` carry the units and
+    the image carries only the pattern -- which is what lets one map drive a stiffness in one
+    specification and a density in another. With `target: youngs` the sampled value is Young's
+    modulus in the run's stress units and the two Lame parameters follow from it at the shared
+    Poisson ratio nu; any other `target` is written straight through as a per-particle buffer of
+    that name.
+
+    Reference: Hu, Y. et al. (2018). A moving least squares material point method with
+    displacement discontinuity and two-way rigid body coupling. ACM Trans. Graph. 37(4):150 (the
+    material model whose mu and lambda this writes).
+    """
 
     EMIT = None                              # sets material, emits no force
     REQUIRES_PARAMS = ["from", "target"]
@@ -2283,13 +2442,7 @@ class MLSMPMMechanics(Exchange):
         # force operator (e.g. gravity) returns {cell: g}; the engine accumulates it and --
         # since the cell has no EMIT -- never integrates it, so the MPM substep is free
         # to consume it here as a body force (no bespoke `H.cell_accel`).
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            a_cell = H.delta(pn)                            # [Nc,2] accumulated parent force (zeros if none)
-            a_cell = torch.nan_to_num(a_cell, posinf=self.a_max, neginf=-self.a_max).clamp(-self.a_max, self.a_max)
-            a_ext = a_cell[p.parent]                        # broadcast down  [Np,2]
-        else:
-            a_ext = torch.zeros(p.n, 2, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, 2, dev)   # broadcast down the WHOLE chain [Np,2]
         part_accel = getattr(H, "part_accel", None)        # optional per-particle external accel
         if part_accel is not None:
             a_ext = a_ext + part_accel                     # (e.g. per-cell cohesion for identity)
@@ -2429,7 +2582,7 @@ if HAVE_WARP:
         R = polar_R(Fp, iters)
         # SNOW HARDENS AS IT PACKS, and this kernel did not know it. `mpm_strain` accumulates the
         # plastic volume ratio Jp, and the DEFAULT scatter scales both Lame parameters by
-        # exp(10(1-Jp)) -- Jp<1 (packed) stiffens, Jp>1 softens (mpm_ops.py:322). Omitting it left
+        # exp(10(1-Jp)) -- Jp<1 (packed) stiffens, Jp>1 softens (see `mpm_strain`). Omitting it left
         # snow with its virgin stiffness no matter how compacted it got, so a snow block compressed
         # without limit into a flat pancake instead of holding a packed shape.
         #
@@ -2546,13 +2699,8 @@ class MPMScatterWarp(MPMScatter):
         # NOT `pa`/`va`: `pa` is rebound to H.part_accel eleven lines down, which silently turned
         # the pos column offset into a tensor.
         p_off, _ = p.state_schema["pos"]; v_off, _ = p.state_schema["vel"]
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            ac = torch.nan_to_num(H.delta(pn), posinf=self.a_max, neginf=-self.a_max
-                                  ).clamp(-self.a_max, self.a_max)
-            a_ext = ac[p.parent]
-        else:
-            a_ext = torch.zeros(p.n, D, device=dev)
+        from plexus.operators.mpm_ops import _ancestor_accel
+        a_ext = _ancestor_accel(H, p, self.a_max, D, dev)
         pa = getattr(H, "part_accel", None)
         if pa is not None:
             a_ext = a_ext + pa
@@ -2583,6 +2731,9 @@ class MPMScatterWarp(MPMScatter):
         _has_turg = _turg is not None
         _turg = _turg.contiguous() if _has_turg else _z
         _act = getattr(H, "active_stress", None)
+        _lact = getattr(p, "act_stress", None)          # per-set active stress; see the torch path
+        if _lact is not None:
+            _act = _lact if _act is None else (_act + _lact)
         # THE SAME ADDITIVE-STRESS SLOT CARRIES BOTH. The kernel takes one mat33 per particle, so
         # active stress and the viscous stress from `mpm_viscosity` are summed here rather than
         # given separate inputs -- they enter the momentum identically and the kernel cannot tell
@@ -3388,14 +3539,7 @@ class MPMScatterTriton(MPMScatter):
         dt = sub_dt(H, self.dt_sub)
 
         X, V = p.get("pos"), p.get("vel")
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            a_cell = H.delta(pn)
-            a_cell = torch.nan_to_num(a_cell, posinf=self.a_max, neginf=-self.a_max
-                                      ).clamp(-self.a_max, self.a_max)
-            a_ext = a_cell[p.parent]
-        else:
-            a_ext = torch.zeros(p.n, D, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, D, dev)
         pa = getattr(H, "part_accel", None)
         if pa is not None:
             a_ext = a_ext + pa
@@ -3574,13 +3718,7 @@ class MPMScatterTritonColour(MPMScatterTriton):
         NG = int(g.nx); inv_dx = 1.0 / float(g.dx)
 
         X, V = p.get("pos"), p.get("vel")
-        pn = getattr(p, "parent_name", None)
-        if pn is not None:
-            ac = torch.nan_to_num(H.delta(pn), posinf=self.a_max, neginf=-self.a_max
-                                  ).clamp(-self.a_max, self.a_max)
-            a_ext = ac[p.parent]
-        else:
-            a_ext = torch.zeros(p.n, D, device=dev)
+        a_ext = _ancestor_accel(H, p, self.a_max, D, dev)
         pa = getattr(H, "part_accel", None)
         if pa is not None:
             a_ext = a_ext + pa
@@ -3749,9 +3887,7 @@ class MPMGatherLoop27(MPMGather):
             new_V = torch.where(live[:, None], new_V, V)
             new_C = torch.where(live[:, None, None], new_C, p.C)
         pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
-        p.state[:, pa:pb] = Xn
-        p.state[:, va:vb] = new_V
-        p.C.copy_(new_C)
+        self._write_particles(p, pa, pb, va, vb, Xn, new_V, new_C)
         return {}
 
 
@@ -3847,9 +3983,14 @@ class ActiveForceDirectional(ActiveForce):
     activation the default produces no force at all and this one produces its full magnitude, so
     they are not two ways of computing one thing.
 
-        F_i = amplitude * a(x_i) * d(x_i)
+            F_i = amplitude * a(x_i) * d(x_i)
 
-    It also READS A SECOND FIELD, which the typed signature now records per variant (R1(c)).
+    a is the activation at the particle, dimensionless, and d the unit direction read from the
+    `direction_from` vector field, so `amplitude` alone carries the units. It reads a SECOND
+    field, which the typed signature records per model.
+
+    Reference: Marchetti, M. C. et al. (2013). Hydrodynamics of soft active matter. Rev. Mod.
+    Phys. 85:1143-1189.
     """
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -3957,11 +4098,13 @@ class ActiveStress(Exchange):
 # ----------------------------------------------------------------------------------------------
 @register_field("label_image", frame="label_image")
 class LabelImageField(Field):
-    """An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.
+    """An integer instance map read from a TIFF: NOT normalised, and NEVER interpolated.
 
-    The one job it has that `image` cannot do: return the id that is actually there. Bilinear
-    weights between label 7 and label 12 are a number that means nothing and points at a cell that
+    The one thing it does that `image` cannot is return the id that is actually there. A bilinear
+    weight between label 7 and label 12 is a number that means nothing and points at a cell that
     may not exist, so `sample_label` indexes rather than interpolates.
+
+    Reference: none -- a measured segmentation is data, not a model.
     """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu", **kw):
@@ -3993,14 +4136,30 @@ class LabelImageField(Field):
 
 @register_operator("seed_from_segmentation", family="seed", set="particle", kind="seed")
 class SeedFromSegmentation(Seed):
-    """Populate tissue -> cell -> particle from a measured instance segmentation. Runs once.
+    """Build a hierarchy from a measured instance segmentation: the cells are the ones in the
+    image, not a lattice, and each carries its own material.
 
-    Was `kind="exchange"` (an `Exchange` subclass reusing the field-sampling machinery for
-    its numerics) with a `family="seed"` tag that already said what it actually was; the
-    mismatch let it masquerade as ordinary dynamics and skip the seed lifecycle guarantees
-    (never scheduled, runs once, before frame 0) -- exactly the case `Seed` exists to rule
-    out. The numerics (reading a field, scattering onto particles) are unchanged; only the
-    lifecycle classification is corrected.
+    label_image -> (cell, particle): reads an integer label map, writes the particle positions,
+    their cell assignment, and each cell's Lame parameters. Runs once, at x_0.
+
+        cell j     = the pixels carrying label j
+        x_i        ~ uniform over the pixels of the cell that owns i
+        E_j        = y_lo + f_j (y_hi - y_lo),      f_j in [0, 1], one per cell
+        mu_j, la_j from E_j at the shared Poisson ratio
+
+    y_lo and y_hi are `youngs_min` and `youngs_max`, in the run's stress units, so f_j is the only
+    dimensionless quantity and it is what the measurement supplies. Given a `props` file, f_j
+    comes from the recording -- a cell that moved little in it is stiff, one that moved a lot is
+    compliant -- and without one it is drawn at random, `jitter` setting how far cells may differ.
+    The label map is INDEXED and never interpolated, a bilinear weight between two labels being a
+    number that means nothing.
+
+    It is a `seed` and not an `exchange`, though its numerics are a field sample and a scatter: it
+    establishes x_0, so it must carry the seed lifecycle -- never scheduled, run once, before
+    frame 0 -- which is what that kind guarantees and a dynamics kind does not.
+
+    Reference: the segmentation is measured, not modelled. The material model whose mu and lambda
+    this writes is Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150.
     """
 
     EMIT = None
@@ -4140,3 +4299,385 @@ class SeedFromSegmentation(Seed):
               f"youngs {float(yc.min()):.0f}-{float(yc.max()):.0f} from {how}; "
               f"cell centres seeded: {moved_cells}", flush=True)
         return {}
+
+
+# --------------------------------------------------------------------------- material, re-stated
+@register_operator("set_material", family="mpm", set="particle", kind="seed")
+class SetMaterial(Seed):
+    """Re-state what a body is MADE OF, once, at x_0 -- after a load, before the dynamics.
+
+    particle -> particle: rewrites `mu`, `la`, the material masks and, if a density is given,
+    `density` and `mass`. Reads nothing.
+
+    THIS IS A SEED AND THE REASON IS THE SAME AS `load_run`'S. `x_0` is not only where the material
+    is, it is also what the material IS: `MPMParticle.provision` reads `youngs`, `material` and
+    `density` off the parent's types at BUILD time, and nothing afterwards can change them. So a
+    continuation could inherit a shape and was forced to inherit the substance that produced it --
+    a cell relaxed as a soft viscoelastic jelly could not then be asked to behave as a stiffer
+    solid, which is exactly what "load this configuration and run different operators over it"
+    most often wants. Declared after `load_run` in the `seed:` section, this closes that gap.
+
+        youngs / bulk_modulus   the modulus, in the run's stress units. `bulk_modulus` is for a
+                                LIQUID, where mu = 0 makes K = lambda exactly; on a solid the two
+                                are different numbers and stating the wrong one is a quiet error,
+                                so giving `bulk_modulus` for a non-liquid is refused.
+        material                elastic | liquid | snow | viscoelastic
+        tau                     the Maxwell relaxation time, for `viscoelastic` only. Short is a
+                                material that forgets its deformation -- it spreads and stays --
+                                and long is one that returns it.
+        density                 rewrites `mass` as p_vol * density, so a re-stated density is
+                                consistent with the volumes the geometry gave.
+
+        mu     = E / (2 (1 + nu))
+        lambda = E nu / ((1 + nu)(1 - 2 nu))        or lambda = K directly, for a liquid
+
+    WHAT IT DOES NOT TOUCH: `p_vol`, `F`, `C` and `Jp`. The volumes belong to the geometry that
+    seeded them, and F/C/Jp are the deformation history -- which a continuation from a trajectory
+    does not have anyway. Every buffer is written IN PLACE, so a captured CUDA graph keeps pointing
+    at the same storage.
+
+    Reference: none -- a restatement of material parameters, not a mechanism. Plexus (this work).
+    """
+
+    EMIT = None                         # writes buffers at x_0; no integrable delta
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["material", "initial_condition", "continuation"]
+    PARAM_ROLES = {"youngs": "youngs_modulus", "bulk_modulus": "liquid_bulk_modulus",
+                   "material": "constitutive_model", "tau": "maxwell_relaxation_time",
+                   "density": "mass_density", "nu": "poisson_ratio"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.youngs = params.get("youngs")
+        self.bulk = params.get("bulk_modulus")
+        self.material = params.get("material")
+        self.tau = params.get("tau")
+        self.density = params.get("density")
+        self.nu = float(params.get("nu", 0.2))
+        if self.youngs is not None and self.bulk is not None:
+            raise ValueError("set_material: give `youngs` OR `bulk_modulus`, not both -- for a "
+                             "liquid they are two routes to the same lambda, and for a solid they "
+                             "are different numbers.")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        mat = self.material
+        if self.bulk is not None and mat not in (None, "liquid"):
+            raise ValueError(
+                f"set_material: `bulk_modulus` on material {mat!r}. It is defined for a liquid, "
+                f"where mu = 0 makes K = lambda exactly; on a solid K = lambda + 2*mu/3 and "
+                f"setting lambda from it would silently be the wrong number.")
+        n = lvl.n
+        said = []
+        if self.youngs is not None or self.bulk is not None:
+            if self.bulk is not None:
+                mu = torch.zeros(n, device=lvl.state.device)
+                la = torch.full((n,), float(self.bulk), device=lvl.state.device)
+                said.append(f"K = {float(self.bulk):g} (liquid)")
+            else:
+                E = float(self.youngs)
+                mu = torch.full((n,), E / (2 * (1 + self.nu)), device=lvl.state.device)
+                la = torch.full((n,), E * self.nu / ((1 + self.nu) * (1 - 2 * self.nu)),
+                                device=lvl.state.device)
+                said.append(f"youngs {E:g} -> mu {float(mu[0]):.4g}, la {float(la[0]):.4g}")
+            if mat == "liquid" and self.bulk is None:
+                mu = torch.zeros_like(mu)       # a fluid carries no shear
+            lvl.mu.copy_(mu)
+            lvl.la.copy_(la)
+        if mat is not None:
+            for nm, on in (("is_liquid", mat == "liquid"), ("is_snow", mat == "snow"),
+                           ("is_visco", mat == "viscoelastic")):
+                b = getattr(lvl, nm, None)
+                if b is not None:
+                    b.fill_(bool(on))
+            if hasattr(lvl, "visco_tau"):
+                # 1e9 is "no relaxation", the value `provision` uses for a purely elastic point
+                lvl.visco_tau.fill_(float(self.tau) if (mat == "viscoelastic" and self.tau)
+                                    else 1e9)
+            said.append(f"material {mat}" + (f", tau {float(self.tau):g}"
+                                             if mat == "viscoelastic" and self.tau else ""))
+        if self.density is not None:
+            rho = float(self.density)
+            if hasattr(lvl, "density"):
+                lvl.density.fill_(rho)
+            if hasattr(lvl, "mass") and hasattr(lvl, "p_vol"):
+                lvl.mass.copy_(lvl.p_vol * rho)     # the volumes are the geometry's; only rho moves
+            said.append(f"density {rho:g}")
+        print(f"[set_material] {lvl.name} ({n:,} points): " + "; ".join(said or ["nothing given"]),
+              flush=True)
+        return {}
+
+
+@register_operator("mpm_density_pressure", family="mpm", set="particle", kind="lateral")
+class MPMDensityPressure(Lateral):
+    """Pressure from the LOCAL DENSITY on the grid, so that material added anywhere has to make room.
+
+    particle -[grid]-> particle: scatters every listed set's mass onto the grid with the solver's own
+    B-spline weights, gathers the density back at each point, and writes
+
+        P = k max(rho / rho_0 - 1, 0)
+
+    into the `turgor` buffer, which `mpm_scatter` already subtracts from the Kirchhoff stress as an
+    isotropic outward push. rho is the density the grid sees at that point, rho_0 the density the
+    same point saw on the first frame, and k the stiffness of the response, in the run's stress
+    units -- comparable to the material's own lambda is the sensible scale.
+
+    WHY THIS EXISTS, AND IT IS THE WHOLE REASON POLYMERISATION DID NOTHING. In MLS-MPM a point's
+    stress is a function of its OWN deformation gradient F and of nothing else. Two points may sit
+    at exactly the same place with F = I each and neither feels the other: the material is twice as
+    dense there and the constitutive law cannot tell. So adding material to a cell -- waking points
+    from a pool, however many, however compressed on arrival -- produces one transient push per
+    point as it relaxes and then nothing at all. Measured: 1,019 um^3 added to a 3,833 um^3 cell,
+    27% of its volume, moved the cell's length by 0.22 um and stopped moving it after 75 frames.
+
+    Density is the state that is missing, and the grid is the only place it exists. Reading it back
+    as a pressure closes the loop: the added mass raises rho where it was added, the excess pressure
+    pushes the neighbourhood apart, and it keeps pushing until rho has fallen back to rho_0 -- which
+    happens exactly when the cell has expanded by the volume that was inserted. The material's own
+    elasticity is untouched; this is one extra term, isotropic, and zero everywhere the density is
+    at rest.
+
+    NOT SYMMETRIC IN SIGN, by choice: `max(., 0)` means the term pushes when material is crowded and
+    does nothing when it is sparse. A negative branch would have removed points PULL, which is
+    tempting -- it would let depolymerisation thin a flank -- and wrong for the same reason a gas
+    does not pull: a rarefied region in a solid is held open by the solid, not closed by a suction.
+    A flank that must come in needs a contractile stress, not a hole.
+
+    THE SETS ARE SHARED, THE PRESSURE IS NOT. `sets:` lists every set whose mass counts toward the
+    density -- the whole cell, since all of them scatter into the same grid and all of them displace
+    each other -- while `at:` is the one set this instance writes the pressure on. The density grid
+    is built ONCE per frame and cached on the hierarchy, so N instances cost one scatter, not N.
+
+    Reference: Monaghan, J. J. (1994). Simulating free surface flows with SPH. J. Comput. Phys.
+    110:399-406 (weakly compressible equation of state); Macklin, M. & Muller, M. (2013). Position
+    based fluids. ACM Trans. Graph. 32:104 (density constraint from a kernel-smoothed count).
+    """
+    EMIT = None                       # writes the `turgor` buffer in place; no integrable delta
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["stiffness", "grid"]
+    REQUIRES_BUFFERS = ["mass"]
+    MECHANISM_TAGS = ["density_pressure", "equation_of_state", "volume_source", "crowding"]
+    PARAM_ROLES = {"stiffness": "pressure_per_relative_overdensity", "grid": "density_grid",
+                   "coarsen": "density_grid_coarsening",
+                   "sets": "sets_contributing_mass", "max_pressure": "clamp"}
+    REFERENCE = ("Monaghan, J. J. (1994). J. Comput. Phys. 110:399-406; "
+                 "Macklin, M. & Muller, M. (2013). ACM Trans. Graph. 32:104.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.grid = str(params["grid"])
+        self.k = float(params["stiffness"])
+        self.sets = [str(x) for x in (params.get("sets") or [])] or None
+        self.max_p = float(params.get("max_pressure", 1e9))
+        # THE DENSITY IS READ ON A COARSER GRID THAN THE ONE THE SOLVER RUNS ON, and that is what
+        # lets the stiffness be large enough to matter. The pressure has to beat the material's own
+        # bulk modulus -- at stiffness 600 against a cytoplasm lambda of 279, only 34% of the volume
+        # added ever appeared, the rest going into compression -- but a stiffness ten times larger
+        # applied to a density measured at the solver's own dx turns every single insertion into a
+        # spike, because one point lands in one cell. Coarsening by 4 makes a cell 1.25 um across,
+        # about a tenth of the cell's own width: an insertion is then a fraction of a percent of the
+        # local density while the cell-scale crowding, which is the thing being resisted, is
+        # unchanged. Big pressure, no spikes.
+        self.coarsen = int(params.get("coarsen", 1))
+        self._said = False
+
+    def _grid(self, g, D):
+        """(inv_dx, shape, dx) of the density grid -- the solver's, coarsened by `coarsen`."""
+        c = max(1, self.coarsen)
+        shape = tuple(max(2, (int(k) + c - 1) // c) for k in g.shape)
+        return g.inv_dx / c, shape, g.dx * c
+
+    def _density(self, H, g, D, dev):
+        """Mass per unit volume at every grid node, from every contributing set. Cached per frame."""
+        tag = (int(getattr(H, "frame", 0) or 0), self.coarsen)
+        cache = getattr(H, "_dens_cache", None)
+        if cache is not None and cache[0] == tag:
+            return cache[1]
+        names = self.sets or [self.at]
+        offsets = stencil_offsets(D, dev)
+        periodic = bool(getattr(H, "periodic", False))
+        inv_dx, shape, dx = self._grid(g, D)
+        n_nodes = 1
+        for k in shape:
+            n_nodes *= int(k)
+        acc = torch.zeros(n_nodes, device=dev)
+        for nm in names:
+            q = H.level(nm)
+            X = q.get("pos")[:, :D]
+            m = q.mass
+            occ = getattr(q, "occ", None)
+            if occ is not None:
+                m = m * (occ > 0).to(m.dtype)
+            _fx, w, flat = bspline(X, inv_dx, offsets, shape, periodic)
+            acc.index_add_(0, flat, (w * m[:, None]).reshape(-1))
+        return acc / (dx ** D)
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        g = H.field(self.grid)
+        dev = p.state.device
+        D = p.F.shape[-1]
+        rho_g = self._density(H, g, D, dev)
+        H._dens_cache = ((int(getattr(H, "frame", 0) or 0), self.coarsen), rho_g)
+        offsets = stencil_offsets(D, dev)
+        inv_dx, shape, _dx = self._grid(g, D)
+        _fx, w, flat = bspline(p.get("pos")[:, :D], inv_dx, offsets, shape,
+                               bool(getattr(H, "periodic", False)))
+        rho = (w * rho_g[flat].reshape(w.shape)).sum(1)
+        if not hasattr(p, "rho0"):
+            # THE REST DENSITY IS THE ONE THIS RUN STARTED AT, not a declared constant: the atlas
+            # gives every compartment its own point volume, so a single number would be wrong for
+            # fourteen of the fifteen sets. A point woken later inherits the set's median, because
+            # its own "rest" was never observed.
+            p.register_buffer("rho0", rho.detach().clone().clamp_min(1e-12))
+            live = (p.occ > 0) if getattr(p, "occ", None) is not None else None
+            med = float(rho[live].median()) if live is not None and bool(live.any()) \
+                else float(rho.median())
+            p.rho0[(rho <= 0) | (~live if live is not None else torch.zeros_like(rho, dtype=torch.bool))] = med
+            print(f"[mpm_density_pressure] {self.at}: rest density {float(p.rho0.median()):.4g}, "
+                  f"stiffness {self.k:g} -- a 10% crowding is worth {0.1 * self.k:.3g} of pressure",
+                  flush=True)
+        P = (self.k * (rho / p.rho0 - 1.0)).clamp(0.0, self.max_p)
+        if mask is not None:
+            P = P * mask.float()
+        buf = getattr(p, "turgor", None)
+        if buf is None or buf.shape != P.shape:
+            p.register_buffer("turgor", torch.zeros_like(P))
+            buf = p.turgor
+        buf.copy_(P)
+        if not self._said:
+            self._said = True
+            print(f"[mpm_density_pressure] {self.at}: max crowding "
+                  f"{float((rho / p.rho0).max()):.2f}x rest, pressure up to {float(P.max()):.3g}",
+                  flush=True)
+        return {}
+
+
+# ==========================================================================================================
+# `implementation: differentiable` -- the same MPM cycle, written so autograd can keep the tape.
+#
+# WHY IT IS AN IMPLEMENTATION AND NOT A MODE. The physics is identical: every number these four
+# compute is the number the default bodies compute, and the impl gate says so. What differs is where
+# the results are PUT. The default bodies write in place, which is what a captured CUDA graph needs
+# -- it holds the addresses it saw at capture -- and is exactly what autograd cannot have, since the
+# tensor a later substep's backward needs has already been overwritten. Making that a `mode` (an
+# ambient `torch.is_grad_enabled()`) would mean a run's numerics depended on the context it happened
+# to be called in; making it an implementation means a specification asks for it BY NAME and a run
+# can say which one it used, which is this repo's rule for every other alternative body.
+#
+# WHAT IT COSTS: one grid allocation and a handful of vector clones per substep. Measured on 12,500
+# points over 12 frames, forward and backward, with `compile: true` on the substep block: 0.51 s an
+# optimiser iteration against 1.01 s uncompiled, and 3.20 s for the same work at 50,000 points.
+#
+# WHAT IT IS FOR: papers/Xu_2024_mpm_shape_morphing.pdf -- deformation-gradient control, where the
+# per-particle F is the control variable of an optimisation and the loss is taken on the grid's own
+# nodal mass. tools/shape_control.py and tools/morph_gallery.py are that loop.
+
+
+@register_operator("mpm_scatter", "p2g", implementation="differentiable", family="mpm",
+                   set="particle", kind="exchange")
+class MPMScatterDiff(MPMScatter):
+    """P2G with a grid that is REBUILT rather than zeroed and re-accumulated.
+
+    Same arithmetic as the default scatter, in the same order. What differs is that the three
+    grid channels are produced as NEW tensors -- `zeros_like` then `index_add`, not `zero_()`
+    then `index_add_` -- so each substep's grid survives for the backward that needs it instead
+    of being overwritten by the next.
+
+    Costs one grid allocation a substep. See the section header above for why this is an
+    implementation and not a mode.
+    """
+    FUNCTIONAL = True
+    DIFFERENTIABLE = True
+
+    def _const_read(self, t):
+        # a seed may rewrite these buffers; a version counter that moves after this forward read is
+        # reported by the backward against the line that READ it, which is not where the write was
+        return t.clone()
+
+    def _deposit(self, g, gm, gmv, gc, flat, weight, mass, mom, D, fresh, lw):
+        gm = torch.zeros_like(g.m) if fresh else g.m
+        gmv = torch.zeros_like(g.mv) if fresh else g.mv
+        gc = torch.zeros_like(g.c) if fresh else g.c
+        gm = gm.index_add(0, flat, (weight * mass[:, None]).reshape(-1))
+        gmv = gmv.index_add(0, flat, (weight[..., None] * mom).reshape(-1, D))
+        if lw is not None:
+            gc = gc.index_add(0, flat, lw)
+        g.m, g.mv, g.c = gm, gmv, gc
+
+
+@register_operator("mpm_grid_update", implementation="differentiable", family="mpm", set="field",
+                   kind="field")
+class MPMGridUpdateDiff(MPMGridUpdate):
+    """The grid solve, with the wall written as a stack rather than into a view.
+
+    The boundary already computes its values with `torch.where`; the default writes them back as
+    `gv[..., k] = ck`, an in-place index_put into a VIEW, which autograd refuses. This carries the
+    components as separate tensors and stacks them -- the same arithmetic in the same order, at
+    the cost of one stack a substep.
+
+    See the section header above for why this is an implementation and not a mode.
+    """
+    FUNCTIONAL = True
+    DIFFERENTIABLE = True
+
+    def _const_read(self, t):
+        return t.clone()
+
+    def _write_v(self, g, gv):
+        g.v = gv
+
+
+@register_operator("mpm_strain", implementation="differentiable", family="mpm", set="particle",
+                   kind="lateral")
+class MPMStrainDiff(MPMStrain):
+    """The material update with F rebound rather than written in place.
+
+    F is the control variable of an inverse run, so it has to carry a graph: `p.F = F` rather than
+    `p.F.copy_(F)`, and the same for the plastic ratio Jp. The values are identical; only the
+    binding differs, so a run that does not take a gradient should use the default and keep the
+    capture.
+
+    See the section header above for why this is an implementation and not a mode.
+    """
+    FUNCTIONAL = True
+    DIFFERENTIABLE = True
+
+    def _const_read(self, t):
+        return t.clone()
+
+    def _write_F(self, p, F):
+        p.F = F
+
+    def _write_Jp(self, p, Jp):
+        p.Jp = Jp
+
+
+@register_operator("mpm_gather", "g2p", implementation="differentiable", family="mpm",
+                   set="particle", kind="exchange")
+class MPMGatherDiff(MPMGather):
+    """G2P writing a fresh state table instead of advecting in place.
+
+    One clone of the particle state a substep, which is the price of keeping positions and
+    velocities on the tape. The default writes into the existing table, which is what a captured
+    CUDA graph needs and what a backward cannot have.
+
+    See the section header above for why this is an implementation and not a mode.
+    """
+    FUNCTIONAL = True
+    DIFFERENTIABLE = True
+
+    def _const_read(self, t):
+        return t.clone()
+
+    def _write_particles(self, p, pa, pb, va, vb, Xn, new_V, new_C):
+        S = p.state.clone()
+        S[:, pa:pb] = Xn
+        S[:, va:vb] = new_V
+        p.state = S
+        p.C = new_C

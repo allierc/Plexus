@@ -24,12 +24,6 @@ operators:
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
 schedule: [radius_graph, attraction_repulsion]
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab10
-  point_size: 4.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -41,3 +35,9 @@ descriptions:
       distributed randomly across the entire two-dimensional plane. They are not connected to one another
       and maintain a uniform density. Each particle is a single pixel or a very small cluster of pixels
       in size.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab10
+  point_size: 4.0

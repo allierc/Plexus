@@ -63,25 +63,6 @@ schedule:
 - sense
 - bounce
 - glide
-plotting:
-  renderer: vtk_points
-  colors:
-    a:
-    - 0.2
-    - 0.95
-    - 0.65
-    b:
-    - 1.0
-    - 0.35
-    - 0.45
-  background: black
-  splat_size: 2.4
-  splat_sharpness: 0.85
-  splat_transparency: 0.14
-  splat_fog: 0.5
-  camera_azim: 0.7
-  camera_elev: 0.5
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -106,3 +87,22 @@ descriptions:
       a multi-colored mesh. Each filament has a consistent, medium thickness and varies in length, forming
       a complex, three-dimensional network. The objects are concentrated in a central diamond-shaped region
       against a solid black background.
+
+plotting:
+  renderer: vtk_points
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+    b:
+    - 1.0
+    - 0.35
+    - 0.45
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5

@@ -10,25 +10,10 @@ general:
   - 4.0
   - 4.0
   - 4.0
-plotting:
-  renderer: vtk_mesh
-  background: black
-  mesh_style: surface
-  mesh_edges: true
-  mesh_opacity: 1.0
-  surface_opacity: 1.0
-  surface_color: '#cfd8e3'
-  fps: 30
-  cross_section:
-    axis: y
-    at: 0.5
-    thickness: 6
-    walls: 48
 sets:
   vertex:
     n: 64
     mesh: half_edge
-    cell_set: cell
     state:
       pos:
         width: 3
@@ -48,14 +33,50 @@ sets:
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+  half_edge:
+    n: 128
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 seed:
 - op: seed_mesh
   model: apicobasal
   at: vertex
-  cell_set: cell
   shape: hexagon
   n_cells: 1
   jitter: 0.0
@@ -72,3 +93,18 @@ operators:
 schedule:
 - cell_geometry
 - topo_record
+
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  surface_opacity: 1.0
+  surface_color: '#cfd8e3'
+  fps: 30
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    walls: 48

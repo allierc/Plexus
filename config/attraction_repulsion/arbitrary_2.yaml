@@ -23,12 +23,6 @@ operators:
 
 schedule: [radius_graph, attraction_repulsion]
 
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab10
-  point_size: 4.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -42,3 +36,9 @@ descriptions:
       high-contrast visual effect. They are arranged in a non-linear, stochastic topology, appearing to
       flow together in clusters and individual streams. The size of each particle is uniform and very
       small, resembling a field of distant stars or microscopic matter in motion.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab10
+  point_size: 4.0

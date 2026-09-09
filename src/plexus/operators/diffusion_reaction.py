@@ -11,7 +11,7 @@ In the order they appear below:
     seed_cell_chem        seed       the initial morphogen field
     cell_chem_diffuse     lateral    morphogen exchange between neighbouring cells
     cell_chem_react       lateral    the local reaction: the pattern-forming nonlinearity
-    cell_grow             structural morphogen -> growth: the chemistry-to-shape coupling
+    cell_grow             lateral    morphogen -> growth: the chemistry-to-shape coupling
     interface_tension     lateral    a purse-string line tension on the activator interface
     interface_push        lateral    the term that is NOT physics, kept separate on purpose
     cell_chem_from_shape  lateral    shape -> chemistry: the other half of the loop
@@ -40,7 +40,7 @@ import torch
 from plexus.models.base import Aggregate, Lateral, Rewire, Structural
 from plexus.models.registry import register_operator
 from plexus.models.base import Lateral
-from plexus.operators.vertex_ops import face_geometry_3d
+from plexus.operators.vertex_ops import face_geometry_3d, resolve_cell_set
 
 
 def _chan(params, who, n_species=2):
@@ -103,7 +103,7 @@ class CellGeometry3D(Aggregate):
     reaction-diffusion runs on.
 
     vertex -> cell: reads the half-edge table stashed on the vertex set and writes the cell set's
-    centroid `cen` and area, by scatter-add over half-edges.
+    centroid `centroid` and area, by scatter-add over half-edges.
 
         cen_f = (1/n_f) sum_{e in f} x_srce(e)          the face centroid
         A_f   = (1/2) | sum_{e in f} x_srce(e) x x_trgt(e) |
@@ -118,7 +118,7 @@ class CellGeometry3D(Aggregate):
     Reference: none -- a geometric readout, not a mechanism. Plexus (this work).
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
-    INPUTS = ["vertex"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["area", "cen"]
+    INPUTS = ["vertex"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["area", "centroid"]
     MECHANISM_TAGS = ["aggregate", "cell_geometry", "cross_scale"]
     REFERENCE = "Plexus (this work)."
 
@@ -132,10 +132,10 @@ class CellGeometry3D(Aggregate):
         if m is None:
             return {}
         pos = vlvl.get("pos")[:m["Nv"]]
-        area, _, cen, _ = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], m["nF"])
+        area, _, centroid, _ = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], m["nF"])
         nF = m["nF"]; st = clvl.state.clone(); sch = clvl.state_schema
-        if "cen" in sch:
-            i0, i1 = sch["cen"]; st[:nF, i0:i1] = cen.detach()
+        if "centroid" in sch:
+            i0, i1 = sch["centroid"]; st[:nF, i0:i1] = centroid.detach()
         if "area" in sch:
             i0, i1 = sch["area"]; st[:nF, i0:i1] = area.detach()[:, None]
         clvl.state = st
@@ -278,7 +278,7 @@ class CellRDSeed(Structural):
         # `H.level(self.vat)` unconditionally, so a spec with no `vertex` set died on
         # `KeyError: 'vertex'` -- and `SUPPORTED_DIMS` says [2, 3], so a flat 2D run is supposed to
         # be legal. All this operator wants from the mesh is nF, THE NUMBER OF CELLS; `scatter` and
-        # `noise` use no geometry whatever, and `patch`/`cones` already guard on `"cen" in
+        # `noise` use no geometry whatever, and `patch`/`cones` already guard on `"centroid" in
         # state_schema` and fall back to a uniform 0.02 without it. On a mesh-free set the cell
         # level IS the population, so its own occupancy answers the only question being asked.
         # `in` rather than `.get`: `H.levels` is an `nn.ModuleDict`, which has no `.get` -- the
@@ -298,16 +298,16 @@ class CellRDSeed(Structural):
         g = torch.Generator(device="cpu"); g.manual_seed(self.seed)
         if self.mode == "patch":                                # localized activation source (a bud/tube driver)
             a = torch.full((nF,), 0.02, device=dev)
-            if "cen" in clvl.state_schema:
-                ci0, ci1 = clvl.state_schema["cen"]; zc = clvl.state[:nF, ci0 + 2]
+            if "centroid" in clvl.state_schema:
+                ci0, ci1 = clvl.state_schema["centroid"]; zc = clvl.state[:nF, ci0 + 2]
                 a = torch.where(zc > self.patch_z * float(zc.max()), torch.ones(nF, device=dev), a)
             u = torch.ones(nF, device=dev)
         elif self.mode == "cones":                              # N FIXED radial activation cones (Fig 5 multi-tube):
             a = torch.full((nF,), 0.02, device=dev)             # each cone's tip stays activated as it extends ->
-            if "cen" in clvl.state_schema:                      # N radial tubes. Re-seeded every frame (tracks tips).
-                ci0, ci1 = clvl.state_schema["cen"]; cen = clvl.state[:nF, ci0:ci0 + 3]
-                d = cen / (cen.norm(dim=1, keepdim=True) + 1e-9)
-                dirs = torch.as_tensor(self._cone_dirs(), dtype=cen.dtype, device=dev)
+            if "centroid" in clvl.state_schema:                      # N radial tubes. Re-seeded every frame (tracks tips).
+                ci0, ci1 = clvl.state_schema["centroid"]; centroid = clvl.state[:nF, ci0:ci0 + 3]
+                d = centroid / (centroid.norm(dim=1, keepdim=True) + 1e-9)
+                dirs = torch.as_tensor(self._cone_dirs(), dtype=centroid.dtype, device=dev)
                 cosmax = (d @ dirs.T).max(dim=1).values
                 a = torch.where(cosmax > float(np.cos(np.radians(self.cone_deg))), torch.ones(nF, device=dev), a)
             u = torch.ones(nF, device=dev)
@@ -871,8 +871,8 @@ class CellReactGiererMeinhardt(Lateral):
 # optional slot. With the gate open (`a_sw = 0`) the same operator is plain uniform growth. Naming
 # the gate in the operator made the optional half look mandatory, and made the sibling pair
 # unreadable -- `cell_grow` / `cell_divide` says what the schedule actually does.
-@register_operator("cell_grow", set="vertex", kind="structural", family="population")
-class Grow3D(Structural):
+@register_operator("cell_grow", set="vertex", kind="lateral", family="population")
+class Grow3D(Lateral):
     """Chemistry-to-shape: the morphogen decides where the tissue grows. Each cell's mechanical
     TARGETS are raised, and the mechanics then inflates the cell by force balance.
 
@@ -880,11 +880,12 @@ class Grow3D(Structural):
     volume V0f and radius R0. It moves no vertex itself -- it raises what the cells ASK for, and
     `cell_mechanics` decides whether they get it.
 
-        g_j = rate ( rho + Hill(a_j) )
+        ds_j/dt = s_j rate ( rho + Hill(a_j) )
         Hill(a) = a^n / (a^n + a_sw^n)
-        s_j <- s_j (1 + g_j)               the cumulative per-cell growth scale
+        s_j                                the cumulative per-cell growth scale, integrated by the engine
 
-    rate is the growth rate in inverse frames. rho is the dimensionless baseline: the fraction of
+    rate is the growth rate in inverse units of simulation time -- the fraction of itself a cell
+    adds per unit time, so a spec's own `dt` sets how much of it lands in one frame. rho is the dimensionless baseline: the fraction of
     the full rate a cell grows at with no activator present. a_sw is the activator concentration at
     which the switch is half open, and n is `hill`, its dimensionless sharpness. The two regimes
     are the ends of one operator:
@@ -907,21 +908,30 @@ class Grow3D(Structural):
     # Reads one species' activator; the span it points into is two wide because a Gray-Scott
     # system is. It never writes chem, so this only has to name the right column.
     N_SPECIES = 2
-    # MAY_MUTATE_INTEGRATED_STATE is True because the `conserve_amount` branch rescales cell.chem
-    # in place, c_j <- c_j * (v_old/v_new), when the cell's target volume grows. That rescale is a
-    # change of VARIABLE forced by a volume change, not a dynamics delta -- returning it as an
-    # integrated delta would change the physics. The operator is registered kind="structural",
-    # which is the category the engine's integration invariant exempts, so declaring it honestly
-    # costs nothing. Note that the branch is only reached once chemistry is present: with no
-    # activator the rescale never runs, so a declaration of False would appear correct on every
-    # composition except the one that matters.
+    # MAY_MUTATE_INTEGRATED_STATE IS STILL TRUE, AND GROWTH IS NO LONGER WHY. The four targets --
+    # `mg_scale`, `A0`, `P0`, `V0f` -- are returned as deltas now and the engine integrates them,
+    # so the dynamics this operator exists for writes nothing. Three things it does BESIDE the
+    # dynamics still land in place on the cell set, and each is a different kind of write:
+    #
+    #   the baseline re-take   `A0_init` / `P0_init` / `V0f_init` are re-seeded whenever `nF` moves.
+    #                          That is a RESET, not a rate, and it has no delta form. (The policy of
+    #                          re-taking the whole population's baseline because some cell divided is
+    #                          wrong and is its own parked rung -- see the note at the test below.)
+    #   `conserve_amount`      c_j <- c_j * (v_old/v_new) when the cell's target volume grows: a
+    #                          change of VARIABLE forced by a volume change, not a dynamics delta.
+    #                          Returning it as an integrated delta would change the physics.
+    #   `inhib_frac`           a readout of the inhibitor gate, recorded so the renderer can show it.
+    #
+    # None of the three is reached on every composition -- the rescale needs chemistry present, the
+    # inhibitor needs `inhib_chan` set -- so a declaration of False would look correct on most runs
+    # and fail on the ones that matter.
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["growth", "morphogen_driven", "budding", "cross_scale"]
     REFERENCE = "Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
         # WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are
         # unchanged; 2 reads a second RD system living in the same buffer.
@@ -951,22 +961,34 @@ class Grow3D(Structural):
         # c_j=m_j/v_j is only READ by the kinetics. We store c_j, so growing v_j must DILUTE c_j to conserve
         # amount (else we silently CREATE mass each step -> spuriously feeds the tip). On (default) = correct.
         self.conserve_amount = bool(params.get("conserve_amount", True))
+        self._said_no_cap = False       # the "ceiling not applied" note is printed once per run
 
-    def _advance(self, s_prev, hillv, m, v_ref):
+    def _rate(self, s_prev, hillv, m, v_ref):
         """The RATE LAW, and the only thing a `model=` variant of cell_grow changes.
 
-        Returns the new per-cell linear scale. Volume is V0f_init * s**3, so a multiplicative step
-        on `s` is exponential growth in volume -- which is the default and is deliberate: it is
-        what Okuda's growth term does. Ginzberg, Kafri & Kirschner (Science 2015) name the
-        consequence exactly: "with exponential growth, larger cells grow faster than do smaller
-        cells, amplifying any existing size disparities". Measured on this campaign's own basis,
-        the coefficient of variation of cell volume climbs 0.160 at seed to 0.33-0.53 by frame 900
-        in every run. The variants below are the mechanisms that review says real cells use to
-        stop that, written so the search can put them side by side.
+        Returns ds/dt: the per-UNIT-TIME rate of change of the per-cell linear growth scale `s`,
+        which the engine integrates as `s <- s + dt * ds`. Volume is V0f_init * s**3, so a constant
+        proportional rate on `s` is exponential growth in volume -- which is the default and is
+        deliberate: it is what Okuda's growth term does. Ginzberg, Kafri & Kirschner (Science 2015)
+        name the consequence exactly: "with exponential growth, larger cells grow faster than do
+        smaller cells, amplifying any existing size disparities". Measured on this campaign's own
+        basis, the coefficient of variation of cell volume climbs 0.160 at seed to 0.33-0.53 by
+        frame 900 in every run. The variants below are the mechanisms that review says real cells
+        use to stop that, written so the search can put them side by side.
+
+        A RATE, NOT A PER-FRAME FACTOR, and that is the change this rung made. The law used to be
+        `s <- s (1 + rate (rho + Hill(a)))` applied once per CALL, so `rate` meant "fraction of
+        itself a cell adds per frame" and the simulation's own `dt` did not appear in it. That is
+        the same number only at `dt = 1`. Every `config/tissue` spec is `dt: 1.0` and reads
+        identically; `log/okuda_ECM` runs `dt: 0.0032` and its growth was running 312x faster per
+        unit of simulated time than the same `rate` now means, so those specs carry `rate / dt` to
+        preserve what they did.
         """
-        return s_prev * (1.0 + self.rate * (self.rho + hillv))
+        return s_prev * self.rate * (self.rho + hillv)
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
         if m is None:
             return {}
@@ -989,7 +1011,24 @@ class Grow3D(Structural):
             a = clvl.state[:nF, h0 + self.chan].detach().to(dev)  # per-cell activator
         else:
             a = torch.zeros(nF, device=dev, dtype=m["V0f"].dtype)
-        if "mg_scale" not in m or m["mg_scale"].shape[0] != nF:  # per-cell cumulative linear scale (capped)
+        # THE TEST WAS DOING TWO JOBS AND THE MOVE SEPARATES THEM. `"mg_scale" not in m or
+        # m["mg_scale"].shape[0] != nF` meant BOTH "this operator has not run yet" AND "the cell
+        # count changed since it last did" -- and on the cell set the name is always present with
+        # length exactly `nF`, so the test can never fire, `s` stays 0 and every target collapses.
+        #
+        # `mg_scale_nF` IS THE SECOND MEANING, WRITTEN DOWN. It is a scalar on the mesh table, like
+        # `n_div` and `div_blocked`, because it is one number per run and not one per cell. The
+        # behaviour is exactly what it was: re-baseline whenever the face count moves, which with
+        # `cell_divide` every four frames is most frames.
+        #
+        # THAT POLICY IS WRONG AND IS NOT CHANGED HERE. Re-taking the whole population's baseline
+        # because SOME cell divided is why `mg_scale` stops meaning "how much this cell has grown"
+        # -- measured, it climbs 1.0035 -> 1.0459 before the first division and then never exceeds
+        # 1.0139 -- and `contact_ops.ecm_gate_growth` read it as cumulative and spent 400 frames
+        # correcting nothing. Fixing it moves numbers, so it is its own rung with its own evidence;
+        # this one only moves the storage, and is byte-identical because of that.
+        if int(m.get("mg_scale_nF", -1)) != int(nF):
+            m["mg_scale_nF"] = int(nF)
             m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
             m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
         # THE GATE'S HALF-POINT, AND WHAT IT IS A FRACTION OF.
@@ -1049,17 +1088,63 @@ class Grow3D(Structural):
                 self._inhib_applied = float(inh.mean())
         s_prev = m["mg_scale"]                                    # per-cell scale BEFORE this tick (for the dilution rate)
         v_ref = float(m.get("v_ref", 1.0))                        # SEED-TIME MEDIAN cell volume (mesh_ops:220)
-        s = self._advance(m["mg_scale"], hillv, m, v_ref)         # <-- the rate law; models override THIS only
-        if self.rho > 0:                                             # OKUDA uniform-cell mode: cap v_eq per cell at
-            s_cap = (self.vth_frac * v_ref / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)
-            s = torch.minimum(s, s_cap.clamp(min=1.0))
+        dt = float(getattr(H, "dt", 1.0))
+        ds = self._rate(s_prev, hillv, m, v_ref)                  # <-- the rate law; models override THIS only
+        # THE CEILING IS FOR A TISSUE WITH NO DIVIDER, AND ONLY FOR ONE.
+        #
+        # `vth_frac` is Okuda's uniform-cell mode: cap `v_eq` under `vth_frac * v_ref` so every cell
+        # oscillates in a band and the population stays uniform WITHOUT anything resetting it. Once
+        # `cell_divide` is in the schedule, division is what resets size -- a cell doubles, splits,
+        # and each daughter starts at half -- so the ceiling is no longer size control. It is a lid,
+        # and if it sits below the division threshold the tissue can never reach that threshold.
+        #
+        # IT DID. `divide_growing_ball` caps at `vth_frac 2.5 * v_ref 2.5433` = 6.36 in WEDGE units,
+        # which plateaus the polyhedron volume -- the one `cell_divide`'s trigger reads -- at 1.987
+        # against a reference of 1.229. That is 1.62x, and `factor: 2.0` needs 2x. Not one division
+        # fired in 401 frames and the cell count sat flat at 200. The two conventions are the deeper
+        # problem (AB_R7R8_TODO section 0a) but they are not what makes this spec dead: two
+        # mechanisms were doing one job.
+        #
+        # A CEILING ON A RATE IS A GATE, NOT A CLAMP. When the operator wrote `s` itself the lid was
+        # `s <- min(s, s_cap)`; an operator that only emits ds/dt cannot clamp a value it does not
+        # own, so the lid is applied to the RATE -- a cell at or above its ceiling grows at zero.
+        # Same fixed point (`s` settles on `s_cap`), and it no longer overshoots-then-truncates
+        # within a step, so the band is entered rather than snapped to.
+        _has_divider = "cell_divide" in getattr(H, "scheduled_ops", frozenset())
+        if self.rho > 0 and not _has_divider:                        # OKUDA uniform-cell mode
+            s_cap = ((self.vth_frac * v_ref
+                      / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)).clamp(min=1.0)
+            ds = torch.where(s_prev + dt * ds > s_cap, (s_cap - s_prev) / max(dt, 1e-12), ds)
+        elif self.rho > 0:
+            if not self._said_no_cap:
+                self._said_no_cap = True
+                print(f"[cell_grow] `cell_divide` is scheduled, so the `vth_frac` ceiling is not "
+                      f"applied: division is what resets cell size here, and a ceiling below the "
+                      f"division threshold would stop the tissue reaching it.", flush=True)
         else:
-            s = torch.clamp(s, max=self.cap)                        # legacy: activator-only bulge to `cap`
-        m["mg_scale"] = s
-        m["A0"] = m["A0_init"] * (s * s)                         # keep A0/P0/v_eq consistent (area~R^2, vol~R^3)
-        m["P0"] = m["P0_init"] * s
-        m["V0f"] = m["V0f_init"] * (s ** 3)
-        m["V0"] = float(m["V0f"].sum())
+            # legacy: activator-only bulge, gated to a stop at `cap` for the same reason as above
+            cap = torch.as_tensor(self.cap, device=ds.device, dtype=ds.dtype)
+            ds = torch.where(s_prev + dt * ds > cap, (cap - s_prev) / max(dt, 1e-12), ds)
+        # THE FOUR TARGETS ARE ONE INTEGRAND SEEN FOUR WAYS, and the chain rule is what keeps them
+        # one. `s` is what grows; A0 = A0_init s^2, P0 = P0_init s, V0f = V0f_init s^3 are algebraic
+        # functions of it, so their rates are its rate times the derivative of each map:
+        #
+        #     dA0/dt = 2 A0_init s (ds/dt)      dP0/dt = P0_init (ds/dt)      dV0f/dt = 3 V0f_init s^2 (ds/dt)
+        #
+        # WHAT THIS COSTS, said plainly, because it is a real difference and not a reassociation.
+        # Writing `A0 = A0_init s_new^2` was exact in `s`; integrating its derivative is exact only
+        # to first order, and leaves A0 short of A0_init s^2 by A0_init (dt ds)^2 per step. On this
+        # campaign's own growth rate (5.78e-04 per unit time) that is 3.3e-07 of A0 per frame. The
+        # alternative -- emitting the exact chord (s_new^2 - s^2)/dt -- would reproduce today's
+        # numbers bit for bit but requires the operator to integrate `s` itself, which is the engine's
+        # job and the thing this rung exists to give back to it.
+        s_next = s_prev + dt * ds                                # what `s` will be once the engine integrates
+        deltas = {(self.cat, "mg_scale"): ds,
+                  (self.cat, "A0"): 2.0 * m["A0_init"] * s_prev * ds,
+                  (self.cat, "P0"): m["P0_init"] * ds,
+                  (self.cat, "V0f"): 3.0 * m["V0f_init"] * s_prev * s_prev * ds}
+        s = s_next                                               # the scalars below summarise the POST-tick tissue
+        m["V0"] = float((m["V0f_init"] * s ** 3).sum())
         # THE SHELL RADIUS MUST GROW WITH THE CELLS. cell_mechanics carries a radial spring,
         #     E += K_R * sum_i (|x_i| - R0)^2
         # and R0 is set once at seeding. An operator that grows the cells without rescaling R0
@@ -1094,7 +1179,16 @@ class Grow3D(Structural):
             # physics where it belongs and stops it destroying the pattern it is meant to shape.
             cst[:nF, h0:h0 + 1] = cst[:nF, h0:h0 + 1] / g_vol.clamp(min=1e-9)[:, None]
             clvl.state = cst
-        return {}
+        # THE LIVE CELLS ARE A PREFIX OF THE BUFFER, and a block delta has to be the whole buffer:
+        # `_integrate` adds it to `lvl.state[:, cx0:cx1]` with no mask, so a short tensor would not
+        # broadcast and a full one must be zero past `nF` or the dead tail of the buffer would grow.
+        N = int(clvl.state.shape[0])
+        out = {}
+        for key, d in deltas.items():
+            z = torch.zeros(N, 1, device=clvl.state.device, dtype=clvl.state.dtype)
+            z[:nF, 0] = d.to(device=clvl.state.device, dtype=clvl.state.dtype)
+            out[key] = z
+        return out
 
 
 # =========================================================== cell_grow: the size-control models
@@ -1111,7 +1205,7 @@ class Grow3D(Structural):
 # epithelial TUBE -- a coherent structure -- and its tissue drifts toward the second picture.
 
 
-@register_operator("cell_grow", model="sizer", set="vertex", kind="structural", family="population")
+@register_operator("cell_grow", model="sizer", set="vertex", kind="lateral", family="population")
 class Grow3DSizer(Grow3D):
     """Growth rate falls with the cell's own size: small cells grow faster, large ones slower.
 
@@ -1134,14 +1228,14 @@ class Grow3DSizer(Grow3D):
         self.size_gain = float(params.get("size_gain", 1.0))
         self.f_max = float(params.get("f_max", 4.0))
 
-    def _advance(self, s_prev, hillv, m, v_ref):
+    def _rate(self, s_prev, hillv, m, v_ref):
         v_now = m["V0f"].clamp(min=1e-9)
         f = (v_ref / v_now) ** self.size_gain
         f = torch.clamp(f, 1.0 / max(self.f_max, 1e-9), self.f_max)
-        return s_prev * (1.0 + self.rate * (self.rho + hillv) * f)
+        return s_prev * self.rate * (self.rho + hillv) * f
 
 
-@register_operator("cell_grow", model="balance", set="vertex", kind="structural", family="population")
+@register_operator("cell_grow", model="balance", set="vertex", kind="lateral", family="population")
 class Grow3DBalance(Grow3D):
     """Size emerges from a synthesis/degradation balance, with no size sensor anywhere.
 
@@ -1167,14 +1261,16 @@ class Grow3DBalance(Grow3D):
         self.k_syn = float(params.get("k_syn", 1.0))
         self.k_deg = float(params.get("k_deg", 1.0))
 
-    def _advance(self, s_prev, hillv, m, v_ref):
+    def _rate(self, s_prev, hillv, m, v_ref):
+        # `dv` IS ALREADY dV/dt -- the docstring's own equation is written that way -- so the only
+        # conversion needed is from a volume rate to a rate on the linear scale. With V = V0f_init s^3,
+        # dV/dt = 3 V0f_init s^2 (ds/dt), hence ds/dt = (dV/dt) * s / (3 V).
         v_now = (m["V0f_init"] * s_prev ** 3).clamp(min=1e-9)
         dv = self.rate * (self.k_syn * v_ref * (self.rho + hillv) - self.k_deg * v_now)
-        v_new = (v_now + dv).clamp(min=1e-9)
-        return (v_new / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)
+        return dv * s_prev / (3.0 * v_now)
 
 
-@register_operator("cell_grow", model="timer", set="vertex", kind="structural", family="population")
+@register_operator("cell_grow", model="timer", set="vertex", kind="lateral", family="population")
 class Grow3DTimer(Grow3D):
     """Grow at whatever rate lands the cell on its target size after `cycle_frames` frames.
 
@@ -1200,12 +1296,17 @@ class Grow3DTimer(Grow3D):
         super().__init__(params, device)
         self.cycle_frames = float(params.get("cycle_frames", 100.0))
 
-    def _advance(self, s_prev, hillv, m, v_ref):
+    def _rate(self, s_prev, hillv, m, v_ref):
+        # THE PROPORTIONAL CONTROLLER, WRITTEN AS THE RATE IT ALWAYS WAS. The per-frame factor
+        # (v_tgt/v_now)^(1/cycle_frames) is exp(ln(v_tgt/v_now)/cycle_frames), so the underlying law is
+        # d(ln V)/dt = ln(v_tgt/v_now) / cycle_frames -- first-order relaxation of log-volume with
+        # time constant `cycle_frames`. On the linear scale that is a third of it, since s = V^(1/3).
+        # `cycle_frames` is now a DURATION IN SIMULATION TIME rather than a count of calls; at the
+        # `dt: 1.0` every spec using this model runs at, the two are the same number.
         v_now = (m["V0f_init"] * s_prev ** 3).clamp(min=1e-9)
         share = (self.rho + hillv) / max(self.rho + 1.0, 1e-9)   # the morphogen sets WHERE, as a target
         v_tgt = (self.vth_frac * v_ref * share).clamp(min=1e-9)
-        g = (v_tgt / v_now) ** (1.0 / max(self.cycle_frames, 1.0))
-        return s_prev * g ** (1.0 / 3.0)
+        return s_prev * torch.log(v_tgt / v_now) / (3.0 * max(self.cycle_frames, 1.0))
 
 
 @register_operator("interface_tension", set="vertex", kind="lateral", family="mechanics")
@@ -1242,7 +1343,7 @@ class InterfaceLineTension3D(Lateral):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.K_purse = float(params.get("K_purse", 1.0))
         # 0.6, AND IT WAS 1.0 -- A DEFAULT THAT CANNOT FIRE. The gate below is
         # `red = a > a_sw * amax`, so a_sw = 1.0 asks for cells STRICTLY ABOVE the maximum: the
@@ -1259,6 +1360,8 @@ class InterfaceLineTension3D(Lateral):
         self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         from plexus.operators.vertex_ops import ShapeEnergy3D
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None); clvl = H.level(self.cat)
         if m is None or "chem" not in clvl.state_schema:
@@ -1343,12 +1446,14 @@ class ExtrusionForcing3D(Lateral):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.K_extrude = float(params.get("K_extrude", 0.5))
         self.a_sw = float(params.get("a_sw", 0.6)); self.eta = float(params.get("eta", 0.05))
         self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         from plexus.operators.vertex_ops import face_geometry_3d
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None); clvl = H.level(self.cat)
         if m is None or "chem" not in clvl.state_schema:
@@ -1370,8 +1475,8 @@ class ExtrusionForcing3D(Lateral):
         redpush = (self.K_extrude * a.clamp(min=0.0) * red)          # per-cell outward magnitude
         for _ in range(self.iters):
             force = torch.zeros(Nv, 3, device=dev, dtype=dt)
-            _, _, cen, _ = face_geometry_3d(x, es, et, ef, nF)
-            cdir = cen / (cen.norm(dim=-1, keepdim=True) + 1e-9)
+            _, _, centroid, _ = face_geometry_3d(x, es, et, ef, nF)
+            cdir = centroid / (centroid.norm(dim=-1, keepdim=True) + 1e-9)
             force.index_add_(0, es, (redpush[ef])[:, None] * cdir[ef] / 3.0)
             x = x + (self.eta * force).clamp(-cap, cap)
         vel = torch.zeros_like(x0)
@@ -1564,12 +1669,12 @@ class ShapeToChemCurvature(_ShapeToChemBase):
     MECHANISM_TAGS = _ShapeToChemBase.MECHANISM_TAGS + ["curvature_sensing"]
 
     def _feature(self, pt, m, es, et, ef, nF):
-        area, _, cen, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
+        area, _, centroid, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
                                            torch.as_tensor(et), torch.as_tensor(ef), nF)
-        cen = cen.numpy()
+        centroid = centroid.numpy()
         nrm = np.zeros((nF, 3))                        # Newell normal per cell, outward
         for a, b, f in zip(es, et, ef):
-            nrm[f] += np.cross(pt[a] - cen[f], pt[b] - cen[f])
+            nrm[f] += np.cross(pt[a] - centroid[f], pt[b] - centroid[f])
         ln = np.linalg.norm(nrm, axis=1, keepdims=True)
         nrm = nrm / np.maximum(ln, 1e-12)
         src, dst = _cell_adjacency(es, et, ef, nF)
@@ -1578,9 +1683,9 @@ class ShapeToChemCurvature(_ShapeToChemBase):
         deg = np.bincount(src, minlength=nF).astype(float)
         nb = np.zeros((nF, 3))
         for d in range(3):
-            nb[:, d] = np.bincount(src, weights=cen[dst][:, d], minlength=nF)
+            nb[:, d] = np.bincount(src, weights=centroid[dst][:, d], minlength=nF)
         nb /= np.maximum(deg, 1)[:, None]
-        delta = nb - cen                                # umbrella vector
+        delta = nb - centroid                                # umbrella vector
         # Divide by the NEIGHBOUR SPACING squared, not by |delta|^2. On a sphere the tangential
         # parts of the umbrella cancel, so |delta| is itself only ~L^2/2R -- dividing by it gives
         # 2R/L^2, which GROWS with radius. That reads as 1/R only if you hold the cell count fixed
@@ -1588,7 +1693,7 @@ class ShapeToChemCurvature(_ShapeToChemBase):
         # test. With the spacing: delta.n = -L^2/2R, so H = 2 (delta.n) / L^2 = 1/R. Correct, and
         # now independent of how finely the sphere is meshed.
         sp = np.zeros(nF)
-        np.add.at(sp, src, np.linalg.norm(cen[dst] - cen[src], axis=1))
+        np.add.at(sp, src, np.linalg.norm(centroid[dst] - centroid[src], axis=1))
         L = sp / np.maximum(deg, 1)
         return -2.0 * (delta * nrm).sum(1) / np.maximum(L ** 2, 1e-12)
 
@@ -1728,9 +1833,9 @@ if __name__ == "__main__":
         g = np.exp(-((u[:, 2] - 1.0) ** 2) / (2 * 0.05 ** 2))
         w = v + amp * g[:, None] * u
         h = op._feature(w, m, es, et, ef, nF)
-        _, _, cen, _ = face_geometry_3d(torch.as_tensor(w), torch.as_tensor(es),
+        _, _, centroid, _ = face_geometry_3d(torch.as_tensor(w), torch.as_tensor(es),
                                         torch.as_tensor(et), torch.as_tensor(ef), nF)
-        top = cen.numpy()[:, 2] > 0.90 * np.linalg.norm(cen.numpy(), axis=1)
+        top = centroid.numpy()[:, 2] > 0.90 * np.linalg.norm(centroid.numpy(), axis=1)
         d = float(np.median(h[top]) - np.median(h[~top]))
         print(f"        {tag:7} curvature at the feature minus elsewhere: {d:+.4f}")
         chk((d > 0) if amp > 0 else (d < 0), f"a {tag} reads the right SIGN")

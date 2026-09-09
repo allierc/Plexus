@@ -16,13 +16,6 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -41,3 +34,10 @@ descriptions:
       a porous, sponge-like topology with irregular, interconnected loops. The individual strands vary
       in thickness but maintain a consistent teal hue against the black background. The overall structure
       occupies the entire frame, creating a dense, uniform mesh.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

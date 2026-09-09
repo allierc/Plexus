@@ -41,8 +41,6 @@ operators:
   - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
       sigma: 6.0, normalize: none}
 schedule: [neuron_update, neuron_signal, voxelize]
-plotting: {renderer: vtk_points, background: black, point_size: 4.0}
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_assembly:
@@ -84,3 +82,5 @@ descriptions:
       are organized into two primary rectangular volumes that are joined or positioned very closely together.
       The blocks are oriented at a roughly 45-degree angle relative to the frame. Each individual particle
       is tiny and uniform in size, contributing to a grainy, textured appearance of the larger shapes.
+
+plotting: {renderer: vtk_points, background: black, point_size: 4.0}

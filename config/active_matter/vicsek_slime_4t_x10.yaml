@@ -31,19 +31,6 @@ operators:
 - {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}   # follow own trail, avoid the others
 - {op: glide,   at: cell}
 schedule: [deposit, diffuse, decay, sense, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-    b: [1.0, 0.35, 0.45]
-    c: [0.4, 0.65, 1.0]
-    d: [1.0, 0.85, 0.3]
-  background: black
-  marker: triangle
-  triangle_size: 0.009
-  gamma: 0.7
-  overlay: true        # extra movie: the trail field with the triangles streaming on top
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -79,3 +66,16 @@ descriptions:
       These particles aggregate into long, continuous curvilinear paths and closed circular loops. The
       primary structures are thick, glowing ribbons of color that vary in width and curvature. The overall
       topology consists of interconnected loops and branching streams that create a sense of fluid flow.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+  background: black
+  marker: triangle
+  triangle_size: 0.009
+  gamma: 0.7
+  overlay: true        # extra movie: the trail field with the triangles streaming on top

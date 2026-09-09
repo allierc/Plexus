@@ -12,13 +12,6 @@ operators:
   - {op: velocity_align,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
   - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.0021, chirality: 0.0}
 schedule: [radius_graph, velocity_align, velocity_cruise]
-plotting:
-  renderer: mpl2d
-  background: black
-  marker: triangle
-  triangle_size: 0.01
-  colormap: tab10
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -31,3 +24,10 @@ descriptions:
       in dense, swirling clusters that form interconnected, filamentary structures. Each individual triangle
       is uniform in size and color, appearing as a bright blue outline against the black void. The topology
       of the objects is characterized by high-density regions of flow and sparse areas of low concentration.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  colormap: tab10

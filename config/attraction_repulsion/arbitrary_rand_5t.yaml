@@ -14,12 +14,6 @@ operators:
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
 schedule: [radius_graph, attraction_repulsion]
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab10
-  point_size: 2.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -31,3 +25,9 @@ descriptions:
       frame. These particles appear in a variety of colors, including red, green, blue, yellow, and white.
       They are arranged in a stochastic, non-connected pattern with no discernible clusters or structures.
       Each individual particle is very small, appearing as a single pixel or a small cluster of pixels.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab10
+  point_size: 2.0

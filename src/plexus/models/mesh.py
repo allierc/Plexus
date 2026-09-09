@@ -37,6 +37,7 @@ three.
 from __future__ import annotations
 
 import numpy as np
+import numpy as _np
 
 try:
     import torch
@@ -50,8 +51,9 @@ RESERVED = ("E_srce", "E_trgt", "E_face", "nF", "Nv")
 # What `mesh_seed` lays down. Recorded here so a checkpoint loader can be checked against it: a
 # reload that produces fewer keys drops straight into the silent-zero paths (`age`/`ndiv` become
 # zeros on a length mismatch; `divjit` falls back to a fixed-seed draw).
-SEED_KEYS = RESERVED + ("A0", "P0", "alive", "divjit", "V0f", "Vbirth", "V0", "v_ref",
-                        "R0", "verts0")
+# `divjit` and `Vbirth` LEFT THIS LIST AT S2c-1: they are declared blocks on the CELL SET now, so
+# a checkpoint loader checks them against the set's schema and not against this tuple.
+SEED_KEYS = RESERVED + ("A0", "P0", "alive", "V0f", "V0", "v_ref", "R0", "verts0")
 
 MESH_KINDS = ("half_edge",)
 
@@ -65,6 +67,91 @@ class MeshTable(dict):
     """
 
     KIND = "half_edge"
+
+    # ---------------------------------------------------------------- state that lives on the cell set
+    #
+    # A NAME IN `_proxied` IS NOT STORED HERE AT ALL. It is a declared width-1 block on the CELL
+    # SET, and this table serves it as a view: reads slice `cell.state[:nF, c]`, writes write into
+    # it. The entry never enters the dict, so `reindex_faces` cannot carry it, `snapshot` cannot
+    # record it, and `Hierarchy.renumber_set` -- which permutes the whole of a set's state -- is the
+    # only thing that moves it. That is the point of the move.
+    #
+    # WHY A VIEW RATHER THAN 130 EDITED CALL SITES. `A0`, `P0`, `V0f` and `alive` are read in eight
+    # files and written in three, and the ones that matter are inside `cell_divide`'s rebuild, where
+    # eight python lists are indexed through `keep` in one block. Rewriting all of that at once
+    # produces a diff nobody can bisect and a failure nobody can localise; routing the NAME while
+    # leaving the arithmetic untouched keeps the change to one class and makes it testable by
+    # byte-identity, which is the only evidence that distinguishes a move from a change.
+    #
+    # The spelling stays `m["A0"]` for now, and that is the wart: plexus2 wants an operator to read
+    # declared state off its set. This makes the state declared and carried FIRST, because that is
+    # what stops the defects; the spelling is a rename with no behaviour in it and can follow one
+    # operator at a time.
+    _proxied: tuple = ()
+    _cell = None                      # the cell set's Level, bound by `bind_cell_state`
+
+    def bind_cell_state(self, cell_level, names):
+        """Serve `names` from `cell_level`'s declared blocks instead of storing them here."""
+        object.__setattr__(self, "_cell", cell_level)
+        object.__setattr__(self, "_proxied", tuple(n for n in names
+                                                   if n in cell_level.state_schema))
+        for n in self._proxied:
+            dict.pop(self, n, None)   # a stale local copy would shadow the set silently
+        return self._proxied
+
+    def _px(self, k):
+        """A CONTIGUOUS view of the cell set's column, not the strided one.
+
+        `Level.get(k)` slices `state[:, c0:c1]`, so column `c` of it has the state's full width as
+        its stride. Every reader here was written against a dense per-face array, and a strided one
+        is not merely slower: `warp.from_torch` rejects it, and the reduction ORDER of an
+        `index_add` over a strided source differs from a dense one. Measured before this line
+        existed, `divide_growing_ball` moved 1.09e-04 in `pos` by frame 1 -- three orders of
+        magnitude above a float32 ULP at those coordinates, so semantic and not rounding -- while
+        `A0` and `V0f` were bit-identical, which is the signature of the VALUES being right and the
+        LAYOUT being wrong.
+
+        A copy on read is safe because nothing writes through the returned tensor: every write goes
+        through `__setitem__`, which writes into the column itself.
+        """
+        c = self._cell
+        if c is None:
+            return None
+        return c.get(k)[:int(dict.get(self, "nF", 0)), 0].contiguous()
+
+    def __getitem__(self, k):
+        return self._px(k) if k in self._proxied else dict.__getitem__(self, k)
+
+    def get(self, k, default=None):
+        if k in self._proxied:
+            v = self._px(k)
+            return default if v is None else v
+        return dict.get(self, k, default)
+
+    def __setitem__(self, k, v):
+        if k not in self._proxied:
+            return dict.__setitem__(self, k, v)
+        import torch as _t
+        col = self._cell.get(k)
+        w = v if _t.is_tensor(v) else _t.as_tensor(_np.asarray(v))
+        # THE ARRAY'S OWN LENGTH IS THE AUTHORITY, not `nF`, because the two disagree by design at
+        # the moment of a topology edit. `cell_die` writes the rebuilt `apop_flag` -- one entry per
+        # SURVIVING face -- several lines BEFORE it sets `m["nF"] = nF2`, so slicing the write by
+        # `nF` asked for 296 rows from a 295-long array. Storing exactly what was handed over is
+        # also what the dict did, so no caller changes meaning.
+        n = min(int(w.shape[0]), int(col.shape[0]))
+        col[:n, 0] = w[:n].to(dtype=col.dtype, device=col.device)
+
+    def __contains__(self, k):
+        return (k in self._proxied and self._cell is not None) or dict.__contains__(self, k)
+
+    def update(self, *a, **kw):
+        """`dict.update` bypasses `__setitem__`, and `seed_mesh` seeds through it."""
+        for src in a:
+            for k, v in (src.items() if hasattr(src, "items") else src):
+                self[k] = v
+        for k, v in kw.items():
+            self[k] = v
 
     # ---------------------------------------------------------------- introspection
     @property
@@ -200,13 +287,19 @@ class MeshTable(dict):
     # EVERY NAME IS OPTIONAL. A run without an inhibitor has no `inhib`; the key is simply absent
     # from the snapshot, and the reader draws nothing -- which is the same None-safe contract
     # `topo_record`'s `cp()` has always had.
-    # `phase` JOINS THE LIST BECAUSE A CYCLE THAT CANNOT BE SEEN IS A CYCLE NOBODY WILL CHECK.
-    # `cell_cycle` writes it per face; without it recorded, the renderer draws a uniform tissue and
-    # the only evidence the operator ran is that the cell count went up -- which a timer with no
-    # phases would also produce. `phase_t` is deliberately NOT here: it is the operator's own
-    # bookkeeping, it is reconstructible from `phase` and the frame index, and a recorded array is
-    # a promise to keep it meaningful.
-    FACE_RECORD = ("A0", "P0", "V0f", "age", "ndiv", "apop", "inhib", "myo_med", "phase")
+    # `phase` LEFT THIS LIST AT S2b AND THE REASON IT WAS EVER HERE STILL HOLDS: a cycle that cannot
+    # be seen is a cycle nobody will check. It is still recorded and still drawn -- as `cell__phase`,
+    # a declared block on the CELL SET, which is where per-cell state belongs and where the topology
+    # operators already renumber it. Both renderer paths read it from there (`live_movie`'s live
+    # `_mesh_face_rgb` through `Level.mesh_cell_set`, its replay through the cell set's recorded
+    # block). `phase_t` was never here and still is not: it is the operator's own bookkeeping, it is
+    # reconstructible from `phase` and the frame index, and a recorded array is a promise to keep it
+    # meaningful.
+    # `A0`, `P0`, `V0f`, `age` and `ndiv` LEFT THIS LIST as they moved to the cell set: a proxied
+    # name is served by this table but not stored in it, and recording it here as well would put the
+    # same numbers in the trajectory twice under two names. They are still recorded and still drawn
+    # -- as `cell__*`, from the set that owns them, which both renderers now read.
+    FACE_RECORD = ("myo_med",)
 
     # THE RECORDED NAME IS NOT ALWAYS THE LIVE ONE, and two of the four colours above were lost to
     # exactly that. The operators write `m["apop_flag"]` (`cell_die`) and `m["inhib_frac"]`
@@ -221,7 +314,15 @@ class MeshTable(dict):
     # An alias rather than a rename because both live names are load-bearing: `apop_flag` is
     # carried across renumbering by `cell_die` and `edge_flip`, and `ecm_gate_growth`'s entry
     # condition is a key TEST on this table, so the namespace is not free to be tidied.
-    FACE_ALIAS = {"apop": "apop_flag", "inhib": "inhib_frac"}
+    # THE ALIAS RETIRES WITH THE COLUMNS. It existed because the RECORDED name differed from the
+    # LIVE one -- operators write `m["apop_flag"]` and `m["inhib_frac"]`, `FACE_RECORD` called them
+    # `apop` and `inhib`, and `snapshot`'s bare `self.get(nm)` returned None for both, so the core
+    # recorded NEITHER the dying-cell flag NOR the growth inhibitor, ever. Once they are declared
+    # blocks on the cell set the block name IS the recorded name (`cell__apop_flag`), so there are
+    # no longer two names to bridge. Kept as an empty mapping rather than deleted, because
+    # `snapshot` and every offline reader still consult it and an absent attribute is a different
+    # failure from an empty one.
+    FACE_ALIAS: dict = {}
 
     # THE OPERATORS' OWN COUNTERS, which are scalars on the table and not per-face arrays -- so
     # `FACE_RECORD` cannot carry them, and without them a gate has to INFER what an operator already

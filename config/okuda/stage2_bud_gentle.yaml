@@ -19,22 +19,62 @@ sets:
   vertex:
     n: 130004
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 65004
     state:
       chem:
         width: 2
         integration: first_order
-      cen:
+      centroid:
         width: 3
       area:
         width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      inhib_frac:
+        width: 1
+      elong:
+        width: 1
+        record: false
+  half_edge:
+    n: 520032
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     radius: 5.0
     jitter: 0.15
@@ -77,7 +117,6 @@ operators:
     field: elong
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.001732
     a_sw: 0.35
     hill: 8.0
@@ -88,7 +127,6 @@ operators:
     before_frame: 1800
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.001732
     a_sw: 0.5
     hill: 8.0
@@ -115,7 +153,6 @@ operators:
     cap_frac: 0.12
   - op: interface_tension
     at: vertex
-    cell_set: cell
     K_purse: 1.0
     a_sw: 0.6
     eta: 0.05
@@ -124,7 +161,6 @@ operators:
     before_frame: 1800
   - op: interface_tension
     at: vertex
-    cell_set: cell
     K_purse: 0.0
     a_sw: 0.6
     eta: 0.05
@@ -142,7 +178,6 @@ operators:
     cycle_cv: 0.15
     p0: 3.5
     every: 4
-    cell_set: cell
     min_cycle: 4
     max_cycle: 1000000000
     after_frame: 100
@@ -158,7 +193,6 @@ operators:
     cycle_cv: 0.15
     p0: 3.5
     every: 4
-    cell_set: cell
     min_cycle: 6
     max_cycle: 1000000000
     after_frame: 1800

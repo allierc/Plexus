@@ -1,0 +1,351 @@
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 256
+general:
+  boundary: wall
+  dim: 3
+  dt: 0.002
+  n_frames: 2000
+  name: cell_atlas_10
+  save_data: false
+  seed: 1
+  units:
+    length_um: 100.0
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+operators:
+- at: cell
+  g: 1.5
+  op: gravity
+- at: mpm_particle
+  implementation: warp
+  op: mpm_strain
+- a_max: 200.0
+  at: mpm_particle
+  drag: 0.0
+  implementation: warp
+  op: mpm_scatter
+  polar: higham
+  to: mpm_grid
+- at: mpm_grid
+  op: mpm_grid_update
+  wall_damp: 1.0
+- at: mpm_particle
+  from: mpm_grid
+  implementation: warp
+  op: mpm_gather
+  vmax: 1.0e9
+  wall_damp: 1.0
+- at: compartment
+  child: mpm_particle
+  op: aggregate_centroid
+- at: cell
+  child: compartment
+  op: aggregate_centroid
+plotting:
+  background: black
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  colors:
+    centriole:
+    - 0.85
+    - 1.0
+    - 0.15
+    chromatin:
+    - 0.52
+    - 0.36
+    - 0.74
+    cytoskeleton:
+    - 0.3
+    - 0.85
+    - 0.4
+    golgi:
+    - 0.96
+    - 0.62
+    - 0.2
+    mitochondria:
+    - 0.9
+    - 0.16
+    - 0.12
+    nucleolus:
+    - 0.92
+    - 0.38
+    - 0.66
+    nucleus:
+    - 0.74
+    - 0.62
+    - 0.88
+    plasma_membrane:
+    - 0.62
+    - 0.82
+    - 0.96
+    protein_a:
+    - 0.95
+    - 0.78
+    - 0.25
+    protein_b:
+    - 0.45
+    - 0.78
+    - 0.98
+    protein_c:
+    - 0.98
+    - 0.45
+    - 0.62
+    protein_d:
+    - 0.66
+    - 0.48
+    - 0.96
+    protein_e:
+    - 0.55
+    - 0.95
+    - 0.82
+    rough_er:
+    - 0.16
+    - 0.52
+    - 0.56
+    smooth_er:
+    - 0.36
+    - 0.78
+    - 0.72
+  dot_size: 0.9
+  fps: 60
+  hide_sets:
+  - cell
+  - compartment
+  opacity:
+    plasma_membrane: 0.38
+    nucleus: 0.28
+    cytoskeleton: 0.28
+    rough_er: 0.196
+    smooth_er: 0.196
+    golgi: 0.196
+    mitochondria: 0.196
+    chromatin: 0.196
+    nucleolus: 0.196
+    centriole: 0.196
+    protein_a: 0.08
+    protein_b: 0.08
+    protein_c: 0.08
+    protein_d: 0.08
+    protein_e: 0.08
+  render_3d: compartments
+  renderer: vtk_points
+  slow_motion: 2
+  surface:
+    plasma_membrane:
+      spacing: 0.003
+      blur: 1.4
+      smooth: 40
+      ambient: 0.12
+      diffuse: 0.62
+      specular: 0.55
+      specular_power: 60
+      backface_culling: true
+    nucleus:
+      spacing: 0.0022
+      blur: 1.2
+      smooth: 30
+    cytoskeleton:
+      render: dots
+      point_size: 0.8
+    chromatin:
+      render: dots
+      point_size: 0.9
+    smooth_er:
+      render: dots
+      point_size: 0.9
+    rough_er:
+      render: dots
+      point_size: 1.1
+    golgi:
+      render: dots
+      point_size: 1.1
+    mitochondria:
+      render: dots
+      point_size: 1.2
+    nucleolus:
+      render: dots
+      point_size: 1.1
+    centriole:
+      render: dots
+      point_size: 1.1
+    protein_a:
+      render: dots
+      point_size: 0.6
+    protein_b:
+      render: dots
+      point_size: 0.6
+    protein_c:
+      render: dots
+      point_size: 0.6
+    protein_d:
+      render: dots
+      point_size: 0.6
+    protein_e:
+      render: dots
+      point_size: 0.6
+  surface_blur: 1.1
+  surface_max_cells: 80000000
+  surface_sample: 60000
+  surface_smooth: 24
+  surface_spacing: 0.0035
+  up_axis: 1
+schedule:
+- gravity
+- steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  substep_dt: 3.2e-05
+- aggregate_centroid
+- aggregate_centroid
+seed:
+- at: compartment
+  cell_radius: 0.1
+  op: seed_cell_atlas
+  particles: mpm_particle
+  seed: 0
+  geometry:
+    plasma_membrane:
+      thickness: 0.07
+  vel_init: 0.12
+sets:
+  cell:
+    n: 10
+    start:
+    - - 0.22212
+      - 0.76405
+      - 0.70047
+    - - 0.31385
+      - 0.49653
+      - 0.46161
+    - - 0.61521
+      - 0.71943
+      - 0.19133
+    - - 0.14154
+      - 0.75518
+      - 0.4489
+    - - 0.69933
+      - 0.1216
+      - 0.45849
+    - - 0.66837
+      - 0.29386
+      - 0.83841
+    - - 0.80508
+      - 0.14325
+      - 0.13934
+    - - 0.53147
+      - 0.83375
+      - 0.40972
+    - - 0.28462
+      - 0.44081
+      - 0.14207
+    - - 0.75656
+      - 0.54291
+      - 0.60814
+  compartment:
+    parent: cell
+    per_parent: 1104
+    radius: 0.1
+    types:
+      centriole:
+        count: 2
+        density: 1.1
+        material: elastic
+        youngs: 700.0
+      chromatin:
+        count: 31
+        density: 1.2
+        material: elastic
+        youngs: 45.0
+      cytoskeleton:
+        count: 400
+        density: 1.0
+        material: elastic
+        youngs: 600.0
+      golgi:
+        count: 14
+        density: 1.0
+        material: elastic
+        youngs: 65.0
+      mitochondria:
+        count: 77
+        density: 1.1
+        material: elastic
+        youngs: 110.0
+      nucleolus:
+        count: 2
+        density: 1.3
+        material: elastic
+        youngs: 120.0
+      nucleus:
+        count: 138
+        density: 1.1
+        material: elastic
+        youngs: 200.0
+      plasma_membrane:
+        count: 421
+        density: 1.0
+        material: elastic
+        youngs: 800.0
+      protein_a:
+        count: 1
+        density: 0.6
+        material: elastic
+        youngs: 40.0
+      protein_b:
+        count: 1
+        density: 0.6
+        material: elastic
+        youngs: 40.0
+      protein_c:
+        count: 1
+        density: 0.6
+        material: elastic
+        youngs: 40.0
+      protein_d:
+        count: 1
+        density: 0.6
+        material: elastic
+        youngs: 40.0
+      protein_e:
+        count: 1
+        density: 0.6
+        material: elastic
+        youngs: 40.0
+      rough_er:
+        count: 11
+        density: 1.0
+        material: elastic
+        youngs: 70.0
+      smooth_er:
+        count: 3
+        density: 1.0
+        material: elastic
+        youngs: 60.0
+  mpm_particle:
+    density: 1.0
+    parent: compartment
+    per_parent:
+      plasma_membrane: 60
+      cytoskeleton: 120
+      nucleus: 1000
+      chromatin: 250
+      nucleolus: 250
+      rough_er: 2500
+      smooth_er: 2500
+      golgi: 250
+      mitochondria: 250
+      centriole: 250
+      protein_a: 25000
+      protein_b: 25000
+      protein_c: 25000
+      protein_d: 25000
+      protein_e: 25000
+    radius: 0.02

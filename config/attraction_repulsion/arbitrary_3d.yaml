@@ -25,12 +25,6 @@ operators:
   - { op: radius_graph, at: particle, radius: 0.12 }
   - { op: attraction_repulsion, at: particle, sigma: 0.035 }
 schedule: [radius_graph, attraction_repulsion]
-plotting:
-  renderer: vtk_points
-  background: black
-  colormap: tab10
-  point_size: 2.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -44,3 +38,9 @@ descriptions:
       They are arranged in a dense, stochastic cloud that occupies a central diamond-shaped region of
       the frame. Each individual particle is uniform in size, creating a granular texture across the entire
       field.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  colormap: tab10
+  point_size: 2.0

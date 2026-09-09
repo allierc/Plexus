@@ -12,10 +12,6 @@ general:
   - 1.0
   units:
     length_um: 1172.3329425556858
-plotting:
-  background: black
-  up_axis: 1
-  box_frame: true
 sets:
   cell:
     n: 1
@@ -119,3 +115,8 @@ schedule:
   - mpm_scatter
   - mpm_grid_update
   - mpm_gather
+
+plotting:
+  background: black
+  up_axis: 1
+  box_frame: true

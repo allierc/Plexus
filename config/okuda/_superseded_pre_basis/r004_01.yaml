@@ -23,7 +23,7 @@ sets:
       chem:
         width: 2
         integration: first_order
-      cen:
+      centroid:
         width: 3
       area:
         width: 1
@@ -31,7 +31,6 @@ fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     radius: 5.0
     jitter: 0.15
@@ -68,7 +67,6 @@ operators:
     rate: 1.0
   - op: cell_grow
     at: vertex
-    cell_set: cell
     rate: 0.000866
     a_sw: 0.35
     hill: 4.0
@@ -93,7 +91,6 @@ operators:
     cap_frac: 0.12
   - op: rd_interface_tension
     at: vertex
-    cell_set: cell
     K_purse: 1.0
     K_extrude: 4.0
     a_sw: 0.6
@@ -112,7 +109,6 @@ operators:
     cycle_cv: 0.15
     p0: 3.5
     every: 4
-    cell_set: cell
     min_cycle: 4
     max_cycle: 1000000000
     after_frame: 100

@@ -147,3 +147,4 @@ config/studio/
 # session that swept a concurrent session's staged files into a commit whose subject was about a
 # figure, and 88 untracked files in the repo root are 88 chances to do it again.
 .scratch/
+papers/morph_models/
