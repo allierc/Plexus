@@ -4841,12 +4841,18 @@ class ECMSeed(Structural):
         # FIBRE CENTRES, REJECTION-SAMPLED OUT OF THE CAVITY. Rejection rather than a closed-form
         # placement because the cavity is a parameter: a formula would have to be rewritten for
         # every new cavity shape, and a rejection loop would not.
-        lo, hi = self.margin, 1.0 - self.margin
+        # THE BOX IS THE WORLD, NOT [0, 1]. Every other length here -- the cavity centre, shell_r,
+        # a block -- is already in world units, but the sampling region was written as the unit
+        # cube. A tissue seeded in cvd2_adder_tension's world of 50 units with a margin of 1.0 then
+        # got the region [1.0, 0.0]: empty, zero fibre centres, and a shape error two lines on.
+        W = torch.as_tensor([float(w) for w in H.world_size], dtype=torch.float32)[:D]
+        lo = torch.full((D,), float(self.margin))
+        hi = W - float(self.margin)
         if self.block is not None:
             b = torch.tensor(self.block, dtype=torch.float32).reshape(2, D)
             inset = 0.5 * self.fibre_len
-            blo = (b[0] + inset).clamp(lo, hi)
-            bhi = (b[1] - inset).clamp(lo, hi)
+            blo = torch.maximum(torch.minimum(b[0] + inset, hi), lo)
+            bhi = torch.maximum(torch.minimum(b[1] - inset, hi), lo)
             blo, bhi = torch.minimum(blo, bhi), torch.maximum(blo, bhi)
             # AND THE CAVITY STILL APPLIES INSIDE THE BLOCK. The hole is what the spheroid will
             # occupy, so it has to be absent from the matrix from frame 0 -- a fibre seeded where the
