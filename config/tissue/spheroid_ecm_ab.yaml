@@ -16,7 +16,7 @@ general:
     force_nN: 6666.666666666667
 sets:
   vertex:
-    n: 24000
+    n: 25584
     mesh: half_edge
     state:
       pos:
@@ -33,49 +33,20 @@ sets:
         width: 3
         integration: first_order
   cell:
-    n: 12000
+    n: 12800
     state:
       area:
         width: 1
       centroid:
         width: 3
-      A0:
-        width: 1
-      P0:
-        width: 1
-      V0f:
-        width: 1
-      alive:
-        width: 1
-        record: false
-      age:
-        width: 1
-      ndiv:
-        width: 1
       Vbirth:
         width: 1
         record: false
       divjit:
         width: 1
         record: false
-      mg_scale:
-        width: 1
-        record: false
-      A0_init:
-        width: 1
-        record: false
-      P0_init:
-        width: 1
-        record: false
-      V0f_init:
-        width: 1
-        record: false
-      apop_flag:
-        width: 1
-      inhib_frac:
-        width: 1
   half_edge:
-    n: 96000
+    n: 102400
     maps:
       srce: vertex
       trgt: vertex
@@ -178,18 +149,18 @@ fields:
 seed:
 - op: seed_mesh
   at: vertex
-  n_cells: 400
+  n_cells: 200
   radius: 0.045
+  jitter: 0.02
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.0
+  model: apicobasal
+  h0: 0.00792
   centre:
   - 0.5
   - 0.5
   - 0.5
-  jitter: 0.18
-  p0: 3.5
-  seed: 0
-  model: apicobasal
-  vseed_cv: 0.15
-  h0: 0.0036
 - op: seed_ecm
   at: mpm_particle
   centre:
@@ -212,8 +183,6 @@ seed:
   seed: 0
   jitter: 0.002
 operators:
-- op: cell_geometry
-  at: cell
 - op: surface_drive
   at: vertex
   grow: 3.0
@@ -221,7 +190,7 @@ operators:
 - op: mesh_contact
   at: mpm_particle
   surface: vertex
-  k_frac: 0.45
+  k_frac: 0.9
   mu: 0.4
   dt: 0.0032
   n_grid: 64
@@ -256,7 +225,6 @@ operators:
   at: mpm_particle
   n_grid: 64
 schedule:
-- cell_geometry
 - surface_drive
 - substep_dt: 0.0004
   steps:
