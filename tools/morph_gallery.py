@@ -124,6 +124,17 @@ def main():
                          "only the sampling changes -- a morph optimised over 20 frames rendered at "
                          "100 is the same trajectory seen five times more finely, not five times "
                          "more of it.")
+    ap.add_argument("--trace-free", action="store_true",
+                    help="project the rate tensor onto its deviatoric part, A <- A - (tr A / 3) I, "
+                         "so expm(-A dt) has unit determinant and every material point deforms at "
+                         "CONSTANT VOLUME by construction. This is the hard version of --vol-weight: "
+                         "no weight to tune and no gradient competing with the shape term. It exists "
+                         "because the log-nodal-mass loss is happy to cheat with volume in either "
+                         "direction -- the proxy ball collapses to 0.448x of its initial volume with "
+                         "max|J-1| = 2.33, while the same control transferred onto the organelle "
+                         "cell INFLATES it to roughly 2.8x and tears the membrane into 661 pieces. "
+                         "The cost: a shape whose volume genuinely differs from the ball's is then "
+                         "out of reach, so this trades reachable shapes for a body that survives.")
     ap.add_argument("--control-dof", type=int, default=6, choices=[6, 9],
                     help="components per control node. 6 stores a SYMMETRIC rate tensor A, so "
                          "expm(-A dt) is a pure stretch along principal axes: every material point "
@@ -284,6 +295,8 @@ def main():
                     A[:, 0, 1] = A[:, 1, 0] = a[:, 3]
                     A[:, 0, 2] = A[:, 2, 0] = a[:, 4]
                     A[:, 1, 2] = A[:, 2, 1] = a[:, 5]
+                if args.trace_free:
+                    A = A - torch.diagonal(A, dim1=1, dim2=2).mean(1)[:, None, None] * eye
                 Adt = -A * dt
                 G = eye + Adt + 0.5 * (Adt @ Adt)     # 2nd order: A dt is small, and 40x cheaper
                 def cb(Hh, tick, G=G):
@@ -360,7 +373,8 @@ def main():
         # everything needed to reproduce this morph: the kind, K, the cube's extent in world
         # coordinates, the rollout the control was optimised for, and the material.
         meta = dict(control_kind=args.control, ctrl_K=(args.ctrl if theta is not None else 0),
-                    control_dof=DOF, vol_weight=args.vol_weight, iters=args.iters, lr=args.lr,
+                    control_dof=DOF, vol_weight=args.vol_weight, trace_free=bool(args.trace_free),
+                    iters=args.iters, lr=args.lr,
                     extent=[C, C, C, R], opt_frames=args.frames, render_frames=len(frames),
                     dt=0.002, n_pts=n_pts, n_grid=n_grid, target=name,
                     ngp=dict(n_levels=8, n_features_per_level=2, log2_hashmap_size=15,
