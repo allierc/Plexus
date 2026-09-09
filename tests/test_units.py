@@ -106,3 +106,79 @@ def test_labels_use_real_superscripts_and_match_what_was_converted():
     assert unit_label("rate", UM10) == "1/s"
     # a pure ratio carries no unit however much is declared, which is why `fraction` exists
     assert unit_label("fraction", UM10) is None
+
+
+# ----------------------------------------------------------------- the checker
+def test_the_checker_never_raises_and_never_stops_a_load():
+    """THE ONE PROPERTY THAT MATTERS MOST. A units annotation is the least load-bearing thing in
+    any spec, and a typo in one must never cost a 600-frame run. `check` catches its own
+    exceptions, so even a spec object it cannot understand costs one printed line."""
+    from plexus.units_check import check
+
+    class Broken:                                   # not a Spec at all
+        pass
+
+    said = []
+    out = check(Broken(), {"nonsense": object}, emit=said.append)
+    assert isinstance(out, list)                    # returned, not raised
+    assert said                                     # and it said something
+
+
+def test_the_checker_names_a_convention_disagreement_between_two_operators():
+    """WEDGE AGAINST POLYHEDRON, WHICH IS THE DEFECT THE CONVENTION TAG EXISTS FOR. Two operators
+    that believe different things about the same block is the same error whether or not the spec
+    ever declared one."""
+    from plexus.units_check import check
+
+    class A:
+        BLOCK_UNITS = {"V0f": "volume[wedge]"}
+
+    class B:
+        BLOCK_UNITS = {"V0f": "volume[polyhedron]"}
+
+    class Sim:
+        units, dt, sets, operators = Units(), 1.0, {}, []
+
+    said = []
+    out = check(Sim(), {"grower": A, "energy": B}, emit=said.append)
+    assert any("V0f" in w and "wedge" in w and "polyhedron" in w for w in out), out
+
+
+def test_a_block_the_spec_declares_is_checked_against_what_the_operator_believes():
+    from plexus.units_check import check
+
+    class Energy:
+        BLOCK_UNITS = {"V0f": "volume[polyhedron]"}
+
+    class Sim:
+        units, dt, operators = Units(), 1.0, []
+        sets = {"cell": {"state": {"V0f": {"width": 1, "unit": "volume[wedge]"}}}}
+
+    out = check(Sim(), {"energy": Energy}, emit=lambda *_: None)
+    assert any("sets.cell.V0f" in w for w in out), out
+
+
+def test_an_unparseable_annotation_is_reported_because_absence_is_not():
+    """A TYPO IS NOT AN ABSENCE. `parse_dim` swallows a malformed string into UNKNOWN so a run is
+    never stopped, which is exactly what would make a misspelt unit indistinguishable from a
+    missing one -- so the checker says which it was."""
+    from plexus.units_check import check
+
+    class Sim:
+        units, dt, operators = Units(), 1.0, []
+        sets = {"cell": {"state": {"V0f": {"width": 1, "unit": "kg/m^3"}}}}
+
+    out = check(Sim(), {}, emit=lambda *_: None)
+    assert any("does not parse" in w for w in out), out
+
+
+def test_an_undeclared_block_is_silent():
+    """POINT 4 AGAIN, AT THE CHECKER. 145 of 177 operator classes declare nothing, by design; a
+    checker that named them would be switched off on its first run."""
+    from plexus.units_check import check
+
+    class Sim:
+        units, dt, operators = Units(), 1.0, []
+        sets = {"cell": {"state": {"V0f": {"width": 1}, "chem": 2}}}
+
+    assert check(Sim(), {}, emit=lambda *_: None) == []

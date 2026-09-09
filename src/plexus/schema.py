@@ -559,7 +559,7 @@ def load(path: str) -> Spec:
             if tok not in op_names:
                 raise ValueError(f"schedule step {tok!r} is not a declared operator or builtin")
 
-    return Spec(
+    _spec = Spec(
         name=gv("name"),
         seed=int(gv("seed", 0)),
         n_frames=int(gv("n_frames", 200)),
@@ -581,3 +581,26 @@ def load(path: str) -> Spec:
         units=parse_units(gv("units", None)),
         save_data=gv("save_data", None),
     )
+    # THE UNITS CHECK: ONE PASS, WARNING ONLY, AND IT CANNOT STOP THE LOAD. It runs here because
+    # this is the first moment the whole declaration is visible at once -- the base scales, every
+    # set's state blocks, and every operator that resolved -- and it is outside anything that runs
+    # per frame, so it costs one pass and can never slow a simulation. `units_check.check` catches
+    # its own exceptions, and this call is wrapped again: a defect in the checker costs one printed
+    # line and nothing else. See `plexus/units_check.py` for what it can and cannot see.
+    try:
+        from plexus.units_check import check as _units_check
+        _classes = {}
+        for _o in list(ops) + list(seed_ops):
+            try:
+                _classes[_o.op] = registry.get_operator(
+                    _o.op, (_o.impl or None), (_o.impl or None))
+            except Exception:                    # noqa: BLE001
+                try:
+                    _classes[_o.op] = registry.get_contract(_o.op).implementations.get(
+                        registry.get_contract(_o.op).default)
+                except Exception:                # noqa: BLE001
+                    pass
+        _units_check(_spec, _classes)
+    except Exception as _e:                      # noqa: BLE001
+        print(f"[units] check skipped ({type(_e).__name__}: {_e})", flush=True)
+    return _spec
