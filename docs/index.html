@@ -368,10 +368,6 @@ window.Quarto = {
 </header>
 
 
-<blockquote class="blockquote">
-<p><em>What I cannot create, I do not understand.</em> <br><span style="font-size:.85em;color:#888">— Richard Feynman, on his blackboard at Caltech, 1988</span></p>
-</blockquote>
-<p>Feynman’s line makes creation the test of understanding. Plexus adds a condition: the creation has to be written in a language that can be read back. A simulator is a creation whose mechanisms are fused to its numerics; a Plexus spec is the same creation with the mechanisms left legible — every operator named, every difference between two models visible as a difference between two files.</p>
 <p>We introduce <strong>Plexus</strong>, a typed intermediate representation for biological mechanisms. Rather than defining yet another simulator, Plexus defines a common language whose primary objects are <strong>biological operators</strong>. Every operator specifies the biological entities it acts upon, the states it requires, the relations between these entities, and one or more numerical implementations. The Plexus research program has three objectives. First, to define an <strong>algebra of biological operators</strong>. Second, to <strong>decompose the existing corpus</strong> of simulation models into this common language. Third, to construct <strong>differentiable implementations</strong> of these operators so that mechanistic models can be directly inferred from biological data.</p>
 <p>Biological systems must be decomposed not only into operators, but also into the entities on which those operators act. These entities are heterogeneous — receptors, signalling proteins, cells, extracellular matrices, tissues, fields — and are organized across biological levels. Plexus makes this organization explicit as a compositional hierarchy: each level carries its own entities and states, operators act between entities within a level, and <strong>aggregate ↑</strong> and <strong>broadcast ↓</strong> connect levels by mapping state upward and downward. Decomposition therefore does not flatten biology into a single collection of variables; it preserves the organization through which mechanisms at one level are composed with mechanisms at another.</p>
 <p>The purpose of this decomposition is ultimately recomposition: to construct complete mechanistic models from reusable entities and operators. Making such compositions executable requires strong structural choices. Plexus separates the language that specifies the biological model from the code that interprets and executes it. The language declares entities, states, relations, hierarchy and operators; the interpreter resolves this description into concrete numerical implementations and schedules their execution.</p>
@@ -398,7 +394,7 @@ window.Quarto = {
 </section>
 <section id="composing-mechanisms" class="level2">
 <h2 class="anchored" data-anchor-id="composing-mechanisms">Composing mechanisms</h2>
-<p>Biological models are expressed as compositions of elementary operators. Plexus represents a model as an ordered sequence of operator applications — a <strong>schedule</strong> — specifying both the order and the frequency with which operators are evaluated. Formally, one simulation step is the composition <span class="math inline">\(\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1\)</span>, whose repeated application generates the system dynamics <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>. Different operators may evolve on different time scales — mechanical interactions every step, diffusion, growth or division less often — so a model is a <em>multi-rate</em> composition of biological mechanisms rather than a monolithic solver.</p>
+<p>Biological models are expressed as compositions of elementary operators. Plexus represents a model as an ordered sequence of operator applications — a <strong>schedule</strong> — specifying both the order and the frequency with which operators are evaluated. Formally, one simulation step is the composition <span class="math inline">\(\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1\)</span>, whose repeated application generates the system dynamics <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>, where <span class="math inline">\(x\)</span> is the whole state — every set and every field at once. Different operators may evolve on different time scales — mechanical interactions every step, diffusion, growth or division less often — so a model is a <em>multi-rate</em> composition of biological mechanisms rather than a monolithic solver.</p>
 <p>Operators are <strong>pure</strong> transformations: rather than modifying state in place, each returns its contribution <span class="math inline">\(\Delta_i\)</span> to the system evolution, and the complete update <span class="math inline">\(\Delta = \sum_i \Delta_i\)</span> is passed to the numerical implementation. Introducing a new mechanism is therefore adding a new operator, never editing an implementation — and because nothing is mutated in place, gradients propagate through the composition and the whole rollout stays <strong>differentiable</strong>.</p>
 </section>
 <section id="composing-hierarchy" class="level2">
@@ -560,7 +556,7 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">The same spec with <code>F: 0.05 → 0.034</code>. Stripes break into spots.</span>
+      <span class="sim-cap">The same spec with the feed rate <code>F: 0.05 → 0.034</code>. Stripes break into spots.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -644,7 +640,7 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">Four states instead of two, a second diffusion–reaction pair, the reactions coupled (<code>gamma: 0.2</code>). Two patterns, no shared cell.</span>
+      <span class="sim-cap">Four states instead of two, a second diffusion–reaction pair, the reactions coupled by a cross term of strength <code>gamma: 0.2</code>. Two patterns, no shared cell.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -2012,7 +2008,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap"><code>kk: 0.062 → 0.031</code>, the reaction rate with it. Lobes and branches instead of arms.</span>
+      <span class="sim-cap">The kill rate <code>kk: 0.062 → 0.031</code>, and the reaction rate with it. Lobes and branches instead of arms.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -2379,7 +2375,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap"><code>rate: 0.25 → 0.75</code>. The shell folds instead of arming.</span>
+      <span class="sim-cap">The reaction rate <code>rate: 0.25 → 0.75</code>. The shell folds instead of arming.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -3555,7 +3551,7 @@ plotting:
     - 0.92
     - 0.94
     - 1.0</pre></span></span>
-      <span class="sim-cap">Three balls of 100,000 particles; only <code>eta</code> differs. One never drains through the plate.</span>
+      <span class="sim-cap">Three balls of 100,000 particles; only the viscosity <code>eta</code> differs. One never drains through the plate.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -3951,7 +3947,7 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap">Nine pillars declared under <code>general</code>, not inside any operator. A wake behind each.</span>
+      <span class="sim-cap">Nine pillars declared in the spec’s world block <code>general</code>, not inside any operator. A wake behind each.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -4075,7 +4071,7 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap"><code>per_parent: 5,000,000</code>. Nothing else changed.</span>
+      <span class="sim-cap">Particles per parent cell, <code>per_parent: 5,000,000</code>. Nothing else changed.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -5417,7 +5413,7 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap"><code>surface_drive grow: 2.4</code> in place of <code>by: −0.11</code>. The shell reaches the gel by inflating.</span>
+      <span class="sim-cap"><code>surface_drive</code> given a growth factor <code>grow: 2.4</code> in place of a downward travel <code>by: −0.11</code>. The shell reaches the gel by inflating.</span>
     </figcaption>
   </figure>
 </div>
@@ -5617,7 +5613,7 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 100.0
   what: the rate whose hole did not stop</pre></span></span>
-      <span class="sim-cap">Secrete, diffuse, activate, inhibit, degrade, tear. Where MMP2 outruns its inhibitor the membrane removes its own faces (structural). Fifty-four openings.</span>
+      <span class="sim-cap">Secrete, diffuse, activate, inhibit, degrade, tear. Where the protease MMP2 outruns its inhibitor the membrane removes its own faces (structural). Fifty-four openings.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -5727,7 +5723,7 @@ run:
   splits: 100524
   twin_of: 06_hole_tiny
   mt1_field: single Gaussian cap, theta 20.0 deg</pre></span></span>
-      <span class="sim-cap">The MT1-MMP field is a single cap instead of six random modes. Six openings, not fifty-four.</span>
+      <span class="sim-cap">The field of MT1-MMP, the protease that activates MMP2, is a single cap instead of six random modes. Six openings, not fifty-four.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -5839,7 +5835,7 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 300.0
   what: the rate that destroyed the membrane</pre></span></span>
-      <span class="sim-cap"><code>k_deg: 300</code>, three times the first breach. Removal outruns the inhibitor; the sheet is still tearing at the end.</span>
+      <span class="sim-cap">The degradation rate <code>k_deg: 300</code>, three times the first breach. Removal outruns the inhibitor; the sheet is still tearing at the end.</span>
     </figcaption>
   </figure>
 </div>
