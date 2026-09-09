@@ -250,6 +250,7 @@ NAMED = {
     "dimensionless": DIMENSIONLESS,
     "fraction": DIMENSIONLESS,           # a ratio that happens to lie in [0, 1]
     "count": DIMENSIONLESS,              # a number of entities
+    "angle": DIMENSIONLESS,              # radians or degrees: a ratio of two lengths either way
     "length": LENGTH,                    # position, radius, rest length, thickness
     "position": LENGTH, "radius": LENGTH, "thickness": LENGTH,
     "area": Dim(L=2),

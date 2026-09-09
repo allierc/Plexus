@@ -744,6 +744,11 @@ class SeedMesh3D(Structural):
     Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644.
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    # WHAT THE SEED'S NUMBERS ARE. `radius` and `h0` are lengths in the world box; `p0` is the
+    # dimensionless shape index P/sqrt(A); `vseed_cv` is a fraction of the quantity it perturbs.
+    # `n_cells` is a count. Anything not named here is UNDECLARED and therefore silent.
+    PARAM_UNITS = {"radius": "length", "h0": "length", "p0": "fraction",
+                   "vseed_cv": "fraction", "n_cells": "count", "seed": "count"}
     MECHANISM_TAGS = ["vesicle", "epithelial_shell", "spherical", "half_edge_mesh", "initial_condition"]
     REFERENCE = "Okuda, S. et al. (2013). Reversible network reconnection model for simulating large deformation in 3D tissues. Biomech. Model. Mechanobiol. 12:627-644; tyssue (DamCB)."
 
@@ -1125,6 +1130,14 @@ class ShapeEnergy3D(Lateral):
     Curr. Biol. 17:2095-2104 (the area, perimeter and line-tension energy); Okuda, S. et al.
     (2013). Biomech. Model. Mechanobiol. 12(4):627-644 (its 3D form on a closed surface)."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
+    # FORCED BY THE ENERGY, NOT CHOSEN. With E = sum_f [K_A(A-A0)^2 + K_P(P-P0)^2 + K_V(v-v_eq)^2]
+    # + Lam sum_e l_e an energy (F*L): K_A L^4 = F L gives K_A = F/L^3, K_P L^2 = F L gives F/L,
+    # K_V L^6 = F L gives F/L^5, and Lam L = F L gives Lam = F -- a line tension IS a force.
+    # `mu` multiplies a force to make a velocity, so it is a mobility, L/(F*T).
+    PARAM_UNITS = {"K_A": "F/L^3", "K_P": "F/L", "K_V": "F/L^5", "K_R": "F/L",
+                   "Lambda": "line_tension", "Gamma": "tension",
+                   "p0": "fraction", "mu": "mobility", "eta": "fraction",
+                   "cap_frac": "fraction", "relax_iters": "count"}
     REQUIRES_PARAMS = ["p0"]
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
@@ -1403,6 +1416,12 @@ class Divide3D(Structural):
     division follows the sheet topology of Tyssue.
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    # MULTIPLES AND COUNTS. `factor` and `delta` are multiples of `v_ref`, not volumes -- which is
+    # what makes them portable across mesh scales -- so they are dimensionless. The cycle bounds
+    # are counts of CALLS, not durations, which is why they are `count` and not `time`.
+    PARAM_UNITS = {"factor": "fraction", "delta": "fraction", "p0": "fraction",
+                   "cycle_cv": "fraction", "split_cv": "fraction", "reset_noise": "fraction",
+                   "min_cycle": "count", "max_cycle": "count"}
     MECHANISM_TAGS = ["division", "cell_division", "vesicle", "proliferation", "volume_doubling"]
     REFERENCE = "Hertwig, O. (1884) (long-axis division rule); tyssue cell_division (DamCB)."
 
@@ -1902,6 +1921,15 @@ class Apoptosis3D(Structural):
     11:1847-1857.
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    # `shrink_rate` IS PER CALL AND IS DECLARED AS WHAT IT IS. It multiplies the target volume by
+    # (1 - shrink_rate) once per invocation, so it is a dimensionless fraction per call and NOT a
+    # rate in 1/T -- exactly the confusion S3 removed from `cell_grow`. Declaring it `rate` would
+    # be a claim this code does not honour: `cell_die` is `kind: die` and has not been converted.
+    # The angles are degrees, which are dimensionless.
+    PARAM_UNITS = {"shrink_rate": "fraction", "critical_frac": "fraction",
+                   "max_mark_frac": "fraction", "frac": "fraction", "field_frac": "fraction",
+                   "band_deg": "angle", "cone_deg": "angle",
+                   "n_max": "count", "min_age": "count", "p0": "fraction"}
     MECHANISM_TAGS = ["apoptosis", "cell_elimination", "extrusion", "delamination", "die"]
     REFERENCE = ("Monier, B. et al. (2015). Apico-basal forces exerted by apoptotic cells drive "
                  "epithelium folding. Nature 518:245-248; tyssue B-Apoptosis (DamCB).")
@@ -2972,6 +3000,13 @@ class CellCycle3D(Lateral):
     # So the flag now names a seeding write rather than a dynamics one, which is a much smaller
     # claim than the one it used to make.
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    # DURATIONS IN SIMULATION TIME AFTER S4, not counts of frames. The cycle is one continuous
+    # coordinate whose rate is 1/T, so a phase of fraction f_k traversed at 1/T takes f_k*T, and
+    # `t_g1`...`t_m` ARE those durations. `p_g1` is the hazard of leaving G1, a true 1/T whose
+    # reciprocal is the mean waiting time. `g1_size` is a multiple of `v_ref`, not a volume.
+    PARAM_UNITS = {"t_g1": "time", "t_s": "time", "t_g2": "time", "t_m": "time",
+                   "p_g1": "rate", "g1_size": "fraction", "phase_cv": "fraction",
+                   "inhib_thresh": "fraction"}
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "phase_progression", "restriction_point",
                       "size_checkpoint"]
     REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
@@ -4544,6 +4579,14 @@ class ApicoBasalShapeEnergy3D(Lateral):
     this writes on the doubled degrees of freedom).
     """
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
+    # THE SAME FUNCTIONAL, SO THE SAME DIMENSIONS -- see `_apicobasal_energy_core`'s equation.
+    # `kappa_s` multiplies the cell's whole polyhedron SURFACE, so kappa_s * L^2 = F*L and
+    # kappa_s = F/L: it IS a surface tension, which is why raising it holds a dying cell's ring
+    # open against `k_v` and stalled 59 of the extrusions on `apop2_ab_half`.
+    PARAM_UNITS = {"k_v": "F/L^5", "kappa_s": "tension", "gamma": "tension",
+                   "Lambda": "line_tension", "K_R": "F/L", "mu": "mobility",
+                   "sep_mu": "fraction", "eta": "fraction", "cap_frac": "fraction",
+                   "relax_iters": "count"}
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos", "sep"]; WRITES = ["pos", "sep"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["vertex_model", "apicobasal", "cell_polyhedron", "cell_3d_volume",
