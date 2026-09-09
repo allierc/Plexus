@@ -125,6 +125,14 @@ def _no_strays(P, k=3.0):
     return Q
 
 
+# THE ONLY CONVERSION PATH IN THE RENDERER. Imported under short names because the curve code
+# below calls them per panel, and because naming them here makes it greppable that the plot is the
+# ONE place in the tree where a simulation number becomes a physical one -- `plexus/units.py` says
+# so and this is the surface it means.
+from plexus.units import to_physical as _units_to_physical      # noqa: E402
+from plexus.units import unit_label as _units_label             # noqa: E402
+
+
 class LiveMovie:
     """An `on_frame(H, tick)` hook that writes one mp4 for the whole run.
 
@@ -248,6 +256,16 @@ class LiveMovie:
         self.dt, self.time_s = dt, time_s
         self.real_time = bool((self.style or {}).get("real_time", real_time))
         self.length_um = length_um
+        # THE RUN'S DECLARATION, REBUILT FOR THE ONE FUNCTION ALLOWED TO CONVERT. The renderer is
+        # handed the two scales as bare floats by its caller; `plexus.units.to_physical` wants the
+        # `Units` those floats came from, and `declared` is the whole difference between a number
+        # that may carry a unit and one that may not -- so a run with no `units:` block gets
+        # `declared=False` here and every panel prints bare, which is what it should always have
+        # done. `force_nN` is absent because no curve quantity needs it.
+        from plexus.units import Units as _Units
+        self._units = _Units(length_um=float(length_um or 1.0),
+                             time_s=float(time_s if time_s is not None else 1.0),
+                             declared=bool(length_um))
         # THE GRID, BESIDE THE PARTICLE COUNT. The two together are what actually determines
         # whether a run resolves anything: 100M particles on a 96^3 grid is 8,176 per cell and a
         # picture of nothing in particular, while the same 100M on 330^3 is the MPM convention of 8.
@@ -1075,6 +1093,14 @@ class LiveMovie:
     #                         cycling in waves and one cycling steadily are told apart by the SD.
     _CURVE_Q = ("cells", "area", "volume", "radius", "myosin", "phase", "cycle_progress")
 
+    # WHAT EACH CURVE IS, SO THE PANEL CAN CONVERT IT. Until this existed the volume panel appended
+    # `µm³` to a raw simulation number and was wrong by `length_um ** 3` -- a factor of 1000 on every
+    # tissue run in the tree. The unit is now DERIVED from the same declaration that converts the
+    # number, so a label can no longer appear over a value nobody scaled. `myosin` is deliberately
+    # absent: it is a per-junction activity with no declared dimension, and UNKNOWN prints bare.
+    _CURVE_UNITS = {"area": "area", "volume": "volume", "radius": "length",
+                    "cells": "count", "phase": "fraction", "cycle_progress": "fraction"}
+
     def _curve_series(self, H, lvl, q, ntype):
         """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
 
@@ -1272,6 +1298,14 @@ class LiveMovie:
             S = self._curve_series(H, lvl, q, ntype)
             if not np.isfinite(S[..., 0]).any():
                 continue
+            # CONVERT ONCE, HERE, AND EVERY SURFACE FOLLOWS. The y-axis range, the +-SD band, the
+            # lines and the on-panel `mean +- SD` readout are all derived from `S`, so scaling it
+            # at the source is what keeps them from disagreeing -- which is exactly how the label
+            # and the number came to disagree in the first place. `to_physical` returns None when
+            # the run declared no scale, and then nothing is scaled and nothing is labelled.
+            _scale = _units_to_physical(1.0, self._CURVE_UNITS.get(q), self._units)
+            if _scale is not None and _scale != 1.0:
+                S = S * float(_scale)
             lo = float(np.nanmin(S[..., 0] - S[..., 1])); hi = float(np.nanmax(S[..., 0] + S[..., 1]))
             # THE ENDS ARE ROUND NUMBERS, AND THE FLOOR IS ZERO WHERE ZERO IS THE FLOOR. An 8% pad
             # below the minimum put the `cells` axis at -317, i.e. a tick labelled with a negative
@@ -1327,8 +1361,7 @@ class LiveMovie:
             # THE REAL CHARACTERS. VTK's text renderer takes them, so `um^3` -- an ASCII
             # transliteration of micro and a caret standing in for an exponent -- was a choice, not
             # a limitation, and it sat two lines under a scale bar already saying `\u00b5m`.
-            _u = ({"volume": "\u00b5m\u00b3", "area": "\u00b5m\u00b2", "radius": "\u00b5m"}.get(q)
-                  if getattr(self, "length_um", None) else None)
+            _u = _units_label(self._CURVE_UNITS.get(q), self._units)
             _u = {"phase": "%"}.get(q, _u)
             ch.y_axis.label = str(cfg.get("ylabel", q)) + (f"  ({_u})" if _u else "")
             # TWO SIZES, NOT ONE MINUS TWO. The axis TITLE ("cells", "frame") and the TICK NUMBERS
@@ -2836,6 +2869,20 @@ class LiveMovie:
         K = float(self.style.get("pressure_K", 3.0e6))
         return K * (1.0 - J), "p = K(1-J) (Pa)"
 
+    @staticmethod
+    def _block_unit(lvl, name):
+        """The `unit:` a set declared for one of its state blocks, or None.
+
+        THROUGH THE SCHEMA, NOT A NAME TABLE. U1 put the declaration on `Block.unit`, so this reads
+        the same object the checker and the engine read; a renderer-local mapping from block name to
+        unit would be a second declaration and therefore a second chance to disagree.
+        """
+        try:
+            sch = getattr(lvl, "state_schema", None)
+            return getattr(sch.block(name), "unit", None) if sch and name in sch else None
+        except Exception:                        # noqa: BLE001 -- a legend is not the run
+            return None
+
     def _rgb_field(self, H, lvl):
         """Map `_field` through a colormap with a FIXED range -> uint8 RGB, or None."""
         val, label = self._field(H, lvl)
@@ -2868,7 +2915,18 @@ class LiveMovie:
             t = ((val - lo) / max(hi - lo, 1e-12)).clamp(0, 1).detach().cpu().numpy()
             self._lut = f"[{lo:.3g}, {hi:.3g}]"
         cm = plt.get_cmap(self.style.get("field_cmap", "turbo"))
-        self.colour_by = f"{label} {self._lut} ({self.style.get('field_cmap','turbo')})"
+        # THE LUT LEGEND CARRIES ITS UNIT NOW, when the block it colours by declared one. The
+        # legend is the only surface in the frame that states a RANGE, and a range is exactly the
+        # kind of number a reader takes away -- "[0, 0.26]" of what? The unit comes from the
+        # block's own `unit:` on the set that owns it (U1), so it is the same declaration the
+        # curve panels and the checker read, and the range is left BARE when there is none rather
+        # than guessed. The numbers themselves are not rescaled here: `lo`/`hi` are the colour
+        # map's endpoints and rescaling them would desynchronise the legend from the colours,
+        # which are computed from the simulation values above.
+        _bu = self._block_unit(lvl, str(self.style.get("color_field", "") or ""))
+        _bl = _units_label(_bu, self._units) if _bu else None
+        self.colour_by = (f"{label} {self._lut}{' ' + _bl if _bl else ''} "
+                          f"({self.style.get('field_cmap','turbo')})")
         return (cm(t)[:, :3] * 255).astype(np.uint8)
 
     def _rgb(self, H, lvl, pos):
