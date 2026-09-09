@@ -1,0 +1,1096 @@
+general:
+  name: cell_morph_spot_x1p5
+  seed: 1
+  n_frames: 45
+  dt: 0.002
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  record_cap: 45
+  save_data: null
+  units:
+    length_um: 100.0
+sets:
+  cell:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  plasma_membrane:
+    parent: cell
+    per_parent: 421
+    radius: 0.1
+    types:
+      plasma_membrane:
+        fraction: 1.0
+        youngs: 20.0
+        density: 1.0
+        material: viscoelastic
+        tau: 0.05
+  plasma_membrane_node:
+    parent: plasma_membrane
+    per_parent: 300
+    radius: 0.1
+    density: 1.0
+    entity: mpm_particle
+  cytoskeleton:
+    parent: cell
+    per_parent: 400
+    radius: 0.1
+    types:
+      cytoskeleton:
+        fraction: 1.0
+        youngs: 75.0
+        density: 1.0
+        material: viscoelastic
+        tau: 0.05
+  cytoskeleton_node:
+    parent: cytoskeleton
+    per_parent: 600
+    radius: 0.1
+    density: 1.0
+    entity: mpm_particle
+  nuclear_envelope:
+    parent: cell
+    per_parent: 138
+    radius: 0.1
+    types:
+      nucleus:
+        fraction: 1.0
+        youngs: 1200.0
+        density: 1.1
+        material: elastic
+  nuclear_envelope_node:
+    parent: nuclear_envelope
+    per_parent: 5000
+    radius: 0.1
+    density: 1.1
+    entity: mpm_particle
+  chromatin:
+    parent: cell
+    per_parent: 31
+    radius: 0.1
+    types:
+      chromatin:
+        fraction: 1.0
+        youngs: 150.0
+        density: 1.2
+        material: viscoelastic
+        tau: 0.05
+  chromatin_node:
+    parent: chromatin
+    per_parent: 1250
+    radius: 0.1
+    density: 1.2
+    entity: mpm_particle
+  nucleolus:
+    parent: cell
+    per_parent: 2
+    radius: 0.1
+    types:
+      nucleolus:
+        fraction: 1.0
+        youngs: 300.0
+        density: 1.3
+        material: viscoelastic
+        tau: 0.05
+  nucleolus_node:
+    parent: nucleolus
+    per_parent: 1250
+    radius: 0.1
+    density: 1.3
+    entity: mpm_particle
+  rough_er:
+    parent: cell
+    per_parent: 11
+    radius: 0.1
+    types:
+      rough_er:
+        fraction: 1.0
+        youngs: 30.0
+        density: 1.0
+        material: viscoelastic
+        tau: 0.05
+  rough_er_node:
+    parent: rough_er
+    per_parent: 12500
+    radius: 0.1
+    density: 1.0
+    entity: mpm_particle
+  smooth_er:
+    parent: cell
+    per_parent: 3
+    radius: 0.1
+    types:
+      smooth_er:
+        fraction: 1.0
+        youngs: 25.0
+        density: 1.0
+        material: viscoelastic
+        tau: 0.05
+  smooth_er_node:
+    parent: smooth_er
+    per_parent: 12500
+    radius: 0.1
+    density: 1.0
+    entity: mpm_particle
+  golgi:
+    parent: cell
+    per_parent: 14
+    radius: 0.1
+    types:
+      golgi:
+        fraction: 1.0
+        youngs: 27.5
+        density: 1.0
+        material: viscoelastic
+        tau: 0.05
+  golgi_node:
+    parent: golgi
+    per_parent: 1250
+    radius: 0.1
+    density: 1.0
+    entity: mpm_particle
+  mitochondria:
+    parent: cell
+    per_parent: 77
+    radius: 0.1
+    types:
+      mitochondria:
+        fraction: 1.0
+        youngs: 45.0
+        density: 1.1
+        material: viscoelastic
+        tau: 0.05
+    state:
+      pos:
+        width: 3
+        role: geometry
+        integration: none
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: none
+        record: false
+      voltage:
+        width: 1
+        role: coordinate
+        integration: first_order
+  mitochondria_node:
+    parent: mitochondria
+    per_parent: 1250
+    radius: 0.1
+    density: 1.1
+    entity: mpm_particle
+  centriole:
+    parent: cell
+    per_parent: 2
+    radius: 0.1
+    types:
+      centriole:
+        fraction: 1.0
+        youngs: 200.0
+        density: 1.1
+        material: viscoelastic
+        tau: 0.05
+  centriole_node:
+    parent: centriole
+    per_parent: 1250
+    radius: 0.1
+    density: 1.1
+    entity: mpm_particle
+  protein_a:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_a:
+        fraction: 1.0
+        youngs: 5.0
+        density: 0.6
+        material: viscoelastic
+        tau: 0.02
+  protein_a_node:
+    parent: protein_a
+    per_parent: 125000
+    radius: 0.1
+    density: 0.6
+    entity: mpm_particle
+  protein_b:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_b:
+        fraction: 1.0
+        youngs: 5.0
+        density: 0.6
+        material: viscoelastic
+        tau: 0.02
+  protein_b_node:
+    parent: protein_b
+    per_parent: 125000
+    radius: 0.1
+    density: 0.6
+    entity: mpm_particle
+  protein_c:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_c:
+        fraction: 1.0
+        youngs: 5.0
+        density: 0.6
+        material: viscoelastic
+        tau: 0.02
+  protein_c_node:
+    parent: protein_c
+    per_parent: 125000
+    radius: 0.1
+    density: 0.6
+    entity: mpm_particle
+  protein_d:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_d:
+        fraction: 1.0
+        youngs: 5.0
+        density: 0.6
+        material: viscoelastic
+        tau: 0.02
+  protein_d_node:
+    parent: protein_d
+    per_parent: 125000
+    radius: 0.1
+    density: 0.6
+    entity: mpm_particle
+  protein_e:
+    parent: cell
+    per_parent: 1
+    radius: 0.1
+    types:
+      protein_e:
+        fraction: 1.0
+        youngs: 5.0
+        density: 0.6
+        material: viscoelastic
+        tau: 0.02
+  protein_e_node:
+    parent: protein_e
+    per_parent: 125000
+    radius: 0.1
+    density: 0.6
+    entity: mpm_particle
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 320
+seed:
+- op: seed_cell_atlas
+  at: plasma_membrane
+  particles: plasma_membrane_node
+  cell_radius: 0.1
+  vel_init: 0.0
+  geometry:
+    plasma_membrane:
+      thickness: 0.1
+- op: seed_cell_atlas
+  at: cytoskeleton
+  particles: cytoskeleton_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: nuclear_envelope
+  particles: nuclear_envelope_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: chromatin
+  particles: chromatin_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: nucleolus
+  particles: nucleolus_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: rough_er
+  particles: rough_er_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: smooth_er
+  particles: smooth_er_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: golgi
+  particles: golgi_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: mitochondria
+  particles: mitochondria_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: centriole
+  particles: centriole_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: protein_a
+  particles: protein_a_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: protein_b
+  particles: protein_b_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: protein_c
+  particles: protein_c_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: protein_d
+  particles: protein_d_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_cell_atlas
+  at: protein_e
+  particles: protein_e_node
+  cell_radius: 0.1
+  vel_init: 0.0
+- op: seed_state_random
+  at: mitochondria
+  block: voltage
+  lo: 0.0
+  hi: 1.0
+  seed: 1
+operators:
+- op: deform_control
+  at: plasma_membrane_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: &id001
+  - 0.5
+  - 0.5
+  - 0.5
+  - 0.1
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: cytoskeleton_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: rough_er_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: smooth_er_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: golgi_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: mitochondria_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: centriole_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: protein_a_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: protein_b_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: protein_c_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: protein_d_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: deform_control
+  at: protein_e_node
+  field: /groups/saalfeld/home/allierc/Graph/Plexus/graphs_data/si_material/morph_spot/morph.npz
+  extent: *id001
+  over: 29
+  rate:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+- op: mpm_strain
+  at: plasma_membrane_node
+  implementation: warp
+- op: mpm_strain
+  at: cytoskeleton_node
+  implementation: warp
+- op: mpm_strain
+  at: nuclear_envelope_node
+  implementation: warp
+- op: mpm_strain
+  at: chromatin_node
+  implementation: warp
+- op: mpm_strain
+  at: nucleolus_node
+  implementation: warp
+- op: mpm_strain
+  at: rough_er_node
+  implementation: warp
+- op: mpm_strain
+  at: smooth_er_node
+  implementation: warp
+- op: mpm_strain
+  at: golgi_node
+  implementation: warp
+- op: mpm_strain
+  at: mitochondria_node
+  implementation: warp
+- op: mpm_strain
+  at: centriole_node
+  implementation: warp
+- op: mpm_strain
+  at: protein_a_node
+  implementation: warp
+- op: mpm_strain
+  at: protein_b_node
+  implementation: warp
+- op: mpm_strain
+  at: protein_c_node
+  implementation: warp
+- op: mpm_strain
+  at: protein_d_node
+  implementation: warp
+- op: mpm_strain
+  at: protein_e_node
+  implementation: warp
+- op: mpm_scatter
+  at: plasma_membrane_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: cytoskeleton_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: nuclear_envelope_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: chromatin_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: nucleolus_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: rough_er_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: smooth_er_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: golgi_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: mitochondria_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: centriole_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: protein_a_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: protein_b_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: protein_c_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: protein_d_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_scatter
+  at: protein_e_node
+  to: mpm_grid
+  drag: 2.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+- op: mpm_gather
+  at: plasma_membrane_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: cytoskeleton_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: nuclear_envelope_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: chromatin_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: nucleolus_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: rough_er_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: smooth_er_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: golgi_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: mitochondria_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: centriole_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: protein_a_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: protein_b_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: protein_c_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: protein_d_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: mpm_gather
+  at: protein_e_node
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1.0
+  implementation: warp
+- op: aggregate_centroid
+  at: plasma_membrane
+  child: plasma_membrane_node
+- op: aggregate_centroid
+  at: cytoskeleton
+  child: cytoskeleton_node
+- op: aggregate_centroid
+  at: nuclear_envelope
+  child: nuclear_envelope_node
+- op: aggregate_centroid
+  at: chromatin
+  child: chromatin_node
+- op: aggregate_centroid
+  at: nucleolus
+  child: nucleolus_node
+- op: aggregate_centroid
+  at: rough_er
+  child: rough_er_node
+- op: aggregate_centroid
+  at: smooth_er
+  child: smooth_er_node
+- op: aggregate_centroid
+  at: golgi
+  child: golgi_node
+- op: aggregate_centroid
+  at: mitochondria
+  child: mitochondria_node
+- op: aggregate_centroid
+  at: centriole
+  child: centriole_node
+- op: aggregate_centroid
+  at: protein_a
+  child: protein_a_node
+- op: aggregate_centroid
+  at: protein_b
+  child: protein_b_node
+- op: aggregate_centroid
+  at: protein_c
+  child: protein_c_node
+- op: aggregate_centroid
+  at: protein_d
+  child: protein_d_node
+- op: aggregate_centroid
+  at: protein_e
+  child: protein_e_node
+schedule:
+- deform_control
+- deform_control
+- deform_control
+- deform_control
+- deform_control
+- deform_control
+- deform_control
+- deform_control
+- deform_control
+- deform_control
+- deform_control
+- deform_control
+- substep_dt: 3.174603e-05
+  steps:
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_strain
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+  - mpm_gather
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+- aggregate_centroid
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: compartments
+  dot_size: 0.9
+  fps: 30
+  slow_motion: 2
+  surface_sample: 60000
+  surface_max_cells: 80000000
+  hide_sets:
+  - cell
+  - plasma_membrane
+  - cytoskeleton
+  - nuclear_envelope
+  - chromatin
+  - nucleolus
+  - rough_er
+  - smooth_er
+  - golgi
+  - mitochondria
+  - centriole
+  - protein_a
+  - protein_b
+  - protein_c
+  - protein_d
+  - protein_e
+  compartment_sets:
+  - plasma_membrane_node
+  - cytoskeleton_node
+  - nuclear_envelope_node
+  - chromatin_node
+  - nucleolus_node
+  - rough_er_node
+  - smooth_er_node
+  - golgi_node
+  - mitochondria_node
+  - centriole_node
+  - protein_a_node
+  - protein_b_node
+  - protein_c_node
+  - protein_d_node
+  - protein_e_node
+  surface:
+    plasma_membrane_node:
+      spacing: 0.00476
+      blur: 1.4
+      smooth: 40
+      ambient: 0.12
+      diffuse: 0.62
+      specular: 0.55
+      specular_power: 60
+      backface_culling: true
+    cytoskeleton_node:
+      render: dots
+      point_size: 0.9
+    nuclear_envelope_node:
+      spacing: 0.00357
+      blur: 1.2
+      smooth: 30
+    chromatin_node:
+      render: dots
+      point_size: 0.9
+    nucleolus_node:
+      render: dots
+      point_size: 0.9
+    rough_er_node:
+      render: dots
+      point_size: 0.9
+    smooth_er_node:
+      render: dots
+      point_size: 0.9
+    golgi_node:
+      render: dots
+      point_size: 0.9
+    mitochondria_node:
+      render: dots
+      point_size: 0.9
+    centriole_node:
+      render: dots
+      point_size: 0.9
+    protein_a_node:
+      render: dots
+      point_size: 0.9
+    protein_b_node:
+      render: dots
+      point_size: 0.9
+    protein_c_node:
+      render: dots
+      point_size: 0.9
+    protein_d_node:
+      render: dots
+      point_size: 0.9
+    protein_e_node:
+      render: dots
+      point_size: 0.9
+  opacity:
+    plasma_membrane_node: 0.38
+    cytoskeleton_node: 0.28
+    nuclear_envelope_node: 0.28
+    chromatin_node: 0.196
+    nucleolus_node: 0.196
+    rough_er_node: 0.196
+    smooth_er_node: 0.196
+    golgi_node: 0.196
+    mitochondria_node: 0.196
+    centriole_node: 0.196
+    protein_a_node: 0.08
+    protein_b_node: 0.08
+    protein_c_node: 0.08
+    protein_d_node: 0.08
+    protein_e_node: 0.08
+  colors:
+    plasma_membrane: &id002
+    - 0.62
+    - 0.82
+    - 0.96
+    cytoskeleton: &id003
+    - 0.3
+    - 0.85
+    - 0.4
+    nuclear_envelope: &id004
+    - 0.74
+    - 0.62
+    - 0.88
+    chromatin: &id005
+    - 0.52
+    - 0.36
+    - 0.74
+    nucleolus: &id006
+    - 0.92
+    - 0.38
+    - 0.66
+    rough_er: &id007
+    - 0.16
+    - 0.52
+    - 0.56
+    smooth_er: &id008
+    - 0.36
+    - 0.78
+    - 0.72
+    golgi: &id009
+    - 0.96
+    - 0.62
+    - 0.2
+    mitochondria: &id010
+    - 0.9
+    - 0.16
+    - 0.12
+    centriole: &id011
+    - 0.85
+    - 1.0
+    - 0.15
+    protein_a: &id012
+    - 0.95
+    - 0.78
+    - 0.25
+    protein_b: &id013
+    - 0.45
+    - 0.78
+    - 0.98
+    protein_c: &id014
+    - 0.98
+    - 0.45
+    - 0.62
+    protein_d: &id015
+    - 0.66
+    - 0.48
+    - 0.96
+    protein_e: &id016
+    - 0.55
+    - 0.95
+    - 0.82
+    plasma_membrane_node: *id002
+    cytoskeleton_node: *id003
+    nuclear_envelope_node: *id004
+    chromatin_node: *id005
+    nucleolus_node: *id006
+    rough_er_node: *id007
+    smooth_er_node: *id008
+    golgi_node: *id009
+    mitochondria_node: *id010
+    centriole_node: *id011
+    protein_a_node: *id012
+    protein_b_node: *id013
+    protein_c_node: *id014
+    protein_d_node: *id015
+    protein_e_node: *id016

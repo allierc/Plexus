@@ -529,6 +529,149 @@ def cmd_measure(a):
           f"{gap_tN_mean / max(gap_t0_mean, 1e-9):.2f}x)")
 
 
+# --------------------------------------------------------------------------- the tear diagnostics
+def _n_components(sub_pts, radius):
+    """Connected components of `sub_pts` under an edge at every pair closer than `radius`.
+
+    Takes an ALREADY-SUBSAMPLED cloud (see `cmd_tear`), because `cKDTree.query_pairs` on 126,300
+    membrane points at a radius that has to resolve real gaps returns tens of millions of pairs. A
+    macroscopic break -- a membrane torn into several lobes -- is visible in a 15,000-point
+    subsample exactly as it is in the full cloud; a single dropped particle is not the kind of
+    tear this is checking for. The RADIUS must be calibrated to THIS subsample's own spacing, not
+    the full cloud's -- passing a radius sized for 126,300 points to a 15,000-point subsample
+    fragments an intact sheet purely from under-sampling, which is a bug this function had until
+    `cmd_tear` was changed to subsample once and calibrate on that exact subsample.
+    """
+    from scipy.spatial import cKDTree
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components as _cc
+    pairs = cKDTree(sub_pts).query_pairs(r=radius, output_type="ndarray")
+    n = sub_pts.shape[0]
+    if len(pairs) == 0:
+        return n
+    rows = np.concatenate([pairs[:, 0], pairs[:, 1]])
+    cols = np.concatenate([pairs[:, 1], pairs[:, 0]])
+    graph = coo_matrix((np.ones(len(rows)), (rows, cols)), shape=(n, n))
+    n_comp, _ = _cc(graph, directed=False)
+    return n_comp
+
+
+def _median_nn_dist(pts, sample=4000, seed=0):
+    from scipy.spatial import cKDTree
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(pts.shape[0], min(sample, pts.shape[0]), replace=False)
+    d, _ = cKDTree(pts).query(pts[idx], k=2)
+    return float(np.median(d[:, 1]))
+
+
+def _local_j_proxy(pts0, ptsN, k=8, sample=8000, seed=0):
+    """A PROXY for the deformation-gradient determinant J, from positions alone.
+
+    F itself is a buffer (`REQUIRES_BUFFERS = ["F"]` on the MPM particle), never written into
+    `state_schema`, so it is not in `trajectory.npz` -- recording pulls from recorded STATE, and F
+    is not state. What IS recoverable from two position clouds sharing the same particle indexing
+    is local packing: mass is conserved per particle, so local density ~ 1 / (local neighbourhood
+    volume), and J = V_now / V_reference. The k-th nearest-neighbour distance is a one-number
+    estimate of that local neighbourhood's radius; cubing it estimates the volume up to a constant
+    that cancels in the ratio.
+    """
+    from scipy.spatial import cKDTree
+    rng = np.random.default_rng(seed)
+    n = min(pts0.shape[0], ptsN.shape[0])
+    idx = rng.choice(n, min(sample, n), replace=False)
+    d0, _ = cKDTree(pts0).query(pts0[idx], k=k + 1)
+    dN, _ = cKDTree(ptsN).query(ptsN[idx], k=k + 1)
+    r0, rN = d0[:, -1], dN[:, -1]
+    return (rN / np.clip(r0, 1e-12, None)) ** 3     # J proxy per sampled particle
+
+
+def _frac_outside_envelope(cyto_pts, membrane_pts, centroid):
+    """Fraction of `cyto_pts` FARTHER from `centroid` than the membrane point NEAREST to them.
+
+    A global convex hull would call a concave (or lobed, or torn) membrane's own reentrant
+    material "outside" -- wrong for exactly the shape a tear produces. Comparing each point only
+    against its own nearest bit of membrane is what stays correct when the membrane is not convex.
+    """
+    from scipy.spatial import cKDTree
+    d, idx = cKDTree(membrane_pts).query(cyto_pts, k=1)
+    r_cyto = np.linalg.norm(cyto_pts - centroid, axis=1)
+    r_memb = np.linalg.norm(membrane_pts[idx] - centroid, axis=1)
+    return float((r_cyto > r_memb).mean())
+
+
+def cmd_tear(a):
+    npz = os.path.join(ROOT, "graphs_data", "cell", f"cell_morph_{a.target}", "trajectory.npz")
+    if not os.path.exists(npz):
+        raise FileNotFoundError(f"{npz} not found -- run the spec first")
+    z = np.load(npz)
+
+    def occ_pos(name, t):
+        p = z[f"{name}__pos"][t]
+        occ = z.get(f"{name}__occ")
+        return p[occ[t].astype(bool)] if occ is not None else p
+
+    T = z["plasma_membrane_node__pos"].shape[0]
+    memb0, membN = occ_pos("plasma_membrane_node", 0), occ_pos("plasma_membrane_node", T - 1)
+    cyto0, cytoN = occ_pos("cytoskeleton_node", 0), occ_pos("cytoskeleton_node", T - 1)
+
+    # ONE subsample, by INDEX, shared between t0 and tN -- particles keep their row across the
+    # run, so the same indices are the same physical points at both times. The radius is
+    # calibrated on THIS subsample's own t0 spacing, not the full cloud's -- see `_n_components`.
+    rng = np.random.default_rng(0)
+    sub_idx = rng.choice(memb0.shape[0], min(15000, memb0.shape[0]), replace=False)
+    memb0_sub, membN_sub = memb0[sub_idx], membN[sub_idx]
+    d0 = _median_nn_dist(memb0_sub, sample=min(4000, memb0_sub.shape[0]))
+    radius = 2.5 * d0
+    n_comp0 = _n_components(memb0_sub, radius)
+    n_compN = _n_components(membN_sub, radius)
+
+    # LOCAL J PROXY over THE CYTOPLASM PROPER: protein_a..e_node, the five bulk-filling "crowd"
+    # sets cell_ops.py's own ATLAS table calls the reason a cell is not hollow. Restricted to
+    # these and not every controlled set, because the k-NN local-volume estimate assumes a roughly
+    # ISOTROPIC 3D packing -- true for a protein ball, false for a thin membrane patch (2D) or a
+    # cytoskeletal filament (locally 1D), where the same estimator returned max|J-1| > 50 from
+    # geometry alone, before any real strain. That is a property of the ESTIMATOR on those shapes,
+    # not a finding about them.
+    cytoplasm_sets = [f"protein_{k}_node" for k in "abcde"]
+    jN_all = []
+    for name in cytoplasm_sets:
+        p0, pN = occ_pos(name, 0), occ_pos(name, T - 1)
+        if min(p0.shape[0], pN.shape[0]) < 20:
+            continue
+        j = _local_j_proxy(p0, pN, sample=min(2000, p0.shape[0]))
+        jN_all.append(j)
+    jN_all = np.concatenate(jN_all) if jN_all else np.array([1.0])
+    absJ = np.abs(jN_all - 1.0)
+
+    centroidN = membN.mean(0)
+    frac_out_t0 = _frac_outside_envelope(cyto0, memb0, memb0.mean(0))
+    frac_out_tN = _frac_outside_envelope(cytoN, membN, centroidN)
+
+    cell_ext0 = memb0.max(0) - memb0.min(0)
+    cell_extN = membN.max(0) - membN.min(0)
+
+    report = {
+        "membrane_n_components_t0": int(n_comp0), "membrane_n_components_tN": int(n_compN),
+        "membrane_component_radius": radius, "membrane_component_sample": 15000,
+        "local_J_proxy_max_abs_minus1": float(absJ.max()),
+        "local_J_proxy_p99_abs_minus1": float(np.percentile(absJ, 99)),
+        "local_J_proxy_n_samples": int(absJ.size),
+        "cytoskeleton_fraction_outside_membrane_t0": frac_out_t0,
+        "cytoskeleton_fraction_outside_membrane_tN": frac_out_tN,
+        "cell_extent_ratio_tN_over_t0_from_membrane": (cell_extN / cell_ext0).tolist(),
+    }
+    print(f"[cell_morph] {a.target}: TEAR diagnostics over {T} recorded frames")
+    print(f"  membrane connected components (radius {radius:.5f}, from t0 packing): "
+          f"{n_comp0} -> {n_compN}")
+    print(f"  local J proxy over {absJ.size} controlled-cytoplasm samples: "
+          f"max|J-1|={absJ.max():.3f}  p99|J-1|={np.percentile(absJ, 99):.3f}")
+    print(f"  cytoskeleton points outside membrane envelope: {100*frac_out_t0:.2f}% (t0) -> "
+          f"{100*frac_out_tN:.2f}% (tN)")
+    print(f"  cell extent ratio (from membrane bbox): {report['cell_extent_ratio_tN_over_t0_from_membrane']}")
+    _append_results({"target": a.target, "measured": report})
+    return report
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -556,11 +699,20 @@ def main():
     b.add_argument("--frames-relax", type=int, default=11)
     b.add_argument("--cell-radius", type=float, default=0.1)
     b.add_argument("--seed", type=int, default=1)
+    b.add_argument("--free-nucleus", action="store_true", help="give nuclear_envelope_node, "
+                  "chromatin_node and nucleolus_node the SAME control as everything else, instead "
+                  "of leaving them rigid -- isolates whether the undeformable karyoplasm is what "
+                  "caps how far the cell follows the control.")
     b.set_defaults(func=cmd_build)
 
     m = sub.add_parser("measure", help="read a finished run's trajectory.npz, append to results.json")
     m.add_argument("--target", required=True)
     m.set_defaults(func=cmd_measure)
+
+    t = sub.add_parser("tear", help="connected components, local J proxy, envelope-escape "
+                       "fraction -- the tear diagnostics, appended under runs/<target>/measured")
+    t.add_argument("--target", required=True)
+    t.set_defaults(func=cmd_tear)
 
     a = ap.parse_args()
     a.func(a)

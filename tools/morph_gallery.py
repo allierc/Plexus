@@ -332,13 +332,22 @@ def main():
 
         with torch.no_grad():
             frames = []
-            if args.render_frames and args.render_frames != args.frames:
-                rf = args.render_frames
-                raw = spec(n_pts, BOX, n_grid, rf, 0.002, 3.4e-4)
-                fr = os.path.join(tempfile.mkdtemp(prefix="render_"), "spec.yaml")
-                yaml.safe_dump(raw, open(fr, "w"), sort_keys=False)
-                sim = load(fr)
-                dt = float(sim.dt) * args.frames / rf     # same total deformation, finer sampling
+            # THE FINAL ROLLOUT DOES NOT NEED A TAPE, so it should not pay for one. Training must use
+            # the `differentiable` bodies -- warp registers no backward -- but this pass is
+            # gradient-free (`rollout` already asks for grad=False whenever it is keeping frames), so
+            # dropping the pin lets engine._resolve_default_impl pick warp for a 3D CUDA run.
+            # Measured by the speed agent against the ALREADY-COMPILED torch path: a 20-frame rollout
+            # falls from 0.417 s to 0.116 s at 12,500 particles on an L4 (3.6x) and from 1.021 s to
+            # 0.173 s at 50,000 particles on an A100 (5.9x), with a maximum absolute difference in
+            # final particle positions of exactly 0.0 -- the same numbers, sooner.
+            rf = args.render_frames or args.frames
+            raw = spec(n_pts, BOX, n_grid, rf, 0.002, 3.4e-4)
+            for o in raw["operators"]:
+                o.pop("implementation", None)
+            fr = os.path.join(tempfile.mkdtemp(prefix="render_"), "spec.yaml")
+            yaml.safe_dump(raw, open(fr, "w"), sort_keys=False)
+            sim = load(fr)
+            dt = float(sim.dt) * args.frames / rf         # same total deformation, finer sampling
             _Xf, _volf = rollout(keep=frames)
         d = os.path.join(args.out, f"morph_{name}")
         os.makedirs(d, exist_ok=True)
