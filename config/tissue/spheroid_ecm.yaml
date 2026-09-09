@@ -171,6 +171,7 @@ seed:
   - 0.0
   - 0.0
   seed: 0
+  jitter: 0.002
 operators:
 - op: surface_drive
   at: vertex
@@ -179,11 +180,11 @@ operators:
 - op: mesh_contact
   at: mpm_particle
   surface: vertex
-  k_frac: 0.15
+  k_frac: 0.45
   mu: 0.4
   dt: 0.0032
   n_grid: 64
-  a_max: 30000.0
+  a_max: 100000.0
   centre: centroid
 - op: mpm_strain
   at: mpm_particle
@@ -233,7 +234,7 @@ plotting:
   camera_turns: 0.0
   camera_zoom: 0.0
   render_3d: dots
-  dot_size: 1.4
+  dot_size: 0.6
   fps: 60
   slow_motion: 4
   cross_section:
