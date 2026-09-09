@@ -4,15 +4,6 @@ resources:
   - gallery/
 ---
 
-> *What I cannot create, I do not understand.*
-> <br><span style="font-size:.85em;color:#888">— Richard Feynman, on his blackboard at Caltech, 1988</span>
-
-Feynman's line makes creation the test of understanding. Plexus adds a condition: the
-creation has to be written in a language that can be read back. A simulator is a
-creation whose mechanisms are fused to its numerics; a Plexus spec is the same
-creation with the mechanisms left legible — every operator named, every difference
-between two models visible as a difference between two files.
-
 We introduce **Plexus**, a typed intermediate representation for biological
 mechanisms. Rather than defining yet another simulator, Plexus defines a common
 language whose primary objects are **biological operators**. Every operator specifies
@@ -79,7 +70,8 @@ represents a model as an ordered sequence of operator applications — a **sched
 specifying both the order and the frequency with which operators are evaluated.
 Formally, one simulation step is the composition
 $\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1$, whose repeated application
-generates the system dynamics $x_{t+1}=\Phi(x_t)$. Different operators may evolve on
+generates the system dynamics $x_{t+1}=\Phi(x_t)$, where $x$ is the whole state — every
+set and every field at once. Different operators may evolve on
 different time scales — mechanical interactions every step, diffusion, growth or
 division less often — so a model is a *multi-rate* composition of biological
 mechanisms rather than a monolithic solver.
@@ -255,7 +247,7 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">The same spec with <code>F: 0.05 → 0.034</code>. Stripes break into spots.</span>
+      <span class="sim-cap">The same spec with the feed rate <code>F: 0.05 → 0.034</code>. Stripes break into spots.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -339,7 +331,7 @@ schedule:
 plotting:
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">Four states instead of two, a second diffusion–reaction pair, the reactions coupled (<code>gamma: 0.2</code>). Two patterns, no shared cell.</span>
+      <span class="sim-cap">Four states instead of two, a second diffusion–reaction pair, the reactions coupled by a cross term of strength <code>gamma: 0.2</code>. Two patterns, no shared cell.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1707,7 +1699,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap"><code>kk: 0.062 → 0.031</code>, the reaction rate with it. Lobes and branches instead of arms.</span>
+      <span class="sim-cap">The kill rate <code>kk: 0.062 → 0.031</code>, and the reaction rate with it. Lobes and branches instead of arms.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2074,7 +2066,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap"><code>rate: 0.25 → 0.75</code>. The shell folds instead of arming.</span>
+      <span class="sim-cap">The reaction rate <code>rate: 0.25 → 0.75</code>. The shell folds instead of arming.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3250,7 +3242,7 @@ plotting:
     - 0.92
     - 0.94
     - 1.0</pre></span></span>
-      <span class="sim-cap">Three balls of 100,000 particles; only <code>eta</code> differs. One never drains through the plate.</span>
+      <span class="sim-cap">Three balls of 100,000 particles; only the viscosity <code>eta</code> differs. One never drains through the plate.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3646,7 +3638,7 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap">Nine pillars declared under <code>general</code>, not inside any operator. A wake behind each.</span>
+      <span class="sim-cap">Nine pillars declared in the spec’s world block <code>general</code>, not inside any operator. A wake behind each.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3770,7 +3762,7 @@ plotting:
     - 0.3
     - 0.62
     - 1.0</pre></span></span>
-      <span class="sim-cap"><code>per_parent: 5,000,000</code>. Nothing else changed.</span>
+      <span class="sim-cap">Particles per parent cell, <code>per_parent: 5,000,000</code>. Nothing else changed.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -5112,7 +5104,7 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - mesh_inside</pre></span></span>
-      <span class="sim-cap"><code>surface_drive grow: 2.4</code> in place of <code>by: −0.11</code>. The shell reaches the gel by inflating.</span>
+      <span class="sim-cap"><code>surface_drive</code> given a growth factor <code>grow: 2.4</code> in place of a downward travel <code>by: −0.11</code>. The shell reaches the gel by inflating.</span>
     </figcaption>
   </figure>
 </div>
@@ -5312,7 +5304,7 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 100.0
   what: the rate whose hole did not stop</pre></span></span>
-      <span class="sim-cap">Secrete, diffuse, activate, inhibit, degrade, tear. Where MMP2 outruns its inhibitor the membrane removes its own faces (structural). Fifty-four openings.</span>
+      <span class="sim-cap">Secrete, diffuse, activate, inhibit, degrade, tear. Where the protease MMP2 outruns its inhibitor the membrane removes its own faces (structural). Fifty-four openings.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -5422,7 +5414,7 @@ run:
   splits: 100524
   twin_of: 06_hole_tiny
   mt1_field: single Gaussian cap, theta 20.0 deg</pre></span></span>
-      <span class="sim-cap">The MT1-MMP field is a single cap instead of six random modes. Six openings, not fifty-four.</span>
+      <span class="sim-cap">The field of MT1-MMP, the protease that activates MMP2, is a single cap instead of six random modes. Six openings, not fifty-four.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -5534,7 +5526,7 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 300.0
   what: the rate that destroyed the membrane</pre></span></span>
-      <span class="sim-cap"><code>k_deg: 300</code>, three times the first breach. Removal outruns the inhibitor; the sheet is still tearing at the end.</span>
+      <span class="sim-cap">The degradation rate <code>k_deg: 300</code>, three times the first breach. Removal outruns the inhibitor; the sheet is still tearing at the end.</span>
     </figcaption>
   </figure>
 </div>
