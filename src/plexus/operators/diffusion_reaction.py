@@ -939,6 +939,11 @@ class Grow3D(Lateral):
                    "vth_frac": "fraction", "a_live": "fraction", "inhib_sw": "fraction",
                    "inhib_hill": "fraction", "size_gain": "fraction", "f_max": "fraction",
                    "k_syn": "fraction", "k_deg": "fraction", "cycle_frames": "time"}
+    # GROWTH SCALES THE SEED'S TARGETS, so it inherits the seed's convention: `V0f` is a WEDGE
+    # volume and `vth_frac` is a multiple of a wedge `v_ref`. On an apicobasal run that is the
+    # other half of the same half-conversion the energy declares -- see
+    # `ApicoBasalShapeEnergy3D.BLOCK_UNITS`.
+    BLOCK_UNITS = {"V0f": "volume[wedge]", "A0": "area[midsurface]", "P0": "length"}
     MECHANISM_TAGS = ["growth", "morphogen_driven", "budding", "cross_scale"]
     REFERENCE = "Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386."
 
