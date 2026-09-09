@@ -234,7 +234,7 @@ plotting:
   camera_turns: 0.0
   camera_zoom: 0.0
   render_3d: dots
-  dot_size: 1.1
+  dot_size: 1.4
   fps: 60
   slow_motion: 4
   cross_section:
@@ -247,3 +247,12 @@ plotting:
   mesh_opacity: 1.0
   mesh_flat: true
   mesh_color: '#cfd8e3'
+  colors:
+    s0: '#2b1a5e'
+    s1: '#4b2a8a'
+    s2: '#6d34a8'
+    s3: '#9438a8'
+    s4: '#c03a8e'
+    s5: '#e05a5a'
+    s6: '#f0873a'
+    s7: '#ffc242'
