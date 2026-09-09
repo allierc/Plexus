@@ -2503,8 +2503,17 @@ class DeformControl(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "particle")
-        r = [float(v) for v in params["rate"]]
-        if len(r) != 6:
+        # A LEARNED FIELD INSTEAD OF SIX NUMBERS. `field:` names an .npz written by
+        # tools/morph_gallery.py: a K^3 x 6 cube of symmetric rates, read at each particle's own
+        # MATERIAL coordinate -- its position the first time this operator runs, never its current
+        # one. That is what makes the control Lagrangian, and it is why a control optimised on a
+        # 50,000-point proxy can be applied to a 2.4 M-point cell: the field means the same thing
+        # at any resolution because it is indexed by where the material STARTED.
+        self.field = params.get("field")
+        self.extent = params.get("extent")            # [cx, cy, cz, half_width] of the control cube
+        self._W = None
+        r = [float(v) for v in (params.get("rate") or [0.0] * 6)]
+        if self.field is None and len(r) != 6:
             raise ValueError("deform_control: `rate` is six numbers -- the diagonal a_xx, a_yy, "
                              f"a_zz then the off-diagonals a_xy, a_xz, a_yz -- got {len(r)}")
         self.r = r
@@ -2517,6 +2526,8 @@ class DeformControl(Lateral):
         p = H.level(self.at)
         if self.over and int(getattr(H, "frame", 0) or 0) >= self.over:
             return {}
+        if self.field is not None:
+            return self._field_forward(H, p)
         if self._G is None:
             a = self.r
             A = torch.tensor([[a[0], a[3], a[4]], [a[3], a[1], a[5]], [a[4], a[5], a[2]]],
@@ -2525,6 +2536,47 @@ class DeformControl(Lateral):
             print(f"[deform_control] {self.at}: rate {a}, acting for "
                   f"{self.over or 'the whole run'} frames", flush=True)
         F = torch.matmul(self._G, p.F)
+        if torch.is_grad_enabled():
+            p.F = F
+        else:
+            p.F.copy_(F)
+        return {}
+
+    def _field_forward(self, H, p):
+        """The learned rate cube, applied per particle."""
+        import numpy as np
+        if self._W is None:
+            z = np.load(self.field)
+            A6 = torch.as_tensor(np.asarray(z["control"], np.float32), device=p.F.device)
+            K = int(round(A6.shape[0] ** (1.0 / 3.0)))
+            cx, cy, cz, half = [float(v) for v in (self.extent or [0.5, 0.5, 0.5, 0.05])]
+            X0 = p.get("pos").detach()
+            u = ((X0 - torch.tensor([cx, cy, cz], device=X0.device)) / (2 * half) + 0.5) \
+                .clamp(0, 1) * (K - 1)
+            b = u.floor().long().clamp(0, K - 1)
+            f = (u - b).clamp(0, 1)
+            a = torch.zeros(p.n, 6, device=X0.device)
+            for dx in (0, 1):
+                for dy in (0, 1):
+                    for dz in (0, 1):
+                        w = (((1 - f[:, 0]) if dx == 0 else f[:, 0])
+                             * ((1 - f[:, 1]) if dy == 0 else f[:, 1])
+                             * ((1 - f[:, 2]) if dz == 0 else f[:, 2]))
+                        i = (((b[:, 0] + dx).clamp(0, K - 1) * K
+                              + (b[:, 1] + dy).clamp(0, K - 1)) * K
+                             + (b[:, 2] + dz).clamp(0, K - 1))
+                        a = a + w[:, None] * A6[i]
+            dt = float(getattr(H, "dt", 0.002))
+            A = torch.zeros(p.n, 3, 3, device=X0.device) + torch.diag_embed(a[:, :3])
+            A[:, 0, 1] = A[:, 1, 0] = a[:, 3]
+            A[:, 0, 2] = A[:, 2, 0] = a[:, 4]
+            A[:, 1, 2] = A[:, 2, 1] = a[:, 5]
+            Adt = -A * dt
+            eye = torch.eye(3, device=X0.device)[None]
+            self._W = eye + Adt + 0.5 * torch.bmm(Adt, Adt)   # 2nd order, as the optimiser used
+            print(f"[deform_control] {self.at}: a {K}^3 rate field from "
+                  f"{os.path.basename(str(self.field))} over {p.n:,} points", flush=True)
+        F = torch.bmm(self._W, p.F)
         if torch.is_grad_enabled():
             p.F = F
         else:
