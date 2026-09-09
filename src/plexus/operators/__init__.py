@@ -10,7 +10,7 @@ other is how anyone can tell which one a specification is getting.
     vertex_ops           the 3D vertex model: seed, geometry, mechanics, grow, divide, die, T1
     diffusion_reaction   chemistry on the cell GRAPH, and the two shape-chemistry couplings
     junction_ops         myosin, on junctions and across the apex, plus the cytokinetic ring
-    ecm_ops              the matrix as MPM material, and the stiff blocks that confine it
+    ecm_ops              the forces the matrix carries, and the stiff blocks that confine it
     membrane_ops         the basement membrane, its crosslink network, and the integrin links
     contact_ops          where a triangulated surface meets a continuum, both directions
     cell_ops             the cell as a composition: compartment pieces, the atlas that places
@@ -44,8 +44,8 @@ from . import motion_ops            # noqa: F401  drag, glide, velocity_cruise, 
 #                                                 attractor_flow, gravity, bounce
 from . import field_ops             # noqa: F401  the grid field, deposit, diffuse, decay, sense,
 #                                                 chemotax, playback, pacemaker, activation_pulse, signal
-from . import mpm_ops               # noqa: F401  mpm_grid + p2g/grid_update/g2p/strain, anchor,
-#                                                 spin, apply_material_map, and the fenced oracle
+from . import mpm_ops               # noqa: F401  mpm_grid + p2g/grid_update/g2p/strain, seed_ecm,
+#                                                 anchor, spin, apply_material_map, fenced oracle
 from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cell_divide, cell_die,
 #                                                 edge_flip, topo_record
 from . import diffusion_reaction    # noqa: F401  seed_cell_chem, cell_chem_diffuse/react,
@@ -53,7 +53,7 @@ from . import diffusion_reaction    # noqa: F401  seed_cell_chem, cell_chem_diff
 #                                                 cell_shape_probe, interface_tension/push
 from . import junction_ops          # noqa: F401  junction_myosin (default|two_pool), junction_sync,
 #                                                 medioapical_myosin, cytokinetic_ring
-from . import ecm_ops               # noqa: F401  ecm_seed/stress/from_cell, cell_exclude,
+from . import ecm_ops               # noqa: F401  ecm_stress/from_cell, cell_exclude,
 #                                                 block_seed/stress
 from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_*
 from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, surface_track,

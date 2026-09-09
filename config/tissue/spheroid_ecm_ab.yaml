@@ -1,0 +1,262 @@
+general:
+  name: spheroid_ecm_ab
+  seed: 0
+  n_frames: 400
+  dt: 0.0032
+  record_cap: 102
+  record_every: 4
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  units:
+    length_um: 1000.0
+    force_nN: 6666.666666666667
+sets:
+  vertex:
+    n: 25584
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  cell:
+    n: 12800
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+  half_edge:
+    n: 102400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+  mpm_particle:
+    n: 200000
+    types:
+      s0:
+        fraction: 0.125
+        youngs: 15.0
+        density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+      s1:
+        fraction: 0.125
+        youngs: 15.0
+        density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+      s2:
+        fraction: 0.125
+        youngs: 15.0
+        density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+      s3:
+        fraction: 0.125
+        youngs: 15.0
+        density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+      s4:
+        fraction: 0.125
+        youngs: 15.0
+        density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+      s5:
+        fraction: 0.125
+        youngs: 15.0
+        density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+      s6:
+        fraction: 0.125
+        youngs: 15.0
+        density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+      s7:
+        fraction: 0.125
+        youngs: 15.0
+        density: 1.0
+        block:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
+        - 1.0
+        - 1.0
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+seed:
+- op: seed_mesh
+  at: vertex
+  n_cells: 200
+  radius: 0.045
+  jitter: 0.02
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.0
+  model: apicobasal
+  h0: 0.00792
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+- op: seed_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  cavity_r: 0.045
+  cavity_h: 0.045
+  cavity_sphere: true
+  axis: 1
+  shell_r: 0.4
+  margin: 0.02
+  n_fibres: 10000
+  fibre_len: 0.12
+  align: 0.0
+  align_dir:
+  - 1.0
+  - 0.0
+  - 0.0
+  seed: 0
+  jitter: 0.002
+operators:
+- op: surface_drive
+  at: vertex
+  grow: 3.0
+  over: 320
+- op: mesh_contact
+  at: mpm_particle
+  surface: vertex
+  k_frac: 0.9
+  mu: 0.4
+  dt: 0.0032
+  n_grid: 64
+  a_max: 100000.0
+  centre: centroid
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 8.0
+  a_max: 100000.0
+  store_stress: true
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.7
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.7
+  wall_contact: 0.04
+  vmax: 1.0e9
+  implementation: warp
+- op: ecm_stress
+  at: mpm_particle
+  scale: 2.0
+  bands: 8
+  measure: vonmises
+- op: mesh_inside
+  at: mpm_particle
+  n_grid: 64
+schedule:
+- surface_drive
+- substep_dt: 0.0004
+  steps:
+  - mesh_contact
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- ecm_stress
+- mesh_inside
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: dots
+  dot_size: 0.6
+  fps: 60
+  slow_motion: 4
+  cross_section:
+    axis: z
+    at: 0.5
+    thickness: 6
+    max_points: 6000
+  mesh_style: surface
+  mesh_edges: true
+  mesh_opacity: 1.0
+  mesh_flat: true
+  mesh_color: '#cfd8e3'
+  color_field: strain
+  color_range:
+  - 0.0
+  - 0.5

@@ -98,7 +98,7 @@ operators:
   model: apicobasal
   at: vertex
   k_v: 4.0
-  kappa_s: 0.1
+  kappa_s: 0.08
   gamma: 0.0
   Lambda: 0.0
   K_R: 0.0
