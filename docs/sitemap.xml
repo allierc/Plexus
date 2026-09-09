@@ -326,7 +326,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/index.html</loc>
-    <lastmod>2026-09-09T19:58:12.645Z</lastmod>
+    <lastmod>2026-09-09T21:18:31.676Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/language.html</loc>
@@ -647,5 +647,9 @@
   <url>
     <loc>https://allierc.github.io/Plexus/library_sets.html</loc>
     <lastmod>2026-09-07T21:06:11.215Z</lastmod>
+  </url>
+  <url>
+    <loc>https://allierc.github.io/Plexus/other.html</loc>
+    <lastmod>2026-09-09T21:18:54.391Z</lastmod>
   </url>
 </urlset>
