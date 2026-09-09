@@ -162,7 +162,7 @@ def parse(raw):
 # over a cell's mid-surface ring -- and `Vbirth` is the POLYHEDRON volume of the same cell, two caps
 # and one wall per ring edge. Measured on the reference spheroid those read 2.5433 and 1.3508 FOR
 # ONE CELL. Both are lengths cubed. The subtraction is dimensionally perfect and biologically
-# meaningless, and it made G1 run 60% long until a 401-frame run and a figure caught it. So a
+# meaningless, and it makes G1 run 60% long with nothing in the output to show for it. So a
 # quantity carries a `Dim` AND an optional CONVENTION, and the convention is what catches that class.
 #
 # NO DEPENDENCY, AND NOT `astropy` OR `pint`. Those wrap values, and the values here are torch

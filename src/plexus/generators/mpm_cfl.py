@@ -62,10 +62,10 @@ def _lame(E, nu=_NU):
 def _max_wave_speed(spec, rho_default=1.0) -> float:
     """Largest elastic P-wave speed over EVERY set's materials (mu = 0 for liquid).
 
-    WALKS ALL SETS, NOT `sets["cell"]`. This used to read the type table of one hard-coded set
-    name and take the density from another (`sets["mpm_particle"]["density"]`, defaulting to 1.0).
-    Both are wrong for a composed body, where the materials live on the CHILD sets: for the cell
-    ladder it was reading the parent `cell` set's placeholder `youngs: 40` and never seeing the
+    WALKS ALL SETS, NOT `sets["cell"]`. Reading the type table of one hard-coded set name and
+    taking the density from another (`sets["mpm_particle"]["density"]`, defaulting to 1.0) is
+    wrong for a composed body, where the materials live on the CHILD sets: on the cell ladder that
+    reads the parent `cell` set's placeholder `youngs: 40` and never sees the
     nucleus at 300 or the membrane at 1500, then dividing by rho = 1.0 instead of 2.6 or 1.1.
 
     THE FAILURE DIRECTION IS THE DANGEROUS ONE. Reading a soft placeholder makes c too SMALL, so
@@ -434,8 +434,7 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
             # A FLAT MPM SCHEDULE STILL GETS ITS REPORT, and is told that nothing bounds its step.
             # Returning here meant a spec that runs the MPM cycle at the FRAME timestep -- no
             # substep block, so no `substep_dt` to correct -- got no CFL check and no [similarity]
-            # line at all. One spec was in that state (config/cell/cell_one.yaml, deleted 2026-09-04) and it was the
-            # single hole in "the report prints for every MPM spec". There is no key to rewrite, so
+            # line at all. A spec in that state is the single hole in "the report prints for every MPM spec". There is no key to rewrite, so
             # this warns rather than corrects.
             _ops = {o.get("op") for o in (spec.get("operators") or []) if isinstance(o, dict)}
             if MPM_STEPS & _ops:
@@ -706,9 +705,9 @@ def _body_volumes(spec, dim):
     out = []
     sets = spec.get("sets") or {}
     # ONLY THE SETS AN MPM OPERATOR ACTUALLY ACTS ON. Every contained set declares `per_parent`,
-    # and this used to take that as "is a body of material points" -- so on a three-level model the
+    # and taking that as "is a body of material points" fails on a three-level model: the
     # intermediate `compartment` set, whose 813 elements are piece CENTRES and are touched by no
-    # solver, was measured against the grid and reported as "0.01 particles per grid cell,
+    # solver, would be measured against the grid and reported as "0.01 particles per grid cell,
     # UNDER-SAMPLED, may fracture numerically". It has no particles at all; it is not a body.
     _mpm = {str(o.get("at")) for o in (spec.get("operators") or [])
             if isinstance(o, dict) and str(o.get("op", "")).startswith(("mpm_", "p2g", "g2p",

@@ -144,7 +144,7 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("vertex_energy", ("^vertex_energy",)),
     # THE COMPOSED-CELL LADDER -- a cell built from heterogeneous substrates, a nucleus, a cytosol
     # of two protein species, a membrane, each its own contained set (appendix "Making a cell in
-    # Plexus"). DELETED 2026-09-04: it was a dead end, and its 11 GB of output went with it. The
+    # Plexus"). That ladder is gone; the
     # rule stays because it costs nothing and a spec named `cell_...` still has to land somewhere
     # rather than in the default folder; no trigger SUBSTRING was ever used here, because `cell`
     # appears in half the corpus and would sweep every vertex-model spec into a directory nobody
@@ -160,7 +160,7 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # hypotheses on the `model:` axis, no `mode:` and no seed window.
     #
     # NO TRIGGER SUBSTRINGS, deliberately, and for the reason `cell` has none: these specs are named
-    # for the experiment (`b_star`, `r010_00_ctrl`) rather than for the folder, and any substring
+    # for the experiment rather than for the folder, and any substring
     # short enough to match them would sweep half the corpus. They are addressed explicitly as
     # `tissue/<name>`, which `add_pre_folder` honours through its `"/" in config_name` branch.
     ("tissue",      ()),

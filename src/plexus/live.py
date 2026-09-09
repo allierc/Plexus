@@ -7,9 +7,9 @@ for the entire time they are running, and the first look at a mistake comes half
 made. This writes a picture of the current state ten times over the run, in place, so `3d.png` in
 either side's directory is always a recent view of what that side is doing.
 
-    "can you write 3d.png every 10% of frames (print frame out of top left) so that I can check live
-     the progress in A and B that should also be live? the live 3d.png should be default when
-     generating"                                                            -- Cedric, 22 August
+The requirement it answers: write `3d.png` every 10% of frames, with the frame number printed top
+left, so the progress of both sides of a comparison can be checked while they run -- and on by
+default when generating.
 
 IT IS WRITTEN ATOMICALLY. The file is opened while a viewer may be reading it, so the render goes to
 `3d.png.tmp` and is renamed over `3d.png` -- an `os.replace` on one filesystem is atomic, so a reader

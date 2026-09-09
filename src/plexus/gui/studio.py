@@ -282,8 +282,8 @@ def _session_id_for(corpus: str) -> str:
 def prime_session(model: str = "sonnet", timeout: int = 120) -> dict:
     """Load the corpus into ONE claude session; later requests fork from it.
 
-    WHY THIS EXISTS. Every spec request used to be a cold `claude -p` carrying the whole reference
-    inline: 24-30 s, and the same tens of thousands of tokens re-sent every time -- which is what
+    WHY THIS EXISTS. A cold `claude -p` per spec request carries the whole reference inline:
+    24-30 s, and the same tens of thousands of tokens re-sent every time -- which is what
     pushed it past the 30 s cap. Priming once and forking per request measured 4.5 s to prime and
     14.8 s per generation, with a prompt that is now just the request.
 

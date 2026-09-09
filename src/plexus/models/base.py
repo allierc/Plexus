@@ -342,7 +342,7 @@ class Level(nn.Module):
         """Wake free slots as clones of `src_idx`: copy EVERY per-node buffer
         (state, parent, node_type, and any domain buffer like MPM mass/F/C/mu/la)
         from the source nodes, set `occ = 1`, and record lineage. This is the
-        init-safe fix for the trap in notes.md -- a structural op no longer has to
+        init-safe form: a structural op no longer has to
         remember to initialise each operator's per-node state by hand; it inherits
         the parent's. The caller then overrides only what must differ (e.g. nudge
         position, zero velocity, reset deformation F). Returns (new_idx, src_used)
@@ -649,11 +649,11 @@ class Hierarchy(nn.Module):
         # live branch while production took the dead one, and passed. The fixture is a real
         # `ModuleDict` now, so the two cannot diverge again.
         #
-        # WHAT IT COST. From the first death, the cell set's `chem` no longer lines up with the
-        # faces. `cell_geometry` rewrites `centroid`, `area` and `occ` from `nF` every tick, so those
-        # self-heal a tick later; `chem` has no rewriter and stays permanently mis-indexed. On
-        # r023_07 the two sides run bit-identical through the first two extrusions and diverge at
-        # the third, and the activator goes non-finite at frame 889.
+        # WHAT IT COSTS OTHERWISE. From the first death, the cell set's `chem` no longer lines up
+        # with the faces. `cell_geometry` rewrites `centroid`, `area` and `occ` from `nF` every tick,
+        # so those self-heal a tick later; `chem` has no rewriter and stays permanently mis-indexed,
+        # and two runs that agree through the first extrusions diverge at a later one, with the
+        # activator going non-finite.
         lvl = self.levels[level_name] if level_name in self.levels else None
         if lvl is None or getattr(lvl, "state", None) is None:
             return False

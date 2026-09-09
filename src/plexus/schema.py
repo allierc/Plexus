@@ -499,11 +499,10 @@ def load(path: str) -> Spec:
         used_props |= set(getattr(cls, "OPTIONAL_TYPE_PROPS", []))   # read only in some modes (e.g. alignment per_type)
     # core/layers/block: consumed by an entity provision hook (e.g. mpm_particle), not by an operator
     #
-    # `material`, `density` and `tau` join them, and the warning that flagged their absence was
-    # RIGHT until now: a child set declaring `material: liquid` was read by nothing, so a cytosol
-    # asking to be a fluid silently built as whatever its parent cell was. The provision hook reads
-    # all three today -- per the PARTICLE's own type, not its parent's -- so the warning would now
-    # be false where it used to be the only notice anyone got.
+    # `material`, `density` and `tau` join them because the provision hook reads all three -- per
+    # the PARTICLE's own type, not its parent's -- so a warning that they are read by nothing would
+    # be false. (Were the hook NOT to read them, that warning would be the only notice that a
+    # cytosol declaring `material: liquid` had silently built as whatever its parent cell was.)
     # `bulk_modulus` is read by mpm_scatter via TYPE_PROP_ALTERNATIVES rather than by name, so the
     # used_props scan does not see it and it would be reported as read by no operator.
     # `count` is consumed by the schema itself (converted to `fraction` above) and by

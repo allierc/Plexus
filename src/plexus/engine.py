@@ -41,8 +41,8 @@ import torch
 
 # BIT-REPRODUCIBLE RUNS ARE NOW OPT-IN, and the reason is a measured factor of 4.4 on a real spec.
 #
-# This line used to read `torch.use_deterministic_algorithms(True, warn_only=True)` unconditionally,
-# so every run in the repo paid for reproducibility whether or not anything was comparing two runs.
+# Set unconditionally, `torch.use_deterministic_algorithms(True)` makes every run in the repo pay
+# for reproducibility whether or not anything is comparing two runs.
 # The flag reroutes CUDA `index_add_` / `scatter_add_` from atomics to a sort-and-segment kernel
 # whose cost is driven by the longest run of DUPLICATE indices. Measured on an RTX A6000:
 #
@@ -56,11 +56,10 @@ import torch
 # gate runner, and both already export `PLEXUS_STRICT_DETERMINISM=1` -- so the setting now follows
 # the thing that actually wants it instead of taxing everything that does not.
 #
-# STRICT MEANS STRICT: `warn_only=False`. The old default downgraded SILENTLY -- a kernel with no
-# deterministic implementation warned once and ran the nondeterministic path anyway, so a run could
-# be irreproducible while this line claimed otherwise. There is no longer a lenient middle setting,
-# because it was the worst of the three: it cost the full 4.4x and did not guarantee the property it
-# was paying for. A comparison that passes because a kernel quietly went nondeterministic has proved
+# STRICT MEANS STRICT: `warn_only=False`. With `warn_only=True` a kernel with no deterministic
+# implementation warns once and runs the nondeterministic path anyway, so a run could be
+# irreproducible while this line claimed otherwise. That lenient middle setting is the worst of the
+# three: it costs the full 4.4x and does not guarantee the property it is paying for. A comparison that passes because a kernel quietly went nondeterministic has proved
 # nothing, so it must fail loudly instead.
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 STRICT_DETERMINISM = os.environ.get("PLEXUS_STRICT_DETERMINISM", "") not in ("", "0", "false")
@@ -1719,8 +1718,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     #
     # Several particle sets can scatter into one `mpm_grid` -- that is what makes a composed cell
     # one body rather than several passing through each other -- so the FIRST scatter of a substep
-    # must zero the grid and every later one must add to it. That question used to be answered at
-    # run time by comparing a counter on the Hierarchy against a stamp on the field. It worked, but
+    # must zero the grid and every later one must add to it. Answering that at run time -- comparing
+    # a counter on the Hierarchy against a stamp on the field -- works, but
     # it is a per-substep side effect, and a side effect is exactly what a replayed CUDA graph
     # cannot reproduce: the replay would re-run whichever branch was live at capture time.
     #
@@ -1753,7 +1752,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # instance (almost every spec) the two rules are identical; with two they differ by a factor of
     # two on the physics.
     #
-    # FOUND ON A STAGED RUN, 17 August. A composition split into two stages -- the same operator at
+    # THE FAILURE THIS PREVENTS. A composition split into two stages -- the same operator at
     # two parameter settings with disjoint frame windows, which is the only way this vocabulary can
     # express a parameter that CHANGES partway through -- integrated its reaction-diffusion and its
     # mechanics at double rate from frame 0: the surface was self-intersecting by frame 25 and the
@@ -1770,8 +1769,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # names the token once (the natural way to write "one grid solve per substep, with the parameter
     # changing at frame 400") bound occurrence 0 to instance 0 forever and NEVER RAN INSTANCE 1.
     #
-    # MEASURED ON si_two_drops3d_cycle: sigma +0.018 before frame 400, sigma -0.018 after. Over 6
-    # ticks the positive instance was called 312 times and the negative one ZERO. The second stage
+    # On `si_two_drops3d_cycle` -- sigma +0.018 before frame 400, -0.018 after -- the positive
+    # instance is called on every substep and the negative one never. The second stage
     # of a two-stage run did not merely do the wrong thing, it did not exist -- and because
     # `mpm_grid_update` is the step that divides momentum by mass, the run also lost its grid solve
     # entirely for the whole second half.
@@ -1940,10 +1939,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         for _j, (nm, ob, sel, (after_frame, before_frame, every)) in enumerate(inst):
             if nm != token or _j not in _want:
                 continue
-            # ROW 0 IS THE STATE AFTER ONE PASS, and it is that way again on purpose. `d58728c8`
-            # made tick 0 the INITIAL CONDITION by skipping every kind but `seed`/`aggregate` on it,
-            # so the first recorded row showed what the run started from rather than the seeded state
-            # plus one update. REVERTED 2026-09-04, because it desynchronised the two recorded series:
+            # ROW 0 IS THE STATE AFTER ONE PASS, on purpose. Making tick 0 the INITIAL CONDITION --
+            # skipping every kind but `seed`/`aggregate` on it, so the first recorded row shows what
+            # the run started from rather than the seeded state plus one update -- reads well and
+            # desynchronises the two recorded series:
             # positions are written on every tick including 0, while `topo_record` is `KIND:
             # structural` and was therefore skipped on tick 0 -- 601 position rows against 600
             # topology rows. `run_one.py`'s D3 guard caught it on 9 sides of the twin suite with
@@ -2074,7 +2073,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     # frame, `mpm_scatter` saw a body force of 20 / 40 / 60 / 80 where the same operator
                     # at frame level gives a flat 20 / 20 / 20 / 20. Anything stiff enough to need
                     # per-substep evaluation was therefore ramping 1x to Nx within every frame -- the
-                    # ECM prototype's `bm_contact` did exactly that from run 110 on.
+                    # ECM prototype's `bm_contact` did exactly that.
                     # Snapshotting and restoring keeps the documented behaviour intact (a frame-level
                     # delta, e.g. gravity, persists across the loop and is seen identically by every
                     # substep) and makes an inner-schedule force what it reads as: recomputed at the
@@ -2315,7 +2314,6 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     # the renderer fell back to a matplotlib point cloud (a drifting blue blob
                     # where the run is a spheroid), and the twin comparison had no nF/Nv to crop by
                     # and reported `pos_0: shape (3996, 3) vs (130004, 3)` on two runs that agree.
-                    # r021_06 and cellfix_B_new both failed exactly this way.
                     _m = getattr(lvl, "mesh", None) or getattr(lvl, "_mesh", None)
                     if _m is not None and getattr(_m, "snapshot", None) is not None:
                         if name not in rec_mesh:

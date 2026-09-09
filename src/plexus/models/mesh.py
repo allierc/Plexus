@@ -406,11 +406,11 @@ def mesh_row_columns(ms):
     Returns `(scalars, edge_cols, face_cols, fill)` -- three sorted name lists and
     `fill(m, col)` giving that row's values, zero-filled when the row lacks the name.
 
-    THE UNION, NOT THE INTERSECTION, AND THIS IS A BUG FIX. Both writers used to take
+    THE UNION, NOT THE INTERSECTION. Taking
 
         cols = set.intersection(*[{k for k in m if k not in RESERVED} for m in ms])
 
-    so a column that did not exist in EVERY row was deleted from the whole trajectory. Almost
+    deletes from the whole trajectory any column that did not exist in EVERY row. Almost
     nothing on this mesh exists at row 0: `cell_divide` is `after_frame`-gated in most specs, so
     `age` and `ndiv` are created a few frames in; `apop` is created when the first cell is
     sentenced; `scalar_n_apop` when the first one is extruded. Measured on the promotion's own runs:

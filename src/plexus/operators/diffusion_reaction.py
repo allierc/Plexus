@@ -53,11 +53,10 @@ def _chan(params, who, n_species=2):
     system's activator ON THE FIRST SYSTEM'S SUBSTRATE: both would run, both would look alive, and
     they would be driving one shared column through a coupling nobody wrote.
 
-    THE OLD RULE WAS "chan MUST BE EVEN" and it was wrong the moment a three-species model existed:
-    May-Leonard tiles at 0, 3, 6, and an even-only guard rejects a correct spec while accepting
-    `chan: 2` for a three-species system, which overlaps. The rule is now "a multiple of this
-    model's own width", which is the actual tiling, and it degrades to the even rule for the
-    two-species models that are all there used to be.
+    AN EVEN-ONLY RULE ON `chan` IS WRONG the moment a three-species model exists: May-Leonard
+    tiles at 0, 3, 6, and an even-only guard rejects a correct spec while accepting `chan: 2` for a
+    three-species system, which overlaps. The rule is "a multiple of this model's own width", which
+    is the actual tiling, and it reduces to the even rule for two-species models.
 
     The BOUNDS check cannot happen here -- `chem`'s width is not known until forward -- so it is
     `_span` that raises on a span running off the end of the buffer.
@@ -926,9 +925,9 @@ class Grow3D(Lateral):
     # inhibitor needs `inhib_chan` set -- so a declaration of False would look correct on most runs
     # and fail on the ones that matter.
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
-    # `rate` IS PER UNIT TIME, AND S3 IS WHAT MADE THAT TRUE. It used to be applied once per call,
-    # so it meant "fraction of itself a cell adds per FRAME" and the spec's own `dt` never entered;
-    # the engine now integrates `s += dt * ds`. Declaring `1/T` is therefore a statement the code
+    # `rate` IS PER UNIT TIME. Applied once per call it would mean "fraction of itself a cell adds
+    # per FRAME" and the spec's own `dt` would never enter; the engine integrates `s += dt * ds`
+    # instead. Declaring `1/T` is therefore a statement the code
     # honours, and it is the one this whole vocabulary exists to be able to make.
     #
     # `a_sw` IS DELIBERATELY ABSENT. It is an absolute activator concentration when `a_sw_rel` is
@@ -994,11 +993,11 @@ class Grow3D(Lateral):
         frame 900 in every run. The variants below are the mechanisms that review says real cells
         use to stop that, written so the search can put them side by side.
 
-        A RATE, NOT A PER-FRAME FACTOR, and that is the change this rung made. The law used to be
-        `s <- s (1 + rate (rho + Hill(a)))` applied once per CALL, so `rate` meant "fraction of
-        itself a cell adds per frame" and the simulation's own `dt` did not appear in it. That is
-        the same number only at `dt = 1`. Every `config/tissue` spec is `dt: 1.0` and reads
-        identically; `log/okuda_ECM` runs `dt: 0.0032` and its growth was running 312x faster per
+        A RATE, NOT A PER-FRAME FACTOR. The law `s <- s (1 + rate (rho + Hill(a)))` applied once
+        per CALL would make `rate` mean "fraction of itself a cell adds per frame", with the
+        simulation's own `dt` nowhere in it. That is the same number only at `dt = 1`: every
+        `config/tissue` spec is `dt: 1.0` and reads identically, while a spec at `dt: 0.0032` would
+        run its growth 312x faster per
         unit of simulated time than the same `rate` now means, so those specs carry `rate / dt` to
         preserve what they did.
         """
@@ -1107,8 +1106,8 @@ class Grow3D(Lateral):
         s_prev = m["mg_scale"]                                    # per-cell scale BEFORE this tick (for the dilution rate)
         # THE REFERENCE IN THE CONVENTION THE CELL IS ACTUALLY MEASURED IN -- polyhedron where the
         # run carries a separation, wedge where it does not. See `vertex_ops.cell_size`. `vth_frac`
-        # is a multiple of this, so on an apicobasal run the growth ceiling used to be stated in a
-        # volume the cell does not have.
+        # is a multiple of this; measured in the wedge convention on an apicobasal run, the growth
+        # ceiling would be stated in a volume the cell does not have.
         v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))
         dt = float(getattr(H, "dt", 1.0))
         ds = self._rate(s_prev, hillv, m, v_ref)                  # <-- the rate law; models override THIS only

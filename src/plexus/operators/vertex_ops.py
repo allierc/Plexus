@@ -1841,9 +1841,9 @@ class Divide3D(Structural):
             try:                                                 # to the cell's longest axis -> compact daughters
                 _, _, vh = np.linalg.svd(P - c, full_matrices=False); u = vh[0]
                 n = c / (np.linalg.norm(c) + 1e-9)               # outward (radial) face normal on the sphere
-                # THE SAME RELATIVE THRESHOLD THAT BUILT THE AXIS. This test used to read
-                # `a_cells[f] > self.orient_asw` -- the ABSOLUTE value -- while the axis above was
-                # already relative to `amax`, so the two disagreed about which cells are the bud.
+                # THE SAME RELATIVE THRESHOLD THAT BUILT THE AXIS. Testing
+                # `a_cells[f] > self.orient_asw` -- the ABSOLUTE value -- while the axis above is
+                # already relative to `amax` makes the two disagree about which cells are the bud.
                 # At orient_asw 0.6 on a field peaking at 1.47 the axis takes the top 40% and this
                 # took everything above 0.6, a different and larger set; on any run whose field
                 # peaks below orient_asw the axis exists and NO cell passes here, which is the
@@ -2165,17 +2165,15 @@ class Apoptosis3D(Structural):
     def _nb(self, m, nF, q):
         """(neighbour mean of `q`, neighbour count) on the CELL ADJACENCY GRAPH.
 
-        Cedric, 9 August: "we could make a comparison graph network between adjacent cells to make
-        a proper rule of cell competition?" -- and then: "this death operator could have different
-        modes: game of life, too small vs others, too slow growth vs others, cell duration too long
-        vs others". They are one mechanism: every useful death rule is a LOCAL comparison, and they
-        differ only in which per-cell quantity is compared. So the graph is built once, here.
+        Every useful death rule -- game of life, too small vs others, too slow vs others, too long
+        since dividing vs others -- is a LOCAL comparison between a cell and its neighbours, and the
+        rules differ only in which per-cell quantity is compared. So the graph is built once, here.
 
-        WHY LOCAL AND NOT GLOBAL. `chem_low` compared each cell against the whole field and marked
-        the tissue when the pattern weakened -- 2,000 cells shrank to 21.6% of their volume and not
-        one was extruded. `stalled` compared growth against the population median and marked NOBODY
-        on r010_12, because at rho = 0.1 every white cell grows at the SAME slow rate and none sits
-        below half the median. Uniformly slow is not the same as losing, and only the neighbour
+        WHY LOCAL AND NOT GLOBAL. `chem_low` compares each cell against the whole field and marks
+        the whole tissue when the pattern weakens -- every cell shrinks and not one is extruded. A
+        rule comparing growth against the population median marks NOBODY when every cell grows at
+        the SAME slow rate, since none then sits below half the median. Uniformly slow is not the
+        same as losing, and only the neighbour
         graph can tell them apart. A local rule is also self-limiting: it cannot mark a uniform
         field however extreme that field is.
 
