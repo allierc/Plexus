@@ -1469,8 +1469,8 @@ class PolarGrowth(Lateral):
     THE SAME LEVER THE GRAPHICS LITERATURE OPTIMISES. `stretch` and `offset` make this operator a
     DECLARED rest-shape change; papers/Xu_2024_mpm_shape_morphing.pdf makes the same per-particle F
     the control variable of a space-time optimisation, with the loss taken on the grid's nodal mass,
-    and reaches arbitrary target shapes with it. tools/shape_control.py is that loop at its smallest
-    against this solver: one symmetric rate, a log nodal-mass loss, gradients through the rollout.
+    and reaches arbitrary target shapes with it. plexus/morph.py is that loop against this solver: a
+    trilinear grid of rates, a log nodal-mass loss, and gradients through the whole rollout.
 
     Reference: Rodriguez, E. K., Hoger, A. & McCulloch, A. D. (1994). Stress-dependent finite
     growth in soft elastic tissues. J. Biomech. 27:455-467; Xu, M., Song, C. Y., Levin, D. I. W. &
