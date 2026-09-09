@@ -2493,7 +2493,11 @@ class DeformControl(Lateral):
     EMIT = None
     SUPPORTED_DIMS = [3]
     DIFFERENTIABLE = True
-    REQUIRES_PARAMS = ["rate"]
+    # NOT `REQUIRES_PARAMS = ["rate"]`. The schema checks that list against the raw YAML BEFORE the
+    # operator is constructed, so a `field:` line -- which needs no rate at all -- was refused
+    # unless it carried a dead `rate: [0, 0, 0, 0, 0, 0]` that nothing ever read. The requirement is
+    # really "rate OR field", which only __init__ can see, and that is where it is enforced.
+    REQUIRES_PARAMS = []
     REQUIRES_BUFFERS = ["F"]
     MECHANISM_TAGS = ["shape_control", "growth", "rest_shape", "inverse_design"]
     PARAM_ROLES = {"rate": "symmetric_3x3_rate_as_six_numbers", "over": "frames_of_action"}
@@ -2512,6 +2516,9 @@ class DeformControl(Lateral):
         self.field = params.get("field")
         self.extent = params.get("extent")            # [cx, cy, cz, half_width] of the control cube
         self._W = None
+        if self.field is None and params.get("rate") is None:
+            raise ValueError("deform_control: give `rate` (six numbers, a symmetric 3x3) or "
+                             "`field` (a .npz holding an optimised K^3 x 6 cube) -- one of them.")
         r = [float(v) for v in (params.get("rate") or [0.0] * 6)]
         if self.field is None and len(r) != 6:
             raise ValueError("deform_control: `rate` is six numbers -- the diagonal a_xx, a_yy, "
@@ -2574,8 +2581,20 @@ class DeformControl(Lateral):
             Adt = -A * dt
             eye = torch.eye(3, device=X0.device)[None]
             self._W = eye + Adt + 0.5 * torch.bmm(Adt, Adt)   # 2nd order, as the optimiser used
+            # SAY WHAT WAS CLAMPED. A point outside the cube silently takes the nearest edge's
+            # rate, which is how a mismatched `extent:` applies the wrong deformation to a whole
+            # body without anything looking wrong. The fraction is the number that catches it.
+            out = float(((u < 0) | (u > (K - 1))).any(dim=1).to(torch.float32).mean()) \
+                if u.numel() else 0.0
             print(f"[deform_control] {self.at}: a {K}^3 rate field from "
-                  f"{os.path.basename(str(self.field))} over {p.n:,} points", flush=True)
+                  f"{os.path.basename(str(self.field))} over {p.n:,} points; "
+                  f"{100 * out:.2f}% of them fall outside the control cube "
+                  f"(centre {cx:g},{cy:g},{cz:g} half-width {half:g}) and take its edge rate",
+                  flush=True)
+            if out > 0.05:
+                print(f"[deform_control] {self.at}: MORE THAN 5% OF THE MATERIAL IS OUTSIDE THE "
+                      f"CONTROL CUBE. `extent:` almost certainly does not match where this body "
+                      f"actually is -- check its bounding box against the cube.", flush=True)
         F = torch.bmm(self._W, p.F)
         if torch.is_grad_enabled():
             p.F = F

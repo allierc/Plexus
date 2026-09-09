@@ -32,6 +32,7 @@ extent, both printed; the pictures are what they are.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import tempfile
@@ -348,9 +349,20 @@ def main():
         ctrl = (theta.detach().cpu().numpy() if theta is not None
                 else np.concatenate([q.detach().cpu().numpy().ravel()
                                      for q in list(grid_enc.parameters()) + list(head.parameters())]))
+        # THE CONTROL WITHOUT ITS SHAPE IS NOT A CONTROL. The array alone does not say how many
+        # nodes per axis it has, nor which family it came from, so nothing downstream can rebuild
+        # the rollout from it -- which is exactly what the render agent could not do. Saved with
+        # everything needed to reproduce this morph: the kind, K, the cube's extent in world
+        # coordinates, the rollout the control was optimised for, and the material.
+        meta = dict(control_kind=args.control, ctrl_K=(args.ctrl if theta is not None else 0),
+                    extent=[C, C, C, R], opt_frames=args.frames, render_frames=len(frames),
+                    dt=0.002, n_pts=n_pts, n_grid=n_grid, target=name,
+                    ngp=dict(n_levels=8, n_features_per_level=2, log2_hashmap_size=15,
+                             base_resolution=4, per_level_scale=1.6, head=[32, 6]))
         np.savez_compressed(os.path.join(d, "morph.npz"), frames=np.stack(frames),
                             target=tgt_np, box=BOX, control=ctrl,
-                            seconds=time.time() - t_target)
+                            seconds=time.time() - t_target,
+                            meta=np.array(json.dumps(meta)))
         render(d, np.stack(frames), tgt_np, BOX, name)
         print(f"    -> {os.path.relpath(d, ROOT)}  ({len(frames)} frames, "
               f"{(time.time() - t_target) / 60:.1f} min total)", flush=True)
