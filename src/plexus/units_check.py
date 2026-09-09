@@ -83,9 +83,21 @@ def _check(sim, classes_by_op, warn):
     # `BLOCK_UNITS` is `{block name -> quantity}`: what this operator believes it is reading or
     # writing there. This is the check that catches a wedge volume compared with a polyhedron one,
     # and it is the reason the vocabulary carries a convention tag at all.
+    # THE PARAMS-AWARE HOOK, because for several operators the convention is a property of the
+    # COMPOSITION rather than of the class. `seed_mesh[apicobasal]` seeds a polyhedron target by
+    # default and a wedge one when a spec asks for `v0_from: wedge` -- and `gate_ab_sphere` asks,
+    # deliberately, because it is the mid-surface mechanics carrying a separation nothing reads.
+    # A class attribute cannot say that, so a class may define `block_units(params)` instead and
+    # the plain attribute remains the default for everything that has no such dependence.
     claims: dict[str, list[tuple[str, str]]] = {}     # block -> [(operator, quantity string)]
-    for opname, cls in (classes_by_op or {}).items():
-        for bname, u in (getattr(cls, "BLOCK_UNITS", None) or {}).items():
+    for opname, entry in (classes_by_op or {}).items():
+        cls, params = entry if isinstance(entry, tuple) else (entry, {})
+        _bu = getattr(cls, "block_units", None)
+        try:
+            table = _bu(params or {}) if callable(_bu) else (getattr(cls, "BLOCK_UNITS", None) or {})
+        except Exception:                            # noqa: BLE001 -- a hook is not the run
+            table = getattr(cls, "BLOCK_UNITS", None) or {}
+        for bname, u in (table or {}).items():
             if quantity(u).dim is UNKNOWN and u is not None:
                 warn.append(f"{opname}.BLOCK_UNITS[{bname!r}] = {u!r} does not parse")
             claims.setdefault(bname, []).append((opname, u))
@@ -122,7 +134,8 @@ def _check(sim, classes_by_op, warn):
     if abs(dt - 1.0) > 1e-12:
         rated = []
         for o in (getattr(sim, "operators", None) or []):
-            cls = (classes_by_op or {}).get(o.op)
+            _e = (classes_by_op or {}).get(o.op)
+            cls = _e[0] if isinstance(_e, tuple) else _e
             pu = getattr(cls, "PARAM_UNITS", None) or {}
             for k in (o.params or {}):
                 if k in pu and quantity(pu[k]).dim == quantity("rate").dim:

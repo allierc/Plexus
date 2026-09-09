@@ -135,6 +135,56 @@ def resolve_cell_set(H, at, override=None):
     return cs
 
 
+def cell_size(lvl, m, nF, pos_np=None):
+    """A cell's volume AND the reference to compare it against, IN ONE CONVENTION.
+
+    THE DEFECT THIS EXISTS TO END. A cell's volume has two definitions in this tree and both are
+    lengths cubed, so nothing dimensional ever separated them:
+
+        wedge        `face_geometry_3d` -- origin-referenced cones over the mid-surface ring. It is
+                     what the mid-surface energy integrates, and it CANNOT SEE THICKNESS.
+        polyhedron   `apicobasal_geometry_3d` -- two caps and one wall per ring edge, by the
+                     divergence theorem. It is what `cell_mechanics[apicobasal]` defends.
+
+    On the reference spheroid they read 2.5433 and 1.3508 for the same cell. Mixed, they produced:
+    a G1 that ran 60% long because `cell_grow`'s checkpoint subtracted a polyhedron `Vbirth` from a
+    wedge threshold; a `gate_ab_population` in which NOT ONE CELL DIVIDED IN 401 FRAMES, because the
+    tissue answered growth by thickening while the wedge volume the trigger read actually FELL,
+    2.32 -> 2.07; and a `cell_die` whose extrusion threshold is stated in a volume the cell does not
+    have.
+
+    `cell_divide` solved it for itself -- read the polyhedron where the run carries a separation,
+    cache the matching reference -- and this is that solution made shared, so the other three size
+    readers cannot drift from it. THE RUN'S GEOMETRY DECIDES, not a parameter: a set carrying `sep`
+    is a set of polyhedra, and there is nothing to configure.
+
+    Returns `(v_now, v_ref)` as float64 numpy, both in the same convention.
+    """
+    import numpy as _np
+    _s = lvl.get("sep") if "sep" in getattr(lvl, "state_schema", {}) else None
+    _Nv = int(m["Nv"])
+    P = (torch.as_tensor(pos_np, dtype=torch.float32)[:_Nv] if pos_np is not None
+         else lvl.get("pos")[:_Nv].detach().to(torch.float32).cpu())
+    if _s is not None:
+        _s = _s.detach() if hasattr(_s, "detach") else torch.as_tensor(_s)
+        if int(_s.shape[0]) >= _Nv:
+            vp, _, _, _ = apicobasal_geometry_3d(P.cpu(), _s[:_Nv].to(torch.float32).cpu(),
+                                                 m["E_srce"].cpu(), m["E_trgt"].cpu(),
+                                                 m["E_face"].cpu(), nF)
+            v = vp.numpy().astype(_np.float64)
+            # CACHED AT THE FIRST CALL, the way the wedge reference is fixed at seed time. The specs
+            # seed their thickness at the energy's own equilibrium (`tools/equilibrium_h.py`), so
+            # the first call is a rest state and needs no settling window -- see `cell_divide`,
+            # where three attempts to time this measurement on a moving shell each produced a
+            # different population from the same spec.
+            if "v_ref_poly" not in m:
+                m["v_ref_poly"] = float(_np.median(v))
+            return v, float(m["v_ref_poly"])
+    _, _, _, vf = face_geometry_3d(P.cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
+                                   m["E_face"].cpu(), nF)
+    return vf.numpy().astype(_np.float64), float(m.get("v_ref", 1.0))
+
+
 def cell_block(H, cat, name, nF):
     """The first `nF` rows of a DECLARED width-1 block on the cell set, as float64. None if absent.
 
@@ -1007,13 +1057,46 @@ class SeedMeshApicoBasal(SeedMesh3D):
     because the monolayer's own `h0` means the same thing and a factor of two here would be
     invisible until a cap-area ratio came out wrong.
     """
+    # WHAT THIS SEED IMPOSES, overriding the mid-surface parent's wedge. A cell with a separation
+    # IS a polyhedron, so its target volume is one -- which is exactly what
+    # `cell_mechanics[apicobasal]` defends, and the two now agree at load.
+    #
+    # A CLASS ATTRIBUTE AND NOT AN INSTANCE ONE. The checker resolves an operator to its CLASS
+    # before anything is constructed -- `schema.load` has no instances yet -- so a `BLOCK_UNITS`
+    # assigned in `__init__` is invisible to it, which is how the first attempt at this kept
+    # reporting the disagreement it had just fixed. A spec that opts back to `v0_from: wedge` for
+    # an archived run therefore still reads `polyhedron` here and gets warned; that is the correct
+    # outcome, because such a run genuinely IS inconsistent.
+    BLOCK_UNITS = {"V0f": "volume[polyhedron]", "Vbirth": "volume[polyhedron]",
+                   "A0": "area[midsurface]", "P0": "length"}
+
+    @classmethod
+    def block_units(cls, params):
+        """The convention this seed imposes, WHICH THE SPEC CAN STILL CHOOSE.
+
+        `v0_from: wedge` is a real composition and not a legacy escape: `gate_ab_sphere` is the
+        mid-surface mechanics carrying a separation nothing reads, so its cells genuinely are
+        wedge-targeted and warning about them would be the checker inventing a defect. The default
+        is `polyhedron` because a cell with a separation normally IS one.
+        """
+        conv = "wedge" if str(params.get("v0_from", "polyhedron")).lower() == "wedge" else "polyhedron"
+        return {"V0f": f"volume[{conv}]", "Vbirth": f"volume[{conv}]",
+                "A0": "area[midsurface]", "P0": "length"}
+
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.h0 = float(params.get("h0", 0.4))                 # FULL thickness; sep is h0/2
         self.sep_block = str(params.get("sep_block", "sep"))
         # WHICH VOLUME THE CELL'S TARGET IS EXPRESSED IN -- see the block at the end of `forward`.
-        # `wedge` is the default and is what every archived apicobasal run used.
-        self.v0_from = str(params.get("v0_from", "wedge")).lower()
+        #
+        # `polyhedron` IS THE DEFAULT NOW, AND IT IS THE ONLY SELF-CONSISTENT ONE. This shipped as
+        # `wedge` to keep archived runs reading identically, and that made every apicobasal spec in
+        # the tree ask its cells for a volume they cannot have: `cell_mechanics[apicobasal]` pulls
+        # the POLYHEDRON volume toward `V0f` while the seed filled `V0f` with a WEDGE one -- 1.3508
+        # against 2.5433 for the same cell on the reference spheroid. A spec may still write
+        # `v0_from: wedge` to reproduce an archived run, and the loader will then tell it what it
+        # disagrees with.
+        self.v0_from = str(params.get("v0_from", "polyhedron")).lower()
         if self.v0_from not in ("wedge", "polyhedron"):
             raise ValueError(f"seed_mesh[apicobasal]: v0_from must be wedge|polyhedron, "
                              f"not {self.v0_from!r}")
@@ -1101,6 +1184,11 @@ class SeedMeshApicoBasal(SeedMesh3D):
             m["V0f"] = (torch.full_like(vp, float(vp.median())) if self.v0_uniform else vp.clone())
             m["V0"] = float(m["V0f"].sum())
             m["v_ref"] = float(vp.median())
+            # AND THE SHARED REFERENCE, from frame 0. `cell_divide` used to cache `v_ref_poly` at
+            # its own first call and `cell_grow`, `cell_die` and `cell_cycle` each read the wedge
+            # one; they all read this now (`cell_size`), so there is a single seed-time median in
+            # the convention the energy defends and the four cannot drift apart.
+            m["v_ref_poly"] = float(vp.median())
             vb = cell_block(H, resolve_cell_set(H, self.at), "Vbirth", nF)
             if vb is not None:
                 set_cell_block(H, resolve_cell_set(H, self.at), "Vbirth",
@@ -1439,7 +1527,12 @@ class Divide3D(Structural):
     # (the wedge reference is 2.5462)"). One block, two conventions, selected by the composition
     # rather than by a parameter. A class attribute cannot express that, and declaring either would
     # be wrong on half the specs in `config/tissue`.
-    BLOCK_UNITS = {"Vbirth": "volume[wedge]"}
+    # AND `Vbirth` IS UNDECLARED FOR THE SAME REASON. This operator writes it from whichever volume
+    # it just triggered on -- polyhedron where the run carries a separation, wedge where it does
+    # not -- so it propagates the run's convention rather than choosing one, exactly like `V0f`
+    # above. Declaring `wedge` made it disagree with the apicobasal seed that had just been made
+    # consistent, which is the checker accusing the operator that has no opinion.
+    BLOCK_UNITS: dict = {}
     MECHANISM_TAGS = ["division", "cell_division", "vesicle", "proliferation", "volume_doubling"]
     REFERENCE = "Hertwig, O. (1884) (long-axis division rule); tyssue cell_division (DamCB)."
 
@@ -1948,12 +2041,12 @@ class Apoptosis3D(Structural):
                    "max_mark_frac": "fraction", "frac": "fraction", "field_frac": "fraction",
                    "band_deg": "angle", "cone_deg": "angle",
                    "n_max": "count", "min_age": "count", "p0": "fraction"}
-    # DEATH READS THE WEDGE. The extrusion test is `V0f < critical_frac * v_ref` and both sides come
-    # from the seed's wedge convention, so on an apicobasal run this threshold is stated in a
-    # volume the cell does not have. It still extrudes -- the pathway works on both geometries --
-    # but the SIZE at which it fires means something different there, and that is what the warning
-    # is for.
-    BLOCK_UNITS = {"V0f": "volume[wedge]", "A0": "area[midsurface]"}
+    # `V0f` IS UNDECLARED BECAUSE DEATH PROPAGATES A CONVENTION RATHER THAN IMPOSING ONE. It reads
+    # whatever the seed put there and compares it against the matching reference through
+    # `cell_size`, so its convention is the run's, not its own. Declaring `wedge` here -- as this
+    # did while the mismatch was being surfaced -- would now be the checker accusing the one
+    # operator that has no opinion.
+    BLOCK_UNITS = {"A0": "area[midsurface]"}
     MECHANISM_TAGS = ["apoptosis", "cell_elimination", "extrusion", "delamination", "die"]
     REFERENCE = ("Monier, B. et al. (2015). Apico-basal forces exerted by apoptotic cells drive "
                  "epithelium folding. Nature 518:245-248; tyssue B-Apoptosis (DamCB).")
@@ -2257,7 +2350,7 @@ class Apoptosis3D(Structural):
             if v is None:
                 return set()
             vv = v.detach().cpu().numpy()[:nF]
-            v_ref = float(m.get("v_ref", 1.0))
+            v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))   # see `cell_size`
             return set(np.where(vv < self.small_frac * v_ref)[0].tolist())
         if self.mode == "stalled":
             # CELL COMPETITION: a cell that is not growing while its neighbours are gets removed.
@@ -2463,7 +2556,10 @@ class Apoptosis3D(Structural):
             return {}
         V0f = m["V0f"].detach().cpu().numpy().astype(np.float64)
         A0 = m["A0"].detach().cpu().numpy().astype(np.float64)
-        v_ref = float(m.get("v_ref", 1.0))
+        # `critical_frac * v_ref` IN THE CONVENTION `V0f` IS ACTUALLY IN -- see `cell_size`. It was
+        # the wedge reference on every run, so an apicobasal cell was extruded at a fraction of a
+        # volume it does not have.
+        _vn, v_ref = cell_size(lvl, m, nF, pos_t)
         crit = self.crit * v_ref
         # 1. SHRINK. cell_mechanics contracts the cell toward the smaller target; T1 then finds its
         #    edges short and sheds neighbours. Nothing is removed here.
@@ -3200,10 +3296,11 @@ class CellCycle3D(Lateral):
         # `phase` is here now; the other three are blocks on the cell set and are carried by
         # `Hierarchy.renumber_set` and by `cell_divide`'s mother-row copy instead.
 
-        _, _, _, vf = face_geometry_3d(lvl.get("pos")[:int(m["Nv"])].detach(),
-                                       m["E_srce"], m["E_trgt"], m["E_face"], nF)
-        v_now = vf.detach().cpu().numpy().astype(np.float64)
-        v_ref = float(m.get("v_ref", 1.0))
+        # ONE CONVENTION, CHOSEN BY THE RUN'S GEOMETRY -- see `cell_size`. This read the WEDGE
+        # volume unconditionally, so on an apicobasal run the sizer's checkpoint, the dilution
+        # model's `cyc_vprev` and `g1_size * v_ref` were all stated in a volume the cell does not
+        # have, while `cell_mechanics[apicobasal]` was defending the polyhedron.
+        v_now, v_ref = cell_size(lvl, m, nF)
         _dt = float(getattr(H, "dt", 1.0))
         vb0 = cell_block(H, self.cat, "Vbirth", nF)
         _rate_prev = cell_block(H, self.cat, "cyc_rate", nF)
