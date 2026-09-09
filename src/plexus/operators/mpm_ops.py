@@ -323,8 +323,8 @@ def _ancestor_accel(H, p, a_max, D, dev):
 
     with pi_L the composition of the parent maps from the particle set up to L (`H.lift_index`).
 
-    WHY IT IS A SUM OVER THE CHAIN AND NOT ONE HOP. Every one of the five MPM scatter bodies
-    used to read `H.delta(p.parent_name)[p.parent]`, which is Broadcast across exactly one
+    WHY IT IS A SUM OVER THE CHAIN AND NOT ONE HOP. Reading `H.delta(p.parent_name)[p.parent]` in the
+    scatter bodies is Broadcast across exactly one
     containment map. That is correct and complete for the two-level models the corpus is made of
     -- `cell -> mpm_particle` -- and silently wrong the moment a model has three:
     `cell -> compartment -> mpm_particle` with `gravity at: cell` builds, validates, runs, and
@@ -707,8 +707,8 @@ class MPMScatter(MPMWrites, Exchange):
         # STEP 2: WRITE INTO THE FIELD'S OWN BUFFERS, never a fresh allocation. Assigning
         # `g.m = torch.zeros(...)` rebinds the attribute to new storage every substep; a captured
         # graph holds the address it saw at capture time, so the replay silently writes somewhere
-        # the rest of the run no longer reads. Measured: capture SUCCEEDS with this left as it was,
-        # raises nothing, and produces a 6-tick checksum of 22816.79 against the correct 22132.22.
+        # the rest of the run no longer reads. That failure is SILENT: capture succeeds, nothing
+        # raises, and the checksum is simply wrong.
         # FUNCTIONAL UNDER GRAD, IN PLACE OTHERWISE, and the two are the same numbers. The
         # in-place form exists for CUDA-graph capture, which holds the addresses it saw -- and
         # capture is off under `grad=True` by construction, since the warp bodies register no
@@ -4701,8 +4701,8 @@ class MPMGatherDiff(MPMGather):
 # ------------------------------------------------------------------------------------
 # seeding the matrix
 # ------------------------------------------------------------------------------------
-# MOVED HERE FROM ecm_ops.py. It lays out MPM material points, so it belongs beside the
-# solver that integrates them rather than beside the ECM-specific forces that read them.
+# The matrix seed lives here rather than with the ECM forces: it lays out MPM material points, so
+# it belongs beside the solver that integrates them, not beside the forces that read them.
 @register_operator("ecm_seed", "seed_ecm", family="seed", set="particle", kind="seed")
 class ECMSeed(Structural):
     """Lay the matrix out once, at frame 0: the box minus a cavity, filled with aligned fibres.

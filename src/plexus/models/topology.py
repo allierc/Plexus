@@ -152,7 +152,7 @@ def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None, emap=None, bir
         return None
     if not _insert_after(rings[nbrB], b1, b0, m2):
         # nbrA HAS ALREADY BEEN MUTATED on this path, so a maintained map would be left describing a
-        # ring that no longer exists. Harmless when the map is rebuilt per call (the old behaviour);
+        # ring that no longer exists. Harmless when the map is rebuilt per call;
         # a silent corruption when it is carried, so it is repaired here rather than at the caller.
         if not own_map:
             _emap_drop(emap, nbrA, old_A); _emap_add(emap, nbrA, rings[nbrA])

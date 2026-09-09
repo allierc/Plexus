@@ -2165,8 +2165,8 @@ class LiveMovie:
                        .astype(np.uint8), (nF, 1))
 
         # `mesh_color_by: phase` -- PAINT THE CELL CYCLE, AND DO IT BEFORE ANYTHING ELSE CAN FAIL.
-        # This block used to sit AFTER the division marks inside one `try`, and that is why it drew
-        # nothing on any run that divided: `_marks` reads a face count that has just changed, and
+        # Placed AFTER the division marks inside one `try`, this block draws nothing on any run
+        # that divides: `_marks` reads a face count that has just changed, and
         # anything it raises aborts the whole block, leaving the PREVIOUS frame's colours on the
         # actor. A six-frame run with no divisions painted phases correctly and a forty-frame run
         # with them painted mother-blue, from the same code and the same spec. Two independent
@@ -2579,8 +2579,8 @@ class LiveMovie:
             # SECTION. On a MESH run those particles are the mesh's own vertices, which on this
             # promotion are the MID-SURFACE -- so a section that already draws apical, basal and
             # the walls gets the mid-surface back a second time, as a dotted line down the middle
-            # of the band, after `cross_section.mid: false` removed the curve. Cedric found it in
-            # exactly that order: first the parallel white ring, then the blue dashes behind it.
+            # of the band, after `cross_section.mid: false` removed the curve -- first a parallel
+            # white ring, then blue dashes behind it.
             #
             # It is a key rather than a rule because on a PARTICLE run the scatter is the section:
             # an MPM slab has nothing else in it, and every existing cross_section spec is one of
@@ -2655,7 +2655,7 @@ class LiveMovie:
                     # It can never be anywhere else and it carries no information the other two
                     # curves do not already have -- that redundancy IS the change of variables.
                     # Drawn between them it reads as a third surface the cell does not have, which
-                    # is what Cedric queried on sight.
+                    # is the first thing a viewer questions.
                     #
                     # IT IS NOT ALWAYS MERELY BOOKKEEPING, which is why this is a key and not a
                     # deletion: `gamma` and `Lambda` act on the mid-surface RING and `K_R` on
@@ -2758,9 +2758,9 @@ class LiveMovie:
                                 # and white ticks ACROSS them, with the ring and the ticks claiming
                                 # to be the same thing. They are not: the ring is `pos`, the
                                 # incumbent's only surface, and the ticks are `2|sep|`, which is
-                                # what this promotion added. Cedric read the picture and asked
-                                # whether the parallel white ring was a bug -- it is not, it is the
-                                # mid-surface, and the colouring is what made that a question.
+                                # what this promotion added. Coloured alike, the parallel white ring
+                                # reads as a bug -- it is not, it is the mid-surface, and the
+                                # colouring is what makes that a question.
                                 #
                                 # Grey rather than another hue: red and blue are already spoken for
                                 # by apical and basal, which are two distinct SOURCES, and a third

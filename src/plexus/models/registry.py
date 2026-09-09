@@ -187,7 +187,7 @@ def register_operator(*names: str, implementation: str | None = None,
         # This is a warning, not a hard error, because a prototype outside this tree may
         # still carry the mismatch and import must not break on it. Inside src/plexus the
         # invariant holds: `integrin_seed` was the last operator tripping it and was fixed
-        # (kind "structural" -> "seed") on 24 August rather than exempted.
+        # (kind "structural" -> "seed") rather than exempted.
         if tags.get("family") == "seed" and tags.get("kind") != "seed":
             _warn(
                 f"[warn] operator {names[0]!r}: family=\"seed\" claims this establishes "
@@ -307,9 +307,9 @@ def seed_contracts() -> dict[str, OperatorContract]:
 # says WHAT IT IS FOR. `kind` is useless for spotting redundancy because 62 of 157 operators are
 # `lateral`; the family axis is where the duplication shows.
 #
-# REBUILT 13 August, from a census rather than from intent. The previous set was ten families,
-# 62 of 157 operators declared none, `death` was in use and undeclared, and the audit this
-# comment describes DID NOT EXIST -- so nothing had ever failed. Two of the old ten also
+# BUILT FROM A CENSUS OF WHAT IS REGISTERED, not from intent. A family list written from intent
+# drifts until operators declare families it never had, and nothing fails until an audit exists
+# to notice. Two candidate names also
 # duplicated the kind axis (`death` against kind=structural, `topology` against kind=rewire);
 # they stay only where they name a role that `kind` does not.
 OPERATOR_FAMILIES = {

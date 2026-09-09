@@ -138,7 +138,7 @@ class MPMParticle:
         else:
             # THE NEAREST ANCESTOR THAT DECLARES `types`, not necessarily the immediate parent.
             #
-            # This used to read `parent.types_raw` and stop. With two levels that is the same
+            # Reading only `parent.types_raw` gives, with two levels, the same
             # thing; with `cell -> compartment -> mpm_particle` it is not, and the failure is
             # silent both ways round: a material declared on the CELL is invisible to a particle
             # whose parent is a compartment, and every particle then builds at the 100.0 default.
