@@ -1604,9 +1604,10 @@ class ParkReserve(Seed):
         p.mass[dorm] = 0.0
         # PARKED ON THEIR OWN PARENT, not left where the atlas drew them. A pool is seeded with the
         # geometry of the piece it belongs to, which is the piece as the ATLAS placed it -- a sphere
-        # at the spec's start position. In a run that then loads a settled cell, that sphere is
-        # wherever the cell used to be before it fell: measured, a dormant cloud 45 um above the
-        # cell it belongs to, inflating every extent read off the set and drawn as a ghost. A
+        # at the spec's start position. In a run that then loads a settled cell, that sphere sits
+        # wherever the atlas put it and not where the cell now is -- a dormant cloud tens of
+        # micrometres from the cell it belongs to, inflating every extent read off the set and
+        # drawn as a ghost. A
         # dormant point has no mechanics, so its position is free; putting it on its parent keeps
         # it inside the piece that will spend it.
         if self.park_on_parent and "pos" in H.level(p.parent_name).state_schema:

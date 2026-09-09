@@ -129,13 +129,13 @@ class MPMGrid(Field):
     [.,dim]). Pure scratch: p2g zeroes + scatters into it each substep, grid_update
     solves on it, g2p reads it back.
 
-    THE CELL SIZE COMES FROM THE WORLD, which it did not before. This used to read
-    `dx = 1.0 / n_grid` with axes 1.. assumed to span [0,1] and only axis 0 scaled by `width`, so
-    `n_grid` meant "cells per unit length". On a box that is not 1 unit across -- a 0.1 m water
-    scene, say -- that puts a 1.0-wide grid on a 0.1-wide world: the cell is 10x too large, only
-    ~10 of 96 cells per axis carry any mass, and the failure is not subtle. `MPMGather` clamps
-    positions into [2*dx, box[k] - 2*dx] with `box` correct and `dx` wrong, which crushes a 0.1 m
-    cube into a 0.058 m slab on the first substep.
+    THE CELL SIZE COMES FROM THE WORLD: dx = world_size[1] / n_grid, so `n_grid` is CELLS ACROSS
+    AXIS 1 and not cells per unit length. The two readings agree only on a box one unit across.
+    Deriving dx from a fixed 1.0 instead would put a unit-wide grid on whatever world the
+    specification declared: on a box a tenth of a unit across the cell is ten times too large,
+    a tenth of the cells per axis carry any mass, and `mpm_gather` -- which clamps positions into
+    [2 dx, box - 2 dx] -- would be clamping with a correct box and a wrong dx, crushing the body
+    into a slab on the first substep.
 
     `n_grid` means CELLS ACROSS AXIS 1, not cells per unit length. The two readings coincide when
     the world is one unit across on that axis, which is the default, so a specification that does
@@ -695,11 +695,11 @@ class MPMScatter(MPMWrites, Exchange):
         # scatter). Multi-SET MPM is what the composed cell introduced, and it is the only thing
         # this ever affected. With one set the stamp is always stale and the zeros are always
         # fresh, so single-set runs stay bit-identical.
-        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. This used to read
-        # `H.micro`, a python int the engine advances every substep, and compare it to a stamp on
-        # the field. That works, but it is a per-substep side effect no CUDA-graph replay can
-        # reproduce -- and it made dynamo recompile on every substep, because it specialises on
-        # integer attributes of an nn.Module. The engine binds the i-th OCCURRENCE of a token to
+        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. Deciding it from
+        # a per-substep counter -- a python int the engine advances, compared against a stamp on
+        # the field -- works, and it is a side effect no CUDA-graph replay can reproduce; it also
+        # makes dynamo recompile every substep, since it specialises on integer attributes of an
+        # nn.Module. The engine binds the i-th OCCURRENCE of a token to
         # the i-th INSTANCE, so occurrence 0 of `mpm_scatter` for a given grid is ALWAYS the first
         # one in a substep: the engine stamps `_zeroes_grid` on it when `inst` is built.
         _fresh = getattr(self, "_zeroes_grid", True)
@@ -1304,11 +1304,10 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
                         _v[_i] = float(_x)
                 else:
                     # DOWN IS WHEREVER GRAVITY SAYS IT IS, and `gravity` says -y: it defaults to
-                    # `gy = -g, gz = 0` in 3D as well as in 2D. This line used to read -z in 3D, so
-                    # on every 3D spec buoyancy pushed at RIGHT ANGLES to the weight it is supposed
-                    # to oppose -- a bubble drifting sideways rather than rising. One shipped spec
-                    # would push at right angles to the weight it opposes. `buoyancy_dir`
-                    # overrides the default axis for a specification that needs another.
+                    # `gy = -g, gz = 0` in 3D as well as in 2D. Buoyancy must use the SAME axis or
+                    # it pushes at right angles to the weight it is meant to oppose, and a bubble
+                    # drifts sideways instead of rising. `buoyancy_dir` overrides the axis for a
+                    # specification that needs another.
                     _v[1] = -1.0
                 self._dir_cache = torch.tensor(_v, device=dev, dtype=gv.dtype)
                 self._dir_key = _key
@@ -4583,7 +4582,16 @@ class MPMDensityPressure(Lateral):
 @register_operator("mpm_scatter", "p2g", implementation="differentiable", family="mpm",
                    set="particle", kind="exchange")
 class MPMScatterDiff(MPMScatter):
-    """P2G with a grid that is REBUILT rather than zeroed and re-accumulated."""
+    """P2G with a grid that is REBUILT rather than zeroed and re-accumulated.
+
+    Same arithmetic as the default scatter, in the same order. What differs is that the three
+    grid channels are produced as NEW tensors -- `zeros_like` then `index_add`, not `zero_()`
+    then `index_add_` -- so each substep's grid survives for the backward that needs it instead
+    of being overwritten by the next.
+
+    Costs one grid allocation a substep. See the section header above for why this is an
+    implementation and not a mode.
+    """
     FUNCTIONAL = True
     DIFFERENTIABLE = True
 
@@ -4608,10 +4616,12 @@ class MPMScatterDiff(MPMScatter):
 class MPMGridUpdateDiff(MPMGridUpdate):
     """The grid solve, with the wall written as a stack rather than into a view.
 
-    The boundary already computes its values with `torch.where`; it is writing them back as
-    `gv[..., k] = ck` -- an in-place index_put into a VIEW -- that autograd refuses. `FUNCTIONAL`
-    switches that loop to carrying the three components as separate tensors and stacking them, which
-    is the same arithmetic in the same order.
+    The boundary already computes its values with `torch.where`; the default writes them back as
+    `gv[..., k] = ck`, an in-place index_put into a VIEW, which autograd refuses. This carries the
+    components as separate tensors and stacks them -- the same arithmetic in the same order, at
+    the cost of one stack a substep.
+
+    See the section header above for why this is an implementation and not a mode.
     """
     FUNCTIONAL = True
     DIFFERENTIABLE = True
@@ -4626,7 +4636,15 @@ class MPMGridUpdateDiff(MPMGridUpdate):
 @register_operator("mpm_strain", implementation="differentiable", family="mpm", set="particle",
                    kind="lateral")
 class MPMStrainDiff(MPMStrain):
-    """F updated by rebinding: F is the control variable of an inverse run and must carry a graph."""
+    """The material update with F rebound rather than written in place.
+
+    F is the control variable of an inverse run, so it has to carry a graph: `p.F = F` rather than
+    `p.F.copy_(F)`, and the same for the plastic ratio Jp. The values are identical; only the
+    binding differs, so a run that does not take a gradient should use the default and keep the
+    capture.
+
+    See the section header above for why this is an implementation and not a mode.
+    """
     FUNCTIONAL = True
     DIFFERENTIABLE = True
 
@@ -4643,7 +4661,14 @@ class MPMStrainDiff(MPMStrain):
 @register_operator("mpm_gather", "g2p", implementation="differentiable", family="mpm",
                    set="particle", kind="exchange")
 class MPMGatherDiff(MPMGather):
-    """G2P writing a fresh state table: one clone a substep, and only while a tape is kept."""
+    """G2P writing a fresh state table instead of advecting in place.
+
+    One clone of the particle state a substep, which is the price of keeping positions and
+    velocities on the tape. The default writes into the existing table, which is what a captured
+    CUDA graph needs and what a backward cannot have.
+
+    See the section header above for why this is an implementation and not a mode.
+    """
     FUNCTIONAL = True
     DIFFERENTIABLE = True
 
