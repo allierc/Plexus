@@ -1048,12 +1048,36 @@ mobility $1/\gamma$ & $L/(F\,T)$ & derived\\
 \end{tabular}}
 \smallskip
 
-Two design decisions follow, and both are deliberate omissions. There is \textbf{no automatic
-conversion of state buffers and no dimensional checking of operator arithmetic}: operators compute in
-simulation units exactly as before, and \code{units} is a declaration attached to the run so that what
-comes \emph{out} can be reported in micrometres and seconds, and so that a spec making a physical claim
-can be asked what it is claiming it in. Unit-checked arithmetic would be a large change and a false
-comfort, since the errors above are all dimensionally consistent.
+Two design decisions follow. There is \textbf{no automatic conversion of state buffers and no
+dimensional checking of operator arithmetic}: operators compute in simulation units exactly as before,
+nothing is wrapped, and the zero-copy path from the state arrays into the compute kernels is
+untouched. Unit-checked arithmetic would be a large change and a false comfort.
+
+\textbf{What \emph{is} checked is the boundary}, which is neither arithmetic nor free of error. A
+quantity carries a \emph{dimension} --- integer exponents of the three base scales --- and,
+orthogonally, an optional \emph{convention} naming which of several definitions of one dimensional
+quantity it is. State blocks may declare theirs, operators declare what they read and write, and one
+pass at load compares declaration against declaration: a block against the operators that use it, two
+operators against each other, and a per-unit-time parameter against a run whose \code{dt} is not one.
+The check \textbf{warns and never refuses}; an undeclared quantity is silent, because a checker that
+complains about absence is switched off and then catches nothing.
+
+\textbf{The convention tag is the half a dimensional system cannot do}, and it is what the omission
+above was really about. In our own tissue model a cell's volume had two definitions --- a wedge sum of
+origin-referenced cones over the mid-surface ring, which cannot see thickness, and the polyhedron of
+two caps and one lateral wall per ring edge --- reading $2.54$ and $1.35$ for the same cell. Both are
+lengths cubed, so no dimensional system separates them, and mixed they produced a growth checkpoint
+that ran $60\%$ long, an extrusion threshold stated in a volume the cell does not have, and a
+population in which not one cell divided in $401$ frames because the tissue grew along the axis its
+trigger could not see. Declaring the conventions made every affected specification say so at load;
+reconciling them --- one volume for growth, division, death \emph{and} the energy, chosen by whether
+the cells carry a thickness --- removed the class.
+
+\textbf{And the reporting boundary converts before it labels.} A plot may print a unit only when the
+scale it needs is declared, and the number it prints is converted by the same declaration that
+supplies the unit, so a label cannot appear over an unscaled value. That failure was live in this
+codebase: a panel appended a micrometre-cubed label to a raw simulation number, wrong by the cube of
+the length scale, in every movie the tissue model produced.
 
 And a model with no \code{units:} block is \textbf{dimensionless}: it loads, it runs, and the loader
 prints \emph{``units: NONE DECLARED --- this run is dimensionless and no result from it may be quoted
