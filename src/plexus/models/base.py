@@ -135,8 +135,28 @@ from plexus.models.state import StateSchema
 # is UNEXPRESSIBLE rather than merely discouraged. This is the same move as EMIT making the
 # engine own integration: a discipline every spec had to remember becomes a guarantee the
 # language provides.
-KINDS = ("lateral", "aggregate", "broadcast", "exchange", "field", "structural", "rewire",
-         "seed")
+# `divide` AND `die` ARE THE PAPER'S OWN FAMILIES AND THEY WERE NOT KINDS. plexus2.tex sec. 3 names
+# eight: Lateral, Aggregate, Broadcast, Exchange, Rewire, Divide, Die, Seed. This tuple named a
+# different eight -- it added `field`, and it collapsed Divide and Die into one `structural` kind --
+# while the reference-implementation section called ITS list "the eight of the main text". The two
+# lists were never the same and the code implemented the second.
+#
+# THE COST OF THE COLLAPSE WAS NOT COSMETIC. `structural` came to mean "may write in place" rather
+# than "changes the entities", because it is the only kind the purity rule grants a write to, and it
+# then absorbed every operator that needed one and was not a Divide, a Die, a Seed, a Rewire or a
+# Field: 40 live registrations of which about 20 are neither Divide nor Die -- `cell_grow`,
+# `cell_cycle`, `junction_myosin`, `cytokinetic_ring`, `topo_record`, five constraint operators. A
+# kind that means two things cannot be enforced, and the class of defect it hides is not
+# hypothetical: `cell_die` and `cell_grow` both wrote `V0f`, the faster one silently erased the
+# slower, and R6 lost every extrusion to it until a gate row caught the vacuum.
+#
+# `field` AND `structural` STAY FOR NOW, deliberately. Ten `field` registrations and about twenty-two
+# `structural` ones live outside this campaign's scope (`mpm_ops`, `contact_ops`, `membrane_ops`,
+# `field_ops`), and removing a kind those specs still declare would break them at load. They go when
+# stage 2 re-kinds those modules; this tuple is the record of a migration in progress, not of a
+# settled taxonomy.
+KINDS = ("lateral", "aggregate", "broadcast", "exchange", "rewire", "divide", "die", "seed",
+         "field", "structural")
 
 
 # The recognised temporal-integration states (Axis A: how a SET moves in time), shared by
@@ -207,7 +227,15 @@ class Level(nn.Module):
         # State is first-class: normalize a legacy {block:(c0,c1)} dict into a StateSchema
         # (the shim). A StateSchema is still dict-indexable (schema['pos'] == (c0,c1)), so
         # `get('pos')` and every legacy call site are unchanged.
-        self.state_schema = StateSchema.normalize(state_schema or {"pos": (0, 2), "vel": (2, 4)})
+        # `is not None`, NOT `or`. `StateSchema` defines `__len__`, so an EMPTY schema is falsy and
+        # `state_schema or {...}` silently replaced it with the legacy 2-D pos/vel default. That is
+        # only reachable for a set that legitimately has no columns -- a relation like `half_edge`,
+        # whose content is its maps -- and the consequence was not a missing block but a hundred
+        # thousand PARTICLES: the set acquired a `pos`, pass 1 seeded it across the world box, and
+        # the movie drew that cloud instead of the epithelium. An absent argument and an empty one
+        # are different statements and this line now tells them apart.
+        self.state_schema = StateSchema.normalize(
+            state_schema if state_schema is not None else {"pos": (0, 2), "vel": (2, 4)})
         N = state.shape[0]
         self.register_buffer("state", state)
         self.embedding = nn.Parameter(embedding) if embedding is not None else None
@@ -463,6 +491,70 @@ class Hierarchy(nn.Module):
         """The set that contains `name` (None for a top-level set)."""
         return getattr(self.levels[name], "parent_name", None)
 
+    def ancestors(self, name: str) -> list[str]:
+        """Every set that contains `name`, however far up -- nearest first, root last.
+
+        THE CONTAINMENT CHAIN IS NOT TWO LEVELS DEEP, and code that assumed it was is the one
+        way a Plexus model can be composed to a depth the runtime silently ignores. Sets and
+        `build` already handle any depth: pass 2 resolves children in declaration order, so
+        `organism -> tissue -> cell -> compartment -> mpm_particle` builds with no new machinery.
+        What did NOT handle it was every reader spelt `lvl.parent_name` / `lvl.parent`, which
+        reaches exactly one hop -- so an operator declared at the top of a five-level model
+        reached the level below it and no further, and nothing raised.
+
+        Cycles are impossible by construction (`parent:` must name an already-built set) but the
+        walk is bounded anyway, because an infinite loop inside a substep is a hang and not an
+        error message.
+        """
+        out, seen, cur = [], {name}, self.parent_of(name)
+        while cur is not None and cur not in seen and len(out) < len(self.levels):
+            out.append(cur); seen.add(cur)
+            cur = self.parent_of(cur)
+        return out
+
+    def lift_index(self, name: str, ancestor: str) -> torch.Tensor:
+        """`[n]` index into `ancestor`, one row per element of `name`: the COMPOSITION of the
+        containment maps between them.
+
+        pi is a function, so a composition of pi's is a function, and that is the whole content
+        of this method: `pi_1 . pi_2 . ... . pi_k` is again a map from children to one ancestor,
+        with the same fibre structure, so an Aggregate or a Broadcast across k levels needs no
+        primitive beyond the two the language already has. `H.delta(anc)[H.lift_index(child, anc)]`
+        is Broadcast across the whole chain; `index_add_(0, H.lift_index(child, anc), x)` is
+        Aggregate across it.
+
+        CACHED, and that is a requirement rather than an optimisation: these are read inside the
+        MPM substep, which the engine captures as a CUDA graph, and a fresh allocation per replay
+        leaves the graph writing into memory the run no longer reads. The cache is invalidated by
+        the identity of the underlying `parent` buffers, so a structural operator that reallocates
+        one rebuilds the composition instead of returning a stale index.
+        """
+        chain = []
+        cur = name
+        while cur != ancestor:
+            nxt = self.parent_of(cur)
+            if nxt is None:
+                raise ValueError(f"{ancestor!r} does not contain {name!r}: the containment chain "
+                                 f"above it is {self.ancestors(name) or '(none)'}")
+            chain.append(self.levels[cur].parent)
+            cur = nxt
+        if not chain:
+            raise ValueError(f"lift_index({name!r}, {ancestor!r}): a set does not contain itself")
+        key = (name, ancestor)
+        sig = tuple(t.data_ptr() for t in chain)
+        cache = getattr(self, "_lift_cache", None)
+        if cache is None:
+            cache = self._lift_cache = {}
+        hit = cache.get(key)
+        if hit is not None and hit[0] == sig:
+            return hit[1]
+        idx = chain[0]
+        for nxt in chain[1:]:
+            idx = nxt[idx]
+        idx = idx.contiguous()
+        cache[key] = (sig, idx)
+        return idx
+
     # --- incidence maps: gather/scatter along a named map (pre/post), not containment -- #
     def gather(self, edge_set: str, role: str, block: str) -> torch.Tensor:
         """Gather an endpoint set's `block` state onto each edge along its `role`
@@ -558,7 +650,7 @@ class Hierarchy(nn.Module):
         # `ModuleDict` now, so the two cannot diverge again.
         #
         # WHAT IT COST. From the first death, the cell set's `chem` no longer lines up with the
-        # faces. `cell_geometry` rewrites `cen`, `area` and `occ` from `nF` every tick, so those
+        # faces. `cell_geometry` rewrites `centroid`, `area` and `occ` from `nF` every tick, so those
         # self-heal a tick later; `chem` has no rewriter and stays permanently mis-indexed. On
         # r023_07 the two sides run bit-identical through the first two extrusions and diverge at
         # the third, and the activator goes non-finite at frame 889.

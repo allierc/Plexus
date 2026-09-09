@@ -22,16 +22,6 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-    b: [1.0, 0.35, 0.45]
-    c: [0.4, 0.65, 1.0]
-    d: [1.0, 0.85, 0.3]
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -54,3 +44,13 @@ descriptions:
       web. These filaments are colored in a repeating palette of red, yellow, green, and blue. They are
       arranged in a dense, overlapping topology that fills the entire two-dimensional space. Each individual
       filament is relatively small in width but spans a significant portion of the frame in length.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+  background: black
+  gamma: 0.7

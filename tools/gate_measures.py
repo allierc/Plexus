@@ -11,7 +11,7 @@ WHAT IS IN A CORE TRAJECTORY, since every function here is bounded by it:
 
     <set>__pos              [T, buffer, D]      positions, the live prefix given by nF/Nv
     <set>__occ              [T, buffer]         bool
-    <set>__<block>          [T, buffer, width]  every recorded state block (chem, area, cen, ...)
+    <set>__<block>          [T, buffer, width]  every recorded state block (chem, area, centroid, ...)
     <set>__mesh_offsets     [T+1]               HALF-EDGE row offsets
     <set>__mesh_face_offsets[T+1]               FACE row offsets -- a DIFFERENT ragged length
     <set>__mesh_nF/_Nv      [T]
@@ -361,7 +361,7 @@ def topology_ledger(T, **kw):
     return out or [0]
 
 
-def nonfinite_count(T, blocks=("chem", "area", "cen"), vblocks=(), **kw):
+def nonfinite_count(T, blocks=("chem", "area", "centroid"), vblocks=(), **kw):
     """Non-finite entries in `pos`, in the named CELL blocks, and in the named VERTEX blocks.
 
     `vblocks` DEFAULTS TO EMPTY so every gate that already declares this row is unchanged, and
@@ -572,11 +572,11 @@ def polyhedron_volume_closure(T, name="sep", **kw):
         es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
         pos = T.pos(t); nF = T.nF(t)
         a, b = pos + sep, pos - sep
-        cen = np.zeros((nF, 3)); cnt = np.zeros(nF)
-        np.add.at(cen, ef, pos[es]); np.add.at(cnt, ef, 1.0)
-        cen /= np.maximum(cnt, 1.0)[:, None]
+        centroid = np.zeros((nF, 3)); cnt = np.zeros(nF)
+        np.add.at(centroid, ef, pos[es]); np.add.at(cnt, ef, 1.0)
+        centroid /= np.maximum(cnt, 1.0)[:, None]
         v_o = _cell_polyhedron_volume(a, b, es, et, ef, nF, np.zeros((nF, 3)))
-        v_c = _cell_polyhedron_volume(a, b, es, et, ef, nF, cen)
+        v_c = _cell_polyhedron_volume(a, b, es, et, ef, nF, centroid)
         d = np.abs(v_o - v_c) / np.maximum(np.abs(v_c), 1e-12)
         out.append(float(np.nanmax(d)) if d.size else 0.0)
     return out
@@ -626,10 +626,10 @@ def _cap_fan_area(p, es, et, ef, nF):
     into one. The two agree exactly on a planar convex ring, which is why AB-C1 and AB-C2 did not
     notice and a curved shell did.
     """
-    cen = np.zeros((nF, 3)); cnt = np.zeros(nF)
-    np.add.at(cen, ef, p[es]); np.add.at(cnt, ef, 1.0)
-    cen /= np.maximum(cnt, 1.0)[:, None]
-    tri = 0.5 * np.linalg.norm(np.cross(p[es] - cen[ef], p[et] - cen[ef]), axis=1)
+    centroid = np.zeros((nF, 3)); cnt = np.zeros(nF)
+    np.add.at(centroid, ef, p[es]); np.add.at(cnt, ef, 1.0)
+    centroid /= np.maximum(cnt, 1.0)[:, None]
+    tri = 0.5 * np.linalg.norm(np.cross(p[es] - centroid[ef], p[et] - centroid[ef]), axis=1)
     out = np.zeros(nF); np.add.at(out, ef, tri)
     return out
 
@@ -666,10 +666,10 @@ def _cell_geom(T, t, name="sep"):
     es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
     pos = T.pos(t); nF = T.nF(t)
     a, b = pos + sep, pos - sep
-    cen = np.zeros((nF, 3)); cnt = np.zeros(nF)
-    np.add.at(cen, ef, pos[es]); np.add.at(cnt, ef, 1.0)
-    cen /= np.maximum(cnt, 1.0)[:, None]
-    V = _cell_polyhedron_volume(a, b, es, et, ef, nF, cen)
+    centroid = np.zeros((nF, 3)); cnt = np.zeros(nF)
+    np.add.at(centroid, ef, pos[es]); np.add.at(cnt, ef, 1.0)
+    centroid /= np.maximum(cnt, 1.0)[:, None]
+    V = _cell_polyhedron_volume(a, b, es, et, ef, nF, centroid)
     S, _, _ = _cell_polyhedron_surface(a, b, es, et, ef, nF)
     return V, S, _newell_area(pos, es, et, ef, nF), _cell_thickness(sep, es, ef, nF)
 
@@ -830,13 +830,14 @@ def cap_area_ratio_vs_measured_geometry(T, name="sep", **kw):
     and not about the seed.
 
     THE STATISTIC OVER CELLS IS THE MEDIAN, AND THAT IS NOT INTERCHANGEABLE WITH `cap_area_ratio`'s
-    MEAN. Once `sep` is free, a fraction of cells wedge all the way to a basal point -- 25 of 1280
-    on `gate_ab_thickshell`, apical cap 0.51 against basal 0.005 -- and an apical:basal ratio is
-    unbounded as its denominator vanishes, so those cells reach 97 and 567 while the tissue's own
-    ratio is 1.43. The mean of a ratio is not the ratio of the means and for area ratios it is
-    dominated by the smallest denominators: measured on the same row, mean 2.69 and median 1.43
-    against a closed form of 1.4391. The median is 0.65% from the closed form; the mean is 87% away
-    and describes the tail rather than the shell. THE TAIL IS NOT DISCARDED BY THIS CHOICE -- it is
+    MEAN. Once `sep` is free, a fraction of cells wedge all the way to a basal point -- 106 of 1280
+    on `gate_ab_thickshell` at the peak of the transient -- and an apical:basal ratio is unbounded
+    as its denominator vanishes, so the worst of those cells reaches 130 while the tissue's own
+    ratio is 1.41. The mean of a ratio is not the ratio of the means and for area ratios it is
+    dominated by the smallest denominators: measured on that same frame, mean 4.72 and median 1.41
+    against a closed form of 1.5880. The median is 11% from the closed form there and 0.9% from it
+    at the end of the run; the mean is 197% away at the peak and describes the tail rather than the
+    shell, which is the whole difference. THE TAIL IS NOT DISCARDED BY THIS CHOICE -- it is
     graded in its own right by `basal_cap_collapse_fraction`, which exists so that the wedging is a
     declared row rather than something a reducer quietly absorbed. `cap_area_ratio` keeps its mean:
     it is AB-C3, frozen on `gate_ab_sphere`, where `sep` cannot move and there is no tail.
@@ -863,10 +864,12 @@ def basal_cap_collapse_fraction(T, name="sep", frac=0.1, **kw):
     REDUCER. At R5 `sep` becomes a solver outcome for the first time, and on a closed shell under a
     LINEAR surface tension a minority of cells collapse their inner cap almost completely. On
     `gate_ab_thickshell` the fraction rises from 0.0023 on the first recorded row to a peak of
-    0.0781 -- 100 of 1280 cells -- at frame 3, then decays to 0.0297 by frame 20, where the 38
+    0.0828 -- 106 of 1280 cells -- at frame 4, then decays to 0.0297 by frame 20, where the 38
     surviving ones have an apical cap of 0.55 against a basal cap of 0.026, at ordinary thickness
-    and ordinary ring valence. Nothing is degenerate -- `apicobasal_span_invalid_count` is 0, every
-    entry is finite -- so these are bottle cells, formed with no myosin anywhere in the spec.
+    and ordinary ring valence, and reaches exactly zero at frame 45. Nothing is degenerate --
+    `apicobasal_span_invalid_count` is 0, every entry is finite -- so these are bottle cells, formed
+    with no myosin anywhere in the spec, and they are TRANSIENT: over an 80-frame run not one cell
+    of the 1280 finishes wedged.
 
     IT IS A PER-CELL, SCALE-FREE TEST AND NOT A COMPARISON WITH THE POPULATION. `A_basal` against a
     fraction of the population median would move with the tissue and would read differently on a
@@ -1317,12 +1320,12 @@ def mean_cell_diameter(T, **kw):
         live = ef < nF
         a, b, f = np.asarray(es)[live], np.asarray(et)[live], np.asarray(ef)[live]
         # each face's centroid, as the mean of its own half-edge sources
-        cen = np.zeros((nF, 3))
+        centroid = np.zeros((nF, 3))
         cnt = np.zeros(nF)
-        np.add.at(cen, f, p[a])
+        np.add.at(centroid, f, p[a])
         np.add.at(cnt, f, 1.0)
-        cen /= np.maximum(cnt, 1)[:, None]
-        tri = 0.5 * np.linalg.norm(np.cross(p[a] - cen[f], p[b] - cen[f]), axis=1)
+        centroid /= np.maximum(cnt, 1)[:, None]
+        tri = 0.5 * np.linalg.norm(np.cross(p[a] - centroid[f], p[b] - centroid[f]), axis=1)
         area = np.zeros(nF)
         np.add.at(area, f, tri)
         out.append(float(np.sqrt(area.mean())))

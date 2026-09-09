@@ -44,8 +44,6 @@ operators:
   - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
       sigma: 6.0, normalize: none}
 schedule: [neuron_update, neuron_signal, voxelize]
-plotting: {renderer: vtk_points, background: black, point_size: 4.0}
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_assembly:
@@ -85,3 +83,5 @@ descriptions:
       in a roughly diamond-shaped cluster. The dots are uniformly distributed with no apparent connections
       or physical links between them. Each point is of a consistent size and brightness relative to the
       black void.
+
+plotting: {renderer: vtk_points, background: black, point_size: 4.0}

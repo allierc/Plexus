@@ -44,8 +44,6 @@ operators:
   - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
       sigma: 6.0, normalize: none}
 schedule: [neuron_update, neuron_signal, voxelize]
-plotting: {renderer: vtk_points, background: black, point_size: 4.0}
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_assembly:
@@ -87,3 +85,5 @@ descriptions:
       clustered together to form a large, roughly diamond-shaped volume. The particles are distributed
       with varying density, creating a textured, granular appearance. Each individual point is uniform
       in size and color, contrasting sharply against the black background.
+
+plotting: {renderer: vtk_points, background: black, point_size: 4.0}

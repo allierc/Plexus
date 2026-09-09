@@ -18,6 +18,19 @@ operators:
   - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
   - {op: squared_law,  at: particle, law: coulomb, clamp: 1000000.0}
 schedule: [radius_graph, squared_law]
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: A cluster of particles begins in a highly compact, organized spherical arrangement. Over
+      time, the particles begin to move outward from the center, causing the cluster to expand. The expansion
+      becomes increasingly chaotic as the particles spread further into the surrounding space. By the
+      final frame, the cluster has significantly loosened, with many individual particles drifting away
+      from the core.
+    objects: The scene contains a large collection of small, spherical particles. These particles are
+      primarily colored in shades of red, grey, and light blue. They are initially arranged in a dense,
+      interconnected cluster at the center of the frame. As the simulation progresses, the particles maintain
+      their individual shapes but lose their tight spatial connection.
+
 plotting:
   renderer: vtk_points
   background: black
@@ -31,16 +44,3 @@ plotting:
     q_n3: [0.5, 0.5, 0.5]
   splat_size: 2.6
   splat_res: 820
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_particle:
-    description: A cluster of particles begins in a highly compact, organized spherical arrangement. Over
-      time, the particles begin to move outward from the center, causing the cluster to expand. The expansion
-      becomes increasingly chaotic as the particles spread further into the surrounding space. By the
-      final frame, the cluster has significantly loosened, with many individual particles drifting away
-      from the core.
-    objects: The scene contains a large collection of small, spherical particles. These particles are
-      primarily colored in shades of red, grey, and light blue. They are initially arranged in a dense,
-      interconnected cluster at the center of the frame. As the simulation progresses, the particles maintain
-      their individual shapes but lose their tight spatial connection.

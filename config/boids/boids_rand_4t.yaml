@@ -16,12 +16,6 @@ operators:
   - {op: velocity_align,    at: particle, per_type: true }
   - {op: separation,   at: particle}
 schedule: [radius_graph, cohesion, velocity_align, separation]
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab20
-  point_size: 6.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -33,3 +27,9 @@ descriptions:
       The dots are colored in three distinct shades: orange, light blue, and white. Each dot is of a uniform,
       very small size relative to the overall canvas. The dots are arranged in a random, non-connected
       point cloud topology.'
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab20
+  point_size: 6.0

@@ -19,7 +19,7 @@ sets:
       chem:
         width: 2
         integration: first_order
-      cen:
+      centroid:
         width: 3
       area:
         width: 1
@@ -27,7 +27,6 @@ fields: {}
 operators:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 2000
     radius: 5.0
     jitter: 0.18

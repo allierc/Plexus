@@ -56,21 +56,6 @@ schedule:
 - sense
 - bounce
 - glide
-plotting:
-  renderer: vtk_points
-  colors:
-    a:
-    - 0.45
-    - 0.75
-    - 1.0
-  background: black
-  splat_size: 2.4
-  splat_sharpness: 0.85
-  splat_transparency: 0.14
-  splat_fog: 0.5
-  camera_azim: 0.7
-  camera_elev: 0.5
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -90,3 +75,18 @@ descriptions:
     objects: The scene contains a single, large, roughly spherical cluster. It is colored in a uniform
       shade of muted blue. The object has a porous or granular texture, giving it a non-smooth appearance.
       It is isolated in the center of a completely black, featureless background.
+
+plotting:
+  renderer: vtk_points
+  colors:
+    a:
+    - 0.45
+    - 0.75
+    - 1.0
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5

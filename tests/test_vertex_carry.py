@@ -174,12 +174,17 @@ def test_cell_divide_carries_a_declared_array_on_a_real_tissue(tmp_path):
 
     raw = {"general": {"name": "carry_probe", "seed": 0, "n_frames": 1, "dt": 1.0, "dim": 3,
                        "world": [40.0, 40.0, 40.0]},
-           "sets": {"vertex": {"n": 4096, "mesh": "half_edge", "cell_set": "cell"},
-                    "cell": {"n": 1024, "state": {"area": {"width": 1}, "cen": {"width": 3}}}},
+           "sets": {"vertex": {"n": 4096, "mesh": "half_edge"},
+                    "half_edge": {"n": 8192, "maps": {"srce": "vertex", "trgt": "vertex",
+                                                "face": "cell"}},
+                 "cell": {"n": 1024, "state": {"area": {"width": 1}, "centroid": {"width": 3},
+                                                 # laid down by `seed_mesh` on the cell set
+                                                 "Vbirth": {"width": 1, "record": False},
+                                                 "divjit": {"width": 1, "record": False}}}},
            "fields": {},
-           "operators": [{"op": "mesh_seed", "at": "vertex", "before_frame": 1, "cell_set": "cell",
+           "operators": [{"op": "mesh_seed", "at": "vertex", "before_frame": 1,
                           "n_cells": 24, "radius": 5.0, "jitter": 0.18, "p0": 3.5, "seed": 0},
-                         {"op": "cell_divide", "at": "vertex", "cell_set": "cell", "every": 1,
+                         {"op": "cell_divide", "at": "vertex", "every": 1,
                           "factor": 0.0, "p0": 3.5}],
            "schedule": ["mesh_seed", "cell_divide"]}
     path = str(tmp_path / "carry_probe.yaml")

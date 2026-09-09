@@ -12,13 +12,6 @@ operators:
   - {op: velocity_align,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
   - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.001, chirality: 0.0}
 schedule: [radius_graph, velocity_align, velocity_cruise]
-plotting:
-  renderer: mpl2d
-  background: black
-  marker: triangle
-  triangle_size: 0.01
-  colormap: tab10
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -32,3 +25,10 @@ descriptions:
       a flow field. Each individual triangle is uniform in size and color, providing a consistent visual
       representation of the data. The topology of the objects changes as they aggregate into dense regions
       and disperse into more scattered formations.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  colormap: tab10

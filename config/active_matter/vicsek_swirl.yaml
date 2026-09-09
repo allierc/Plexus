@@ -12,13 +12,6 @@ operators:
   - {op: velocity_align,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
   - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.002, chirality: 0.05}
 schedule: [radius_graph, velocity_align, velocity_cruise]
-plotting:
-  renderer: mpl2d
-  background: black
-  marker: triangle
-  triangle_size: 0.01
-  colormap: tab10
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -30,3 +23,10 @@ descriptions:
       These objects are arranged in irregular, swirling clusters that vary in density throughout the space.
       Each triangle is uniform in size and color, appearing as thin outlines. The particles are not connected
       but move collectively to form large-scale structures.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  colormap: tab10

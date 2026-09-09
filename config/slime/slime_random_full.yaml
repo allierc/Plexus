@@ -17,13 +17,6 @@ operators:
 - {op: bounce,  at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -46,3 +39,10 @@ descriptions:
       uniform texture across the field. As time progresses, the objects transition from connected lines
       into smaller, irregular clusters and then into individual dots. The final objects are small, isolated
       teal points that are distributed randomly with significant space between them.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

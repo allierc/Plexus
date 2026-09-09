@@ -8,29 +8,58 @@ general:
   dim: 3
   world: [50.0, 50.0, 50.0]
 
-plotting:
-  renderer: vtk_mesh
-  background: black
-
 sets:
   vertex:
     n: 64
     mesh: half_edge
-    cell_set: cell
     state:
-      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
-      vel: {width: 3, role: rate, integration: second_order_rate, record: false}
-      sep: {width: 3, integration: first_order}
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
   cell:
     n: 8
     state:
-      area: {width: 1}
-      cen:  {width: 3}
-
+      area:
+        width: 1
+      centroid:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+  half_edge:
+    n: 64
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 
 seed:
-  - {op: seed_mesh, model: apicobasal, at: vertex, cell_set: cell,
+  - {op: seed_mesh, model: apicobasal, at: vertex,
      shape: hexagon, n_cells: 1, radius: 1.0, jitter: 0.0, p0: 3.5, seed: 0, h0: 1.0}
 
 operators:
@@ -98,19 +127,23 @@ _gate:
 descriptions:
   movie:
     description: The video shows a single hexagonal cell that remains stationary throughout the sequence.
-      The cell maintains a constant shape and position in the center of the frame. There is no movement
-      or deformation of the geometry over the five frames. The only change is a slight shift in the brightness
-      of the cell's surface.
-    objects: The scene contains a single large hexagonal cell centered in a black void. The cell is composed
-      of two triangles joined at a common diagonal edge. Its color transitions from a light grey in the
-      first frame to a darker grey in the subsequent frames. The size of the hexagon remains constant
-      and occupies a significant portion of the horizontal space.
+      The cell maintains a constant shape and size without any internal movement or deformation. The lighting
+      or shading of the cell appears to remain uniform across all frames. There are no other objects or
+      environmental changes visible in the simulation.
+    objects: The scene contains a single large hexagonal cell centered in the frame. The cell is a solid,
+      light-grey color with a flat, uniform surface. It is composed of six sides of equal length, forming
+      a symmetrical geometric shape. The cell occupies a significant portion of the central area against
+      a solid black background.
   movie_kburns:
-    description: The video shows a 3D hexagonal prism mesh rotating in a 3D space. The mesh starts in
-      a front-facing orientation and rotates clockwise around its vertical axis. As it rotates, the perspective
-      of the hexagonal faces changes, revealing the depth of the prism. The rotation continues until the
-      mesh completes a significant portion of a full turn.
-    objects: The primary object is a single hexagonal prism mesh. It is a solid, three-dimensional geometric
-      shape with six rectangular side faces and two hexagonal bases. The mesh is colored in a light grey
-      or off-white shade against a solid black background. The size of the prism remains constant throughout
-      the duration of the simulation.
+    description: The video shows a 3D hexagonal prism rotating around its vertical axis. The rotation
+      is smooth and continuous, revealing different facets of the geometric shape. The camera remains
+      stationary as the object turns in the center of the frame. The animation concludes after a full
+      rotation, returning the prism to its original orientation.
+    objects: The primary object is a large, three-dimensional hexagonal prism. It is composed of six rectangular
+      side faces and two hexagonal bases. The object is rendered in a solid, light-grey color against
+      a black background. The prism occupies a significant portion of the central frame, maintaining a
+      constant size throughout the sequence.
+
+plotting:
+  renderer: vtk_mesh
+  background: black

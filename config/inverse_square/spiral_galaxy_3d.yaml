@@ -19,13 +19,6 @@ fields: {}
 operators:
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true}
 schedule: [squared_law]
-plotting: {renderer: vtk_points, background: black, colors: {s: [1.0, 1.0, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
-           # camera pitch SWEEP over the movie: 0.0 = top-down/face-on -> 1.35 rad (~77 deg) = almost side/edge-on.
-           # `camera_turns` adds a gentle azimuthal drift so the tilt reads as 3D.
-           camera_azim: 0.7, camera_elev: 0.0, camera_elev_end: 1.35, camera_turns: 0.15,
-           # Ken Burns move: slow push-in (camera_zoom) + slow screen drift (camera_pan [dx, dy], screen fraction).
-           camera_zoom: 0.30, camera_pan: [0.05, 0.03]}
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_star:
@@ -39,3 +32,10 @@ descriptions:
       circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
       irregular cloud with trailing filaments. The size of the individual particles remains constant,
       but the overall volume occupied by the group increases dramatically over time.
+
+plotting: {renderer: vtk_points, background: black, colors: {s: [1.0, 1.0, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
+           # camera pitch SWEEP over the movie: 0.0 = top-down/face-on -> 1.35 rad (~77 deg) = almost side/edge-on.
+           # `camera_turns` adds a gentle azimuthal drift so the tilt reads as 3D.
+           camera_azim: 0.7, camera_elev: 0.0, camera_elev_end: 1.35, camera_turns: 0.15,
+           # Ken Burns move: slow push-in (camera_zoom) + slow screen drift (camera_pan [dx, dy], screen fraction).
+           camera_zoom: 0.30, camera_pan: [0.05, 0.03]}

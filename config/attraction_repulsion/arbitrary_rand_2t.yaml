@@ -11,12 +11,6 @@ operators:
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
 schedule: [radius_graph, attraction_repulsion]
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab10
-  point_size: 2.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -28,3 +22,9 @@ descriptions:
       while the other set is colored blue. The particles are distributed randomly and are not connected
       to one another in any way. Each individual particle is very small and occupies only a few pixels
       in size.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab10
+  point_size: 2.0

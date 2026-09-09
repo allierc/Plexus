@@ -138,14 +138,58 @@ def load(path: str) -> Spec:
     for sname, s in raw["sets"].items():
         types = s.get("types", {})
         if types:
-            total = sum(t["fraction"] for t in types.values())
-            if abs(total - 1.0) > 1e-6:
-                raise ValueError(f"set {sname!r} type fractions sum to {total}, must be 1.0")
+            # TWO WAYS TO SAY THE SAME THING, AND EXACTLY ONE OF THEM PER SET. `fraction` is a
+            # share of the set and `count` is a number of elements; a set may state either, never
+            # both, because two statements of one partition are two chances to disagree and
+            # nothing downstream could tell which was meant. `count` exists because an inventory
+            # -- a cell atlas's 421 plasma-membrane pieces, 77 mitochondria -- is naturally
+            # counted, and writing it as 0.100790 of 4,177 both hides the number and reaches it
+            # only by rounding. Counts are converted to fractions HERE, so every other reader
+            # (`_type_fracs`, the operators, the atlas) is untouched; `_assign_types` then uses
+            # the count itself, so the assignment is exact by construction.
+            n_counted = sum(1 for t in types.values() if "count" in t)
+            n_frac = sum(1 for t in types.values() if "fraction" in t)
+            if n_counted and n_counted != len(types):
+                missing = [k for k, t in types.items() if "count" not in t]
+                raise ValueError(
+                    f"set {sname!r}: {n_counted} of {len(types)} types declare `count:` -- "
+                    f"missing on {missing}. A partition is stated one way for the whole set.")
+            if n_counted and n_frac:
+                both = [k for k, t in types.items() if "count" in t and "fraction" in t]
+                raise ValueError(
+                    f"set {sname!r} types {both} declare BOTH `count:` and `fraction:`. They are "
+                    f"two statements of one partition -- give the count, or give the share.")
+            if n_counted:
+                # `count` is measured against what the set actually holds: `n` for a root set,
+                # `per_parent` for a contained one (the per-parent inventory, which is what
+                # `per_parent` already means).
+                live = s.get("n", s.get("per_parent"))
+                if isinstance(live, dict):
+                    raise ValueError(
+                        f"set {sname!r} uses `count:` on its types and a per-type `per_parent:` "
+                        f"mapping. `count` counts THIS set's elements and the mapping counts its "
+                        f"CHILDREN's -- put the mapping on the child set, where it belongs.")
+                if live is None:
+                    raise ValueError(f"set {sname!r} uses `count:` but declares neither `n:` nor "
+                                     f"`per_parent:`, so there is nothing for the counts to add up to")
+                tot = sum(int(t["count"]) for t in types.values())
+                if tot != int(live):
+                    raise ValueError(
+                        f"set {sname!r} type counts sum to {tot:,}, but the set holds "
+                        f"{int(live):,}. Every element belongs to exactly one type.")
+                for t in types.values():
+                    t["fraction"] = int(t["count"]) / float(live)
+            else:
+                total = sum(t["fraction"] for t in types.values())
+                if abs(total - 1.0) > 1e-6:
+                    raise ValueError(f"set {sname!r} type fractions sum to {total}, must be 1.0")
         # `buffer` is the allocated slot count for a cardinality-changing set
         # (occupancy `occ` marks the live subset). It must hold the initial set.
         buf = s.get("buffer")
         if buf is not None:
             live0 = s.get("n", s.get("per_parent"))
+            if isinstance(live0, dict):
+                live0 = max(int(v) for v in live0.values())   # the largest block a parent may hold
             if live0 is not None and int(buf) < int(live0):
                 raise ValueError(
                     f"set {sname!r} buffer={buf} is smaller than its initial size {live0}; "
@@ -155,13 +199,31 @@ def load(path: str) -> Spec:
         # VALIDATED HERE AND LOUDLY, because the failure mode of not validating is silence: before
         # this, `mesh: half-edge` (a hyphen) or `mesh:` on the wrong set parsed clean, allocated
         # nothing, and the run proceeded with a spec that claimed a topology it did not have.
+        # ---- `mesh:` NAMES A SET NOW, NOT A KIND -------------------------------------------------
+        # It used to name one of `MESH_KINDS` -- the single string "half_edge" -- and the topology
+        # it stood for was declared nowhere: `E_srce`, `E_trgt` and `E_face` were three parallel
+        # arrays on a table hanging off this set, and the CELL those faces are was a second key,
+        # `cell_set:`, repeated as a parameter on every operator that crossed between them.
+        #
+        # A HALF-EDGE IS AN ELEMENT, SO IT IS A SET. plexus2 sec. Hierarchy: a many-to-many relation
+        # needs no new primitive, because a relation IS a set with functions out of it. Every
+        # half-edge has exactly one source vertex, exactly one target vertex and exactly one face --
+        # three functions, so three maps, and the whole mesh is those three plus the sets they land
+        # in. `index_add(0, E_face, ...)` in `face_geometry_3d` is then a declared AGGREGATE along
+        # half_edge -> cell and `pos[E_srce]` a declared BROADCAST along half_edge -> vertex, which
+        # are the two families sec. Hierarchy says are the only ones allowed to cross.
+        #
+        # `cell_set:` RETIRES INTO `maps.face`. The pairing is no longer a key that names a set; it
+        # is the codomain of a declared map, so `edge_flip` cannot renumber a set the spec never
+        # said it touches, and no operator has to be told a relation the mesh already states.
+        #
+        # WHY THE MAPS ARE NOT `pre`/`post`. An edge-set is built from a STATIC `edges:` list or an
+        # npz -- the connectome is given and does not change. A half-edge table is rewritten by
+        # every division and every T1, so its maps are OWNED BY THE TOPOLOGY OPERATORS, and its `n:`
+        # is a capacity rather than a count. Same idea, different lifetime; sharing the `pre`/`post`
+        # keys would have hidden that.
         mk = s.get("mesh")
         if mk is not None:
-            from plexus.models.mesh import MESH_KINDS
-            if mk not in MESH_KINDS:
-                raise ValueError(
-                    f"set {sname!r}: mesh {mk!r} is not a known mesh kind "
-                    f"(expected one of: {', '.join(MESH_KINDS)})")
             if s.get("pre") is not None or s.get("post") is not None:
                 raise ValueError(
                     f"set {sname!r} declares `mesh:` and is an EDGE-SET (it has pre/post). An "
@@ -171,47 +233,54 @@ def load(path: str) -> Spec:
                     f"set {sname!r} declares `mesh: {mk}` but the model is "
                     f"{raw.get('general', {}).get('dim')}D -- every mesh operator declares "
                     f"SUPPORTED_DIMS = [3].")
-            # THE FACE<->CELL PAIRING IS DECLARED NOWHERE TODAY. A face of the mesh IS a cell, and
-            # every operator that crosses between them takes the cell set as an OPERATOR PARAMETER
-            # (`mesh_ops` twice, `edge_flip` falling back to the literal string "cell"). So the
-            # pairing is repeated per operator, defaulted in one place, and stated in none -- which
-            # is how `edge_flip` came to renumber a set it never declared it needed.
-            #
-            # AND `cell_set:` IS A STAND-IN FOR A MAP THIS SPEC CANNOT YET DECLARE. The paper names
-            # three (`parent` for containment, `pre`/`post` for incidence); this is none of them.
-            # It is a BIJECTION between the cell set's rows and the mesh's FACES, which are not a
-            # set at all but a table derived from E_srce/E_trgt/E_face.
-            #
-            # It is not `parent` because pi has to be a FUNCTION, and vertex -> cell is not one: on
-            # a trivalent mesh a vertex belongs to three cells. That is the whole reason the mesh
-            # took a different route from the hierarchy.
-            #
-            # THE ROUTE IT SHOULD EVENTUALLY TAKE NEEDS NO NEW PRIMITIVE, and plexus2.tex sec.
-            # Hierarchy now says so: a many-to-many relation IS a set with two functions out of it,
-            # and the half-edge table is that set -- every half-edge has exactly one source vertex
-            # and exactly one face. The mesh code already runs the two cross-level families without
-            # declaring them: `index_add(0, ef, ...)` in `face_geometry_3d` is Aggregate along
-            # half_edge -> cell, and `pos[es]` is Broadcast along half_edge -> vertex. Declaring a
-            # `half_edge` set with both legs would retire this key entirely.
-            #
-            # NOT DONE HERE, deliberately: it changes the topological master of every mesh spec in
-            # the repo, so it needs its own gate rung with a byte-identical twin, and the
-            # `cell_complex` promotion moves the target (there nF != nC and the bijection below
-            # stops holding). Designing it now would design it against a mesh already scheduled for
-            # replacement.
-            cs = s.get("cell_set")
-            if cs is None:
+            if mk not in raw["sets"]:
                 raise ValueError(
-                    f"set {sname!r} declares `mesh: {mk}` but no `cell_set:`. A face of the mesh "
-                    f"IS a cell, and the pairing must be declared once here rather than repeated "
-                    f"as a parameter on every operator that crosses between them.")
-            if cs == sname:
+                    f"set {sname!r} declares `mesh: {mk}`, which is not a set in this spec "
+                    f"(have: {', '.join(sorted(raw['sets']))}). `mesh:` names the half-edge SET "
+                    f"whose `maps:` say what the topology is; it is no longer a kind.")
+            if s.get("cell_set") is not None:
                 raise ValueError(
-                    f"set {sname!r} declares `cell_set: {cs}` -- itself. The mesh lives on the "
-                    f"VERTEX set and its faces are the CELL set; they are two different sets.")
-            if cs not in raw["sets"]:
-                raise ValueError(f"set {sname!r} declares `cell_set: {cs}`, which is not a set in "
-                                 f"this spec (have: {', '.join(sorted(raw['sets']))})")
+                    f"set {sname!r} still declares `cell_set: {s['cell_set']}`. That key retired: "
+                    f"a face of the mesh IS a cell, and the pairing is now `maps.face` on the "
+                    f"{mk!r} set. Delete it from here and from every operator line.")
+            hs = raw["sets"][mk]
+            for role in ("srce", "trgt", "face"):
+                if role not in (hs.get("maps") or {}):
+                    raise ValueError(
+                        f"set {mk!r} is used as {sname!r}'s mesh but declares no `maps.{role}:`. A "
+                        f"half-edge has exactly one source vertex, one target vertex and one face; "
+                        f"all three are functions out of it and all three must be declared.")
+
+        # ---- `maps:` -- named functions OUT of this set, one row to one row of the codomain -------
+        mp = s.get("maps")
+        if mp is not None:
+            if not isinstance(mp, dict) or not mp:
+                raise ValueError(f"set {sname!r}: `maps:` must be a mapping of role -> set name")
+            for role, tgt in mp.items():
+                if tgt not in raw["sets"]:
+                    raise ValueError(
+                        f"set {sname!r} map {role!r} lands in {tgt!r}, which is not a set in this "
+                        f"spec (have: {', '.join(sorted(raw['sets']))})")
+                if tgt == sname:
+                    raise ValueError(
+                        f"set {sname!r} map {role!r} lands in itself. A map goes OUT of a set.")
+            if s.get("pre") is not None or s.get("post") is not None:
+                raise ValueError(
+                    f"set {sname!r} declares both `maps:` and `pre`/`post`. They are the same idea "
+                    f"with different lifetimes -- pre/post are a static edge list, `maps` are "
+                    f"owned by the topology operators -- so a set has one or the other.")
+
+        # `entity:` -- WHICH REGISTERED KIND PROVIDES THIS SET'S STATE, when the set's own name is
+        # not that kind. Validated here because the failure is otherwise silent and late: an
+        # unregistered name falls back to the pos/vel default, no `provision` runs, and an MPM set
+        # dies several hundred lines later on a missing `F`.
+        ent = s.get("entity")
+        if ent is not None:
+            from plexus.models.registry import _ENTITY_REGISTRY
+            if ent not in _ENTITY_REGISTRY:
+                raise ValueError(
+                    f"set {sname!r} declares `entity: {ent}`, which is not a registered entity "
+                    f"(have: {', '.join(sorted(_ENTITY_REGISTRY))})")
 
         # optional `state:` block -- the set's StateSchema (the fifth primitive). Absent =>
         # the spatial pos/vel default. Each entry is a width (int) or {width, integration,
@@ -432,7 +501,9 @@ def load(path: str) -> Spec:
     # be false where it used to be the only notice anyone got.
     # `bulk_modulus` is read by mpm_scatter via TYPE_PROP_ALTERNATIVES rather than by name, so the
     # used_props scan does not see it and it would be reported as read by no operator.
-    _KNOWN_TYPE_KEYS = {"fraction", "core", "layers", "block",
+    # `count` is consumed by the schema itself (converted to `fraction` above) and by
+    # `_assign_types`, not by an operator, so it joins the keys the typo guard already knows.
+    _KNOWN_TYPE_KEYS = {"fraction", "count", "core", "layers", "block",
                         "material", "density", "tau", "bulk_modulus", "shape",
                         "eta"} | used_props          # per-type dynamic viscosity (mpm_viscosity)
     for sname, s in raw["sets"].items():

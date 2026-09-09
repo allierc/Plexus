@@ -25,12 +25,6 @@ operators:
 
 schedule: [radius_graph, attraction_repulsion]
 
-plotting:
-  renderer: mpl2d
-  background: black
-  colormap: tab10
-  point_size: 4.0
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
@@ -43,3 +37,9 @@ descriptions:
       frame. These particles are primarily colored in shades of blue, orange, and green. They are arranged
       in a sparse, non-connected distribution with no clear geometric patterns or clusters. Each individual
       particle is uniform in size and maintains a consistent appearance across all time steps.
+
+plotting:
+  renderer: mpl2d
+  background: black
+  colormap: tab10
+  point_size: 4.0

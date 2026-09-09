@@ -94,6 +94,151 @@ def _carry_face_state(m, keep, dt, dev):
         m[nm] = a.to(dev)[idx.clamp(max=max(a.shape[0] - 1, 0))].to(dt)
 
 
+def _as_np(v, dtype=np.float64):
+    """A per-cell array as numpy, whether it arrived as a tensor or was already an array."""
+    if v is None:
+        return None
+    if hasattr(v, "detach"):
+        return v.detach().cpu().numpy().astype(dtype)
+    return np.asarray(v, dtype).copy()
+
+
+def resolve_cell_set(H, at, override=None):
+    """The set this mesh's faces ARE -- read from the mesh's own declaration, not from a parameter.
+
+    DECLARED ONCE, ON THE SET. `sets.<vertex set>.cell_set:` is where the pairing lives, `schema.py`
+    refuses a `mesh:` without it, and `engine._attach_mesh` records it as `Level.mesh_cell_set`.
+    Every operator that crosses between the two then took the SAME pairing again as its own
+    `cell_set:` parameter -- 67 lines across the 21 specs in `config/tissue`, all of them the word
+    `cell` -- and defaulted it to the literal `"cell"` when absent. That is a relation stated in one
+    place and re-stated in sixty-seven, and the schema's own message already says which is right:
+    the pairing "must be declared once here rather than repeated as a parameter on every operator
+    that crosses between them".
+
+    TWO THINGS THE REPETITION COST, both already recorded in this tree. `edge_flip` fell back to the
+    literal `"cell"` and so renumbered a set it never declared it needed. And `cell_divide`
+    defaulted to `None` rather than to `"cell"` -- alone among the readers -- so on a divide line
+    the parameter was LOAD-BEARING: omit it and the daughters silently stop inheriting their
+    mother's cell state, with nothing to say so.
+
+    `override` keeps a spec that still passes `cell_set:` working; no spec in `config/tissue` takes
+    that path any more.
+    """
+    if override is not None:
+        return override
+    lvl = H.level(at) if at in getattr(H, "levels", {}) else None
+    cs = getattr(lvl, "mesh_cell_set", None) if lvl is not None else None
+    if cs is None:
+        raise KeyError(
+            f"no cell set for {at!r}: declare `cell_set:` on that set, beside its `mesh:`. A face "
+            f"of the mesh IS a cell, and this operator crosses between the two.")
+    return cs
+
+
+def cell_block(H, cat, name, nF):
+    """The first `nF` rows of a DECLARED width-1 block on the cell set, as float64. None if absent.
+
+    THE OTHER HOME FOR PER-CELL STATE, AND THE ONE plexus2 ACTUALLY DESCRIBES. Two stores have
+    grown up side by side: `chem`, `area` and `centroid` are declared blocks on the `cell` SET, permuted
+    by `Hierarchy.renumber_set`; `A0`, `V0f`, `age`, `phase` and the rest are columns on the mesh
+    table of the `vertex` set, permuted by `MeshTable.reindex_faces` through `m["face_carry"]`. They
+    hold the same kind of quantity -- one number per cell -- and the paper knows about only one of
+    them. An operator whose output is not declared state cannot emit a delta, which is why every
+    writer of the second store had to register `kind="structural"`; the two facts are one fact.
+
+    THE THREE TOPOLOGY PATHS ALREADY AGREE, which is what makes moving a column safe rather than a
+    rewrite. `cell_die` calls `reindex_faces(keep)` and `renumber_set(cat, keep, nF2)` with THE SAME
+    `keep`; `edge_flip` does the same after a face drop; `cell_divide` reindexes the face columns by
+    `keep` and copies the mother's whole cell-set row onto each daughter (`cst[nF + i] =
+    cst[mother]`), which is the same semantics `reindex_faces` gives -- the parent's value on both
+    daughters, so what moves must be INTENSIVE, exactly as before. A column therefore lands in the
+    same place either way, and the byte-identity harness is what says so rather than this comment.
+
+    RETURNS None RATHER THAN RAISING when the block is not declared, because the caller is better
+    placed to say what the spec is missing: `cell_cycle` names the three blocks and the set in one
+    message. A silent zero here would be the defect this move exists to remove.
+    """
+    lvl = H.level(cat) if cat else None
+    if lvl is None or getattr(lvl, "state", None) is None or name not in lvl.state_schema:
+        return None
+    return lvl.get(name)[:nF, 0].detach().cpu().numpy().astype(np.float64)
+
+
+def set_cell_block(H, cat, name, values, nF):
+    """Write `values` (length nF) into the first nF rows of a declared width-1 cell block.
+
+    IN PLACE, ON THE VIEW `Level.get` RETURNS, which is a slice of the set's `state`. That is
+    writing integrated state from an operator and it is why `cell_cycle` is still `kind:
+    structural` after this rung -- S4 turns the phase into a continuous progress variable that can
+    be emitted as a delta, and only then does the write go away. Moving the STORE and changing the
+    KIND are two separate claims and this rung makes only the first.
+    """
+    lvl = H.level(cat)
+    col = lvl.get(name)
+    col[:nF, 0] = torch.as_tensor(np.asarray(values), dtype=lvl.state.dtype,
+                                  device=lvl.state.device)
+
+
+def cell_block_t(H, cat, name, nF):
+    """The live rows of a declared width-1 cell block AS A TENSOR, in the set's own dtype.
+
+    THE FLOAT64 ROUND-TRIP IN `cell_block` IS NOT FREE. That one returns float64 numpy because its
+    first callers already worked in numpy and compared against thresholds coarse enough not to
+    care. The energy's targets are not like that: `A0`, `P0` and `V0f` go straight into
+    `cell_mechanics`, which turns them into vertex positions, and `edge_flip` reconnects on an
+    edge-length comparison -- so a single mantissa bit moves one flip and the run diverges from
+    there. Staying in the state tensor's dtype is what makes moving these arrays a MOVE, testable
+    by byte-identity, rather than a change that merely looks like one.
+    """
+    lvl = H.level(cat) if cat else None
+    if lvl is None or getattr(lvl, "state", None) is None or name not in lvl.state_schema:
+        return None
+    return lvl.get(name)[:nF, 0]
+
+
+def set_cell_block_t(H, cat, name, values, nF):
+    """Write a tensor into the first nF rows of a declared width-1 cell block, no dtype detour."""
+    lvl = H.level(cat)
+    v = values if torch.is_tensor(values) else torch.as_tensor(np.asarray(values))
+    lvl.get(name)[:nF, 0] = v.to(dtype=lvl.state.dtype, device=lvl.state.device)
+
+
+def require_cell_block(H, cat, name, nF, who):
+    """`cell_block`, but a missing declaration is an error naming the spec line that fixes it.
+
+    THE DIFFERENCE BETWEEN A REFUSAL AND A SILENT ZERO is the whole reason per-cell state is being
+    moved onto the set. A mesh table is an open namespace: `m.get("Vbirth")` on a run that never
+    seeded it returns None, and every reader of it grew its own fallback -- `divjit`'s was a
+    fixed-seed draw, which means a spec missing its seed still ran, still divided, and staggered its
+    divisions with a jitter nobody asked for. A declared block cannot be missing by accident; it can
+    only be missing from the spec, and then this says so.
+    """
+    a = cell_block(H, cat, name, nF)
+    if a is None:
+        raise KeyError(
+            f"{who} needs the set {cat!r} to declare the width-1 block {name!r}. Add it under "
+            f"`sets.{cat}.state` as `{name}: {{width: 1, record: false}}`. It is per-cell state, "
+            f"so it belongs to the set whose members are cells -- where the topology operators "
+            f"renumber it without having to know its name.")
+    return a
+
+
+def _seed_cell_blocks(H, cat, nF, dt, dev, **arrays):
+    """Write a seed operator's per-cell arrays into declared blocks on the cell set.
+
+    SEEDING IS WHERE THE DECLARATION HAS TO BE CHECKED, because it is the first write and the only
+    one that happens before frame 0. A spec that forgot the block would otherwise reach its first
+    `cell_divide` -- possibly hundreds of frames later, possibly in a run left overnight -- before
+    anything noticed.
+    """
+    for k, v in arrays.items():
+        if cell_block(H, cat, k, nF) is None:
+            raise KeyError(
+                f"seed_mesh writes the per-cell block {k!r}, which the set {cat!r} does not "
+                f"declare. Add `{k}: {{width: 1, record: false}}` under `sets.{cat}.state`.")
+        set_cell_block(H, cat, k, np.asarray(v, np.float64), nF)
+
+
 def fib_sphere(n, r=1.0):
     i = np.arange(n) + 0.5
     phi = np.arccos(1 - 2 * i / n); theta = np.pi * (1 + 5 ** 0.5) * i
@@ -153,6 +298,106 @@ def build_hexagon_mesh(n=1, r=1.0, jitter=0.0, seed=0):
     es = np.arange(6, dtype=np.int64)
     et = (np.arange(6, dtype=np.int64) + 1) % 6
     return verts, es, et, np.zeros(6, np.int64), 1
+
+
+def build_prism_mesh(n, r=1.0, jitter=0.0, seed=0, height=None):
+    """ONE apico-basal cell as a closed surface: an apical cap, a basal cap, and n lateral walls.
+
+    Returns the same four things every builder here returns -- vertices [Nv,3], E_srce/E_trgt/E_face,
+    nF -- so it drops into `seed_mesh` beside the sphere and the disc, and everything downstream
+    (mesh_contact, the renderer, the geometry operators) works on it unchanged.
+
+    WHY A PRISM AND NOT A MID-SURFACE WITH `sep`. Plexus's apico-basal representation is a mid-
+    surface mesh plus a per-vertex half-separation, with apical at `pos + sep`, basal at `pos - sep`
+    and the lateral walls REBUILT on every call rather than stored. That is the right representation
+    to compute with and the wrong one to DRAW or to put material inside: a single cell in it is one
+    polygon, which renders as a flat disc and encloses nothing. This builder emits the surface that
+    polygon stands for -- the apical ring at +h/2, the basal ring at -h/2, one quad per side -- so a
+    single cell is a closed, orientable, star-shaped surface with an inside.
+
+        Nv = 2n     nF = n + 2       nH = 2n (the two caps) + 4n (the walls) = 6n
+        V - E + F = 2n - 3n + (n + 2) = 2, as a closed surface must be
+
+    `n` is the number of SIDES, `r` the circumradius of the caps and `height` their separation --
+    the cell's own apico-basal axis, along y, which is the up axis everywhere in this library.
+
+    Reference: the prism is the cell of Okuda, S. et al. (2013), Biomech. Model. Mechanobiol.
+    12:627-644, drawn rather than integrated.
+    """
+    n = max(3, int(n))
+    h = float(height if height is not None else 2.0 * r)
+    g = np.random.default_rng(seed)
+    th = 2.0 * np.pi * np.arange(n) / n
+    rr = r * (1.0 + jitter * (g.random(n) - 0.5))
+    apical = np.stack([rr * np.cos(th), np.full(n, 0.5 * h), rr * np.sin(th)], 1)
+    basal = np.stack([rr * np.cos(th), np.full(n, -0.5 * h), rr * np.sin(th)], 1)
+    V = np.concatenate([apical, basal], 0)
+    rings = [list(range(n)), list(range(2 * n - 1, n - 1, -1))]          # the two caps
+    for k in range(n):                                                   # one wall per side
+        k1 = (k + 1) % n
+        rings.append([k, k1, n + k1, n + k])
+    # ORIENTED CCW SEEN FROM OUTSIDE, by the same Newell test `build_sphere_mesh` uses: a face whose
+    # normal points back toward the body is reversed. That is what makes every directed edge appear
+    # exactly once, which the topology operators and `mesh_contact`'s star-shape both rely on.
+    c = V.mean(0)
+    for i, rr_ in enumerate(rings):
+        P = V[rr_]
+        N = np.cross(P - c, np.roll(P, -1, 0) - c).sum(0)
+        if float(np.dot(N, P.mean(0) - c)) < 0:
+            rings[i] = rr_[::-1]
+    es, et, ef = [], [], []
+    for f, rr_ in enumerate(rings):
+        k = len(rr_)
+        for i in range(k):
+            es.append(int(rr_[i])); et.append(int(rr_[(i + 1) % k])); ef.append(f)
+    return (V.astype(np.float64), np.array(es, np.int64), np.array(et, np.int64),
+            np.array(ef, np.int64), len(rings))
+
+
+def build_prisms_mesh(n, r=1.0, jitter=0.0, seed=0, height=None):
+    """`n` ADJACENT apico-basal cells: hexagonal prisms on the lattice that tiles the plane.
+
+    The single-cell `build_prism_mesh` repeated over the first `n` sites of a hexagonal lattice,
+    which is the packing an epithelium actually has -- flat-top hexagons of circumradius `r` sit at
+    a centre-to-centre distance of sqrt(3) r, so neighbouring cells share a full wall rather than
+    touching along a line. Each cell is its OWN closed surface: the shared wall is two coincident
+    faces, one belonging to each cell.
+
+    THAT IS DELIBERATE AND IT IS THE DIFFERENCE FROM `seed_mesh[apicobasal]`. A tissue in the
+    apico-basal representation is ONE mid-surface whose faces are the cells, so a wall is a single
+    face and the cells cannot be separated. Here each cell is a closed volume of its own, which is
+    what is needed to put material INSIDE one -- a containment map wants a cell to have an inside,
+    and a shared wall would make "which cell is this point in" ambiguous exactly at the wall.
+
+        per cell   Nv = 2m,  nF = m + 2,  nH = 6m       (m = 6 sides)
+        n cells    the same, n times, with no shared vertices
+
+    Reference: Honda, H. (1978). J. Theor. Biol. 72:523-543 (the hexagonal packing of an
+    epithelium); the prism itself is Okuda, S. et al. (2013), Biomech. Model. Mechanobiol.
+    12:627-644.
+    """
+    n = max(1, int(n))
+    m = 6
+    d = float(np.sqrt(3.0)) * float(r)                       # centre-to-centre of adjacent hexagons
+    # THE ORDER OF THE SITES IS A PICTURE DECISION AND NOTHING ELSE. A compact rhombus is the
+    # tightest packing and the worst thing to look at: two of its four cells sit directly behind the
+    # other two in any axis-aligned view, so a four-cell patch renders as two. This walk spreads the
+    # first few sites across the plane while keeping every one of them adjacent to the previous.
+    ax = [(0, 0), (1, 0), (1, -1), (2, -1), (0, 1), (-1, 1), (-1, 0), (0, -1),
+          (2, 0), (1, 1), (0, 2), (-1, 2), (-2, 2), (-2, 1), (-2, 0)]
+    if n > len(ax):
+        raise ValueError(f"build_prisms_mesh: {n} cells asked for, {len(ax)} lattice sites known")
+    centres = [(d * (q + 0.5 * rr), 0.0, d * float(np.sqrt(3.0)) / 2.0 * rr)
+               for q, rr in ax[:n]]
+    Vs, ess, ets, efs = [], [], [], []
+    nv0, nf0 = 0, 0
+    for cx, cy, cz in centres:
+        V, es, et, ef, nF = build_prism_mesh(m, r, jitter, seed, height=height)
+        Vs.append(V + np.array([cx, cy, cz], V.dtype))
+        ess.append(es + nv0); ets.append(et + nv0); efs.append(ef + nf0)
+        nv0 += V.shape[0]; nf0 += nF
+    return (np.concatenate(Vs, 0), np.concatenate(ess), np.concatenate(ets),
+            np.concatenate(efs), nf0)
 
 
 def build_disc_mesh(n, r=1.0, jitter=0.0, seed=0):
@@ -345,9 +590,9 @@ def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
     area = N.norm(dim=-1)
     perim = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, length)
     cnt = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, w)
-    cen = torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, sw) / cnt.clamp(min=1)[:, None]
-    vf = (1.0 / 3.0) * (cen * N).sum(dim=-1)                 # per-cell wedge volume (sum = lumen volume)
-    return area, perim, cen, vf
+    centroid = torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, sw) / cnt.clamp(min=1)[:, None]
+    vf = (1.0 / 3.0) * (centroid * N).sum(dim=-1)                 # per-cell wedge volume (sum = lumen volume)
+    return area, perim, centroid, vf
 
 
 def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R, Lam, Gam,
@@ -356,7 +601,7 @@ def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_
     change, so it compiles once even under division). Dead slots are masked out: `alive` (faces),
     `eocc` (half-edges), `vocc` (vertices, for the radial term). R0 is a tensor (changes each frame);
     the K_* / Lam / Gam coefficients are compile-time constants."""
-    area, perim, cen, vf = face_geometry_3d(pos, es, et, ef, nF, eocc)
+    area, perim, centroid, vf = face_geometry_3d(pos, es, et, ef, nF, eocc)
     E = (K_A * (area - A0) ** 2 + K_P * (perim - P0) ** 2 + 0.5 * Gam * perim ** 2) * alive
     line = (pos[et] - pos[es]).norm(dim=-1) * eocc          # line tension over live half-edges only
     # PER-JUNCTION MYOSIN, when a junction operator has supplied it. `Lam` alone is one number for the
@@ -529,12 +774,19 @@ class SeedMesh3D(Structural):
         # `build_hexagon_mesh`. It is a value for the same reason `disc` is -- the same hypothesis
         # about the tissue, seeded into a geometry chosen so a closed form is reachable.
         self.shape = str(params.get("shape", "sphere")).lower()
+        # THE APICO-BASAL AXIS OF A `prism`: the separation between its apical and its basal cap, in
+        # world units. Unset, a prism is as tall as it is wide -- which is a cuboidal cell, not a
+        # claim that height does not matter.
+        self.height = params.get("height")
+        if self.height is not None:
+            self.height = float(self.height)
         # `plane`, `ribbon` and `moebius` are three more VALUES on the same axis, for the reason
         # `disc` is one: the same hypothesis about the tissue, seeded into a different geometry.
         # See `build_strip_mesh` -- and note that `moebius` is the one seed on which "apical" is not
         # globally definable, which is what makes it a test rather than a picture.
         self.strip_width = float(params.get("width", 0.5))
-        if self.shape not in ("sphere", "disc", "hexagon", "plane", "ribbon", "moebius"):
+        if self.shape not in ("sphere", "disc", "hexagon", "plane", "ribbon", "moebius",
+                              "prism", "prisms"):
             raise ValueError(f"mesh_seed: shape must be 'sphere', 'disc', 'hexagon', 'plane', "
                              f"'ribbon' or 'moebius', "
                              f"got {self.shape!r}")
@@ -545,7 +797,7 @@ class SeedMesh3D(Structural):
         # the shell at the equator of the axis named, tiling the declared `fraction`s along it, at
         # the moment the faces first have centroids.
         self.type_layout = str(params.get("type_layout", "random")).lower()
-        self.cell_set = params.get("cell_set", "cell")
+        self._cat = params.get("cell_set")          # override only; the SET declares the pairing
         # THE PREFERRED AREA, SET APART FROM THE GEOMETRY. `A0` was always `mean(area)` of the mesh
         # just built, so every run started exactly at its target and the ONLY direction it could go
         # was down, under whatever line tension the mechanics carried: a sweep of six specs that all
@@ -559,6 +811,7 @@ class SeedMesh3D(Structural):
         # and the paper's own words become the gate: a tissue "free to expand so that its total area
         # was larger by a factor g" must settle at A = g x its seeded area.
         self.a0_scale = float(params.get("a0_scale", 1.0))
+        self.v0_uniform = bool(params.get("v0_uniform", False))   # one target volume for every cell
         if self.a0_scale <= 0:
             raise ValueError(f"mesh_seed: a0_scale must be > 0, got {self.a0_scale}")
         self.vseed_cv = float(params.get("vseed_cv", 0.0))       # STOCHASTIC VOLUME SEED: per-cell random cell-cycle
@@ -581,14 +834,20 @@ class SeedMesh3D(Structural):
         self.age_seed = float(params.get("age_seed", 0.0))
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cell_set = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         lvl = H.level(self.at); dev = lvl.state.device; dt = lvl.state.dtype
         if self.shape in ("plane", "ribbon", "moebius"):
             verts, es, et, ef, nF = build_strip_mesh(self.n, self.R, self.jitter, self.seed,
                                                      kind=self.shape, width=self.strip_width)
         else:
             _build = {"sphere": build_sphere_mesh, "disc": build_disc_mesh,
-                      "hexagon": build_hexagon_mesh}[self.shape]
-            verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
+                      "hexagon": build_hexagon_mesh,
+                      "prism": build_prism_mesh,
+                      "prisms": build_prisms_mesh}[self.shape]
+            _kw = {"height": self.height} if (self.shape in ("prism", "prisms")
+                                              and self.height is not None) else {}
+            verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed, **_kw)
         Nv = verts.shape[0]; Nbuf = lvl.state.shape[0]
         if Nv > Nbuf:
             raise ValueError(f"sphere mesh has {Nv} vertices but buffer n={Nbuf}")
@@ -601,7 +860,7 @@ class SeedMesh3D(Structural):
             occ = torch.zeros(Nbuf, device=dev); occ[:Nv] = 1.0; lvl.occ = occ
         est = torch.as_tensor(es, device=dev); ett = torch.as_tensor(et, device=dev)
         eft = torch.as_tensor(ef, device=dev)
-        area, perim, cen, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
+        area, perim, centroid, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
         A_seed = float(area.mean())
         A0 = A_seed * self.a0_scale; P0 = self.p0 * (A0 ** 0.5)
         if self.a0_scale != 1.0:
@@ -642,7 +901,7 @@ class SeedMesh3D(Structural):
                 print(f"[mesh_seed] type_layout={self.type_layout} ignored: set "
                       f"{self.cell_set!r} declares fewer than two types", flush=True)
             else:
-                order = torch.argsort(cen[:, _ax])              # faces, sorted along the axis
+                order = torch.argsort(centroid[:, _ax])              # faces, sorted along the axis
                 nt = torch.zeros(int(_cl.n), dtype=torch.long, device=dev)
                 cuts = (torch.cumsum(_fr / _fr.sum(), 0) * nF).round().long().tolist()
                 lo = 0
@@ -659,7 +918,6 @@ class SeedMesh3D(Structural):
                          A0=torch.full((nF,), A0, dtype=dt, device=dev),
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
-                         divjit=torch.as_tensor(dj, dtype=dt, device=dev),   # per-cell division-threshold multiplier
                          age=torch.as_tensor(ag, dtype=dt, device=dev),      # per-cell cell-cycle PHASE at t=0
                          # THE VOLUME AND RADIUS TARGETS FOLLOW `a0_scale`, on the isotropic rescale
                          # it implies: a preferred AREA g times larger is a preferred LENGTH sqrt(g)
@@ -669,8 +927,17 @@ class SeedMesh3D(Structural):
                          # constraint the paper's 2D model does not even have. `Vbirth` follows V0f
                          # for the same reason: a cell must still divide at twice its OWN target,
                          # not at twice a volume it was never meant to hold.
-                         V0f=vf.detach().clone() * self.a0_scale ** 1.5,   # PER-CELL target wedge volume (v_eq per cell)
-                         Vbirth=vf.detach().clone() * self.a0_scale ** 1.5,   # volume at birth -> cell divides when it doubles
+                         # `v0_uniform` -- EVERY CELL ASKS FOR THE SAME VOLUME, which is the
+                         # control this seed could not express. `A0` and `P0` are already scalars
+                         # here (`torch.full`), so the target AREA is uniform and only the target
+                         # VOLUME is per-cell, taken from each cell's own seeded wedge. That
+                         # asymmetry is invisible until you want to ask whether the mechanics
+                         # equalises cell volume on its own: with per-cell targets it cannot, because
+                         # every cell is already at the size it was asked for, and the answer would
+                         # be about the seed rather than about the energy. Setting them all to the
+                         # MEDIAN makes the question well posed.
+                         V0f=(torch.full_like(vf, float(vf.median())) if self.v0_uniform
+                              else vf.detach().clone()) * self.a0_scale ** 1.5,
                          V0=float(vf.sum()) * self.a0_scale ** 1.5,
                          v_ref=float(vf.median()) * self.a0_scale ** 1.5,   # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
                          #   morphogen growth caps v_eq at (4/3)v_ref, cells cycle in [2/3,4/3]v_ref centred on v_ref
@@ -681,6 +948,16 @@ class SeedMesh3D(Structural):
             m.clear(); m.update(seeded)          # the engine's table, filled in place
         else:
             lvl._mesh = MeshTable(**seeded)      # spec has no `mesh:` declaration yet
+        # THE PER-CELL BLOCKS GO ON THE CELL SET, not into `seeded`. `Vbirth` is the volume this
+        # cell was born holding and `divjit` its personal multiplier on the division threshold;
+        # both are one number per cell, so plexus2 puts them on the set whose members are cells,
+        # where `Hierarchy.renumber_set` carries them through every topology edit without any
+        # operator naming them. A spec that declares neither gets a clear refusal rather than a
+        # silent zero -- which is what the mesh table gave, and what `divjit`'s fixed-seed fallback
+        # was papering over.
+        _seed_cell_blocks(H, self.cell_set, nF, dt, dev,
+                          Vbirth=vf.detach().cpu().numpy() * self.a0_scale ** 1.5,
+                          divjit=np.asarray(dj, np.float64))
         return {}
 
 
@@ -723,6 +1000,12 @@ class SeedMeshApicoBasal(SeedMesh3D):
         super().__init__(params, device)
         self.h0 = float(params.get("h0", 0.4))                 # FULL thickness; sep is h0/2
         self.sep_block = str(params.get("sep_block", "sep"))
+        # WHICH VOLUME THE CELL'S TARGET IS EXPRESSED IN -- see the block at the end of `forward`.
+        # `wedge` is the default and is what every archived apicobasal run used.
+        self.v0_from = str(params.get("v0_from", "wedge")).lower()
+        if self.v0_from not in ("wedge", "polyhedron"):
+            raise ValueError(f"seed_mesh[apicobasal]: v0_from must be wedge|polyhedron, "
+                             f"not {self.v0_from!r}")
 
     def forward(self, H, mask=None):
         out = super().forward(H, mask)                         # pos, occ and the mesh table
@@ -776,6 +1059,45 @@ class SeedMeshApicoBasal(SeedMesh3D):
         print(f"[seed_mesh:apicobasal] {Nv} vertices carry an apico-basal separation of "
               f"h0/2 = {0.5 * self.h0:g} along the vertex normal (cell thickness {self.h0:g})",
               flush=True)
+        # `v0_from: polyhedron` -- SEED THE TARGET IN THE CONVENTION THE ENERGY MEASURES.
+        #
+        # THE DEFECT IT REMOVES. The parent seeds `V0f` and `v_ref` from `face_geometry_3d`'s WEDGE
+        # volume -- a sum of origin-referenced cones over the mid-surface ring -- because that is
+        # what the mid-surface model's `K_V` integrates. An apico-basal cell is not that solid: it
+        # is the polyhedron of two caps and one wall per ring edge, and `cell_mechanics[apicobasal]`
+        # pulls THAT volume toward `V0f` with `k_v`. The two differ by a fixed factor for the same
+        # cell -- measured on the reference spheroid, wedge 2.5433 against polyhedron 1.3508 -- so
+        # every cell is born asking for a volume it does not have, and the tissue inflates until the
+        # polyhedron reaches a wedge-sized target.
+        #
+        # MEASURED, WITH NO GROWTH OPERATOR SCHEDULED AT ALL: `apop2_ab_half` runs its mean radius
+        # from 5.03 to 6.06 in 300 frames, a swelling of 1.20x that no operator in the spec asks
+        # for. It also masks the mechanism the spec exists to show -- killing 691 of 2000 cells
+        # holds the radius at 1.02x of its seed, where the same deaths on the mid-surface sheet
+        # contract it to 0.85x.
+        #
+        # DEFAULT False, so no archived apicobasal run changes meaning. It is a seed-time choice
+        # and belongs here: `v_ref` is read by `cell_die`'s extrusion threshold and `cell_grow`'s
+        # ceiling, so setting both from one convention is what makes those thresholds mean the size
+        # they say. (The wider reconciliation -- one volume for growth, division, death AND the
+        # energy -- is AB_R7R8_TODO section 0a and is not settled here.)
+        if self.v0_from == "polyhedron":
+            _wedge = float(m.get("v_ref", 0.0))     # what the mid-surface model would have used
+            vp, _ap, _cp, _hp = apicobasal_geometry_3d(
+                lvl.get("pos")[:Nv].detach(), lvl.get(self.sep_block)[:Nv].detach(),
+                m["E_srce"], m["E_trgt"], m["E_face"], nF)
+            vp = vp.detach().to(device=m["V0f"].device, dtype=m["V0f"].dtype)
+            m["V0f"] = (torch.full_like(vp, float(vp.median())) if self.v0_uniform else vp.clone())
+            m["V0"] = float(m["V0f"].sum())
+            m["v_ref"] = float(vp.median())
+            vb = cell_block(H, resolve_cell_set(H, self.at), "Vbirth", nF)
+            if vb is not None:
+                set_cell_block(H, resolve_cell_set(H, self.at), "Vbirth",
+                               m["V0f"].detach().cpu().numpy().astype(np.float64), nF)
+            print(f"[seed_mesh:apicobasal] V0f and v_ref seeded from the POLYHEDRON volume "
+                  f"(median {float(vp.median()):.4f}) rather than the wedge volume "
+                  f"({_wedge:.4f}) -- the target is now in the convention `k_v` measures",
+                  flush=True)
         return out
 
 
@@ -796,7 +1118,12 @@ class ShapeEnergy3D(Lateral):
     K_V is a PER-CELL volume elasticity on each cell's wedge volume v_f (Turing_vertex Eq.3 / tyssue
     ClosedMonolayer), not a single global lumen term: it keeps every cell inflated and resists local
     buckling, so growth (ramping v_eq per cell) inflates the shell smoothly. Force = -grad E by one 3D
-    autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity."""
+    autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity.
+
+    Reference: Farhadifar, R., Roper, J.-C., Aigouy, B., Eaton, S. & Julicher, F. (2007). The
+    influence of cell mechanics, cell-cell interactions, and proliferation on epithelial packing.
+    Curr. Biol. 17:2095-2104 (the area, perimeter and line-tension energy); Okuda, S. et al.
+    (2013). Biomech. Model. Mechanobiol. 12(4):627-644 (its 3D form on a closed surface)."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["p0"]
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
@@ -1051,7 +1378,7 @@ class ShapeEnergy3D(Lateral):
 # VOLUME, so the same plateau is `vth_frac = max_scale ** 3`.
 
 
-@register_operator("cell_divide", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", set="vertex", kind="divide", family="population")
 class Divide3D(Structural):
     """Cell division: a septum through a face, so one cell becomes two, and the surface gains a
     cell without losing its closure.
@@ -1097,7 +1424,7 @@ class Divide3D(Structural):
         # created cannot be told apart from one that corrects deviations it did not.
         #
         # Randomising how a cell splits is not a different hypothesis about what a cell IS, so by
-        # AXES.md it is a value -- the same axis as `cycle_cv`, `vseed_cv` and `age_seed`, and not a
+        # by the axis test it is a value -- the same axis as `cycle_cv`, `vseed_cv` and `age_seed`, not a
         # `model:` of its own.
         #
         # WHAT IT PERTURBS IS THE TARGET, NOT THE SEPTUM, and that limit is stated rather than
@@ -1127,7 +1454,7 @@ class Divide3D(Structural):
         # (a fast-growing tip cell can't divide instantly -> tighter size CV); max_cycle: force division after
         # this many calls even if volume < 2x (a stalled cell still cycles). 0/inf = pure volume-doubling.
         self.min_cycle = int(params.get("min_cycle", 0)); self.max_cycle = int(params.get("max_cycle", 10 ** 9))
-        self.cell_set = params.get("cell_set", None)             # if set, daughters inherit the mother's cell state (morphogen)
+        self._cat = params.get("cell_set")          # override only; resolved from the set in forward()
         # G1 RAMP (SimuCell3D/tyssue "birth-at-target"): set each daughter's TARGET volume v_eq to its ACTUAL
         # birth volume instead of mother_target/2. The division trigger is ACTUAL volume (vf>=2*Vbirth) but v_eq
         # is set by ramped morphogen growth, so an actively-growing tip cell has mother_V0f >> vf; halving it
@@ -1184,6 +1511,8 @@ class Divide3D(Structural):
         return v if n > 1 else float(v[0])
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cell_set = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         from plexus.models.topology import rings_from_flat_3d, flat_from_rings_3d, divide_face_3d
         # THE VERTEX PARENTAGE, collected here and spent below. Empty `vertex_carry` -> a no-op, so
         # every existing spec is byte-identical; the list is built regardless because it costs two
@@ -1231,6 +1560,26 @@ class Divide3D(Structural):
                     _s[:_Nv].to(torch.float32).cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
                     m["E_face"].cpu(), nF)
                 vf = _vp.numpy().astype(np.float64)
+                # THE REFERENCE IS THE SEED-TIME MEDIAN, THE WAY THE WEDGE ONE ALWAYS WAS -- and
+                # that is only honest because `seed_mesh` now seeds `h0` at the thickness the energy
+                # wants, and it is not free. Left as an arbitrary number, `h0` would be 0.4 on this spec
+                # against an equilibrium of 0.8796, 1.8 on `mech_shell_free` against 0.8001. The
+                # seeded shell then spent the opening of every run RELAXING toward a thickness
+                # nobody had asked for -- on `mech_shell_free` about 300 frames, with the mean
+                # radius drifting 5.03 -> 7.47 on the way -- and the polyhedron volume moved with
+                # it, 0.613 -> 1.229 here.
+                #
+                # Every attempt to time a measurement on that ramp produced a different population
+                # from the same spec: cache at the first call, 12,543 cells; wait for the shell to
+                # settle, 236; freeze when the median stops moving by 1% a call, 200 and flat,
+                # because once growth is uncapped it moves MORE than 1% a call and the reference
+                # simply tracked the cells -- median 17.339 against a reference of 17.339, a trigger
+                # comparing a quantity with itself. None of those numbers was wrong about what it
+                # measured. They were all measuring a shell that had not finished moving.
+                #
+                # `tools/equilibrium_h.py` measures the thickness a spec's energy settles to, and
+                # the specs now seed it. With the shell starting where it ends, the first call is a
+                # rest state and needs no window, no tolerance and no freeze.
                 if "v_ref_poly" not in m:
                     m["v_ref_poly"] = float(np.median(vf))
                     print(f"[cell_divide] this run carries a separation, so the trigger reads the "
@@ -1240,14 +1589,15 @@ class Divide3D(Structural):
         pos = [p for p in pos_np]
         A0 = m["A0"].detach().cpu().numpy().tolist()
         V0f = m["V0f"].detach().cpu().numpy().tolist()
-        Vbirth = m["Vbirth"].detach().cpu().numpy().tolist()
+        Vbirth = require_cell_block(H, self.cell_set, "Vbirth", nF, "cell_divide").tolist()
         alive = m["alive"].detach().cpu().numpy().tolist()
         rng = np.random.default_rng(12345 + self._k)
-        djit = m.get("divjit")                                   # per-cell threshold jitter -> staggered divisions
-        if djit is None:
-            djit = self._fresh_djit(np.random.default_rng(777), nF).tolist()
-        else:
-            djit = djit.detach().cpu().numpy().tolist()
+        # THE FIXED-SEED FALLBACK IS GONE WITH THE MESH COLUMN. It read: if `divjit` is absent,
+        # draw it here from `default_rng(777)`. That is a spec's missing seed answered by an
+        # invented one -- the run divided, staggered its thresholds with a jitter nobody declared,
+        # and looked entirely normal. A declared block cannot be absent by accident, so the honest
+        # answer is the refusal `require_cell_block` gives.
+        djit = require_cell_block(H, self.cell_set, "divjit", nF, "cell_divide").tolist()
         age = m.get("age")                                       # per-cell age in division-calls since birth
         age = ([0] * nF) if (age is None or age.shape[0] != nF) else (age.detach().cpu().numpy() + 1).tolist()
         # HAS THIS CELL EVER DIVIDED? `age` alone cannot answer it: it starts at 0 for every SEEDED
@@ -1266,7 +1616,7 @@ class Divide3D(Structural):
         # reads size or time -- but `model: cycle` reads a PHASE another operator owns, which is not
         # among them. `_ready_mask` is the opt-in: a model that defines it gets one per-face boolean
         # computed once, and every model that does not is untouched.
-        _mask = self._ready_mask(m, nF) if hasattr(self, "_ready_mask") else None
+        _mask = self._ready_mask(H, m, nF) if hasattr(self, "_ready_mask") else None
 
         def _ready(f):
             if rings[f] is None or len(rings[f]) < 4 or alive[f] <= 0:
@@ -1442,12 +1792,35 @@ class Divide3D(Structural):
         m["A0"] = torch.as_tensor(A0a, dtype=dt, device=dev)
         m["P0"] = torch.as_tensor(P0a, dtype=dt, device=dev)
         m["V0f"] = torch.as_tensor(V0fa, dtype=dt, device=dev)
-        m["Vbirth"] = torch.as_tensor(Vba, dtype=dt, device=dev)
-        m["divjit"] = torch.as_tensor(dja, dtype=dt, device=dev)
         m["age"] = torch.as_tensor(agea, dtype=dt, device=dev)
         m["ndiv"] = torch.as_tensor(ndva, dtype=dt, device=dev)
         m["alive"] = torch.as_tensor(alv, dtype=dt, device=dev)
-        _carry_face_state(m, keep, dt, dev)
+        # A DAUGHTER MUST BE CARRIED FROM ITS MOTHER, AND `keep` ALONE CANNOT SAY THAT.
+        #
+        # `keep[j]` is the index of new face `j` in the RINGS LIST, and `divide_face_3d` APPENDS
+        # daughter B at rings index `nF + i` while daughter A keeps the mother's index `f`. The
+        # eight explicit targets above survive that because their python lists were extended in the
+        # same order before `keep` was applied -- `A0.append(a0e)`, `age.append(0)` -- so `A0[keep]`
+        # finds a real entry at `nF + i`. A `face_carry` array is NOT extended: it is still the
+        # length-nF tensor the operator wrote last frame, and `reindex_faces` CLAMPS an out-of-range
+        # index to `nF - 1`. So every daughter B was given THE LAST CELL'S VALUE -- not its
+        # mother's, not a default, but whichever cell happened to sit at the end of the array.
+        #
+        # WHAT THAT COST, on `cycle_phases`: daughter B inherited a stranger's phase and time-in-
+        # phase, so `cell_cycle`'s reset -- which fires on "age 0 AND phase still M" -- missed it
+        # whenever that stranger was not in M, and the daughter carried on from the middle of
+        # someone else's cycle. Measured at frame 13 of 120, 17 of 217 cells held a `phase_t` that
+        # belonged to no ancestor of theirs; the worst read 56.5 frames into a phase it had never
+        # entered against the 1.0 its mother's reset should have given it.
+        #
+        # `carry` is `keep` with the appended rows redirected to the mother, which is what
+        # `reindex_faces`'s docstring has always CLAIMED the map does. Faces that merely moved are
+        # untouched, so a spec that never divides is unaffected.
+        carry = keep
+        if daughter_mothers:
+            born = {nF + i: mo for i, mo in enumerate(daughter_mothers)}
+            carry = np.array([born.get(int(o), int(o)) for o in keep], np.int64)
+        _carry_face_state(m, carry, dt, dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
         if self.local_relax > 0 and "mech" in m and Nv2 > Nv:    # heal the fresh caps in place at birth
             esT = m["E_srce"]; etT = m["E_trgt"]; efT = m["E_face"]
@@ -1484,11 +1857,24 @@ class Divide3D(Structural):
                 for i, mother in enumerate(daughter_mothers):
                     nt[nF + i] = nt[mother]
                 retype(clvl, nt)                                 # and put the derived buffers back
+        # LAST, BECAUSE THE INHERITANCE ABOVE COPIES THE WHOLE ROW. `cst[nF + i] = cst[mother]` is
+        # right for everything the mother and daughter share -- the morphogen, the cell type -- and
+        # WRONG for the two blocks this operator has just computed per daughter: `Vbirth` is the
+        # volume each daughter was actually born with (`half` and `other`, which differ whenever
+        # `split_cv > 0`), and `divjit` is a FRESH draw per daughter, the whole point of which is
+        # that sisters do not divide together.
+        #
+        # Written here rather than beside `m["A0"]` above, and the difference is measurable: with
+        # the writes before the copy, every daughter inherited its mother's jitter, the division
+        # stagger collapsed, and `gate_00_spheroid` finished at 6,674 cells against its pinned
+        # 6,914 with `t1_total` 1,497 against 1,499. The mesh columns never had this problem
+        # because nothing copies a mesh row wholesale.
+        set_cell_block(H, self.cell_set, "Vbirth", Vba, nF2)
+        set_cell_block(H, self.cell_set, "divjit", dja, nF2)
         return {}
 
 
-
-@register_operator("cell_die", set="vertex", kind="structural", family="population")
+@register_operator("cell_die", set="vertex", kind="die", family="population")
 class Apoptosis3D(Structural):
     """Cell elimination: the die family, and the inverse of `cell_divide`. A marked cell contracts
     its own ring to a point over several frames and is then removed from the surface.
@@ -1528,7 +1914,7 @@ class Apoptosis3D(Structural):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.cells = [int(c) for c in (params.get("cells") or [])]
         # WHICH CELLS DIE is targeting, not a second mechanism: the shrink-shed-extrude pathway is
         # identical in every mode, so these are one operator rather than four.
@@ -1682,11 +2068,11 @@ class Apoptosis3D(Structural):
     def _q(self, m, H, nF, what):
         """The per-cell quantity a local mode compares."""
         if what == "growth":                                  # fractional growth SINCE BIRTH
-            v = m.get("V0f"); vb = m.get("Vbirth")
+            v = m.get("V0f"); vb = cell_block(H, self.cat, "Vbirth", nF)
             if v is None or vb is None:
                 return None
             return np.maximum(v.detach().cpu().numpy()[:nF]
-                              / np.maximum(vb.detach().cpu().numpy()[:nF], 1e-12) - 1.0, 0.0)
+                              / np.maximum(vb, 1e-12) - 1.0, 0.0)
         if what == "volume":
             v = m.get("V0f")
             return None if v is None else v.detach().cpu().numpy()[:nF]
@@ -1784,17 +2170,17 @@ class Apoptosis3D(Structural):
         if self.mode == "list":
             return {c for c in self.cells if c < nF}
         # THE CENTROID IS A PRECONDITION OF TWO MODES, NOT OF DEATH. This guard used to stand here
-        # unconditionally -- `if cen is None: return set()` -- so every mode in the operator was
+        # unconditionally -- `if centroid is None: return set()` -- so every mode in the operator was
         # silently gated behind a quantity only `band` and `cone` read. A geometric precondition
         # that switches off a competition rule, or a probe-driven one, is the same defect as an
         # absolute threshold on a relative field: the operator goes quiet for a reason unrelated to
         # its own mechanism, and quiet is indistinguishable from "nothing qualified".
         u = None
         if self.mode in ("band", "cone"):
-            cen = m.get("cen_np")                                  # per-cell centroid from the rings
-            if cen is None:
+            centroid = m.get("centroid_np")                                  # per-cell centroid from the rings
+            if centroid is None:
                 return set()
-            u = cen / (np.linalg.norm(cen, axis=1) + 1e-12)[:, None]
+            u = centroid / (np.linalg.norm(centroid, axis=1) + 1e-12)[:, None]
         if self.mode == "band":                                    # `n_bands` latitude rings
             lat = np.degrees(np.arcsin(np.clip(u[:, 2], -1, 1)))   # -90 .. +90
             if self.n_bands <= 1:
@@ -1834,11 +2220,11 @@ class Apoptosis3D(Structural):
             # V0f/Vbirth is growth since birth and `age` is time since birth. Both are already
             # carried across renumbering by `keep` -- in cell_divide and in this operator -- so this
             # needs no new bookkeeping, which is the part that has gone wrong twice already.
-            v = m.get("V0f"); vb = m.get("Vbirth"); ag = m.get("age")
+            v = m.get("V0f"); vb = cell_block(H, self.cat, "Vbirth", nF); ag = m.get("age")
             if v is None or vb is None:
                 return set()
             vv = v.detach().cpu().numpy()[:nF]
-            vbb = np.maximum(vb.detach().cpu().numpy()[:nF], 1e-12)
+            vbb = np.maximum(vb, 1e-12)
             # THE EXCESS OVER BIRTH SIZE, NOT THE RATIO -- and the first version compared ratios,
             # which cannot work. V0f/Vbirth is >= 1 for any cell that has grown at all and exactly
             # 1.0 for one that has not, so with a median near 1.4 a cut at 0.5 x median = 0.7 sits
@@ -1927,6 +2313,8 @@ class Apoptosis3D(Structural):
         return set()
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         # THE ACTED LEDGER IS BLIND TO THIS OPERATOR, AND TO THE WHOLE DIE FAMILY. Measured over
         # rounds r001-r012 of the live campaign: 24 runs killed cells, 6,693 deaths in total, and
         # `inert_operators` recorded `cell_die` as having acted in ZERO of them -- including
@@ -1970,14 +2358,22 @@ class Apoptosis3D(Structural):
         es = m["E_srce"].cpu().numpy(); et = m["E_trgt"].cpu().numpy(); ef = m["E_face"].cpu().numpy()
         rings = [np.asarray(r, np.int64) for r in rings_from_flat_3d(es, et, ef, nF)]
         # per-cell centroid, for the geometric modes
-        m["cen_np"] = np.array([pos_t[r].mean(0) if r is not None and len(r) else np.zeros(3)
+        m["centroid_np"] = np.array([pos_t[r].mean(0) if r is not None and len(r) else np.zeros(3)
                                 for r in rings])
         # MARKED CELLS ARE A PER-FACE FLAG, NOT A LIST OF INDICES, and the first version was a
         # list. Every collapse renumbers the faces through `keep`, so `cells: [900]` pointed at a
         # DIFFERENT cell after each death: marking one cell killed seven in the first smoke run,
         # a cascade down the index space. The flag rides the same `keep` map as `alive` and `age`,
         # so a cell stays the cell it was.
+        # AS NUMPY, BECAUSE THIS OPERATOR IS NUMPY. `apop_flag` was a float64 numpy array on the
+        # mesh table -- `m["apop_flag"] = np.asarray(...)` a few hundred lines down -- and the whole
+        # marking path is written in numpy: `np.where`, fancy indexing, set arithmetic. On the cell
+        # set it is a float32 CUDA tensor like every other declared block, so it is converted once
+        # here rather than each of the six places that assume an array. The values are a 0/1 flag,
+        # so float64 -> float32 -> float64 is exact and the run stays byte-identical.
         flag = m.get("apop_flag")
+        if flag is not None and hasattr(flag, "detach"):
+            flag = flag.detach().cpu().numpy().astype(np.float64)
         if flag is None or len(flag) != nF:
             base = np.zeros(nF, np.float64)
             if flag is not None:                       # carried across a topology change already
@@ -2164,7 +2560,11 @@ class Apoptosis3D(Structural):
         m["A0"] = _car("A0", A0); m["V0f"] = _car("V0f", V0f)
         m["P0"] = torch.as_tensor(self.p0 * np.sqrt(np.maximum(
             m["A0"].detach().cpu().numpy(), 1e-9)), dtype=dt, device=dev)
-        for nm in ("Vbirth", "divjit", "age", "ndiv", "alive"):
+        # `Vbirth` AND `divjit` ARE NOT HERE ANY MORE, and their absence is the point: they are
+        # blocks on the cell set, and `H.renumber_set(self.cat, keep, nF2)` a few lines below
+        # permutes the whole of that set's state with the same `keep`. Carrying them here as well
+        # would permute them twice.
+        for nm in ("age", "ndiv", "alive"):
             if nm in m:
                 m[nm] = _car(nm)
         _carry_face_state(m, keep, dt, dev)
@@ -2226,139 +2626,245 @@ class Apoptosis3D(Structural):
         return {}
 
 
-@register_operator("cell_die", model="competition", set="vertex", kind="structural",
+@register_operator("cell_die", model="competition", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DCompetition(Apoptosis3D):
-    """`competition` MODEL of cell_die -- grows slower than its neighbours -- the Myc-style loser.
+    """`competition` model of cell_die: a cell growing more slowly than its neighbours is
+    out-proliferated and removed -- the Myc-style loser of cell competition.
+
+        mark j   when   g_j  <  stall_frac * mean_(k ~ j) g_k     and   mean_k g_k > stall_margin
+
+    g_j is the cell's fractional growth SINCE BIRTH, V0f_j / Vbirth_j, dimensionless.
+    A LOCAL comparison, against this cell's own neighbours on the mesh -- so `stall_frac` is a
+    fraction OF THE NEIGHBOUR MEAN and carries no units of its own. The neighbours must also be
+    above `stall_margin`, or a uniformly quiet patch culls itself from the inside.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Morata, G. & Ripoll, P. (1975). Minutes: mutants of Drosophila autonomously
+    affected in cell division rate. Dev. Biol. 42:211-221; de la Cova, C. et al. (2004).
+    Drosophila Myc regulates organ size by inducing cell competition. Cell 117:107-116.
     """
     DEATH = "competition"
 
 
-@register_operator("cell_die", model="smaller", set="vertex", kind="structural",
+@register_operator("cell_die", model="smaller", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DSmaller(Apoptosis3D):
-    """`smaller` MODEL of cell_die -- smaller than its neighbours: squeezed out by a fitter crowd.
+    """`smaller` model of cell_die: a cell smaller than its neighbours is squeezed out by a
+    tissue that can no longer accommodate it.
+
+        mark j   when   v_j  <  stall_frac * mean_(k ~ j) v_k     and   mean_k v_k > stall_margin
+
+    v_j is the cell's target volume V0f, in world units cubed.
+    A LOCAL comparison, against this cell's own neighbours on the mesh -- so `stall_frac` is a
+    fraction OF THE NEIGHBOUR MEAN and carries no units of its own. The neighbours must also be
+    above `stall_margin`, or a uniformly quiet patch culls itself from the inside.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Marinari, E. et al. (2012). Live-cell delamination counterbalances epithelial
+    growth to limit tissue overcrowding. Nature 484:542-545.
     """
     DEATH = "smaller"
 
 
-@register_operator("cell_die", model="dimmer", set="vertex", kind="structural",
+@register_operator("cell_die", model="dimmer", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DDimmer(Apoptosis3D):
-    """`dimmer` MODEL of cell_die -- less activator than its neighbours -- the LOCAL chemical loser.
+    """`dimmer` model of cell_die: a cell carrying less activator than its neighbours -- the
+    LOCAL form of `chem_low`, which compares against the whole tissue instead.
+
+        mark j   when   a_j  <  stall_frac * mean_(k ~ j) a_k     and   mean_k a_k > stall_margin
+
+    a_j is the cell's activator concentration, dimensionless.
+    A LOCAL comparison, against this cell's own neighbours on the mesh -- so `stall_frac` is a
+    fraction OF THE NEIGHBOUR MEAN and carries no units of its own. The neighbours must also be
+    above `stall_margin`, or a uniformly quiet patch culls itself from the inside. That is what makes it survive
+    a weakening pattern, where a global threshold marks the entire tissue at once.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Morata, G. & Ripoll, P. (1975). Dev. Biol. 42:211-221 (competition on a
+    cell-autonomous signal).
     """
     DEATH = "dimmer"
 
 
-@register_operator("cell_die", model="older", set="vertex", kind="structural",
+@register_operator("cell_die", model="older", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DOlder(Apoptosis3D):
-    """`older` MODEL of cell_die -- has gone longer without dividing than its neighbours.
+    """`older` model of cell_die: a cell that has gone longer without dividing than its
+    neighbours -- one that has stopped cycling while the tissue around it has not.
+
+        mark j   when   age_j  >  mean_(k ~ j) age_k / stall_frac
+
+    age_j is the number of division calls since the cell was born, in frames. The comparison is
+    inverted relative to the other local models, because here losing means being ABOVE.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Morata, G. & Ripoll, P. (1975). Dev. Biol. 42:211-221.
     """
     DEATH = "older"
 
 
-@register_operator("cell_die", model="crowded", set="vertex", kind="structural",
+@register_operator("cell_die", model="crowded", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DCrowded(Apoptosis3D):
-    """`crowded` MODEL of cell_die -- has more neighbours than its neighbours do -- density-driven extrusion.
+    """`crowded` model of cell_die: a cell with more neighbours than a trivalent sheet should
+    give it -- density-driven extrusion.
+
+        mark j   when   deg(j)  >=  n_max     and   age_j >= min_age
+
+    deg(j) is the number of cells sharing an edge with j, which on a closed trivalent surface
+    averages about six -- so `n_max` is read against that, not against a lattice coordination.
+    It fires where division has packed a region.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Eisenhoffer, G. T. et al. (2012). Crowding induces live cell extrusion to maintain
+    homeostatic cell numbers in epithelia. Nature 484:546-549.
     """
     DEATH = "crowded"
 
 
-@register_operator("cell_die", model="lonely", set="vertex", kind="structural",
+@register_operator("cell_die", model="lonely", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DLonely(Apoptosis3D):
-    """`lonely` MODEL of cell_die -- has fewer -- the tissue closes over a gap.
+    """`lonely` model of cell_die: a cell with fewer neighbours than a sheet should give it, so
+    the tissue closes over a gap.
+
+        mark j   when   0 < deg(j) <= n_min     and   age_j >= min_age
+
+    deg(j) is the number of cells sharing an edge with j. Since a closed trivalent sheet gives
+    every cell about six, this can only fire once deaths have already thinned a region -- which
+    makes it a rule about how a WOUND spreads or heals, and worth having for that alone.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Plexus (this work); the neighbour-count rule of Conway's Game of Life, taken to the
+    real adjacency rather than a lattice.
     """
     DEATH = "lonely"
 
 
-@register_operator("cell_die", model="small", set="vertex", kind="structural",
+@register_operator("cell_die", model="small", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DSmall(Apoptosis3D):
-    """`small` MODEL of cell_die -- below an ABSOLUTE volume threshold, not a relative one.
+    """`small` model of cell_die: below an ABSOLUTE volume threshold, not a relative one -- the
+    one selection that is genuinely about the cell's own state and not about where it sits.
+
+        mark j   when   v_j  <  small_frac * v_ref
+
+    v_j is the cell's target volume V0f and v_ref the seed-time MEDIAN cell volume, both in world
+    units cubed, so `small_frac` is a dimensionless fraction of a typical cell at the start. A
+    cell arrives in this set by shrinking rather than by being pushed, so it is re-evaluated every
+    frame.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Marinari, E. et al. (2012). Nature 484:542-545 (delamination of the smallest
+    cells).
     """
     DEATH = "small"
 
 
-@register_operator("cell_die", model="stalled", set="vertex", kind="structural",
+@register_operator("cell_die", model="stalled", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DStalled(Apoptosis3D):
-    """`stalled` MODEL of cell_die -- below an absolute GROWTH-RATE threshold.
+    """`stalled` model of cell_die: below an absolute GROWTH-RATE threshold -- a cell that has
+    stopped growing, judged against a number rather than against its neighbours.
+
+        mark j   when   g_j  <  stall_frac_abs
+
+    g_j is the cell's fractional growth since birth, dimensionless. Absolute where `competition`
+    is relative, so the two disagree exactly when the whole tissue slows down: this one then marks
+    everything, and that one marks nothing.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Morata, G. & Ripoll, P. (1975). Dev. Biol. 42:211-221.
     """
     DEATH = "stalled"
 
 
-@register_operator("cell_die", model="chem_low", set="vertex", kind="structural",
+@register_operator("cell_die", model="chem_low", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DChemLow(Apoptosis3D):
-    """`chem_low` MODEL of cell_die -- below an absolute activator threshold -- dies BETWEEN the spots.
+    """`chem_low` model of cell_die: below an absolute activator threshold, so cells die BETWEEN
+    the spots of a pattern.
+
+        mark j   when   a_j  <  a_sw * max_k a_k
+
+    a_j is the cell's activator concentration and the maximum runs over the whole tissue, so
+    `a_sw` is a dimensionless fraction of the pattern's own peak rather than of a neighbourhood.
+    That global reference is the difference from `dimmer`, and its weakness: when the pattern
+    weakens, the maximum falls with it and the threshold marks the entire tissue at once.
 
     The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
-    as `cell_divide._trigger` is the only thing its models change.
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Plexus (this work); death keyed to a morphogen the reaction-diffusion operators
+    write.
     """
     DEATH = "chem_low"
 
 
-@register_operator("cell_die", model="prescribed", set="vertex", kind="structural",
+@register_operator("cell_die", model="prescribed", set="vertex", kind="die",
                    family="population")
 class Apoptosis3DPrescribed(Apoptosis3D):
-    """`prescribed` MODEL of cell_die -- the EXPERIMENTER ablates a patch; the tissue did not choose.
+    """`prescribed` model of cell_die: the EXPERIMENTER ablates a patch, and the tissue did not
+    choose it. A control, and the way to ask what a wound does.
 
-    ONE MODEL, THREE GEOMETRIES, and the geometry is a VALUE. `region: list | band | cone` names a
-    set of cells (explicit indices), a set of latitude rings, or one contiguous cap. All three make
-    the same claim -- "these cells are removed from outside" -- applied to different shapes, which is
-    the `mesh_seed.shape: sphere | disc` case: "the same hypothesis about the tissue seeded into two
-    different geometries". Splitting them into three models would have claimed three hypotheses where
-    there is one.
+        mark j   when   j is in the named region
 
-    IT IS NOT A MECHANISM AND SHOULD NOT BE READ AS ONE. Every other model of this operator answers
-    "what makes a cell die"; this one answers "which cells did we kill", which is a protocol.
+    ONE MODEL, THREE GEOMETRIES, and the geometry is a VALUE. `region: list | band | cone` names
+    a set of cells by index, a set of latitude rings, or one contiguous cap. All three make the
+    same claim -- "these cells are removed from outside" -- applied to different shapes, which is
+    what makes them values on one model rather than three models.
+
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Plexus (this work); laser ablation as an experimental protocol.
     """
     DEATH = "prescribed"
 
 
-@register_operator("cell_die", model="field", set="vertex", kind="structural", family="population")
+@register_operator("cell_die", model="field", set="vertex", kind="die", family="population")
 class Apoptosis3DField(Apoptosis3D):
-    """`field` MODEL of cell_die -- death keyed to a per-cell quantity SOME OTHER OPERATOR published.
+    """`field` model of cell_die: death keyed to a per-cell quantity SOME OTHER operator
+    published, so a new measurement needs no new branch here.
 
-    The generic one, and the base class already says why it exists: these "carry no criterion of
-    their own; `field` names a per-cell quantity some other operator measured and published on the
-    mesh, and `field_frac` is the multiple of its live MEDIAN that counts as qualifying. Death stops
-    needing a new branch for every new measurement."
+        mark j   when   q_j  <  frac * median_k q_k        compare: low
+        mark j   when   q_j  >  frac * median_k q_k        compare: high
 
-    `compare: high | low` is a VALUE, not two models: which tail of one distribution qualifies is a
-    threshold direction, not a different claim about the tissue.
+    q is the field named by `field`, whatever an operator such as `cell_shape_probe` wrote onto
+    the mesh. The reference is the MEDIAN of the live cells and not the maximum, so one runaway
+    cell cannot set the scale of the quantity that exists to find it -- and `frac` then means the
+    same thing on a shape index near 3.7 as on an aspect ratio near 1.5. An UNPUBLISHED field
+    marks nothing: no probe ran, so nothing is known, and killing none is the only honest reading.
+
+    `compare: high | low` is a VALUE, not two models: which tail qualifies.
+
+    The only thing a `model=` variant of cell_die changes is what marks a cell for death, exactly
+    as `cell_divide`'s models change only what triggers a division.
+
+    Reference: Plexus (this work); the generic form of the measured criteria above.
     """
     DEATH = "field"
 
 
-@register_operator("cell_divide", model="doubler", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", model="doubler", set="vertex", kind="divide", family="population")
 class Divide3DDoubler(Divide3D):
     """Divide at `factor` x THIS CELL'S OWN BIRTH VOLUME -- the rule that was the default until
     kept because it is the null the absolute-size rule has to beat, and because a large part of
@@ -2367,6 +2873,9 @@ class Divide3DDoubler(Divide3D):
     Under exponential growth this is a TIMER wearing a sizer's clothes: doubling from any birth
     volume takes the same time, so it never consults size in any way that could correct one. The
     review is direct about the consequence: size disparities are amplified, not constrained.
+
+    Reference: Ginzberg, M. B., Kafri, R. & Kirschner, M. W. (2015). On being the right (cell)
+    size. Science 348:1245075.
     """
     MECHANISM_TAGS = ["division", "volume_doubling", "relative_threshold", "no_size_control"]
 
@@ -2374,7 +2883,7 @@ class Divide3DDoubler(Divide3D):
         return v_now >= self.factor * jit * v_birth
 
 
-@register_operator("cell_divide", model="timer", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", model="timer", set="vertex", kind="divide", family="population")
 class Divide3DTimer(Divide3D):
     """Divide on the CLOCK: `age >= cycle * jit` division-calls since birth, size ignored entirely.
 
@@ -2386,6 +2895,9 @@ class Divide3DTimer(Divide3D):
     the upper bound the sizer and the balance model should be read against.
 
     `cycle` is in DIVISION-CALLS, the same unit as `min_cycle` and `max_cycle`, not frames.
+
+    Reference: Ginzberg, M. B., Kafri, R. & Kirschner, M. W. (2015). Science 348:1245075 (the
+    timer, and why it is the weakest rule alone and the strongest when paired).
     """
     MECHANISM_TAGS = ["division", "timer", "cell_cycle_clock", "size_independent"]
 
@@ -2397,23 +2909,19 @@ class Divide3DTimer(Divide3D):
         return age >= self.cycle * jit
 
 
-@register_operator("cell_cycle", set="vertex", kind="structural", family="population")
-class CellCycle3D(Structural):
+@register_operator("cell_cycle", set="vertex", kind="lateral", family="population")
+class CellCycle3D(Lateral):
     """G1 -> S -> G2 -> M as per-cell STATE, advanced by a declared rule. It divides nothing.
 
     WHY THIS IS ITS OWN CONTRACT AND NOT A `model:` OF `cell_divide`, by this repo's own two tests.
     `cell_divide._trigger`'s docstring says "THE ONLY THING A `model=` VARIANT OF cell_divide
     CHANGES" is the trigger, and a four-phase machine is not a trigger -- it is state, transitions
-    and its own couplings. And AXES.md's second test is decisive: "a variant that needs a second SET
+    and its own couplings. And the axis test's second question is decisive: a variant that needs a second SET
     or a second state BLOCK is making a different claim". A cycle needs `phase`. So it cannot live
     on that contract, and the split is the same one already drawn between `cell_grow` (what the cell
     ASKS for) and `cell_divide` (what the topology DOES): this operator says when a cell is ready,
     `cell_divide[model: cycle]` performs the division.
 
-<<<<<<< HEAD
-        phase    0 = G1, 1 = S, 2 = G2, 3 = M
-        phase_t  frames spent in the current phase
-=======
         cycle_progress  p: the cell's continuous position through one cycle, 0 at birth, 1 at
                         the end of M. THIS is the state; the operator returns dp/dt and the engine
                         integrates it, like any other lateral.
@@ -2421,7 +2929,6 @@ class CellCycle3D(Structural):
                         holds nothing `p` does not. Kept because it is what the renderer colours by
                         and what `cell_divide[model: cycle]` triggers on.
         phase_t         time spent in the current phase. A readout: nothing consults it any more.
->>>>>>> 60c993f6 (site: lower-case the algebra's names everywhere, and captions become sentences)
 
     THE PHASE DURATIONS ARE NOT EQUAL AND THE DEFAULTS SAY SO. A mammalian cycle of about 24 h runs
     roughly G1 11 h, S 8 h, G2 4 h, M 1 h, so the defaults are in that proportion (110/80/40/10 of
@@ -2430,20 +2937,41 @@ class CellCycle3D(Structural):
     them, which is what the measurements report and also what makes the models comparable -- one
     transition changes, so a difference between two runs has one possible cause.
 
-    WHAT THE DAUGHTERS INHERIT, AND THE TRAP IN IT. `m["face_carry"]` reindexes a declared per-face
-    array through division, death and T1, and its docstring is explicit that `keep` COPIES the
-    parent's value onto BOTH daughters -- so what is carried must be INTENSIVE. `phase` (a label)
-    and `phase_t` (a time) are; an inhibitor AMOUNT would not be, and would double at every
-    division. That is why `inhibitor_dilution` below stores a CONCENTRATION and dilutes it by the
-    volume ratio, which is also the physically right thing: halving the volume and halving the
-    amount leaves the concentration where it was.
+    WHERE THE STATE LIVES. `phase_t`, `cyc_inhib` and `cyc_vprev` are declared width-1 blocks on
+    the CELL SET and must appear under `sets.<cell_set>.state` or this operator refuses to run --
+    see `cell_block`. `phase` is still a column on the mesh table, because it is recorded and drawn
+    and moving a recorded array renames a trajectory key; that is a separate rung.
+
+    WHAT THE DAUGHTERS INHERIT, AND THE TRAP IN IT. Both stores copy the parent's value onto BOTH
+    daughters -- `m["face_carry"]` through `keep`, the cell set through `cell_divide`'s
+    `cst[nF + i] = cst[mother]` -- so what is carried must be INTENSIVE. `phase` (a label) and
+    `phase_t` (a time) are; an inhibitor AMOUNT would not be, and would double at every division.
+    That is why `inhibitor_dilution` below stores a CONCENTRATION and dilutes it by the volume
+    ratio, which is also the physically right thing: halving the volume and halving the amount
+    leaves the concentration where it was.
 
     RESET IS DETECTED, NOT SIGNALLED. A cell that has just divided is the one carrying `age == 0`
     while its inherited phase is still M -- `cell_divide` zeroes `age` for both daughters and the
     carry copies M onto them -- so the reset needs no second channel between the two operators and
     cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.
+
+    Reference: Howard, A. & Pelc, S. R. (1953). Synthesis of desoxyribonucleic acid in normal and
+    irradiated cells and its relation to chromosome breakage. Heredity 6(suppl.):261-273 (the
+    G1-S-G2-M division of the cycle this carries as state).
     """
-    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
+    # `MAY_MUTATE_INTEGRATED_STATE` IS STILL TRUE AFTER S4, AND THE DYNAMICS IS NO LONGER WHY.
+    # Every per-frame quantity this operator produces -- `cycle_progress`, `phase`, `phase_t`,
+    # `cyc_inhib`, `cyc_vprev`, `cyc_rate` -- is returned as a delta on a declared block and
+    # integrated by the engine. What is left in place is ONE thing, and it happens once:
+    #
+    #     `seed_async` draws the initial spread over the cycle and, with it, rescales `V0f` and
+    #     `Vbirth` so that a cell drawn mid-cycle has the volume of a cell mid-cycle. That is an
+    #     initial condition, not a rate, and it fires on tick 0 -- exactly the tick the invariant
+    #     checks. It belongs in `seed_mesh` and moving it is its own rung.
+    #
+    # So the flag now names a seeding write rather than a dynamics one, which is a much smaller
+    # claim than the one it used to make.
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "phase_progression", "restriction_point",
                       "size_checkpoint"]
     REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
@@ -2461,7 +2989,7 @@ class CellCycle3D(Structural):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
         self.t = [float(params.get("t_g1", 110.0)), float(params.get("t_s", 80.0)),
                   float(params.get("t_g2", 40.0)), float(params.get("t_m", 10.0))]
         self.g1_size = float(params.get("g1_size", 1.6))
@@ -2472,26 +3000,95 @@ class CellCycle3D(Structural):
         self._rng = np.random.default_rng(self.seed + 4242)
 
     # ------------------------------------------------------------------ the rule
-    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
-        """G1 -> S. THE ONLY TRANSITION A MODEL CHANGES; the base is the size checkpoint.
+    def _g1_rate(self, ctx):
+        """dp/dt THROUGH G1. THE ONLY THING A MODEL CHANGES; the base is the size checkpoint.
 
         A cell leaves G1 when it is big enough, not when it is old enough: this is the restriction
         point in mammalian cells and Start in budding yeast, and it is the transition Ginzberg et al.
         review as the one that has to be read on an ABSOLUTE scale for size control to work at all.
         `g1_size` is therefore in units of `v_ref`, the seed-time median cell volume, exactly as
         `cell_divide.factor` and `.delta` are.
+
+        AS A RATE, THE SIZER SAYS SOMETHING THE PREDICATE COULD NOT: progress through G1 IS volume
+        accumulated toward the checkpoint. The cell needs to add `v* - v_birth` of volume to pass,
+        it adds `dV/dt` of it per unit time, and G1 occupies the fraction `f_G1` of the cycle, so
+
+            dp/dt = f_G1 * (dV/dt) / (v* - v_birth),      v* = g1_size * v_ref
+
+        reaches exactly the G1/S boundary at exactly the moment the old predicate fired. A cell that
+        is ALREADY past `v*` -- one born large, or one whose threshold moved -- is carried over the
+        boundary within the step by the second term, which reproduces the predicate's own answer for
+        that case rather than making it wait for a volume increment it does not need.
+
+        `ctx` carries the per-cell arrays the models read: see `forward`, where it is built.
         """
-        return v_now >= self.g1_size * v_ref
+        # THE RATE IS SIGNED, AND THAT IS NOT AN OVERSIGHT. A cell that SHRINKS moves back through
+        # G1, because the predicate this replaces read the cell's volume NOW -- `v_now >= v*` is
+        # false again the moment the cell falls back under the threshold, and progress that only
+        # ever accumulated would be a ratchet the predicate never had. Measured with the ratchet in
+        # place, the sizer's population reached 2,289 cells against the predicate's 1,493 over 401
+        # frames, because cells banked every transient inflation and never paid it back.
+        # ONE VOLUME CONVENTION, AND `Vbirth` IS NOT IN IT. `v_now` and `v_ref` are WEDGE volumes --
+        # `face_geometry_3d`'s origin-referenced cones, which is what the predicate compared -- while
+        # `Vbirth` is the POLYHEDRON volume `cell_divide` records (measured on this spec: v_ref
+        # 2.5433 against a Vbirth median of 1.6374, so `v* - Vbirth` was 2.43 where the wedge answer
+        # is 1.53, and G1 was 60% too long). The distance a cell has to cover is stated in the
+        # reference's own units instead: it must add `(g1_size - 1)` of `v_ref` to pass, which is
+        # what an absolute size checkpoint at `g1_size * v_ref` means for a cell born at `v_ref`.
+        # (The two conventions are AB_R7R8_TODO section 0a and are not settled here.)
+        v_star = self.g1_size * ctx["v_ref"]
+        need = max((self.g1_size - 1.0) * ctx["v_ref"], 1e-9)
+        r = ctx["f"][self.G1] * ctx["dv_dt"] / need
+        return np.where(ctx["v_now"] >= v_star, np.maximum(r, ctx["to_boundary"]), r)
 
     def forward(self, H, mask=None):
+        # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
+        self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
         if m is None:
             return {}
         nF = int(m["nF"]); dev = lvl.state.device; dt = lvl.state.dtype
         _np = lambda k: (m[k].detach().cpu().numpy().astype(np.float64)     # noqa: E731
                          if k in m and m[k] is not None else None)
-        ph = _np("phase"); pt = _np("phase_t"); cc = _np("cyc_inhib")
-        if ph is None or len(ph) != nF:
+        # ALL FOUR PER-CELL ARRAYS LIVE ON THE CELL SET -- see `cell_block`. `phase` joined them at
+        # S2b, which is the rung that also renamed its recorded key from `vertex__mesh_phase` to
+        # `cell__phase` and taught both renderer paths to read it there. Nothing of this operator's
+        # state is on the mesh table any more, so `face_carry` is empty for a `cell_cycle` run and
+        # the daughter-inheritance question is answered in one place: `cell_divide` copies the
+        # mother's whole cell-set row.
+        for _b in ("phase", "phase_t", "cyc_inhib", "cyc_vprev"):
+            if cell_block(H, self.cat, _b, nF) is None:
+                raise KeyError(
+                    f"cell_cycle needs the set {self.cat!r} to declare the width-1 block {_b!r}. "
+                    f"Add it under `sets.{self.cat}.state` -- `{_b}: {{width: 1, record: false}}` "
+                    f"-- for all four of phase, phase_t, cyc_inhib, cyc_vprev. `phase` is the "
+                    f"one that is RECORDED and drawn (0 = G1, 1 = S, 2 = G2, 3 = M); the other "
+                    f"three are the operator's own bookkeeping -- time in phase, inhibitor "
+                    f"concentration, last frame's volume -- and take `record: false`. All four "
+                    f"are declared because per-cell state belongs to the cell set, where the "
+                    f"topology operators already renumber it.")
+        ph = cell_block(H, self.cat, "phase", nF)
+        pt = cell_block(H, self.cat, "phase_t", nF)
+        cc = cell_block(H, self.cat, "cyc_inhib", nF)
+        # A DELTA IS MEASURED AGAINST WHAT THE BLOCK HOLDS, NOT AGAINST A LOCAL COPY OF IT, and the
+        # difference is the whole reason the async seed and the birth reset still work. Both of them
+        # SET a value -- `seed_async` scatters the population over the cycle, division puts a
+        # daughter back at (G1, 0) -- and under the old in-place write `set_cell_block` simply stored
+        # it. An operator that returns rates cannot store anything, so a set has to be expressed as
+        # the rate that reaches it in one step: `(target - stored) / dt`. Measured against the
+        # post-seed LOCAL instead, the seed cancels itself and every cell starts at G1 with the
+        # population synchronised, which is exactly what `seed_async` exists to prevent.
+        ph_st, pt_st, cc_st = ph.copy(), pt.copy(), cc.copy()
+        _seeded = False
+        # THE SEED FIRES ON `cyc_vprev == 0`, NOT ON A MISSING `phase`. A mesh column did not exist
+        # before its first write, so `phase is None` was a sound test for "this operator has not run
+        # yet". A declared block exists from the moment the set is built and reads 0.0, which is a
+        # LEGITIMATE phase (G1) -- so the old test would never fire and the population would start
+        # every cell at (G1, phase_t 0), the synchronised culture `seed_async` exists to avoid.
+        # `cyc_vprev` is a volume: 0 is not a value any live cell can hold, and this operator is the
+        # only writer, so it is the one array whose zero unambiguously means "never written".
+        if not np.any(cell_block(H, self.cat, "cyc_vprev", nF) > 0.0):
+            _seeded = True
             # `seed_async` -- START THE POPULATION SOMEWHERE, NOT ALL AT THE SAME PLACE. Seeding
             # every cell at (G1, phase_t 0) makes the tissue a synchronised culture: the first
             # generation divides in one wave, the second in a slightly broader one, and the cell
@@ -2526,10 +3123,9 @@ class CellCycle3D(Structural):
                 v0 = m["V0f"].detach().cpu().numpy().astype(np.float64)
                 if len(v0) == nF:
                     m["V0f"] = torch.as_tensor(v0 * (1.0 + u) / 1.5, dtype=dt, device=dev)
-                    if "Vbirth" in m and m["Vbirth"] is not None:
-                        vb = m["Vbirth"].detach().cpu().numpy().astype(np.float64)
-                        if len(vb) == nF:
-                            m["Vbirth"] = torch.as_tensor(vb / 1.5, dtype=dt, device=dev)
+                    vb = cell_block(H, self.cat, "Vbirth", nF)
+                    if vb is not None and len(vb) == nF:
+                        set_cell_block(H, self.cat, "Vbirth", vb / 1.5, nF)
                 print(f"[cell_cycle] seeded {nF} cells asynchronously: "
                       f"G1 {int((ph == 0).sum())}, S {int((ph == 1).sum())}, "
                       f"G2 {int((ph == 2).sum())}, M {int((ph == 3).sum())}", flush=True)
@@ -2537,52 +3133,163 @@ class CellCycle3D(Structural):
             pt = np.zeros(nF)
         if cc is None or len(cc) != nF:
             cc = np.ones(nF)
-        # DECLARED ONCE, CARRIED BY THE TOPOLOGY FROM THEN ON -- see `_carry_face_state`.
-        m.setdefault("face_carry", set()).update({"phase", "phase_t", "cyc_inhib"})
+        # DECLARED ONCE, CARRIED BY THE TOPOLOGY FROM THEN ON -- see `_carry_face_state`. Only
+        # `phase` is here now; the other three are blocks on the cell set and are carried by
+        # `Hierarchy.renumber_set` and by `cell_divide`'s mother-row copy instead.
 
         _, _, _, vf = face_geometry_3d(lvl.get("pos")[:int(m["Nv"])].detach(),
                                        m["E_srce"], m["E_trgt"], m["E_face"], nF)
         v_now = vf.detach().cpu().numpy().astype(np.float64)
         v_ref = float(m.get("v_ref", 1.0))
+        _dt = float(getattr(H, "dt", 1.0))
+        vb0 = cell_block(H, self.cat, "Vbirth", nF)
+        _rate_prev = cell_block(H, self.cat, "cyc_rate", nF)
+        if _rate_prev is None or len(_rate_prev) != nF:
+            _rate_prev = np.zeros(nF)
         age = _np("age")
         # THE RESET: just divided = age 0 while still carrying the mother's M. See the class note.
+        born = np.zeros(nF, bool)
         if age is not None and len(age) == nF:
             born = (age <= 0) & (ph >= self.M)
-            ph[born] = self.G1; pt[born] = 0.0; cc[born] = 1.0
+            ph = np.where(born, float(self.G1), ph)
+            pt = np.where(born, 0.0, pt)
+            cc = np.where(born, 1.0, cc)
         # DILUTION IS APPLIED TO EVERY CELL EVERY FRAME, whatever the model, because it is a
         # statement about volume and not about the rule: a concentration in a growing cell falls.
-        vp = _np("cyc_vprev")
+        #
+        # A ZERO IN `cyc_vprev` MEANS "NOT YET SET" AND MUST NOT DILUTE. On the mesh table the
+        # column simply did not exist before the first write, and `_np` returned None, so the first
+        # frame skipped the dilution. A declared block exists from the moment the set is built and
+        # reads zero, and a bare `vp / v_now` would then multiply every cell's inhibitor by 0 on
+        # frame 0 -- every cell instantly past its dilution checkpoint, which is the opposite of
+        # the model. The per-cell `vp > 0` test reproduces the old behaviour exactly: zero only
+        # ever occurs on the first frame, because a daughter inherits its mother's row and a
+        # renumbered cell keeps its own.
+        # THE INHIBITOR JUST BEFORE THE DILUTION, which is what `inhibitor_dilution` spends: taken
+        # AFTER the birth reset, so a daughter's first frame dilutes from the 1.0 it was reset to
+        # rather than from the mother's spent concentration.
+        cc0 = cc.copy()
+        vp = cell_block(H, self.cat, "cyc_vprev", nF)
         if vp is not None and len(vp) == nF:
-            cc = cc * np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0)
-        m["cyc_vprev"] = torch.as_tensor(v_now, dtype=dt, device=dev)
-        m.setdefault("face_carry", set()).add("cyc_vprev")
+            cc = cc * np.where(vp > 0.0, np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0), 1.0)
+        # `cyc_vprev` IS RETURNED AS A DELTA NOW rather than written here, and the arithmetic is
+        # unchanged by that: the engine adds `dt * (v_now - vp)/dt` to `vp`, which is `v_now`.
 
-        jit = _np("divjit")
+        jit = cell_block(H, self.cat, "divjit", nF)
         jit = np.ones(nF) if jit is None or len(jit) != nF else jit
         cvj = (1.0 + self.phase_cv * self._rng.standard_normal(nF)).clip(0.4, 1.8) \
             if self.phase_cv > 0 else np.ones(nF)
-        pt = pt + 1.0
-        adv = np.zeros(nF, bool)
-        g1 = ph <= self.G1
+
+        # ============================================================ the cycle as a rate, not a jump
+        # THE CYCLE IS STATE, NOT A COUNTER. Rather than four integers and a per-phase
+        # counter advanced by a predicate, and it is now ONE continuous coordinate `p` -- position
+        # through the cycle, 0 at birth, 1 at the end of M -- whose RATE the models set. `phase` is
+        # read off `p` by the phase boundaries and no longer holds anything `p` does not.
+        #
+        # WHY IT HAD TO CHANGE. plexus2's eight families are all rate laws: an operator says how
+        # fast state moves and the engine integrates. A predicate that assigns `phase + 1` is not a
+        # rate, has no delta form, and is exactly why this operator was `kind: structural` and had
+        # to declare `MAY_MUTATE_INTEGRATED_STATE`. Every per-frame quantity below is now returned
+        # as a delta on a declared block, so the engine does the updating and the tick-0 invariant
+        # is free to check it.
+        #
+        # WHAT `p` BUYS BEYOND COMPLIANCE, which is the part worth keeping even if the algebra had
+        # not asked. Under the predicate, a cell in G1 was a cell in G1 -- there was no reading of
+        # HOW FAR through it was, because "far" was only ever elapsed frames and G1's exit does not
+        # read elapsed frames in three of the four models. `p` is that reading, and it is defined by
+        # each model's own currency: volume accumulated toward the checkpoint for the sizer,
+        # inhibitor diluted away for `inhibitor_dilution`, elapsed time for `timer`, fraction of the
+        # cell's own drawn waiting time for `transition_probability`. A population's spread in `p`
+        # is therefore comparable across the four in a way a phase histogram never was.
+        T = float(sum(self.t)) or 1.0
+        f = np.asarray(self.t, np.float64) / T                  # each phase as a fraction of the cycle
+        cut = np.cumsum(f)                                      # phase boundaries in `p`
+        p = cell_block(H, self.cat, "cycle_progress", nF)
+        if p is None:
+            raise KeyError(
+                f"cell_cycle needs the set {self.cat!r} to declare the width-1 block "
+                f"'cycle_progress' -- `cycle_progress: {{width: 1}}` under `sets.{self.cat}.state`. "
+                f"It is the cell's continuous position through the cycle (0 at birth, 1 at the end "
+                f"of M) and it is what this operator integrates; `phase` is read off it.")
+        p_st = p.copy()
+        # SEEDED FROM THE PHASES THE ASYNC DRAW ALREADY MADE, so `seed_async` keeps meaning what it
+        # meant: a cell drawn into the middle of S starts at the `p` that IS the middle of S.
+        if _seeded:
+            lo = np.concatenate([[0.0], cut[:-1]])[ph.astype(int)]
+            p = lo + pt / T                        # `pt` frames into a phase is pt/T of the cycle
+        p = np.where(born, 0.0, p) if age is not None and len(age) == nF else p
+        # dV/dt AND -dc/dt ARE THE TWO CURRENCIES THE MODELS SPEND. Both come from the frame's own
+        # volume change, which `cyc_vprev` already recorded for the dilution above.
+        dv_dt = np.where(vp > 0.0, (v_now - vp) / max(_dt, 1e-12), 0.0) \
+            if vp is not None and len(vp) == nF else np.zeros(nF)
+        _rate_draw = _rate_prev.copy()
+        ctx = dict(v_now=v_now, v_ref=v_ref, v_birth=(vb0 if vb0 is not None else v_now),
+                   rate_prev=_rate_prev, rate_draw=_rate_draw, born=born, conc_prev=cc0,
+                   dv_dt=dv_dt, conc=cc, jit=jit, cvj=cvj, f=f, T=T, p=p, dt=_dt,
+                   to_boundary=np.maximum(cut[self.G1] - p, 0.0) / max(_dt, 1e-12),
+                   rng=self._rng)
+        # OUTSIDE G1 EVERY MODEL IS THE SAME CLOCK, and that is the design of the family rather than
+        # a simplification: S, G2 and M are near-fixed in all four hypotheses, so a difference
+        # between two runs has exactly one possible cause. `1/T` in cycle units per unit time is a
+        # cycle of exactly `T` -- the phase fractions do the rest, because a phase of fraction f_k
+        # traversed at 1/T takes f_k * T, which is `t_k`.
+        rate = np.full(nF, 1.0 / T) / np.maximum(jit * cvj, 1e-9)
+        g1 = p < cut[self.G1]
         if g1.any():
-            adv[g1] = self._leave_g1(v_now[g1], v_ref, pt[g1], self.t[0] * jit[g1] * cvj[g1],
-                                     cc[g1])
-        for k in (self.S, self.G2):
-            sel = ph == k
-            if sel.any():
-                adv[sel] = pt[sel] >= self.t[k] * jit[sel] * cvj[sel]
-        # M IS NOT ADVANCED HERE. A cell leaves M by DIVIDING, which is `cell_divide[model: cycle]`'s
+            rate = np.where(g1, self._g1_rate(ctx), rate)
+        # M IS NOT ADVANCED. A cell leaves M by DIVIDING, which is `cell_divide[model: cycle]`'s
         # business; advancing it here would let a tissue with no divide operator cycle for ever
-        # while never making a cell, which is a population model that silently is not one.
-        ph = np.where(adv, np.minimum(ph + 1, self.M), ph)
-        pt = np.where(adv, 0.0, pt)
-        m["phase"] = torch.as_tensor(ph, dtype=dt, device=dev)
-        m["phase_t"] = torch.as_tensor(pt, dtype=dt, device=dev)
-        m["cyc_inhib"] = torch.as_tensor(cc, dtype=dt, device=dev)
-        return {}
+        # while never making a cell, which is a population model that silently is not one. Under
+        # the predicate that was `min(phase + 1, M)`; here it is a rate of zero, which is the same
+        # statement and is one the engine can integrate.
+        rate = np.where(p >= cut[self.G2], 0.0, rate)
+        # BACKWARD ONLY INSIDE G1. S, G2 and M are clocks in every model and a clock does not run
+        # backwards; only the G1 rules read a quantity that can fall.
+        rate = np.where((p >= cut[self.G1]) & (rate < 0.0), 0.0, rate)
+        rate = np.where(born, 0.0, rate) if age is not None and len(age) == nF else rate
+        # A CELL STOPS AT M'S DOORSTEP. `rate` is already zero once `p` is inside M, so the only
+        # way past is the single step that crosses -- and an unbounded rate can carry it far past
+        # (a `transition_probability` cell whose drawn waiting time is a fraction of a frame reached
+        # p = 3.76 before this cap). `p` has no meaning beyond the start of M, because M is left by
+        # dividing and not by progressing, so the crossing step lands exactly on the boundary.
+        p_next = np.clip(p + _dt * rate, 0.0, cut[self.G2])
+        ph_next = np.searchsorted(cut, p_next, side="right").astype(np.float64).clip(0, self.M)
+        # `phase_t` IS A READOUT NOW, NOT A DRIVER. Nothing above consults it -- the models spend
+        # volume, inhibitor or a drawn waiting time, and `timer` spends `p` itself -- but it is
+        # declared by every spec that runs this operator and is what a reader means by "how long has
+        # this cell been in S", so it is kept and reset on a phase change like before.
+        pt_next = np.where(ph_next != ph, 0.0, pt + _dt)
+        return self._emit(H, nF, {
+            "cycle_progress": (p_next - p_st) / max(_dt, 1e-12),
+            "phase":          (ph_next - ph_st) / max(_dt, 1e-12),
+            "phase_t":        (pt_next - pt_st) / max(_dt, 1e-12),
+            "cyc_inhib":      (cc - cc_st) / max(_dt, 1e-12),
+            "cyc_vprev":      (v_now - (vp if vp is not None else v_now)) / max(_dt, 1e-12),
+            "cyc_rate":       (ctx["rate_draw"] - _rate_prev) / max(_dt, 1e-12),
+        })
+
+    def _emit(self, H, nF, blocks):
+        """Per-cell deltas -> full-buffer `(set, block)` deltas the engine integrates.
+
+        THE LIVE CELLS ARE A PREFIX OF THE BUFFER and `_integrate` adds a block delta to the whole
+        of `lvl.state[:, cx0:cx1]` with no mask, so a short tensor would not broadcast and a full
+        one must be zero past `nF` or the dead tail of the buffer would drift.
+        """
+        clvl = H.level(self.cat)
+        N = int(clvl.state.shape[0])
+        out = {}
+        for name, d in blocks.items():
+            if d is None or cell_block(H, self.cat, name, nF) is None:
+                continue                       # a block this spec did not declare is not written
+            z = torch.zeros(N, 1, device=clvl.state.device, dtype=clvl.state.dtype)
+            z[:nF, 0] = torch.as_tensor(np.asarray(d, np.float64),
+                                        device=clvl.state.device).to(clvl.state.dtype)
+            out[(self.cat, name)] = z
+        return out
 
 
-@register_operator("cell_cycle", model="timer", set="vertex", kind="structural", family="population")
+
+@register_operator("cell_cycle", model="timer", set="vertex", kind="lateral", family="population")
 class CellCycleTimer(CellCycle3D):
     """Every phase on a clock, G1 included: the NULL against which a checkpoint has to be an
     improvement.
@@ -2592,14 +3299,20 @@ class CellCycleTimer(CellCycle3D):
     is: paired with a growth rule that guarantees size, it is the strongest homeostasis available,
     and alone it is the weakest. Which of the two it is depends entirely on what else is scheduled,
     and that is worth being able to say out loud in a spec.
+
+    Reference: Ginzberg, M. B., Kafri, R. & Kirschner, M. W. (2015). Science 348:1245075 (the
+    timer as the null a sizer has to beat).
     """
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "timer", "size_independent"]
 
-    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
-        return phase_t >= tg1
+    def _g1_rate(self, ctx):
+        # THE CLOCK, WHICH IS THE SAME CLOCK THE OTHER THREE PHASES RUN ON. `1/T` in cycle units per
+        # unit time makes G1 take `f_G1 * T = t_g1`, so this model is the one whose `p` is literally
+        # elapsed time -- and that is the null the other three have to beat.
+        return np.full(np.shape(ctx["v_now"]), 1.0 / ctx["T"]) / np.maximum(ctx["jit"] * ctx["cvj"], 1e-9)
 
 
-@register_operator("cell_cycle", model="transition_probability", set="vertex", kind="structural",
+@register_operator("cell_cycle", model="transition_probability", set="vertex", kind="lateral",
                    family="population")
 class CellCycleTransitionProbability(CellCycle3D):
     """Smith & Martin: G1 is not a duration, it is a CONSTANT HAZARD of starting.
@@ -2618,6 +3331,9 @@ class CellCycleTransitionProbability(CellCycle3D):
 
     Drawn from this operator's own generator, so a run is reproducible under
     `PLEXUS_STRICT_DETERMINISM` for a given `seed`.
+
+    Reference: Smith, J. A. & Martin, L. (1973). Do cells cycle? PNAS 70:1263-1267 (G1 as a
+    constant hazard, and the exponential tail that is its evidence).
     """
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "transition_probability", "memoryless",
                       "stochastic_start"]
@@ -2628,11 +3344,37 @@ class CellCycleTransitionProbability(CellCycle3D):
         super().__init__(params, device)
         self.p_g1 = float(params.get("p_g1", 1.0 / max(self.t[0], 1.0)))
 
-    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
-        return self._rng.random(np.shape(v_now)) < self.p_g1
+    def _g1_rate(self, ctx):
+        """THE HAZARD, WRITTEN AS A SPEED DRAWN ONCE PER CELL, which is the same distribution.
+
+        A per-frame coin flip has no rate form -- it is a jump, and a jump is what S4 exists to
+        remove -- but the QUANTITY it defines does. A constant hazard `p_g1` means the waiting time
+        is exponential with mean `1/p_g1`; so drawing `w ~ Exp(1/p_g1)` when the cell enters G1 and
+        crossing G1 at the constant speed `f_G1 / w` produces exactly that waiting-time
+        distribution, and is memoryless in the only sense the model claims -- the draw does not read
+        how long the cell has waited, or anything else about it.
+
+        WHAT IT CHANGES, said plainly: an individual cell's exit is now decided at G1 entry rather
+        than re-rolled every frame, so a run is no longer memoryless CONDITIONAL ON THE RUN -- the
+        population's exponential tail is identical, one cell's own future is not. The alternative
+        (rate = f_G1 * Bernoulli(p_g1)/dt) reproduces the per-frame roll and is a jump wearing a
+        rate's clothes, which is the thing being retired.
+
+        `cyc_rate` HOLDS THE DRAW so it survives to the next frame and through a renumbering; it is
+        reset for the cells that just entered G1, which after S4 are exactly the ones `born` marks.
+        """
+        # THE DRAW IS FLOORED AT ONE STEP. An exponential has no lower bound, so a waiting time of
+        # 1e-4 frames is a legal draw and gives a G1 speed of `f_G1 / 1e-4` -- which carried `p` to
+        # 3.76 in the first version of this, past the end of the cycle in a single step. A cell
+        # cannot pass through G1 faster than the simulation can resolve, so `dt` is the floor.
+        w = np.maximum(self._rng.exponential(1.0 / max(self.p_g1, 1e-12), np.shape(ctx["v_now"])),
+                       ctx["dt"])
+        fresh = ctx["born"] | (ctx["rate_prev"] <= 0.0)
+        ctx["rate_draw"][:] = np.where(fresh, w, ctx["rate_prev"])
+        return ctx["f"][self.G1] / np.maximum(ctx["rate_draw"], 1e-9)
 
 
-@register_operator("cell_cycle", model="inhibitor_dilution", set="vertex", kind="structural",
+@register_operator("cell_cycle", model="inhibitor_dilution", set="vertex", kind="lateral",
                    family="population")
 class CellCycleInhibitorDilution(CellCycle3D):
     """The size checkpoint with a MECHANISM under it: an inhibitor, diluted by growth, crossing a
@@ -2659,6 +3401,9 @@ class CellCycleInhibitorDilution(CellCycle3D):
     idea collapses into the sizer, because a fixed amount diluted to a fixed threshold is just a
     constant absolute volume. It only becomes a distinct hypothesis once something owns the
     inhibitor across the cycle, which is what this operator does.
+
+    Reference: Schmoller, K. M., Turner, J. J., Koivomagi, M. & Skotheim, J. M. (2015). Dilution
+    of the cell-cycle inhibitor Whi5 controls budding-yeast cell size. Nature 526:268-272.
     """
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "inhibitor_dilution", "size_control",
                       "restriction_point", "mechanistic_sizer"]
@@ -2673,11 +3418,27 @@ class CellCycleInhibitorDilution(CellCycle3D):
         super().__init__(params, device)
         self.inhib_thresh = float(params.get("inhib_thresh", 0.6))
 
-    def _leave_g1(self, v_now, v_ref, phase_t, tg1, conc):
-        return conc <= self.inhib_thresh
+    def _g1_rate(self, ctx):
+        # PROGRESS IS INHIBITOR SPENT. The cell has to dilute `c` from 1 at birth down to
+        # `inhib_thresh`, and it spends `-dc/dt` of that per unit time, so G1 is traversed exactly
+        # when the concentration arrives at the threshold:
+        #
+        #     dp/dt = f_G1 * (-dc/dt) / (1 - inhib_thresh)
+        #
+        # `-dc/dt` is the dilution the base class has already applied this frame, read back as the
+        # difference it made. A cell that is not growing does not dilute and does not progress,
+        # which is the model's own claim and was true of the predicate too.
+        # SIGNED, for the reason the sizer's rate is: a cell whose volume falls RE-CONCENTRATES its
+        # inhibitor, and the predicate `c <= inhib_thresh` goes false again when it does. Clamping
+        # the drop at zero made progress a ratchet and let the population run to 2,532 cells against
+        # the predicate's 727 over 401 frames.
+        drop = (ctx["conc_prev"] - ctx["conc"]) / max(ctx["dt"], 1e-12)
+        span = max(1.0 - self.inhib_thresh, 1e-9)
+        r = ctx["f"][self.G1] * drop / span
+        return np.where(ctx["conc"] <= self.inhib_thresh, np.maximum(r, ctx["to_boundary"]), r)
 
 
-@register_operator("cell_divide", model="cycle", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", model="cycle", set="vertex", kind="divide", family="population")
 class Divide3DCycle(Divide3D):
     """Divide when `cell_cycle` says the cell is in M. The trigger reads a phase and nothing else.
 
@@ -2687,21 +3448,27 @@ class Divide3DCycle(Divide3D):
     without `cell_cycle` divides nothing at all -- there is no `phase` on the table and the trigger
     is false for every cell -- which is the honest failure for a spec that asked for a cycle-driven
     tissue and did not schedule the cycle.
+
+    Reference: none of its own -- the hypothesis lives in whichever `cell_cycle` model is
+    scheduled, and this reads only its answer. Plexus (this work).
     """
     MECHANISM_TAGS = ["division", "cell_cycle", "mitosis", "phase_gated"]
 
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
         return False                                    # replaced wholesale in forward, below
 
-    def _ready_mask(self, m, nF):
-        ph = m.get("phase")
+    def _ready_mask(self, H, m, nF):
+        # THE PHASE IS A BLOCK ON THE CELL SET, so this needs the hierarchy and not just the mesh
+        # table. A spec that schedules this model without declaring the block, or without
+        # `cell_cycle`, gets an all-False mask and divides nothing -- the honest failure named in
+        # the class docstring, unchanged by where the array lives.
+        ph = cell_block(H, self.cell_set, "phase", nF)
         if ph is None:
             return np.zeros(nF, bool)
-        a = ph.detach().cpu().numpy() if hasattr(ph, "detach") else np.asarray(ph)
-        return (np.asarray(a, np.float64)[:nF] >= CellCycle3D.M)
+        return ph >= CellCycle3D.M
 
 
-@register_operator("cell_divide", model="adder", set="vertex", kind="structural", family="population")
+@register_operator("cell_divide", model="adder", set="vertex", kind="divide", family="population")
 class Divide3DAdder(Divide3D):
     """Divide once the cell has ADDED a constant volume since birth: `v >= v_birth + delta*jit*v_ref`.
 
@@ -2726,6 +3493,10 @@ class Divide3DAdder(Divide3D):
     is deliberate: the two rules then differ only in what the threshold is measured FROM, so a spec
     can be moved between them without retuning, and `delta: 1.0` puts the steady state at the same
     place `factor: 2.0` does for a population that starts uniform.
+
+    Reference: Campos, M. et al. (2014). A constant size extension drives bacterial cell size
+    homeostasis. Cell 159:1433-1446; Taheri-Araghi, S. et al. (2015). Cell-size control and
+    homeostasis in bacteria. Curr. Biol. 25:385-391.
     """
     MECHANISM_TAGS = ["division", "adder", "size_control", "incremental_threshold",
                       "absolute_increment"]
@@ -2743,7 +3514,7 @@ class Divide3DAdder(Divide3D):
         return v_now >= v_birth + self.delta * jit * v_ref
 
 
-@register_operator("cell_divide", model="concerted", set="vertex", kind="structural",
+@register_operator("cell_divide", model="concerted", set="vertex", kind="divide",
                    family="population")
 class Divide3DConcerted(Divide3D):
     """Size AND time together: divide when `w*(v/(factor*jit*v_ref)) + (1-w)*(age/(cycle*jit)) >= 1`.
@@ -2764,6 +3535,9 @@ class Divide3DConcerted(Divide3D):
     model contains both as limits and a sweep over one parameter moves continuously between them.
     That is the reason to have it as well as them and not instead of them: the endpoints stay
     available under their own names, with their own docstrings and their own citations.
+
+    Reference: Ginzberg, M. B., Kafri, R. & Kirschner, M. W. (2015). Science 348:1245075 (the
+    sizer and the timer this interpolates between).
     """
     MECHANISM_TAGS = ["division", "size_control", "concerted", "growth_rate_modulation",
                       "cycle_duration_modulation"]
@@ -2836,7 +3610,7 @@ class TopoSnapshot3D(Structural):
             # that only existed inside one frame's forward pass, and "where is growth stopped" is
             # the whole point of an inhibitor -- an invisible mechanism is one nobody can check.
             # None-safe, so a run without an inhibitor records None and the renderer draws nothing.
-            inhib=cp("inhib_frac"), phase=cp("phase"),
+            inhib=cp("inhib_frac"),
             # THE CONSERVATION LAW'S OWN ERROR TERM. Material a dying cell could not bequeath
             # without pushing a neighbour out of the integrator's basin is dropped and counted
             # here rather than injected. It must be ~0 on a healthy run; a large value says the
@@ -2864,8 +3638,10 @@ class TopoSnapshot3D(Structural):
             # a dying cell is drawn exactly like a living one, the sheet closes over the gap, and
             # the mechanism is invisible in the movie -- which is what happened: a 293-cell patch
             # dying at the north pole could not be seen even looking straight down at it.
-            apop=(np.asarray(m["apop_flag"]).copy()
-                  if isinstance(m.get("apop_flag"), np.ndarray) else None),
+            # EITHER TYPE. The flag is a declared block on the cell set now, so it arrives as a
+            # tensor; a spec that has not moved it still has the numpy column. An `isinstance`
+            # check on one of the two silently recorded None for the other.
+            apop=_as_np(m.get("apop_flag")),
             buf_full=bool(m.get("buf_full"))))
         return {}
 
@@ -3130,6 +3906,7 @@ class ReconnectT1_3D(Rewire):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
+        self._cat = params.get("cell_set")          # override only; the SET declares the pairing
         self.l_th = float(params.get("l_th", 0.0))           # absolute; <=0 -> l_th_frac x mean edge
         self.l_th_frac = float(params.get("l_th_frac", 0.15))
         self.max_flips = int(params.get("max_flips", 20))
@@ -3195,12 +3972,17 @@ class ReconnectT1_3D(Rewire):
             print(f"[edge_flip] a flip left {nF - nF2} face(s) below three sides -- "
                   f"reindexing {nF} -> {nF2}. Per-face targets follow the mesh; a cell was lost "
                   f"to topology, not to biology.", flush=True)
-            for _nm in ("A0", "P0", "V0f", "Vbirth", "divjit", "age", "ndiv", "alive"):
+            # `Vbirth` and `divjit` are gone from this list for the reason `cell_die`'s note
+            # gives: they are cell-set blocks and `renumber_set` below already permutes them.
+            for _nm in ("A0", "P0", "V0f", "age", "ndiv", "alive"):
                 if _nm in m:
                     _a = m[_nm].detach().cpu().numpy()
                     m[_nm] = torch.as_tensor(np.asarray([_a[i] for i in keep]),
                                              dtype=m[_nm].dtype, device=m[_nm].device)
-            if isinstance(m.get("apop_flag"), np.ndarray):
+            # ONLY WHILE IT IS STILL A MESH COLUMN. Declared on the cell set it is permuted by
+            # `H.renumber_set` below, with the same `keep`; carrying it here as well would permute
+            # it twice.
+            if isinstance(dict.get(m, "apop_flag", None), np.ndarray):
                 m["apop_flag"] = np.asarray([m["apop_flag"][i] for i in keep], np.float64)
             # AND THE OPEN NAMES, which this branch has never carried. The tuple above is the
             # CLOSED list every topology operator knows; `face_carry` is the open one an operator
@@ -3236,7 +4018,10 @@ class ReconnectT1_3D(Rewire):
             #
             # `edge_flip` declares no `cell_set`, so the cell level is looked up by name and a model
             # without one simply skips: `renumber_set` returns False rather than raising.
-            _cat = getattr(self, "cat", None) or "cell"
+            # NOT `getattr(self, "cat", None) or "cell"`. This operator has no `cat`, so that
+            # expression WAS the literal `"cell"` every time -- `edge_flip` renumbering a set it
+            # never declared it needed, which is the case `resolve_cell_set`'s note names.
+            _cat = resolve_cell_set(H, self.at, self._cat)
             if not H.renumber_set(_cat, keep, n_new=nF2):
                 m["renumber_failed"] = int(m.get("renumber_failed", 0)) + 1
                 print(f"[edge_flip] renumber_set({_cat!r}) DID NOT ACT after a face drop -- the "
@@ -3411,10 +4196,10 @@ def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
     a_s, a_t, b_s, b_t = a[es], a[et], b[es], b[et]
     z3 = lambda: torch.zeros(nF, 3, device=dev, dtype=dt)                        # noqa: E731
     cnt = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, ones_e).clamp(min=1e-9)
-    cen = z3().index_add(0, ef, pos[es] * ones_e[:, None]) / cnt[:, None]        # mid-ring centroid
+    centroid = z3().index_add(0, ef, pos[es] * ones_e[:, None]) / cnt[:, None]        # mid-ring centroid
     ca = z3().index_add(0, ef, a_s * ones_e[:, None]) / cnt[:, None]             # apical cap centroid
     cb = z3().index_add(0, ef, b_s * ones_e[:, None]) / cnt[:, None]             # basal cap centroid
-    o = cen[ef]
+    o = centroid[ef]
 
     def tri(p, q, r):
         return torch.einsum("ij,ij->i", p - o, torch.cross(q - o, r - o, dim=-1)) * ones_e
@@ -3426,10 +4211,10 @@ def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
     v6 = v6.index_add(0, ef, tri(a_s, b_t, a_t))                                 # wall, triangle 2
     v_f = v6 / 6.0
     # THE CAP'S AREA IS MEASURED ON THE SURFACE ITS VOLUME IS MEASURED ON -- the SAME centroid fan,
-    # summed as true triangle areas. It used to be the Newell magnitude ||1/2 sum a_s x a_t||, chosen
-    # so that on a right prism the caps were the same arithmetic as the monolayer's and AB-C1 was an
-    # identity rather than a near miss. IT BOUGHT THAT IDENTITY WITH A NULL SPACE, and the null space
-    # is the whole failure mode of the free separation.
+    # summed as true triangle areas, NOT the Newell magnitude ||1/2 sum a_s x a_t||. The Newell
+    # form makes the caps the same arithmetic as the monolayer's on a right prism, so AB-C1 comes
+    # out an identity rather than a near miss -- but IT BUYS THAT IDENTITY WITH A NULL SPACE, and
+    # the null space is the whole failure mode of the free separation.
     #
     # The Newell magnitude is the area of the ring's PLANAR PROJECTION, so a crumpled cap and a flat
     # one of the same outline measure the SAME, and the area is stationary to first order when one
@@ -3536,8 +4321,12 @@ class MonolayerShapeEnergy3D(Lateral):
     capped at cap_frac x mean edge). EMIT=velocity. Selected by {op: cell_mechanics, model:
     monolayer} -- `model:`, because giving every cell its own 3D volume is a different HYPOTHESIS
     about the tissue, not the same one computed differently; `implementation: monolayer` is refused
-    by the schema, and this docstring said it for months. Emergent bending (thin undulate / thick straight) falls out of the vertex-normal offset;
-    no explicit K_bend. See monolayer_design.md."""
+    by the schema. Emergent bending -- thin sheets undulate, thick ones stay straight -- falls out
+    of the vertex-normal offset, with no explicit bending modulus.
+
+    Reference: Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces
+    autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386, Eq. 3 (the per-cell
+    apical, basal and lateral surfaces this sums)."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
@@ -3750,6 +4539,9 @@ class ApicoBasalShapeEnergy3D(Lateral):
     enforces its sign, because a normalisation of another operator's state is not a mechanism. The
     cost of that decision is gate row AB-B1, which counts the vertices whose span has inverted, and
     that cost is paid in the table rather than hidden in a clamp.
+
+    Reference: Okuda, S. et al. (2018). Sci. Rep. 8:2386, Eq. 3 (the per-cell volume and surface
+    this writes on the doubled degrees of freedom).
     """
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos", "sep"]; WRITES = ["pos", "sep"]
@@ -3975,6 +4767,10 @@ class ShapeEnergy3DMarinari(ShapeEnergy3D):
     area, and their T2 removes a cell at exactly 3 junctions and area < A0/4. This operator is the
     force law alone; on the inherited overdamped-descent mover it will relax to a minimum of W rather
     than fluctuate through it, so it reproduces their ENERGY and not yet their PHENOMENON.
+
+    Reference: Marinari, E. et al. (2012). Live-cell delamination counterbalances epithelial
+    growth to limit tissue overcrowding. Nature 484:542-545, Supplementary p.1 (the work function
+    this implements).
     """
 
     def __init__(self, params, device="cpu"):
@@ -4077,8 +4873,8 @@ if HAVE_WARP:
         Nf = N[f] * 0.5                             # the half-sum, applied once
         area = wp.length(Nf)
         cnt = wp.max(CNT[f], 1.0)
-        cen = CSUM[f] / cnt
-        vf = wp.dot(cen, Nf) / 3.0
+        centroid = CSUM[f] / cnt
+        vf = wp.dot(centroid, Nf) / 3.0
 
         dA = 2.0 * K_A * (area - A0[f]) * a
         DP[f] = (2.0 * K_P * (P[f] - P0[f]) + Gam * P[f]) * a
@@ -4089,7 +4885,7 @@ if HAVE_WARP:
             nhat = Nf / area
         # HALVED HERE, not in the half-edge kernel: dN_f/d(cross_e) = 1/2, and folding it in once
         # per face keeps the scatter pass to the three cross products it is really doing.
-        G[f] = (nhat * dA + cen * (dv / 3.0)) * 0.5
+        G[f] = (nhat * dA + centroid * (dv / 3.0)) * 0.5
         CG[f] = Nf * (dv / (3.0 * cnt))
 
     @wp.kernel
@@ -4268,5 +5064,7 @@ class ShapeEnergy3DWarp(ShapeEnergy3D):
     derivative is a backend choice, not a model, so there is no longer an `autograd` variant to
     select in the other direction -- `_grad` uses the warp kernels wherever they apply and falls
     back to `torch.autograd` where they do not, saying so once.
+
+    Reference: same contract and same energy -- see `cell_mechanics` for the citation.
     """
     MECHANISM_TAGS = ShapeEnergy3D.MECHANISM_TAGS + ["warp"]

@@ -48,14 +48,14 @@ def frame_stats(z, t):
 
     occ = z["cell__occ"][t]
     area = z["cell__area"][t][occ, 0].astype(np.float64)
-    cen = z["cell__cen"][t][occ].astype(np.float64)
+    centroid = z["cell__centroid"][t][occ].astype(np.float64)
     A0 = float(z["vertex__mesh_A0"][0])
 
     return dict(
         frame=t,
         cells=int(occ.sum()),
         junctions=int(l.size),
-        radius=float(np.linalg.norm(cen - cen.mean(0), axis=1).mean()),
+        radius=float(np.linalg.norm(centroid - centroid.mean(0), axis=1).mean()),
         mean_l=float(l.mean()),
         cv_l=float(l.std() / l.mean()),
         mean_A=float(area.mean()),

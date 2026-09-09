@@ -179,7 +179,7 @@ def data_generate(
     if save:
         flat = {}
         for sname, d in out["sets"].items():
-            # A SET NEED NOT HAVE POSITIONS. The vertex model's `cell` set carries `chem`, `cen` and
+            # A SET NEED NOT HAVE POSITIONS. The vertex model's `cell` set carries `chem`, `centroid` and
             # `area` and no `pos` block at all, so `d["pos"]` is None -- and writing None into an
             # npz makes a 0-d OBJECT array, which `np.load` then refuses without `allow_pickle`.
             # Every read of that file died on `cell__pos`, including `plot.py`'s own.
@@ -242,6 +242,10 @@ def data_generate(
         for fname, fd in out.get("fields", {}).items():     # continuum fields (heatmap movies)
             flat[f"{fname}__grid"] = fd["grid"]
             flat[f"{fname}__colors"] = fd["colors"]
+        # THE RUN'S OWN COST, one reading per simulated tick, so the movie can stamp `ms/frame
+        # compute` and mean it. Without it the replay could only time itself and said `render`.
+        if out.get("frame_ms") is not None:
+            flat["frame_ms"] = np.asarray(out["frame_ms"], np.float32)
         np.savez(os.path.join(data_dir, "trajectory.npz"), world=out["world"],
                  world_size=out["world_size"], **flat)
 

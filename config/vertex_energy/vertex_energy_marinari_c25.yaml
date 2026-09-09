@@ -13,38 +13,47 @@ general:
   units:
     length_um: 10.0
     time_s: 600.0
-plotting:
-  renderer: vtk_points
-  background: black
-  real_time: false
-  fps: 20
-  movie_max_frames: 300
-  mesh_edges: true
-  curve:
-    - quantity: area
-      ticks: 4
-    - quantity: radius
-      ticks: 4
 sets:
   vertex:
     n: 25584
     mesh: half_edge
-    cell_set: cell
   cell:
     n: 12800
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       chem:
         width: 2
         integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+  half_edge:
+    n: 102400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 fields: {}
 seed:
   - op: mesh_seed
     at: vertex
-    cell_set: cell
     n_cells: 200
     radius: 4.55
     jitter: 0.8
@@ -86,3 +95,16 @@ descriptions:
   movie:
     description: A large spherical cluster of particles is shown within a cubic bounding box. Over the course of the simulation, the cluster undergoes a slight contraction in its overall radius. The internal structure of the sphere remains relatively stable, with the polygonal facets shifting slightly. By the final frame, the sphere has reached a steady state with a constant radius and stable internal geometry.
     objects: The primary object is a large, beige-colored sphere composed of many smaller polygonal facets. This sphere is centered within a transparent, wireframe cubic bounding box. A scale bar in the bottom left corner indicates a length of 25 micrometers. Two line graphs on the right side track the evolution of the sphere's area and radius over 300 frames.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  real_time: false
+  fps: 20
+  movie_max_frames: 300
+  mesh_edges: true
+  curve:
+    - quantity: area
+      ticks: 4
+    - quantity: radius
+      ticks: 4

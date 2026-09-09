@@ -22,18 +22,6 @@ operators:
 - {op: bounce,  at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  renderer: mpl2d
-  colors:
-    a: [0.2, 0.95, 0.65]
-    b: [1.0, 0.35, 0.45]
-    c: [0.4, 0.65, 1.0]
-    d: [1.0, 0.85, 0.3]
-    e: [0.95, 0.4, 0.95]
-    f: [1.0, 0.6, 0.2]
-  background: black
-  gamma: 0.7
-
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
@@ -57,3 +45,15 @@ descriptions:
       These lines are colored in a vibrant palette of pink, orange, yellow, and cyan. Each line follows
       a winding, non-linear path, creating a complex web-like topology. The lines are uniform in thickness
       and are distributed evenly across the entire field of view.
+
+plotting:
+  renderer: mpl2d
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+    e: [0.95, 0.4, 0.95]
+    f: [1.0, 0.6, 0.2]
+  background: black
+  gamma: 0.7

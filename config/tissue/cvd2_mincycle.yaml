@@ -1,0 +1,179 @@
+general:
+  name: cvd2_mincycle
+  seed: 0
+  n_frames: 801
+  dt: 1.0
+  record_cap: 803
+  boundary: free
+  dim: 3
+  world:
+  - 50.0
+  - 50.0
+  - 50.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 25584
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  cell:
+    n: 12800
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      inhib_frac:
+        width: 1
+  half_edge:
+    n: 102400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  rate: 0.000578
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
+- op: cell_mechanics
+  model: apicobasal
+  at: vertex
+  k_v: 4.0
+  kappa_s: 0.2
+  gamma: 0.0
+  Lambda: 0.0
+  K_R: 0.4
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  sep_mu: 1.0
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: cell_divide
+  at: vertex
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.0
+  min_cycle: 20
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.0
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_grow
+- cell_mechanics
+- edge_flip
+- cell_divide
+- topo_record
+seed:
+- op: seed_mesh
+  at: vertex
+  n_cells: 200
+  radius: 5.0
+  jitter: 0.02
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.0
+  model: apicobasal
+  h0: 0.88
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: '#cfd8e3'
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    span: 34.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: '#e8e8e8'
+    mid: false
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: volume
+    xlabel: frame
+    ylabel: cell volume
+    ticks: 4
+  scale_bar_corner: right_face
+  scale_bar_lift: -0.07

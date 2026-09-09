@@ -44,12 +44,6 @@ general:
   units:
     length_um: 1172.3329425556858
 
-plotting:
-  renderer: vtk_points
-  background: black
-  up_axis: 1
-  box_frame: true
-
 sets:
   # THE MPM PARENT. Its accumulated delta is what `mpm_scatter` reads as `a_ext`, so `gravity` is
   # declared once on one element and moves ninety thousand. Its POSITION IS NOT USED: it stays where
@@ -213,3 +207,9 @@ _gate:
         is tens to hundreds of micrometres between crosslinks, so this is the row that says the
         seeded microstructure is a matrix and not a mesh of the wrong scale. ONLY POSSIBLE because
         `units:` declares the box; without it the number is 0.09 of nothing.
+
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true

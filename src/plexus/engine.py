@@ -33,6 +33,7 @@ per the migration order in SEED_MIGRATION.md. New specs should use `seed:`.
 from __future__ import annotations
 
 import contextlib
+import time
 import os
 import math
 import numpy as np
@@ -420,13 +421,22 @@ def _entity_schema(decl, dim: int) -> StateSchema | None:
     return None                                    # legacy {block: (c0, c1)} dict: a hint only
 
 
-def _entity_meta(sname: str, dim: int = 2) -> tuple[StateSchema | None, dict, int]:
+def _entity_meta(sname: str, dim: int = 2, entity: str | None = None) -> tuple[StateSchema | None, dict, int]:
     """(state_schema, render, depth) for a set name, from the entity registry. `schema` is
     None when the name is unregistered or the entity declares no honourable schema -- the
     caller then falls back to `spatial_schema(dim)`. `depth` is the hierarchy-depth integer
-    (was the overloaded `level`)."""
+    (was the overloaded `level`).
+
+    `entity` OVERRIDES THE LOOKUP BY NAME, and it exists because a set's NAME is what the set
+    IS while the entity is what PROVIDES its state. The two coincide while a model has one
+    cloud of material points, which can simply be called `mpm_particle`. They stop coinciding
+    the moment a cell is decomposed into fifteen organelles that each own their own points:
+    `mitochondrion_node` and `golgi_node` are different sets and the same KIND of thing, and
+    only four names are registered aliases of the MPM particle. Without this the fifteenth set
+    would build with the default pos/vel schema, no `provision` would run, and the first
+    `mpm_strain` would die on a missing `F` -- naming the symptom, not the cause."""
     try:
-        ent = get_entity(sname)
+        ent = get_entity(entity or sname)
         schema = _entity_schema(getattr(ent, "STATE_SCHEMA", None), dim)
         render = getattr(ent, "RENDER", None) or DEFAULT_RENDER
         depth = getattr(ent, "DEPTH", None)
@@ -455,8 +465,25 @@ def _resolve_schema(s: dict, D: int, sname: str | None = None) -> StateSchema:
     have -- so no existing spec moves a byte (`promotion_identical.py --phase A`)."""
     if "state" in s:
         return schema_from_spec(s["state"])
+    # STEP 1b: A SET THAT IS A RELATION CARRIES NO POSITION, AND MUST NOT BE GIVEN ONE.
+    #
+    # A set declaring `maps:` is a relation -- a half-edge is a pairing of two vertices with a face,
+    # not a thing that sits anywhere -- so the pos/vel fallback below is wrong for it in a way that
+    # is not merely wasteful. Falling through to `spatial_schema` gave `half_edge` a `pos` block,
+    # and pass 1 SEEDS positions across the domain for any set that has one: declaring the mesh's
+    # 32,768-slot half-edge set on `divide_growing_ball` created 102,400 real particles scattered
+    # through the world box, which then outnumbered the 25,584 vertices and so became
+    # `_biggest_particle_set`'s answer -- the movie drew that cloud, demoted the epithelium to an
+    # inset, and the per-frame render went 55 ms -> 106 ms. Nothing about the physics changed; the
+    # spec had simply acquired a hundred thousand particles nobody asked for.
+    #
+    # An empty schema is the honest layout: no columns, `has_pos` False, no seeding, no `__pos` in
+    # the trajectory, and therefore invisible to every consumer that finds sets by asking which
+    # ones carry positions. The relation's content is its MAPS, which the topology operators own.
+    if s.get("maps"):
+        return StateSchema([])
     if sname is not None:
-        ent_schema, _render, _depth = _entity_meta(sname, D)
+        ent_schema, _render, _depth = _entity_meta(sname, D, s.get("entity"))
         if ent_schema is not None:
             return ent_schema
     return spatial_schema(D)
@@ -531,6 +558,61 @@ def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
     H.add_level(lvl)
 
 
+# THE PER-CELL NAMES THAT MAY LIVE ON THE CELL SET. A name here is served from the set when the
+# spec declares it and stays a mesh column when it does not, so the migration is per spec and per
+# rung rather than a flag day.
+MESH_CELL_STATE = ("A0", "P0", "V0f", "alive", "age", "ndiv",
+                   "Vbirth", "divjit", "phase", "phase_t", "cyc_inhib", "cyc_vprev",
+                   "mg_scale", "A0_init", "P0_init", "V0f_init",
+                   "apop_flag", "inhib_frac", "elong")
+
+
+def _link_mesh_maps(H, sim) -> None:
+    """Resolve `mesh:` -> the half-edge set -> `maps.face` -> the cell set, once every set is built.
+
+    A SECOND PASS BECAUSE A MAP NEEDS BOTH ENDS. `_build_mesh` runs while the sets are still being
+    allocated, so the half-edge set it names may not exist yet; the resolution has to happen after
+    the last `add_level`. `schema.py` has already checked that the named set exists and declares all
+    three roles, so anything reached here is a build-order bug rather than a spec error.
+
+    WHAT THIS REPLACES. `cell_set:` -- a key that named the cell set on the VERTEX set, and was then
+    repeated on 35 operator lines across `config/tissue` because an operator had no other way to
+    learn it. Now the mesh names its half-edge set, that set declares `face: cell`, and the answer
+    is derived in one place. `Level.mesh_cell_set` survives as the resolved answer so the table's
+    consumers need not each walk the maps -- derived, not declared twice.
+    """
+    for sname, lvl in H.levels.items():
+        hs = getattr(lvl, "mesh_set", None)
+        if hs is None:
+            continue
+        he = H.levels[hs] if hs in H.levels else None
+        maps = dict(getattr(he, "maps", {}) or {}) if he is not None else {}
+        if not maps:
+            raise ValueError(
+                f"set {sname!r} declares `mesh: {hs}` but {hs!r} has no `maps:`. The half-edge set "
+                f"is what states the topology: `srce`/`trgt` into the vertex set, `face` into the "
+                f"cell set.")
+        lvl.mesh_cell_set = maps["face"]
+        lvl.mesh_vertex_set = maps["srce"]
+        # PER-CELL STATE THE CELL SET DECLARES IS SERVED FROM THERE, not stored on the mesh table.
+        # Only the names the spec actually declares are bound, so a spec that has not moved yet
+        # keeps its columns and runs exactly as before -- which is what lets the twelve arrays
+        # migrate one writer-group at a time instead of in one unbisectable commit.
+        cl = H.levels.get(maps["face"]) if hasattr(H.levels, "get") else (
+            H.levels[maps["face"]] if maps["face"] in H.levels else None)
+        m = getattr(lvl, "mesh", None)
+        if cl is not None and m is not None and hasattr(m, "bind_cell_state"):
+            bound = m.bind_cell_state(cl, MESH_CELL_STATE)
+            if bound:
+                print(f"[build] {sname}: {len(bound)} per-cell block(s) served from "
+                      f"{maps['face']!r}: {', '.join(bound)}", flush=True)
+        if maps["srce"] != sname or maps["trgt"] != sname:
+            raise ValueError(
+                f"set {hs!r} is {sname!r}'s mesh, so its `srce`/`trgt` maps must land in {sname!r}, "
+                f"not in {maps['srce']!r}/{maps['trgt']!r}. A half-edge runs between two vertices "
+                f"OF THE MESH IT BELONGS TO.")
+
+
 def _build_mesh(lvl, s: dict, device: str) -> None:
     """Allocate the set's half-edge table if it declares one (`mesh: half_edge`).
 
@@ -559,16 +641,22 @@ def _build_mesh(lvl, s: dict, device: str) -> None:
     from plexus.models.mesh import MeshTable
     z = torch.empty(0, dtype=torch.long, device=device)
     lvl.mesh = MeshTable(E_srce=z, E_trgt=z.clone(), E_face=z.clone(), nF=0, Nv=0)
-    lvl.mesh_cell_set = s.get("cell_set")
+    # THE HALF-EDGE SET THIS MESH IS, BY NAME. `mesh:` names a declared set now, and that set's
+    # `maps:` are what say the topology: `srce`/`trgt` land in the vertex set, `face` in the cell
+    # set. `mesh_cell_set` is kept as the resolved answer to "which set are the faces" so that the
+    # forty consumers of the table need not each walk the maps, but it is now DERIVED from a
+    # declaration instead of being a second declaration -- `cell_set:` is gone from the schema.
+    lvl.mesh_set = kind
+    lvl.mesh_cell_set = None            # filled by `_link_mesh_maps` once every set exists
 
 
-def _entity_class(sname: str):
+def _entity_class(sname: str, entity: str | None = None):
     """The registered entity class for a set name, or None. An entity MAY define a
     `provision(lvl, parent, s, H, device)` classmethod to allocate domain-specific
     per-node buffers at build time (e.g. mpm_particle's F/C/mass/mu/la/p_vol) -- the
     contract-clean way to add new state without special-casing the engine."""
     try:
-        return get_entity(sname)
+        return get_entity(entity or sname)
     except KeyError:
         return None
 
@@ -651,11 +739,45 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
     else:
         perm = torch.randperm(lvl.n, generator=H.rng, device=device)
         total = lvl.n
-    start = 0
-    for tid, t in enumerate(type_list):
-        # last type absorbs the remainder, so per-type rounding never leaves nodes unassigned
-        k = (total - start) if tid == len(type_list) - 1 else int(round(t["fraction"] * total))
-        node_type[perm[start:start + k]] = tid; start += k
+    # `count:` -- SAY HOW MANY, WHEN HOW MANY IS THE FACT YOU HAVE. A share is the natural
+    # statement for a mixture ("30% of the cells are motile") and the wrong one for an inventory:
+    # a cell atlas reports 421 plasma-membrane pieces and 77 mitochondria, and writing those as
+    # 0.100790 and 0.018433 of 4,177 hides the numbers, cannot be checked by eye, and lands on
+    # 421 only by rounding. The schema converts counts to fractions so every other reader is
+    # unchanged; the assignment below uses the count itself, so it is exact by construction and
+    # not by the arithmetic happening to round the right way.
+    counted = all("count" in t for t in type_list)
+    # A COUNT ON A CONTAINED SET IS PER PARENT, and it has to be, because that is what
+    # `per_parent` -- the number the schema makes it add up to -- already means. Assigned over the
+    # WHOLE level with one permutation, 25 cells sharing 27,600 compartments would each receive a
+    # MULTINOMIAL DRAW of each organelle rather than the atlas: one cell with 431 membrane patches
+    # and 129 nuclear ones, the next with 410 and 147, and nothing saying so. The inventory is a
+    # property of a cell, so it is tiled per cell and shuffled INSIDE each cell's block.
+    #
+    # The blocks are contiguous and in parent order (`repeat_interleave` in build's pass 2), so a
+    # parent's rows are `[b*per, (b+1)*per)`; the per-block shuffle is one argsort of a random
+    # matrix rather than a python loop over parents.
+    _per = s.get("per_parent")
+    if counted and "parent" in s and _per is not None and not isinstance(_per, dict):
+        per = int(_per) + int(s.get("grow_reserve", 0))
+        nblk = lvl.n // per
+        if nblk * per != lvl.n:
+            raise ValueError(f"{lvl.name}: {lvl.n} elements do not divide into blocks of {per}")
+        pat = torch.cat([torch.full((int(t["count"]),), tid, dtype=torch.long, device=device)
+                         for tid, t in enumerate(type_list)])
+        if pat.numel() < per:                       # a `grow_reserve` tail: dormant slots take type 0
+            pat = torch.cat([pat, torch.zeros(per - pat.numel(), dtype=torch.long, device=device)])
+        order = torch.argsort(torch.rand(nblk, per, generator=H.rng, device=device), dim=1)
+        node_type = pat[order].reshape(-1)
+    else:
+        start = 0
+        for tid, t in enumerate(type_list):
+            if counted:
+                k = int(t["count"])
+            else:
+                # last type absorbs the remainder, so per-type rounding never leaves nodes unassigned
+                k = (total - start) if tid == len(type_list) - 1 else int(round(t["fraction"] * total))
+            node_type[perm[start:start + k]] = tid; start += k
     lvl.register_buffer("node_type", node_type)
     if all("p" in t for t in types.values()):
         P = torch.tensor([list(t["p"]) for t in types.values()], dtype=torch.float32, device=device)
@@ -815,6 +937,20 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     # OUTSIDE the graph, read as a tensor INSIDE it, so the value the kernels see is current.
     H.frame_t = torch.zeros((), device=device)
     H.obstacles = list(getattr(sim, "obstacles", []) or [])   # wall rects/discs for the `bounce` op
+    # WHAT ELSE IS IN THE SCHEDULE, so an operator can ask instead of guess.
+    #
+    # Needed because two operators can implement the same mechanism and only one of them should be
+    # active. `cell_grow`'s `vth_frac` ceiling is Okuda's uniform-cell mode -- it holds `v_eq` under
+    # `vth_frac * v_ref` so cells oscillate in a band WITHOUT a divider resetting them -- and once
+    # `cell_divide` is scheduled, division is what resets size. Left on, the ceiling is not size
+    # control, it is a lid BELOW the division threshold: on `divide_growing_ball` it caps the cell
+    # at 1.62x its reference while the trigger needs 2x, so growth stalls and the population sits at
+    # 200 for 401 frames.
+    #
+    # A NAME SET AND NOT A FLAG ON THE OPERATOR LINE, because the question is about the SCHEDULE and
+    # a spec should not have to say twice that it contains a divider. It is read-only and built once.
+    H.scheduled_ops = frozenset(o.op for o in (getattr(sim, "operators", None) or [])
+                                if getattr(o, "op", None))
 
     # pass 1: top-level sets (no parent) -- positions seeded across the domain.
     for sname, s in sim.sets.items():
@@ -823,7 +959,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         n = int(s["n"])
         D = H.dim
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
-        _, render, depth = _entity_meta(sname, D)      # render hints + depth from the registry
+        _, render, depth = _entity_meta(sname, D, s.get("entity"))   # render + depth from the registry
         schema = _resolve_schema(s, D, sname)          # StateSchema: `state:` block, else the entity's, else pos/vel
         dim = schema.dim
         state = torch.zeros(buffer, dim, device=device)
@@ -866,7 +1002,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema)
         lvl.render = render
         lvl.vmax = float(s["vmax"]) if "vmax" in s else None    # optional per-tick cell speed cap
-        _build_mesh(lvl, s, device)                             # `mesh: half_edge` -> an empty table to fill
+        lvl.maps = dict(s.get("maps") or {})    # declared functions OUT of this set (role -> set)
+        _build_mesh(lvl, s, device)                             # `mesh: <set>` -> an empty table to fill
         if head is not None:
             # heading is a unit VECTOR [., D] in every dimension (the universal
             # orientation representation read by glide / bounce / sense).
@@ -892,7 +1029,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         #
         # `parent=None` IS PASSED EXPLICITLY, so an entity that needs one says so itself rather
         # than being handed a stand-in. The contained path below is unchanged.
-        _ent_r = _entity_class(sname)
+        _ent_r = _entity_class(sname, s.get("entity"))
         _prov_r = getattr(_ent_r, "provision", None) if _ent_r is not None else None
         if _prov_r is not None:
             _prov_r(lvl, None, s, H, device)
@@ -916,7 +1053,43 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         if s.get("edge_set"):                                     # an edge-set: elements are connections (pre/post), not scattered in space
             _build_edge_set(H, sname, s, device)
             continue
-        per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
+        # `per_parent` MAY DEPEND ON WHAT KIND OF PARENT IT IS. As a single integer it says every
+        # parent holds the same number of children, which is right when the parents are copies of
+        # one body and wrong when they are not: a cell atlas gives a plasma-membrane patch 50
+        # material points and a nuclear-envelope patch 50,000, because a patch is thin and a
+        # nucleus is not, and forcing one number on both either under-samples the nucleus or spends
+        # 400,000 points on a membrane that needs 21,000. Written as a MAPPING from the parent's
+        # type name to a count, it stays one statement per compartment and the containment map
+        # absorbs the variation.
+        #
+        # The uniform path below is untouched -- `per` stays an int, `per_tot` stays an int, and
+        # every existing spec allocates exactly the tensor it did before.
+        per_map = s["per_parent"]
+        if isinstance(per_map, dict):
+            _tn = list(getattr(parent, "type_names", []) or [])
+            if not _tn:
+                raise ValueError(
+                    f"set {sname!r} gives `per_parent` as a mapping, but its parent {pname!r} "
+                    f"declares no `types:` -- there are no parent kinds to key it by.")
+            _missing = [t for t in _tn if t not in per_map]
+            _extra = [t for t in per_map if t not in _tn]
+            if _missing or _extra:
+                raise ValueError(
+                    f"set {sname!r} `per_parent` mapping does not match {pname!r}'s types: "
+                    f"missing {_missing or '-'}, unknown {_extra or '-'}. Every parent must be "
+                    f"told how many children it holds.")
+            if int(s.get("grow_reserve", 0)):
+                raise ValueError(
+                    f"set {sname!r} combines a `per_parent` mapping with `grow_reserve`. The "
+                    f"reserve is a fixed dormant tail on every parent's block, and with unequal "
+                    f"blocks there is no single tail length -- declare one or the other.")
+            per_vec = torch.tensor([int(per_map[_tn[int(t)]]) for t in parent.node_type.tolist()],
+                                   dtype=torch.long, device=device)
+            per = None                                       # no single count; `per_vec` is the answer
+        else:
+            per = int(per_map)
+            per_vec = None
+        radius = float(s.get("radius", 0.02))
         # AN INNER RADIUS, SO A CHILD SET CAN BE A SHELL RATHER THAN A BALL. Without it every child
         # is scattered through the WHOLE ball about its parent, so a cytosol and a nucleus declared
         # on the same cell interpenetrate -- the nucleus occupies a volume the cytosol is also
@@ -926,13 +1099,22 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         # archived moves.
         r_in = float(s.get("radius_inner", 0.0))
         reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for agent_grow to wake
-        per_tot = per + reserve
-        _, render, depth = _entity_meta(sname, H.dim)  # render hints + depth from the registry
+        per_tot = None if per is None else per + reserve
+        _, render, depth = _entity_meta(sname, H.dim, s.get("entity"))  # render + depth from the registry
         schema = _resolve_schema(s, H.dim, sname)      # StateSchema: `state:` block, else the entity's, else pos/vel
         dim = schema.dim
         has_pos = "pos" in schema                                 # spatial child: scatter in space; non-spatial (voltage,...) child: no placement
-        Np = parent.n * per_tot                                   # `per` live + `reserve` dormant per parent slot
-        parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per_tot)
+        if per_vec is None:
+            Np = parent.n * per_tot                               # `per` live + `reserve` dormant per parent slot
+            parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per_tot)
+        else:
+            # THE BLOCKS ARE UNEQUAL BUT STILL CONTIGUOUS AND STILL IN PARENT ORDER, which is the
+            # property every reader of `lvl.parent` relies on -- `repeat_interleave` with a vector
+            # gives exactly that, so a child's rows are `[offset[p], offset[p] + per_vec[p])`.
+            Np = int(per_vec.sum())
+            parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per_vec)
+            lvl_per_particle = per_vec[parent_idx]                 # this child's block size, per child
+            s = {**s, "_per_vec": per_vec, "_per_particle": lvl_per_particle}
         state = torch.zeros(Np, dim, device=device)
         D = H.dim                                                # the child's pos dimension (the global dim contract)
         if has_pos:
@@ -1003,15 +1185,30 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema,
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
         lvl.render = render
+        lvl.maps = dict(s.get("maps") or {})
         _build_mesh(lvl, s, device)                # a CONTAINED set may carry the surface too
         _assign_types(lvl, s, H, device)
+        # A CONTAINED SET IS ALSO SOMEBODY'S PARENT, and until now only a ROOT set published its
+        # raw type table. `MPMParticle.provision` reads `parent.types_raw` for `youngs`,
+        # `material`, `density`, `layers` and `core`, so in a three-level chain -- cell ->
+        # compartment -> mpm_particle -- the middle set's types were invisible: MEASURED, a
+        # compartment set declaring `youngs: 400` (membrane) and `youngs: 80` (mitochondrion)
+        # produced mu = 41.67 for BOTH, the Lame pair of the 100.0 default, and no material mask
+        # was ever set. Two compartments meant to be two materials were one material wearing two
+        # colours, exactly as the two-level case was before the child's own `types` were honoured.
+        # Inert for every existing spec: the only three-level chains in the corpus are the neural
+        # ones (brain -> assembly -> neuron), and `Neuron` has no `provision` to read this.
+        lvl.types_raw = s.get("types")
         # an entity may provision domain-specific per-node buffers (e.g. mpm_particle's
         # F/C/mass/mu/la/p_vol + block-fill) -- read off the parent's per-type config.
-        ent = _entity_class(sname)
+        ent = _entity_class(sname, s.get("entity"))
         provision = getattr(ent, "provision", None) if ent is not None else None
         if provision is not None:
             provision(lvl, parent, s, H, device)
         H.add_level(lvl)
+
+    # pass 2b: resolve every mesh's maps, now that every set exists.
+    _link_mesh_maps(H, sim)
 
     # pass 3: continuous fields -- a field is a pure-state continuum bound to one
     # set; the operators (deposit/diffuse/decay/sense) do all the dynamics. One
@@ -1044,7 +1241,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
 # --------------------------------------------------------------------------- #
 #  seed: x_0 = S(theta_S), executed exactly once, before any dynamics
 # --------------------------------------------------------------------------- #
-def _capture_state(H) -> list:
+def _capture_state(H, sets=None) -> list:
     """Every tensor a substep can write. Snapshot/restore around a graph capture.
 
     Warming up and capturing both run the substep body, so the state they leave behind is not the
@@ -1052,7 +1249,9 @@ def _capture_state(H) -> list:
     advances the simulation by however many warm-up substeps were used.
     """
     seen, out = set(), []
-    for lvl in H.levels.values():
+    for _nm, lvl in H.levels.items():
+        if sets is not None and _nm not in sets:
+            continue                       # a set the captured block never touches cannot go stale
         for _n, t in lvl.named_buffers(recurse=False):
             if torch.is_tensor(t) and t.data_ptr() not in seen:
                 seen.add(t.data_ptr()); out.append(t)
@@ -1063,7 +1262,29 @@ def _capture_state(H) -> list:
     return out
 
 
-def _graph_sig(H) -> tuple:
+def _block_sets(step: dict, inst: list) -> set:
+    """The sets the operators INSIDE one substep block act on -- and every set they reach through
+    containment, since an MPM scatter reads its ancestors' deltas.
+
+    Both capture checks were global: `_capture_refusals` refused whenever ANY set in the model was
+    engine-integrated, and `_graph_sig` compared EVERY buffer of every level. That is correct and
+    far too strong once a model does something outside the MPM cycle. Measured on the per-organelle
+    cell atlas: three `radius_graph` operators, scheduled once a frame OUTSIDE the substep, rebuild
+    `edge_index` on three sets the substep never touches -- and since `edge_index` is a registered
+    buffer, its new pointer changed the signature and the captured graph was dropped on tick 2 of
+    every run. Nothing was wrong; the check was simply looking at the wrong sets.
+    """
+    names = set()
+    toks = set(step.get("steps", []) or [])
+    for nm, ob, sel, _g in inst:
+        if nm in toks:
+            names.add(sel.set)
+            names.add(getattr(ob, "at", None))
+    names.discard(None)
+    return names
+
+
+def _graph_sig(H, sets=None) -> tuple:
     """Identity of every buffer a captured graph baked in: storage address, shape, dtype.
 
     A CUDA graph replays kernels against the pointers it saw at capture. Anything that reallocates
@@ -1075,7 +1296,7 @@ def _graph_sig(H) -> tuple:
 
     Once per tick over ~30 tensors, so the cost is nil against a 15-substep frame.
     """
-    return tuple((t.data_ptr(), tuple(t.shape), t.dtype) for t in _capture_state(H))
+    return tuple((t.data_ptr(), tuple(t.shape), t.dtype) for t in _capture_state(H, sets))
 
 
 def _capture_refusals(sim: Spec, H, step: dict, inst: list) -> list[str]:
@@ -1113,8 +1334,10 @@ def _capture_refusals(sim: Spec, H, step: dict, inst: list) -> list[str]:
                     why.append(f"set {name!r} contains {label} particles; that branch of "
                                f"mpm_strain is SVD plus boolean-mask indexing and is uncapturable "
                                f"-- `implementation: warp` on mpm_strain removes this")
-    if getattr(H, "emit_order", None):
-        why.append(f"engine-integrated sets {list(H.emit_order)} -- `_integrate` rebinds lvl.state "
+    _touched = _block_sets(step, inst)
+    _ints = [n for n in (getattr(H, "emit_order", None) or {}) if n in _touched]
+    if _ints:
+        why.append(f"engine-integrated sets {_ints} -- `_integrate` rebinds lvl.state "
                    f"every tick, so a captured graph would read a stale buffer")
     # `mesh_contact` READS A SURFACE ON THE HOST EVERY FRAME. It rebuilds its direction-bin table
     # from the live vertex set -- `torch.tensor` from a python list, `int(ef.max())`,
@@ -1790,8 +2013,19 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             pass
     # the tape is OFF unless the caller asked for it (see the docstring): generation pays no
     # memory for a graph it will never traverse, and the inverse half asks explicitly.
+    frame_ms: list[float] = []
     with (contextlib.nullcontext() if grad else torch.no_grad()):
         for tick in ticks:                           # one tick = one pass of the schedule + integrate
+            # THE COST OF THE TICK, MEASURED WHERE IT IS PAID. The movie stamps a `ms/frame` and
+            # neither pass could honestly say "compute": the LIVE one times its own loop, which
+            # renders, and the REPLAY one times the renderer and says so. So a figure meant to
+            # report how expensive the physics is reported how expensive the picture was.
+            #
+            # Recorded per tick and carried into the trajectory, so the replay -- the pass that
+            # writes the movie that is kept -- can stamp the number the run actually took. It is
+            # WALL time and includes the recorder; the alternative, timing only the schedule, would
+            # report a figure no one can reproduce from the outside.
+            _t_tick = time.perf_counter()
             if tick == 1:
                 _install_compile()                   # after tick 0 has warmed every run-constant cache
             if progress and tick and hasattr(ticks, "set_postfix_str") and tick % 8 == 0:
@@ -1837,26 +2071,36 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     # delta, e.g. gravity, persists across the loop and is seen identically by every
                     # substep) and makes an inner-schedule force what it reads as: recomputed at the
                     # substep's own positions, applied once per substep.
+                    # THE PERSISTENT DELTA BUFFERS ARE FOR CAPTURE AND COMPILE, AND THEY ARE
+                    # IN-PLACE. Under grad they are the wrong thing twice over: `copy_` into a
+                    # static buffer overwrites a tensor a later backward needs (measured: a
+                    # [12500, 3] at version 78 against an expected 1), and there is no captured
+                    # graph to hold addresses for in the first place, since capture is off whenever
+                    # a tape is being kept. The snapshot/restore below still runs -- it is what
+                    # makes a frame-level delta persist across the substep loop -- it just uses the
+                    # clones directly instead of installing them into reused storage.
+                    _static_ok = not torch.is_grad_enabled()
                     _d0 = {k: v.clone() for k, v in H._delta.items()}
                     _b0 = {k: {b: t.clone() for b, t in d.items()}
                            for k, d in H._delta_blocks.items()}
                     # install the persistent buffers, refilled from this tick's snapshot
-                    for _k, _v in _d0.items():
+                    for _k, _v in (_d0.items() if _static_ok else ()):
                         _t = _static_d.get(_k)
                         if _t is None or _t.shape != _v.shape or _t.device != _v.device:
                             _t = _static_d[_k] = torch.empty_like(_v)
                         _t.copy_(_v)
                     for _k in [k for k in _static_d if k not in _d0]:
                         del _static_d[_k]                       # a set that stopped emitting
-                    for _k, _d in _b0.items():
+                    for _k, _d in (_b0.items() if _static_ok else ()):
                         _sb = _static_b.setdefault(_k, {})
                         for _b, _t2 in _d.items():
                             _c = _sb.get(_b)
                             if _c is None or _c.shape != _t2.shape or _c.device != _t2.device:
                                 _c = _sb[_b] = torch.empty_like(_t2)
                             _c.copy_(_t2)
-                    H._delta = _static_d
-                    H._delta_blocks = _static_b
+                    if _static_ok:
+                        H._delta = _static_d
+                        H._delta_blocks = _static_b
                     # ------------------------------------------------ CUDA graph capture, opt-in
                     # THE SUBSTEP IS 415 KERNEL LAUNCHES AND ~30 us OF GPU WORK PER LAUNCH-BOUND
                     # FRAME. Profiling says the GPU is idle 60% of the wall clock waiting for the
@@ -1921,6 +2165,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                                  f"after_frame/before_frame window, so that step is absent from "
                                  f"the cycle from here on. If this is a staged run, the stage that "
                                  f"takes over is missing or its window does not start at {tick}.")
+                    _blk_sets = _block_sets(step, inst)
                     if step.get("capture", True) and _graph.get(_cap_key) is None and tick >= 1:
                         _why = _capture_refusals(sim, H, step, inst)
                         if _why or not str(device).startswith("cuda"):
@@ -1946,7 +2191,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             # operators captures cleanly once this context is right.
                             _dev_ctx = torch.cuda.device(device)
                             _dev_ctx.__enter__()
-                            _snap = _capture_state(H)
+                            _snap = _capture_state(H, _blk_sets)
                             _keep = [t.clone() for t in _snap]
                             # WARM-UP ON A SIDE STREAM is required, not hygiene: a cold capture
                             # picks up cuBLAS/cuDNN lazy initialisation and fails.
@@ -1968,13 +2213,13 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             for _t, _k in zip(_snap, _keep):
                                 _t.copy_(_k)                    # and undo the capture pass
                             _graph[_cap_key] = _gr
-                            _graph_sigs[_cap_key] = _graph_sig(H)
+                            _graph_sigs[_cap_key] = _graph_sig(H, _blk_sets)
                             _dev_ctx.__exit__(None, None, None)
                             print(f"[engine] substep captured as a CUDA graph "
                                   f"({len(step['steps'])} operators, {count} replays/frame)",
                                   flush=True)
                     _gr = _graph.get(_cap_key)
-                    if _gr and _graph_sig(H) != _graph_sigs[_cap_key]:
+                    if _gr and _graph_sig(H, _blk_sets) != _graph_sigs[_cap_key]:
                         # A BUFFER MOVED SINCE CAPTURE. Fall back rather than replay into memory
                         # nothing reads any more -- that failure is silent and produces a run that
                         # looks finished and is wrong.
@@ -2016,13 +2261,20 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                         if _s:
                             # REFILL, DO NOT REBIND. Same values as the clone this replaces; the
                             # storage survives, which is what a captured graph requires.
-                            for _k, _v in _d0.items():
+                            if not _static_ok:
+                                # under grad: restore by REBINDING the clones. `copy_` into reused
+                                # storage is what a backward two substeps later finds moved.
+                                H._delta = {k: v.clone() for k, v in _d0.items()}
+                                H._delta_blocks = {k: {b: t.clone() for b, t in d.items()}
+                                                   for k, d in _b0.items()}
+                            for _k, _v in (_d0.items() if _static_ok else ()):
                                 _static_d[_k].copy_(_v)
-                            for _k, _d in _b0.items():
+                            for _k, _d in (_b0.items() if _static_ok else ()):
                                 for _b, _t2 in _d.items():
                                     _static_b[_k][_b].copy_(_t2)
-                            H._delta = _static_d
-                            H._delta_blocks = _static_b
+                            if _static_ok:
+                                H._delta = _static_d
+                                H._delta_blocks = _static_b
                         if _gr:
                             _gr.replay()        # the whole substep, one launch
                         else:
@@ -2082,8 +2334,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     _op._armed = True
             if on_frame is not None:
                 on_frame(H, tick)
+            frame_ms.append((time.perf_counter() - _t_tick) * 1000.0)
 
     out = _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, rec_mesh=rec_mesh)
+    out["frame_ms"] = np.asarray(frame_ms, np.float32)   # one wall-clock reading per simulated tick
 
     if out_path is not None:
         import zarr
