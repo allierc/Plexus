@@ -5532,7 +5532,7 @@ run:
 <!-- END spheroid-bm-ecm -->
 
 <h3>Other</h3>
-<p class="opk">Four more families, decomposed the same way and shown in full on the <a href="other.qmd">other models</a> page: stigmergy as five operators over one set and one field, a chaotic flow as a single operator on a cloud whose points never touch, agent interaction as a rewire and the laterals that run along it, and gravity as one lateral summed over every pair. By composing the same kinds over sets that are not tissue we get transport networks, attractors, flocks and galaxies. One clip from each is shown here.</p>
+<p class="opk">Four more families, decomposed the same way and shown in full on the <a href="other.html">other models</a> page: stigmergy as five operators over one set and one field, a chaotic flow as a single operator on a cloud whose points never touch, agent interaction as a rewire and the laterals that run along it, and gravity as one lateral summed over every pair. By composing the same kinds over sets that are not tissue we get transport networks, attractors, flocks and galaxies. One clip from each is shown here.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
     <video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
