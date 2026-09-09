@@ -60,6 +60,13 @@ def main():
     ap.add_argument("--run", default="graphs_data/tissue/spheroid_ecm")
     ap.add_argument("--centre", type=float, nargs=3, default=[0.5, 0.5, 0.5])
     ap.add_argument("--out", default=None)
+    ap.add_argument("--movie", action="store_true",
+                    help="also write ecm_strain.mp4: the hoop-strain slab frame by frame, beside "
+                         "the radial profile as it builds. THE COLOUR SCALE IS FIXED FOR THE WHOLE "
+                         "CLIP, from the last frame's 99th percentile -- a per-frame range would "
+                         "renormalise every frame and the strain would appear to arrive instantly "
+                         "and then never grow.")
+    ap.add_argument("--fps", type=int, default=12)
     args = ap.parse_args()
 
     import matplotlib
@@ -167,6 +174,68 @@ def main():
     print(f"  radial strain: min {np.nanmin(e_rr):+.4f}, max {np.nanmax(e_rr):+.4f}")
     print(f"  falloff exponent {slope:+.2f} against -2 for an incompressible shell")
     print(f"  -> {out}")
+    if args.movie:
+        write_movie(P, occ, V, Vocc, keep, c, args, os.path.join(args.run, "ecm_strain.mp4"))
+
+
+def write_movie(P, occ, V, Vocc, keep, c, args, out):
+    import imageio.v3 as iio
+    import matplotlib.pyplot as plt
+
+    P0 = P[0][keep].astype(np.float64)
+    r0 = np.linalg.norm(P0 - c, axis=1)
+    slab = np.abs(P0[:, 2] - c[2]) < 0.012
+    # ONE RANGE FOR THE WHOLE CLIP, taken from the last frame.
+    uN = np.einsum('ij,ij->i', P[-1][keep].astype(np.float64) - P0,
+                   (P0 - c) / np.maximum(r0, 1e-12)[:, None])
+    vmax = float(np.nanpercentile((uN / np.maximum(r0, 1e-12))[slab], 99))
+    rb_N, ur_N, _ = radial_profile(P0, P[-1][keep].astype(np.float64), c)
+    y_hi = float(np.nanmax(ur_N) * 1000 * 1.08)
+
+    frames = []
+    for f in range(P.shape[0]):
+        Pf = P[f][keep].astype(np.float64)
+        ur = np.einsum('ij,ij->i', Pf - P0, (P0 - c) / np.maximum(r0, 1e-12)[:, None])
+        e_tt = ur / np.maximum(r0, 1e-12)
+        fig = plt.figure(figsize=(11.4, 5.3), facecolor="black")
+        ax0 = fig.add_subplot(1, 2, 1); ax1 = fig.add_subplot(1, 2, 2)
+        for ax in (ax0, ax1):
+            ax.set_facecolor("black")
+            for sp in ax.spines.values():
+                sp.set_color("#888888")
+            ax.tick_params(colors="#cccccc", labelsize=8)
+            ax.xaxis.label.set_color("white"); ax.yaxis.label.set_color("white")
+        sc = ax0.scatter((P0[slab, 0] - c[0]) * 1000, (P0[slab, 1] - c[1]) * 1000,
+                         c=e_tt[slab], s=1.1, cmap="magma", vmin=0.0, vmax=vmax)
+        vf = V[f][Vocc[f]]
+        rv = np.linalg.norm(vf - c, axis=1).max()
+        th = np.linspace(0, 2 * np.pi, 256)
+        ax0.plot(rv * 1000 * np.cos(th), rv * 1000 * np.sin(th), color="white", lw=1.1)
+        ax0.set_aspect("equal"); ax0.set_xlim(-420, 420); ax0.set_ylim(-420, 420)
+        ax0.set_xlabel("x  (um)"); ax0.set_ylabel("y  (um)")
+        ax0.text(0.02, 0.97, "A", transform=ax0.transAxes, va="top", color="white",
+                 fontsize=11, fontweight="bold")
+        ax0.text(0.02, 0.03, f"frame {f}/{P.shape[0]-1}   spheroid r = {rv*1000:.0f} um",
+                 transform=ax0.transAxes, color="#cccccc", fontsize=9)
+        cb = fig.colorbar(sc, ax=ax0, fraction=0.046, pad=0.02)
+        cb.set_label("hoop strain  eps_tt", color="white", fontsize=9)
+        cb.ax.tick_params(colors="#cccccc", labelsize=8); cb.outline.set_edgecolor("#888888")
+
+        rb, urp, _ = radial_profile(P0, Pf, c)
+        ax1.plot(rb * 1000, urp * 1000, color="#ffc242", lw=1.9)
+        ax1.axvline(rv * 1000, color="white", lw=1.0, ls="--")
+        ax1.set_xlabel("undeformed radius  r  (um)")
+        ax1.set_ylabel("radial displacement  u_r  (um)")
+        ax1.set_ylim(-0.02 * y_hi, y_hi); ax1.axhline(0.0, color="#555555", lw=0.8)
+        ax1.text(0.02, 0.97, "B", transform=ax1.transAxes, va="top", color="white",
+                 fontsize=11, fontweight="bold")
+        fig.tight_layout()
+        fig.canvas.draw()
+        img = np.asarray(fig.canvas.buffer_rgba())[:, :, :3].copy()
+        frames.append(img)
+        plt.close(fig)
+    iio.imwrite(out, frames, fps=args.fps, codec="libx264", macro_block_size=None)
+    print(f"  -> {out}  ({len(frames)} frames, {args.fps} fps)")
 
 
 if __name__ == "__main__":
