@@ -74,38 +74,75 @@ def sample_inside(path, n, box_c, size, rng):
     return (P - ctr) * scale + box_c
 
 
-def render(out_dir, frames, target, box, name, px=1100):
+def render(out_dir, frames, target, box, name, px=1100, glass=True):
     """The morph as an mp4 and stills, drawn where it happened rather than as a table of numbers.
 
     THE MATERIAL'S OWN COLOUR, not a height ramp. A default renderer colours a point cloud by its
     initial height, which is a useful material TAG when you want to see where material went and a
     misleading one here: the question is what shape the elastic body took, and the body is one
-    material. Orange is this repo's elastic; the target is drawn once, faint, behind it.
+    material.
+
+    GLASS, because a cloud of 50,000 opaque dots hides its own shape. `glass` reconstructs the body
+    as a SURFACE -- the point cloud voxelised and contoured, the same isosurface the live renderer
+    builds for a compartment -- and draws it with physically based shading: a smooth dielectric with
+    a little roughness, lit by three lights, over a dark ground. What that buys is a silhouette you
+    can read and a highlight that says which way a face turns, which is exactly what a morph is
+    being judged on. The target stays behind it as a faint grey cloud.
     """
     import pyvista as pv
     import imageio.v3 as iio
     pv.OFF_SCREEN = True
-    ORANGE, GREY = "#ff8c1a", "#3a4a5a"
+    AMBER, GREY = "#ff9a3c", "#4a5a6a"
+    dx = box / 96.0
+
+    def surface(P):
+        """The body as a contoured density, or None if it is too sparse to contour."""
+        g = pv.ImageData(dimensions=(97, 97, 97), spacing=(dx, dx, dx), origin=(0.0, 0.0, 0.0))
+        idx = np.clip((P / dx).astype(int), 0, 95)
+        d = np.zeros((96, 96, 96), np.float32)
+        np.add.at(d, (idx[:, 0], idx[:, 1], idx[:, 2]), 1.0)
+        # one pass of a 3^3 box blur, so the contour is a body and not a staircase of voxels
+        k = np.ones((3, 3, 3), np.float32) / 27.0
+        try:
+            from scipy.ndimage import convolve
+            d = convolve(d, k, mode="constant")
+        except Exception:                                    # scipy absent: the raw count contours too
+            pass
+        g["v"] = np.pad(d, ((0, 1), (0, 1), (0, 1))).flatten(order="F")
+        iso = max(0.35 * float(d[d > 0].mean()), 1e-6)
+        try:
+            return g.contour([iso], scalars="v").smooth(n_iter=30, relaxation_factor=0.2)
+        except Exception:
+            return None
+
     imgs = []
     for i, X in enumerate(frames):
-        pl = pv.Plotter(off_screen=True, window_size=(px, px))
-        pl.set_background("black")
-        pl.add_mesh(pv.PolyData(target.astype("float32")), color=GREY, opacity=0.10,
-                    point_size=2.0, render_points_as_spheres=False)
-        pl.add_mesh(pv.PolyData(X.astype("float32")), color=ORANGE, point_size=2.2,
-                    render_points_as_spheres=False)
-        pl.add_mesh(pv.Box((0, box, 0, box, 0, box)), style="wireframe", color="#555555",
+        pl = pv.Plotter(off_screen=True, window_size=(px, px), lighting="none")
+        pl.set_background("#05070a")
+        pl.add_mesh(pv.PolyData(target.astype("float32")), color=GREY, opacity=0.06,
+                    point_size=1.6, render_points_as_spheres=False)
+        surf = surface(X.astype("float64")) if glass else None
+        if surf is not None and surf.n_points > 0:
+            pl.add_mesh(surf, color=AMBER, pbr=True, metallic=0.05, roughness=0.28,
+                        diffuse=1.0, specular=1.0, smooth_shading=True, opacity=1.0)
+        else:
+            pl.add_mesh(pv.PolyData(X.astype("float32")), color=AMBER, point_size=2.2)
+        # THREE LIGHTS, because one gives a shape a bright side and a black one: a key to model the
+        # form, a fill to keep the shadow readable, and a rim to separate the body from the ground.
+        pl.add_light(pv.Light(position=(box * 2.0, box * 2.4, box * 1.6), intensity=0.95))
+        pl.add_light(pv.Light(position=(-box * 1.6, box * 0.8, box * 2.0), intensity=0.35))
+        pl.add_light(pv.Light(position=(0.0, -box * 1.2, -box * 2.0), intensity=0.5))
+        pl.add_mesh(pv.Box((0, box, 0, box, 0, box)), style="wireframe", color="#2a3340",
                     line_width=1.0, lighting=False)
-        pl.camera_position = [(box * 2.6, box * 1.5, box * 2.6), (box / 2,) * 3, (0, 1, 0)]
-        pl.add_text(f"{name}   frame {i}/{len(frames) - 1}   {len(X):,} material points\n"
-                    f"orange: the cell   grey: the target",
-                    position="upper_left", font_size=9, color="white")
+        pl.camera_position = [(box * 2.4, box * 1.35, box * 2.4), (box / 2,) * 3, (0, 1, 0)]
+        pl.add_text(f"{name}   frame {i}/{len(frames) - 1}   {len(X):,} material points",
+                    position="upper_left", font_size=9, color="#c8d4e0")
         img = pl.screenshot(return_img=True)
         pl.close()
         imgs.append(img)
         if i in (0, len(frames) // 2, len(frames) - 1):
             iio.imwrite(os.path.join(out_dir, f"still_{i:03d}.png"), img)
-    iio.imwrite(os.path.join(out_dir, "movie.mp4"), imgs, fps=8, codec="libx264",
+    iio.imwrite(os.path.join(out_dir, "movie.mp4"), imgs, fps=20, codec="libx264",
                 macro_block_size=None)
 
 
@@ -121,6 +158,12 @@ def main():
     ap.add_argument("--n-grid", type=int, default=40)
     ap.add_argument("--device", default="cuda:1")
     ap.add_argument("--out", default=os.path.join(ROOT, "graphs_data", "si_material"))
+    ap.add_argument("--render-frames", type=int, default=0,
+                    help="frames in the FINAL rollout, the one that becomes the movie. The rate is "
+                         "divided by the same factor, so the total deformation is identical and "
+                         "only the sampling changes -- a morph optimised over 20 frames rendered at "
+                         "100 is the same trajectory seen five times more finely, not five times "
+                         "more of it.")
     ap.add_argument("--control", default="grid", choices=["grid", "ngp"],
                     help="`grid`: a cube of rates, trilinear. `ngp`: the multiresolution hash "
                          "encoding this repo already has (plexus.models.hashgrid) plus a small "
@@ -200,6 +243,7 @@ def main():
     for name in [t.strip() for t in args.targets.split(",") if t.strip()]:
         path = os.path.join(MODELS, f"{name}.obj")
         theta = grid_enc = head = None
+        t_target = time.time()
         print(f"\n  {name}: {len(stages)} stage(s), control {args.control}", flush=True)
         for si, (n_pts, n_grid, iters) in enumerate(stages):
             raw = spec(n_pts, BOX, n_grid, args.frames, 0.002, 3.4e-4)
@@ -291,13 +335,25 @@ def main():
 
         with torch.no_grad():
             frames = []
+            if args.render_frames and args.render_frames != args.frames:
+                rf = args.render_frames
+                raw = spec(n_pts, BOX, n_grid, rf, 0.002, 3.4e-4)
+                fr = os.path.join(tempfile.mkdtemp(prefix="render_"), "spec.yaml")
+                yaml.safe_dump(raw, open(fr, "w"), sort_keys=False)
+                sim = load(fr)
+                dt = float(sim.dt) * args.frames / rf     # same total deformation, finer sampling
             rollout(keep=frames)
         d = os.path.join(args.out, f"morph_{name}")
         os.makedirs(d, exist_ok=True)
-        np.savez_compressed(os.path.join(d, "morph.npz"), frames=np.stack(frames), target=tgt_np,
-                            box=BOX)
+        ctrl = (theta.detach().cpu().numpy() if theta is not None
+                else np.concatenate([q.detach().cpu().numpy().ravel()
+                                     for q in list(grid_enc.parameters()) + list(head.parameters())]))
+        np.savez_compressed(os.path.join(d, "morph.npz"), frames=np.stack(frames),
+                            target=tgt_np, box=BOX, control=ctrl,
+                            seconds=time.time() - t_target)
         render(d, np.stack(frames), tgt_np, BOX, name)
-        print(f"    -> {os.path.relpath(d, ROOT)}  ({len(frames)} frames)", flush=True)
+        print(f"    -> {os.path.relpath(d, ROOT)}  ({len(frames)} frames, "
+              f"{(time.time() - t_target) / 60:.1f} min total)", flush=True)
 
 
 if __name__ == "__main__":
