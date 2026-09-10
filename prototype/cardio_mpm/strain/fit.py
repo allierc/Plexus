@@ -46,8 +46,8 @@ def recovery(P, truth):
     if truth is None:
         return out
     with torch.no_grad():
-        for k in ("g", "logE", "g2"):
-            if k == "g2" and float(truth["g2"].std()) < 1e-9:
+        for k in ("g", "logE", "g2", "logtau"):
+            if k in ("g2", "logtau") and float(truth[k].std()) < 1e-9:
                 continue
             e, t = getattr(P, k).detach(), truth[k]
             sp = t.std().clamp(min=1e-12)
@@ -89,6 +89,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--plant-gain", type=float, default=1.5)
     ap.add_argument("--plant-sigma-logE", type=float, default=0.3)
+    ap.add_argument("--plant-logtau-sd", type=float, default=0.0, help="planted per-cell log decay-time scatter (0 = shared clock)")
     ap.add_argument("--plant-g2", type=float, default=0.0,
                     help="planted transverse strain as a fraction of g (with 30%% per-cell scatter); 0 = rank-1 truth")
     ap.add_argument("--noise", default="none", choices=["none", "tracker", "rest"])
@@ -149,6 +150,8 @@ def main():
             Pt.g.copy_(amp_m * args.plant_gain)
             Pt.logE.copy_(math.log(args.youngs)
                           + args.plant_sigma_logE * torch.randn(C, generator=gen).to(dev))
+            if args.plant_logtau_sd > 0:
+                Pt.logtau.copy_(args.plant_logtau_sd * torch.randn(C, generator=gen).to(dev))
             if args.plant_g2 != 0:
                 Pt.g2.copy_((args.plant_g2 * Pt.g * (1 + 0.3 * torch.randn(C, generator=gen).to(dev))).clamp(-0.2, 0.2))
         with torch.no_grad():

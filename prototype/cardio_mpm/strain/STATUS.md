@@ -356,3 +356,16 @@ The planted gate for g2 with a POSITIVE planted g2 (`gate_g2_s0`) degraded every
 and (g, g2, φ) ↔ (g2, g, φ + 90°) a symmetry the recovery metric does not know. Re-planted with the
 sign the data has (g2 = −0.9 g, `gate_g2neg_s0`), running. HCM with the second axis
 (`hcm_r3_p120_d150_g2`), running.
+
+## Stopped 2026-09-11 (Cedric's call) — what is still running and where to pick up
+
+Background jobs left running (they finish on their own, ~1 h): `gate_g2neg_s0` (planted gate for the
+second axis with the observed sign), `hcm_r3_p120_d150_g2` → its scoring, then `gate_g2neg_tau_s0`;
+on the other GPU `s4_live_r9_p120_d150_g2_tau` (per-cell relaxation time, step 3a) → its scoring.
+Read them with `python rounds_table.py`, `out/*.score.log`, and `out/fits/gate_*/fit.json`
+(`log[-1].recovery`). Best model so far: `out/fits/s4_live_r8_p120_d150_g2` — held-out R²(A) 0.82,
+R²(u) 0.87, 120 particles/cell, drag 150, λ = 0.3, band masked, per-cell g, g2, φ, E, δ + one clock;
+movie `out/movies/s4_live_r8_p120_d150_g2_beat1.mp4`. Score anything with
+`s4_score.py --per-parent 120 --drag 150`. Next per PLAN_R2: read the g2 and τ gates, HCM with g2
+(`compare_sheets.py --healthy out/fits/s4_live_r8_p120_d150_g2 --hcm out/fits/hcm_r3_p120_d150_g2`),
+then step 5 (seeds).
