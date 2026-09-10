@@ -5899,7 +5899,7 @@ schedule:
   <figure class="sim-card">
     <video src="gallery/meshmpm_spheroid_gel.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the tool grows instead<span class="sim-spec"><pre># MESH-MPM 05 -- THE SPHEROID INDENTS THE GEL BY GROWING. Nothing is translated.
+      <span class="sim-name" tabindex="0">inflated, not pressed<span class="sim-spec"><pre># MESH-MPM 05 -- THE SPHEROID INDENTS THE GEL BY GROWING. Nothing is translated.
 #
 # `mesh_mpm_sphere_elastic.yaml` WITH ONE OPERATOR LINE CHANGED: `surface_drive` scales the shell
 # about its own centroid instead of pushing it down. Same gel, same 500,000 material points, same
