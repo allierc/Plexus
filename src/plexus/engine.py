@@ -976,25 +976,23 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         grot = None
         if has_pos:
             px0, px1 = schema["pos"]
-            if "spawn" in s:
-                if D == 3 and s["spawn"] in ("two_disks", "disk_pair"):
-                    # a PAIR of discs in one set: two galaxies that feel each other through the
-                    # same all-pairs law that holds each of them together.
-                    pos, head, gid, grot = _spawn_pair3d(
-                        n, H.world_size, s.get("spawn_radius", 0.3), H.rng, device,
-                        thickness=s.get("spawn_thickness", 0.0),
-                        separation=float(s.get("spawn_separation", 0.0)),
-                        offset=float(s.get("spawn_offset", 0.0)),
-                        tilt=float(s.get("spawn_tilt", 0.0)),
-                        arms=s.get("spawn_arms"))
-                elif D == 3:                           # 3D agent: vector heading; ball / thin `disk` spawn
-                    pos, head = _spawn3d(s["spawn"], n, H.world_size,
-                                         float(s.get("spawn_radius", 0.3)), H.rng, device,
-                                         thickness=float(s.get("spawn_thickness", 0.0)))
-                else:                                           # 2D: framed to the world box (not height-1)
-                    pos, head = _spawn(s["spawn"], n, H.world_size,
-                                       float(s.get("spawn_radius", 0.3)), H.rng, device)
-            elif "start" in s:
+            # WHERE A SET'S ENTITIES START IS A SEED OPERATOR, NOT A PROPERTY OF THE SET. `spawn:`
+            # and its `spawn_*` companions were read here, before any operator existed, so the one
+            # thing a seed is for -- writing x_0 -- happened outside the algebra with no operator
+            # responsible. `seed_positions` (operators/seed_ops.py) calls the same `_spawn` /
+            # `_spawn3d` / `_spawn_pair3d` below, and every spec that carried the keys was
+            # rewritten on 2026-09-09; a spec that still carries one is refused rather than half-run.
+            _legacy = [k for k in s if k == "spawn" or str(k).startswith("spawn_")]
+            if _legacy:
+                raise ValueError(
+                    f"sets.{sname}: {', '.join(_legacy)} -- `spawn` is no longer a property of a "
+                    f"set. Where a set's entities start is a seed operator:\n"
+                    f"  seed:\n"
+                    f"    - {{op: seed_positions, at: {sname}, mode: {s.get('spawn', '...')!r}, "
+                    f"radius: {s.get('spawn_radius', '...')}}}\n"
+                    f"(`two_disks` takes separation / offset / tilt / thickness / arms; the set keeps "
+                    f"`n`, `state`, `types`, `vel_init`.)")
+            if "start" in s:
                 pos = _start_centers(s["start"], n, H.rng, device)  # known locations (e.g. an MPM blob)
             else:
                 pos = torch.rand(n, D, generator=H.rng, device=device) * H.world_size   # uniform in the box
@@ -1040,10 +1038,12 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         _prov_r = getattr(_ent_r, "provision", None) if _ent_r is not None else None
         if _prov_r is not None:
             _prov_r(lvl, None, s, H, device)
-        if isinstance(vinit, dict) and "vel" in schema:
-            vx0, vx1 = schema["vel"]
-            vel = _init_velocity(vinit, lvl, H.world_size, H.rng, device)
-            st = lvl.state.clone(); st[:vel.shape[0], vx0:vx1] = vel; lvl.state = st
+        # A COMPUTED VELOCITY IC READS x_0, AND x_0 IS FINAL ONLY AFTER THE SEEDS HAVE RUN. Applied
+        # here, `circular_orbit` measured radii and enclosed mass on the positions the build
+        # scattered uniformly, and `seed_positions` then moved every star into its disc -- so the
+        # orbits were set for a cloud that no longer existed. The IC is stashed and applied in
+        # `run()` right after `seed()`; for a set no seed moves, that is the same computation.
+        lvl._vel_init = vinit if (isinstance(vinit, dict) and "vel" in schema) else None
         H.add_level(lvl)
 
     # pass 2: contained sets -- the typed containment graph. Each child set is
@@ -1688,6 +1688,13 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
               f"(unset in the spec; `implementation: default` forces the torch body)", flush=True)
     H = build(sim, device)                    # 1) build the Hierarchy: every set (level) + field, from the spec
     seed(H, sim, device)                      # 1.5) x_0 = S(theta_S): the seed: section, exactly once
+    for lvl in H.levels.values():             # 1.6) v_0 from x_0 -- see the stash in `build`
+        vinit = getattr(lvl, "_vel_init", None)
+        if vinit:
+            vx0, vx1 = lvl.state_schema["vel"]
+            vel = _init_velocity(vinit, lvl, H.world_size, H.rng, device)
+            st = lvl.state.clone(); st[:vel.shape[0], vx0:vx1] = vel; lvl.state = st
+            lvl._vel_init = None
     H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
     # 3) instantiate each operator ONCE -> (op_name, live instance, selector, frame-window); its params
     #    carry the field refs (to/from) + the set name (_at), and the frame gate (after_frame/before_frame)

@@ -35,3 +35,18 @@ plotting:
   camera_elev: 0.5
   camera_elev_end: 1.15
   camera_turns: 0.1
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A cluster of yellow particles begins as a small, dense point in the center of a 3D bounding
+      box. Over time, the particles expand and begin to rotate, forming a large, sweeping arc that stretches
+      vertically. As the simulation progresses, the structure twists and flattens into a complex, multi-layered
+      spiral shape. In the final frames, the particles stretch into elongated, orbital paths that wrap
+      around the central axis.
+    objects: The primary objects are 60,000 individual yellow particles that represent a dynamic fluid
+      or particle system. These particles are initially clustered together in a tight, spherical topology
+      before evolving into a large, curved sheet. The particles maintain a consistent small size throughout
+      the simulation, though their collective arrangement changes from a point to a complex spiral. The
+      entire system is contained within a large, white wireframe cube that provides a spatial reference
+      for the motion.

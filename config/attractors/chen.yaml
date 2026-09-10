@@ -35,3 +35,17 @@ plotting:
   camera_elev: 0.95
   camera_elev_end: 1.4
   camera_turns: 0.1
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A small cluster of cyan particles begins as a concentrated point near the center of a
+      3D bounding box. As time progresses, the particles rapidly expand and organize into a complex, symmetrical
+      double-lobed structure. The structure maintains a stable, intertwined shape while the surrounding
+      cloud of particles becomes more diffuse. By the final frames, the system reaches a steady state
+      where the central core remains clearly defined against a faint background of scattered points.
+    objects: The primary objects are thousands of tiny cyan particles that form a dense, interconnected
+      web. These particles are arranged in a symmetrical, butterfly-like topology with two distinct lobes
+      connected at a central point. The size of individual particles is extremely small, appearing as
+      single pixels or dots within the larger volume. A secondary set of much fainter, scattered cyan
+      points forms a sparse cloud surrounding the main structure.

@@ -15,7 +15,6 @@ general: {name: vicsek_slime_4t_glide12, seed: 0, n_frames: 1200, dt: 1.0, bound
 sets:
   cell:
     n: 9000
-    spawn: random
     types:
       a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
@@ -23,48 +22,26 @@ sets:
       d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.024}
 - {op: diffuse, at: chemical, rate: 0.013}
-- {op: decay,   at: chemical, rate: 0.002}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}   # follow own trail, avoid the others
-- {op: glide,   at: cell, noise: 0.012}
+- {op: decay, at: chemical, rate: 0.002}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}     # follow own trail, avoid the others
+- {op: glide, at: cell, noise: 0.012}
 schedule: [deposit, diffuse, decay, sense, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a collection of small, multi-colored particles distributed across
-      a black background. Over time, the particles appear to move and shift slightly, though they maintain
-      a relatively uniform density throughout the frame. There is no significant global movement or large-scale
-      structural change visible between the keyframes. The overall appearance remains a static-like field
-      of colorful, jagged shapes.
-    objects: The scene contains thousands of small, jagged, and irregular shapes that resemble tiny sparks
-      or fragments. These objects are colored in a mix of red, green, blue, and yellow. They are distributed
-      randomly across the entire space without forming any specific connected structures or large clusters.
-      Each individual object is very small in size relative to the overall frame.
+    description: The simulation shows a collection of small, multi-colored particles distributed across a black background. Over time, the particles appear to move and shift slightly, though they maintain a relatively uniform density throughout the frame. There is no significant global movement or large-scale structural change visible between the keyframes. The overall appearance remains a static-like field of colorful, jagged shapes.
+    objects: The scene contains thousands of small, jagged, and irregular shapes that resemble tiny sparks or fragments. These objects are colored in a mix of red, green, blue, and yellow. They are distributed randomly across the entire space without forming any specific connected structures or large clusters. Each individual object is very small in size relative to the overall frame.
   movie_chemical:
-    description: The simulation shows a collection of multi-colored, amorphous blobs moving and morphing
-      against a black background. Over time, the shapes shift their positions and change their internal
-      configurations while maintaining a relatively constant density. The movement appears fluid and stochastic,
-      with some shapes merging or stretching into elongated forms. The overall scene remains dynamic,
-      with the various colored regions constantly evolving in shape and location.
-    objects: The scene contains several distinct sets of objects colored in blue, green, yellow, and red.
-      These objects are irregular, blob-like shapes that vary in size from small dots to larger, elongated
-      structures. They are distributed somewhat uniformly across the frame, appearing as disconnected
-      entities that occasionally touch or overlap. The colors are vibrant and saturated, contrasting sharply
-      against the dark, noisy background.
+    description: The simulation shows a collection of multi-colored, amorphous blobs moving and morphing against a black background. Over time, the shapes shift their positions and change their internal configurations while maintaining a relatively constant density. The movement appears fluid and stochastic, with some shapes merging or stretching into elongated forms. The overall scene remains dynamic, with the various colored regions constantly evolving in shape and location.
+    objects: The scene contains several distinct sets of objects colored in blue, green, yellow, and red. These objects are irregular, blob-like shapes that vary in size from small dots to larger, elongated structures. They are distributed somewhat uniformly across the frame, appearing as disconnected entities that occasionally touch or overlap. The colors are vibrant and saturated, contrasting sharply against the dark, noisy background.
   movie_overlay_chemical:
-    description: The simulation shows a dense field of small, multi-colored particles that appear to be
-      in a state of constant, chaotic motion. Over time, larger, diffuse clusters of color emerge and
-      shift positions within the background of smaller points. These larger clusters seem to pulsate and
-      morph, changing their shapes and intensities as they move. The overall scene maintains a high level
-      of complexity, with the small particles providing a constant texture while the larger blobs evolve
-      dynamically.
-    objects: The scene contains thousands of tiny, needle-like particles in red, blue, green, and yellow.
-      These small particles are distributed uniformly across the entire frame, creating a dense, speckled
-      background. Interspersed among them are large, amorphous blobs of color that appear as soft, glowing
-      clouds. These larger clusters vary in size and shape, with some appearing as elongated streaks and
-      others as rounded, fuzzy masses.
+    description: The simulation shows a dense field of small, multi-colored particles that appear to be in a state of constant, chaotic motion. Over time, larger, diffuse clusters of color emerge and shift positions within the background of smaller points. These larger clusters seem to pulsate and morph, changing their shapes and intensities as they move. The overall scene maintains a high level of complexity, with the small particles providing a constant texture while the larger blobs evolve dynamically.
+    objects: The scene contains thousands of tiny, needle-like particles in red, blue, green, and yellow. These small particles are distributed uniformly across the entire frame, creating a dense, speckled background. Interspersed among them are large, amorphous blobs of color that appear as soft, glowing clouds. These larger clusters vary in size and shape, with some appearing as elongated streaks and others as rounded, fuzzy masses.
 
 plotting:
   renderer: mpl2d

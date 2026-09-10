@@ -15,7 +15,6 @@ general: {name: vicsek_slime_4t_sense50, seed: 0, n_frames: 1200, dt: 1.0, bound
 sets:
   cell:
     n: 9000
-    spawn: random
     types:
       a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
@@ -23,47 +22,26 @@ sets:
       d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.024}
 - {op: diffuse, at: chemical, rate: 0.013}
-- {op: decay,   at: chemical, rate: 0.002}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 0.5}   # follow own trail, avoid the others
-- {op: glide,   at: cell, noise: 0.0}
+- {op: decay, at: chemical, rate: 0.002}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 0.5}     # follow own trail, avoid the others
+- {op: glide, at: cell, noise: 0.0}
 schedule: [deposit, diffuse, decay, sense, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, chaotic field of small, multi-colored particles moving
-      in various directions. Over time, these particles begin to organize into distinct, flowing streams
-      and swirling vortices. The streams become more defined and elongated, forming complex, interconnected
-      paths across the frame. By the final frame, the motion has coalesced into large-scale coherent structures
-      with clear rotational and linear patterns.
-    objects: The scene contains thousands of tiny, needle-like particles in red, yellow, green, and blue.
-      These particles are initially distributed randomly but eventually align into long, continuous filamentary
-      structures. The filaments vary in length and curvature, forming large loops and winding paths that
-      span the entire image. The colors are distributed somewhat uniformly, though they often cluster
-      together within the same flowing streams.
+    description: The simulation begins with a dense, chaotic field of small, multi-colored particles moving in various directions. Over time, these particles begin to organize into distinct, flowing streams and swirling vortices. The streams become more defined and elongated, forming complex, interconnected paths across the frame. By the final frame, the motion has coalesced into large-scale coherent structures with clear rotational and linear patterns.
+    objects: The scene contains thousands of tiny, needle-like particles in red, yellow, green, and blue. These particles are initially distributed randomly but eventually align into long, continuous filamentary structures. The filaments vary in length and curvature, forming large loops and winding paths that span the entire image. The colors are distributed somewhat uniformly, though they often cluster together within the same flowing streams.
   movie_chemical:
-    description: The simulation shows a complex fluid-like flow of colorful streamlines evolving over
-      time. The lines twist and turn, forming various vortices and elongated structures as they move across
-      the black background. Over the course of the sequence, the patterns shift and morph, maintaining
-      a consistent density of flow. The overall motion appears smooth and continuous, characteristic of
-      a laminar or turbulent fluid dynamics model.
-    objects: The scene contains numerous thin, continuous streamlines that weave together in a dense network.
-      These lines are colored in a repeating palette of cyan, magenta, yellow, and green. The structures
-      vary in size, ranging from small, tight circular vortices to large, sweeping loops. The lines are
-      interconnected and overlapping, creating a complex topological web of flowing paths.
+    description: The simulation shows a complex fluid-like flow of colorful streamlines evolving over time. The lines twist and turn, forming various vortices and elongated structures as they move across the black background. Over the course of the sequence, the patterns shift and morph, maintaining a consistent density of flow. The overall motion appears smooth and continuous, characteristic of a laminar or turbulent fluid dynamics model.
+    objects: The scene contains numerous thin, continuous streamlines that weave together in a dense network. These lines are colored in a repeating palette of cyan, magenta, yellow, and green. The structures vary in size, ranging from small, tight circular vortices to large, sweeping loops. The lines are interconnected and overlapping, creating a complex topological web of flowing paths.
   movie_overlay_chemical:
-    description: The simulation begins with a dense field of small, multi-colored particles moving in
-      chaotic, high-frequency patterns. Over time, these particles begin to organize into coherent, flowing
-      streams that follow curved trajectories. As the simulation progresses, the streams thicken and develop
-      distinct, smooth paths that resemble fluid flow or magnetic field lines. By the final frames, the
-      motion is dominated by large, sweeping loops and vortices of color against a black background.
-    objects: The scene contains thousands of tiny, needle-like particles in red, yellow, blue, and green.
-      These small particles are distributed throughout the space, often clustering along the paths of
-      larger structures. The primary objects are thick, continuous ribbons of light that form complex,
-      intertwined loops and swirls. These ribbons vary in width and are colored in vibrant shades of cyan,
-      magenta, yellow, and lime green.
+    description: The simulation begins with a dense field of small, multi-colored particles moving in chaotic, high-frequency patterns. Over time, these particles begin to organize into coherent, flowing streams that follow curved trajectories. As the simulation progresses, the streams thicken and develop distinct, smooth paths that resemble fluid flow or magnetic field lines. By the final frames, the motion is dominated by large, sweeping loops and vortices of color against a black background.
+    objects: The scene contains thousands of tiny, needle-like particles in red, yellow, blue, and green. These small particles are distributed throughout the space, often clustering along the paths of larger structures. The primary objects are thick, continuous ribbons of light that form complex, intertwined loops and swirls. These ribbons vary in width and are colored in vibrant shades of cyan, magenta, yellow, and lime green.
 
 plotting:
   renderer: mpl2d

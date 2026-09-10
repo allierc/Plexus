@@ -14,8 +14,6 @@ general:
 sets:
   cell:
     n: 12000
-    spawn: disc
-    spawn_radius: 0.3
     types:
       a:
         fraction: 1.0
@@ -29,6 +27,8 @@ fields:
     frame: grid
     res: 80
     couples_to: cell
+seed:
+- {op: seed_positions, at: cell, mode: disc, radius: 0.3, seed: 0}
 operators:
 - op: deposit
   at: cell
@@ -59,25 +59,11 @@ schedule:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense, spherical cluster of green particles initially appears as a solid mass. Over
-      time, the cluster begins to fragment and expand outward into a more porous, web-like structure.
-      Long, thin filaments of particles extend from the central mass into the surrounding black space.
-      By the final frame, the central core has become highly irregular and sparse, with many isolated
-      particles scattered throughout the field.
-    objects: The primary object is a large, roughly spherical cluster of green particles. This cluster
-      transitions from a solid, compact topology to a complex, interconnected network of filaments and
-      voids. Numerous small, individual green particles are scattered around the main mass, appearing
-      as a sparse cloud. The filaments are thin and elongated, extending several times the radius of the
-      central core.
+    description: A dense, spherical cluster of green particles initially appears as a solid mass. Over time, the cluster begins to fragment and expand outward into a more porous, web-like structure. Long, thin filaments of particles extend from the central mass into the surrounding black space. By the final frame, the central core has become highly irregular and sparse, with many isolated particles scattered throughout the field.
+    objects: The primary object is a large, roughly spherical cluster of green particles. This cluster transitions from a solid, compact topology to a complex, interconnected network of filaments and voids. Numerous small, individual green particles are scattered around the main mass, appearing as a sparse cloud. The filaments are thin and elongated, extending several times the radius of the central core.
   movie_chemical:
-    description: A single green spherical particle is initially shown in the center of a black background.
-      Over time, several thin, branch-like structures emerge from the surface of the sphere. These protrusions
-      extend outward in various directions, becoming more defined as the simulation progresses. The central
-      sphere remains relatively stable in size and position while the surrounding filaments grow.
-    objects: The primary object is a large, circular green sphere located in the center of the frame.
-      Several thin, elongated green filaments sprout from the sphere's perimeter. These filaments are
-      arranged in a radial pattern, extending into the surrounding black space. The sphere is significantly
-      larger than the individual filaments, which appear as delicate, thread-like structures.
+    description: A single green spherical particle is initially shown in the center of a black background. Over time, several thin, branch-like structures emerge from the surface of the sphere. These protrusions extend outward in various directions, becoming more defined as the simulation progresses. The central sphere remains relatively stable in size and position while the surrounding filaments grow.
+    objects: The primary object is a large, circular green sphere located in the center of the frame. Several thin, elongated green filaments sprout from the sphere's perimeter. These filaments are arranged in a radial pattern, extending into the surrounding black space. The sphere is significantly larger than the individual filaments, which appear as delicate, thread-like structures.
 
 plotting:
   renderer: vtk_points

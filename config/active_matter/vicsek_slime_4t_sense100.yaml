@@ -15,7 +15,6 @@ general: {name: vicsek_slime_4t_sense100, seed: 0, n_frames: 1200, dt: 1.0, boun
 sets:
   cell:
     n: 9000
-    spawn: random
     types:
       a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
@@ -23,46 +22,26 @@ sets:
       d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.024}
 - {op: diffuse, at: chemical, rate: 0.013}
-- {op: decay,   at: chemical, rate: 0.002}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}   # follow own trail, avoid the others
-- {op: glide,   at: cell, noise: 0.0}
+- {op: decay, at: chemical, rate: 0.002}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}     # follow own trail, avoid the others
+- {op: glide, at: cell, noise: 0.0}
 schedule: [deposit, diffuse, decay, sense, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a collection of colorful, elongated particles moving in complex,
-      winding paths across a black background. Over time, the particles transition from a state of high-frequency,
-      chaotic motion to a more organized, fluid-like flow. The trajectories become increasingly smooth
-      and continuous as the agents follow established paths. By the final frame, the motion appears as
-      a coherent, swirling network of interconnected streams.
-    objects: The scene contains numerous small, rod-shaped particles in vibrant shades of red, yellow,
-      green, and blue. These particles are arranged in long, continuous, and winding trajectories that
-      overlap and intertwine. The size of the individual particles is small and uniform, while the length
-      of their paths varies significantly. The colors are distributed somewhat evenly, creating a multi-colored,
-      web-like structure across the entire field of view.
+    description: The simulation shows a collection of colorful, elongated particles moving in complex, winding paths across a black background. Over time, the particles transition from a state of high-frequency, chaotic motion to a more organized, fluid-like flow. The trajectories become increasingly smooth and continuous as the agents follow established paths. By the final frame, the motion appears as a coherent, swirling network of interconnected streams.
+    objects: The scene contains numerous small, rod-shaped particles in vibrant shades of red, yellow, green, and blue. These particles are arranged in long, continuous, and winding trajectories that overlap and intertwine. The size of the individual particles is small and uniform, while the length of their paths varies significantly. The colors are distributed somewhat evenly, creating a multi-colored, web-like structure across the entire field of view.
   movie_chemical:
-    description: The video shows a series of colorful, undulating lines moving across a black background.
-      These lines appear to be flowing or oscillating in a fluid-like motion. Over time, the paths of
-      the lines shift and intertwine, creating a dynamic, tangled web. The overall effect is a continuous,
-      rhythmic evolution of complex, wavy patterns.
-    objects: The scene contains multiple continuous, thread-like lines of varying lengths. These lines
-      are colored in shades of blue, green, yellow, and pink. They are arranged in a dense, overlapping
-      network that fills the entire frame. Each line has a consistent thickness and follows a smooth,
-      curvilinear path.
+    description: The video shows a series of colorful, undulating lines moving across a black background. These lines appear to be flowing or oscillating in a fluid-like motion. Over time, the paths of the lines shift and intertwine, creating a dynamic, tangled web. The overall effect is a continuous, rhythmic evolution of complex, wavy patterns.
+    objects: The scene contains multiple continuous, thread-like lines of varying lengths. These lines are colored in shades of blue, green, yellow, and pink. They are arranged in a dense, overlapping network that fills the entire frame. Each line has a consistent thickness and follows a smooth, curvilinear path.
   movie_overlay_chemical:
-    description: The simulation begins with a dense, chaotic field of small, multi-colored particles moving
-      in various directions. As time progresses, these particles begin to organize into distinct, flowing
-      streams that follow complex, winding paths. The streams maintain their individual colors while weaving
-      around each other, creating a sense of fluid motion. By the end of the sequence, the flow patterns
-      become more defined, showing a continuous, interconnected network of moving lines.
-    objects: The scene contains numerous small, triangular particles in colors like red, yellow, green,
-      and blue. These particles are distributed throughout the space, often clustering along the paths
-      of the larger streams. The primary objects are long, continuous, ribbon-like streams that curve
-      and loop across the black background. These streams are thick and vibrant, with colors ranging from
-      bright cyan and yellow to magenta and lime green.
+    description: The simulation begins with a dense, chaotic field of small, multi-colored particles moving in various directions. As time progresses, these particles begin to organize into distinct, flowing streams that follow complex, winding paths. The streams maintain their individual colors while weaving around each other, creating a sense of fluid motion. By the end of the sequence, the flow patterns become more defined, showing a continuous, interconnected network of moving lines.
+    objects: The scene contains numerous small, triangular particles in colors like red, yellow, green, and blue. These particles are distributed throughout the space, often clustering along the paths of the larger streams. The primary objects are long, continuous, ribbon-like streams that curve and loop across the black background. These streams are thick and vibrant, with colors ranging from bright cyan and yellow to magenta and lime green.
 
 plotting:
   renderer: mpl2d

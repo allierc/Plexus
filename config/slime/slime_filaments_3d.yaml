@@ -14,8 +14,6 @@ general:
 sets:
   cell:
     n: 13000
-    spawn: disc
-    spawn_radius: 0.3
     types:
       a:
         fraction: 1.0
@@ -29,6 +27,8 @@ fields:
     frame: grid
     res: 80
     couples_to: cell
+seed:
+- {op: seed_positions, at: cell, mode: disc, radius: 0.3, seed: 0}
 operators:
 - op: deposit
   at: cell
@@ -59,26 +59,11 @@ schedule:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense cluster of green particles begins as a compact, roughly spherical mass. Over
-      time, the particles begin to disperse outward from the center, creating a more diffuse and irregular
-      shape. The expansion is non-uniform, with some particles forming elongated filaments or streaks
-      while others scatter randomly. By the final frame, the central core remains visible but is surrounded
-      by a much larger, more chaotic cloud of scattered points.
-    objects: The primary objects are thousands of small, individual green particles. These particles are
-      initially arranged in a high-density, spherical topology at the center of the frame. As the simulation
-      progresses, the topology shifts from a solid-like cluster to a sparse, branching network of points.
-      The particles maintain a consistent small size and vibrant green color throughout the entire sequence.
+    description: A dense cluster of green particles begins as a compact, roughly spherical mass. Over time, the particles begin to disperse outward from the center, creating a more diffuse and irregular shape. The expansion is non-uniform, with some particles forming elongated filaments or streaks while others scatter randomly. By the final frame, the central core remains visible but is surrounded by a much larger, more chaotic cloud of scattered points.
+    objects: The primary objects are thousands of small, individual green particles. These particles are initially arranged in a high-density, spherical topology at the center of the frame. As the simulation progresses, the topology shifts from a solid-like cluster to a sparse, branching network of points. The particles maintain a consistent small size and vibrant green color throughout the entire sequence.
   movie_chemical:
-    description: A single green spherical particle is initially shown in the center of a black background.
-      Over time, numerous thin, thread-like filaments begin to sprout outward from the surface of the
-      sphere. These filaments grow longer and more complex, creating a fuzzy, starburst-like appearance
-      around the central core. By the final frame, the sphere is almost entirely enveloped by a dense
-      network of these radiating green structures.
-    objects: The primary object is a large, solid green sphere located in the center of the frame. Surrounding
-      this sphere is a set of thin, elongated filaments that radiate outward in all directions. These
-      filaments are the same green color as the central sphere and vary in length and thickness. The overall
-      structure forms a complex, symmetrical topology where the filaments appear to be anchored to the
-      surface of the central body.
+    description: A single green spherical particle is initially shown in the center of a black background. Over time, numerous thin, thread-like filaments begin to sprout outward from the surface of the sphere. These filaments grow longer and more complex, creating a fuzzy, starburst-like appearance around the central core. By the final frame, the sphere is almost entirely enveloped by a dense network of these radiating green structures.
+    objects: The primary object is a large, solid green sphere located in the center of the frame. Surrounding this sphere is a set of thin, elongated filaments that radiate outward in all directions. These filaments are the same green color as the central sphere and vary in length and thickness. The overall structure forms a complex, symmetrical topology where the filaments appear to be anchored to the surface of the central body.
 
 plotting:
   renderer: vtk_points

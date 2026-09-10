@@ -16,7 +16,6 @@ general: {name: vicsek_slime_4t_x10, seed: 0, n_frames: 12000, dt: 1.0, boundary
 sets:
   cell:
     n: 9000
-    spawn: random
     types:
       a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
@@ -24,48 +23,26 @@ sets:
       d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.024}
 - {op: diffuse, at: chemical, rate: 0.013}
-- {op: decay,   at: chemical, rate: 0.002}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}   # follow own trail, avoid the others
-- {op: glide,   at: cell}
+- {op: decay, at: chemical, rate: 0.002}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}     # follow own trail, avoid the others
+- {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a collection of colorful, curved lines and closed loops evolving
-      on a black background. Over time, the shapes shift and deform, with some loops expanding while others
-      contract or merge. The movement appears fluid and continuous, suggesting a dynamic field or a system
-      of interacting agents. The overall pattern maintains a consistent density of elements throughout
-      the duration of the video.
-    objects: The scene contains several closed loops and elongated, winding paths in various colors including
-      red, yellow, green, and blue. These objects are interconnected or adjacent, forming a complex network
-      of overlapping and nested shapes. The sizes of the loops vary significantly, ranging from small
-      circular points to large, sprawling enclosures. Each object is composed of a textured, dashed-line
-      appearance that gives them a vibrant, energetic look.
+    description: The simulation shows a collection of colorful, curved lines and closed loops evolving on a black background. Over time, the shapes shift and deform, with some loops expanding while others contract or merge. The movement appears fluid and continuous, suggesting a dynamic field or a system of interacting agents. The overall pattern maintains a consistent density of elements throughout the duration of the video.
+    objects: The scene contains several closed loops and elongated, winding paths in various colors including red, yellow, green, and blue. These objects are interconnected or adjacent, forming a complex network of overlapping and nested shapes. The sizes of the loops vary significantly, ranging from small circular points to large, sprawling enclosures. Each object is composed of a textured, dashed-line appearance that gives them a vibrant, energetic look.
   movie_chemical:
-    description: The simulation shows a dynamic field of interconnected, fluid-like loops and lines evolving
-      over time. The structures shift and morph, with some loops expanding while others contract or merge
-      into larger shapes. The lines flow smoothly across the black background, exhibiting a continuous,
-      organic motion. By the final frame, the complex network of paths has rearranged into a new configuration
-      of nested and overlapping curves.
-    objects: The scene contains several closed loops and elongated, winding lines in various colors including
-      teal, gold, pink, and blue. These objects are topologically connected in some areas, forming complex
-      networks where multiple paths converge or branch out. The sizes of the loops vary significantly,
-      ranging from small, tight circles to large, expansive shapes that dominate the frame. The colors
-      remain consistent throughout the sequence, providing a clear visual distinction between the different
-      flowing paths.
+    description: The simulation shows a dynamic field of interconnected, fluid-like loops and lines evolving over time. The structures shift and morph, with some loops expanding while others contract or merge into larger shapes. The lines flow smoothly across the black background, exhibiting a continuous, organic motion. By the final frame, the complex network of paths has rearranged into a new configuration of nested and overlapping curves.
+    objects: The scene contains several closed loops and elongated, winding lines in various colors including teal, gold, pink, and blue. These objects are topologically connected in some areas, forming complex networks where multiple paths converge or branch out. The sizes of the loops vary significantly, ranging from small, tight circles to large, expansive shapes that dominate the frame. The colors remain consistent throughout the sequence, providing a clear visual distinction between the different flowing paths.
   movie_overlay_chemical:
-    description: The simulation begins with a dense, chaotic field of small, multicolored particles scattered
-      across a black background. Over time, these particles begin to organize into distinct, flowing streams
-      and closed loops. The movement transitions from random diffusion to a structured, fluid-like motion
-      where lines of color trace continuous paths. By the final frames, the particles have coalesced into
-      thick, vibrant ribbons and circular orbits that define a complex topological network.
-    objects: The scene contains thousands of tiny, triangular particles in red, yellow, green, and blue.
-      These particles aggregate into long, continuous curvilinear paths and closed circular loops. The
-      primary structures are thick, glowing ribbons of color that vary in width and curvature. The overall
-      topology consists of interconnected loops and branching streams that create a sense of fluid flow.
+    description: The simulation begins with a dense, chaotic field of small, multicolored particles scattered across a black background. Over time, these particles begin to organize into distinct, flowing streams and closed loops. The movement transitions from random diffusion to a structured, fluid-like motion where lines of color trace continuous paths. By the final frames, the particles have coalesced into thick, vibrant ribbons and circular orbits that define a complex topological network.
+    objects: The scene contains thousands of tiny, triangular particles in red, yellow, green, and blue. These particles aggregate into long, continuous curvilinear paths and closed circular loops. The primary structures are thick, glowing ribbons of color that vary in width and curvature. The overall topology consists of interconnected loops and branching streams that create a sense of fluid flow.
 
 plotting:
   renderer: mpl2d

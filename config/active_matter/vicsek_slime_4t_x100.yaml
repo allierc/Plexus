@@ -15,7 +15,6 @@ general: {name: vicsek_slime_4t_x100, seed: 0, n_frames: 120000, dt: 1.0, bounda
 sets:
   cell:
     n: 9000
-    spawn: random
     types:
       a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
@@ -23,49 +22,26 @@ sets:
       d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.024}
 - {op: diffuse, at: chemical, rate: 0.013}
-- {op: decay,   at: chemical, rate: 0.002}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}   # follow own trail, avoid the others
-- {op: glide,   at: cell}
+- {op: decay, at: chemical, rate: 0.002}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}     # follow own trail, avoid the others
+- {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
-      across a black background. Over time, these particles begin to organize into distinct, flowing streams
-      and large, circular structures. The streams curve and merge, while the circular regions expand and
-      contract as they move through the space. By the final frame, the system has transitioned from a
-      random state into a highly structured pattern of undulating lines and nested loops.
-    objects: The scene contains thousands of small, triangular particles in colors including red, yellow,
-      green, and blue. These particles aggregate into thick, continuous lines that curve across the frame
-      in a fluid-like motion. Several large, nested circular structures appear, characterized by thick
-      yellow and green boundaries. The overall topology shows a transition from a high-entropy gas-like
-      state to a low-entropy organized flow of filaments and loops.
+    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered across a black background. Over time, these particles begin to organize into distinct, flowing streams and large, circular structures. The streams curve and merge, while the circular regions expand and contract as they move through the space. By the final frame, the system has transitioned from a random state into a highly structured pattern of undulating lines and nested loops.
+    objects: The scene contains thousands of small, triangular particles in colors including red, yellow, green, and blue. These particles aggregate into thick, continuous lines that curve across the frame in a fluid-like motion. Several large, nested circular structures appear, characterized by thick yellow and green boundaries. The overall topology shows a transition from a high-entropy gas-like state to a low-entropy organized flow of filaments and loops.
   movie_chemical:
-    description: The simulation begins with several distinct, closed loops and flowing lines of different
-      colors. Over time, the loops and lines migrate across the frame, changing their shapes and relative
-      positions. The lines appear to flow and stretch as they move, while the closed loops maintain their
-      integrity but shift in location. By the final frame, the initial configuration has completely transformed
-      into a new arrangement of flowing curves and loops.
-    objects: The scene contains several closed loops of varying sizes, including a large yellow-gold loop
-      and smaller green and red loops. There are also multiple long, continuous lines in blue, green,
-      and red that flow across the black background. The loops are generally nested or adjacent to one
-      another, while the lines weave around the loops. The colors are distinct and consistent for each
-      individual path or loop throughout the simulation.
+    description: The simulation begins with several distinct, closed loops and flowing lines of different colors. Over time, the loops and lines migrate across the frame, changing their shapes and relative positions. The lines appear to flow and stretch as they move, while the closed loops maintain their integrity but shift in location. By the final frame, the initial configuration has completely transformed into a new arrangement of flowing curves and loops.
+    objects: The scene contains several closed loops of varying sizes, including a large yellow-gold loop and smaller green and red loops. There are also multiple long, continuous lines in blue, green, and red that flow across the black background. The loops are generally nested or adjacent to one another, while the lines weave around the loops. The colors are distinct and consistent for each individual path or loop throughout the simulation.
   movie_overlay_chemical:
-    description: The simulation begins with a dense field of multicolored particles and small triangular
-      agents scattered across a black background. Over time, these elements organize into distinct, flowing
-      curvilinear paths and large closed loops. The particles and agents appear to be guided by an underlying
-      vector field, forming coherent streams of color. By the final frame, the motion has stabilized into
-      a series of smooth, interconnected ribbons and circular orbits.
-    objects: The scene contains thousands of tiny, multicolored particles and small triangular agents
-      that act as the primary moving elements. These elements are organized into large, continuous curvilinear
-      paths and closed loops that vary in size and curvature. The colors are primarily vibrant shades
-      of blue, green, yellow, and red, which define the different flow trajectories. The topology of the
-      scene transitions from a chaotic distribution to a structured network of interconnected ribbons
-      and nested circles.
+    description: The simulation begins with a dense field of multicolored particles and small triangular agents scattered across a black background. Over time, these elements organize into distinct, flowing curvilinear paths and large closed loops. The particles and agents appear to be guided by an underlying vector field, forming coherent streams of color. By the final frame, the motion has stabilized into a series of smooth, interconnected ribbons and circular orbits.
+    objects: The scene contains thousands of tiny, multicolored particles and small triangular agents that act as the primary moving elements. These elements are organized into large, continuous curvilinear paths and closed loops that vary in size and curvature. The colors are primarily vibrant shades of blue, green, yellow, and red, which define the different flow trajectories. The topology of the scene transitions from a chaotic distribution to a structured network of interconnected ribbons and nested circles.
 
 plotting:
   renderer: mpl2d

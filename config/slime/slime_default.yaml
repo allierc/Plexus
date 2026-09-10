@@ -7,42 +7,28 @@ general: {name: slime_default, seed: 0, n_frames: 400, dt: 1.0, boundary: wall}
 sets:
   cell:
     n: 12000
-    spawn: disc
-    spawn_radius: 0.3
     types:
       a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 220, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: disc, radius: 0.3, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.045}
-- {op: diffuse, at: chemical,            rate: 0.0175}
-- {op: decay,   at: chemical,            rate: 0.0006}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
+- {op: diffuse, at: chemical, rate: 0.0175}
+- {op: decay, at: chemical, rate: 0.0006}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense cloud of green particles initially forms a roughly spherical shape. Over time,
-      the particles begin to organize into a complex, interconnected network of filaments. These filaments
-      form a web-like structure that maintains a spherical overall boundary. The network becomes increasingly
-      defined as the particles align into distinct paths.
-    objects: The primary objects are small, bright green particles. These particles are arranged in a
-      spherical cluster that occupies the center of the frame. They transition from a random distribution
-      into a connected topology of curved lines and loops. The overall size of the cluster remains constant
-      while the internal structure evolves from a cloud to a web.
+    description: A dense cloud of green particles initially forms a roughly spherical shape. Over time, the particles begin to organize into a complex, interconnected network of filaments. These filaments form a web-like structure that maintains a spherical overall boundary. The network becomes increasingly defined as the particles align into distinct paths.
+    objects: The primary objects are small, bright green particles. These particles are arranged in a spherical cluster that occupies the center of the frame. They transition from a random distribution into a connected topology of curved lines and loops. The overall size of the cluster remains constant while the internal structure evolves from a cloud to a web.
   movie_chemical:
-    description: The simulation begins with a dense, uniform cloud of green particles forming a circular
-      shape. Over time, these particles begin to organize into a complex, interconnected network of filaments.
-      The network structure becomes increasingly defined, forming a dense web of loops and strands within
-      the central sphere. Finally, long, thin filaments extend outward from the central mass into the
-      surrounding black space.
-    objects: The primary object is a large, circular cluster of green filaments located in the center
-      of the frame. These filaments are interconnected in a complex, web-like topology, creating a porous
-      internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
-      outward in all directions. All objects are a consistent teal-green color and are set against a solid
-      black background.
+    description: The simulation begins with a dense, uniform cloud of green particles forming a circular shape. Over time, these particles begin to organize into a complex, interconnected network of filaments. The network structure becomes increasingly defined, forming a dense web of loops and strands within the central sphere. Finally, long, thin filaments extend outward from the central mass into the surrounding black space.
+    objects: The primary object is a large, circular cluster of green filaments located in the center of the frame. These filaments are interconnected in a complex, web-like topology, creating a porous internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate outward in all directions. All objects are a consistent teal-green color and are set against a solid black background.
 
 plotting:
   renderer: mpl2d

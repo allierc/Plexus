@@ -1,6 +1,6 @@
 # spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS on
 # `squared_law` (law: gravity, all_pairs). Initialization is a SPEC concern (no operator):
-# `spawn: disk` places a FLAT xy disc with out-of-plane `spawn_thickness` scatter, and
+# `mode: disk` places a FLAT xy disc with out-of-plane `thickness` scatter, and
 # `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds from the enclosed mass
 # (+ a central point mass). Replaces the former `disk_ic` operator.
 #
@@ -10,32 +10,18 @@ general: {name: spiral_galaxy_3d, seed: 2, n_frames: 10000, dt: 0.004, boundary:
 sets:
   star:
     n: 25000
-    spawn: disk                                     # flat xy disc + out-of-plane thickness
-    spawn_radius: 1.5
-    spawn_thickness: 0.08
     vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.08, central_mass: 0.5, jitter: 0.06}
     types: {s: {fraction: 1.0, mass: 0.00004}}      # disk mass ~1.0
 fields: {}
+seed:
+- {op: seed_positions, at: star, mode: disk, radius: 1.5, thickness: 0.08, seed: 2}
 operators:
-  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true}
+- {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true}
 schedule: [squared_law]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_star:
-    description: A small, dense cluster of white particles begins as a compact, spherical mass in the
-      center of a black void. As time progresses, the cluster begins to expand outward, losing its initial
-      symmetry and becoming more irregular. The particles spread further into the surrounding space, forming
-      a larger, more diffuse cloud with visible internal structures. By the final frame, the mass has
-      significantly elongated and fragmented into a wide, sprawling distribution of individual points.
-    objects: The primary objects are numerous small, white particles that appear as distinct points of
-      light. Initially, these particles are tightly packed together to form a single, cohesive, and roughly
-      circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
-      irregular cloud with trailing filaments. The size of the individual particles remains constant,
-      but the overall volume occupied by the group increases dramatically over time.
+    description: A small, dense cluster of white particles begins as a compact, spherical mass in the center of a black void. As time progresses, the cluster begins to expand outward, losing its initial symmetry and becoming more irregular. The particles spread further into the surrounding space, forming a larger, more diffuse cloud with visible internal structures. By the final frame, the mass has significantly elongated and fragmented into a wide, sprawling distribution of individual points.
+    objects: The primary objects are numerous small, white particles that appear as distinct points of light. Initially, these particles are tightly packed together to form a single, cohesive, and roughly circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse, irregular cloud with trailing filaments. The size of the individual particles remains constant, but the overall volume occupied by the group increases dramatically over time.
 
-plotting: {renderer: vtk_points, background: black, colors: {s: [1.0, 1.0, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
-           # camera pitch SWEEP over the movie: 0.0 = top-down/face-on -> 1.35 rad (~77 deg) = almost side/edge-on.
-           # `camera_turns` adds a gentle azimuthal drift so the tilt reads as 3D.
-           camera_azim: 0.7, camera_elev: 0.0, camera_elev_end: 1.35, camera_turns: 0.15,
-           # Ken Burns move: slow push-in (camera_zoom) + slow screen drift (camera_pan [dx, dy], screen fraction).
-           camera_zoom: 0.30, camera_pan: [0.05, 0.03]}
+plotting: {renderer: vtk_points, background: black, colors: {s: [1.0, 1.0, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25, camera_azim: 0.7, camera_elev: 0.0, camera_elev_end: 1.35, camera_turns: 0.15, camera_zoom: 0.30, camera_pan: [0.05, 0.03]}

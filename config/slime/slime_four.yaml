@@ -4,7 +4,6 @@ general: {name: slime_four, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
 sets:
   cell:
     n: 14000
-    spawn: random
     types:
       a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
@@ -12,37 +11,24 @@ sets:
       d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.02}
 - {op: diffuse, at: chemical, rate: 0.013}
-- {op: decay,   at: chemical, rate: 0.002}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
+- {op: decay, at: chemical, rate: 0.002}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a collection of multi-colored particles moving in complex, fluid-like
-      trajectories across a black background. Over time, the particles form elongated, winding filaments
-      that twist and curve like smoke or flowing water. These filaments appear to interact and weave around
-      one another, maintaining distinct paths while filling the space. The overall motion is continuous
-      and smooth, creating a dynamic, organic pattern of flowing lines.
-    objects: The scene contains thousands of tiny, point-like particles of varying colors including red,
-      yellow, green, and blue. These particles are organized into long, continuous, thread-like structures
-      that curve and loop throughout the frame. The filaments are densely packed in some areas and more
-      sparse in others, creating a sense of depth and flow. Each individual particle is very small, but
-      their collective arrangement forms large, sweeping paths that dominate the visual field.
+    description: The simulation shows a collection of multi-colored particles moving in complex, fluid-like trajectories across a black background. Over time, the particles form elongated, winding filaments that twist and curve like smoke or flowing water. These filaments appear to interact and weave around one another, maintaining distinct paths while filling the space. The overall motion is continuous and smooth, creating a dynamic, organic pattern of flowing lines.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including red, yellow, green, and blue. These particles are organized into long, continuous, thread-like structures that curve and loop throughout the frame. The filaments are densely packed in some areas and more sparse in others, creating a sense of depth and flow. Each individual particle is very small, but their collective arrangement forms large, sweeping paths that dominate the visual field.
   movie_chemical:
-    description: The simulation shows a complex network of colorful, undulating lines moving across a
-      black background. These lines appear to flow and twist in a fluid-like motion, maintaining their
-      continuous paths throughout the sequence. The movement is smooth and organic, with the lines weaving
-      over and under one another. Over time, the overall pattern remains stable while the individual curves
-      shift and evolve dynamically.
-    objects: The scene contains numerous thin, continuous lines that form a dense, tangled web. These
-      lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a
-      uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected
-      in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.
+    description: The simulation shows a complex network of colorful, undulating lines moving across a black background. These lines appear to flow and twist in a fluid-like motion, maintaining their continuous paths throughout the sequence. The movement is smooth and organic, with the lines weaving over and under one another. Over time, the overall pattern remains stable while the individual curves shift and evolve dynamically.
+    objects: The scene contains numerous thin, continuous lines that form a dense, tangled web. These lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.
 
 plotting:
   renderer: mpl2d

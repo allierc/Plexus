@@ -15,7 +15,6 @@ general: {name: vicsek_slime_4t_x200, seed: 0, n_frames: 240000, dt: 1.0, bounda
 sets:
   cell:
     n: 9000
-    spawn: random
     types:
       a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
@@ -23,47 +22,26 @@ sets:
       d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.024}
 - {op: diffuse, at: chemical, rate: 0.013}
-- {op: decay,   at: chemical, rate: 0.002}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}   # follow own trail, avoid the others
-- {op: glide,   at: cell}
+- {op: decay, at: chemical, rate: 0.002}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}     # follow own trail, avoid the others
+- {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
-      across a black background. Over time, these particles begin to organize into distinct, flowing streamlines
-      and coherent structures. The chaotic motion transitions into a more ordered state where the particles
-      follow curved paths, forming large-scale vortices and laminar flows. By the final frame, the system
-      has settled into a highly structured pattern of nested loops and parallel trajectories.
-    objects: The scene contains thousands of small, individual particles that appear as tiny flecks of
-      color. These particles are primarily colored in shades of blue, green, yellow, and red. Initially,
-      they are arranged in a stochastic, high-entropy distribution with no clear spatial correlation.
-      As the simulation progresses, they align into continuous, elongated filaments and closed circular
-      loops that define the fluid dynamics of the field.
+    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered across a black background. Over time, these particles begin to organize into distinct, flowing streamlines and coherent structures. The chaotic motion transitions into a more ordered state where the particles follow curved paths, forming large-scale vortices and laminar flows. By the final frame, the system has settled into a highly structured pattern of nested loops and parallel trajectories.
+    objects: The scene contains thousands of small, individual particles that appear as tiny flecks of color. These particles are primarily colored in shades of blue, green, yellow, and red. Initially, they are arranged in a stochastic, high-entropy distribution with no clear spatial correlation. As the simulation progresses, they align into continuous, elongated filaments and closed circular loops that define the fluid dynamics of the field.
   movie_chemical:
-    description: The simulation begins with a set of colored lines flowing across a black background.
-      Over time, a closed loop structure emerges and stabilizes in the center-left of the frame. The surrounding
-      lines continue to flow and curve, maintaining their relative positions. The final frame shows the
-      stable loop and the continuous flow of the surrounding lines.
-    objects: The scene contains several continuous, thin lines in blue, red, green, and yellow. A distinct
-      closed loop is formed by a green and a yellow line in the center-left. The other lines are arranged
-      in parallel-like curves that flow from the top-left to the bottom-right. All lines are of a similar
-      thickness and maintain a consistent color throughout the sequence.
+    description: The simulation begins with a set of colored lines flowing across a black background. Over time, a closed loop structure emerges and stabilizes in the center-left of the frame. The surrounding lines continue to flow and curve, maintaining their relative positions. The final frame shows the stable loop and the continuous flow of the surrounding lines.
+    objects: The scene contains several continuous, thin lines in blue, red, green, and yellow. A distinct closed loop is formed by a green and a yellow line in the center-left. The other lines are arranged in parallel-like curves that flow from the top-left to the bottom-right. All lines are of a similar thickness and maintain a consistent color throughout the sequence.
   movie_overlay_chemical:
-    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
-      across a black background. Over time, these particles begin to organize into distinct, flowing streamlines
-      that curve and swirl across the frame. The chaotic noise gradually diminishes as the particles align
-      into coherent paths, forming large-scale structures. By the end of the sequence, the particles have
-      settled into smooth, continuous ribbons of color that trace the underlying flow field.
-    objects: The scene contains thousands of small, triangular particles that act as tracers for the underlying
-      fluid dynamics. These particles are colored in a variety of hues, including red, green, blue, and
-      yellow, which represent different properties or velocities. Initially, the particles are arranged
-      in a stochastic, high-entropy distribution with no clear spatial correlation. As the simulation
-      progresses, they form elongated, continuous filaments that follow curved trajectories, creating
-      a sense of fluid motion.
+    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered across a black background. Over time, these particles begin to organize into distinct, flowing streamlines that curve and swirl across the frame. The chaotic noise gradually diminishes as the particles align into coherent paths, forming large-scale structures. By the end of the sequence, the particles have settled into smooth, continuous ribbons of color that trace the underlying flow field.
+    objects: The scene contains thousands of small, triangular particles that act as tracers for the underlying fluid dynamics. These particles are colored in a variety of hues, including red, green, blue, and yellow, which represent different properties or velocities. Initially, the particles are arranged in a stochastic, high-entropy distribution with no clear spatial correlation. As the simulation progresses, they form elongated, continuous filaments that follow curved trajectories, creating a sense of fluid motion.
 
 plotting:
   renderer: mpl2d
