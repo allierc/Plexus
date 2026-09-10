@@ -1169,6 +1169,16 @@ class SeedMeshApicoBasal(SeedMesh3D):
         super().__init__(params, device)
         self.h0 = float(params.get("h0", 0.4))                 # FULL thickness; sep is h0/2
         self.sep_block = str(params.get("sep_block", "sep"))
+        # WHICH WAY THE APICAL SIDE FACES. `out` (default, every archived run): apical = pos + sep
+        # with sep along the outward normal, so a closed vesicle is apical-out and its basal
+        # surface faces the lumen. `in`: the sign of sep is flipped, apical faces the lumen and
+        # the basal surface faces out -- the polarity of a cyst in a matrix, where a basement
+        # membrane sits. The energy is unchanged: `cell_mechanics[apicobasal] surface:` names the
+        # ring the belt acts on, so `apical: in` + `surface: basal` is the archived spheroid with
+        # its labels swapped.
+        self.apical_side = str(params.get("apical", "out")).lower()
+        if self.apical_side not in ("out", "in"):
+            raise ValueError(f"seed_mesh[apicobasal]: apical must be out|in, not {self.apical_side!r}")
         # WHICH VOLUME THE CELL'S TARGET IS EXPRESSED IN -- see the block at the end of `forward`.
         #
         # `polyhedron` IS THE DEFAULT NOW, AND IT IS THE ONLY SELF-CONSISTENT ONE. This shipped as
@@ -1232,7 +1242,7 @@ class SeedMeshApicoBasal(SeedMesh3D):
         c0, c1 = lvl.state_schema[self.sep_block]
         st = lvl.state.clone()
         st[:, c0:c1] = 0.0
-        st[:Nv, c0:c1] = (0.5 * self.h0) * n
+        st[:Nv, c0:c1] = (0.5 * self.h0) * n * (-1.0 if self.apical_side == "in" else 1.0)
         lvl.state = st
         # DECLARED FOR THE CARRY, so a vertex born on a septum inherits its parents' separation
         # instead of the buffer's zero -- a cell of zero height along the seam it just grew.
