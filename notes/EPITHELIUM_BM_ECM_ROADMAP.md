@@ -147,88 +147,135 @@ cannot silently change again.
 
 ### M1: tissue + membrane, live, in the tissue's own box
 
-The shape FUSED_09 argues for, and the audit confirms: **one operator, `bm_solve`**, `at: vertex`,
-`EMIT velocity`, owning the rig's `Sheet`, the plaque edge set, the refinement reservoir and its own
-adaptive substep loop as internal state, returning `{vertex: f_es / mu_v}`, the arrow the archive
-throws away. Not thirty operators: the sheet's internals were certified as a unit (G14-G18) and
-splitting them into engine operators would re-open every gate for no modelling gain.
+**What M1 delivers.** One spec runs the apico-basal tissue and its basement membrane together,
+frame by frame, with the membrane pulling on the tissue. Today the membrane only exists in a
+separate Python program (a "rig") that reads a recorded tissue and cannot push back.
 
-Steps:
-1. Move `bm_ops.Sheet`, `adhesion_ops` (plaque) and `bm_refine_local` under `src/plexus/models/`
-   unchanged; `bm_solve` wraps them. The sheet's sets (`bm_node`, `bm_face`, `plaque`) are declared
-   in the spec so their state is recorded and rendered by the engine.
-2. Bind the plaques to the **basal** surface of the apico-basal tissue (`surface: basal`), the payoff
-   `notes/apicobasal/APICOBASAL_PROMOTION.md:477` names. Today the tissue has no adhesion interface
-   at all (zero `basement` hits in `vertex_ops.py`).
-3. The `kn: 0` control: with the plaque stiffness at zero the tissue's fingerprint must equal
-   cvd2_adder_tension's. Register the coupled run as a working point once accepted.
-4. Re-measure what the `k_drive = 50` shadow epithelium hid: standoff, lambda_geo against the
-   basal radius, slip, the plaque momentum residual.
+**The design: one operator, not thirty.** The membrane becomes a single engine operator called
+`bm_solve`. It acts on the vertex set of the tissue. It returns a velocity for each tissue vertex:
+the force the membrane exerts on that vertex, divided by the vertex's friction coefficient. Inside,
+the operator keeps everything the rig kept: the elastic sheet, the adhesion springs (called
+plaques) that tie the sheet to the tissue, the pool of spare triangles the sheet refines from as
+the tissue grows, and its own small time loop, because the sheet needs many small steps for each
+tissue frame. The sheet's internals were certified together by the archive's gates G14 to G18
+(refinement changes neither the stretch nor the energy, and no bad triangles appear). Splitting
+those internals into separate engine operators would reopen every one of those gates and would not
+change the model, so they stay together.
+
+**Steps.**
+
+1. Move the rig's three modules unchanged into the engine's model folder: the elastic sheet
+   (`discovery_okuda/ops/bm_ops.py`, class `Sheet`), the plaques (`adhesion_ops.py`) and the
+   local refinement (`bm_refine_local.py`). `bm_solve` wraps them. The membrane's three sets are
+   declared in the spec (its nodes, its triangular faces, and the plaque relation between a tissue
+   face and a membrane node), so the engine records and renders their state like any other set.
+2. Attach the plaques to the basal surface of the apico-basal tissue. This is the payoff the
+   apico-basal promotion note announced: the archive attached the membrane to a recorded
+   mid-surface because the old tissue had no inner surface. The live tissue has one, but no
+   operator can bind to it yet.
+3. Run the control with the plaque stiffness set to zero. The tissue must then reproduce the
+   cvd2_adder_tension working point exactly, cell count and shell radius at every checkpoint.
+   Once the coupled run is looked at and accepted, register it as a working point.
+4. Re-measure what the old rig could not. The archived membrane runs held the tissue in place
+   with an artificial restoring force of stiffness 50 toward the recorded positions, so the
+   membrane's effect on the tissue was erased every frame. With that gone, measure: the gap
+   between the sheet and the tissue surface (the standoff), the sheet's stretch against the growth
+   of the basal radius, how much the sheet slides over the tissue (the slip), and the sum of the
+   forces exchanged through the plaques, which must be zero to round-off.
 
 ### M2: the matrix pushes back
 
-`mesh_reaction` (`at: vertex`, `EMIT velocity`): sum the contact's per-vertex reaction
-(`VERTEX_FORCE`, already barycentric and momentum-balanced) over the substeps of a frame and return
-it as a velocity delta, `v_i = F_i / mu_v`. Two constraints decide the integration: the engine
-takes the substep count from a spec constant, and at the tissue's `dt = 1.0` the matrix would need
-~2,500 CFL-safe substeps per frame. Either the matrix runs a fixed substep block in the tissue frame
-with an explicit CFL check (what `spheroid_ecm_ab` does today, 20 substeps of 0.05) or it relaxes
-quasi-statically (`mpm_relax`) between tissue frames.
+**What M2 delivers.** The matrix pushes back on the tissue. Today the contact operator computes
+the force the matrix exerts on each tissue vertex, records it, and nothing reads it.
 
-Test: the two-way run's momentum residual, and the number the biologist asked for: **growth under
-a stiff matrix is slower than growth in a soft one**. Sweep `youngs` 15 / 150 / 1500 and record
-cells(t) and r_med(t); the isotropic control must come out identical to `spheroid_ecm_ab`.
+**The design.** A new operator, `mesh_reaction`, acting on the tissue's vertex set. It adds up the
+recorded force on each vertex over the small matrix steps of one tissue frame and returns it as a
+velocity: force divided by the vertex's friction coefficient. The force is already distributed
+correctly over the three corners of each tissue face, and the total force on tissue and matrix
+together is already zero to round-off, so no new mechanics is needed.
+
+**One decision to make.** The matrix needs about 2,500 small steps per tissue frame to stay stable
+at the tissue's time step of 1.0, and the engine reads the number of small steps from a constant in
+the spec. Either the matrix keeps a fixed block of small steps inside each tissue frame with an
+explicit stability check (what `spheroid_ecm_ab` does today: 20 steps of 0.05), or the matrix is
+relaxed to rest between tissue frames instead of integrated in time.
+
+**Tests.** The total force exchanged stays zero to round-off. And the number the biologist asked
+for: growth in a stiff matrix is slower than growth in a soft one. Run the matrix stiffness (its
+Young's modulus, the spec key `youngs`) at 15, 150 and 1500 and record the cell count and the shell
+radius over time. The run with the coupling switched off must come out identical to
+`spheroid_ecm_ab`.
 
 ### M3: a matrix that is a fibre network
 
-The archive's most load-bearing negative: fibre-shaped, constitutively isotropic (02i, 04).
-`ecm_seed` already stores each particle's strand direction on the operator "so an anisotropic term
-can read them" (`mpm_ops.py:5069`); the term is not written. Add a transversely isotropic
-contribution to the stress in `mpm_scatter`: an along-fibre stiffness that engages under tension,
-of Holzapfel-Gasser-Ogden form, `psi_f = (k1 / 2 k2) (exp(k2 (I4 - 1)^2) - 1)` for `I4 = n.C.n > 1`,
-with `n` the seeded direction advected by `F`. The cardiac `active_stress` already computes the
-fibre stretch `|F n|` (`mpm_ops.py:4190`), so the kinematics exist.
+**What M3 delivers.** A matrix that behaves like a network of fibres, not like a solid drawn in
+the shape of fibres. The archive measured the difference: under compression the matrix stiffened
+by a factor 1.13, where a fibre network stiffens by 10 to 100; and the fibres near the growing
+tissue turned exactly as much as a passively advected continuum would, no more.
 
-Tests: 02i's stiffening ratio moves from 1.13 into 10-100 and Poisson toward 0-0.1; 04's cos2 near
-the tissue exceeds the affine prediction; the directional pressure ratio of aligned fibres exceeds
-the 1.50x measured today.
+**The design.** The matrix seeder already stores the direction of the strand each particle
+belongs to, in anticipation of exactly this. Add to the stress law a term that resists stretch
+along that direction and does nothing across it, engaging only under tension, of the standard
+Holzapfel-Gasser-Ogden form: the energy per unit volume is
+`psi_f = (k1 / (2 k2)) * (exp(k2 * (I4 - 1)^2) - 1)` when `I4 > 1`, where `I4` is the squared
+stretch along the fibre direction, `k1` is the fibre stiffness and `k2` sets how sharply it
+stiffens. The fibre stretch is already computed for the cardiac active-stress operator, so the
+kinematics exist.
+
+**Tests.** The archived compression test's stiffening ratio moves from 1.13 into the 10 to 100
+range and its lateral bulging drops toward that of a network; the fibre alignment near the tissue
+exceeds the passive prediction; the pressure difference between along-fibre and across-fibre
+directions exceeds the 1.5 times measured today.
 
 ### M4: the protease chemistry as operators on the membrane
 
-The six operators the minisite names, on `bm_face`, sharing the face-Laplacian solver
-(`protease_ops.py`), promoted as a family: `bm_secrete` (mass balance, G24-G27), `bm_diffuse`
-(`(I + dt D L) c = c_old` by CG), `bm_activate` (the ternary complex, G54-G55), `bm_inhibit`
-(TIMP-2 soluble, TIMP-3 bound), `bm_degrade` (rho loss), `bm_tear` (a face removed below
-`rho_crit`, kind rewire). The archived gates become regression fingerprints. Fix the tear metric so
-it counts rim loops after refinement (`06_hole_stable`'s defect).
+**What M4 delivers.** The protease chemistry of the minisite as engine operators on the membrane's
+face set, so a spec can switch it on. Six operators, one per step of the chemistry: secretion of
+membrane material, diffusion of the soluble species over the sheet, activation of the enzyme
+(the matrix metalloproteinase MMP-2 is activated by the membrane-bound enzyme MT1-MMP through a
+three-molecule complex with its own inhibitor TIMP-2, which is why activation rises and then
+falls as the inhibitor increases), inhibition (TIMP-2 diffuses, TIMP-3 stays bound and is the only
+inhibitor that can hold a pattern), degradation of membrane material by the free enzyme, and
+tearing (a face is removed when its material density falls below a threshold). The diffusion uses
+the rig's implicit solver on the face graph. The archived gates for these steps (G24 to G27 for the
+mass balance, G53 to G57 for the chemistry) become regression fingerprints. Also fix the tear
+count so it survives refinement: one archived run reported zero torn faces while 46 holes were
+visible.
 
 ### M5: the interface regulates growth on the live tissue
 
-`bm_sense` today reads a recorded equirectangular map; make it read the live sheet's ligand density
-under each basal face (`plaque` relation, aggregate up). Then the chain of 08 runs live:
-`bm_degrade/bm_tear -> ligation deficit -> cell.chem -> cell_grow rate (rho + Hill(a)) ->
-cell_divide[orient_iface]`. Test: the bud follows the hole (+0.975 on axis, off-axis within
-+-0.04), now with a matrix that feels the bud. Fix the two defects 08 logged on the way: the
-longitude smoother that flattened the map (growth contrast 1.01-1.10x), and the withdrawn
-`max_div` cap.
+**What M5 delivers.** The membrane regulates growth on the live tissue, which is the archive's
+payoff rebuilt without replays. The sensing operator `bm_sense` reads today a recorded map of how
+much membrane sits under each cell. Make it read the live sheet through the plaque relation. Then
+the chain runs live: the enzyme degrades and tears the membrane; each cell reads how much ligand it
+has lost underneath; that deficit is written into the cell's chemical state; growth rate rises with
+it; division orients along the interface. This is integrin signalling read as a brake on the cell
+cycle: a cell anchored to an intact membrane divides less.
+
+**Test.** The bud follows the hole, as in the archive (+0.975 along the hole's axis, within
++-0.04 elsewhere), now with a matrix that feels the bud. Two defects the archive logged are fixed
+on the way: the smoothing of the membrane map that flattened it (it left a growth contrast of only
+1.01 to 1.10 times), and a division cap that was declared in specs but read by nothing.
 
 ### M6: the molecular corset (the biologist's demo)
 
-Bilder's egg chamber elongates because growth is constrained anisotropically: circumferential
-collagen IV fibrils in the basement membrane and polarised follicle-cell tension act as a corset,
-so the tissue grows along the free axis. Two ingredients, each a step above:
+**What M6 delivers.** The demo the biologist suggested. In the fly egg chamber (Bilder's work)
+the tissue elongates because growth is constrained in one direction: collagen fibrils in the
+basement membrane run around the circumference and the cells' own tension is polarised, so
+together they act as a corset and the tissue grows along the free axis. Two ingredients, each
+building on a milestone above:
 
-1. **In-surface anisotropic connection strength.** `junction_myosin` keyed on edge ORIENTATION
-   (a new `keyed_on: orientation` with an axis) gives circumferential junctions a higher line
-   tension. This needs the apico-basal energy to read myosin at all: `_apicobasal_energy_core`
-   (`vertex_ops.py:4508`) has no `myo_e` argument, while the mid-surface model does (`:736`). Add
-   it, certify it against autograd as the warp gradient is (`tests/test_vertex_warp.py`).
-2. **A corset in the matrix.** `seed_ecm` with `align: 1` about the polar axis in a ring around the
-   spheroid, made stiff along the fibre by M3, felt by the tissue through M2.
+1. **Direction-dependent junction tension within the tissue.** Give the junction-myosin operator a
+   new mode in which the tension of an edge depends on its orientation relative to a declared
+   axis, so circumferential junctions pull harder. This first needs the apico-basal energy to read
+   myosin at all: today only the mid-surface model does. Add that and certify the gradient against
+   automatic differentiation, as the warp gradient is certified.
+2. **A corset in the matrix.** Seed the fibres aligned around the polar axis in a ring around the
+   spheroid, make them stiff along their length (M3), and let the tissue feel them (M2).
 
-Test: aspect ratio of the spheroid at frame 800 against the isotropic control (1.02 in
-`00_spheroid/metrics.json`); the elongation axis must follow the corset axis when the axis is
-rotated, the same control design as 08b's rotated hole.
+**Test.** The spheroid's aspect ratio at frame 800 against the isotropic control (1.02 in the
+archive). When the corset axis is rotated, the elongation axis must rotate with it, the same control
+design as the archive's rotated hole.
 
 ---
 
