@@ -437,7 +437,7 @@ class LiveMovie:
                 _es = default_settings()
                 _es["env_bright"] = float((self.style or {}).get("surface_env_bright",
                                                                  _es["env_bright"]))
-                self.p.set_environment_texture(env_texture(_es["env_bright"]))
+                self.p.set_environment_texture(self._env_texture(_es["env_bright"]))
                 build_lights(self.p, _es)
                 print(f"[live-movie] environment map + 4-light rig (bright {_es['env_bright']:g})",
                       flush=True)
@@ -1697,6 +1697,35 @@ class LiveMovie:
             """Per-vertex interpolation of a per-particle scalar, same inverse-square weights."""
             return np.einsum("vk,vk->v", self.w, np.asarray(values, float)[self.idx])
 
+    def _env_texture(self, bright):
+        """The environment map: morph.py's navy-teal sky, or `surface_env_color`'s.
+
+        WHY THE SKY IS A KNOB. A translucent dielectric takes its reflected colour from the
+        environment, so the amber honey and the orange droplet both read BROWN under the
+        armadillo's blue sky -- the sky was chosen to make a blue glass sing and it tints
+        everything else. `surface_env_color: white` (or any colour name / RGB triplet) builds the
+        same equirectangular gradient -- darker at the horizon, the colour at the zenith, one soft
+        bright sun patch -- in that hue instead, so a body's own colour comes back off it.
+        Unset means morph's sky, unchanged, so the armadillo look is exactly what it was.
+        """
+        from plexus.morph import env_texture
+        st = self.style or {}
+        col = st.get("surface_env_color")
+        if not col:
+            return env_texture(bright)
+        import pyvista as pv
+        from matplotlib.colors import to_rgb
+        c = np.asarray(to_rgb(tuple(col) if isinstance(col, (list, tuple)) else col), np.float64)
+        Hh, W = 128, 256
+        yy = np.linspace(0, 1, Hh)[:, None] * np.ones((1, W))
+        xx = np.linspace(0, 1, W)[None, :] * np.ones((Hh, 1))
+        sky = (0.35 + 0.65 * yy)[..., None] * c[None, None, :] * bright
+        sun = np.exp(-(((xx - 0.7) * W) ** 2 + ((yy - 0.15) * Hh) ** 2) / (2 * 22 ** 2))
+        sky = sky + sun[..., None] * np.array([0.6, 0.6, 0.6]) * bright
+        tex = pv.Texture((np.clip(sky, 0, 1) * 255).astype(np.uint8))
+        tex.SetMipmap(True); tex.SetInterpolate(True)
+        return tex
+
     def _contour_settings(self):
         """morph.py's dielectric, with the spec allowed to override the few knobs that are a look.
 
@@ -1714,6 +1743,11 @@ class LiveMovie:
         s["roughness"] = float(st.get("surface_roughness", s["roughness"]))
         s["metallic"] = float(st.get("surface_metallic", s["metallic"]))
         s["env_bright"] = float(st.get("surface_env_bright", s["env_bright"]))
+        # THE TWO THAT MAKE A WARM COLOUR READ AS ITSELF. The armadillo's diffuse 0.42 / ambient
+        # 0.06 is a dark saturated glass; an orange droplet under them at 60% opacity over black
+        # comes out brown. A spec that wants its declared colour back raises these.
+        s["diffuse"] = float(st.get("surface_diffuse", s["diffuse"]))
+        s["ambient"] = float(st.get("surface_ambient", s["ambient"]))
         s["ngrid"] = int(st.get("contour_ngrid", s["ngrid"]))
         s["sigma"] = float(st.get("contour_sigma", s["sigma"]))
         s["iso_frac"] = float(st.get("contour_iso_frac", s["iso_frac"]))
@@ -1785,7 +1819,7 @@ class LiveMovie:
             # THE SKY AND THE RIG, set once. `surface_env` may already have set them at plotter
             # construction; setting the texture twice is harmless, adding the lights twice is not.
             if not getattr(self, "_contour_lit", False):
-                self.p.set_environment_texture(env_texture(s["env_bright"]))
+                self.p.set_environment_texture(self._env_texture(s["env_bright"]))
                 if not bool((self.style or {}).get("surface_env", False)):
                     build_lights(self.p, s)
                 try:

@@ -94,10 +94,13 @@ plotting:
   - cell
   render_3d: contour
   contour_by_type: true
-  surface_opacity: 0.6
+  surface_opacity: 0.7
+  surface_diffuse: 0.85
+  surface_ambient: 0.25
   surface_roughness: 0.08
   surface_metallic: 0.0
   surface_env_bright: 2.3
+  surface_env_color: white
   contour_ngrid: 160
   contour_sigma: 0.95
   contour_iso_frac: 0.3
