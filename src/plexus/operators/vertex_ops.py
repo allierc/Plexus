@@ -699,7 +699,13 @@ def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_
     if Gam_l:
         E = E + 0.5 * Gam_l * ((line ** 2) * eocc).sum()
     E = E + K_V * ((vf - V0f) ** 2 * alive).sum()
-    E = E + K_R * (((pos.norm(dim=1) - R0) ** 2) * vocc).sum()   # radial over live vertices only
+    # THE RADIUS IS MEASURED FROM THE TISSUE'S OWN CENTRE, weighted by occupancy -- the same
+    # correction the apico-basal and monolayer cores carry. |pos| is that radius only for a
+    # vesicle at the origin, and cellfix_B_new seeded at a wall box's centre with K_R 0.4 would
+    # otherwise be pulled toward the corner by this term.
+    _w = vocc.to(pos.dtype).reshape(-1, 1)
+    _c = (pos * _w).sum(dim=0, keepdim=True) / _w.sum().clamp(min=1.0)
+    E = E + K_R * ((((pos - _c).norm(dim=1) - R0) ** 2) * vocc).sum()   # radial over live vertices only
     if K_bend > 0 and twin_face is not None:
         # DIHEDRAL bending (Wardetzky hinge): penalise the angle between a cell face's outward normal and
         # the normal of the cell across each shared edge -> smooths sharp cell-to-cell FOLDS (the hollow /
