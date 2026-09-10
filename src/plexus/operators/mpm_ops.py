@@ -3244,7 +3244,7 @@ if HAVE_WARP:
                    dt: float, half_inv_dx: float, cell_vol: float,
                    mass_floor: float, csf_floor: float,
                    surf: float, inv_cell_mass: float, band: float, gain: float, eps: float,
-                   full_mass: float, wd: float,
+                   full_mass: float, wd: float, mu: float,
                    buoy: float, rho_ref: float, bdir: wp.vec3,
                    has_bf: int, has_csf: int, has_walls: int, has_buoy: int):
         t = wp.tid()
@@ -3302,27 +3302,56 @@ if HAVE_WARP:
         vx = v[0]
         vy = v[1]
         vz = v[2]
+        # COULOMB FRICTION, MIRRORING THE TORCH LOOP: the inward normal speed is read BEFORE the
+        # clamp removes it -- that impulse is the friction budget -- and after the clamp the other
+        # two components on that axis's slabs are reduced by mu times it, to zero if the budget
+        # covers them (stick). `mu == 0` takes none of these branches, so a frictionless run is the
+        # kernel it always was. See MPMGridUpdate.__init__ for the rule and the reference.
+        vin0 = 0.0
         if lo0:
+            vin0 = wp.max(-vx, 0.0)
             vx = wp.max(vx, 0.0)
         if hi0:
+            vin0 = wp.max(vx, 0.0)
             vx = wp.min(vx, 0.0)
         if wd != 1.0 and (lo0 or hi0):
             vy = vy * wd
             vz = vz * wd
+        if mu > 0.0 and (lo0 or hi0):
+            vt0 = wp.max(wp.sqrt(vy * vy + vz * vz), 1.0e-12)
+            f0 = wp.max(1.0 - mu * vin0 / vt0, 0.0)
+            vy = vy * f0
+            vz = vz * f0
+        vin1 = 0.0
         if lo1:
+            vin1 = wp.max(-vy, 0.0)
             vy = wp.max(vy, 0.0)
         if hi1:
+            vin1 = wp.max(vy, 0.0)
             vy = wp.min(vy, 0.0)
         if wd != 1.0 and (lo1 or hi1):
             vx = vx * wd
             vz = vz * wd
+        if mu > 0.0 and (lo1 or hi1):
+            vt1 = wp.max(wp.sqrt(vx * vx + vz * vz), 1.0e-12)
+            f1 = wp.max(1.0 - mu * vin1 / vt1, 0.0)
+            vx = vx * f1
+            vz = vz * f1
+        vin2 = 0.0
         if lo2:
+            vin2 = wp.max(-vz, 0.0)
             vz = wp.max(vz, 0.0)
         if hi2:
+            vin2 = wp.max(vz, 0.0)
             vz = wp.min(vz, 0.0)
         if wd != 1.0 and (lo2 or hi2):
             vx = vx * wd
             vy = vy * wd
+        if mu > 0.0 and (lo2 or hi2):
+            vt2 = wp.max(wp.sqrt(vx * vx + vy * vy), 1.0e-12)
+            f2 = wp.max(1.0 - mu * vin2 / vt2, 0.0)
+            vx = vx * f2
+            vy = vy * f2
         v = wp.vec3(vx, vy, vz)
 
         if has_walls == 1 and walls[t] != wp.uint8(0):   # no-slip inside a solid obstacle
@@ -3343,9 +3372,11 @@ if HAVE_WARP:
 @register_operator("mpm_grid_update", implementation="warp", family="mpm",
                    set="field", kind="field")
 class MPMGridUpdateWarp(MPMGridUpdate):
-    # `wall_friction` is imposed by the default path's wall loop only; this implementation has its
-    # own wall code and does not read it yet. The base __init__ warns once if a spec asks.
-    HONOURS_WALL_FRICTION = False
+    # `wall_friction` is imposed in `grid_solve`, mirroring the torch loop axis for axis. This is
+    # the implementation the engine selects when a spec leaves it unset, so it had to be -- the
+    # first friction measurement ran entirely on this path and the base __init__'s refusal was the
+    # only thing that stopped a frictionless run being read as a null result.
+    HONOURS_WALL_FRICTION = True
     """The 3D grid solve -- mass normalisation, the continuum surface force, box walls, obstacles
     and buoyancy -- as two Warp kernels rather than several dozen whole-grid torch operations.
 
@@ -3434,6 +3465,7 @@ class MPMGridUpdateWarp(MPMGridUpdate):
                     float(self.surface_tension), float(inv_cell_mass),
                     float(self.csf_band), float(gain), float(self._const("csf_eps", g)),
                     float(self.csf_rho * cell_vol), float(self.wall_damp),
+                    float(self.wall_friction),
                     float(self.buoyancy), float(self.rho_ref),
                     wp.vec3(buoy_dir[0], buoy_dir[1], buoy_dir[2]),
                     int(_bf is not None), int(has_csf), int(has_walls),
