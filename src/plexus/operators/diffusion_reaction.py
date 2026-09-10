@@ -40,7 +40,7 @@ import torch
 from plexus.models.base import Aggregate, Lateral, Rewire, Structural
 from plexus.models.registry import register_operator
 from plexus.models.base import Lateral
-from plexus.operators.vertex_ops import face_geometry_3d, resolve_cell_set
+from plexus.operators.vertex_ops import face_geometry_3d, resolve_cell_set, wedge_apex
 
 
 def _chan(params, who, n_species=2):
@@ -617,7 +617,7 @@ class CellDiffuseInterfaceWeighted(Lateral):
         shared = (twin != ef).to(dt)                          # 0 on an unpaired (boundary) half-edge
         w = (pos[et] - pos[es]).norm(dim=-1) * shared         # A_ij / h : the SHARED-WALL weight
 
-        _, _, _, vf = face_geometry_3d(pos, es, et, ef, nF)   # per-cell wedge volume = the model's own v_i
+        _, _, _, vf = face_geometry_3d(pos, es, et, ef, nF, apex=wedge_apex(m, pos))   # per-cell wedge volume = the model's own v_i
         alive = m["alive"][:nF].to(device=dev, dtype=dt) if "alive" in m else torch.ones(nF, device=dev, dtype=dt)
         live_pos = vf[(vf > 0) & (alive > 0)]
         med = live_pos.median() if live_pos.numel() else vf.new_tensor(1.0)
@@ -1802,7 +1802,8 @@ class ShapeToChemPressure(_ShapeToChemBase):
         if "V0f" not in m:
             return None
         _, _, _, vf = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
-                                       torch.as_tensor(et), torch.as_tensor(ef), nF)
+                                       torch.as_tensor(et), torch.as_tensor(ef), nF,
+                                       apex=wedge_apex(m, torch.as_tensor(pt)))
         V0 = np.asarray(_np(m["V0f"])[:nF], float)
         mech = m.get("mech", {}) or {}
         kV = float(mech.get("K_V", 1.0))
@@ -2037,7 +2038,7 @@ class ShapeIndexProbe(_ShapeProbeBase):
     def _measure(self, pos, m, es, et, ef, nF):
         pt = torch.as_tensor(pos)
         area, perim, _cen, _vf = face_geometry_3d(
-            pt, torch.as_tensor(es), torch.as_tensor(et), torch.as_tensor(ef), nF)
+            pt, torch.as_tensor(es), torch.as_tensor(et), torch.as_tensor(ef), nF, apex=wedge_apex(m, pt))
         a = _np(area)[:nF]; p = _np(perim)[:nF]
         out = np.full(nF, np.nan)
         ok = a > 1e-12

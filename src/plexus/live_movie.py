@@ -1202,10 +1202,10 @@ class LiveMovie:
             for j in range(nt):                   # per VERTEX, so the type split is by face
                 row[j] = (float(np.mean(r)), float(np.std(r)))
             return row
-        from plexus.operators.vertex_ops import face_geometry_3d
+        from plexus.operators.vertex_ops import face_geometry_3d, wedge_apex
         nv = int(m["Nv"])
         pos = torch.as_tensor(_np(lvl.get("pos")[:nv]), dtype=torch.float64)
-        a, _p, _c, _v = face_geometry_3d(pos, _es, _et, _ef, nF)
+        a, _p, _c, _v = face_geometry_3d(pos, _es, _et, _ef, nF, apex=wedge_apex(m, pos))
         a = a.numpy()
         # `area` FOLLOWS `volume`'S RULE, AND FOR THE SAME REASON. What `face_geometry_3d`
         # returns is the MID-SURFACE area, and on an apico-basal run the mid-surface is not a
