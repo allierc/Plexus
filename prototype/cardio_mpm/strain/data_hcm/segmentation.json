@@ -1,0 +1,46 @@
+{
+ "kept": {
+  "flatten": "flat60",
+  "min_sigma": 25,
+  "max_sigma": 60,
+  "threshold": 0.015,
+  "polarity": "dark",
+  "n": 434,
+  "median_diam_px": 70.71067811865476,
+  "seconds": 18.2
+ },
+ "table": [
+  {
+   "flatten": "flat60",
+   "min_sigma": 25,
+   "max_sigma": 60,
+   "threshold": 0.015,
+   "polarity": "dark",
+   "n": 434,
+   "median_diam_px": 70.71067811865476,
+   "seconds": 18.2
+  }
+ ],
+ "n_cells": 434,
+ "lambda_compactness": 3.0,
+ "nodes_per_cell": {
+  "min": 11,
+  "median": 42.0,
+  "max": 97
+ },
+ "off_voronoi_fraction": 0.09211998508178379,
+ "grid": {
+  "x0": -1.1912068128585815,
+  "y0": 1.0528943538665771,
+  "sx": 14.993611335754395,
+  "sy": 14.949304580688477
+ },
+ "canvas": {
+  "size": 2560,
+  "offset": 384,
+  "sheet": 1792,
+  "world_lo": 0.15,
+  "world_hi": 0.85
+ },
+ "source": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1/1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif.derivatives.npy"
+}

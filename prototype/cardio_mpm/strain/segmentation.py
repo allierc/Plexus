@@ -36,11 +36,23 @@ sys.path.insert(0, CELLS)
 import beat as B          # noqa: E402  the beat average and the axis PCA
 import seeded as SD       # noqa: E402  nuclei_on_grid / bnd_from / voronoi
 
-RT = "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1"
-TIF = f"{RT}/0_B_15kPa_1_MMStack_Pos0.ome.tif"
+import argparse
+_ap = argparse.ArgumentParser(add_help=False)
+_ap.add_argument("--tif", default="/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/"
+                 "Cardio_1/0_B_15kPa_1_MMStack_Pos0.ome.tif")
+_ap.add_argument("--out", default=os.path.join(HERE, "data"))
+_ap.add_argument("--onsets", default="2,51,101,152,204", help="speed-peak onsets of the recording")
+_ap.add_argument("--beat-len", type=int, default=49)
+_ap.add_argument("--target-n", type=int, default=472, help="nucleus count the detector setting is chosen by; "
+                 "0 = use the healthy sheet's setting (flat60, sigma 25-60, th 0.015, dark) unchanged")
+_ap.add_argument("--raster-only", action="store_true")
+_A = _ap.parse_args()
+TIF = _A.tif
 DER = f"{TIF}.derivatives.npy"
-OUT = os.path.join(HERE, "data")
-TARGET_N = 472
+OUT = _A.out
+TARGET_N = _A.target_n
+ONSETS = [int(v) for v in _A.onsets.split(",")]
+BEAT_LEN = _A.beat_len
 LAM = 3.0
 CANVAS, LO, SHEET = 2560, 384, 1792          # 0.15 * 2560 = 384, 0.70 * 2560 = 1792, exactly
 
@@ -54,8 +66,12 @@ def nuclei(img):
     grid = [(a60, "flat60", mn, mx, th, 6, 0.2) for mn, mx in ((18, 45), (25, 60))
             for th in (0.006, 0.010, 0.015)]
     grid += [(a40, "flat40", 8, 26, 0.012, 8, 0.3)]           # nuclei.detect's defaults
+    if TARGET_N == 0:                                   # the healthy sheet's setting, no search
+        grid = [(a60, "flat60", 25, 60, 0.015, 6, 0.2)]
     for arr0, flat, mn, mx, th, ns, ov in grid:
         for pol, arr in (("bright", arr0), ("dark", -arr0)):
+            if TARGET_N == 0 and pol != "dark":
+                continue
             t0 = time.time()
             bl = blob_log(arr, min_sigma=mn, max_sigma=mx, num_sigma=ns, threshold=th, overlap=ov)
             row = dict(flatten=flat, min_sigma=mn, max_sigma=mx, threshold=th, polarity=pol,
@@ -64,7 +80,7 @@ def nuclei(img):
             table.append(row)
             print(f"  {flat} sigma[{mn},{mx}] th={th:.3f} {pol:>6s}: {row['n']:5d} blobs  "
                   f"median diam {row['median_diam_px']:5.0f} px  ({row['seconds']} s)", flush=True)
-            if best is None or abs(row["n"] - TARGET_N) < abs(best[1]["n"] - TARGET_N):
+            if best is None or (TARGET_N > 0 and abs(row["n"] - TARGET_N) < abs(best[1]["n"] - TARGET_N)):
                 best = (bl, row)
     return best, table
 
@@ -94,7 +110,7 @@ def rasterise(lab, X0, Y0, canvas=CANVAS, reach=0.75):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    if "--raster-only" in sys.argv:                 # the label grid exists; only redo the image
+    if _A.raster_only:                 # the label grid exists; only redo the image
         lab = np.load(os.path.join(OUT, "labels_grid.npy"))
         D = np.load(DER, mmap_mode="r")
         X0, Y0 = np.asarray(D[0, :, :, 0]), np.asarray(D[0, :, :, 1])
@@ -111,7 +127,8 @@ def main():
 
     D = np.load(DER, mmap_mode="r")
     uv = np.asarray(D[:, :, :, 0:2] - D[0:1, :, :, 0:2], dtype=np.float32)   # [T,137,137,2] px
-    b, nb = B.mean_beat(uv)
+    b, nb = B.mean_beat(uv, onsets=ONSETS, n=BEAT_LEN)
+    SD.RT = DER                                        # seeded.nuclei_on_grid reads the lattice from here
     seeds, gi, gj = SD.nuclei_on_grid(os.path.join(OUT, "nuclei.npy"))
     dist = ndi.distance_transform_edt(seeds == 0)
     dist = dist / np.percentile(dist, 90)

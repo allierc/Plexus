@@ -96,6 +96,9 @@ def main():
                          "toward uniform. The first live fit let log E spread to sd 2.0 (3 to 900) "
                          "against a gate tested at sd 0.3; the prior says how much of that the "
                          "data insists on")
+    ap.add_argument("--mask-band", action="store_true",
+                    help="leave cells with any particle in the prescribed band out of the loss")
+    ap.add_argument("--specimen", default="healthy", choices=["healthy", "hcm"])
     ap.add_argument("--init-truth", default="", help="planted only: families started AT the truth "
                     "(diagnostic: isolates the identifiability of the free ones)")
     ap.add_argument("--tag", default="")
@@ -108,8 +111,9 @@ def main():
     free = [f for f in args.free.split(",") if f]
     lrs = {kv.split("=")[0]: float(kv.split("=")[1]) for kv in args.lr.split(",")}
 
-    rec = R.load(device=dev)
+    rec = R.load(device=dev, specimen=args.specimen)
     C = rec["n_cells"]
+    LTIF = os.path.join(HERE, "data_hcm" if rec.get("specimen") == "hcm" else "data", "cells_2560.tif")
     win = R.beat_window(rec, args.beat)
     T = len(win["frames"])
     A_rec, u_rec = R.window_affine(rec, win)
@@ -119,12 +123,14 @@ def main():
     # rest positions + band from one 0-frame rollout (the seed decides where particles sit)
     P0 = M.Params(C, dev, nu=args.nu)
     with torch.no_grad():
-        r0 = M.rollout(M.load_sim(M.build_spec(differentiable=False, name="fit_rest",
+        r0 = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="fit_rest",
                                                **dict(kw, n_frames=0))), P0, dev, C, grad=False)
     X0, cid = r0["X0"], r0["cid"]
     band = ((X0[:, 0] < M.DOM_LO + args.band) | (X0[:, 0] > M.DOM_HI - args.band)
             | (X0[:, 1] < M.DOM_LO + args.band) | (X0[:, 1] > M.DOM_HI - args.band))
     prescribe = (band, M.band_prescription(A_rec, u_rec, X0, cid, band))
+    interior = M.interior_cells(cid, band, C) if args.mask_band else None
+    n_int = int(interior.sum()) if interior is not None else C
 
     # ---- the target ----------------------------------------------------------------------
     phi_m, amp_m, _ = R.fibre_init(A_rec)
@@ -139,7 +145,7 @@ def main():
             Pt.logE.copy_(math.log(args.youngs)
                           + args.plant_sigma_logE * torch.randn(C, generator=gen).to(dev))
         with torch.no_grad():
-            tgt = M.rollout(M.load_sim(M.build_spec(differentiable=False, name="fit_plant", **kw)),
+            tgt = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="fit_plant", **kw)),
                             Pt, dev, C, grad=False, prescribe=prescribe)
         A_t, u_t = tgt["A"].detach(), tgt["u"].detach()
         truth = {k: v.detach().clone() for k, v in Pt.leaves().items()}
@@ -165,7 +171,7 @@ def main():
     eye = torch.eye(2, device=dev)
     w_A = 1.0 / ((A_t - eye) ** 2).mean()
     w_u = 1.0 / (u_t ** 2).mean()
-    sim = M.load_sim(M.build_spec(differentiable=True, name="fit", **kw))
+    sim = M.load_sim(M.build_spec(label_tif=LTIF, differentiable=True, name="fit", **kw))
     groups = [dict(params=[getattr(P, k)], lr=lrs[k]) for k in free]
     opt = torch.optim.Adam(groups)
     # cosine from 1x to 0.05x of each group's own rate
@@ -177,7 +183,7 @@ def main():
     od = os.path.join(HERE, "out", "fits", tag)
     os.makedirs(od, exist_ok=True)
     print(f"  fit {tag}: {C} cells x {args.per_parent} pts ({X0.shape[0]:,}), window {win['span']} "
-          f"({T} frames), free {free}, band {int(band.sum())} particles", flush=True)
+          f"({T} frames), free {free}, band {int(band.sum())} particles, {n_int} cells in the loss", flush=True)
     print(f"  init recovery: {json.dumps(recovery(P, truth))}", flush=True)
 
     log = []
@@ -186,7 +192,7 @@ def main():
         t0 = time.time()
         opt.zero_grad()
         out = M.rollout(sim, P, dev, C, grad=True, prescribe=prescribe)
-        loss = M.affine_loss(out["A"], out["u"], A_t, u_t, w_u=w_u, w_A=w_A)
+        loss = M.affine_loss(out["A"], out["u"], A_t, u_t, w_u=w_u, w_A=w_A, cells=interior)
         if args.clock_mode == "free":
             loss = loss + args.clock_smooth * P.smoothness()
         if args.E_shrink > 0:
@@ -210,8 +216,9 @@ def main():
             print(f"  it {it:4d} loss {float(loss):.5f}  {rowd['seconds']:.1f} s{extra}", flush=True)
         if (it + 1) % args.save_every == 0 or it == args.iters - 1:
             np.savez(os.path.join(od, "params.npz"), **P.state_dict(),
+                     interior=(interior.cpu().numpy() if interior is not None else np.ones(C, bool)),
                      **({f"true_{k}": v.cpu().numpy() for k, v in truth.items()} if truth else {}))
-            json.dump(dict(config=vars(args), tag=tag, window=win["span"], n_cells=C,
+            json.dump(dict(config=vars(args), tag=tag, window=win["span"], n_cells=C, n_cells_in_loss=n_int,
                            particles=int(X0.shape[0]), log=log,
                            seconds_total=time.time() - t_fit,
                            peak_mem_gb=torch.cuda.max_memory_allocated(dev) / 2 ** 30),

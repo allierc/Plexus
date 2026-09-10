@@ -261,17 +261,31 @@ def rollout(sim, params, device, n_cells, grad=True, prescribe=None, keep_pos=Fa
     return out
 
 
-def affine_loss(A, u, A_ref, u_ref, w_u=None, w_A=None, frames=None):
+def affine_loss(A, u, A_ref, u_ref, w_u=None, w_A=None, frames=None, cells=None):
     """Mean squared mismatch of the per-cell affine maps, each channel scaled by the reference's
-    own spread so a 2x2 strain (~1e-2) and a centroid displacement (~1e-3 world) weigh alike."""
+    own spread so a 2x2 strain (~1e-2) and a centroid displacement (~1e-3 world) weigh alike.
+    `cells` [C] bool restricts everything to those cells: a cell with particles in the prescribed
+    edge band has part of its motion dictated, not modelled, so its g is unconstrained by the loss
+    (measured: g inflated along the band in round 4); such cells are left out of loss and claim."""
     eye = torch.eye(2, device=A.device)
     if frames is not None:
         A, u, A_ref, u_ref = A[frames], u[frames], A_ref[frames], u_ref[frames]
+    if cells is not None:
+        A, u, A_ref, u_ref = A[:, cells], u[:, cells], A_ref[:, cells], u_ref[:, cells]
     if w_A is None:
         w_A = 1.0 / ((A_ref - eye) ** 2).mean().clamp(min=1e-12)
     if w_u is None:
         w_u = 1.0 / (u_ref ** 2).mean().clamp(min=1e-12)
     return w_A * ((A - A_ref) ** 2).mean() + w_u * ((u - u_ref) ** 2).mean()
+
+
+def interior_cells(cid, band, n_cells, max_frac=0.0):
+    """[C] bool: cells with at most `max_frac` of their particles in the prescribed band."""
+    idx = cid - 1
+    ones = torch.ones(cid.shape[0], device=cid.device)
+    cnt = torch.zeros(n_cells, device=cid.device).index_add(0, idx, ones).clamp(min=1)
+    inb = torch.zeros(n_cells, device=cid.device).index_add(0, idx, band.float())
+    return (inb / cnt) <= max_frac
 
 
 def band_prescription(rec_A, rec_u, X0, cid, band):

@@ -1,0 +1,11 @@
+{
+ "params": "out/fits/hcm_r1_Efixed_mask_delay/params.npz",
+ "beat": 2,
+ "window": [
+  113,
+  177
+ ],
+ "r2_A": 0.6285187005996704,
+ "frames": 65,
+ "fps": 8
+}
