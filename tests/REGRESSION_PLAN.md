@@ -15,7 +15,7 @@ The three collection errors are one cause: `tests/test_apicobasal_measures.py`,
 `tools/`, and there is no `conftest.py` to put `tools/` on the path. Run without
 `--continue-on-collection-errors`, pytest stops and **zero tests execute**. Seven of the eight
 recorded failures are one dead operator name (`aggregate` -> `aggregate_centroid`);
-`TEST_KNOWN_FAILURES.md` records rows 2-5 as "the decomposed MPM no longer reproduces the oracle",
+`tests/TEST_KNOWN_FAILURES.md` records rows 2-5 as "the decomposed MPM no longer reproduces the oracle",
 but those specs die at load, so the MPM physics has not been measured since the rename.
 
 | file | tests | pins | bio model | state | verdict |
@@ -48,7 +48,7 @@ Not one test in the tree reads an archived working point, and not one asserts a 
 ### Repairs to make before anything is added (half a day)
 
 1. `tests/conftest.py` inserting `tools/` (and `src/`) on `sys.path`; delete the
-   `PYTHONPATH=src:tools` folklore from `TEST_KNOWN_FAILURES.md`.
+   `PYTHONPATH=src:tools` folklore from `tests/TEST_KNOWN_FAILURES.md`.
 2. `test_mpm_decomposition.py`: `aggregate` -> `aggregate_centroid` at :53 and :68, then re-run and
    record what the oracle comparison actually says; rewrite rows 2-5 of the known-failures doc.
 3. `test_neural.py`: retire the three `aggregate` tests with a sentence saying the capability was
@@ -100,7 +100,8 @@ where the origin bug lived) and compares each checkpoint:
     roughness        within 25 % relative AND more than 0.02 absolute (0.012 / 0.018 / 0.026 are
                                             the archive and two reruns of one healthy shell at frame
                                             150; 0.0054 -> 0.077 was the crumpled shell)
-    deaths           within 3 % of the population at that frame; ndiv_sum within 5 %
+    deaths           within 3 % of the population at that frame (ndiv_sum recorded, not asserted:
+                                            5-6 % between two runs of the same code)
     mpm spread, bbox within 5 %; particles inside the surface within 5 %
     (the seed's V0f and convention are checked exactly by the seed table, Layer C)
 

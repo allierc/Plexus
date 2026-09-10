@@ -40,7 +40,7 @@ def test_seed_conventions_table():
 # a small reference tissue, built in-process, for the invariance tests
 # ---------------------------------------------------------------------------------------------
 _TISSUE = """
-general: {name: _inv, seed: 0, n_frames: 5, dt: 1.0, record_cap: 7, boundary: free, dim: 3, world: [50.0, 50.0, 50.0]}
+general: {name: _inv, seed: 0, n_frames: 2, dt: 1.0, record_cap: 4, boundary: free, dim: 3, world: [50.0, 50.0, 50.0]}
 sets:
   vertex: {n: 4096, mesh: half_edge}
   cell:
@@ -108,8 +108,10 @@ def test_translation_invariance():
     """ff32200b / a5757463 / 6c400487: wedge volumes and the radial term were measured from the
     world origin, so the same tissue at the box centre grew, divided and relaxed differently
     (0.42 per vertex by frame 10 at [25,25,25]; crushed to r 3.2 on the warp path). Seeded at the
-    origin and at [20, 20, 20], the centred positions must agree to float32 round-off amplified
-    by five relax frames (< 2e-2), not to a different tissue (> 1e-1)."""
+    origin and at [20, 20, 20], the centred positions must agree to float32 round-off through two
+    frames (< 2e-2; measured 4e-3 at frame 0, 3e-2 at frame 1 for a shift of 58.6). Not more frames:
+    a growing tissue amplifies round-off chaotically (0.08 by frame 4 between two runs of the SAME
+    code), while the defect this guards is > 1e-1 at frame 0."""
     dev = DEVICE if CUDA else "cpu"
     a = _run(_TISSUE, dev)
     b = _run(_TISSUE, dev, centre=(20.0, 20.0, 20.0))
@@ -120,11 +122,11 @@ def test_translation_invariance():
 @pytest.mark.skipif(not CUDA, reason="needs CUDA to compare against CPU")
 def test_device_equivalence():
     """The warp `cell_mechanics` gradient is CUDA-only and is where the origin defect lived: the
-    same spec held r 4.66 on CPU and crumpled to r 3.2 on CUDA at frame 1. Four frames on both
-    devices must agree to the atomics noise: measured 2e-4 at frame 0, 5e-3 by frame 3 (float32
-    index_add vs wp.atomic_add, amplified by 30 relax iterations per frame). The defect this guards
-    is 1e-1 per vertex and up, so the band is 2e-2."""
-    spec = _TISSUE.replace("n_frames: 5", "n_frames: 4")
+    same spec held r 4.66 on CPU and crumpled to r 3.2 on CUDA at frame 1. Two frames on both
+    devices must agree to the atomics noise: measured 2e-4 at frame 0, 7e-4 at frame 1 (float32
+    index_add vs wp.atomic_add through 30 relax iterations per frame). The defect this guards is
+    1e-1 per vertex and up, so the band is 2e-2."""
+    spec = _TISSUE
     a = _run(spec, "cpu", centre=(20.0, 20.0, 20.0))
     b = _run(spec, DEVICE, centre=(20.0, 20.0, 20.0))
     d = _maxdiff(a, b)

@@ -7,7 +7,7 @@ tick loop and is suppressed after frame 0 by a `before_frame: 1` window. The int
 top-level `seed:` block, and the op appears in NEITHER `operators:` NOR `schedule:` -- `Spec.seed_ops`
 says it in one line: "the seed: section (x_0), NOT a schedule".
 
-`schema.load` has warned about the legacy form for months and pointed at `SEED_MIGRATION.md`, which
+`schema.load` has warned about the legacy form for months and pointed at `notes/campaigns/SEED_MIGRATION.md`, which
 does not exist in this tree. 1,512 specs use the legacy form and 22 use the modern one.
 
 WHY IT IS SAFE, MEASURED RATHER THAN ARGUED. Every seed operator sets

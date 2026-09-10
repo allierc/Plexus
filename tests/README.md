@@ -56,4 +56,4 @@ A source commit that needs a refresh to go green is a working-point change and i
     python tools/fingerprint.py diff cvd2_adder_tension --device cuda:1
     PLEXUS_REGRESSION_DEVICE=cuda:1 python -m pytest tests/regression -m regression -k cvd2_adder_tension
 
-Design and the bands: `tests/REGRESSION_PLAN.md`. Status of the old suite: `TEST_KNOWN_FAILURES.md`.
+Design and the bands: `tests/REGRESSION_PLAN.md`. Status of the old suite: `tests/TEST_KNOWN_FAILURES.md`.

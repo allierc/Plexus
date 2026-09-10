@@ -33,7 +33,9 @@ PYTHON = sys.executable
 # THE BANDS. Relative unless stated. tests/REGRESSION_PLAN.md section 2 derives each one from a
 # measured spread (two identical CUDA runs) and a measured regression (what it must not let through).
 BANDS = {
-    "cells": 0.03, "half_edges": 0.03, "deaths_or_net_loss": 0.03, "ndiv_sum": 0.05,
+    "cells": 0.03, "half_edges": 0.03, "deaths_or_net_loss": 0.03,
+    # ndiv_sum (sum of per-cell generation numbers) is RECORDED, not asserted: 5-6% between two runs
+    # of the same code on a dividing tissue; `cells` already guards division.
     "r_med": 0.01, "r_p10": 0.03, "r_p90": 0.03, "area_mean": 0.05,   # area: a batch of fresh daughters moves the mean 2-3%
     "roughness": 0.25, "z_sd": 0.25,
     "mpm_spread": 0.05, "mpm_bbox": 0.05, "mpm_inside": 0.05,

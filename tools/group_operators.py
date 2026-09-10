@@ -118,7 +118,7 @@ INTERFACE_TENSION AND INTERFACE_PUSH ARE TWO OPERATORS AND MUST STAY TWO. They w
 `rd_interface_tension`, carrying `K_purse * sum l_e` (ordinary vertex-model physics) MINUS
 `K_extrude * sum a*r` (an energy that falls as red cells move outward -- it pays the tissue to
 produce the morphology the search was looking for). One name over both cost four campaign rounds of
-verdicts about a term that measured 0.0 in all 78 specs that ever carried it. See OKUDA_PROMOTION.md.
+verdicts about a term that measured 0.0 in all 78 specs that ever carried it. See notes/campaigns/OKUDA_PROMOTION.md.
 """''',
     ),
     dict(
@@ -158,7 +158,7 @@ one contract, which is the paper's rule and not a switch statement: `junction_my
 `ecm_seed` AND `block_seed` ARE NOT REDUNDANT and are not merged: one fills the complement of a
 cavity with aligned fibres, the other fills two slabs with a jittered lattice. Same family, same
 module, different geometry. `ecm_stress` and `block_stress` ARE the same body and are marked for
-merging -- see OKUDA_PROMOTION.md; what keeps them apart today is a MODULE-LEVEL history list per
+merging -- see notes/campaigns/OKUDA_PROMOTION.md; what keeps them apart today is a MODULE-LEVEL history list per
 set, and moving that onto the Level is what lets one operator serve both.
 """''',
     ),
@@ -469,7 +469,7 @@ def _drop_identical_duplicates(bodies):
                         f"  REFUSED: `{name}` is defined in both {src_first} and {s} and the two "
                         f"differ. Concatenating would silently shadow one with the other; decide "
                         f"which is right, add it to ALLOW_DUPLICATE with the reason, and record it "
-                        f"in OKUDA_PROMOTION.md.")
+                        f"in notes/campaigns/OKUDA_PROMOTION.md.")
                 drop.append((a, b, name, src_first))
             else:
                 seen[name] = (s, dump)
@@ -519,7 +519,7 @@ def build(group, dry=False):
     # that happens. `_np` is defined identically in `shape_chem_ops` and `shape_probe_ops`; the
     # second copy is dropped, and only when the two parse to the same tree with the docstring
     # ignored. A duplicate that is NOT identical stops the move -- that is a merge decision, not a
-    # mechanical one, and it belongs in OKUDA_PROMOTION.md.
+    # mechanical one, and it belongs in notes/campaigns/OKUDA_PROMOTION.md.
     bodies = _drop_identical_duplicates(bodies)
 
     out = [group["doc"], "\n"]
