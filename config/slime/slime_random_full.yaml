@@ -4,41 +4,28 @@ general: {name: slime_random_full, seed: 0, n_frames: 400, dt: 1.0, boundary: wa
 sets:
   cell:
     n: 18000
-    spawn: random
     types:
       a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.045}
 - {op: diffuse, at: chemical, rate: 0.0175}
-- {op: decay,   at: chemical, rate: 0.0006}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
+- {op: decay, at: chemical, rate: 0.0006}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a static distribution of blue particles forming a complex network.
-      There is no visible movement or evolution between the four provided keyframes. The spatial arrangement
-      of the points remains constant throughout the sequence. The overall structure appears to be a frozen
-      snapshot of a stochastic process.
-    objects: The scene contains thousands of tiny, individual blue dots. These dots are arranged into
-      a web-like topology of interconnected filaments and loops. The filaments vary in thickness and curvature,
-      creating a porous, sponge-like structure. The background is a solid, uniform black color that provides
-      high contrast for the blue points.
+    description: The simulation shows a static distribution of blue particles forming a complex network. There is no visible movement or evolution between the four provided keyframes. The spatial arrangement of the points remains constant throughout the sequence. The overall structure appears to be a frozen snapshot of a stochastic process.
+    objects: The scene contains thousands of tiny, individual blue dots. These dots are arranged into a web-like topology of interconnected filaments and loops. The filaments vary in thickness and curvature, creating a porous, sponge-like structure. The background is a solid, uniform black color that provides high contrast for the blue points.
   movie_chemical:
-    description: The simulation begins with a dense, interconnected network of teal-colored filaments
-      forming a continuous web-like structure. Over time, the filaments begin to thin and break apart,
-      causing the network to fragment into smaller, isolated segments. As the process continues, these
-      segments further disintegrate into a collection of distinct, disconnected dots. By the final frame,
-      the original web has completely dissolved into a sparse field of small, scattered points.
-    objects: The initial objects are long, continuous teal filaments that are highly interconnected to
-      form a complex mesh. These filaments are relatively thick and vary in length, creating a dense and
-      uniform texture across the field. As time progresses, the objects transition from connected lines
-      into smaller, irregular clusters and then into individual dots. The final objects are small, isolated
-      teal points that are distributed randomly with significant space between them.
+    description: The simulation begins with a dense, interconnected network of teal-colored filaments forming a continuous web-like structure. Over time, the filaments begin to thin and break apart, causing the network to fragment into smaller, isolated segments. As the process continues, these segments further disintegrate into a collection of distinct, disconnected dots. By the final frame, the original web has completely dissolved into a sparse field of small, scattered points.
+    objects: The initial objects are long, continuous teal filaments that are highly interconnected to form a complex mesh. These filaments are relatively thick and vary in length, creating a dense and uniform texture across the field. As time progresses, the objects transition from connected lines into smaller, irregular clusters and then into individual dots. The final objects are small, isolated teal points that are distributed randomly with significant space between them.
 
 plotting:
   renderer: mpl2d

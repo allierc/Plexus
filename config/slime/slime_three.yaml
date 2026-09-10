@@ -4,47 +4,32 @@ general: {name: slime_three, seed: 2, n_frames: 420, dt: 1.0, boundary: wall}
 sets:
   cell:
     n: 15000
-    spawn: random
     types:
       a: {fraction: 0.3334, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       b: {fraction: 0.3333, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       c: {fraction: 0.3333, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 2}
 operators:
 # below-saturation density (low deposit, higher decay) so the cross=-1 gradient
 # survives and the three species carve out distinct territories.
 - {op: deposit, at: cell, to: chemical, amount: 0.025}
-- {op: diffuse, at: chemical,            rate: 0.014}
-- {op: decay,   at: chemical,            rate: 0.0015}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
+- {op: diffuse, at: chemical, rate: 0.014}
+- {op: decay, at: chemical, rate: 0.0015}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, uniform distribution of multicolored particles across
-      the entire frame. Over time, these particles begin to organize into distinct, flowing filaments
-      and swirling patterns. The filaments move and morph, creating a dynamic network of interconnected
-      paths. By the final frame, the particles have formed complex, looping structures that resemble fluid
-      flow or biological networks.
-    objects: The scene contains thousands of tiny, individual particles in red, green, and blue colors.
-      These particles are arranged into elongated, thread-like filaments that curve and loop throughout
-      the space. The filaments vary in length and curvature, forming a dense, interconnected web-like
-      topology. The overall size of the individual particles is very small, while the collective structures
-      they form span the entire image.
+    description: The simulation begins with a dense, uniform distribution of multicolored particles across the entire frame. Over time, these particles begin to organize into distinct, flowing filaments and swirling patterns. The filaments move and morph, creating a dynamic network of interconnected paths. By the final frame, the particles have formed complex, looping structures that resemble fluid flow or biological networks.
+    objects: The scene contains thousands of tiny, individual particles in red, green, and blue colors. These particles are arranged into elongated, thread-like filaments that curve and loop throughout the space. The filaments vary in length and curvature, forming a dense, interconnected web-like topology. The overall size of the individual particles is very small, while the collective structures they form span the entire image.
   movie_chemical:
-    description: The simulation shows a dense network of undulating, thread-like structures moving in
-      a fluid, continuous motion. These filaments appear to shift and sway slightly while maintaining
-      their overall interconnected web-like configuration. The movement is smooth and rhythmic, suggesting
-      a dynamic field or a complex system of interacting agents. Over the sequence, the patterns evolve
-      with subtle changes in curvature and position without breaking their structural integrity.
-    objects: The scene contains numerous long, thin filaments that are intertwined to form a complex,
-      non-linear network. These structures are colored in distinct shades of vibrant red, bright green,
-      and cool blue. Each filament is of a similar thickness and length, creating a uniform texture across
-      the entire frame. The objects are densely packed and overlap frequently, creating a multi-layered,
-      three-dimensional appearance against a black background.
+    description: The simulation shows a dense network of undulating, thread-like structures moving in a fluid, continuous motion. These filaments appear to shift and sway slightly while maintaining their overall interconnected web-like configuration. The movement is smooth and rhythmic, suggesting a dynamic field or a complex system of interacting agents. Over the sequence, the patterns evolve with subtle changes in curvature and position without breaking their structural integrity.
+    objects: The scene contains numerous long, thin filaments that are intertwined to form a complex, non-linear network. These structures are colored in distinct shades of vibrant red, bright green, and cool blue. Each filament is of a similar thickness and length, creating a uniform texture across the entire frame. The objects are densely packed and overlap frequently, creating a multi-layered, three-dimensional appearance against a black background.
 
 plotting:
   renderer: mpl2d

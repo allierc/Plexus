@@ -4,41 +4,29 @@ general: {name: slime_two_repel, seed: 0, n_frames: 420, dt: 1.0, boundary: wall
 sets:
   cell:
     n: 11000
-    spawn: random
     types:
       a: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
       b: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.025}
 - {op: diffuse, at: chemical, rate: 0.014}
-- {op: decay,   at: chemical, rate: 0.0015}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
+- {op: decay, at: chemical, rate: 0.0015}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a collection of particles moving in complex, swirling patterns across
-      a black background. Over time, the particles form elongated, winding filaments that appear to flow
-      and interact with one another. The motion is fluid and organic, with some paths looping back on
-      themselves while others stretch across the frame. The overall structure remains dynamic, with the
-      filaments constantly shifting and evolving their shapes.
-    objects: The scene contains two distinct sets of particles, one colored in a vibrant cyan and the
-      other in a reddish-pink. These particles are arranged into long, continuous, and winding filaments
-      that resemble fluid streamlines or biological structures. Each filament is composed of many small,
-      individual dots that maintain a consistent density along the paths. The filaments vary in length
-      and curvature, weaving through the space in a complex, interconnected topology.
+    description: The simulation shows a collection of particles moving in complex, swirling patterns across a black background. Over time, the particles form elongated, winding filaments that appear to flow and interact with one another. The motion is fluid and organic, with some paths looping back on themselves while others stretch across the frame. The overall structure remains dynamic, with the filaments constantly shifting and evolving their shapes.
+    objects: The scene contains two distinct sets of particles, one colored in a vibrant cyan and the other in a reddish-pink. These particles are arranged into long, continuous, and winding filaments that resemble fluid streamlines or biological structures. Each filament is composed of many small, individual dots that maintain a consistent density along the paths. The filaments vary in length and curvature, weaving through the space in a complex, interconnected topology.
   movie_chemical:
-    description: The video shows a static image of intertwined, winding lines. There is no movement or
-      evolution between the four keyframes provided. The lines remain in the same positions throughout
-      the sequence. The scene represents a steady state of a complex network.
-    objects: The scene contains two sets of continuous, thread-like lines. One set is colored in a vibrant
-      cyan-green, while the other is a deep pinkish-red. These lines are highly convoluted and intertwined,
-      forming a dense, tangled network across the black background. Each line is of a similar thickness
-      and occupies a significant portion of the frame.
+    description: The video shows a static image of intertwined, winding lines. There is no movement or evolution between the four keyframes provided. The lines remain in the same positions throughout the sequence. The scene represents a steady state of a complex network.
+    objects: The scene contains two sets of continuous, thread-like lines. One set is colored in a vibrant cyan-green, while the other is a deep pinkish-red. These lines are highly convoluted and intertwined, forming a dense, tangled network across the black background. Each line is of a similar thickness and occupies a significant portion of the frame.
 
 plotting:
   renderer: mpl2d

@@ -1,8 +1,8 @@
 # spiral_galaxy (2D) -- a rotating self-gravitating disk on `squared_law` (law: gravity, all_pairs).
-# Initialization is a SPEC concern (no operator): `spawn: disc` places the disc, and
+# Initialization is the `seed_positions` operator: `mode: disc` places the disc, and
 # `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds v = spin*sqrt(G*M(<r)/r)
 # from the enclosed mass, plus an optional central point mass (`central_mass`). This replaces the
-# former `disk_ic` operator -- placement lives in `spawn`, velocity in `vel_init`.
+# former `disk_ic` operator -- placement lives in `seed_positions`, velocity in `vel_init`.
 #
 # TWIN of the galaxy prototype's sweep winner bh0.5_m1_j0.06_s0.9 (N=25000, world 8, disc_R 1.5,
 # central mass 0.5, disk mass 1.0, spin 0.9, jitter 0.06, softening 0.08, dt 0.004, 10000 frames).
@@ -10,26 +10,18 @@ general: {name: spiral_galaxy, seed: 2, n_frames: 10000, dt: 0.004, boundary: fr
 sets:
   star:
     n: 25000
-    spawn: disc                                     # flat disc, centred in the world box
-    spawn_radius: 1.5
     vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.08, central_mass: 0.5, jitter: 0.06}
     types: {s: {fraction: 1.0, mass: 0.00004}}      # disk mass ~1.0
 fields: {}
+seed:
+- {op: seed_positions, at: star, mode: disc, radius: 1.5, seed: 2}
 operators:
-  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true}
+- {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true}
 schedule: [squared_law]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_star:
-    description: A dense, spherical cluster of particles begins as a uniform, solid mass in the center
-      of the frame. Over time, the cluster undergoes a violent expansion and fragmentation, with particles
-      streaming outward in distinct, curved trajectories. The structure transitions from a compact sphere
-      into a complex, swirling nebula-like formation with several prominent filaments. By the final frame,
-      the particles have dispersed into a diffuse, irregular cloud with a noticeable central void.
-    objects: The primary objects are thousands of tiny, white and light-blue particles that form a large,
-      central cluster. Initially, these particles are packed tightly together to create a circular, high-density
-      sphere. As the simulation progresses, the particles separate into elongated, curved streams and
-      wispy filaments that radiate from the center. The background is a solid black void, providing high
-      contrast for the evolving white particle field.
+    description: A dense, spherical cluster of particles begins as a uniform, solid mass in the center of the frame. Over time, the cluster undergoes a violent expansion and fragmentation, with particles streaming outward in distinct, curved trajectories. The structure transitions from a compact sphere into a complex, swirling nebula-like formation with several prominent filaments. By the final frame, the particles have dispersed into a diffuse, irregular cloud with a noticeable central void.
+    objects: The primary objects are thousands of tiny, white and light-blue particles that form a large, central cluster. Initially, these particles are packed tightly together to create a circular, high-density sphere. As the simulation progresses, the particles separate into elongated, curved streams and wispy filaments that radiate from the center. The background is a solid black void, providing high contrast for the evolving white particle field.
 
 plotting: {renderer: mpl2d, background: black, point_size: 1, colors: {s: [0.86, 0.9, 1.0]}, movie_max_frames: 1000, fps: 25}

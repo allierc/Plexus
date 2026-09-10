@@ -247,3 +247,12 @@ resolved here (see Open Questions).
   (`translate.py`, `run_one.py`, `biologist.py`, `composition_space.py`),
   plus one independent, disagreeing taxonomy (`composition_space.OPERATORS`
   `role=`) to reconcile or explicitly leave alone.
+
+## Resolved 2026-09-09
+
+`spawn` and its `spawn_*` companions are no longer set keys. Placement is the `seed_positions` operator
+(`src/plexus/operators/seed_ops.py`), which calls the engine's own `_spawn` / `_spawn3d` / `_spawn_pair3d`;
+the engine refuses a set that still carries the keys, and every spec under `config/` was migrated in place
+(132 files, verified semantically identical with only the placement keys moved). A computed `vel_init`
+is now applied after the `seed:` section runs, since it reads x_0. `start`, `vel_init` and `types` remain
+set keys for now.

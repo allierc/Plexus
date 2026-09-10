@@ -14,7 +14,6 @@ general:
 sets:
   cell:
     n: 11000
-    spawn: random
     types:
       a:
         fraction: 0.5
@@ -30,12 +29,13 @@ sets:
         sensor_angle: 28
         sensor_dist: 0.032
         sensor_size: 1
-    spawn_radius: 0.28
 fields:
   chemical:
     frame: grid
     res: 80
     couples_to: cell
+seed:
+- {op: seed_positions, at: cell, mode: random, radius: 0.28, seed: 0}
 operators:
 - op: deposit
   at: cell
@@ -66,25 +66,11 @@ schedule:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, uniform distribution of orange and blue particles.
-      Over time, the particles begin to organize into distinct, elongated filamentary structures. These
-      filaments intertwine and weave through each other, creating a complex network of interconnected
-      paths. By the final frame, the structures have become highly defined, showing clear branching and
-      winding patterns.
-    objects: 'The scene contains two primary sets of objects: orange and blue particles. Initially, the
-      particles are small, individual points scattered randomly across the frame. As the simulation progresses,
-      they aggregate into long, continuous, thread-like filaments. These filaments maintain their distinct
-      colors while forming a tangled, three-dimensional web-like topology.'
+    description: The simulation begins with a dense, uniform distribution of orange and blue particles. Over time, the particles begin to organize into distinct, elongated filamentary structures. These filaments intertwine and weave through each other, creating a complex network of interconnected paths. By the final frame, the structures have become highly defined, showing clear branching and winding patterns.
+    objects: 'The scene contains two primary sets of objects: orange and blue particles. Initially, the particles are small, individual points scattered randomly across the frame. As the simulation progresses, they aggregate into long, continuous, thread-like filaments. These filaments maintain their distinct colors while forming a tangled, three-dimensional web-like topology.'
   movie_chemical:
-    description: The simulation shows a dense cluster of intertwined, worm-like filaments undergoing subtle
-      conformational changes. Over time, the red and green structures shift and rotate slightly while
-      maintaining their overall spatial distribution. The filaments appear to vibrate or fluctuate in
-      place rather than migrating across the frame. The overall volume of the cluster remains constant
-      throughout the sequence.
-    objects: The scene contains two distinct sets of elongated, thread-like filaments colored red and
-      green. These filaments are highly entangled and intertwined, forming a complex, porous network.
-      Each individual filament is relatively thin and exhibits a curved, irregular geometry. The entire
-      collection of objects is concentrated into a roughly diamond-shaped cluster against a black background.
+    description: The simulation shows a dense cluster of intertwined, worm-like filaments undergoing subtle conformational changes. Over time, the red and green structures shift and rotate slightly while maintaining their overall spatial distribution. The filaments appear to vibrate or fluctuate in place rather than migrating across the frame. The overall volume of the cluster remains constant throughout the sequence.
+    objects: The scene contains two distinct sets of elongated, thread-like filaments colored red and green. These filaments are highly entangled and intertwined, forming a complex, porous network. Each individual filament is relatively thin and exhibits a curved, irregular geometry. The entire collection of objects is concentrated into a roughly diamond-shaped cluster against a black background.
 
 plotting:
   renderer: vtk_points

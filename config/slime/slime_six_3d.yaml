@@ -14,7 +14,6 @@ general:
 sets:
   cell:
     n: 18000
-    spawn: random
     types:
       a:
         fraction: 0.16667
@@ -58,12 +57,13 @@ sets:
         sensor_angle: 28
         sensor_dist: 0.032
         sensor_size: 1
-    spawn_radius: 0.28
 fields:
   chemical:
     frame: grid
     res: 64
     couples_to: cell
+seed:
+- {op: seed_positions, at: cell, mode: random, radius: 0.28, seed: 0}
 operators:
 - op: deposit
   at: cell
@@ -94,27 +94,11 @@ schedule:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, chaotic cloud of multi-colored particles filling
-      a diamond-shaped volume. As time progresses, the particles begin to organize into distinct, winding
-      filaments or paths. These filaments weave through the space, creating a complex network of interconnected
-      trajectories. By the final frame, the structure has transitioned from a random distribution to a
-      highly organized, tangled web of continuous lines.
-    objects: The scene contains thousands of small, circular particles that are densely packed in the
-      center. These particles are colored in a variety of hues, including orange, purple, green, and blue.
-      Over time, the particles align to form elongated, thread-like filaments that maintain their individual
-      colors. The overall topology evolves from a stochastic point cloud into a complex, interconnected
-      network of curved paths.
+    description: The simulation begins with a dense, chaotic cloud of multi-colored particles filling a diamond-shaped volume. As time progresses, the particles begin to organize into distinct, winding filaments or paths. These filaments weave through the space, creating a complex network of interconnected trajectories. By the final frame, the structure has transitioned from a random distribution to a highly organized, tangled web of continuous lines.
+    objects: The scene contains thousands of small, circular particles that are densely packed in the center. These particles are colored in a variety of hues, including orange, purple, green, and blue. Over time, the particles align to form elongated, thread-like filaments that maintain their individual colors. The overall topology evolves from a stochastic point cloud into a complex, interconnected network of curved paths.
   movie_chemical:
-    description: The simulation begins with a collection of discrete, multi-colored points distributed
-      in a roughly spherical cluster. Over time, these points begin to elongate and connect, transforming
-      into a dense network of intertwined filaments. As the simulation progresses, the filaments become
-      more defined and occupy a larger volume, forming a complex, tangled web. By the final frame, the
-      structure has evolved into a highly intricate, three-dimensional mesh of continuous fibers.
-    objects: The scene contains a large number of small, multi-colored particles that transition into
-      elongated, thread-like filaments. These objects are arranged in a dense, overlapping, and non-linear
-      topology that fills a central volume. The color palette is diverse, featuring shades of orange,
-      purple, green, and blue distributed throughout the cluster. The size of the individual elements
-      increases significantly as they evolve from point-like dots into long, continuous strands.
+    description: The simulation begins with a collection of discrete, multi-colored points distributed in a roughly spherical cluster. Over time, these points begin to elongate and connect, transforming into a dense network of intertwined filaments. As the simulation progresses, the filaments become more defined and occupy a larger volume, forming a complex, tangled web. By the final frame, the structure has evolved into a highly intricate, three-dimensional mesh of continuous fibers.
+    objects: The scene contains a large number of small, multi-colored particles that transition into elongated, thread-like filaments. These objects are arranged in a dense, overlapping, and non-linear topology that fills a central volume. The color palette is diverse, featuring shades of orange, purple, green, and blue distributed throughout the cluster. The size of the individual elements increases significantly as they evolve from point-like dots into long, continuous strands.
 
 plotting:
   renderer: vtk_points

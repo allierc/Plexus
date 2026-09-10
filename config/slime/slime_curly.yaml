@@ -4,42 +4,28 @@ general: {name: slime_curly, seed: 1, n_frames: 400, dt: 1.0, boundary: wall}
 sets:
   cell:
     n: 12000
-    spawn: disc
-    spawn_radius: 0.32
     types:
       a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.95, sensor_angle: 45, sensor_dist: 0.013, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 220, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: disc, radius: 0.32, seed: 1}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.045}
-- {op: diffuse, at: chemical,            rate: 0.015}
-- {op: decay,   at: chemical,            rate: 0.00075}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
+- {op: diffuse, at: chemical, rate: 0.015}
+- {op: decay, at: chemical, rate: 0.00075}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large cluster of blue particles initially appears as a dense, uniform sphere. Over
-      time, the particles begin to organize into distinct, interconnected looping structures. These loops
-      expand and refine their shapes while maintaining a roughly spherical overall boundary. By the end
-      of the sequence, the internal structure is clearly defined by a network of continuous, winding paths.
-    objects: The primary objects are thousands of small, light-blue dots. These dots are arranged in a
-      complex, interconnected network of closed loops and winding paths. The overall shape of the collection
-      is a large, roughly spherical cluster against a black background. A few isolated dots and small
-      linear trails appear outside the main spherical body.
+    description: A large cluster of blue particles initially appears as a dense, uniform sphere. Over time, the particles begin to organize into distinct, interconnected looping structures. These loops expand and refine their shapes while maintaining a roughly spherical overall boundary. By the end of the sequence, the internal structure is clearly defined by a network of continuous, winding paths.
+    objects: The primary objects are thousands of small, light-blue dots. These dots are arranged in a complex, interconnected network of closed loops and winding paths. The overall shape of the collection is a large, roughly spherical cluster against a black background. A few isolated dots and small linear trails appear outside the main spherical body.
   movie_chemical:
-    description: The video begins with a nearly invisible, faint cluster of particles in the center of
-      a black background. Over the course of the simulation, these particles rapidly brighten and organize
-      into a dense, interconnected network of blue filaments. The structure expands slightly as the filaments
-      become more defined and saturated in color. By the final frame, the central cluster is fully formed
-      and surrounded by thin, radiating lines extending outward.
-    objects: The primary object is a large, spherical cluster of interconnected blue filaments located
-      in the center of the frame. These filaments are arranged in a complex, tangled topology resembling
-      a neural network or a microscopic biological structure. Surrounding this central mass are several
-      thin, faint blue lines that radiate outward like spokes. The color of the filaments is a consistent
-      medium blue, contrasting sharply against the solid black background.
+    description: The video begins with a nearly invisible, faint cluster of particles in the center of a black background. Over the course of the simulation, these particles rapidly brighten and organize into a dense, interconnected network of blue filaments. The structure expands slightly as the filaments become more defined and saturated in color. By the final frame, the central cluster is fully formed and surrounded by thin, radiating lines extending outward.
+    objects: The primary object is a large, spherical cluster of interconnected blue filaments located in the center of the frame. These filaments are arranged in a complex, tangled topology resembling a neural network or a microscopic biological structure. Surrounding this central mass are several thin, faint blue lines that radiate outward like spokes. The color of the filaments is a consistent medium blue, contrasting sharply against the solid black background.
 
 plotting:
   renderer: mpl2d

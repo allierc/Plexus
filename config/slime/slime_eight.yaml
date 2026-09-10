@@ -4,7 +4,6 @@ general: {name: slime_eight, seed: 0, n_frames: 440, dt: 1.0, boundary: wall}
 sets:
   cell:
     n: 24000
-    spawn: random
     types:
       a: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
       b: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
@@ -16,39 +15,24 @@ sets:
       h: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 256, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: random, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.0165}
 - {op: diffuse, at: chemical, rate: 0.012}
-- {op: decay,   at: chemical, rate: 0.0025}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
+- {op: decay, at: chemical, rate: 0.0025}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
-      across a black background. Over time, the particles begin to organize into distinct, flowing streams
-      and swirling patterns. These structures evolve into complex, interconnected filaments that resemble
-      turbulent fluid flows or magnetic field lines. By the final frame, the particles have formed highly
-      defined, undulating curves and nested loops that fill the entire space.
-    objects: The scene contains thousands of tiny, point-like particles of varying colors including cyan,
-      magenta, yellow, and green. Initially, these objects are arranged in a stochastic, high-entropy
-      distribution with no clear spatial correlation. As the simulation progresses, the particles align
-      into elongated, continuous trajectories that form a network of winding filaments. These filaments
-      exhibit a nested topology, creating concentric loops and branching structures that mimic the behavior
-      of a complex dynamical system.
+    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered across a black background. Over time, the particles begin to organize into distinct, flowing streams and swirling patterns. These structures evolve into complex, interconnected filaments that resemble turbulent fluid flows or magnetic field lines. By the final frame, the particles have formed highly defined, undulating curves and nested loops that fill the entire space.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including cyan, magenta, yellow, and green. Initially, these objects are arranged in a stochastic, high-entropy distribution with no clear spatial correlation. As the simulation progresses, the particles align into elongated, continuous trajectories that form a network of winding filaments. These filaments exhibit a nested topology, creating concentric loops and branching structures that mimic the behavior of a complex dynamical system.
   movie_chemical:
-    description: The simulation begins with a dense, chaotic network of multicolored filaments intertwined
-      in a dark space. Over time, these filaments appear to shift and undulate, maintaining their complex,
-      tangled structure while subtly changing their positions. The movement is fluid and continuous, suggesting
-      a dynamic flow or a field of interacting agents. By the final frame, the overall pattern remains
-      consistent, showing a steady-state of turbulent, weaving lines.
-    objects: The scene contains numerous thin, thread-like filaments that are densely packed and overlapping.
-      These objects are arranged in a complex, non-linear topology, forming a tangled web of curves and
-      loops. The filaments exhibit a vibrant color palette including shades of cyan, magenta, yellow,
-      and orange. Each individual filament is very small in width but spans across large portions of the
-      frame, creating a high-frequency texture.
+    description: The simulation begins with a dense, chaotic network of multicolored filaments intertwined in a dark space. Over time, these filaments appear to shift and undulate, maintaining their complex, tangled structure while subtly changing their positions. The movement is fluid and continuous, suggesting a dynamic flow or a field of interacting agents. By the final frame, the overall pattern remains consistent, showing a steady-state of turbulent, weaving lines.
+    objects: The scene contains numerous thin, thread-like filaments that are densely packed and overlapping. These objects are arranged in a complex, non-linear topology, forming a tangled web of curves and loops. The filaments exhibit a vibrant color palette including shades of cyan, magenta, yellow, and orange. Each individual filament is very small in width but spans across large portions of the frame, creating a high-frequency texture.
 
 plotting:
   renderer: mpl2d

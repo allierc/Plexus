@@ -14,8 +14,6 @@ general:
 sets:
   cell:
     n: 12000
-    spawn: disc
-    spawn_radius: 0.32
     types:
       a:
         fraction: 1.0
@@ -29,6 +27,8 @@ fields:
     frame: grid
     res: 80
     couples_to: cell
+seed:
+- {op: seed_positions, at: cell, mode: disc, radius: 0.32, seed: 1}
 operators:
 - op: deposit
   at: cell
@@ -59,22 +59,11 @@ schedule:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A cluster of blue particles begins as a dense, roughly spherical mass. Over time, the
-      cluster undergoes a process of expansion and fragmentation. Individual particles and small sub-clusters
-      break away from the main body, moving outward into the surrounding space. By the final frame, the
-      central mass has become more porous and irregular as the surrounding cloud of particles grows larger.
-    objects: The primary object is a large, irregular cluster of blue particles. These particles are arranged
-      in a dense, roughly spherical topology with a porous internal structure. The color of the particles
-      is a consistent muted blue against a solid black background. The size of the cluster is large relative
-      to the frame, while the individual particles are very small and point-like.
+    description: A cluster of blue particles begins as a dense, roughly spherical mass. Over time, the cluster undergoes a process of expansion and fragmentation. Individual particles and small sub-clusters break away from the main body, moving outward into the surrounding space. By the final frame, the central mass has become more porous and irregular as the surrounding cloud of particles grows larger.
+    objects: The primary object is a large, irregular cluster of blue particles. These particles are arranged in a dense, roughly spherical topology with a porous internal structure. The color of the particles is a consistent muted blue against a solid black background. The size of the cluster is large relative to the frame, while the individual particles are very small and point-like.
   movie_chemical:
-    description: A single blue spherical cluster remains stationary in the center of a black void. The
-      cluster exhibits a slightly irregular, textured surface that appears to fluctuate subtly. There
-      is no significant change in the overall size or position of the object across the frames. The simulation
-      shows a stable, static state of a single particle or aggregate.
-    objects: The scene contains a single, large, roughly spherical cluster. It is colored in a uniform
-      shade of muted blue. The object has a porous or granular texture, giving it a non-smooth appearance.
-      It is isolated in the center of a completely black, featureless background.
+    description: A single blue spherical cluster remains stationary in the center of a black void. The cluster exhibits a slightly irregular, textured surface that appears to fluctuate subtly. There is no significant change in the overall size or position of the object across the frames. The simulation shows a stable, static state of a single particle or aggregate.
+    objects: The scene contains a single, large, roughly spherical cluster. It is colored in a uniform shade of muted blue. The object has a porous or granular texture, giving it a non-smooth appearance. It is isolated in the center of a completely black, featureless background.
 
 plotting:
   renderer: vtk_points

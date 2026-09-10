@@ -14,7 +14,6 @@ general:
 sets:
   cell:
     n: 18000
-    spawn: random
     types:
       a:
         fraction: 1.0
@@ -23,12 +22,13 @@ sets:
         sensor_angle: 28
         sensor_dist: 0.025
         sensor_size: 1
-    spawn_radius: 0.28
 fields:
   chemical:
     frame: grid
     res: 80
     couples_to: cell
+seed:
+- {op: seed_positions, at: cell, mode: random, radius: 0.28, seed: 0}
 operators:
 - op: deposit
   at: cell
@@ -59,24 +59,11 @@ schedule:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense cluster of blue particles begins as a relatively uniform, diamond-shaped cloud.
-      Over time, the particles begin to organize into distinct, interconnected filamentary structures.
-      These filaments branch out and weave together, creating a complex, web-like network within the original
-      volume. By the final frame, the internal structure is highly defined with clear pathways and dense
-      nodes of connectivity.
-    objects: The scene contains a large collection of small, individual blue particles. These particles
-      are initially distributed in a roughly diamond-shaped spatial arrangement. As the simulation progresses,
-      they form elongated, thread-like filaments that connect to one another. The resulting topology is
-      a complex, three-dimensional branching network of interconnected lines and clusters.
+    description: A dense cluster of blue particles begins as a relatively uniform, diamond-shaped cloud. Over time, the particles begin to organize into distinct, interconnected filamentary structures. These filaments branch out and weave together, creating a complex, web-like network within the original volume. By the final frame, the internal structure is highly defined with clear pathways and dense nodes of connectivity.
+    objects: The scene contains a large collection of small, individual blue particles. These particles are initially distributed in a roughly diamond-shaped spatial arrangement. As the simulation progresses, they form elongated, thread-like filaments that connect to one another. The resulting topology is a complex, three-dimensional branching network of interconnected lines and clusters.
   movie_chemical:
-    description: The simulation shows a dense, green, cloud-like structure that gradually contracts and
-      rotates. As time progresses, the outer edges of the cluster become more defined and less diffuse.
-      The overall volume of the green mass appears to shrink while its internal density increases. By
-      the final frame, the structure has settled into a more compact, tilted orientation.
-    objects: The scene contains a single large, amorphous cluster of green particles. These particles
-      are densely packed in the center and become more sparse toward the outer boundaries. The cluster
-      maintains a roughly diamond-shaped topology as it evolves. The green color remains consistent throughout
-      the entire duration of the simulation.
+    description: The simulation shows a dense, green, cloud-like structure that gradually contracts and rotates. As time progresses, the outer edges of the cluster become more defined and less diffuse. The overall volume of the green mass appears to shrink while its internal density increases. By the final frame, the structure has settled into a more compact, tilted orientation.
+    objects: The scene contains a single large, amorphous cluster of green particles. These particles are densely packed in the center and become more sparse toward the outer boundaries. The cluster maintains a roughly diamond-shaped topology as it evolves. The green color remains consistent throughout the entire duration of the simulation.
 
 plotting:
   renderer: vtk_points

@@ -14,7 +14,6 @@ general:
 sets:
   cell:
     n: 11000
-    spawn: random
     types:
       fast:
         fraction: 0.5
@@ -30,12 +29,13 @@ sets:
         sensor_angle: 42
         sensor_dist: 0.022
         sensor_size: 1
-    spawn_radius: 0.28
 fields:
   chemical:
     frame: grid
     res: 80
     couples_to: cell
+seed:
+- {op: seed_positions, at: cell, mode: random, radius: 0.28, seed: 0}
 operators:
 - op: deposit
   at: cell
@@ -66,25 +66,11 @@ schedule:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a dense collection of particles and filaments evolving within a
-      bounded diamond-shaped region. Over time, the orange filaments appear to undergo a process of elongation
-      and complex folding. The blue particles remain relatively stationary, providing a background density
-      for the moving structures. The overall system maintains a high degree of spatial complexity as the
-      orange structures intertwine with one another.
-    objects: 'The scene contains two primary types of objects: orange filaments and blue particles. The
-      orange filaments are long, continuous, and highly curved structures that form a tangled network.
-      The blue particles are small, discrete points distributed throughout the volume. Both sets of objects
-      are concentrated within a diamond-shaped boundary against a black background.'
+    description: The simulation shows a dense collection of particles and filaments evolving within a bounded diamond-shaped region. Over time, the orange filaments appear to undergo a process of elongation and complex folding. The blue particles remain relatively stationary, providing a background density for the moving structures. The overall system maintains a high degree of spatial complexity as the orange structures intertwine with one another.
+    objects: 'The scene contains two primary types of objects: orange filaments and blue particles. The orange filaments are long, continuous, and highly curved structures that form a tangled network. The blue particles are small, discrete points distributed throughout the volume. Both sets of objects are concentrated within a diamond-shaped boundary against a black background.'
   movie_chemical:
-    description: The simulation shows a dense network of red filaments evolving within a bounded diamond-shaped
-      region. Over time, the filaments appear to undergo subtle structural rearrangements and fluctuations
-      in their spatial distribution. The underlying green background field remains relatively static while
-      the red structures shift slightly. The overall density and connectivity of the red network remain
-      consistent throughout the sequence.
-    objects: The primary objects are elongated, thread-like red filaments that form a complex, interconnected
-      web. These filaments are distributed throughout a diamond-shaped volume against a dark background.
-      A faint green background field provides a secondary layer of spatial information. The red filaments
-      vary in length and curvature, creating a disordered, porous topology.
+    description: The simulation shows a dense network of red filaments evolving within a bounded diamond-shaped region. Over time, the filaments appear to undergo subtle structural rearrangements and fluctuations in their spatial distribution. The underlying green background field remains relatively static while the red structures shift slightly. The overall density and connectivity of the red network remain consistent throughout the sequence.
+    objects: The primary objects are elongated, thread-like red filaments that form a complex, interconnected web. These filaments are distributed throughout a diamond-shaped volume against a dark background. A faint green background field provides a secondary layer of spatial information. The red filaments vary in length and curvature, creating a disordered, porous topology.
 
 plotting:
   renderer: vtk_points

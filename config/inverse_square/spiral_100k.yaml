@@ -14,12 +14,6 @@ general:
 sets:
   star:
     n: 100000
-    spawn: two_disks
-    spawn_radius: 1.2
-    spawn_thickness: 0.06
-    spawn_separation: 18.0
-    spawn_offset: 0.0
-    spawn_tilt: 0.6
     type_layout: split_x
     vel_init:
       mode: circular_orbit
@@ -37,11 +31,9 @@ sets:
       blue:
         fraction: 0.5
         mass: 1.5e-05
-    spawn_arms:
-      m: 2
-      amplitude: 0.3
-      pitch: 20.0
 fields: {}
+seed:
+- {op: seed_positions, at: star, mode: two_disks, radius: 1.2, thickness: 0.06, separation: 18.0, offset: 0.0, tilt: 0.6, arms: {m: 2, amplitude: 0.3, pitch: 20.0}, seed: 2}
 operators:
 - op: squared_law
   at: star

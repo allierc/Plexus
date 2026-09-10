@@ -14,7 +14,6 @@ general:
 sets:
   cell:
     n: 11000
-    spawn: random
     types:
       a:
         fraction: 0.5
@@ -30,12 +29,13 @@ sets:
         sensor_angle: 28
         sensor_dist: 0.032
         sensor_size: 1
-    spawn_radius: 0.28
 fields:
   chemical:
     frame: grid
     res: 80
     couples_to: cell
+seed:
+- {op: seed_positions, at: cell, mode: random, radius: 0.28, seed: 0}
 operators:
 - op: deposit
   at: cell
@@ -66,27 +66,11 @@ schedule:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a collection of particles forming elongated, worm-like structures
-      that move and shift over time. These structures appear to be interconnected or overlapping, creating
-      a complex, tangled network. As the video progresses, the individual strands undergo subtle deformations
-      and reorientations within the bounded space. The overall density of the network remains relatively
-      constant, with the strands weaving through one another.
-    objects: The scene contains two distinct sets of particles, colored in shades of red and green. These
-      particles are arranged into long, continuous, and winding filaments that resemble polymer chains
-      or biological fibers. Each filament is composed of many small, discrete points that maintain a consistent
-      spacing to form a coherent line. The structures are distributed throughout a central cluster, exhibiting
-      a high degree of entanglement and overlapping topology.
+    description: The simulation shows a collection of particles forming elongated, worm-like structures that move and shift over time. These structures appear to be interconnected or overlapping, creating a complex, tangled network. As the video progresses, the individual strands undergo subtle deformations and reorientations within the bounded space. The overall density of the network remains relatively constant, with the strands weaving through one another.
+    objects: The scene contains two distinct sets of particles, colored in shades of red and green. These particles are arranged into long, continuous, and winding filaments that resemble polymer chains or biological fibers. Each filament is composed of many small, discrete points that maintain a consistent spacing to form a coherent line. The structures are distributed throughout a central cluster, exhibiting a high degree of entanglement and overlapping topology.
   movie_chemical:
-    description: The simulation shows a dense cluster of intertwined, worm-like filaments in a state of
-      constant motion. Over time, the filaments undergo subtle conformational changes, shifting and twisting
-      within the bounded volume. The overall density of the cluster remains relatively stable as the individual
-      strands fluctuate. The motion appears stochastic, suggesting a dynamic equilibrium or a diffusion-like
-      process within the group.
-    objects: The scene contains numerous elongated, curvilinear filaments that are highly entangled with
-      one another. These objects are primarily colored in shades of muted green and reddish-brown, creating
-      a multi-colored mesh. Each filament has a consistent, medium thickness and varies in length, forming
-      a complex, three-dimensional network. The objects are concentrated in a central diamond-shaped region
-      against a solid black background.
+    description: The simulation shows a dense cluster of intertwined, worm-like filaments in a state of constant motion. Over time, the filaments undergo subtle conformational changes, shifting and twisting within the bounded volume. The overall density of the cluster remains relatively stable as the individual strands fluctuate. The motion appears stochastic, suggesting a dynamic equilibrium or a diffusion-like process within the group.
+    objects: The scene contains numerous elongated, curvilinear filaments that are highly entangled with one another. These objects are primarily colored in shades of muted green and reddish-brown, creating a multi-colored mesh. Each filament has a consistent, medium thickness and varies in length, forming a complex, three-dimensional network. The objects are concentrated in a central diamond-shaped region against a solid black background.
 
 plotting:
   renderer: vtk_points

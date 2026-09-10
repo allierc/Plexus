@@ -37,19 +37,20 @@ sets:
     # spreads by the persistent random walk, so the strip/gyration show the ballistic->diffusive
     # crossover the rotational-diffusion leg controls. Positions are dynamically irrelevant
     # (NoForce), but a point start makes that spreading legible.
-    spawn: point
     types:
       # one type; move_speed is glide's self-propulsion speed v0 (matched to the oracle 0.3)
-      a: { fraction: 1.0, move_speed: 0.3 }
+      a: {fraction: 1.0, move_speed: 0.3}
 
 fields: {}
+seed:
+- {op: seed_positions, at: cell, mode: point, seed: 0}
 
 operators:
   # THE LEG UNDER TEST: single-body rotational diffusion of the heading, dtheta = sqrt(2 D_r dt)*xi.
   # after_frame 1 -> frame 0 is the pristine IC, frame t is exactly t reorients (oracle-aligned).
-  - { op: reorient, at: cell, rot_diffusion: 0.1, after_frame: 1 }
+- {op: reorient, at: cell, rot_diffusion: 0.1, after_frame: 1}
   # self-propulsion along the (rotating) heading: vel = move_speed * heading; the engine integrates.
-  - { op: glide, at: cell }
+- {op: glide, at: cell}
 
 schedule: [reorient, glide]
 
