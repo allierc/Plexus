@@ -1,0 +1,170 @@
+{
+ "params": "out/fits/s4_live_s0/params.npz",
+ "config": {
+  "params": "out/fits/s4_live_s0/params.npz",
+  "device": "cuda:1",
+  "per_parent": 50,
+  "n_grid": 128,
+  "anchor": 10000.0,
+  "band": 0.03,
+  "nu": 0.3,
+  "fit_beat": 3,
+  "beats": "0,1,2,3",
+  "no_realign": false,
+  "out": null
+ },
+ "results": {
+  "0": {
+   "window": [
+    0,
+    47
+   ],
+   "held_out": true,
+   "t0_shift": -3,
+   "model": {
+    "r2_A": 0.5816464424133301,
+    "r2_u": 0.5276434421539307,
+    "loss": 0.8353719115257263,
+    "shortening_corr": 0.8648207783699036,
+    "axis_agreement": 0.8753387928009033,
+    "peak_frame": 10,
+    "peak_frame_ref": 7,
+    "median_shortening_ratio": 0.8155053853988647
+   },
+   "replay": {
+    "r2_A": 0.9888958930969238,
+    "r2_u": 0.9957054853439331,
+    "loss": 0.014894803985953331,
+    "shortening_corr": 0.9960702061653137,
+    "axis_agreement": 0.9977484345436096,
+    "peak_frame": 7,
+    "peak_frame_ref": 7,
+    "median_shortening_ratio": 0.9978764653205872
+   },
+   "nothing": {
+    "r2_A": -8.940696716308594e-05,
+    "r2_u": -0.13259804248809814,
+    "loss": 2.0,
+    "shortening_corr": NaN,
+    "axis_agreement": -0.04738109931349754,
+    "peak_frame": 0,
+    "peak_frame_ref": 7,
+    "median_shortening_ratio": -0.0
+   }
+  },
+  "1": {
+   "window": [
+    43,
+    97
+   ],
+   "held_out": true,
+   "t0_shift": 0,
+   "model": {
+    "r2_A": 0.676714301109314,
+    "r2_u": 0.7010863423347473,
+    "loss": 0.6057840585708618,
+    "shortening_corr": 0.8676818013191223,
+    "axis_agreement": 0.8945510983467102,
+    "peak_frame": 13,
+    "peak_frame_ref": 13,
+    "median_shortening_ratio": 0.8347129225730896
+   },
+   "replay": {
+    "r2_A": 0.9810999035835266,
+    "r2_u": 0.9612868428230286,
+    "loss": 0.05549032986164093,
+    "shortening_corr": 0.9957578182220459,
+    "axis_agreement": 0.9954323768615723,
+    "peak_frame": 13,
+    "peak_frame_ref": 13,
+    "median_shortening_ratio": 1.0211217403411865
+   },
+   "nothing": {
+    "r2_A": -0.0001348257064819336,
+    "r2_u": -0.05794417858123779,
+    "loss": 2.0,
+    "shortening_corr": NaN,
+    "axis_agreement": -0.04912484437227249,
+    "peak_frame": 0,
+    "peak_frame_ref": 13,
+    "median_shortening_ratio": -0.0
+   }
+  },
+  "2": {
+   "window": [
+    93,
+    148
+   ],
+   "held_out": true,
+   "t0_shift": 0,
+   "model": {
+    "r2_A": 0.6794723868370056,
+    "r2_u": 0.7006855010986328,
+    "loss": 0.6042460203170776,
+    "shortening_corr": 0.8673052191734314,
+    "axis_agreement": 0.8975995779037476,
+    "peak_frame": 13,
+    "peak_frame_ref": 13,
+    "median_shortening_ratio": 0.8411988615989685
+   },
+   "replay": {
+    "r2_A": 0.9852578639984131,
+    "r2_u": 0.9684754014015198,
+    "loss": 0.04462721571326256,
+    "shortening_corr": 0.9945785403251648,
+    "axis_agreement": 0.9970910549163818,
+    "peak_frame": 13,
+    "peak_frame_ref": 13,
+    "median_shortening_ratio": 1.0334253311157227
+   },
+   "nothing": {
+    "r2_A": -0.00016582012176513672,
+    "r2_u": -0.05477297306060791,
+    "loss": 2.0,
+    "shortening_corr": NaN,
+    "axis_agreement": -0.04413991421461105,
+    "peak_frame": 0,
+    "peak_frame_ref": 13,
+    "median_shortening_ratio": -0.0
+   }
+  },
+  "3": {
+   "window": [
+    144,
+    200
+   ],
+   "held_out": false,
+   "t0_shift": 0.0,
+   "model": {
+    "r2_A": 0.6812663674354553,
+    "r2_u": 0.6725970506668091,
+    "loss": 0.6148282289505005,
+    "shortening_corr": 0.8666648268699646,
+    "axis_agreement": 0.896355926990509,
+    "peak_frame": 13,
+    "peak_frame_ref": 13,
+    "median_shortening_ratio": 0.8254624605178833
+   },
+   "replay": {
+    "r2_A": 1.0,
+    "r2_u": 0.9999999403953552,
+    "loss": 3.4378672353341244e-08,
+    "shortening_corr": 1.0,
+    "axis_agreement": 1.0,
+    "peak_frame": 13,
+    "peak_frame_ref": 13,
+    "median_shortening_ratio": 0.9999873638153076
+   },
+   "nothing": {
+    "r2_A": -0.00010192394256591797,
+    "r2_u": -0.10561633110046387,
+    "loss": 2.0,
+    "shortening_corr": NaN,
+    "axis_agreement": -0.04971085488796234,
+    "peak_frame": 0,
+    "peak_frame_ref": 13,
+    "median_shortening_ratio": -0.0
+   }
+  }
+ }
+}

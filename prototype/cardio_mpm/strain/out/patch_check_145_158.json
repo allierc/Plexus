@@ -1,0 +1,22 @@
+{
+ "n": 400,
+ "rest": 145,
+ "peak": 158,
+ "patch": 49,
+ "search": 20,
+ "pixels_vs_tracking1": {
+  "corr_x": 0.9734168490132846,
+  "corr_y": 0.9697556797245629,
+  "median_diff_px": 0.615280272843661
+ },
+ "pixels_vs_tracking2": {
+  "corr_x": 0.2537151640993404,
+  "corr_y": -0.09777793545637814,
+  "median_diff_px": 4.384639084874569
+ },
+ "tracking1_vs_tracking2": {
+  "corr_x": 0.2099730908548332,
+  "corr_y": -0.08536222631920967,
+  "median_diff_px": 4.502662194783216
+ }
+}

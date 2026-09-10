@@ -1,0 +1,176 @@
+{
+ "kept": {
+  "flatten": "flat60",
+  "min_sigma": 25,
+  "max_sigma": 60,
+  "threshold": 0.015,
+  "polarity": "dark",
+  "n": 472,
+  "median_diam_px": 70.71067811865476,
+  "seconds": 18.1
+ },
+ "table": [
+  {
+   "flatten": "flat60",
+   "min_sigma": 18,
+   "max_sigma": 45,
+   "threshold": 0.006,
+   "polarity": "bright",
+   "n": 1013,
+   "median_diam_px": 50.91168824543143,
+   "seconds": 12.9
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 18,
+   "max_sigma": 45,
+   "threshold": 0.006,
+   "polarity": "dark",
+   "n": 908,
+   "median_diam_px": 50.91168824543143,
+   "seconds": 13.0
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 18,
+   "max_sigma": 45,
+   "threshold": 0.01,
+   "polarity": "bright",
+   "n": 1000,
+   "median_diam_px": 50.91168824543143,
+   "seconds": 13.0
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 18,
+   "max_sigma": 45,
+   "threshold": 0.01,
+   "polarity": "dark",
+   "n": 903,
+   "median_diam_px": 50.91168824543143,
+   "seconds": 13.0
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 18,
+   "max_sigma": 45,
+   "threshold": 0.015,
+   "polarity": "bright",
+   "n": 987,
+   "median_diam_px": 50.91168824543143,
+   "seconds": 12.9
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 18,
+   "max_sigma": 45,
+   "threshold": 0.015,
+   "polarity": "dark",
+   "n": 895,
+   "median_diam_px": 50.91168824543143,
+   "seconds": 12.9
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 25,
+   "max_sigma": 60,
+   "threshold": 0.006,
+   "polarity": "bright",
+   "n": 520,
+   "median_diam_px": 70.71067811865476,
+   "seconds": 18.1
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 25,
+   "max_sigma": 60,
+   "threshold": 0.006,
+   "polarity": "dark",
+   "n": 481,
+   "median_diam_px": 70.71067811865476,
+   "seconds": 18.2
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 25,
+   "max_sigma": 60,
+   "threshold": 0.01,
+   "polarity": "bright",
+   "n": 513,
+   "median_diam_px": 70.71067811865476,
+   "seconds": 18.2
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 25,
+   "max_sigma": 60,
+   "threshold": 0.01,
+   "polarity": "dark",
+   "n": 480,
+   "median_diam_px": 70.71067811865476,
+   "seconds": 18.2
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 25,
+   "max_sigma": 60,
+   "threshold": 0.015,
+   "polarity": "bright",
+   "n": 507,
+   "median_diam_px": 70.71067811865476,
+   "seconds": 18.0
+  },
+  {
+   "flatten": "flat60",
+   "min_sigma": 25,
+   "max_sigma": 60,
+   "threshold": 0.015,
+   "polarity": "dark",
+   "n": 472,
+   "median_diam_px": 70.71067811865476,
+   "seconds": 18.1
+  },
+  {
+   "flatten": "flat40",
+   "min_sigma": 8,
+   "max_sigma": 26,
+   "threshold": 0.012,
+   "polarity": "bright",
+   "n": 4013,
+   "median_diam_px": 22.627416997969522,
+   "seconds": 9.6
+  },
+  {
+   "flatten": "flat40",
+   "min_sigma": 8,
+   "max_sigma": 26,
+   "threshold": 0.012,
+   "polarity": "dark",
+   "n": 3674,
+   "median_diam_px": 22.627416997969522,
+   "seconds": 9.8
+  }
+ ],
+ "n_cells": 472,
+ "lambda_compactness": 3.0,
+ "nodes_per_cell": {
+  "min": 9,
+  "median": 38.0,
+  "max": 117
+ },
+ "off_voronoi_fraction": 0.09680856731845064,
+ "grid": {
+  "x0": -0.3446227014064789,
+  "y0": 1.4392061233520508,
+  "sx": 15.384247779846191,
+  "sy": 14.624049186706543
+ },
+ "canvas": {
+  "size": 2560,
+  "offset": 384,
+  "sheet": 1792,
+  "world_lo": 0.15,
+  "world_hi": 0.85
+ },
+ "source": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1/0_B_15kPa_1_MMStack_Pos0.ome.tif.derivatives.npy"
+}
