@@ -449,7 +449,15 @@ class MeshContact(Lateral):
             return {self.at: torch.zeros_like(pos)}
         dt_sub = float(getattr(H, "sub_dt", None) or self.dt_frame)
         k = (self.k_frac / dt_sub) ** 2
-        dx = 1.0 / self.n_grid
+        # THE GRID CELL IS world/n_grid, NOT 1/n_grid. In a 117-unit box the unit-box value made
+        # the prefilter band 117x too thin and reported a 0.18-unit penetration as "11 cells".
+        _W = getattr(H, "world_size", None)
+        try:
+            _Wmin = float(min(float(v) for v in _W)) if _W is not None else 1.0
+        except TypeError:
+            _Wmin = float(_W) if _W else 1.0
+        dx = _Wmin / self.n_grid
+        self._dx = dx
 
         c = torch.tensor(self.centre, device=dev, dtype=dt_)
         d = pos - c
@@ -550,7 +558,7 @@ class MeshContact(Lateral):
             if self.verbose and (f < 2 or f % 50 == 0):
                 print(f"[mesh_contact] frame {f}: {M['n_tri']} triangles, {M['G']['nbin']} bins in "
                       f"{M['G']['nrow']} rows (max {M['K']} per bucket), {n_con} contacts, "
-                      f"penetration {dmax / (1.0 / self.n_grid):.2f} cells, momentum residual "
+                      f"penetration {dmax / getattr(self, '_dx', 1.0 / self.n_grid):.2f} cells, momentum residual "
                       f"{resid:.2e}", flush=True)
         row = CONTACT_HISTORY[-1]
         row["n_sub"] += 1
