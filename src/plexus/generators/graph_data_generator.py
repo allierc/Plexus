@@ -249,6 +249,38 @@ def data_generate(
         np.savez(os.path.join(data_dir, "trajectory.npz"), world=out["world"],
                  world_size=out["world_size"], **flat)
 
+    # THE INTERFACE'S OWN RECORD, WRITTEN BY THE RUN AND NOT BY A SCRIPT. mesh_contact, mesh_inside
+    # and the pressure map append one row a frame to module-level lists in contact_ops -- the
+    # momentum residual, the penetration depth, the count behind the surface, the reaction map --
+    # and until now only the okuda_ECM rig scripts read them, so a spec run through Plexus_Main
+    # measured its contact and then forgot it. `contact.json` beside the trajectory is the same
+    # record; `pressure.npz` is the map. Both are skipped, silently and correctly, on a run with
+    # no contact in it.
+    try:
+        from plexus.operators import contact_ops as _co
+        _rec = {}
+        if _co.CONTACT_HISTORY:
+            _rec["contact"] = [{k: (float(v) if isinstance(v, (int, float, np.floating, np.integer)) else v)
+                                for k, v in row.items()} for row in _co.CONTACT_HISTORY]
+        if _co.INSIDE_HISTORY:
+            _rec["inside"] = [{k: float(v) for k, v in row.items()} for row in _co.INSIDE_HISTORY]
+        if _rec:
+            import json as _json
+            _json.dump(_rec, open(os.path.join(data_dir, "contact.json"), "w"))
+            _pm = [pm for pm in _co.PRESSURE_MAP if pm is not None]
+            if _pm:
+                np.savez_compressed(os.path.join(data_dir, "pressure.npz"),
+                                    pressure=np.stack(_pm).astype(np.float32))
+            _c = _rec.get("contact") or []
+            _i = _rec.get("inside") or []
+            print(f"[generate] contact.json: {len(_c)} contact rows"
+                  + (f", momentum residual max {max(r['momentum_residual'] for r in _c):.2e}, "
+                     f"penetration max {max(r['depth_max'] for r in _c):.4g} (world units)" if _c else "")
+                  + (f"; {len(_i)} inside rows, max behind the surface {int(max(r['n_inside'] for r in _i))}" if _i else "")
+                  + (f"; pressure.npz {len(_pm)} maps" if _pm else ""), flush=True)
+    except Exception as _e:                                       # noqa: BLE001 -- a record, never the run
+        print(f"[generate] contact record not written ({type(_e).__name__}: {_e})", flush=True)
+
     # count the rows off a set that HAS them -- `occ` is recorded for every set, spatial or not
     nrec = next(iter(out["sets"].values()))["occ"].shape[0]
     print(f"[generate] done: {nrec} recorded frames -> {data_dir}", flush=True)
