@@ -1095,6 +1095,16 @@ class LiveMovie:
                 if not self._skins_build(H, lvl, pos):
                     self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                     point_size=self._dot_px(pos))
+            elif _r3d == "contour":
+                # A SURFACE RE-CONTOURED EVERY FRAME, for a body whose topology changes -- a syrup
+                # rope that coils, folds and merges with the pool it lands in. The bound `Skin` of
+                # `render_3d: surface` is built once and advected, which is right for a body that
+                # deforms and wrong for one that reconnects; `compartments` is per type and static
+                # in topology for the same reason. This path pays for a fresh density contour each
+                # frame and draws it as morph.py's dielectric, which is the armadillo look.
+                if not self._contour_build(H, lvl, pos):
+                    self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
+                                    point_size=self._dot_px(pos))
             elif _r3d != "surface" or not self._skin_build(H, lvl, pos):
                 self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                 point_size=self._dot_px(pos))
@@ -1110,6 +1120,7 @@ class LiveMovie:
             return
         self.cloud.points = self._xyz(lvl)
         self._skin_update(H, lvl, self.cloud.points)
+        self._contour_update(H, lvl, self.cloud.points)
         self._graph_update(H, tick)
         self._update_meshes(H)
         self._curves_update(tick, H)
@@ -1685,6 +1696,171 @@ class LiveMovie:
         def scalar(self, values):
             """Per-vertex interpolation of a per-particle scalar, same inverse-square weights."""
             return np.einsum("vk,vk->v", self.w, np.asarray(values, float)[self.idx])
+
+    def _contour_settings(self):
+        """morph.py's dielectric, with the spec allowed to override the few knobs that are a look.
+
+        THE SETTINGS ARE THE ARMADILLO'S BY DEFAULT and are imported, not copied, so this render
+        and the morphing script cannot drift: `default_settings()` is the blue glass -- opacity
+        0.5, roughness 0.07, an index of refraction and a clear coat, a bright synthetic sky. A
+        spec changes the COLOUR (`surface_color`) and may move opacity, roughness, metallic and the
+        sky's brightness; the coat, IOR and lights are the recipe and stay.
+        """
+        from plexus.morph import default_settings
+        s = default_settings()
+        st = self.style or {}
+        s["color"] = str(st.get("surface_color", s["color"]))
+        s["opacity"] = float(st.get("surface_opacity", s["opacity"]))
+        s["roughness"] = float(st.get("surface_roughness", s["roughness"]))
+        s["metallic"] = float(st.get("surface_metallic", s["metallic"]))
+        s["env_bright"] = float(st.get("surface_env_bright", s["env_bright"]))
+        s["ngrid"] = int(st.get("contour_ngrid", s["ngrid"]))
+        s["sigma"] = float(st.get("contour_sigma", s["sigma"]))
+        s["iso_frac"] = float(st.get("contour_iso_frac", s["iso_frac"]))
+        s["smooth_iter"] = int(st.get("contour_smooth", s["smooth_iter"]))
+        return s
+
+    def _contour_surface(self, pts):
+        """The density contour of the live cloud, or None when there is nothing to contour."""
+        from plexus.morph import reconstruct_contour
+        s = self._contour_s
+        X = np.asarray(pts, np.float64)
+        if X.shape[0] < 8:
+            return None
+        box = float(np.max(self.world)) if getattr(self, "world", None) is not None \
+            else float(np.max(X))
+        return reconstruct_contour(X, box, ngrid=s["ngrid"], sigma=s["sigma"],
+                                   iso_frac=s["iso_frac"], smooth_iter=s["smooth_iter"])
+
+    def _contour_partition(self, H, lvl):
+        """`contour_by_type: true` -- (names, type id per drawn particle, colour per name), or None.
+
+        THE PARTITION IS THE ONE THE MODEL DECLARES, exactly as `render_3d: compartments` reads
+        it: a particle's type is its own `node_type` if the set is typed, else its PARENT's. Two
+        droplets of two types become two contours in two hues, and a droplet that splashes into
+        the other stays its own colour through the splash, which is the picture a bicolour run is
+        for. Computed once: a particle never changes parent.
+        """
+        st = self.style or {}
+        if not bool(st.get("contour_by_type", False)):
+            return None
+        own = getattr(lvl, "node_type", None); par = getattr(lvl, "parent", None)
+        if own is not None:
+            names = list(getattr(lvl, "type_names", []) or [])
+            tid = np.asarray(own[self.idx].detach().cpu().numpy())
+        elif getattr(lvl, "parent_name", None) and par is not None:
+            plv = H.level(lvl.parent_name)
+            names = list(getattr(plv, "type_names", []) or [])
+            pnt = getattr(plv, "node_type", None)
+            if pnt is None:
+                return None
+            tid = np.asarray(pnt.detach().cpu().numpy())[np.asarray(par[self.idx].detach().cpu().numpy())]
+        else:
+            return None
+        if not names:
+            return None
+        from matplotlib.colors import to_rgb, to_hex
+        pal = st.get("colors") or {}
+        cols = {nm: (to_hex(to_rgb(tuple(pal[nm]) if isinstance(pal.get(nm), (list, tuple)) else pal[nm]))
+                     if nm in pal else self._contour_s["color"]) for nm in names}
+        return names, tid, cols
+
+    def _contour_build(self, H, lvl, pos):
+        """First frame: the material, the sky, the lights and the screen-space occlusion, once."""
+        self._contour_s = None
+        self._contour_part = None
+        try:
+            import pyvista as pv
+            from plexus.morph import build_lights, env_texture
+            s = self._contour_settings()
+            self._contour_s = s
+            self._contour_part = self._contour_partition(H, lvl)
+            if self._contour_part is None:
+                surf = self._contour_surface(pos)
+                if surf is None or surf.n_points == 0:
+                    print("[live-movie] contour: nothing to contour on the first frame; drawing dots",
+                          flush=True)
+                    self._contour_s = None
+                    return False
+            # THE SKY AND THE RIG, set once. `surface_env` may already have set them at plotter
+            # construction; setting the texture twice is harmless, adding the lights twice is not.
+            if not getattr(self, "_contour_lit", False):
+                self.p.set_environment_texture(env_texture(s["env_bright"]))
+                if not bool((self.style or {}).get("surface_env", False)):
+                    build_lights(self.p, s)
+                try:
+                    self.p.enable_depth_peeling(number_of_peels=int(s["peels"]))
+                    box = float(np.max(self.world))
+                    self.p.enable_ssao(radius=box * s["ssao_radius_frac"],
+                                       bias=box * s["ssao_bias_frac"],
+                                       kernel_size=int(s["ssao_kernel"]))
+                except Exception as _e:                              # noqa: BLE001
+                    print(f"[live-movie] contour: ssao/peeling unavailable ({_e})", flush=True)
+                self._contour_lit = True
+            if self._contour_part is None:
+                self._contour_draw(surf)
+                print(f"[live-movie] contour: {surf.n_points:,} pts / {surf.n_cells:,} faces at "
+                      f"{s['ngrid']}^3, colour {s['color']}, opacity {s['opacity']:g}", flush=True)
+            else:
+                n_ok = self._contour_draw_types(np.asarray(pos))
+                names = self._contour_part[0]
+                print(f"[live-movie] contour by type: {n_ok} of {len(names)} surfaces "
+                      f"({', '.join(names)}) at {s['ngrid']}^3, opacity {s['opacity']:g}", flush=True)
+                if n_ok == 0:
+                    self._contour_s = None
+                    return False
+            return True
+
+        except Exception as e:                                       # noqa: BLE001
+            print(f"[live-movie] contour unavailable ({type(e).__name__}: {e}); drawing dots",
+                  flush=True)
+            self._contour_s = None
+            return False
+
+    def _contour_draw_types(self, pts):
+        """One contour per type, each in its own hue; returns how many had a surface."""
+        names, tid, cols = self._contour_part
+        n_ok = 0
+        for j, nm in enumerate(names):
+            sel = tid == j
+            if int(sel.sum()) < 8:
+                continue
+            surf = self._contour_surface(pts[sel])
+            if surf is not None and surf.n_points > 0:
+                self._contour_draw(surf, name=f"contour_{nm}", color=cols[nm]); n_ok += 1
+        return n_ok
+
+    def _contour_draw(self, surf, name="contour", color=None):
+        """Replace the contour actor -- same name, so pyvista swaps rather than stacks."""
+        s = self._contour_s
+        act = self.p.add_mesh(surf, name=name, color=(color or s["color"]), pbr=True,
+                              metallic=s["metallic"], roughness=s["roughness"],
+                              opacity=s["opacity"], diffuse=s["diffuse"], ambient=s["ambient"],
+                              smooth_shading=True, show_scalar_bar=False)
+        # THE DIELECTRIC ITSELF, as morph.draw_scene sets it: an index of refraction and a thin,
+        # sharp clear coat over the base layer -- the glassy double highlight rather than the
+        # single soft plastic one.
+        try:
+            prop = act.GetProperty()
+            prop.SetBaseIOR(s["ior"]); prop.SetCoatStrength(s["coat_strength"])
+            prop.SetCoatRoughness(s["coat_roughness"]); prop.SetCoatIOR(s["coat_ior"])
+        except Exception:                                            # noqa: BLE001
+            pass
+
+    def _contour_update(self, H, lvl, pts):
+        if getattr(self, "_contour_s", None) is None:
+            return
+        try:
+            if getattr(self, "_contour_part", None) is not None:
+                self._contour_draw_types(np.asarray(pts))
+            else:
+                surf = self._contour_surface(pts)
+                if surf is not None and surf.n_points > 0:
+                    self._contour_draw(surf)
+        except Exception as e:                                       # noqa: BLE001
+            if not getattr(self, "_contour_warned", False):
+                self._contour_warned = True
+                print(f"[live-movie] contour update failed ({type(e).__name__}: {e})", flush=True)
 
     def _skin_build(self, H, lvl, pos):
         """Reconstruct the rest surface and bind it. Returns True when the surface is live."""
