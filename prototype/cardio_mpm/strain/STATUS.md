@@ -239,3 +239,47 @@ What the two sheets differ in: the HCM cells contract about twice as hard (g med
 twice as aligned (order 0.20 vs 0.09). What they share: the timing jitter (0.10 s in both) and the
 clock's shape (rise 70–80 ms, plateau 0.75–0.82 s, decay 140–180 ms). Stiffness is deliberately
 not compared yet.
+
+## The stiffness sweep and the comparison with E (2026-09-10, evening)
+
+Healthy sheet, beat 3, band masked, g/φ/δ/E + clock free, `--E-shrink λ` on mean((log E − mean)²);
+scored on held-out beats 1–2 (`out/fits/s4_live_r6_Eshrink*`). Hard bounds were added to the
+optimiser on the way: log E within 10× of 80 and |δ| ≤ 8 frames, plus a NaN guard that restores the
+last finite parameters and halves the learning rates (the λ = 0.03 fit had diverged at iteration 90).
+
+| λ | log E sd | E p10 / p50 / p90 | held-out R²(A) | R²(u) |
+|---|---|---|---|---|
+| E fixed | 0 | 80 | 0.547 | 0.572 |
+| 0.3 | **0.40** | 22 / 37 / 60 | 0.637 | 0.658 |
+| 0.1 | 0.70 | 15 / 39 / 92 | 0.661 | 0.677 |
+| 0.03 | 1.12 | 10 / 44 / 197 | 0.669 | 0.699 |
+| 0.01 | 1.49 | 8 / 44 / 365 | 0.673 | 0.722 |
+| 0 (round 4) | 1.92 | 4 / 28 / 630 | 0.703 | 0.741 |
+
+Reading: the step from "E fixed" to "any E freedom" is worth 0.09 in R²(A); the further 0.07 from
+a spread of ±60% to one of 100× is bought with values (E = 4 to 630) no gate has certified. λ = 0.3
+keeps the spread (sd 0.40) inside the regime the S3 gate certified (planted sd 0.3, recovered to
+0.40 of spread), so **λ = 0.3 is the setting under which per-cell stiffness is reported**, for both
+sheets.
+
+**HCM at λ = 0.3** (`hcm_r2_Eshrink0.3`): held-out beats 1, 2, 4: R²(A) **0.705–0.709**, R²(u)
+0.699–0.712, shortening r 0.91, axis 0.90 — up from 0.63 / 0.66 with E fixed.
+
+**Healthy vs HCM with stiffness** (`compare_sheets.py`, `out/figures/fig5_healthy_vs_hcm_withE.png`,
+interior cells, one sheet each):
+
+| | healthy (330) | HCM (299) |
+|---|---|---|
+| fitted g, median (p10 / p90) | 0.056 (0.007 / 0.107) | 0.084 (0.020 / 0.136) |
+| silent cells (g < 0.01) | 11% | 7% |
+| fitted E, median (p10 / p90), spec units | **37** (22 / 60) | **96** (54 / 141) |
+| clock delay sd | 0.098 s | 0.111 s |
+| axis order | 0.12 | 0.20 |
+| clock rise / plateau / decay | 0.07 / 0.84 / 0.21 s | 0.08 / 0.79 / 0.15 s |
+
+With stiffness free the amplitude gap narrows (g 0.056 vs 0.084 instead of 0.040 vs 0.090) and part
+of it moves into E: the HCM cells come out 2.6× stiffer at the median, with the two E
+distributions barely overlapping (healthy p90 60, HCM p10 54). g and E trade off in this model, so
+"harder and stiffer" is one reading and "the same drive against stiffer neighbours" is the other;
+what is robust across the E-fixed and E-free fits is that the HCM sheet strains 1.6× more, has
+fewer silent cells, is twice as aligned, and shares the healthy sheet's excitation timing.

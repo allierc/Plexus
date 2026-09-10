@@ -187,6 +187,7 @@ def main():
     print(f"  init recovery: {json.dumps(recovery(P, truth))}", flush=True)
 
     log = []
+    last_ok = {k: v.detach().clone() for k, v in P.leaves().items()}
     t_fit = time.time()
     for it in range(args.iters):
         t0 = time.time()
@@ -199,11 +200,28 @@ def main():
             loss = loss + args.E_shrink * (P.logE - P.logE.mean()).pow(2).mean()
         if args.delay_shrink > 0:
             loss = loss + args.delay_shrink * P.delay.pow(2).mean()
+        if not torch.isfinite(loss):
+            # a diverged rollout (measured once: lambda 0.03, iteration 90, loss 0.67 -> 2.8 -> nan):
+            # restore the last finite parameters, halve every learning rate, and go on
+            with torch.no_grad():
+                for k, v in last_ok.items():
+                    getattr(P, k).copy_(v) if k != "clock" or P.clock_mode != "free" else P.gfree.copy_(v)
+            for g_ in opt.param_groups:
+                g_["lr"] *= 0.5
+            print(f"  it {it:4d} loss not finite -- restored the last finite parameters, learning rates halved",
+                  flush=True)
+            sched.step()
+            continue
         loss.backward()
         opt.step()
         sched.step()
         with torch.no_grad():
             P.g.clamp_(min=0.0)
+            # HARD BOUNDS, not priors: a stiffness a hundred times off, or a delay past the clock's
+            # flat tail, is a rollout the MPM cannot integrate (J -> 0, nan), not a hypothesis.
+            P.logE.clamp_(min=math.log(args.youngs / 10), max=math.log(args.youngs * 10))
+            P.delay.clamp_(min=-8.0, max=8.0)
+            last_ok = {k: v.detach().clone() for k, v in P.leaves().items()}
         rowd = dict(it=it, loss=float(loss), seconds=time.time() - t0, recovery=recovery(P, truth),
                     lr=[g_["lr"] for g_ in opt.param_groups])
         log.append(rowd)
