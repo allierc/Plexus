@@ -29,6 +29,7 @@ import yaml
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FINGERPRINTS = os.path.join(ROOT, "tests", "regression", "fingerprints")
 PYTHON = sys.executable
+sys.path.insert(0, os.path.join(ROOT, "src"))
 
 # THE BANDS. Relative unless stated. tests/REGRESSION_PLAN.md section 2 derives each one from a
 # measured spread (two identical CUDA runs) and a measured regression (what it must not let through).
@@ -58,82 +59,7 @@ def load_traj(path: str) -> dict:
     return np.load(path, allow_pickle=False)
 
 
-def _occ(d, key, fr):
-    o = d.get(key)
-    return None if o is None else o[fr].astype(bool)
-
-
-def checkpoint_metrics(d, fr: int) -> dict:
-    """Everything the fingerprint records at one frame. Keys absent from the run are absent here."""
-    m: dict = {}
-    files = set(d.files)
-    # ---- a vertex tissue --------------------------------------------------------------------
-    if "vertex__pos" in files:
-        occ = _occ(d, "vertex__occ", fr)
-        P = d["vertex__pos"][fr]
-        P = P[occ] if occ is not None else P
-        if P.shape[0]:
-            c = P.mean(0)
-            r = np.linalg.norm(P - c, axis=1)
-            m["r_med"] = float(np.median(r))
-            m["r_p10"] = float(np.percentile(r, 10))
-            m["r_p90"] = float(np.percentile(r, 90))
-            m["roughness"] = float(r.std() / max(r.mean(), 1e-12))
-            m["centroid"] = [float(v) for v in c]
-            m["vertices"] = int(P.shape[0])
-            # out-of-plane spread, the sheet's own number; on a shell it is just the radius
-            m["z_sd"] = float(P[:, -1].std())
-        if "cell__occ" in files:
-            m["cells"] = int(d["cell__occ"][fr].sum())
-        if "vertex__mesh_offsets" in files:
-            off = d["vertex__mesh_offsets"]
-            if fr + 1 < off.shape[0]:
-                m["half_edges"] = int(off[fr + 1] - off[fr])   # live half-edges, from the mesh table
-        if "cell__area" in files and "cell__occ" in files:
-            a = d["cell__area"][fr].reshape(-1)
-            co = d["cell__occ"][fr].astype(bool)
-            a = a[co] if a.shape[0] == co.shape[0] else a
-            if a.size:
-                m["area_mean"] = float(a.mean())
-        for k in ("cell__ndiv", "cell__age"):
-            if k in files and "cell__occ" in files:
-                v = d[k][fr].reshape(-1)
-                co = d["cell__occ"][fr].astype(bool)
-                v = v[co] if v.shape[0] == co.shape[0] else v
-                if k == "cell__ndiv" and v.size:
-                    m["ndiv_sum"] = int(v.sum())   # sum of per-cell generation counts, monotone
-        for k in ("cell__chem", "vertex__chem"):
-            if k in files:
-                v = d[k][fr]
-                oc = _occ(d, k.split("__")[0] + "__occ", fr)
-                v = v[oc] if oc is not None and v.shape[0] == oc.shape[0] else v
-                if v.size and float(np.abs(v).max()) > 0.0:   # an all-zero chem block is unused
-                    m["chem_max"] = float(v[:, 0].max())
-                    m["chem_min"] = float(v[:, 0].min())
-    # ---- an MPM body -------------------------------------------------------------------------
-    mp = [k[:-5] for k in files if k.endswith("__pos") and k != "vertex__pos"]
-    if mp:
-        mset = "mpm_particle" if "mpm_particle" in mp else sorted(mp)[0]
-        m["mpm_set"] = mset
-        occ = _occ(d, mset + "__occ", fr)
-        X = d[mset + "__pos"][fr]
-        X = X[occ] if occ is not None else X
-        if X.shape[0]:
-            m["mpm_n"] = int(X.shape[0])
-            m["mpm_spread"] = float(X.std(0).mean())
-            m["mpm_bbox"] = float((X.max(0) - X.min(0)).mean())
-            m["mpm_centroid"] = [float(v) for v in X.mean(0)]
-            if "vertex__pos" in files and "r_med" in m:
-                c = np.asarray(m["centroid"])
-                m["mpm_inside"] = int((np.linalg.norm(X - c, axis=1) < m["r_med"]).sum())
-    return m
-
-
-def deaths_by(d, fr: int) -> int | None:
-    """Cells that have left the live set since frame 0, when the run has a cell set."""
-    if "cell__occ" not in d.files:
-        return None
-    return int(max(0, int(d["cell__occ"][0].sum()) - int(d["cell__occ"][fr].sum())))
+from plexus.measures import _occ, checkpoint_metrics, deaths_by  # noqa: E402,F401  -- moved verbatim
 
 
 def fingerprint_traj(d, cut: int, spec: dict, meta: dict, checkpoints=None) -> dict:

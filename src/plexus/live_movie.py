@@ -1223,15 +1223,20 @@ class LiveMovie:
     #                         `phase` panel cannot show: four fractions say how the population is
     #                         SPLIT between phases, this says how far through it is, so a tissue
     #                         cycling in waves and one cycling steadily are told apart by the SD.
-    _CURVE_Q = ("cells", "area", "volume", "radius", "myosin", "phase", "cycle_progress")
+    from plexus.measures import CURVE_QUANTITIES as _CURVE_Q   # the registry names them
+
+    @staticmethod
+    def _curve_dim(q):
+        """The dimension a curve quantity converts through; `count:<set>` is a count."""
+        from plexus.measures import CURVE_DIMS
+        return "count" if str(q).startswith("count:") else CURVE_DIMS.get(q)
 
     # WHAT EACH CURVE IS, SO THE PANEL CAN CONVERT IT. Until this existed the volume panel appended
     # `µm³` to a raw simulation number and was wrong by `length_um ** 3` -- a factor of 1000 on every
     # tissue run in the tree. The unit is now DERIVED from the same declaration that converts the
     # number, so a label can no longer appear over a value nobody scaled. `myosin` is deliberately
     # absent: it is a per-junction activity with no declared dimension, and UNKNOWN prints bare.
-    _CURVE_UNITS = {"area": "area", "volume": "volume", "radius": "length",
-                    "cells": "count", "phase": "fraction", "cycle_progress": "fraction"}
+    from plexus.measures import CURVE_DIMS as _CURVE_UNITS   # one declaration, with the measures
 
     def _curve_series(self, H, lvl, q, ntype):
         """[T, ntype, 2] of (mean, sd) for `q` over every recorded frame. Replay only.
@@ -1255,129 +1260,10 @@ class LiveMovie:
 
     def _curve_row(self, H, lvl, q, ntype, nt):
         """[nt, 2] of (mean, sd) for `q` at the level's CURRENT frame -- one row of `_curve_series`.
-
-        THE SAME BODY SERVES THE REPLAY AND THE LIVE PASS. The replay sets `lvl.t` and calls this per
-        recorded frame with numpy arrays behind `lvl.get`; the live pass calls it once per frame with
-        CUDA tensors behind the same accessors, so everything that feeds numpy or a CPU geometry call
-        goes through `_np`, a no-op on an array and `.detach().cpu().numpy()` on a tensor.
-        """
-        import torch
-        def _np(v):
-            return v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
-        row = np.full((nt, 2), np.nan)
-        m = getattr(lvl, "mesh", None)
-        if m is None or not int(m.get("nF", 0) or 0):
-            return row
-        _es, _et, _ef = (torch.as_tensor(_np(m[k])) for k in ("E_srce", "E_trgt", "E_face"))
-        nF = int(m["nF"])
-        # THE CELL SET'S BLOCKS, on the curve path too. `phase` is a block on the cell set and
-        # not a face column, and this is the only reader of it outside `_mesh_face_rgb`; the
-        # panel is the one that says what fraction of the tissue is in G1/S/G2/M, so without
-        # the overlay it would draw four empty series and look like a run with no cycle.
-        m = _MeshView(m, self._cell_cols(H, lvl, nF))
-        k = (np.zeros(nF, int) if ntype is None
-             else np.asarray(ntype)[np.clip(np.arange(nF), 0, len(ntype) - 1)].astype(int))
-        if q == "cells":
-            for j in range(nt):
-                row[j] = (float((k == j).sum()), 0.0)
-            return row
-        if q == "phase":
-            # PERCENT OF THE POPULATION IN EACH PHASE, four series in one panel. A cycle is
-            # read as a DISTRIBUTION -- what fraction is where -- and the count of cells does
-            # not show it: a tissue cycling steadily and one frozen in G1 both just grow. The
-            # four fractions sum to 100 at every frame, so the panel is also its own check.
-            #
-            # It ignores `ntype`: the partition here is the PHASE, and splitting phases by cell
-            # type as well would be sixteen series in one panel, which is a different plot.
-            v = m.get("phase")
-            if v is None:
-                return row
-            a = np.rint(np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach")
-                                   else v, float).ravel()[:nF]).astype(int)
-            for j in range(min(nt, 4)):
-                row[j] = (100.0 * float(np.mean(a == j)) if a.size else np.nan, 0.0)
-            return row
-        if q == "cycle_progress":
-            v = m.get("cycle_progress")
-            if v is None:
-                return row
-            vv = np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach") else v,
-                            float).ravel()[:nF]
-            for j in range(nt):
-                sel = k == j
-                if sel.any():
-                    row[j] = (float(np.nanmean(vv[sel])), float(np.nanstd(vv[sel])))
-            return row
-        if q == "myosin":
-            v = m.get("e_myo")
-            if v is None:
-                return row
-            ef = _np(m["E_face"]); live = ef < nF
-            vv = np.asarray(v, float)[live]
-            ke = k[np.clip(ef[live].astype(int), 0, nF - 1)]
-            for j in range(nt):
-                sel = ke == j
-                if sel.any():
-                    row[j] = (float(np.nanmean(vv[sel])), float(np.nanstd(vv[sel])))
-            return row
-        import torch
-        if q == "radius":
-            nv = int(m["Nv"])
-            P = _np(lvl.get("pos")[:nv])
-            r = np.linalg.norm(P - P.mean(0), axis=1)
-            for j in range(nt):                   # per VERTEX, so the type split is by face
-                row[j] = (float(np.mean(r)), float(np.std(r)))
-            return row
-        from plexus.operators.vertex_ops import face_geometry_3d, wedge_apex
-        nv = int(m["Nv"])
-        pos = torch.as_tensor(_np(lvl.get("pos")[:nv]), dtype=torch.float64)
-        a, _p, _c, _v = face_geometry_3d(pos, _es, _et, _ef, nF, apex=wedge_apex(m, pos))
-        a = a.numpy()
-        # `area` FOLLOWS `volume`'S RULE, AND FOR THE SAME REASON. What `face_geometry_3d`
-        # returns is the MID-SURFACE area, and on an apico-basal run the mid-surface is not a
-        # boundary of anything: the cell's surface is the polyhedron's -- two caps and one wall
-        # per ring edge -- and that is the `S` the energy's `kappa_s` integrates. A panel
-        # labelled "cell area" showing the area of a surface the cell does not have is the same
-        # defect the volume branch below documents, one term along in the same functional.
-        #
-        # Falls back to the mid-surface when the run carries no `sep`, where it IS the cell.
-        if q == "area":
-            _sa = lvl.get("sep")
-            if _sa is not None and int(_sa.shape[0]) >= nv:
-                from plexus.operators.vertex_ops import apicobasal_geometry_3d
-                _ss = torch.as_tensor(np.asarray(_sa[:nv].detach().cpu()
-                                                 if hasattr(_sa, "detach") else _sa[:nv]),
-                                      dtype=torch.float64)
-                a = apicobasal_geometry_3d(pos, _ss, _es, _et, _ef, nF)[1].numpy()
-        if q == "volume":
-            # THE VOLUME THE ENERGY DEFENDS, WHICH ON AN APICO-BASAL RUN IS NOT `_v`.
-            # `face_geometry_3d` returns the origin-referenced WEDGE volume -- the cone from
-            # the world origin out to the cell's mid-surface ring -- and that is the quantity
-            # `cell_grow` scales and `cell_divide` triggers on, but it is NOT the cell. It
-            # rises when the SHELL's radius rises, with the cell unchanged, which is how a
-            # tissue comes to divide without growing. `cell_mechanics[model: apicobasal]`
-            # defends the polyhedron: two caps and one wall per ring edge, by the divergence
-            # theorem, and that is what a plot labelled "cell volume" has to show.
-            #
-            # Falls back to the wedge when the run carries no `sep`, so a mid-surface spec
-            # asking for this curve still gets the only volume it has.
-            try:
-                _sp = lvl.get("sep")
-            except Exception:                                # noqa: BLE001
-                _sp = None
-            if _sp is not None and int(_sp.shape[0]) >= nv:
-                from plexus.operators.vertex_ops import apicobasal_geometry_3d
-                _s = torch.as_tensor(np.asarray(_sp[:nv].detach().cpu()
-                                                if hasattr(_sp, "detach") else _sp[:nv]),
-                                     dtype=torch.float64)
-                a = apicobasal_geometry_3d(pos, _s, _es, _et, _ef, nF)[0].numpy()
-            else:
-                a = _v.numpy()
-        for j in range(nt):
-            sel = k == j
-            if sel.any():
-                row[j] = (float(np.nanmean(a[sel])), float(np.nanstd(a[sel])))
-        return row
+        The body lives in `plexus.measures.curve_row`, one entry point with the gates and the
+        fingerprints; this passes the renderer's cell-column reader and nothing else."""
+        from plexus.measures import curve_row
+        return curve_row(H, lvl, q, ntype, nt, self._cell_cols)
 
     def _curve_types(self, H, lvl):
         """The per-cell type ids, or None. `mesh_cell_set` names which set a face belongs to."""
@@ -1449,9 +1335,11 @@ class LiveMovie:
         for _i, cfg in enumerate(cfgs):
             cfg = dict(cfg)
             q = str(cfg.get("quantity", "cells")).lower()
-            if q not in self._CURVE_Q:
+            if q not in self._CURVE_Q and not str(q).startswith("count:"):
                 raise ValueError(f"plotting.curve.quantity: {q!r} is not one of "
-                                 f"{', '.join(self._CURVE_Q)}")
+                                 f"{', '.join(self._CURVE_Q)} or count:<set>")
+            if str(q).startswith("count:") and q[len("count:"):] not in getattr(H, "levels", {}):
+                raise ValueError(f"plotting.curve.quantity: {q!r} names a set this run does not have")
             if live:
                 nt0 = 4 if q == "phase" else (1 if ntype is None else int(np.max(ntype)) + 1)
                 S = np.full((T_live, nt0, 2), np.nan)
@@ -1464,7 +1352,7 @@ class LiveMovie:
             # at the source is what keeps them from disagreeing -- which is exactly how the label
             # and the number came to disagree in the first place. `to_physical` returns None when
             # the run declared no scale, and then nothing is scaled and nothing is labelled.
-            _scale = _units_to_physical(1.0, self._CURVE_UNITS.get(q), self._units)
+            _scale = _units_to_physical(1.0, self._curve_dim(q), self._units)
             if _scale is not None and _scale != 1.0:
                 S = S * float(_scale)
             lo, hi = ((float(cfg["ymin"]), float(cfg["ymax"])) if live else
@@ -1481,7 +1369,7 @@ class LiveMovie:
                 e = 10.0 ** np.floor(np.log10(abs(v)))
                 f = np.ceil(abs(v) / e) if (v > 0) == up else np.floor(abs(v) / e)
                 return float(np.sign(v) * max(f, 1.0) * e)
-            lo = 0.0 if (lo >= 0 or q in ("cells", "area", "volume", "myosin")) else _r1(lo, False)
+            lo = 0.0 if (lo >= 0 or q in ("cells", "area", "volume", "myosin") or str(q).startswith("count:")) else _r1(lo, False)
             # A ROUND STEP, NOT A ROUND TOP. Snapping only the top to one significant figure still
             # left the ticks between the ends to be whatever the count divided into: 0..8000 over
             # `ticks: 4` printed 0, 2667, 5333, 8000, and the two in the middle are the artefact of
@@ -1533,7 +1421,7 @@ class LiveMovie:
             # THE REAL CHARACTERS. VTK's text renderer takes them, so `um^3` -- an ASCII
             # transliteration of micro and a caret standing in for an exponent -- was a choice, not
             # a limitation, and it sat two lines under a scale bar already saying `\u00b5m`.
-            _u = _units_label(self._CURVE_UNITS.get(q), self._units)
+            _u = _units_label(self._curve_dim(q), self._units)
             _u = {"phase": "%"}.get(q, _u)
             ch.y_axis.label = str(cfg.get("ylabel", q)) + (f"  ({_u})" if _u else "")
             # TWO SIZES, NOT ONE MINUS TWO. The axis TITLE ("cells", "frame") and the TICK NUMBERS
@@ -1701,7 +1589,7 @@ class LiveMovie:
                    else None)
             if lab is not None:
                 m0, s0 = S[t, :, 0], S[t, :, 1]
-                if lab["q"] == "cells":
+                if lab["q"] == "cells" or str(lab["q"]).startswith("count:"):   # a count prints as an integer
                     txt = f"{np.nansum(m0):,.0f}"
                 elif lab["q"] == "phase":
                     txt = "  ".join(f"{v:.0f}" for v in m0) + " %"
@@ -3541,42 +3429,7 @@ class LiveMovie:
 # WHAT REPLAY CANNOT DO, and says so: `color_field` (vorticity / pressure) needs `C` and `F`, the
 # per-particle affine and deformation tensors, and a trajectory stores neither. Those colours are a
 # live-only feature; the replay falls back to the type palette and prints that it did.
-class _MeshView:
-    """A read-only mesh table with the cell set's per-cell blocks overlaid.
-
-    WHY A VIEW AND NOT A DICT COPY. The live path's `m` is a `MeshTable` holding CUDA tensors and
-    the replay path's is a plain dict; both are read the same two ways, `m["nF"]` and
-    `m.get(name)`, and nothing in the renderer writes to either. Wrapping keeps one code path for
-    both and copies nothing.
-
-    THE MESH WINS EVERY NAME CLASH. An overlay is consulted only for a name the table does not
-    have, so a cell-set block called `area` -- and there is one -- can never shadow a face column
-    or `nF`. The overlay is what the mesh no longer carries, never a second opinion about what it
-    does.
-    """
-
-    __slots__ = ("_m", "_c")
-
-    def __init__(self, m, cell_cols):
-        self._m = m
-        self._c = cell_cols or {}
-
-    def __getitem__(self, k):
-        try:
-            return self._m[k]
-        except KeyError:
-            return self._c[k]
-
-    def __contains__(self, k):
-        return k in self._m or k in self._c
-
-    def get(self, k, default=None):
-        v = self._m.get(k, None)
-        return self._c.get(k, default) if v is None else v
-
-    def __getattr__(self, a):                 # `reindex_faces`, `snapshot`, ... stay reachable
-        return getattr(self._m, a)
-
+from plexus.measures import _MeshView  # noqa: E402  -- the read-only mesh view lives with the measures now
 
 class _ReplayLevel:
     """One set of a trajectory.npz, shaped like the Level the renderer reads off the engine."""
