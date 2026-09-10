@@ -148,3 +148,6 @@ config/studio/
 # figure, and 88 untracked files in the repo root are 88 chances to do it again.
 .scratch/
 papers/morph_models/
+
+# transient specs written by tools/regression_lib.run_cut for the duration of one rerun
+config/*/_regression_*.yaml

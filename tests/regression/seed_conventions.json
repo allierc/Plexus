@@ -1,0 +1,1757 @@
+{
+ "cell/ab_tissue_mpm_still": {
+  "vertex": {
+   "Nv": 44,
+   "V0f_median": 0.000429703330155462,
+   "V0f_sum": 0.01037184614688158,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 24,
+   "v0_from": "wedge",
+   "v_ref": 0.0004208147875033319
+  }
+ },
+ "cell/abcell_A_mesh_only": {
+  "vertex": {
+   "Nv": 32,
+   "V0f_median": 0.00022119106142781675,
+   "V0f_sum": 0.005308585241436958,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 18,
+   "v0_from": "wedge",
+   "v_ref": 0.00022119106142781675
+  }
+ },
+ "cell/abcell_B_mpm_only": {
+  "vertex": {
+   "Nv": 32,
+   "V0f_median": 0.00022119106142781675,
+   "V0f_sum": 0.005308585241436958,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 18,
+   "v0_from": "wedge",
+   "v_ref": 0.00022119106142781675
+  }
+ },
+ "cell/abcell_C_mesh_and_mpm": {
+  "vertex": {
+   "Nv": 32,
+   "V0f_median": 0.00022119106142781675,
+   "V0f_sum": 0.005308585241436958,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 18,
+   "v0_from": "wedge",
+   "v_ref": 0.00022119106142781675
+  }
+ },
+ "cell/abquad_A_mesh_only": {
+  "vertex": {
+   "Nv": 48,
+   "V0f_median": 0.0001195115692098625,
+   "V0f_sum": 0.004302415065467358,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 32,
+   "v0_from": "wedge",
+   "v_ref": 0.00011951156193390489
+  }
+ },
+ "cell/abquad_B_mpm_only": {
+  "vertex": {
+   "Nv": 48,
+   "V0f_median": 0.0001195115692098625,
+   "V0f_sum": 0.004302415065467358,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 32,
+   "v0_from": "wedge",
+   "v_ref": 0.00011951156193390489
+  }
+ },
+ "cell/abquad_C_mesh_and_mpm": {
+  "vertex": {
+   "Nv": 48,
+   "V0f_median": 0.0001195115692098625,
+   "V0f_sum": 0.004302415065467358,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 32,
+   "v0_from": "wedge",
+   "v_ref": 0.00011951156193390489
+  }
+ },
+ "cell/adh_mesh_cell": {
+  "vertex": {
+   "Nv": 3196,
+   "V0f_median": 4.708302185463253e-06,
+   "V0f_sum": 0.013988295570015907,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1600,
+   "v0_from": "wedge",
+   "v_ref": 6.580800800293218e-06
+  }
+ },
+ "cell/cell_A_mesh_only": {
+  "vertex": {
+   "Nv": 3196,
+   "V0f_median": 4.708302185463253e-06,
+   "V0f_sum": 0.013988295570015907,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1600,
+   "v0_from": "wedge",
+   "v_ref": 6.580800800293218e-06
+  }
+ },
+ "cell/cell_B_mpm_only": {
+  "vertex": {
+   "Nv": 3196,
+   "V0f_median": 4.708302185463253e-06,
+   "V0f_sum": 0.013988295570015907,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1600,
+   "v0_from": "wedge",
+   "v_ref": 6.580800800293218e-06
+  }
+ },
+ "cell/cell_C_mesh_and_mpm": {
+  "vertex": {
+   "Nv": 3196,
+   "V0f_median": 4.708302185463253e-06,
+   "V0f_sum": 0.013988295570015907,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1600,
+   "v0_from": "wedge",
+   "v_ref": 6.580800800293218e-06
+  }
+ },
+ "cell/compress_cage": {
+  "vertex": {
+   "Nv": 24,
+   "V0f_median": 0.00012643751688301563,
+   "V0f_sum": 0.0022758753038942814,
+   "centre": [
+    0.175,
+    0.175,
+    0.175
+   ],
+   "nF": 14,
+   "v0_from": "wedge",
+   "v_ref": 0.00012643751688301563
+  }
+ },
+ "cell/grow_in_cage": {
+  "vertex": {
+   "Nv": 24,
+   "V0f_median": 0.00012643751688301563,
+   "V0f_sum": 0.0022758753038942814,
+   "centre": [
+    0.175,
+    0.175,
+    0.175
+   ],
+   "nF": 14,
+   "v0_from": "wedge",
+   "v_ref": 0.00012643751688301563
+  }
+ },
+ "cell/mesh_cell_still": {
+  "vertex": {
+   "Nv": 3196,
+   "V0f_median": 4.708302185463253e-06,
+   "V0f_sum": 0.013988295570015907,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1600,
+   "v0_from": "wedge",
+   "v_ref": 6.580800800293218e-06
+  }
+ },
+ "cell/onecell_A_mesh_only": {
+  "vertex": {
+   "Nv": 796,
+   "V0f_median": 2.683296406758018e-05,
+   "V0f_sum": 0.011285446584224701,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 400,
+   "v0_from": "wedge",
+   "v_ref": 2.6812636860995553e-05
+  }
+ },
+ "cell/onecell_B_mpm_only": {
+  "vertex": {
+   "Nv": 796,
+   "V0f_median": 2.683296406758018e-05,
+   "V0f_sum": 0.011285446584224701,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 400,
+   "v0_from": "wedge",
+   "v_ref": 2.6812636860995553e-05
+  }
+ },
+ "cell/onecell_C_mesh_and_mpm": {
+  "vertex": {
+   "Nv": 796,
+   "V0f_median": 2.683296406758018e-05,
+   "V0f_sum": 0.011285446584224701,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 400,
+   "v0_from": "wedge",
+   "v_ref": 2.6812636860995553e-05
+  }
+ },
+ "cell/squeeze_prism": {
+  "vertex": {
+   "Nv": 24,
+   "V0f_median": 6.125000800238922e-05,
+   "V0f_sum": 0.0011025002459064126,
+   "centre": [
+    0.175,
+    0.175,
+    0.175
+   ],
+   "nF": 14,
+   "v0_from": "wedge",
+   "v_ref": 6.125000800238922e-05
+  }
+ },
+ "gates/gate_00_spheroid": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "gates/gate_01_nomyosin": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "gates/gate_01_nosync": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "gates/gate_ab_curved": {
+  "vertex": {
+   "Nv": 636,
+   "V0f_median": 1.6173710823059082,
+   "V0f_sum": 515.5731201171875,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 320,
+   "v0_from": "wedge",
+   "v_ref": 1.616619348526001
+  }
+ },
+ "gates/gate_ab_curved_coarse": {
+  "vertex": {
+   "Nv": 156,
+   "V0f_median": 6.086949825286865,
+   "V0f_sum": 488.925537109375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 80,
+   "v0_from": "wedge",
+   "v_ref": 6.077931880950928
+  }
+ },
+ "gates/gate_ab_flat": {
+  "vertex": {
+   "Nv": 123,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "nF": 48,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "gates/gate_ab_flat_mono": {
+  "vertex": {
+   "Nv": 123,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "nF": 48,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "gates/gate_ab_hexprism": {
+  "vertex": {
+   "Nv": 6,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "gates/gate_ab_population": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "gates/gate_ab_sphere": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "gates/gate_ab_thickshell": {
+  "vertex": {
+   "Nv": 2556,
+   "V0f_median": 0.4074851870536804,
+   "V0f_sum": 521.4725341796875,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1280,
+   "v0_from": "wedge",
+   "v_ref": 0.4074814021587372
+  }
+ },
+ "tissue/apop2_ab_half": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ab_many": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ab_one": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ab_patch": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ab_rings9": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_abfix_half": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.06277474761009216,
+   "V0f_sum": 125.42611694335938,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "polyhedron",
+   "v_ref": 0.06276801228523254
+  }
+ },
+ "tissue/apop2_abfix_many": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.06277474761009216,
+   "V0f_sum": 125.42611694335938,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "polyhedron",
+   "v_ref": 0.06276801228523254
+  }
+ },
+ "tissue/apop2_abfix_one": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.06277474761009216,
+   "V0f_sum": 125.42611694335938,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "polyhedron",
+   "v_ref": 0.06276801228523254
+  }
+ },
+ "tissue/apop2_abfix_patch": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.06277474761009216,
+   "V0f_sum": 125.42611694335938,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "polyhedron",
+   "v_ref": 0.06276801228523254
+  }
+ },
+ "tissue/apop2_abfix_rings9": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.06277474761009216,
+   "V0f_sum": 125.42611694335938,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "polyhedron",
+   "v_ref": 0.06276801228523254
+  }
+ },
+ "tissue/apop2_crit062": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_flip060": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks0p0": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks0p05": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks0p1": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks0p2": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks0p4": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks2_0p02": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks2_0p035": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks2_0p05": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks2_0p08": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_ks2_0p1": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_sheet_half": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_sheet_many": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_sheet_one": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_sheet_patch": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_sheet_rings9": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_sr_0p1": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_sr_0p2": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/apop2_sr_0p4": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/b_star": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/cv_kv_double": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cv_kv_half": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cv_kv_oct": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cv_kv_quad": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cv_relax_long": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cv_shape_low": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cv_target_percell": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cv_target_uniform": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.5462114810943604,
+   "V0f_sum": 509.2423095703125,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cv_tension_high": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cv_tension_low": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_adder": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_adder_quiet": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_adder_tension": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_all": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.5462114810943604,
+   "V0f_sum": 509.2423095703125,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_doubler": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_every1": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_mincycle": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_quiet_relax": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_quiet_uniform": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.5462114810943604,
+   "V0f_sum": 509.2423095703125,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_rerun": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd2_slow_quiet": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_baseline": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_cyclecv_off": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_factor_low": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_g1ramp": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_noise_off": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_quiet": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_quiet_tension": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_slow": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_tension_low": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cvd_uniform_seed": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.5462114810943604,
+   "V0f_sum": 509.2423095703125,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/cyc4_dilution": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "tissue/cyc4_hazard": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "tissue/cyc4_sizer": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "tissue/cyc4_timer": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "tissue/cycle_phases": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "tissue/divide_growing_ball": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/divide_sparse": {
+  "vertex": {
+   "Nv": 2556,
+   "V0f_median": 0.4074851870536804,
+   "V0f_sum": 521.4725341796875,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1280,
+   "v0_from": "wedge",
+   "v_ref": 0.4074814021587372
+  }
+ },
+ "tissue/divide_uniform_volume": {
+  "vertex": {
+   "Nv": 2556,
+   "V0f_median": 0.4074851870536804,
+   "V0f_sum": 521.4725341796875,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1280,
+   "v0_from": "wedge",
+   "v_ref": 0.4074814021587372
+  }
+ },
+ "tissue/mech_hexprism": {
+  "vertex": {
+   "Nv": 6,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "tissue/mech_reduction_apicobasal": {
+  "vertex": {
+   "Nv": 123,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "nF": 48,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "tissue/mech_shell_free": {
+  "vertex": {
+   "Nv": 2556,
+   "V0f_median": 0.4074851870536804,
+   "V0f_sum": 521.4725341796875,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 1280,
+   "v0_from": "wedge",
+   "v_ref": 0.4074814021587372
+  }
+ },
+ "tissue/mech_shell_frozen": {
+  "vertex": {
+   "Nv": 636,
+   "V0f_median": 1.6173710823059082,
+   "V0f_sum": 515.5731201171875,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 320,
+   "v0_from": "wedge",
+   "v_ref": 1.616619348526001
+  }
+ },
+ "tissue/mech_uniform_target": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.5462114810943604,
+   "V0f_sum": 509.2423095703125,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/r010_00_ctrl": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26143890619277954,
+   "V0f_sum": 522.2630004882812,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.26141637563705444
+  }
+ },
+ "tissue/r020_00_ctrl": {
+  "vertex": {
+   "Nv": 3996,
+   "V0f_median": 0.26065969467163086,
+   "V0f_sum": 522.255859375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 2000,
+   "v0_from": "wedge",
+   "v_ref": 0.2606367766857147
+  }
+ },
+ "tissue/shape_moebius": {
+  "vertex": {
+   "Nv": 1046,
+   "V0f_median": 0.22043465077877045,
+   "V0f_sum": 99.83198547363281,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 455,
+   "v0_from": "wedge",
+   "v_ref": 0.22043465077877045
+  }
+ },
+ "tissue/shape_plane": {
+  "vertex": {
+   "Nv": 940,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 420,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "tissue/shape_ribbon": {
+  "vertex": {
+   "Nv": 1046,
+   "V0f_median": 0.3796500861644745,
+   "V0f_sum": 156.95774841308594,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 455,
+   "v0_from": "wedge",
+   "v_ref": 0.3796500861644745
+  }
+ },
+ "tissue/sheet_die": {
+  "vertex": {
+   "Nv": 819,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 374,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "tissue/sheet_divide": {
+  "vertex": {
+   "Nv": 819,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 374,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "tissue/sheet_moebius": {
+  "vertex": {
+   "Nv": 1046,
+   "V0f_median": 0.22043465077877045,
+   "V0f_sum": 99.83198547363281,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 455,
+   "v0_from": "wedge",
+   "v_ref": 0.22043465077877045
+  }
+ },
+ "tissue/sheet_morphogen": {
+  "vertex": {
+   "Nv": 819,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 374,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "tissue/sheet_morphogen_die": {
+  "vertex": {
+   "Nv": 819,
+   "V0f_median": 0.0,
+   "V0f_sum": 0.0,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 374,
+   "v0_from": "wedge",
+   "v_ref": 0.0
+  }
+ },
+ "tissue/spheroid_ecm": {
+  "vertex": {
+   "Nv": 796,
+   "V0f_median": 8.23296090857184e-07,
+   "V0f_sum": 0.0003740946704056114,
+   "centre": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "nF": 400,
+   "v0_from": "wedge",
+   "v_ref": 8.216856599574385e-07
+  }
+ },
+ "tissue/spheroid_ecm_04": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.544588565826416,
+   "V0f_sum": 509.8047790527344,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5433268547058105
+  }
+ },
+ "tissue/spheroid_ecm_ab": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844005584717,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    25.0,
+    25.0,
+    25.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462100505828857
+  }
+ }
+}

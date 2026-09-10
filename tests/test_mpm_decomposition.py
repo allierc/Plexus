@@ -50,10 +50,10 @@ sets:
   {_CELL.format(**case)}
 fields: {{}}
 operators:
-  - {{op: aggregate, at: cell}}
+  - {{op: aggregate_centroid, at: cell, child: mpm_particle}}
   - {{op: gravity, at: cell, g: {case['g']}}}
   - {{op: mls_mpm_mechanics, at: mpm_particle, n_grid: 64, substeps: {case['sub']}, dt_sub: {DT_SUB}, a_max: 200, drag: {case['drag']}, wall_damp: {case['wd']}, wall_contact: 0.05, surface_tension: {case['st']}}}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+schedule: [aggregate_centroid, gravity, mls_mpm_mechanics]
 """
 
 
@@ -65,14 +65,14 @@ sets:
 fields:
   mpm_grid: {{frame: mpm_grid, n_grid: 64}}
 operators:
-  - {{op: aggregate, at: cell}}
+  - {{op: aggregate_centroid, at: cell, child: mpm_particle}}
   - {{op: gravity, at: cell, g: {case['g']}}}
   - {{op: mpm_strain, at: mpm_particle, dt_sub: {DT_SUB}}}
   - {{op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: {DT_SUB}, drag: {case['drag']}, a_max: 200}}
   - {{op: mpm_grid_update, at: mpm_grid, dt_sub: {DT_SUB}, surface_tension: {case['st']}, wall_damp: {case['wd']}, wall_contact: 0.05}}
   - {{op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: {DT_SUB}, wall_damp: {case['wd']}, wall_contact: 0.05, vmax: 1.0e9}}
 schedule:
-  - aggregate
+  - aggregate_centroid
   - gravity
   - {{substep_dt: {DT_SUB}, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}}
 """
