@@ -1754,6 +1754,26 @@ class LiveMovie:
         s["smooth_iter"] = int(st.get("contour_smooth", s["smooth_iter"]))
         return s
 
+    def _contour_live(self, lvl):
+        """Which DRAWN particles are alive: `lvl.occ` over the drawn index, or None if untracked.
+
+        THE DORMANT POOL IS PARKED, NOT REMOVED. `_xyz` hands back every node the set was allocated
+        -- an emitter's 11.3 M pool with 173 k live -- and hides the rest by position, at one
+        corner, because the dot cloud's colours are bound to a fixed-length array. A density contour
+        does not know that: 11 M particles in one voxel set the iso-level a thousand times above the
+        6 mm thread, and the only surface it found was the parking spot. Measured on si_honey: the
+        jet invisible, one speck in the corner. So the contour is built from live particles only.
+        """
+        occ = getattr(lvl, "occ", None)
+        if occ is None or getattr(self, "idx", None) is None:
+            return None
+        try:
+            m = np.asarray((occ[self.idx] > 0).detach().cpu().numpy() if hasattr(occ, "detach")
+                           else np.asarray(occ)[np.asarray(self.idx)] > 0)
+            return m if m.shape[0] == int(self.idx.numel()) else None
+        except Exception:                        # noqa: BLE001
+            return None
+
     def _contour_surface(self, pts):
         """The density contour of the live cloud, or None when there is nothing to contour."""
         from plexus.morph import reconstruct_contour
@@ -1809,6 +1829,8 @@ class LiveMovie:
             s = self._contour_settings()
             self._contour_s = s
             self._contour_part = self._contour_partition(H, lvl)
+            _live = self._contour_live(lvl)
+            pos = np.asarray(pos)[_live] if _live is not None else np.asarray(pos)
             if self._contour_part is None:
                 surf = self._contour_surface(pos)
                 if surf is None or surf.n_points == 0:
@@ -1836,7 +1858,7 @@ class LiveMovie:
                 print(f"[live-movie] contour: {surf.n_points:,} pts / {surf.n_cells:,} faces at "
                       f"{s['ngrid']}^3, colour {s['color']}, opacity {s['opacity']:g}", flush=True)
             else:
-                n_ok = self._contour_draw_types(np.asarray(pos))
+                n_ok = self._contour_draw_types(np.asarray(pos), _live)
                 names = self._contour_part[0]
                 print(f"[live-movie] contour by type: {n_ok} of {len(names)} surfaces "
                       f"({', '.join(names)}) at {s['ngrid']}^3, opacity {s['opacity']:g}", flush=True)
@@ -1851,9 +1873,14 @@ class LiveMovie:
             self._contour_s = None
             return False
 
-    def _contour_draw_types(self, pts):
-        """One contour per type, each in its own hue; returns how many had a surface."""
+    def _contour_draw_types(self, pts, live=None):
+        """One contour per type, each in its own hue; returns how many had a surface.
+
+        `pts` is already the LIVE subset when `live` is given; `tid` is over the full drawn index,
+        so it is masked the same way here to stay aligned."""
         names, tid, cols = self._contour_part
+        if live is not None:
+            tid = tid[live]
         n_ok = 0
         for j, nm in enumerate(names):
             sel = tid == j
@@ -1885,8 +1912,10 @@ class LiveMovie:
         if getattr(self, "_contour_s", None) is None:
             return
         try:
+            _live = self._contour_live(lvl)
+            pts = np.asarray(pts)[_live] if _live is not None else np.asarray(pts)
             if getattr(self, "_contour_part", None) is not None:
-                self._contour_draw_types(np.asarray(pts))
+                self._contour_draw_types(pts, _live)
             else:
                 surf = self._contour_surface(pts)
                 if surf is not None and surf.n_points > 0:
