@@ -135,6 +135,16 @@ def resolve_cell_set(H, at, override=None):
     return cs
 
 
+def size_ref(m):
+    """The reference volume a size rule compares against: the polyhedron median when the seed
+    declared `v0_from: polyhedron` and one has been cached, the seed-time wedge median otherwise.
+    Before c671fb31 every reader but `cell_divide` read the wedge one; the September 7 working
+    points (cyc4_sizer, apop2_ks*) were made that way and are reproduced only that way."""
+    if str(m.get("v0_from", "wedge")).lower() == "polyhedron" and "v_ref_poly" in m:
+        return float(m["v_ref_poly"])
+    return float(m.get("v_ref", 1.0))
+
+
 def cell_size(lvl, m, nF, pos_np=None):
     """A cell's volume AND the reference to compare it against, IN ONE CONVENTION.
 
@@ -165,7 +175,11 @@ def cell_size(lvl, m, nF, pos_np=None):
     _Nv = int(m["Nv"])
     P = (torch.as_tensor(pos_np, dtype=torch.float32)[:_Nv] if pos_np is not None
          else lvl.get("pos")[:_Nv].detach().to(torch.float32).cpu())
-    if _s is not None:
+    # THE SEED'S DECLARED CONVENTION DECIDES, not the presence of `sep`. c671fb31 made every reader
+    # take the polyhedron whenever the set carried a separation, which re-timed the size-triggered
+    # rules of every apico-basal working point (cyc4_sizer: 620 cells at frame 150 against the
+    # archive's 318; apop2_ks0p1: death 50 frames late). Polyhedron only when the spec says so.
+    if _s is not None and str(m.get("v0_from", "wedge")).lower() == "polyhedron":
         _s = _s.detach() if hasattr(_s, "detach") else torch.as_tensor(_s)
         if int(_s.shape[0]) >= _Nv:
             vp, _, _, _ = apicobasal_geometry_3d(P.cpu(), _s[:_Nv].to(torch.float32).cpu(),
@@ -1249,6 +1263,7 @@ class SeedMeshApicoBasal(SeedMesh3D):
         # ceiling, so setting both from one convention is what makes those thresholds mean the size
         # they say. (The wider reconciliation -- one volume for growth, division, death AND the
         # energy -- is AB_R7R8_TODO section 0a and is not settled here.)
+        m["v0_from"] = self.v0_from                  # read by cell_size / size_ref
         if self.v0_from == "polyhedron":
             _wedge = float(m.get("v_ref", 0.0))     # what the mid-surface model would have used
             vp, _ap, _cp, _hp = apicobasal_geometry_3d(
@@ -2425,7 +2440,7 @@ class Apoptosis3D(Structural):
             if v is None:
                 return set()
             vv = v.detach().cpu().numpy()[:nF]
-            v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))   # see `cell_size`
+            v_ref = size_ref(m)                                        # see `cell_size`
             return set(np.where(vv < self.small_frac * v_ref)[0].tolist())
         if self.mode == "stalled":
             # CELL COMPETITION: a cell that is not growing while its neighbours are gets removed.
