@@ -62,7 +62,7 @@ DOM_LO, DOM_HI = 0.15, 0.85
 def build_spec(n_grid=128, per_parent=100, n_frames=50, dt=0.002, sub=2e-4, n_cells=472,
                youngs=80.0, drag_k=30.0, anchor_k=0.0, differentiable=True, compile=True,
                wall_damp=0.5, wall_contact=0.06, a_max=200.0, label_tif=LABEL_TIF,
-               name="cardio_strain", seed=0):
+               name="cardio_strain", seed=0, density=1.0):
     """A 2D sheet of `n_cells` measured cells, `per_parent` material points each, no forces of
     its own: the contraction comes from `on_frame`. `implementation: differentiable` names the
     operator bodies that rebind instead of writing in place (what autograd needs)."""
@@ -78,7 +78,7 @@ def build_spec(n_grid=128, per_parent=100, n_frames=50, dt=0.002, sub=2e-4, n_ce
                                               fraction=1.0, youngs=youngs))),
             cell=dict(parent="tissue", per_parent=n_cells, radius=0.02,
                       types=dict(myocyte=dict(fraction=1.0, youngs=youngs))),
-            mpm_particle=dict(density=1.0, parent="cell", per_parent=per_parent)),
+            mpm_particle=dict(density=float(density), parent="cell", per_parent=per_parent)),
         fields=dict(mpm_grid=dict(frame="mpm_grid", n_grid=n_grid),
                     cells=dict(frame="label_image", source=label_tif)),
         operators=[
@@ -96,6 +96,15 @@ def build_spec(n_grid=128, per_parent=100, n_frames=50, dt=0.002, sub=2e-4, n_ce
                   dict(substep_dt=sub, compile=bool(compile),
                        steps=["mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather"])],
         plotting={})
+
+
+def sim_label_tif(sim):
+    """The label image a loaded spec reads (so a rollout can re-seed onto it)."""
+    for f in getattr(sim, "fields", []) or []:
+        src = getattr(f, "params", {}).get("source") if hasattr(f, "params") else None
+        if src and str(src).endswith(".tif"):
+            return src
+    return LABEL_TIF
 
 
 def load_sim(raw):
@@ -126,6 +135,15 @@ class Params:
         # gradient (so not a wave). delay_j shifts cell j's clock: gamma_j(t) = gamma(t - delay_j).
         # Zero by default, which is the one-clock model exactly.
         self.delay = torch.zeros(C, device=device, requires_grad=True)
+        # SECOND ACTIVE AXIS. g2_j is the active strain ACROSS the fibre (positive = thickening) at
+        # full activation, so the active part is I + gamma (g f f^T + g2 f_perp f_perp^T). Zero = the
+        # rank-1 model. The recording is area-preserving at the cell level (expansion/shortening
+        # 1.11); an isotropic sheet with nu = 0.3 reaches 0.95 with rank-1 shortening alone.
+        self.g2 = torch.zeros(C, device=device, requires_grad=True)
+        # PER-CELL RELAXATION. The recording's second temporal mode (6.7% of variance) is early-negative /
+        # late-positive: cells differ not only in WHEN they start (delay) but in how long they stay
+        # contracted. logtau_j scales cell j's decay time: tau_d,j = tau_d * exp(logtau_j). Zero = shared.
+        self.logtau = torch.zeros(C, device=device, requires_grad=True)
         self.g = torch.full((C,), float(g0), device=device, requires_grad=True)
         phi = (torch.zeros(C, device=device) if phi0 is None
                else torch.as_tensor(phi0, device=device, dtype=torch.float32).clone())
@@ -140,10 +158,13 @@ class Params:
 
     def leaves(self):
         clk = self.gfree if self.clock_mode == "free" else self.clock
-        return dict(g=self.g, phi=self.phi, logE=self.logE, clock=clk, delay=self.delay)
+        return dict(g=self.g, phi=self.phi, logE=self.logE, clock=clk, delay=self.delay, g2=self.g2,
+                    logtau=self.logtau)
 
-    def _s(self, t):
+    def _s(self, t, logtau=None):
         t0, tr, d, td = self.clock[0], self.clock[1].exp(), self.clock[2].exp(), self.clock[3].exp()
+        if logtau is not None:
+            td = td * logtau.exp()                     # per-cell decay time, [C]
         t = torch.as_tensor(t, device=self.clock.device, dtype=self.clock.dtype)
         return torch.sigmoid((t - t0) / tr) * torch.sigmoid((t0 + d - t) / td)
 
@@ -158,8 +179,8 @@ class Params:
         if self.clock_mode == "free":
             return self.gamma(t).expand(self.delay.shape[0])
         tt = float(t) - self.shift - self.delay
-        s0 = self._s(0.0 - self.delay)
-        return ((self._s(tt) - s0) / (1.0 - s0)).clamp(min=0.0)
+        s0 = self._s(0.0 - self.delay, self.logtau)
+        return ((self._s(tt, self.logtau) - s0) / (1.0 - s0)).clamp(min=0.0)
 
     def gamma(self, t):
         if self.clock_mode == "free":
@@ -189,7 +210,7 @@ class Params:
             for k, v in d.items():
                 if k == "clock_mode":
                     continue
-                if k == "delay" and np.asarray(v).shape != tuple(self.delay.shape):
+                if k in ("delay", "g2", "logtau") and np.asarray(v).shape != tuple(self.delay.shape):
                     continue
                 if k == "clock" and self.clock_mode == "free":
                     self.gfree = torch.as_tensor(np.asarray(v), device=self.g.device,
@@ -198,8 +219,47 @@ class Params:
                     getattr(self, k).copy_(torch.as_tensor(np.asarray(v)))
 
 
+def lattice_positions(H, label_tif, per_parent, device):
+    """Regular placement: each cell's `per_parent` particles on a square lattice inside its own mask,
+    spacing sqrt(area / per_parent), instead of the seed's uniform-random pixels. Same cell ids,
+    same counts; only WHERE the material points sit changes. Returns [N,2] world positions ordered
+    like the particle set (cell j's particles are contiguous in parent order)."""
+    import tifffile
+    img = tifffile.imread(label_tif)[::-1, :]                    # rows = world y (LabelImageField's flip)
+    n = img.shape[0]
+    q = H.level("mpm_particle"); cid = q.cell_id.long().cpu().numpy(); N = cid.shape[0]
+    pos = np.zeros((N, 2), np.float32)
+    ys, xs = np.nonzero(img)
+    labs = img[ys, xs]
+    order = np.argsort(labs, kind="stable"); labs, ys, xs = labs[order], ys[order], xs[order]
+    starts = np.searchsorted(labs, np.arange(1, labs.max() + 2))
+    rng = np.random.default_rng(0)
+    for j in range(1, labs.max() + 1):
+        members = np.nonzero(cid == j)[0]
+        if members.size == 0:
+            continue
+        py, px = ys[starts[j - 1]:starts[j]], xs[starts[j - 1]:starts[j]]
+        if py.size == 0:
+            continue
+        area = py.size; s_px = np.sqrt(area / members.size)      # lattice spacing in canvas pixels
+        # lattice anchored on the cell's bounding box, kept to pixels inside the mask
+        gy = np.arange(py.min() + s_px / 2, py.max() + 1, s_px); gx = np.arange(px.min() + s_px / 2, px.max() + 1, s_px)
+        GY, GX = np.meshgrid(gy, gx, indexing="ij"); GY, GX = GY.ravel(), GX.ravel()
+        iy, ix = np.clip(GY.round().astype(int), 0, n - 1), np.clip(GX.round().astype(int), 0, n - 1)
+        inside = img[iy, ix] == j
+        cand = np.stack([GX[inside], GY[inside]], 1)
+        if cand.shape[0] >= members.size:                      # thin evenly to the count
+            sel = np.linspace(0, cand.shape[0] - 1, members.size).round().astype(int)
+            pts = cand[sel]
+        else:                                                  # top up with random mask pixels
+            extra = rng.choice(py.size, members.size - cand.shape[0], replace=True)
+            pts = np.concatenate([cand, np.stack([px[extra], py[extra]], 1).astype(float)])
+        pos[members] = (pts + 0.5) / n                         # canvas pixel -> world [0,1)
+    return torch.as_tensor(pos, device=device)
+
+
 def rollout(sim, params, device, n_cells, grad=True, prescribe=None, keep_pos=False,
-            progress=False):
+            progress=False, lattice=False, label_tif=None):
     """Run one window of `sim.n_frames` frames from rest. Returns per-frame per-cell affine maps.
 
     prescribe: optional (band [N] bool, u_band [T+1, N, 2]) -- particles in `band` are pinned
@@ -220,10 +280,20 @@ def rollout(sim, params, device, n_cells, grad=True, prescribe=None, keep_pos=Fa
         if tick == 0:
             cid = q.cell_id.long()
             box["cid"] = cid
+            if lattice:
+                # the seed's random pixels are replaced by a per-cell lattice BEFORE the rest state is
+                # taken (a state write at tick 0, as morph does; the material is at rest either way)
+                tif = label_tif or sim_label_tif(sim)
+                newpos = lattice_positions(H, tif, None, q.state.device)
+                p0, p1 = q.state_schema["pos"]
+                S = q.state.clone(); S[:, p0:p1] = newpos; q.state = S
             box["X0"] = q.get("pos").detach().clone()
             f = torch.stack([torch.cos(params.phi), torch.sin(params.phi)], 1)   # [C,2]
+            fp = torch.stack([-torch.sin(params.phi), torch.cos(params.phi)], 1)
             box["ff"] = (f[:, :, None] * f[:, None, :])[cid - 1]               # [N,2,2]
+            box["pp"] = (fp[:, :, None] * fp[:, None, :])[cid - 1]
             box["g"] = params.g[cid - 1]
+            box["g2"] = params.g2[cid - 1]
             box["gam_prev"] = params.gamma_cells(0)[cid - 1]
             # the stiffness LEAF, bound after the seed wrote its own per-cell value
             E_p = params.logE.exp()[cid - 1]
@@ -232,8 +302,9 @@ def rollout(sim, params, device, n_cells, grad=True, prescribe=None, keep_pos=Fa
             cid = box["cid"]
             gam = params.gamma_cells(tick)[cid - 1]
             c = (gam - box["gam_prev"]) * box["g"] / (1.0 + box["gam_prev"] * box["g"])
+            c2 = (gam - box["gam_prev"]) * box["g2"] / (1.0 + box["gam_prev"] * box["g2"])
             box["gam_prev"] = gam
-            G = eye + c[:, None, None] * box["ff"]
+            G = eye + c[:, None, None] * box["ff"] + c2[:, None, None] * box["pp"]
             q.F = torch.bmm(G, q.F)
         if prescribe is not None:
             band, u_band = prescribe

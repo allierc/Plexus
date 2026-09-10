@@ -47,6 +47,7 @@ def main():
     ap.add_argument("--per-parent", type=int, default=50)
     ap.add_argument("--n-grid", type=int, default=128)
     ap.add_argument("--anchor", type=float, default=1e4)
+    ap.add_argument("--drag", type=float, default=30.0, help="Stokes drag k; 150 critically damps the substrate mode (step_test.py)")
     ap.add_argument("--band", type=float, default=0.03)
     ap.add_argument("--amplify", type=float, default=12.0, help="displacement arrows are drawn this many times longer")
     ap.add_argument("--fps", type=int, default=8)
@@ -60,12 +61,12 @@ def main():
     z = np.load(args.params)
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
     P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["clock"].shape[0]) if mode == "free" else 0)
-    P.load({k: z[k] for k in ("g", "phi", "logE", "clock", "delay") if k in z.files})
+    P.load({k: z[k] for k in ("g", "phi", "logE", "clock", "delay", "g2") if k in z.files})
     win = R.beat_window(rec, args.beat); T = len(win["frames"])
     A_ref, u_ref = R.window_affine(rec, win)
     trunc = (win["onset"] - win["span"][0]) - R.PRE
     P.shift = -float(trunc)
-    kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_k=args.anchor)
+    kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_k=args.anchor, drag_k=args.drag)
     with torch.no_grad():
         r0 = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="mv_rest", **dict(kw, n_frames=0))),
                        P, dev, C, grad=False)
