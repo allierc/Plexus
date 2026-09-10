@@ -791,7 +791,8 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
                    "plate_gap_half": "free_half_gap", "plate_gap_half_end": "final_free_half_gap",
                    "plate_close_from": "frame_closing_starts", "plate_close_to": "frame_closing_ends",
                    "plate_axis": "confined_axis", "plate_centre": "gap_centre_on_axis",
-                   "wall_damp": "wall_restitution", "csf_rho": "liquid_reference_density",
+                   "wall_damp": "wall_restitution", "wall_friction": "wall_coulomb_coefficient",
+                   "csf_rho": "liquid_reference_density",
                    "csf_band": "interface_fraction_band", "csf_smooth": "colour_mollify_passes"}
     REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994)."
 
@@ -900,6 +901,36 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
         _bd = params.get("buoyancy_dir")
         self.buoy_dir = [float(x) for x in _bd] if _bd else None
         self.wall_damp = float(params.get("wall_damp", 1.0))
+        # `wall_friction` -- COULOMB FRICTION AT THE DOMAIN WALLS, beside `wall_damp` because the two
+        # are the two coefficients a rigid wall has: restitution for the normal direction and
+        # friction for the tangential one. It is a parameter of THIS operator and not an operator of
+        # its own for a reason that is physics, not taste: Coulomb's rule spends the NORMAL IMPULSE
+        # the wall absorbs -- how hard the node hit -- and that number exists only here, in the
+        # instant before the normal velocity is clamped away. A separate operator scheduled after
+        # this one would have to guess it (gravity times dt for a body at rest on the floor, right
+        # for resting and wrong for every impact).
+        #
+        # WHAT `wall_damp` IS NOT. It multiplies the tangential velocity by a fraction every
+        # substep, which is viscous damping: it scales with speed, so a fast body loses more than a
+        # slow one and a body at rest on a slope still creeps. Coulomb is the opposite -- a fixed
+        # budget set by the normal load, independent of speed -- which is what stops thirty cows
+        # sliding across the floor of si_obj_cow.
+        #
+        # THE RULE, per wall node with inward normal speed v_n > 0 and tangential velocity v_t:
+        #
+        #     |v_t| <= mu v_n   ->  v_t = 0                        (stick)
+        #     |v_t| >  mu v_n   ->  v_t = v_t (1 - mu v_n / |v_t|) (slip, reduced by the budget)
+        #
+        # Stomakhin, A., Schroeder, C., Chai, L., Teran, J. & Selle, A. (2013). A material point
+        # method for snow simulation. ACM Trans. Graph. 32(4):102, sec. 8 (boundary conditions).
+        # Default 0 = today's frictionless wall, byte-identical: the branch is skipped entirely.
+        self.wall_friction = float(params.get("wall_friction", 0.0))
+        if self.wall_friction < 0:
+            raise ValueError(f"wall_friction must be >= 0, got {self.wall_friction}")
+        if self.wall_friction > 0 and not getattr(self, "HONOURS_WALL_FRICTION", True):
+            print(f"[warn] {type(self).__name__}: wall_friction {self.wall_friction:g} is NOT applied "
+                  f"by this implementation -- only the default mpm_grid_update imposes Coulomb "
+                  f"friction at the walls. The run continues frictionless.", flush=True)
         # A MOVING PLATEN, AS A GRID VELOCITY BOUNDARY CONDITION.
         #
         # WHY IT CANNOT BE A POSITION PROJECTION, which is what `plate_confine` does and what the
@@ -1248,12 +1279,37 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
                     shp = [1] * D; shp[k] = n_k
                     lo_m = (idx < bnd).view(shp); hi_m = (idx > n_k - bnd).view(shp)
                     ck = comps[k] if _grad else gv[..., k]
+                    # THE NORMAL IMPULSE, READ BEFORE IT IS CLAMPED AWAY: the inward speed the wall
+                    # is about to cancel. This is the one quantity Coulomb friction spends, and it
+                    # is why friction lives here and not in an operator of its own.
+                    mu = self.wall_friction
+                    if mu > 0.0:
+                        v_in = torch.where(lo_m, (-ck).clamp(min=0), torch.zeros_like(ck)) \
+                             + torch.where(hi_m, ck.clamp(min=0), torch.zeros_like(ck))
                     ck = torch.where(lo_m, ck.clamp(min=0), ck)     # don't penetrate the wall
                     ck = torch.where(hi_m, ck.clamp(max=0), ck)
                     if _grad:
                         comps[k] = ck
                     else:
                         gv[..., k] = ck
+                    if mu > 0.0:
+                        # STICK OR SLIP, per node. The tangential speed is the norm over the other
+                        # axes; the budget is mu times the impulse; whatever is left after paying it
+                        # is the slip. `factor` is 0 where the budget covers the whole tangential
+                        # speed (stick) and (1 - mu v_n / |v_t|) otherwise, applied to every
+                        # tangential component so the direction is kept and only the speed drops.
+                        slab = lo_m | hi_m
+                        tang = [(comps[j] if _grad else gv[..., j]) for j in range(D) if j != k]
+                        vt = torch.sqrt(sum(c * c for c in tang)).clamp(min=1e-12)
+                        factor = (1.0 - mu * v_in / vt).clamp(min=0.0)
+                        for j in range(D):
+                            if j == k:
+                                continue
+                            cj = comps[j] if _grad else gv[..., j]
+                            if _grad:
+                                comps[j] = torch.where(slab, cj * factor, cj)
+                            else:
+                                gv[..., j] = torch.where(slab, cj * factor, cj)
                     if wd != 1.0:                                   # tangential friction on the wall slabs
                         slab = lo_m | hi_m
                         for j in range(D):
@@ -1342,6 +1398,9 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
 @register_operator("mpm_grid_update", implementation="nosync", family="mpm",
                    set="field", kind="field")
 class MPMGridUpdateNoSync(MPMGridUpdate):
+    # `wall_friction` is imposed by the default path's wall loop only; this implementation has its
+    # own wall code and does not read it yet. The base __init__ warns once if a spec asks.
+    HONOURS_WALL_FRICTION = False
     """The grid solve with a sync-free 2D wall boundary condition: the same physics, with the
     host synchronisation that the default 2D path incurs removed. Identical in 3D, where the
     default already has none.
@@ -3284,6 +3343,9 @@ if HAVE_WARP:
 @register_operator("mpm_grid_update", implementation="warp", family="mpm",
                    set="field", kind="field")
 class MPMGridUpdateWarp(MPMGridUpdate):
+    # `wall_friction` is imposed by the default path's wall loop only; this implementation has its
+    # own wall code and does not read it yet. The base __init__ warns once if a spec asks.
+    HONOURS_WALL_FRICTION = False
     """The 3D grid solve -- mass normalisation, the continuum surface force, box walls, obstacles
     and buoyancy -- as two Warp kernels rather than several dozen whole-grid torch operations.
 
@@ -4629,6 +4691,9 @@ class MPMScatterDiff(MPMScatter):
 @register_operator("mpm_grid_update", implementation="differentiable", family="mpm", set="field",
                    kind="field")
 class MPMGridUpdateDiff(MPMGridUpdate):
+    # `wall_friction` is imposed by the default path's wall loop only; this implementation has its
+    # own wall code and does not read it yet. The base __init__ warns once if a spec asks.
+    HONOURS_WALL_FRICTION = False
     """The grid solve, with the wall written as a stack rather than into a view.
 
     The boundary already computes its values with `torch.where`; the default writes them back as
