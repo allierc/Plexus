@@ -65,7 +65,7 @@ class Particle:
 _NU = 0.2                          # Poisson ratio (shared; near-incompressible MPM materials)
 
 
-def _obj_points(t, nb, vol, D, H, device, cache):
+def _obj_points(t, nb, vol, D, H, device, cache, par=None):
     """`nb` points uniform inside the mesh named by `t["obj"]`, scaled to volume `vol`, centred at 0.
 
     Returns `(points [nb, D] on `device`, longest extent after scaling)`. 3-D only: an OBJ is a
@@ -116,6 +116,26 @@ def _obj_points(t, nb, vol, D, H, device, cache):
             raise ValueError(f"{path}: no interior points found -- is the surface closed?")
         out.append(keep); have += len(keep)
     pts = (np.concatenate(out)[:nb] - ctr) * sc
+    # `obj_rotate: random` -- EACH BODY IN ITS OWN ORIENTATION, drawn once from the run's seed.
+    # A lattice of identical bodies all facing the same way is a crystal, and a crystal falls as
+    # one; sixty cows that each landed on the same hoof would say nothing about elasticity that
+    # one cow does not. The rotation is uniform on SO(3) -- the Q of a QR decomposition of a
+    # Gaussian matrix, sign-fixed so it is a rotation and not a reflection -- and it is drawn per
+    # PARENT from `H.rng`, so the same seed gives the same sixty orientations every time.
+    if str(t.get("obj_rotate", "none")).lower() in ("random", "rand", "true") and par is not None:
+        par_np = np.asarray(par.detach().cpu().numpy() if hasattr(par, "detach") else par)
+        rot = {}
+        for k in np.unique(par_np):
+            g = np.random.default_rng(
+                int(torch.randint(0, 2 ** 31 - 1, (1,), generator=H.rng, device=device).item()))
+            q, r = np.linalg.qr(g.standard_normal((3, 3)))
+            q = q * np.sign(np.diag(r))[None, :]
+            if np.linalg.det(q) < 0:
+                q[:, 0] = -q[:, 0]
+            rot[int(k)] = q
+        for k, R in rot.items():
+            sel = par_np == k
+            pts[sel] = pts[sel] @ R.T
     return (torch.as_tensor(pts, dtype=torch.float32, device=device),
             float((hi - lo).max() * sc))
 
@@ -350,7 +370,8 @@ class MPMParticle:
                     # once per spec however many bodies wear it, and the points are drawn with a
                     # numpy generator seeded from `H.rng`, so the run stays reproducible under the
                     # same seed it always had.
-                    _pts, _side = _obj_points(t, nb, _vol, D, H, device, _mesh_cache)
+                    _pts, _side = _obj_points(t, nb, _vol, D, H, device, _mesh_cache,
+                                              par=pidx[bm])
                     pos[bm] = cpos[bm] + _pts
                 else:
                     raise ValueError(f"shape must be 'cube', 'ball' or 'obj', got {_shape!r}")
