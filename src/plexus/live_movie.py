@@ -902,6 +902,46 @@ class LiveMovie:
             self.failed = f"{type(e).__name__}: {e}"
             print(f"[live-movie] DISABLED after frame {tick}: {self.failed}", flush=True)
 
+    def _body_shade(self, lvl, pts, base):
+        """`dot_shading: body` -- light each dot by its body's outward normal, per frame.
+
+        WHY SPRITE LIGHTING WAS NOT ENOUGH. `dot_shading: true` lights each sprite as a sphere, and
+        at one or two pixels a body of 40,000 of them has no macroscopic normal: every sprite shows
+        the same lit hemisphere and across the body they average to a flat disc. Measured on the
+        cows at 1.2 px and again at 2.5 px -- no lit side, no dark side, silhouettes.
+
+        THE CHEAPEST NORMAL A BODY HAS is the direction from its own centroid to the dot,
+        which is exact for a sphere and a fair reading for anything convex-ish. The shade is
+        Lambert on that normal against one fixed light, floored at `dot_ambient`, and it is
+        recomputed every frame from the current positions, so a body that tumbles turns its lit
+        side. No surface is reconstructed and the dots stay the reference picture; this only
+        modulates their brightness. Bodies come from `lvl.parent`, the per-child parent index the
+        hierarchy already carries.
+        """
+        par = getattr(lvl, "parent", None)
+        if par is None or base is None:
+            return base
+        par = np.asarray(par.detach().cpu().numpy() if hasattr(par, "detach") else par).astype(int)
+        n = min(len(par), len(pts), len(base))
+        par, P, B = par[:n], np.asarray(pts[:n], np.float64), np.asarray(base[:n], np.float64)
+        k = int(par.max()) + 1 if n else 0
+        if k == 0:
+            return base
+        cnt = np.bincount(par, minlength=k).astype(np.float64)
+        cen = np.zeros((k, 3))
+        for d in range(3):
+            cen[:, d] = np.bincount(par, weights=P[:, d], minlength=k) / np.maximum(cnt, 1.0)
+        nrm = P - cen[par]
+        nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-12)
+        st = self.style or {}
+        L = np.asarray(st.get("dot_light", [-0.45, 0.8, 0.4]), np.float64)
+        L /= max(np.linalg.norm(L), 1e-12)
+        amb = float(st.get("dot_ambient", 0.35))
+        shade = amb + (1.0 - amb) * np.clip(nrm @ L, 0.0, 1.0)
+        out = np.asarray(base).copy()
+        out[:n] = np.clip(B * shade[:, None], 0, 255).astype(out.dtype)
+        return out
+
     def _frame(self, H, tick):
         import torch
         sname = _biggest_particle_set(H)
@@ -998,6 +1038,11 @@ class LiveMovie:
             # A100 jobs rendered nothing before this was noticed.
             _rgbv = self._rgb_field(H, lvl)
             self.cloud["rgb"] = _rgbv if _rgbv is not None else self._rgb(H, lvl, pos)
+            self._base_rgb = None
+            if str((self.style or {}).get("dot_shading", "")).lower() == "body":
+                self._base_rgb = np.asarray(self.cloud["rgb"]).copy()
+                self.cloud["rgb"] = self._body_shade(lvl, np.asarray(self.cloud.points),
+                                                     self._base_rgb)
             # POINT SPRITES AND THE CHART OVERLAY DO NOT COEXIST. `add_chart` inserts a
             # vtkContextActor, and with one present `render_points_as_spheres=True` draws nothing at
             # all: measured on this scene, 3,701 blue pixels with the panel and 61,331 without, from
@@ -1005,6 +1050,20 @@ class LiveMovie:
             # Plain GL points render correctly alongside the chart and are visually identical at the
             # 1-2 px these dots are drawn at, so the panel costs the sprite, not the picture.
             _flat = dict(FLAT)
+            # `dot_shading: true` -- LIT SPHERE SPRITES INSTEAD OF FLAT DISCS. FLAT switches
+            # lighting off so a dot is one colour edge to edge, which is right for a cloud read as
+            # density and wrong for a cloud read as a BODY: thirty bouncing cows drawn flat are
+            # thirty silhouettes. With lighting on, `render_points_as_spheres` shades each sprite
+            # as the sphere it claims to be, so a body gets a lit side and a dark side from the
+            # scene's lights without any surface reconstruction -- which is the point: the dots are
+            # the reference picture and this only lights them.
+            if (self.style or {}).get("dot_shading", False) is True:
+                _st = self.style or {}
+                _flat.update(lighting=True,
+                             ambient=float(_st.get("dot_ambient", 0.3)),
+                             diffuse=float(_st.get("dot_diffuse", 0.7)),
+                             specular=float(_st.get("dot_specular", 0.3)),
+                             specular_power=float(_st.get("dot_specular_power", 20)))
             if self.cs is not None:
                 _flat["render_points_as_spheres"] = False
             # WHEN THE SUBJECT IS A MESH, THE DOTS ARE ITS OWN VERTICES and drawing them is drawing
@@ -1040,6 +1099,8 @@ class LiveMovie:
         self._graph_update(H, tick)
         self._update_meshes(H)
         self._curves_update(tick, H)
+        if getattr(self, "_base_rgb", None) is not None:
+            self.cloud["rgb"] = self._body_shade(lvl, np.asarray(self.cloud.points), self._base_rgb)
         # A FIELD COLOUR IS A PROPERTY OF NOW, so unlike the body hue it is recomputed each frame.
         if str(self.style.get("color_field", "") or ""):
             _c = self._rgb_field(H, lvl)
@@ -3215,6 +3276,12 @@ class _ReplayLevel:
             setattr(self, k, None if v is None else torch.as_tensor(np.asarray(v), device=dev))
         pn = z[f"{name}__parent_name"] if f"{name}__parent_name" in z.files else None
         self.parent_name = None if pn is None else str(pn)
+        # THE PER-CHILD PARENT INDEX, WHICH THE TRAJECTORY HAS ALWAYS RECORDED AND THIS CLASS NEVER
+        # READ. `dot_shading: body` groups dots by the body they belong to, so on the replay path --
+        # every `-o plot` re-render -- it silently did nothing while the live path shaded. Same
+        # attribute name as the engine's `Level.parent`, so one renderer reads both.
+        self.parent = (torch.as_tensor(np.asarray(z[f"{name}__parent"]).astype(np.int64))
+                       if f"{name}__parent" in z.files else None)
         self.C = self.F = None                        # not stored in a trajectory -- see above
         # EVERY RECORDED STATE BLOCK OF THIS SET, so `get` can serve them -- see `get`.
         _skip = ("pos", "occ", "node_type", "parent", "parent_name")
