@@ -19,10 +19,11 @@ every spec in a group; this pins the part that is already done.
 """
 from __future__ import annotations
 
+import os
 import numpy as np
 import pytest
 
-torch = pytest.importorskip("torch")
+import torch
 
 from plexus import schema                                     # noqa: E402
 from plexus.engine import run                                 # noqa: E402
@@ -40,7 +41,7 @@ DEV = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 def _run(name, frames=8):
-    sim = schema.load(f"config/tissue/{name}.yaml")
+    sim = schema.load(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "tissue", f"{name}.yaml"))
     sim.n_frames = frames
     H, _ = run(sim, out_path=None, device=DEV)
     return H

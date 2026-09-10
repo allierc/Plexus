@@ -17,3 +17,10 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+# The regression series (tests/regression, marker `regression`) reruns working points for minutes
+# on a GPU; it is deselected by default and requested with `pytest tests/regression -m regression`.
+addopts = "-m 'not regression'"
+markers = ["regression: reruns working points; needs CUDA and minutes (tests/REGRESSION_PLAN.md)"]
+testpaths = ["tests"]

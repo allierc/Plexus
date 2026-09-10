@@ -1,0 +1,120 @@
+{
+ "archive": "/workspace/Plexus/graphs_data/tissue/sheet_divide",
+ "archived_on": "2026-09-09 22:18",
+ "because": "registered from the accepted archive",
+ "checkpoints": {
+  "0": {
+   "area_mean": 0.18893446028232574,
+   "cells": 440,
+   "centroid": [
+    -0.004566425457596779,
+    -0.006428837776184082,
+    0.0
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 2640,
+   "ndiv_sum": 132,
+   "r_med": 3.1747403144836426,
+   "r_p10": 1.5168507099151611,
+   "r_p90": 4.003443717956543,
+   "roughness": 0.3231058418750763,
+   "vertices": 951,
+   "z_sd": 0.0
+  },
+  "112": {
+   "area_mean": 0.08563660830259323,
+   "cells": 564,
+   "centroid": [
+    0.004956533666700125,
+    0.0033118799328804016,
+    0.0
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 3384,
+   "ndiv_sum": 399,
+   "r_med": 2.735097885131836,
+   "r_p10": 1.1515347957611084,
+   "r_p90": 3.770826578140259,
+   "roughness": 0.3719203770160675,
+   "vertices": 1199,
+   "z_sd": 0.0
+  },
+  "150": {
+   "area_mean": 0.0931706354022026,
+   "cells": 605,
+   "centroid": [
+    -0.026554236188530922,
+    -0.04148618504405022,
+    0.0
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 3630,
+   "ndiv_sum": 493,
+   "r_med": 2.93013334274292,
+   "r_p10": 1.2253364324569702,
+   "r_p90": 4.070245742797852,
+   "roughness": 0.37394338846206665,
+   "vertices": 1281,
+   "z_sd": 0.0
+  },
+  "37": {
+   "area_mean": 0.07561146467924118,
+   "cells": 462,
+   "centroid": [
+    0.013942552730441093,
+    -0.004420843441039324,
+    0.0
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 2772,
+   "ndiv_sum": 176,
+   "r_med": 2.3513970375061035,
+   "r_p10": 1.0389381647109985,
+   "r_p90": 3.2766034603118896,
+   "roughness": 0.36618924140930176,
+   "vertices": 995,
+   "z_sd": 0.0
+  },
+  "75": {
+   "area_mean": 0.08119384199380875,
+   "cells": 505,
+   "centroid": [
+    0.0052073136903345585,
+    -0.0013642027042806149,
+    0.0
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 3030,
+   "ndiv_sum": 262,
+   "r_med": 2.535191059112549,
+   "r_p10": 1.1449915170669556,
+   "r_p90": 3.5196189880371094,
+   "roughness": 0.36383771896362305,
+   "vertices": 1081,
+   "z_sd": 0.0
+  }
+ },
+ "cut": {
+  "checkpoints": [
+   0,
+   37,
+   75,
+   112,
+   150
+  ],
+  "n_frames": 150
+ },
+ "device": "archive",
+ "family": "tissue",
+ "generated_at_commit": "7983f784",
+ "name": "sheet_divide",
+ "spec_sha256": "6a260ee7533769b8",
+ "timing": {
+  "device": "archive",
+  "frames": [
+   20,
+   150
+  ],
+  "ms_per_frame": 49.94411659240723
+ }
+}
