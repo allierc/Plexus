@@ -1,0 +1,34 @@
+{
+ "config": {
+  "ppc": "80,120,200",
+  "n_grid": 160,
+  "lattice": false,
+  "device": "cuda:0",
+  "params": "/workspace/Plexus/prototype/cardio_mpm/strain/out/fits/s4_live_r6_Eshrink0.3/params.npz",
+  "beat": 1,
+  "specimen": "healthy"
+ },
+ "rows": [
+  {
+   "ppc": 80,
+   "particles": 37760,
+   "r2_heldout": 0.5350742340087891,
+   "r2_vs_previous": null,
+   "shortening_corr_vs_previous": null
+  },
+  {
+   "ppc": 120,
+   "particles": 56640,
+   "r2_heldout": 0.5567671060562134,
+   "r2_vs_previous": 0.8626915216445923,
+   "shortening_corr_vs_previous": 0.9416261315345764
+  },
+  {
+   "ppc": 200,
+   "particles": 94400,
+   "r2_heldout": 0.5563313961029053,
+   "r2_vs_previous": 0.9408519268035889,
+   "shortening_corr_vs_previous": 0.9698824286460876
+  }
+ ]
+}

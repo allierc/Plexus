@@ -46,7 +46,9 @@ def recovery(P, truth):
     if truth is None:
         return out
     with torch.no_grad():
-        for k in ("g", "logE"):
+        for k in ("g", "logE", "g2"):
+            if k == "g2" and float(truth["g2"].std()) < 1e-9:
+                continue
             e, t = getattr(P, k).detach(), truth[k]
             sp = t.std().clamp(min=1e-12)
             out[k] = dict(rel_err=float((e - t).abs().median() / sp),
@@ -75,17 +77,20 @@ def main():
     ap.add_argument("--per-parent", type=int, default=50)
     ap.add_argument("--n-grid", type=int, default=128)
     ap.add_argument("--anchor", type=float, default=1e4)
+    ap.add_argument("--drag", type=float, default=30.0, help="Stokes drag k; 150 critically damps the substrate mode (step_test.py)")
     ap.add_argument("--band", type=float, default=0.03)
     ap.add_argument("--nu", type=float, default=0.3)
     ap.add_argument("--youngs", type=float, default=80.0)
     ap.add_argument("--iters", type=int, default=150)
     ap.add_argument("--free", default="g,phi,logE,clock")
-    ap.add_argument("--lr", default="g=2e-3,phi=0.03,logE=0.03,clock=0.05,delay=0.1")
+    ap.add_argument("--lr", default="g=2e-3,phi=0.03,logE=0.03,clock=0.05,delay=0.1,g2=2e-3,logtau=0.05")
     ap.add_argument("--delay-shrink", type=float, default=0.0,
                     help="weight on mean(delay^2) (frames^2): keeps per-cell timing near the shared clock")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--plant-gain", type=float, default=1.5)
     ap.add_argument("--plant-sigma-logE", type=float, default=0.3)
+    ap.add_argument("--plant-g2", type=float, default=0.0,
+                    help="planted transverse strain as a fraction of g (with 30%% per-cell scatter); 0 = rank-1 truth")
     ap.add_argument("--noise", default="none", choices=["none", "tracker", "rest"])
     ap.add_argument("--noise-scale", type=float, default=1.0)
     ap.add_argument("--clock-mode", default="sigmoid", choices=["sigmoid", "free"])
@@ -118,7 +123,7 @@ def main():
     T = len(win["frames"])
     A_rec, u_rec = R.window_affine(rec, win)
     kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C,
-              youngs=args.youngs, anchor_k=args.anchor)
+              youngs=args.youngs, anchor_k=args.anchor, drag_k=args.drag)
 
     # rest positions + band from one 0-frame rollout (the seed decides where particles sit)
     P0 = M.Params(C, dev, nu=args.nu)
@@ -144,6 +149,8 @@ def main():
             Pt.g.copy_(amp_m * args.plant_gain)
             Pt.logE.copy_(math.log(args.youngs)
                           + args.plant_sigma_logE * torch.randn(C, generator=gen).to(dev))
+            if args.plant_g2 != 0:
+                Pt.g2.copy_((args.plant_g2 * Pt.g * (1 + 0.3 * torch.randn(C, generator=gen).to(dev))).clamp(-0.2, 0.2))
         with torch.no_grad():
             tgt = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="fit_plant", **kw)),
                             Pt, dev, C, grad=False, prescribe=prescribe)
@@ -221,6 +228,8 @@ def main():
             # flat tail, is a rollout the MPM cannot integrate (J -> 0, nan), not a hypothesis.
             P.logE.clamp_(min=math.log(args.youngs / 10), max=math.log(args.youngs * 10))
             P.delay.clamp_(min=-8.0, max=8.0)
+            P.g2.clamp_(min=-0.2, max=0.2)
+            P.logtau.clamp_(min=-1.5, max=1.5)
             last_ok = {k: v.detach().clone() for k, v in P.leaves().items()}
         rowd = dict(it=it, loss=float(loss), seconds=time.time() - t0, recovery=recovery(P, truth),
                     lr=[g_["lr"] for g_ in opt.param_groups])

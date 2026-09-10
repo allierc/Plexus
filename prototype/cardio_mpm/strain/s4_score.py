@@ -71,6 +71,7 @@ def main():
     ap.add_argument("--per-parent", type=int, default=50)
     ap.add_argument("--n-grid", type=int, default=128)
     ap.add_argument("--anchor", type=float, default=1e4)
+    ap.add_argument("--drag", type=float, default=30.0, help="Stokes drag k; 150 critically damps the substrate mode (step_test.py)")
     ap.add_argument("--band", type=float, default=0.03)
     ap.add_argument("--nu", type=float, default=0.3)
     ap.add_argument("--fit-beat", type=int, default=3)
@@ -89,7 +90,7 @@ def main():
     interior = torch.as_tensor(z["interior"], device=dev) if "interior" in z.files else torch.ones(C, dtype=torch.bool, device=dev)
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
     P = M.Params(C, dev, nu=args.nu, clock_mode=mode, n_frames=int(z["clock"].shape[0]) if mode == "free" else 0)
-    P.load({k: z[k] for k in ("g", "phi", "logE", "clock", "delay") if k in z.files})
+    P.load({k: z[k] for k in ("g", "phi", "logE", "clock", "delay", "g2") if k in z.files})
     fit_win = R.beat_window(rec, args.fit_beat)
     A_fit, u_fit = R.window_affine(rec, fit_win)
 
@@ -99,7 +100,7 @@ def main():
         T = len(win["frames"])
         A_ref, u_ref = R.window_affine(rec, win)
         kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C,
-                  anchor_k=args.anchor)
+                  anchor_k=args.anchor, drag_k=args.drag)
         with torch.no_grad():
             r0 = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="s4_rest",
                                                    **dict(kw, n_frames=0))), P, dev, C, grad=False)

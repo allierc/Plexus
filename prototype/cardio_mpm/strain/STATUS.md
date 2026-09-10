@@ -283,3 +283,76 @@ distributions barely overlapping (healthy p90 60, HCM p10 54). g and E trade off
 "harder and stiffer" is one reading and "the same drive against stiffer neighbours" is the other;
 what is robust across the E-fixed and E-free fits is that the HCM sheet strains 1.6× more, has
 fewer silent cells, is twice as aligned, and shares the healthy sheet's excitation timing.
+
+## Caveat found 2026-09-10 evening: the particle layout is not innocent
+
+Cedric asked why the particles are not on a grid. They are the stock seed's uniform-random pixels
+per cell, and rolling the SAME fitted parameters (λ = 0.3) out on other layouts changes the answer:
+held-out R²(A) **0.29 / 0.64 / 0.55 at 30 / 50 / 80 particles per cell**; two layouts predict each
+other to R² 0.80 (50 vs 80), 0.35 (30 vs 50). At 50 per cell on a 128 grid there are ~2.6 particles
+per grid cell, below what MPM needs (4–8). So every fit so far is conditional on one under-resolved
+random layout, and part of what the parameters fitted is that layout's discretisation noise. The
+planted gate could not see this: truth and fit shared the layout.
+
+In progress: (1) `layout_convergence.py` — the forward at 50 / 80 / 120 / 200 per cell, random and
+regular-lattice placement (`rollout(lattice=True)`, new in model.py), to find the density where the
+result stops changing; (2) refits at that density, both sheets, before any number here is quoted.
+
+## PLAN_R2 steps 1–2 (2026-09-10, night)
+
+**Step 1, discretisation.** `layout_convergence.py`: with the λ = 0.3 parameters, random layouts at
+80 → 120 → 200 particles per cell agree to R² 0.81 / 0.92 / 0.96 (grid 128; 0.97 at grid 96, 0.94
+at grid 160), and the held-out R² settles at **0.55** — the 0.64 obtained on the 50-particle fit
+layout was 0.09 of layout noise fitted. Regular lattices are worse (successive-density R² 0.52–0.77,
+and negative held-out R² with random-fitted parameters): MPM aliases against its grid when
+particles sit regularly. **Setting: random placement, grid 128, 120 particles per cell** (56,640).
+**Two-layout floor** (same parameters, 120 vs 121 per cell): R² **0.958** — no fit may be read
+closer to 1 than that.
+
+**Step 2, relaxation.** `step_test.py` (clock 0 → 1 → 0, signed strain along each cell's fibre): at
+the reference (κ 1e4, drag 30, ρ 1) the sheet unloads to 37% in 2 frames, then **overshoots to −32%
+of the plateau and is still 10% off 20 frames later**: the substrate mode rings (damping ratio
+k / 2√(κρ) = 0.15, period 31 frames). Neither grid, particle count, substep, E nor density changes
+it; drag does: **drag 150 → decay 3 frames, no overshoot, zero by +10 frames**; 200–300 over-damp
+(slow tail). κ = 3e4 with drag 200 is also clean but halves the plateau. **Setting: drag 150.**
+(The earlier "damping sweep" that saw no effect was run with the sigmoid clock's slow decay, which
+hid the ringing.) The old campaign's spec ran drag 30, i.e. rang on every beat.
+
+Refits at 120 per cell, λ = 0.3, mask, delays: drag 150 (`s4_live_r7_p120_d150`) and drag 30
+(`s4_live_r7_p120_d30`) to separate the two effects. Scoring must use the same drag and density.
+
+### Steps 1c/2c done, and the diagnosis that reorders steps 3–4
+
+Refits at 120 particles per cell, λ = 0.3, band masked, delays (`s4_live_r7_p120_d30`, `_d150`):
+held-out R²(A) / R²(u) **0.65 / 0.66 at drag 30, 0.69 / 0.66 at drag 150**. The converged refit
+lands where the layout test said (0.55 → 0.65 once refitted on the converged layout; +0.04 from
+damping). Two-layout floor 0.958.
+
+`rank_ceiling.py` (the recording's own SVD on beat 3, patterns kept on beats 1–2): **one spatial
+pattern with one fixed time course predicts held-out beats at R² 0.87; two patterns 0.94; three
+0.97.** So 0.9 is reachable by a one-clock model in principle, and what the mechanical model lacks
+is SPATIAL: its dominant pattern correlates 0.91 with the recording's (time course 0.99), and 24% of
+the model's own motion lies outside the recording's top-3 spatial modes — the mechanics produce
+cell-to-cell structure the tissue does not have. By phase, 70% of the residual sits in the plateau
+(90% of the signal); the relaxation phase holds 9% (its residual/signal > 1 was a division by a
+vanishing signal, not a mechanics defect — PLAN_R2 step 2's exit criterion was mis-specified).
+Consequence: step 3 (per-cell relaxation) is worth ≤ 0.07; **step 4 (the spatial pattern) is worth
+up to 0.18** and goes first. Poisson ratio is not the lever (forward sweep ν 0.2 / 0.3 / 0.4 / 0.45:
+0.695 / 0.692 / 0.628 / 0.495). Running: a second active axis per cell (g2, transverse strain;
+`s4_live_r8_p120_d150_g2`) and its planted gate (`gate_g2_s0`).
+
+### Step 4c — a second active axis (2026-09-11)
+
+`model.Params.g2`: active strain ACROSS the fibre, F_a = I + γ (g f fᵀ + g2 f⊥ f⊥ᵀ), one number per
+cell, zero = the rank-1 model. Fit `s4_live_r8_p120_d150_g2` (120/cell, drag 150, λ = 0.3, mask,
+delays): **held-out R²(A) 0.82 / R²(u) 0.87, shortening r 0.92, axis 0.94** (from 0.69 / 0.66).
+The fitted g2 is **−0.9 g at the median** (negative = thickening): the cells thicken across the fibre
+by about as much as they shorten along it, i.e. they are area-preserving at the cell level — the
+model now reaches what the recording showed from the start (expansion/shortening 1.11). A
+scoring defect was found again on the way (the scorers did not load g2; first score 0.45 / −0.43).
+
+The planted gate for g2 with a POSITIVE planted g2 (`gate_g2_s0`) degraded every family (g 0.24,
+φ 19°): a positive transverse strain makes the active tensor nearly isotropic, the axis undefined,
+and (g, g2, φ) ↔ (g2, g, φ + 90°) a symmetry the recovery metric does not know. Re-planted with the
+sign the data has (g2 = −0.9 g, `gate_g2neg_s0`), running. HCM with the second axis
+(`hcm_r3_p120_d150_g2`), running.
