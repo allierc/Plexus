@@ -370,3 +370,11 @@ on the live tissue, no matrix) can be shown right after M0 and is the cheapest d
 
 Every milestone ends the way this week's work did: an accepted run registered as a working point,
 so the next default flip fails a test.
+
+## 7. Open renderer defects met on the way (2026-09-10)
+
+- `plotting.zoom` on a REPLAYED free-boundary run renders every frame black (the live pass with
+  zoom renders; the replay without zoom renders; the replay with zoom rendered only the late
+  frames of the first integrin run). The framing centre of a replayed free run under zoom is the
+  suspect. Until fixed, specs that declare curve panels (which force the replay) do not use zoom.
+
