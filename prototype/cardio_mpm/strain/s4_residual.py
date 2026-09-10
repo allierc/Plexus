@@ -39,9 +39,11 @@ def main():
     ap.add_argument("--band", type=float, default=0.03)
     ap.add_argument("--nu", type=float, default=0.3)
     ap.add_argument("--beat", type=int, default=3)
+    ap.add_argument("--specimen", default="healthy", choices=["healthy", "hcm"])
     args = ap.parse_args()
     dev = args.device
-    rec = R.load(device=dev); C = rec["n_cells"]
+    rec = R.load(device=dev, specimen=args.specimen); C = rec["n_cells"]
+    LTIF = os.path.join(HERE, "data_hcm" if rec.get("specimen") == "hcm" else "data", "cells_2560.tif")
     z = np.load(args.params)
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
     P = M.Params(C, dev, nu=args.nu, clock_mode=mode, n_frames=int(z["clock"].shape[0]) if mode == "free" else 0)
@@ -50,12 +52,12 @@ def main():
     A_ref, u_ref = R.window_affine(rec, win)
     kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_k=args.anchor)
     with torch.no_grad():
-        r0 = M.rollout(M.load_sim(M.build_spec(differentiable=False, name="res_rest", **dict(kw, n_frames=0))),
+        r0 = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="res_rest", **dict(kw, n_frames=0))),
                        P, dev, C, grad=False)
         X0, cid = r0["X0"], r0["cid"]
         band = ((X0[:, 0] < M.DOM_LO + args.band) | (X0[:, 0] > M.DOM_HI - args.band)
                 | (X0[:, 1] < M.DOM_LO + args.band) | (X0[:, 1] > M.DOM_HI - args.band))
-        out = M.rollout(M.load_sim(M.build_spec(differentiable=False, name="res", **kw)), P, dev, C,
+        out = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="res", **kw)), P, dev, C,
                         grad=False, prescribe=(band, M.band_prescription(A_ref, u_ref, X0, cid, band)))
     A, u = out["A"], out["u"]
     eye = torch.eye(2, device=dev)

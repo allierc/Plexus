@@ -199,3 +199,43 @@ Seen in `out/figures/fig4_fitted_maps.png`: fitted g is inflated along the right
 sit in the prescribed band, so their own g is unconstrained by the loss; band cells should be masked
 from the loss and from any per-cell claim (not yet done). The delay map has spatial clusters of
 early cells (blue), i.e. timing is coherent over a few cells; the E map is salt-and-pepper.
+
+## The HCM sheet (2026-09-10 afternoon) — seal broken on Cedric's instruction, `data_hcm/SEAL_BREAK.md`
+
+**Which file.** Three claim to track the HCM movie. `hcm_referee.py` (pixels, 400 nodes, rest 110 →
+peak 67): T1 `1_HCM…derivatives.npy` r 0.997 / 0.983 with 0.86 px error on 6.8 px of motion;
+T2 `Cardio_0/derivatives.npy` identical to T1; T3 `diseased.npy` r 0.30 / −0.01 — broken like
+`healthy.npy`. T1 is used. Segmentation with the healthy sheet's detector setting: **434 cells**,
+labels aligned to nodes at 100%. Recording: 299 frames, onsets 17/61/121/181/241; beats 1–4 are
+clean 65-frame rest→peak→rest windows (beat 0 starts mid-contraction, excluded); peak mean
+shortening **0.032** against the healthy 0.021.
+
+**Like-for-like fits** (E fixed at 80, band cells masked from the loss, per-cell g, φ, δ + one
+clock, beat 3 fitted, 200 iterations):
+
+| sheet | held-out beats | R²(A) | R²(u) | shortening r | axis | replay R²(A) |
+|---|---|---|---|---|---|---|
+| healthy (`s4_live_r5_Efixed_mask_delay`) | 1, 2 | 0.55 | 0.57 | 0.85 | 0.86 | 0.98 |
+| HCM (`hcm_r1_Efixed_mask_delay`) | 1, 2, 4 | **0.63** | **0.66** | 0.87 | 0.87 | 0.96–0.99 |
+
+Both are lower than the healthy round 4 (0.70/0.74) because E is fixed here; that is the price of
+a comparison the stiffness noise cannot contaminate.
+
+**The comparison** (`compare_sheets.py`, interior cells only, n = 1 sheet each — a description of
+two specimens, not a statistic; `out/figures/fig5_healthy_vs_hcm.png`):
+
+| | healthy (330 cells) | HCM (299 cells) |
+|---|---|---|
+| recorded peak shortening per cell, median | 0.025 | 0.040 |
+| fitted g (shortening at full activation), median | 0.040 | **0.090** |
+| fitted g, p10 / p90 | 0.000 / 0.094 | 0.026 / 0.157 |
+| silent cells (g < 0.01) | **19%** | 6% |
+| clock delay per cell, sd | 0.104 s | 0.098 s |
+| fibre-axis order (0 random, 1 parallel) | 0.09 | 0.20 |
+| clock rise / plateau / decay | 0.07 / 0.75 / 0.18 s | 0.08 / 0.82 / 0.14 s |
+
+What the two sheets differ in: the HCM cells contract about twice as hard (g median 0.090 vs
+0.040, the recorded strain 1.6×), far fewer of them are silent (6% vs 19%), and their axes are
+twice as aligned (order 0.20 vs 0.09). What they share: the timing jitter (0.10 s in both) and the
+clock's shape (rise 70–80 ms, plateau 0.75–0.82 s, decay 140–180 ms). Stiffness is deliberately
+not compared yet.

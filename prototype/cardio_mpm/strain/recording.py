@@ -46,8 +46,27 @@ def _disc(name):
     return m
 
 
-def load(device="cpu"):
-    """The recording in world units, its frozen split, and the per-node cell labels."""
+HCM_DER = ("/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1/"
+           "1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif.derivatives.npy")
+HCM_ONSETS = [17, 61, 121, 181, 241]           # speed peaks of the HCM recording (299 frames)
+DATA_HCM = os.path.join(HERE, "data_hcm")
+
+
+def load(device="cpu", specimen="healthy"):
+    """The recording in world units and the per-node cell labels.
+
+    `healthy` goes through discovery_cardio_mpm/data.py (content-checked, and it enforces that
+    loop's seal). `hcm` reads the HCM sheet's own 137-grid derivatives directly -- the seal-break
+    is deliberate and recorded in data_hcm/SEAL_BREAK.md (authorised 2026-09-10); the pixel referee
+    (hcm_referee.py) showed this file, and not diseased.npy, moves like the movie."""
+    if specimen == "hcm":
+        D = np.load(HCM_DER, mmap_mode="r")
+        pos = DOM_LO + (DOM_HI - DOM_LO) * np.asarray(D[:, :, :, 0:2], dtype=np.float32).reshape(D.shape[0], -1, 2) / 2048.0
+        lab = np.load(os.path.join(DATA_HCM, "labels_nodes.npy")).astype(np.int64)
+        assert lab.shape[0] == pos.shape[1], (lab.shape, pos.shape)
+        return dict(pos=torch.as_tensor(pos, device=device), labels=torch.as_tensor(lab, device=device),
+                    n_cells=int(lab.max()), onsets=list(HCM_ONSETS), specimen="hcm", dt_s=DT_S,
+                    fit_span=None, heldout_spans=None, eval_mask=None)
     data = _disc("data")
     z = data.open_npz(expect_sha256=data.HEALTHY_POS_SHA256)
     pos = DOM_LO + (DOM_HI - DOM_LO) * z["pos"].astype(np.float32)          # [T,N,2] world
@@ -57,7 +76,7 @@ def load(device="cpu"):
     assert lab.shape[0] == pos.shape[1], (lab.shape, pos.shape)
     return dict(pos=torch.as_tensor(pos, device=device),
                 labels=torch.as_tensor(lab, device=device),
-                n_cells=int(lab.max()),
+                n_cells=int(lab.max()), specimen="healthy",
                 fit_span=tuple(split["fit"]["span"]),
                 heldout_spans=[tuple(s) for s in split["heldout_beats"]["spans"]],
                 onsets=list(split["beats"]["onsets"]),

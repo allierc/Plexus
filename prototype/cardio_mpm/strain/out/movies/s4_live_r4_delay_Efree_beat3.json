@@ -1,0 +1,11 @@
+{
+ "params": "/workspace/Plexus/prototype/cardio_mpm/strain/out/fits/s4_live_r4_delay_Efree/params.npz",
+ "beat": 3,
+ "window": [
+  144,
+  200
+ ],
+ "r2_A": 0.7073082327842712,
+ "frames": 57,
+ "fps": 8
+}

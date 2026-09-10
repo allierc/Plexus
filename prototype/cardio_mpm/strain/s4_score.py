@@ -52,10 +52,13 @@ def peak_metrics(A, A_ref):
                 median_shortening_ratio=float(sm[pm].median() / sr[pr].median()))
 
 
-def score(A, u, A_ref, u_ref):
+def score(A, u, A_ref, u_ref, cells=None):
+    """All metrics on `cells` (the interior when a band mask was used), else on every cell."""
+    if cells is not None:
+        A, u, A_ref, u_ref = A[:, cells], u[:, cells], A_ref[:, cells], u_ref[:, cells]
     eye = torch.eye(2, device=A.device)
     out = dict(r2_A=r2(A - eye, A_ref - eye), r2_u=r2(u, u_ref),
-               loss=float(M.affine_loss(A, u, A_ref, u_ref)))
+               loss=float(M.affine_loss(A, u, A_ref, u_ref)), n_cells=int(A.shape[1]))
     out.update(peak_metrics(A, A_ref))
     return out
 
@@ -73,14 +76,17 @@ def main():
     ap.add_argument("--fit-beat", type=int, default=3)
     ap.add_argument("--beats", default="0,1,2,3")
     ap.add_argument("--no-realign", action="store_true")
+    ap.add_argument("--specimen", default="healthy", choices=["healthy", "hcm"])
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     dev = args.device
     torch.backends.cuda.matmul.allow_tf32 = True
 
-    rec = R.load(device=dev)
+    rec = R.load(device=dev, specimen=args.specimen)
     C = rec["n_cells"]
+    LTIF = os.path.join(HERE, "data_hcm" if rec.get("specimen") == "hcm" else "data", "cells_2560.tif")
     z = np.load(args.params)
+    interior = torch.as_tensor(z["interior"], device=dev) if "interior" in z.files else torch.ones(C, dtype=torch.bool, device=dev)
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
     P = M.Params(C, dev, nu=args.nu, clock_mode=mode, n_frames=int(z["clock"].shape[0]) if mode == "free" else 0)
     P.load({k: z[k] for k in ("g", "phi", "logE", "clock", "delay") if k in z.files})
@@ -95,13 +101,13 @@ def main():
         kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C,
                   anchor_k=args.anchor)
         with torch.no_grad():
-            r0 = M.rollout(M.load_sim(M.build_spec(differentiable=False, name="s4_rest",
+            r0 = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="s4_rest",
                                                    **dict(kw, n_frames=0))), P, dev, C, grad=False)
         X0, cid = r0["X0"], r0["cid"]
         band = ((X0[:, 0] < M.DOM_LO + args.band) | (X0[:, 0] > M.DOM_HI - args.band)
                 | (X0[:, 1] < M.DOM_LO + args.band) | (X0[:, 1] > M.DOM_HI - args.band))
         prescribe = (band, M.band_prescription(A_ref, u_ref, X0, cid, band))
-        sim = M.load_sim(M.build_spec(differentiable=False, name="s4", **kw))
+        sim = M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="s4", **kw))
         t0_fit = 0.0
         # a window opens PRE frames before its onset unless the recording starts later (beat 0 opens
         # at frame 0, 2 frames before its onset): that known truncation shifts the clock and the
@@ -114,7 +120,7 @@ def main():
             with torch.no_grad():
                 P.shift = -sh                      # gamma(t) evaluated at t + sh
                 out = M.rollout(sim, P, dev, C, grad=False, prescribe=prescribe)
-            sc = score(out["A"], out["u"], A_ref, u_ref)
+            sc = score(out["A"], out["u"], A_ref, u_ref, interior)
             if best is None or sc["loss"] < best[1]["loss"]:
                 best = (sh, sc)
         P.shift = 0.0
@@ -124,8 +130,8 @@ def main():
         A_rep, u_rep = A_fit[idx], u_fit[idx]
         eye = torch.eye(2, device=dev)
         results[k] = dict(window=win["span"], held_out=(k != args.fit_beat), t0_shift=best[0],
-                          model=best[1], replay=score(A_rep, u_rep, A_ref, u_ref),
-                          nothing=score(eye.expand_as(A_ref).clone(), torch.zeros_like(u_ref), A_ref, u_ref))
+                          model=best[1], replay=score(A_rep, u_rep, A_ref, u_ref, interior),
+                          nothing=score(eye.expand_as(A_ref).clone(), torch.zeros_like(u_ref), A_ref, u_ref, interior))
         m, rp = results[k]["model"], results[k]["replay"]
         print(f"  beat {k} {'held-out' if k != args.fit_beat else 'FIT     '} window {win['span']}  "
               f"t0 shift {best[0]:+.0f}: model R2(A) {m['r2_A']:.3f} R2(u) {m['r2_u']:.3f} "
