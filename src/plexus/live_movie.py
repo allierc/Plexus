@@ -1294,10 +1294,15 @@ class LiveMovie:
         # largest -- which in a coupled run is the 200,000 material points, not the 25,000-vertex
         # vesicle. Pointed at the particles they came back all-NaN and the panels were skipped
         # without a word, so a spec that asked for three curves silently got none.
+        # `live` IS DECIDED BEFORE THE MESH SET IS CHOSEN, because the choice keys on `_pos` -- a
+        # replay-only attribute -- and a live pass has it on no level. Keyed after, the live pass
+        # kept the SUBJECT, which in a coupled run is the material points; a particle set has no
+        # mesh, every row came back NaN, and the panels drew as `0` and `nan +- nan`.
+        live = not hasattr(lvl, "_pos")
         lq = lvl
         for _nm, _lv in H.levels.items():
             _m = getattr(_lv, "mesh", None)
-            if _m is not None and int(_m.get("nF", 0) or 0) and hasattr(_lv, "_pos"):
+            if _m is not None and int(_m.get("nF", 0) or 0) and (live or hasattr(_lv, "_pos")):
                 lq = _lv
                 if _nm != getattr(self, "_sname", None):
                     print(f"[live-movie] curves read set {_nm!r} (it carries the mesh), not "
@@ -1309,7 +1314,6 @@ class LiveMovie:
         # range from it; a live generate has only the current frame, so it can draw the same
         # panels only if the spec says the range -- `ymin`/`ymax` on every curve -- and the series
         # is then filled one row a frame in `_curves_update`. Without them it declines, as before.
-        live = not hasattr(lvl, "_pos")
         if live and not all(("ymin" in c and "ymax" in c) for c in cfgs):
             print("[live-movie] plotting.curve needs the whole clip to fix its axes and a live "
                   "generate has only the current frame -- declare `ymin`/`ymax` on every curve to "
