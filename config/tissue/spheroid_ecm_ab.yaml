@@ -7,9 +7,9 @@ general:
   boundary: wall
   dim: 3
   world:
-  - 50.0
-  - 50.0
-  - 50.0
+  - 40.0
+  - 40.0
+  - 40.0
   units:
     length_um: 10.0
     time_s: 600.0
@@ -80,7 +80,7 @@ sets:
       trgt: vertex
       face: cell
   mpm_particle:
-    n: 200000
+    n: 380000
     types:
       s0:
         fraction: 0.125
@@ -90,9 +90,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 50.0
-        - 50.0
-        - 50.0
+        - 40.0
+        - 40.0
+        - 40.0
       s1:
         fraction: 0.125
         youngs: 15.0
@@ -101,9 +101,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 50.0
-        - 50.0
-        - 50.0
+        - 40.0
+        - 40.0
+        - 40.0
       s2:
         fraction: 0.125
         youngs: 15.0
@@ -112,9 +112,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 50.0
-        - 50.0
-        - 50.0
+        - 40.0
+        - 40.0
+        - 40.0
       s3:
         fraction: 0.125
         youngs: 15.0
@@ -123,9 +123,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 50.0
-        - 50.0
-        - 50.0
+        - 40.0
+        - 40.0
+        - 40.0
       s4:
         fraction: 0.125
         youngs: 15.0
@@ -134,9 +134,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 50.0
-        - 50.0
-        - 50.0
+        - 40.0
+        - 40.0
+        - 40.0
       s5:
         fraction: 0.125
         youngs: 15.0
@@ -145,9 +145,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 50.0
-        - 50.0
-        - 50.0
+        - 40.0
+        - 40.0
+        - 40.0
       s6:
         fraction: 0.125
         youngs: 15.0
@@ -156,9 +156,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 50.0
-        - 50.0
-        - 50.0
+        - 40.0
+        - 40.0
+        - 40.0
       s7:
         fraction: 0.125
         youngs: 15.0
@@ -167,9 +167,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 50.0
-        - 50.0
-        - 50.0
+        - 40.0
+        - 40.0
+        - 40.0
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -281,23 +281,20 @@ seed:
   vseed_cv: 0.0
   model: apicobasal
   h0: 0.88
-  centre:
-  - 25.0
-  - 25.0
-  - 25.0
+  centre: &id001
+  - 20.0
+  - 20.0
+  - 20.0
 - op: seed_ecm
   at: mpm_particle
-  centre:
-  - 25.0
-  - 25.0
-  - 25.0
+  centre: *id001
   cavity_r: 5.0
   cavity_h: 5.0
   cavity_sphere: true
   axis: 2
-  shell_r: 20.0
+  shell_r: 30.0
   margin: 1.0
-  n_fibres: 10000
+  n_fibres: 19000
   fibre_len: 6.0
   align: 0.0
   align_dir:
@@ -325,7 +322,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 44.0
+    span: 36.0
     walls: 64
     loc:
     - 0.015
@@ -353,3 +350,19 @@ plotting:
   color_range:
   - 0.0
   - 0.5
+descriptions:
+  movie:
+    description: The simulation begins with a dense, spherical cluster of particles
+      that remains relatively stable in size and shape for the first few hundred frames.
+      As time progresses, the central core of the cluster begins to expand and diffuse
+      outward into the surrounding space. In the later stages, the cluster undergoes
+      a significant structural change where the central density decreases and the
+      overall volume fluctuates. By the final frames, the particles have redistributed
+      into a more heterogeneous, multi-colored spherical cloud with a hollower center.
+    objects: The primary objects are thousands of individual particles arranged in
+      a large, roughly spherical cluster. These particles transition from a uniform
+      purple color to a multi-colored distribution of blue, green, and yellow as the
+      simulation evolves. The cluster is centered within a large 3D bounding box and
+      is accompanied by a smaller 2D cross-sectional view in the bottom left corner.
+      Quantitative data is displayed on the right side, showing the total cell count
+      and the evolving volume of the cluster over time.

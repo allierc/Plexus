@@ -133,6 +133,27 @@ from plexus.units import to_physical as _units_to_physical      # noqa: E402
 from plexus.units import unit_label as _units_label             # noqa: E402
 
 
+
+def _snap_range(lo, hi, ticks):
+    """Round ends with a round step: the largest of {1, 2, 2.5, 5} x 10^k no bigger than
+    range/(ticks-1), and the top is the first multiple of it above hi*1.02. Returns
+    (lo, hi, tick_count). One implementation, used at setup and again when a live curve
+    leaves its range."""
+    raw = max(hi * 1.02 - lo, 1e-12) / max(int(ticks) - 1, 1)
+    e = 10.0 ** np.floor(np.log10(raw))
+    step = max([f * e for f in (1.0, 2.0, 2.5, 5.0) if f * e <= raw] or [e])
+    n = int(np.ceil((hi * 1.02 - lo) / step))
+    return float(lo), float(lo + step * max(n, 1)), max(n, 1) + 1
+
+
+def _round1(v, up):
+    """Snap to ONE significant figure, away from zero when `up` matches the sign."""
+    if v == 0 or not np.isfinite(v):
+        return 0.0
+    e = 10.0 ** np.floor(np.log10(abs(v)))
+    f = np.ceil(abs(v) / e) if (v > 0) == up else np.floor(abs(v) / e)
+    return float(np.sign(v) * max(f, 1.0) * e)
+
 class LiveMovie:
     """An `on_frame(H, tick)` hook that writes one mp4 for the whole run.
 
@@ -1468,12 +1489,9 @@ class LiveMovie:
             # {1, 2, 2.5, 5} x 10^k that is no bigger than range/(ticks-1) -- and the top is then the
             # first multiple of it above the data. Every tick is round by construction, and the tick
             # COUNT follows from the step rather than forcing it.
-            _raw = max(hi * 1.02 - lo, 1e-12) / max(int(cfg.get("ticks", 4)) - 1, 1)
-            _e = 10.0 ** np.floor(np.log10(_raw))
-            _step = max([f * _e for f in (1.0, 2.0, 2.5, 5.0) if f * _e <= _raw] or [_e])
-            _n = int(np.ceil((hi * 1.02 - lo) / _step))
-            hi = lo + _step * max(_n, 1)
-            cfg["ticks"] = max(_n, 1) + 1
+            _ticks_req = int(cfg.get("ticks", 4))
+            _floor0 = bool(lo == 0.0)
+            lo, hi, cfg["ticks"] = _snap_range(lo, hi, _ticks_req)
             pad = 0.0
             # THE PANEL'S WIDTH IS A FRACTION OF THE WINDOW, USED AS GIVEN. Dividing it by the
             # aspect kept its SHAPE constant and left the column it was supposed to fill only
@@ -1491,7 +1509,20 @@ class LiveMovie:
             ch.border_style = None
             ch.title = str(cfg.get("title", ""))
             ch.x_axis.range = [0.0, float(S.shape[0] - 1)]
-            ch.y_axis.range = [float(cfg.get("ymin", lo - pad)), float(cfg.get("ymax", hi + pad))]
+            # A DECLARED RANGE IS WHERE THE AXIS STARTS, NEVER A CLIP. Replaying off the trajectory,
+            # the whole series is known: if it climbs past the declared top the top moves so the
+            # maximum sits at 60% of the axis (the same rule `_curve_follow` applies frame by frame
+            # in a live generate); a declared bottom that is not the zero floor moves the same way.
+            # Before this, `ymax: 120` on a 200-cell run drew an empty panel with "200" above it.
+            y0 = float(cfg.get("ymin", lo - pad)); y1 = float(cfg.get("ymax", hi + pad))
+            if not live:
+                _dmax = float(np.nanmax(S[..., 0] + S[..., 1])); _dmin = float(np.nanmin(S[..., 0] - S[..., 1]))
+                if np.isfinite(_dmax) and _dmax > y1:
+                    y0, y1, cfg["ticks"] = _snap_range(y0, y0 + (_dmax - y0) / 0.6, _ticks_req)
+                if np.isfinite(_dmin) and _dmin < y0 and y0 != 0.0:
+                    y0 = _round1(_dmin - 0.4 * (y1 - _dmin), False)
+                    y0, y1, cfg["ticks"] = _snap_range(y0, y1, _ticks_req)
+            ch.y_axis.range = [y0, y1]
             ch.x_axis.label = str(cfg.get("xlabel", "frame"))
             # UNITS ON THE Y AXIS, DERIVED FROM THE DECLARED SCALE AND NOT TYPED IN.
             # `general.units: length_um` is the one thing that turns a length in this model into a
@@ -1602,10 +1633,43 @@ class LiveMovie:
             self._curves.append({"S": S, "bands": bands, "lines": lines, "nt": nt,
                                  "sd": bool(cfg.get("sd", q not in ("cells", "phase"))),
                                  "live": live, "lvl": lvl, "q": q, "ntype": ntype,
+                                 "ch": ch, "ticks": _ticks_req, "floor0": _floor0,
+                                 "declared": ("ymin" in cfg, "ymax" in cfg),
                                  "scale": (float(_scale) if (_scale is not None and _scale != 1.0) else None)})
             print(f"[live-movie] curve {q}: {S.shape[0]} frames, {nt} "
                   f"{'series by type' if nt > 1 else 'series'}, "
                   f"y [{ch.y_axis.range[0]:.4g}, {ch.y_axis.range[1]:.4g}]", flush=True)
+
+    def _curve_follow(self, cv, row):
+        """A live curve that leaves its declared range gets a WIDER range, once, not a new one
+        every frame. The declared `ymin`/`ymax` are where the axis starts; when the value climbs
+        past the top, the top moves so the value sits at 60% of the new range (it has to grow
+        1.67x before the axis moves again), snapped to the same round step as at setup; when it
+        drops below a bottom that is not the zero floor, the bottom moves the same way. An axis
+        that renormalised every frame is unreadable; one that never moves loses the curve.
+        """
+        ch = cv.get("ch")
+        if ch is None:
+            return
+        lo, hi = float(ch.y_axis.range[0]), float(ch.y_axis.range[1])
+        mu = np.asarray(row[:, 0], dtype=float)
+        sd = np.asarray(row[:, 1], dtype=float) if cv.get("sd") else np.zeros_like(mu)
+        ok = np.isfinite(mu)
+        if not ok.any():
+            return
+        vmax = float(np.nanmax((mu + sd)[ok])); vmin = float(np.nanmin((mu - sd)[ok]))
+        changed = False
+        if vmax > hi:
+            lo, hi, n = _snap_range(lo, lo + (vmax - lo) / 0.6, cv.get("ticks", 4))
+            changed = True
+        if vmin < lo and not cv.get("floor0", False):
+            lo = _round1(vmin - 0.4 * (hi - vmin), False)
+            lo, hi, n = _snap_range(lo, hi, cv.get("ticks", 4))
+            changed = True
+        if changed:
+            ch.y_axis.range = [lo, hi]
+            ch.y_axis.tick_count = int(n)
+            print(f"[live-movie] curve {cv.get('q')}: value left the axis, range -> [{lo:.4g}, {hi:.4g}]", flush=True)
 
     def _curves_update(self, tick, H=None):
         """Reveal each series up to the current RECORDED row -- the band is mean-SD .. mean+SD."""
@@ -1616,6 +1680,7 @@ class LiveMovie:
                 # THE ROW FOR THIS FRAME, from the live level, in the units the axis was declared in.
                 r = self._curve_row(H, cv["lvl"], cv["q"], cv["ntype"], cv["nt"])
                 S[t] = r * cv["scale"] if cv["scale"] else r
+                self._curve_follow(cv, S[t])
             if t < 1:
                 continue
             x = np.arange(t + 1, dtype=float)
