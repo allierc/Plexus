@@ -202,13 +202,8 @@ plotting:
   camera_elev: 1.18
   camera_turns: 0.0
   camera_zoom: 0.0
-  render_3d: compartments
-  surface_pbr: true
-  surface_metallic: 0.35
-  surface_roughness: 0.2
-  surface_env: true
-  surface_env_bright: 2.3
-  surface_opacity: 1.0
+  render_3d: dots
+  dot_size: 1.2
   splat_res: 600
   box_frame: true
   hide_sets:
