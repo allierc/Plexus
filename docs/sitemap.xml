@@ -6,7 +6,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library_operators.html</loc>
-    <lastmod>2026-09-07T21:06:11.203Z</lastmod>
+    <lastmod>2026-09-10T00:03:48.488Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/voxelize.html</loc>
@@ -326,7 +326,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/index.html</loc>
-    <lastmod>2026-09-09T23:49:13.819Z</lastmod>
+    <lastmod>2026-09-10T00:09:14.819Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/language.html</loc>
@@ -651,5 +651,9 @@
   <url>
     <loc>https://allierc.github.io/Plexus/other.html</loc>
     <lastmod>2026-09-09T23:04:37.433Z</lastmod>
+  </url>
+  <url>
+    <loc>https://allierc.github.io/Plexus/library/seed_positions.html</loc>
+    <lastmod>2026-09-10T00:03:45.848Z</lastmod>
   </url>
 </urlset>

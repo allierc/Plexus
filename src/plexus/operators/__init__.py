@@ -48,6 +48,7 @@ from . import mpm_ops               # noqa: F401  mpm_grid + p2g/grid_update/g2p
 #                                                 anchor, spin, apply_material_map, fenced oracle
 from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cell_divide, cell_die,
 #                                                 edge_flip, topo_record
+from . import seed_ops              # noqa: F401  seed_positions -- where a set's entities start
 from . import diffusion_reaction    # noqa: F401  seed_cell_chem, cell_chem_diffuse/react,
 #                                                 cell_geometry, cell_grow, cell_chem_from_shape,
 #                                                 cell_shape_probe, interface_tension/push

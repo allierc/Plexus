@@ -89,7 +89,8 @@ seed:
   jitter: 0.15
   p0: 3.5
   seed: 0
-  vseed_cv: 0.15
+  vseed_cv: 0.5
+  age_seed: 60.0
 operators:
 - op: cell_geometry
   at: cell
@@ -118,14 +119,15 @@ operators:
   K_lumen: 0.0
 - op: cell_divide
   at: vertex
-  factor: 2.0
-  cycle_cv: 0.15
+  cycle_cv: 0.4
   min_cycle: 4
   p0: 3.5
   every: 4
   engine_clock: true
   reset_noise: 0.12
   max_cycle: 1000000000
+  model: timer
+  cycle: 60.0
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -149,3 +151,27 @@ plotting:
   camera:
     elev: 90.0
     azim: 0.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a cellular mesh expanding and subdividing over time. Initially,
+      the mesh consists of large, irregular polygons that gradually refine into smaller, more uniform
+      hexagonal cells. Red and blue markers appear at specific vertices, indicating points of active division
+      or structural change. As the frame count increases, the total cell count grows significantly while
+      the overall circular shape remains relatively stable.
+    objects: The primary objects are white polygonal cells arranged in a dense, packed tessellation. These
+      cells vary in size, starting large and becoming progressively smaller as the mesh subdivides. Red
+      and blue markers are located at the junctions where multiple cells meet, highlighting specific interaction
+      points. The entire collection of cells forms a roughly circular cluster against a solid black background.
+  movie_kburns:
+    description: The simulation shows a 2D Voronoi-like mesh undergoing a continuous refinement process.
+      Over time, the individual cells within the sheet divide into smaller, more numerous polygons. This
+      subdivision occurs uniformly across the entire surface, increasing the density of the mesh. The
+      final frames show a highly complex, fine-grained network of small cells compared to the initial
+      coarse state.
+    objects: The scene contains a single large, elliptical sheet composed of numerous polygonal cells.
+      These cells are arranged in a contiguous, non-overlapping tiling pattern that covers the entire
+      surface. The objects are light gray or off-white in color with thin black outlines defining their
+      boundaries. The size of the individual cells decreases significantly as the simulation progresses
+      from the first to the last frame.
