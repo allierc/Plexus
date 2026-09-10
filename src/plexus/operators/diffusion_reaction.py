@@ -1108,7 +1108,8 @@ class Grow3D(Lateral):
         # run carries a separation, wedge where it does not. See `vertex_ops.cell_size`. `vth_frac`
         # is a multiple of this; measured in the wedge convention on an apicobasal run, the growth
         # ceiling would be stated in a volume the cell does not have.
-        v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))
+        from plexus.operators.vertex_ops import size_ref
+        v_ref = size_ref(m)
         dt = float(getattr(H, "dt", 1.0))
         ds = self._rate(s_prev, hillv, m, v_ref)                  # <-- the rate law; models override THIS only
         # THE CEILING IS FOR A TISSUE WITH NO DIVIDER, AND ONLY FOR ONE.
