@@ -186,7 +186,6 @@ operators:
   at: mpm_particle
   from: mpm_grid
   wall_damp: 1.0
-  wall_friction: 0.5
   vmax: 1000000000.0
   implementation: warp
 schedule:
