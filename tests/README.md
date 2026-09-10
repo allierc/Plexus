@@ -51,6 +51,18 @@ A source commit that needs a refresh to go green is a working-point change and i
     python tools/seed_conventions.py            # rebuilds tests/regression/seed_conventions.json
     python tools/seed_conventions.py --check    # what differs from the table
 
+## When a quantity's definition is touched
+
+    python tools/quantities_baseline.py capture --label before
+    ... change plexus/measures.py or a consumer ...
+    python tools/quantities_baseline.py capture --label after
+    python tools/quantities_baseline.py compare before after     # must print 0 differing values
+
+`plexus.measures` is the one entry point for the curve panel, the gates and the fingerprints;
+three captures are committed under `tests/regression/quantities/` and `test_quantities.py`
+recomputes them. A changed number is a changed definition and needs a refreshed reference in its
+own commit.
+
 ## One working point by hand
 
     python tools/fingerprint.py diff cvd2_adder_tension --device cuda:1

@@ -1,0 +1,1500 @@
+"""The gate measures: one function per series over a `Traj`, moved verbatim from
+tools/gate_measures.py on the quantities-refactor branch so that `plexus.measures` is one entry
+point. The docstring that explains the trajectory layout and the two offset arrays stays in
+tools/gate_measures.py, which is now a shim that re-exports this module."""
+from __future__ import annotations
+
+import os
+
+import numpy as np
+
+from plexus.measures import _Lazy, Traj, CoreTraj, ParticleTraj, OkudaTraj, _core, open_traj  # noqa: F401
+
+
+# ============================================================================== helpers
+def _n_edges(T, t):
+    """Undirected edges of a CLOSED surface: every edge is exactly two half-edges."""
+    es, _et, _ef = T.half_edges(t)
+    return len(es) // 2
+
+
+def _live_face_mask(T, t):
+    es, et, ef = T.half_edges(t)
+    return ef < T.nF(t)
+
+
+# ============================================================================== the measures
+def cell_count(T, **kw):
+    return [T.nF(t) for t in range(T.n_rows())]
+
+
+def cell_count_delta(T, **kw):
+    c = cell_count(T)
+    return [c[i] - c[i - 1] for i in range(1, len(c))] or [0]
+
+
+def vertex_count(T, **kw):
+    return [T.nV(t) for t in range(T.n_rows())]
+
+
+def occ_vs_mesh(T, vertex_set="vertex", cell_set="cell", **kw):
+    """|live(occ) - nF| + |live(vertex occ) - Nv| per row.
+
+    okuda records the live PREFIX and no mask, so there is nothing to disagree with and the row is
+    identically zero there. That is honest -- the check exists for the core's reservoir, which is the
+    side that has a mask to get wrong -- and it is stated rather than hidden, because a row that is
+    structurally zero on one side is a row that cannot fail there.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        ov, oc = T.occ(vertex_set, t), T.occ(cell_set, t)
+        d = 0
+        if ov is not None:
+            d += abs(int(ov.sum()) - T.nV(t))
+        if oc is not None:
+            d += abs(int(oc.sum()) - T.nF(t))
+        out.append(d)
+    return out
+
+
+def topology_ledger(T, **kw):
+    """|dV - 2*dF| + |dE - 3*dF| per recorded tick.
+
+    A septum adds 2 vertices, 3 edges, 1 face; a T1 adds none of the three. On a DECIMATED reference
+    the differences span many ticks and the identity does not hold per row, so this returns the
+    per-row residual only when consecutive rows are consecutive ticks.
+    """
+    ticks = getattr(T, "ticks", None)
+    out = []
+    for t in range(1, T.n_rows()):
+        if ticks is not None and ticks[t] - ticks[t - 1] != 1:
+            continue
+        dV = T.nV(t) - T.nV(t - 1)
+        dF = T.nF(t) - T.nF(t - 1)
+        dE = _n_edges(T, t) - _n_edges(T, t - 1)
+        out.append(abs(dV - 2 * dF) + abs(dE - 3 * dF))
+    return out or [0]
+
+
+def nonfinite_count(T, blocks=("chem", "area", "centroid"), vblocks=(), **kw):
+    """Non-finite entries in `pos`, in the named CELL blocks, and in the named VERTEX blocks.
+
+    `vblocks` DEFAULTS TO EMPTY so every gate that already declares this row is unchanged, and
+    AB-B9 passes `[sep]`. That row's whole point is that the second degree-of-freedom group is
+    integrated by a new energy with no hand-written gradient, which is exactly where a NaN enters --
+    and `cell_mechanics` passes its gradient through `nan_to_num`, so a blown-up relaxation LAUNDERS
+    itself: the run continues, the last frame is finite, and every `reduce: last` row still passes.
+    Hence `reduce: all` wherever this row is declared.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        n = int((~np.isfinite(T.pos(t))).sum())
+        for b in blocks:
+            v = T.state(b, t)
+            if v is not None:
+                n += int((~np.isfinite(v)).sum())
+        for b in vblocks:
+            v = T.vertex_block(b, t)
+            if v is not None:
+                n += int((~np.isfinite(v)).sum())
+        out.append(n)
+    return out
+
+
+def reservoir_fraction(T, **kw):
+    """Live vertices as a fraction of the allocated buffer. Core only -- okuda's file does not
+    carry the buffer size, so the row reports 0 there rather than guessing."""
+    z = getattr(T, "z", None)
+    s = getattr(T, "s", None)
+    if z is None or s is None or f"{s}__occ" not in getattr(z, "files", []):
+        return [0.0]
+    buf = z[f"{s}__occ"].shape[1]
+    return [T.nV(t) / float(buf) for t in range(T.n_rows())]
+
+
+# ============================================================================== apico-basal
+# THE FOUR ROWS OF R2, and all four exist only because R1(d) gave the facade `vertex_block`. Every
+# one reads `sep` -- the apico-basal HALF separation, so apical = pos + sep and basal = pos - sep --
+# which is a per-VERTEX state block cropped by nV, not a per-cell one cropped by nF.
+
+
+def _sep(T, t, name="sep"):
+    """The separation at row t, or None. One place, because four measures need it and a second
+    spelling of "which block holds the separation" is a second thing to keep in step."""
+    return T.vertex_block(name, t)
+
+
+def _vertex_normals_np(pos, es, et, ef, nF, nV):
+    """Outward unit normal per vertex: the normalised sum of incident face area vectors.
+
+    THE SAME CONSTRUCTION `monolayer_shells` USES, in numpy because a measure reads a saved run and
+    never has torch tensors. It is a reader, not a second definition of the model's geometry: if the
+    two ever disagree the gate is measuring something the run did not do, which is why AB-B1 tests
+    the SIGN against this normal and never the magnitude against it.
+    """
+    cr = np.cross(pos[es], pos[et])
+    Nf = np.zeros((nF, 3)); np.add.at(Nf, ef, cr); Nf *= 0.5
+    vn = np.zeros((nV, 3)); np.add.at(vn, es, Nf[ef])
+    return vn / np.maximum(np.linalg.norm(vn, axis=1, keepdims=True), 1e-12)
+
+
+def _cell_polyhedron_volume(a, b, es, et, ef, nF, origin):
+    """Signed volume of each cell's polyhedron about `origin[f]`, by the divergence theorem.
+
+    V_f = (1/6) * sum over the cell's triangles of (p-o) . ((q-o) x (r-o)), over the closed surface
+
+        apical cap   the ring on `a`, fanned from the cap's own centroid, outward winding
+        basal cap    the ring on `b`, REVERSED, because it faces the other way
+        lateral wall one quad per ring edge (a_s, a_t, b_t, b_s), split into two triangles
+
+    which is exactly the surface `cell_geometry[implementation: polyhedral]` will integrate at R7 --
+    so a disagreement between this and that is a disagreement about the same object, not about two
+    conventions.
+    """
+    o = origin[ef]                                             # [E, 3] the owning cell's origin
+    ca = np.zeros((nF, 3)); cb = np.zeros((nF, 3)); cnt = np.zeros(nF)
+    np.add.at(ca, ef, a[es]); np.add.at(cb, ef, b[es]); np.add.at(cnt, ef, 1.0)
+    k = np.maximum(cnt, 1.0)[:, None]
+    ca /= k; cb /= k                                           # cap centroids, per cell
+    vol = np.zeros(nF)
+
+    def acc(p, q, r):
+        np.add.at(vol, ef, np.einsum("ij,ij->i", p - o, np.cross(q - o, r - o)))
+
+    A0, A1, B0, B1 = a[es], a[et], b[es], b[et]
+    acc(ca[ef], A0, A1)                                        # apical cap, outward
+    acc(cb[ef], B1, B0)                                        # basal cap, reversed
+    # THE LATERAL WALL, WOUND OUTWARD. Written (a_s, a_t, b_t) first, which is the order the quad
+    # reads in, and that is INWARD: for a ring CCW seen from outside, (a_t - a_s) is tangential and
+    # (b_t - a_s) points basally, and their cross product faces into the cell. The closure test did
+    # not catch it -- an inward-wound wall is still CLOSED, so the two origins still agreed exactly
+    # -- it only showed up against a hexagonal prism of known volume, which came back -0.866 for a
+    # cell of +2.598. Consistency is not correctness, which is why this function is checked against
+    # an analytic solid and not only against itself.
+    acc(A0, B0, B1)                                            # lateral quad, triangle 1
+    acc(A0, B1, A1)                                            # lateral quad, triangle 2
+    return vol / 6.0
+
+
+def apicobasal_span_invalid_count(T, name="sep", **kw):
+    """AB-B1 -- ring-referenced vertices whose apico-basal span is non-finite or points INWARD.
+
+    THE POLARITY AXIS IS DERIVED AND NOTHING ENFORCES ITS SIGN. `sep/|sep|` is the cell's
+    apical-basal direction and no operator owns it: the design declines to write a `cell_polarity`
+    operator, because a normalisation of another operator's state is not a mechanism, and the cost of
+    that decision is exactly this row. A shell that inverts through itself keeps a perfectly
+    plausible energy while apical and basal have swapped.
+
+    OUTWARD IS TESTED AGAINST THE MID-SURFACE NORMAL, NOT THE RADIUS. A radial test only works on a
+    star-shaped shell about the origin and would score every buckle as a failure -- which is the
+    shape this promotion exists to produce.
+
+    ONLY RING-REFERENCED VERTICES COUNT, and that mask is load-bearing rather than tidy: `cell_die`
+    rewrites `nF` and never `Nv`, so a vertex orphaned by an extrusion keeps a stale span that no
+    face reads and no reader should score.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        if sep is None:
+            out.append(float("nan")); continue
+        es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        pos = T.pos(t); nF = T.nF(t); nV = pos.shape[0]
+        n = _vertex_normals_np(pos, es, et, ef, nF, nV)
+        used = np.zeros(nV, bool); used[es] = True
+        bad = ~np.isfinite(sep).all(axis=1)
+        inward = (sep * n).sum(axis=1) <= 0.0
+        out.append(float(np.count_nonzero((bad | inward) & used)))
+    return out
+
+
+def apicobasal_span_recorded_fraction(T, name="sep", **kw):
+    """AB-B7 -- 1.0 on a row that carries a finite, non-zero span; 0.0 otherwise.
+
+    THE ROW THAT SAYS THE APICOBASAL PATH ACTUALLY RAN. `run_gates` never reads a gate's
+    `operators_exercised:` key -- preflight reads id, arms, measures and the per-row keys only -- so
+    a gate can NAME a variant and prove nothing about which one it got. A quantity the operator
+    itself writes is the only evidence, and it is free: `sep` reaches the trajectory through the
+    generic per-set recording path.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        ok = (sep is not None and np.isfinite(sep).all()
+              and float(np.linalg.norm(sep, axis=1).max(initial=0.0)) > 0.0)
+        out.append(1.0 if ok else 0.0)
+    return out
+
+
+def apicobasal_span_zero_fraction(T, name="sep", floor=1e-6, **kw):
+    """The fraction of RING-REFERENCED vertices whose apico-basal span is zero -- the CARRY row.
+
+    AB-B7 IS NOT THIS ROW AND CANNOT BE. It asks whether the trajectory carries a non-zero span at
+    all, over the whole array, with a `max` -- so ONE live vertex makes it read 1.0. That is the
+    right question for "did the apicobasal path run", and the wrong one entirely for "did every
+    vertex the run created get a span", which is a different failure with its own history.
+
+    THE FAILURE IT IS WRITTEN FOR ALREADY HAPPENED, AT R2. `carry_vertices` looked only in the mesh
+    table while `sep` is a state block on the LEVEL -- deliberately, so it never touches
+    FACE_RECORD or `snapshot()` and cannot trip the recorded-arrays rule. The declaration succeeded,
+    the lookup returned None, the loop skipped it in silence, and every vertex born by division kept
+    the buffer's ZERO: 66 of 462 vertices at 60 frames, |sep| = 0.0000 against a seeded 0.2000, on a
+    run whose AB-B7 row read a perfect 1.0 throughout. A degenerate polyhedron on the septum, and
+    nothing in the table said so.
+
+    R6 IS THE RUNG WHERE IT MATTERS, because R2-R5 create no vertices: division, T1 and death all
+    arrive here, and `cell_divide` and `face_collapse_3d` are the two operators that mint and merge
+    them. Only ring-referenced vertices count, for the reason AB-B1 gives: `cell_die` rewrites `nF`
+    and never `Nv`, so a vertex orphaned by an extrusion keeps a stale span that no face reads and
+    no row should score.
+
+    `floor` is 1e-6 of a sim length rather than an exact zero because the state is float32 and the
+    quantity is a norm; the failure it detects is a span of identically 0.0, four orders below it.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        if sep is None:
+            out.append(float("nan")); continue
+        es, _et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        live = ef < T.nF(t)
+        used = np.unique(es[live])
+        used = used[used < sep.shape[0]]
+        if used.size == 0:
+            out.append(float("nan")); continue
+        out.append(float(np.mean(np.linalg.norm(sep[used], axis=1) < floor)))
+    return out
+
+
+def polyhedron_volume_closure(T, name="sep", **kw):
+    """AB-B2 -- is each cell's polyhedron CLOSED? Two origins, one volume.
+
+    A closed oriented surface encloses the same volume from ANY origin; an unclosed one, or one with
+    a face wound the wrong way, does not. So the entire apico-basal geometry -- both caps, one
+    lateral quad per ring edge, the fan triangulation and the orientation convention -- is exercised
+    by a single number: the relative discrepancy between the volume taken about the cell's own
+    centroid and the volume taken about the world origin.
+
+    It is the only row that would catch a lateral quad wound the wrong way, which is the failure the
+    maintained C++ reference needs an explicit `polygonDirections_` array to avoid. Returns the WORST
+    cell per row, relative to that cell's own volume.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        if sep is None:
+            out.append(float("nan")); continue
+        es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        pos = T.pos(t); nF = T.nF(t)
+        a, b = pos + sep, pos - sep
+        centroid = np.zeros((nF, 3)); cnt = np.zeros(nF)
+        np.add.at(centroid, ef, pos[es]); np.add.at(cnt, ef, 1.0)
+        centroid /= np.maximum(cnt, 1.0)[:, None]
+        v_o = _cell_polyhedron_volume(a, b, es, et, ef, nF, np.zeros((nF, 3)))
+        v_c = _cell_polyhedron_volume(a, b, es, et, ef, nF, centroid)
+        d = np.abs(v_o - v_c) / np.maximum(np.abs(v_c), 1e-12)
+        out.append(float(np.nanmax(d)) if d.size else 0.0)
+    return out
+
+
+def cap_area_ratio(T, name="sep", **kw):
+    """AB-C3 -- the mean apical:basal cap-area ratio.
+
+    On a spherical shell of radius R and thickness h the caps scale with their own radii, so the
+    closed form is ((R + h/2) / (R - h/2))^2 -- 1.1736111 at R = 5, h = 0.4. It is a CONTROL at R2,
+    where `sep` is frozen at (h0/2)n and the caps are therefore exactly what `monolayer_shells`
+    would build; it becomes a result at R5, when `sep` is integrated and the ratio is solved rather
+    than constructed. Both rows exist so that the difference between them is visible.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        if sep is None:
+            out.append(float("nan")); continue
+        es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        pos = T.pos(t); nF = T.nF(t)
+        a, b = pos + sep, pos - sep
+        # Newell area of each cap ring: |1/2 sum (p x q)| over the directed ring edges
+        Aa = np.zeros((nF, 3)); Ab = np.zeros((nF, 3))
+        np.add.at(Aa, ef, np.cross(a[es], a[et]))
+        np.add.at(Ab, ef, np.cross(b[es], b[et]))
+        na = np.linalg.norm(Aa, axis=1); nb = np.linalg.norm(Ab, axis=1)
+        r = na / np.maximum(nb, 1e-12)
+        out.append(float(np.nanmean(r)) if r.size else float("nan"))
+    return out
+
+
+def _newell_area(p, es, et, ef, nF):
+    """|1/2 sum (p_s x p_t)| per cell -- the PLANAR polygon area of each ring, origin-independent."""
+    N = np.zeros((nF, 3)); np.add.at(N, ef, np.cross(p[es], p[et]))
+    return 0.5 * np.linalg.norm(N, axis=1)
+
+
+def _cap_fan_area(p, es, et, ef, nF):
+    """Cap area as the SUM OF ITS FAN TRIANGLES about the ring's own centroid -- the true area.
+
+    NOT `_newell_area`, and the difference is the whole of the R5 instability. The Newell magnitude
+    is the area of the ring's PLANAR PROJECTION: a crumpled cap and a flat one with the same outline
+    measure the same, and the area is stationary to first order when a single vertex moves normal to
+    the cap. Pricing a cell's surface that way while enclosing its volume with the fan leaves the
+    apico-basal separation with no restoring force against a checkerboard, and the tissue crumples
+    into one. The two agree exactly on a planar convex ring, which is why AB-C1 and AB-C2 did not
+    notice and a curved shell did.
+    """
+    centroid = np.zeros((nF, 3)); cnt = np.zeros(nF)
+    np.add.at(centroid, ef, p[es]); np.add.at(cnt, ef, 1.0)
+    centroid /= np.maximum(cnt, 1.0)[:, None]
+    tri = 0.5 * np.linalg.norm(np.cross(p[es] - centroid[ef], p[et] - centroid[ef]), axis=1)
+    out = np.zeros(nF); np.add.at(out, ef, tri)
+    return out
+
+
+def _cell_polyhedron_surface(a, b, es, et, ef, nF):
+    """(S, A_ap, A_ba) per cell: two fanned caps plus the lateral wall, two triangles per ring edge.
+
+    THE SAME ARITHMETIC AS `apicobasal_geometry_3d`, term for term, for the same reason the volume
+    is: a gate that measured the surface by a different formula than the energy minimised would be
+    grading a different solid than the one that relaxed. Both moved off the Newell magnitude at the
+    same time and for the reason `_cap_fan_area` gives.
+    """
+    A_ap = _cap_fan_area(a, es, et, ef, nF)
+    A_ba = _cap_fan_area(b, es, et, ef, nF)
+    A0, A1, B0, B1 = a[es], a[et], b[es], b[et]
+    la = (0.5 * np.linalg.norm(np.cross(A1 - A0, B1 - A0), axis=1)
+          + 0.5 * np.linalg.norm(np.cross(B1 - A0, B0 - A0), axis=1))
+    A_lat = np.zeros(nF); np.add.at(A_lat, ef, la)
+    return A_ap + A_ba + A_lat, A_ap, A_ba
+
+
+def _cell_thickness(sep, es, ef, nF):
+    """Per-cell thickness = mean of |a - b| = 2|sep| over the cell's own ring vertices."""
+    h = np.zeros(nF); c = np.zeros(nF)
+    np.add.at(h, ef, 2.0 * np.linalg.norm(sep[es], axis=1)); np.add.at(c, ef, 1.0)
+    return h / np.maximum(c, 1.0)
+
+
+def _cell_geom(T, t, name="sep"):
+    """(V, S, A_mid, h) per live cell at row t, or None if this trajectory carries no separation."""
+    sep = _sep(T, t, name)
+    if sep is None:
+        return None
+    es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+    pos = T.pos(t); nF = T.nF(t)
+    a, b = pos + sep, pos - sep
+    centroid = np.zeros((nF, 3)); cnt = np.zeros(nF)
+    np.add.at(centroid, ef, pos[es]); np.add.at(cnt, ef, 1.0)
+    centroid /= np.maximum(cnt, 1.0)[:, None]
+    V = _cell_polyhedron_volume(a, b, es, et, ef, nF, centroid)
+    S, _, _ = _cell_polyhedron_surface(a, b, es, et, ef, nF)
+    return V, S, _newell_area(pos, es, et, ef, nF), _cell_thickness(sep, es, ef, nF)
+
+
+def cell_shape_index(T, name="sep", **kw):
+    """AB-C2 and AB-M3 -- the mean cell shape index `s = S / V^(2/3)` over the live cells.
+
+    DIMENSIONLESS AND SCALE-FREE, which is why it can be both a closed form and a measurement. On a
+    regular hexagonal prism of side 1 and height 1 it is 5.924261377933605 exactly (AB-C2, against
+    `seed_mesh` `shape: hexagon`); measured epithelial cells sit near `Q = A^3/V^2 ~ 300`, i.e.
+    `s = 6.69`, well above the published 3D rigidity transition at 5.31-5.41 (AB-M3). A free
+    `length_um` cannot move it, which is the point: a micrometre band on a spec that declares no
+    width row is satisfiable by choosing the scale, and this is not.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        g = _cell_geom(T, t, name)
+        if g is None:
+            out.append(float("nan")); continue
+        V, S, _, _ = g
+        ok = V > 1e-12
+        out.append(float(np.mean(S[ok] / V[ok] ** (2.0 / 3.0))) if ok.any() else float("nan"))
+    return out
+
+
+def prism_volume_excess(T, name="sep", **kw):
+    """AB-B8 and the raw half of AB-C5 -- the fractional excess of the cell's volume over `A_mid * h`.
+
+        excess = V / (A_mid h) - 1,     A_mid = |Newell(mid ring)|,  h = mean 2|sep| over the ring
+
+    `A_mid * h` IS THE INCUMBENT'S VOLUME, not an approximation invented here: `cell_mechanics
+    [model: monolayer]` computes `v_f = |N_f| * h_cell` exactly (`vertex_ops.py`,
+    `monolayer_geometry_3d`), dropping the `O((h/R)^2)` prism correction. So this row measures
+    precisely what the promotion added to the volume, and nothing else.
+
+    AS A CONTROL (AB-B8) IT RUNS ON A FLAT PATCH, where the closed form says the excess is zero: a
+    right prism's volume IS its cap area times its height. A measure that reported an excess there
+    would be reporting its own arithmetic, and every number AB-C5 draws from it would be noise
+    wearing a physical name. AS A RESULT (AB-C5) it runs on a curved shell, where the continuum
+    value is `h^2/(12 R^2)` -- but see `prism_volume_excess_convergence` for why that comparison is
+    a convergence and not a tolerance.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        g = _cell_geom(T, t, name)
+        if g is None:
+            out.append(float("nan")); continue
+        V, _, A_mid, h = g
+        den = A_mid * h
+        ok = den > 1e-12
+        out.append(float(np.mean(V[ok] / den[ok] - 1.0)) if ok.any() else float("nan"))
+    return out
+
+
+def _shell_R(T, t):
+    """The shell's own radius at row t: the mean distance of a vertex from the mesh centroid."""
+    p = T.pos(t)
+    return float(np.linalg.norm(p - p.mean(0), axis=1).mean())
+
+
+def shell_asphericity(T, **kw):
+    """How far from a sphere the shell is, per row: `std(r) / mean(r)` over the mid-surface vertices.
+
+    THE GUARD THAT MAKES `prism_volume_excess_convergence` LEGITIMATE, AND IT IS NOT DECORATION.
+    That row compares a measured excess against `h^2/(12 R^2)`, which is the continuum shell
+    identity FOR A SPHERE OF RADIUS R, and `_shell_R` hands it one number -- the mean vertex radius
+    -- whatever the body actually is. Nothing in the arithmetic notices when that mean stops
+    describing anything: on `gate_ab_curved_coarse` at frame 20 the vertex radii run from 3.09 to
+    8.23 about a mean of 5.05, and the closed form is still evaluated, still returns 5.2e-4, and
+    still gets subtracted. This measure is what says out loud which rows the comparison is entitled
+    to be made on. Seeded, it reads 0.0064 at 80 cells and 0.0011 at 320; relaxed for twenty frames,
+    0.1972 and 0.0104.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        p = T.pos(t)
+        r = np.linalg.norm(p - p.mean(0), axis=1)
+        m = float(r.mean())
+        out.append(float(r.std()) / m if m > 1e-12 else float("nan"))
+    return out
+
+
+def prism_volume_excess_convergence(A, B, name="sep", **kw):
+    """AB-C5 -- does the measured excess CONVERGE on `h^2/(12 R^2)` as the mesh is refined?
+
+    THE ROW ASSERTS CONVERGENCE AND NOT A VALUE, DELIBERATELY. Integrating a shell of thickness `h`
+    across a mid-surface of radius `R` gives `V / (A_mid h) = 1 + h^2/(12 R^2)` -- 5.333e-4 at
+    R = 5, h = 0.4 -- but that is a CONTINUUM identity, and the code's `A_mid` is a PLANAR Newell
+    polygon inscribed in a curved cap. At a few hundred cells the polygon-vs-cap discretisation
+    error dominates 5.333e-4 by an order of magnitude, with the opposite sign. A fixed tolerance on
+    the excess would therefore be a MESH number wearing the phenomenon's clothes, which is the one
+    thing the paper's threshold rule forbids.
+
+    So: `resid(coarse) / resid(fine)`, where `resid = |excess - h^2/(12 R^2)|`, with `h` and `R`
+    MEASURED on each arm's own row rather than read from its spec. `A` is the coarse arm and `B` the
+    fine one; quadrupling the cell count should at least halve the residual.
+
+    IT RETURNS A SERIES, ONE RATIO PER ROW, AND WHICH ROW IS GRADED IS THE WHOLE QUESTION. The
+    identity is a statement about the DISCRETISATION of one surface, so it is only a comparison at
+    all while the two arms are two meshes OF THE SAME SPHERE. On the first recorded row they are --
+    that row is the state after ONE pass, not the seed, by the deliberate choice recorded in
+    `engine.py` -- and it reads 3.971 for 80 -> 320 cells and 3.994 for 320 -> 1280, second order and
+    the predicted factor of 4 both times. Twenty frames of relaxation destroy the premise rather than testing it: the
+    80-cell arm stops being a sphere (`shell_asphericity` 0.0064 -> 0.1972, vertex radii 3.09 to
+    8.23), and the ratio falls to 1.633. REFINING DOES NOT RESCUE IT, which is the measurement that
+    settles the question: the 1280-cell arm is still spherical at frame 20 (asphericity 0.0038) and
+    its excess still flips from -1.41e-3 to +1.14e-2, putting the 320 -> 1280 ratio at 0.705. The
+    cause is that `cell_mechanics` takes a FIXED 30 gradient iterations per frame at a fixed `eta`,
+    so a finer mesh -- shorter edges, the same step -- is further along its own relaxation after
+    twenty frames than a coarse one. The arms at frame 20 are three different surfaces, not one
+    surface at three resolutions. Grade this on `first`; the relaxed row is declared known-red.
+    """
+    def resid(T, t):
+        g = _cell_geom(T, t, name)
+        if g is None:
+            return float("nan")
+        V, _, A_mid, h = g
+        den = A_mid * h
+        ok = den > 1e-12
+        exc = float(np.mean(V[ok] / den[ok] - 1.0))
+        R = _shell_R(T, t)
+        return abs(exc - float(np.mean(h[ok])) ** 2 / (12.0 * R * R))
+    n = min(A.n_rows(), B.n_rows())
+    if A.n_rows() != B.n_rows():
+        raise ValueError(f"the two arms recorded {A.n_rows()} and {B.n_rows()} rows")
+    out = []
+    for t in range(n):
+        rb = resid(B, t)
+        out.append(resid(A, t) / rb if rb > 0 else float("inf"))
+    return out
+
+
+def _cap_areas(T, t, name="sep"):
+    """(apical, basal) Newell cap area per live cell at row `t`, or None if the run carries no span."""
+    sep = _sep(T, t, name)
+    if sep is None:
+        return None
+    es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+    pos = T.pos(t)
+    nF = T.nF(t)
+    a, b = pos + sep, pos - sep
+    Aa = np.zeros((nF, 3))
+    Ab = np.zeros((nF, 3))
+    np.add.at(Aa, ef, np.cross(a[es], a[et]))
+    np.add.at(Ab, ef, np.cross(b[es], b[et]))
+    return 0.5 * np.linalg.norm(Aa, axis=1), 0.5 * np.linalg.norm(Ab, axis=1)
+
+
+def cap_area_ratio_vs_measured_geometry(T, name="sep", **kw):
+    """AB-C4 -- the measured apical:basal cap ratio DIVIDED by the closed form for the shell it is on.
+
+    THE ROW THAT DISTINGUISHES A CONSTRUCTION FROM A RESULT. AB-C3 asserts the ratio itself, and at
+    R2-R4 that is a control: with `sep` frozen at (h0/2)n the caps are identically what
+    `monolayer_shells` builds, so the row re-measures the offset formula while appearing to test the
+    solver. This one is declared at the rung where `sep` is INTEGRATED, and its two inputs come from
+    two different places -- `h` is the median measured thickness `2|sep|`, `R` is the shell's own
+    enclosing radius -- so agreeing with `((R + h/2)/(R - h/2))^2` is a statement about the solution
+    and not about the seed.
+
+    THE STATISTIC OVER CELLS IS THE MEDIAN, AND THAT IS NOT INTERCHANGEABLE WITH `cap_area_ratio`'s
+    MEAN. Once `sep` is free, a fraction of cells wedge all the way to a basal point -- 106 of 1280
+    on `gate_ab_thickshell` at the peak of the transient -- and an apical:basal ratio is unbounded
+    as its denominator vanishes, so the worst of those cells reaches 130 while the tissue's own
+    ratio is 1.41. The mean of a ratio is not the ratio of the means and for area ratios it is
+    dominated by the smallest denominators: measured on that same frame, mean 4.72 and median 1.41
+    against a closed form of 1.5880. The median is 11% from the closed form there and 0.9% from it
+    at the end of the run; the mean is 197% away at the peak and describes the tail rather than the
+    shell, which is the whole difference. THE TAIL IS NOT DISCARDED BY THIS CHOICE -- it is
+    graded in its own right by `basal_cap_collapse_fraction`, which exists so that the wedging is a
+    declared row rather than something a reducer quietly absorbed. `cap_area_ratio` keeps its mean:
+    it is AB-C3, frozen on `gate_ab_sphere`, where `sep` cannot move and there is no tail.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        caps = _cap_areas(T, t, name)
+        sep = _sep(T, t, name)
+        if caps is None or sep is None:
+            out.append(float("nan")); continue
+        na, nb = caps
+        r = float(np.median(na / np.maximum(nb, 1e-12))) if na.size else float("nan")
+        h = float(np.median(2.0 * np.linalg.norm(sep, axis=1)))
+        R = _shell_R(T, t)
+        closed = ((R + 0.5 * h) / max(R - 0.5 * h, 1e-12)) ** 2
+        out.append(r / closed if closed > 0 else float("nan"))
+    return out
+
+
+def basal_cap_collapse_fraction(T, name="sep", frac=0.1, **kw):
+    """The fraction of live cells that have wedged to a basal point: `A_basal < frac * A_apical`.
+
+    THE PHENOMENON THE FREE SEPARATION PRODUCES ON ITS OWN, PUT IN THE TABLE RATHER THAN LEFT TO A
+    REDUCER. At R5 `sep` becomes a solver outcome for the first time, and on a closed shell under a
+    LINEAR surface tension a minority of cells collapse their inner cap almost completely. On
+    `gate_ab_thickshell` the fraction rises from 0.0023 on the first recorded row to a peak of
+    0.0828 -- 106 of 1280 cells -- at frame 4, then decays to 0.0297 by frame 20, where the 38
+    surviving ones have an apical cap of 0.55 against a basal cap of 0.026, at ordinary thickness
+    and ordinary ring valence, and reaches exactly zero at frame 45. Nothing is degenerate --
+    `apicobasal_span_invalid_count` is 0, every entry is finite -- so these are bottle cells, formed
+    with no myosin anywhere in the spec, and they are TRANSIENT: over an 80-frame run not one cell
+    of the 1280 finishes wedged.
+
+    IT IS A PER-CELL, SCALE-FREE TEST AND NOT A COMPARISON WITH THE POPULATION. `A_basal` against a
+    fraction of the population median would move with the tissue and would read differently on a
+    shell that had wedged everywhere; against the cell's OWN apical cap it says the one thing meant
+    -- this cell has lost its basal surface -- whatever its neighbours did. `frac` is a tenth.
+
+    WHY THE ROW IS BOOKKEEPING AND NOT A MEASUREMENT. The functional predicts wedging on a curved
+    sheet, but nothing here has been compared with a measured bottle-cell fraction in a real tissue;
+    the row asserts only that the wedging is a TAIL and not the tissue, which is the condition under
+    which the shell rows around it mean what they say.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        caps = _cap_areas(T, t, name)
+        if caps is None:
+            out.append(float("nan")); continue
+        na, nb = caps
+        out.append(float(np.mean(nb < frac * na)) if na.size else float("nan"))
+    return out
+
+
+def cell_thickness_fold(T, name="sep", **kw):
+    """Median cell thickness `2|sep|` at each row, over its value at the first row.
+
+    WHAT STOPS EVERY OTHER R5 ROW BEING VACUOUS, and the direct analogue of gate_ab_flat's
+    `the_patch_actually_relaxed`. AB-C4 is declared at the rung where the separation is a SOLVER
+    OUTCOME rather than a declared constant, and with `sep_mu: 0` -- the same spec, one key changed
+    -- the caps are identically what `monolayer_shells` builds, the closed form is re-measured
+    instead of tested, and the row passes while proving nothing. A gate cannot see the difference
+    from the outside: `run_gates` never reads `operators_exercised:`. This row is the evidence that
+    the second degree-of-freedom group moved.
+
+    THE DENOMINATOR IS THE FIRST RECORDED ROW, NOT THE SEEDED `h0`. `engine.py` records row 0 as the
+    state after ONE pass, so on `gate_ab_thickshell` the thickness has already gone from the seeded
+    1.8 to 1.4280 before this series starts, and 1.0789 at frame 20 is a fold of 0.7555 here against
+    0.599 measured from the seed. The row therefore UNDERSTATES the movement rather than flattering
+    it. It is stated against row 0 because that is the only reference a measure reading a trajectory
+    has: `h0` is a spec constant and the trajectory does not carry it.
+
+    THINNING IS A PREDICTION AND NOT AN OBSERVATION, which is why the assertion can be one-sided.
+    The cell's energy is `(1/2) k_v (V - V_eq)^2 + kappa_s S`, so at the seeded state -- where
+    `_rest_offset` has calibrated `V_eq` with `sep` HELD FIXED, balancing the mid-surface and
+    nothing else -- the derivative with respect to thickness is `kappa_s P`, the perimeter times the
+    surface tension, and it is strictly positive. There is no target area to push back, so the only
+    direction available to the thickness at the first step is down.
+    """
+    out = []
+    h0 = None
+    for t in range(T.n_rows()):
+        sep = _sep(T, t, name)
+        if sep is None:
+            out.append(float("nan")); continue
+        h = float(np.median(2.0 * np.linalg.norm(sep, axis=1)))
+        if h0 is None:
+            h0 = h
+        out.append(h / h0 if h0 > 1e-12 else float("nan"))
+    return out
+
+
+class _OneRow(Traj):
+    """One row of a trajectory, presented as a one-row trajectory.
+
+    So that a per-row measure can be reused inside another per-row measure without either of them
+    growing a `t=` argument that every OTHER caller would then have to pass. `cap_area_ratio` is the
+    only current user; it stays a whole-trajectory measure, which is the interface `run_gates`
+    calls it through.
+    """
+    def __init__(self, T, t): self._T, self._t = T, t
+    def n_rows(self): return 1
+    def nF(self, t): return self._T.nF(self._t)
+    def nV(self, t): return self._T.nV(self._t)
+    def pos(self, t): return self._T.pos(self._t)
+    def half_edges(self, t): return self._T.half_edges(self._t)
+    def face_col(self, n, t): return self._T.face_col(n, self._t)
+    def state(self, b, t): return self._T.state(b, self._t)
+    def vertex_block(self, n, t): return self._T.vertex_block(n, self._t)
+    def occ(self, s, t): return self._T.occ(s, self._t)
+    def scalar(self, n, t): return self._T.scalar(n, self._t)
+    def edge_col(self, n, t): return self._T.edge_col(n, self._t)
+
+
+def cell_height_to_width(T, name="sep", **kw):
+    """AB-M1 -- mean cell height over its in-plane width, dimensionless.
+
+    THE HEADLINE OBSERVABLE, STATED AS A RATIO ON PURPOSE. A columnar epithelium is 2-4x taller than
+    it is wide, and `length_um` is a free constant read off the spec -- so a micrometre HEIGHT band
+    on a spec that declares no width row is satisfiable by choosing the scale, and this is not.
+    Width is the equivalent-disc diameter of the mid-surface ring, `2 sqrt(A_mid/pi)`, because a
+    Voronoi cell has no single width and its longest chord would score elongation as height.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        g = _cell_geom(T, t, name)
+        if g is None:
+            out.append(float("nan")); continue
+        _V, _S, A_mid, h = g
+        w = 2.0 * np.sqrt(np.maximum(A_mid, 1e-12) / np.pi)
+        out.append(float(np.mean(h / w)))
+    return out
+
+
+def euler_closed(T, **kw):
+    """V - E + F of the mid-surface, over the vertices and half-edges the LIVE faces reference.
+
+    COUNTED OVER THE RING-REFERENCED VERTICES, NOT OVER `Nv`, and that is not tidiness. `cell_die`
+    rewrites `nF` and never `Nv` -- AB-B1's docstring records the same fact for a different reason
+    -- so an extruded cell leaves its merged vertices in the buffer, referenced by nothing. Each
+    `face_collapse_3d` merges three vertices into one and orphans two, and a raw `Nv` counts them:
+    measured on gate_ab_population, 26 extrusions left 52 orphans and the characteristic read
+    2 + 2*26 = 54 on a surface that was closed the whole time. The row would have reported a
+    torn mesh at every death, which is the one event it most needs to be right about.
+
+    The half-edges are filtered the same way, for the same reason.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        es, _et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        nF = T.nF(t)
+        live = ef < nF
+        out.append(int(np.unique(es[live]).size) - int(live.sum()) // 2 + int(nF))
+    return out
+
+
+def valence_fraction(T, valence=3, **kw):
+    """Fraction of LIVE vertices with exactly `valence` incident half-edges.
+
+    Counted over `E_srce` of the live faces: on a closed trivalent surface every vertex is the source
+    of exactly three half-edges. Orphaned vertices -- the ones `cell_die` leaves inside `Nv` without
+    touching the table -- appear with valence 0 and would drag the fraction down, so they are excluded
+    by counting only vertices that appear at all.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        es, _et, ef = T.half_edges(t)
+        live = ef < T.nF(t)
+        v, c = np.unique(np.asarray(es)[live], return_counts=True)
+        out.append(float((c == valence).mean()) if len(c) else 1.0)
+    return out
+
+
+def mean_neighbours_residual(T, **kw):
+    """|2E/F - (6 - 12/F)|, Euler's theorem for a trivalent closed cellular surface."""
+    out = []
+    for t in range(T.n_rows()):
+        F, E = T.nF(t), _n_edges(T, t)
+        out.append(abs(2.0 * E / max(F, 1) - (6.0 - 12.0 / max(F, 1))))
+    return out
+
+
+def _radii(T, t):
+    p = T.pos(t)
+    return np.linalg.norm(p - p.mean(0), axis=1)
+
+
+def apical_radius(T, **kw):
+    """MEDIAN vertex radius about the vertex centroid -- the reference's own definition.
+
+    Not the mean, and the difference is not cosmetic: `tissue.py:329` is
+    `float(np.median(np.linalg.norm(v, axis=1)))`, and a just-divided sliver sitting briefly outside
+    the surface moves a mean and not a median. The first version of this row used the mean and came
+    out at 3.85781 against a threshold of 3.8607 derived from the median -- a FAILING row that was
+    measuring a different quantity from the one its threshold described. Two estimators of "apical
+    radius" is exactly the way a gate lies.
+
+    CENTROID-REFERENCED, for the reason `apical_map` gives: nothing pins the vesicle to the origin,
+    so an origin-referenced radius reads the vesicle's DRIFT as growth.
+    """
+    return [float(np.median(_radii(T, t))) for t in range(T.n_rows())]
+
+
+def apical_radius_fold(T, **kw):
+    r = apical_radius(T)
+    return [x / max(r[0], 1e-12) for x in r]
+
+
+def aspect_ratio(T, **kw):
+    """Equatorial over axial semi-axis, from the gyration tensor's eigenvalues.
+
+    THE REFERENCE'S OWN ESTIMATOR (`tissue.py:336-337`): the 98th percentile of hypot(x, y) over the
+    98th percentile of |z|, both about the vertex centroid. The 98th rather than the max because one
+    stray vertex should not set the shape of a tissue and a just-divided sliver can sit briefly
+    outside the surface.
+
+    THIS REPLACED A GYRATION TENSOR, and the swap is the point rather than a detail. The tensor is a
+    perfectly good aspect estimator -- it is more robust than a percentile -- but it is a DIFFERENT
+    NUMBER, and it read 1.00787 against a threshold of 1.0193 taken from the percentile pair. A row
+    that fails because its threshold and its measurement disagree about what they mean is worse than
+    no row: it looks like a finding.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        p = T.pos(t)
+        v = p - p.mean(0)
+        r_eq = float(np.percentile(np.hypot(v[:, 0], v[:, 1]), 98))
+        r_ax = float(np.percentile(np.abs(v[:, 2]), 98))
+        out.append(r_eq / max(r_ax, 1e-9))
+    return out
+
+
+def scalar_col(T, name, **kw):
+    """One of the operators' own cumulative counters, per recorded row (`n_t1`, `n_apop`, ...).
+
+    THE OPERATOR'S NUMBER, NOT A RECONSTRUCTION OF IT. `t1_total_inferred` below reconstructs the
+    same quantity from the topology and disagrees by about a factor of two, because a 3D reversible
+    network reconnection rewires more than the one edge it is named for. Both are right about
+    different things, which is why a gate must read the counter the operator keeps.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        v = T.scalar(name, t)
+        out.append(0.0 if v is None else float(v))
+    return out
+
+
+def _cell_rings(T, t):
+    """Per live cell, its ring as the source -> target map of its half-edges.
+
+    Returns `(rings, nF)` where `rings[f]` is a dict from a vertex to the vertex the cell's ring
+    steps to next. On a well-formed cell that map is a permutation of the cell's own vertices with
+    exactly ONE cycle -- which is what makes a cell a polygon rather than a bag of edges, and what
+    `cell_face_count_residual` checks after the topology operators have moved it.
+    """
+    es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+    nF = T.nF(t)
+    live = ef < nF
+    rings = [dict() for _ in range(nF)]
+    for s, e, f in zip(es[live], et[live], ef[live]):
+        rings[f][int(s)] = int(e)
+    return rings, nF
+
+
+def cell_face_count_residual(T, **kw):
+    """AB-B3 -- per row, the total over live cells of (faces the cell actually has) - (2 + valence).
+
+    A CELL IS TWO CAPS AND ONE WALL PER RING EDGE, so its polyhedron has `2 + k` faces for a ring of
+    `k` edges. That is the incidence `apicobasal_geometry_3d` builds from, and the whole cell->faces
+    relation in this design is DERIVED from the ring: nothing stores it, so nothing can disagree
+    with it -- as long as the ring is a ring.
+
+    THE ROW IS NOT THE ARITHMETIC `2 + k - (2 + k)`, WHICH WOULD BE VACUOUS. What can actually break
+    is the PREMISE: that a cell's half-edges form exactly one closed cycle. Follow `source -> target`
+    around a cell and a well-formed ring visits every one of its vertices once and returns; a ring
+    that has split into two loops -- which is what a mis-stitched `divide_face_3d`, a T1 that rewired
+    one side, or a `face_collapse_3d` that merged the wrong pair would leave behind -- has the same
+    edge count `k` and therefore the same `2 + k`, while the solid it bounds has `2c + k` faces for
+    `c` cycles. So the residual is `2(c - 1)`, zero exactly when the ring is one cycle, and the row
+    is a statement about the topology operators rather than about addition.
+
+    A cell whose map is not a permutation at all (a repeated source, a dangling half-edge) cannot be
+    walked and is scored as one defect rather than crashing the grade: it is a broken ring either
+    way, and a measure that raised here would report INFRA_FAIL for a mesh defect the row exists to
+    catch.
+
+    R6 is the rung for it because R2-R5 never move a ring: division, T1 and death all arrive here.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        rings, nF = _cell_rings(T, t)
+        bad = 0
+        for f in range(nF):
+            m = rings[f]
+            if not m:
+                continue                      # a face with no live half-edges is not a live cell
+            seen, start, v, n = set(), next(iter(m)), next(iter(m)), 0
+            while v in m and v not in seen:
+                seen.add(v); v = m[v]; n += 1
+            if v != start or n != len(m):
+                # not one closed cycle over all of this cell's edges: count the cycles it does have
+                unvisited, cycles = set(m), 0
+                while unvisited:
+                    u = next(iter(unvisited)); cycles += 1
+                    while u in unvisited:
+                        unvisited.discard(u); u = m.get(u, None)
+                        if u is None:
+                            break
+                bad += 2 * max(cycles - 1, 1)
+        out.append(bad)
+    return out
+
+
+def scutoid_fraction(T, **kw):
+    """AB-B10 -- the fraction of live cells whose APICAL and BASAL neighbour sets differ.
+
+    THE LIMIT OF THIS DESIGN, STATED AS A NUMBER IN THE GATE TABLE RATHER THAN AS A SENTENCE IN A
+    DESIGN DOCUMENT. A scutoid is a cell that neighbours one cell apically and a different one
+    basally; real epithelia are full of them in curved tissue, and this promotion CANNOT REPRESENT
+    ONE. The topological master is the mid-surface half-edge table, a cell owns exactly one ring,
+    and its neighbour across a wall is the face of that ring edge's twin -- so the apical and the
+    basal neighbour set are computed here by two separate walks that are reading the same twin
+    relation, and the answer is 0 for a structural reason and not an empirical one.
+
+    IT IS WRITTEN AS A MEASURE ANYWAY, AND IT IS NOT DECORATION. The gate table is where this
+    promotion's boundaries are supposed to live, and "no scutoids" is the largest of them. A limit
+    recorded only in prose is one a later reader can miss, quote around, or believe was tested; a
+    row that reads 0.0 every frame with this docstring behind it cannot be mistaken for evidence
+    that the tissue has none. What would have to change for it to read anything else is a per-wall
+    identity independent of the mid-surface ring -- that is, the `cell_complex` mesh kind.
+
+    **THIS ROW IS DELETED BY THE `cell_complex` PROMOTION, NEVER RELAXED.** Widening it to `le: 0.05`
+    at any later date would be asserting that a representation which cannot express a scutoid has
+    nearly no scutoids, which is not a measurement of a tissue.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        es, et, ef = (np.asarray(x, int) for x in T.half_edges(t))
+        nF = T.nF(t)
+        live = ef < nF
+        es, et, ef = es[live], et[live], ef[live]
+        # the twin of a half-edge is the half-edge with its endpoints reversed
+        owner = {(int(a), int(b)): int(f) for a, b, f in zip(es, et, ef)}
+        apical = [set() for _ in range(nF)]
+        basal = [set() for _ in range(nF)]
+        for a, b, f in zip(es, et, ef):
+            nb = owner.get((int(b), int(a)))
+            if nb is None:
+                continue                      # a boundary edge on an open patch has no cell across
+            apical[f].add(nb)                 # the wall's apical rim and its basal rim are the
+            basal[f].add(nb)                  # SAME wall: one ring, one twin, one neighbour
+        n = sum(1 for f in range(nF) if apical[f] or basal[f])
+        d = sum(1 for f in range(nF) if apical[f] != basal[f])
+        out.append(d / n if n else float("nan"))
+    return out
+
+
+def renumber_did_not_act(T, **kw):
+    """`renumber_failed`, cumulative -- THE SENTINEL THAT WAS INSTALLED AND NEVER WIRED UP.
+
+    When a cell dies or a T1 drops a face the cells are renumbered, and every per-cell array must be
+    permuted to match or the chemistry ends up on the wrong cells. `Hierarchy.renumber_set` does
+    that and returns False if it could not. On 23 August it returned False on EVERY call -- its
+    guard tested `hasattr(self.levels, "get")` and `levels` is an `nn.ModuleDict`, which has no
+    `.get` -- and both call sites discarded the bool. Nineteen twin rows stayed green while the
+    chemistry of every run that killed a cell was scrambled; one run went half-NaN from frame 889
+    and stamped itself `valid_evidence: True`.
+
+    The fix put this counter in `MeshTable.SCALAR_RECORD` for one stated reason: "so a gate can
+    assert it is 0 instead of a human having to notice a printed line". THAT ASSERTION WAS NEVER
+    WRITTEN. The counter has been recorded, and unread, ever since: `MEASURES` exposes four thin
+    wrappers over `scalar_col` and `scalar_col` itself is not in the table, so a row naming it fails
+    preflight. This is the fifth wrapper.
+    """
+    return scalar_col(T, "renumber_failed")
+
+
+def t1_total(T, **kw):
+    """`edge_flip`'s own accepted-reconnection counter, cumulative."""
+    return scalar_col(T, "n_t1")
+
+
+def n_apop(T, **kw):
+    """`cell_die`'s own extrusion counter, cumulative."""
+    return scalar_col(T, "n_apop")
+
+
+def divisions_refused(T, **kw):
+    """`cell_divide`'s count of divisions refused for want of buffer, per frame."""
+    return scalar_col(T, "div_blocked")
+
+
+def apop_spill(T, **kw):
+    """Material a death could not bequeath without pushing a neighbour out of the integrator's
+    basin. It is dropped and counted rather than injected, and it must stay ~0."""
+    return scalar_col(T, "apop_spill")
+
+
+def t1_total_inferred(T, **kw):
+    """Cumulative NEW EDGES BETWEEN PRE-EXISTING VERTICES, inferred from the topology.
+
+    NOT THE SAME QUANTITY AS `t1_total`, and the gap is the finding: this reads 2,890 where
+    `edge_flip`'s own counter reads 1,499 on gate 00, i.e. about two new old-old edges per accepted
+    reconnection. Kept as a separate measure rather than reconciled, because it is the only T1
+    diagnostic available on a trajectory recorded before `SCALAR_RECORD` existed.
+
+    A T1 changes the half-edge table WITHOUT changing V, E or F, so the Euler ledger cannot see it;
+    what it changes is WHICH VERTEX PAIRS are edges.
+
+    THE DIVISIONS HAVE TO BE SUBTRACTED, AND NOT BY COUNTING THEM. The first version of this took
+    "pairs present now, absent before, minus 3 per new face", on the grounds that a septum adds three
+    edges. It returned 16,169 against the reference's 1,499. A division does not add three pairs: it
+    SPLITS two existing edges -- each split deletes one pair and creates two -- and then adds the
+    septum, so five pairs appear and two disappear for a net of three. Subtracting three left two per
+    division, about 13,000 of them, and the row read as a ten-fold T1 excess that did not exist.
+
+    SO THE DIVISIONS ARE EXCLUDED BY GEOMETRY RATHER THAN BY ARITHMETIC. Every pair a division
+    creates involves at least one vertex that did not exist a tick ago -- the two edge midpoints. A
+    T1's new pair joins two vertices that were both already there. Counting only new pairs whose
+    endpoints are both below the previous tick's `Nv` therefore counts flips and nothing else, with
+    no coefficient to get wrong.
+    """
+    ticks = getattr(T, "ticks", None)
+    total, out = 0, []
+    prev, prev_nv = None, 0
+    for t in range(T.n_rows()):
+        es, et, ef = T.half_edges(t)
+        live = ef < T.nF(t)
+        a, b = np.asarray(es)[live], np.asarray(et)[live]
+        cur = set(map(tuple, np.sort(np.stack([a, b], 1), axis=1).tolist()))
+        step_ok = t > 0 and (ticks is None or ticks[t] - ticks[t - 1] == 1)
+        if prev is not None and step_ok:
+            total += sum(1 for (x, y) in (cur - prev) if x < prev_nv and y < prev_nv)
+        prev, prev_nv = cur, T.nV(t)
+        out.append(total)
+    return out
+
+
+def t1_rail_fraction(T, max_flips=30, **kw):
+    """Fraction of the `edge_flip` calls that DID something and hit the cap while doing it.
+
+    Read off the operator's own cumulative counter, so a call's delivery is exact. A call that hit
+    the rail wanted more reconnections than it got, so the T1 rate on that frame is a property of
+    `max_flips` and not of the tissue -- which is the whole reason this row exists beside
+    `t1_total`.
+    """
+    tt = t1_total(T)
+    per = [tt[i] - tt[i - 1] for i in range(1, len(tt))]
+    calls = [x for x in per if x > 0]
+    if not calls:
+        return [0.0]
+    return [float(sum(1 for x in calls if x >= max_flips) / len(calls))]
+
+
+def doubling_time_hours(T, **kw):
+    """Mean cell-cycle length. NEEDS THE `units:` BLOCK -- the reducer converts, and raises without
+    one; this returns the cycle in FRAMES."""
+    c = cell_count(T)
+    d = np.log2(max(c[-1], 1) / max(c[0], 1))
+    n = getattr(T, "ticks", None)
+    span = (n[-1] - n[0]) if n else (len(c) - 1)
+    return [float(span / max(d, 1e-9))]
+
+
+def mean_cell_diameter(T, **kw):
+    """sqrt of the mean apical area per cell, in simulation length units.
+
+    Area from the closed surface, not from `cell__area`: the state block is recorded before the
+    frame's divisions are applied, so on a dividing frame it is a few entries short -- which is the
+    same off-by-a-few that made the renderer's blue flicker.
+
+    THE TRIANGLE FAN IS ABOUT EACH FACE'S OWN CENTROID, not about the body's. The first version
+    fanned every half-edge from the global centre, which measures the volume swept rather than the
+    surface: it returned 50.9 um for a cell that is 7.7 um across, a factor of 6.6, and it would have
+    been read as a model that grows by inflating its cells.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        p, (es, et, ef) = T.pos(t), T.half_edges(t)
+        nF = T.nF(t)
+        live = ef < nF
+        a, b, f = np.asarray(es)[live], np.asarray(et)[live], np.asarray(ef)[live]
+        # each face's centroid, as the mean of its own half-edge sources
+        centroid = np.zeros((nF, 3))
+        cnt = np.zeros(nF)
+        np.add.at(centroid, f, p[a])
+        np.add.at(cnt, f, 1.0)
+        centroid /= np.maximum(cnt, 1)[:, None]
+        tri = 0.5 * np.linalg.norm(np.cross(p[a] - centroid[f], p[b] - centroid[f]), axis=1)
+        area = np.zeros(nF)
+        np.add.at(area, f, tri)
+        out.append(float(np.sqrt(area.mean())))
+    return out
+
+
+def spheroid_diameter(T, **kw):
+    return [2.0 * r for r in apical_radius(T)]
+
+
+# ============================================================================== junction measures
+def _edges(T, t):
+    """(vi, vj, length) over the LIVE half-edges of row t, and the half-edge index they came from."""
+    p, (es, et, ef) = T.pos(t), T.half_edges(t)
+    live = np.asarray(ef) < T.nF(t)
+    a, b = np.asarray(es)[live], np.asarray(et)[live]
+    return a, b, np.linalg.norm(p[b] - p[a], axis=1), live
+
+
+def myosin_aligned(T, name="myo", **kw):
+    """|len(myo) - len(E_srce)| per row. A BOOKKEEPING row, and the one that made it necessary.
+
+    `junction_myosin` writes `myo` for the half-edge arrays as they were, and `edge_flip` and
+    `cell_divide` then rewire and lengthen them within the same tick. On the 401-frame nominal, 56
+    of 200 archived snapshots carried a myosin array 6 to 1,356 entries short of the edge arrays,
+    and every reader indexes it positionally -- so each of those frames coloured, averaged and
+    thresholded the wrong junctions. `junction_sync` re-keys it by vertex pair; this asserts the
+    re-keying happened.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        es, _et, _ef = T.half_edges(t)
+        out.append(0 if v is None else abs(len(v) - len(es)))
+    return out
+
+
+def myosin_mean(T, name="myo", **kw):
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        _a, _b, _l, live = _edges(T, t)
+        out.append(0.0 if v is None or len(v) < len(live)
+                   else float(np.asarray(v)[live].mean()))
+    return out
+
+
+def myosin_dispersion(T, name="myo", pct=98, **kw):
+    """p98 / mean over the live junctions -- how UNEVEN the myosin is.
+
+    The mean is pinned near `activity` by construction, so it says nothing; a belt that is doing
+    something has a tail. This is the number that separates "myosin is present" from "myosin is
+    localised", and the two have completely different mechanics.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        _a, _b, _l, live = _edges(T, t)
+        if v is None or len(v) < len(live):
+            out.append(0.0); continue
+        w = np.asarray(v)[live]
+        m = float(w.mean())
+        out.append(float(np.percentile(w, pct) / m) if m > 1e-12 else 0.0)
+    return out
+
+
+def hot_junction_fraction(T, name="myo", above=1.5, **kw):
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        _a, _b, _l, live = _edges(T, t)
+        if v is None or len(v) < len(live):
+            out.append(0.0); continue
+        w = np.asarray(v)[live]
+        m = float(w.mean())
+        out.append(float((w > above * m).mean()) if m > 1e-12 else 0.0)
+    return out
+
+
+def myosin_length_correlation(T, name="myo", **kw):
+    """Pearson r between a junction's myosin and its LENGTH, over the live junctions.
+
+    THE ROW THAT DISTINGUISHES THE TWO BELTS, and it is independent of the dispersion row in a way
+    `hot_junction_fraction` was not. `junction_myosin` has two keyings: `length` accumulates myosin
+    on SHORT junctions, which homogenises lengths and suppresses intercalation; `tension` is the
+    destabilising one the germband-extension literature describes and produces T1s. Both raise the
+    dispersion identically -- so a "myosin is localised" row cannot tell them apart, and this can:
+    the length-keyed belt gives a NEGATIVE correlation, the tension-keyed one does not.
+
+    WHY IT REPLACED `hot_junction_fraction`. That row asked for at least 2% of junctions above 1.5x
+    the mean while its sibling asserted p98/mean >= 1.20. The two are not independent, they are in
+    CONTRADICTION: p98 = 1.42 means, by the definition of a 98th percentile, that exactly 2% of
+    junctions are above 1.42 -- so at most 2% can be above 1.5, and the pair could never both hold.
+    It measured 0.0079 against a demand for 0.02. A gate row that cannot pass while its neighbour
+    passes is not a strict row, it is a wrong one.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        _a, _b, L, live = _edges(T, t)
+        if v is None or len(v) < len(live):
+            out.append(0.0); continue
+        w = np.asarray(v)[live]
+        if w.std() < 1e-12 or L.std() < 1e-12:
+            out.append(0.0); continue
+        out.append(float(np.corrcoef(w, L)[0, 1]))
+    return out
+
+
+def mean_junction_length(T, **kw):
+    return [float(_edges(T, t)[2].mean()) for t in range(T.n_rows())]
+
+
+def mean_junction_length_fold(T, **kw):
+    L = mean_junction_length(T)
+    return [x / max(L[0], 1e-12) for x in L]
+
+
+def junction_persistence(T, lag=1, **kw):
+    """Fraction of a row's junctions that were also junctions `lag` recorded rows earlier.
+
+    A tissue that intercalates loses junctions; one that only grows keeps them and adds more. This
+    separates the two, which cell count and radius cannot.
+    """
+    out, prev = [], None
+    for t in range(T.n_rows()):
+        a, b, _l, _live = _edges(T, t)
+        cur = set(map(tuple, np.sort(np.stack([a, b], 1), axis=1).tolist()))
+        out.append(1.0 if prev is None else float(len(cur & prev) / max(len(prev), 1)))
+        prev = cur
+    return out
+
+
+def pos_max_delta(A, B, **kw):
+    """max |pos_A - pos_B| over every row both sides recorded -- the two-arm neutrality row.
+
+    Refuses rather than truncates when the two arms disagree in length or in live count: two runs
+    that are not the same length are not a controlled comparison, and silently comparing the first
+    N rows of each is how a neutrality claim comes to be about a prefix.
+    """
+    n = min(A.n_rows(), B.n_rows())
+    if A.n_rows() != B.n_rows():
+        raise ValueError(f"the two arms recorded {A.n_rows()} and {B.n_rows()} rows")
+    worst = 0.0
+    for t in range(n):
+        pa, pb = A.pos(t), B.pos(t)
+        if pa.shape != pb.shape:
+            raise ValueError(f"row {t}: {pa.shape} live vertices against {pb.shape}")
+        worst = max(worst, float(np.abs(pa - pb).max()))
+    return [worst]
+
+
+def pos_max_delta_rel(A, B, until=None, **kw):
+    """AB-C1 -- `pos_max_delta` in the unit of the PHENOMENON: fractions of the mean junction length.
+
+    THE SAME COMPARISON, DENOMINATED SO IT CAN BE JUDGED. `pos_max_delta` returns sim length units,
+    and a bound in those units is only meaningful once you know how big a cell is and what precision
+    the state carries. Plexus state is float32 -- there is no dtype knob and the buffers are
+    `torch.zeros(...)` -- so on a patch whose coordinates are O(5) the smallest representable
+    difference is already ~5e-7, and a bound of 1e-9 on the raw quantity is a bound in a precision
+    the code does not have. It could only ever be met by two arms that were BIT-identical, which two
+    different expressions for the same volume will never be.
+
+    So the row is stated as a fraction of the mean edge, and the bound comes from the arithmetic on
+    both sides of it: float32 rounding in the two energies differs by ~1e-6 relative, the relaxation
+    is contractive toward a shared minimum so that difference saturates rather than accumulating,
+    and a genuinely DIFFERENT energy moves vertices by O(0.1) of an edge. Any bound between those is
+    a discriminator; the gate declares 1e-4, four orders below the thing it must exclude.
+
+    `until=k` RESTRICTS THE COMPARISON TO THE FIRST k RECORDED ROWS, AND IT IS NOT A CONVENIENCE. A
+    reduction identity is a statement about the FORCE -- same energy, same gradient, same step. It is
+    NOT a statement that the two trajectories stay together, because that is a property of the
+    DYNAMICS and not of the models. Measured on gate_ab_flat's own patch, restarted from a
+    bit-identical state: the two models stay 1 ulp apart for five gradient iterations and then
+    separate at about 1.3x per iteration -- 2.7e-6 at ten, 5.9e-4 at thirty -- because a shrinking
+    flat patch relaxing under surface tension is locally unstable in its tangential modes. Over
+    twenty frames that reaches 1.4e-2 for two models whose every energy evaluation agrees to one
+    float32 ulp. A whole-run equality row therefore asserts Lyapunov stability and would fail a
+    CORRECT implementation, while a bound widened to survive it would no longer exclude anything:
+    on the first frame the identity measures 6.9e-7 and a cell only 0.1% thicker measures 1.0e-3.
+    So `until: 1` asserts the identity on the step it IS an identity for, and the amplification is
+    declared as its own known-red row rather than absorbed into a tolerance.
+    """
+    n = min(A.n_rows(), B.n_rows())
+    if A.n_rows() != B.n_rows():
+        raise ValueError(f"the two arms recorded {A.n_rows()} and {B.n_rows()} rows")
+    if until is not None:
+        n = min(n, int(until))
+    worst = 0.0
+    for t in range(n):
+        pa, pb = A.pos(t), B.pos(t)
+        if pa.shape != pb.shape:
+            raise ValueError(f"row {t}: {pa.shape} live vertices against {pb.shape}")
+        es, et, _ef = (np.asarray(x, int) for x in A.half_edges(t))
+        L = float(np.linalg.norm(pa[et] - pa[es], axis=1).mean())
+        worst = max(worst, float(np.abs(pa - pb).max()) / max(L, 1e-12))
+    return [worst]
+
+
+def t1_rate_delta(A, B, **kw):
+    """(T1 per cell per frame in A) - (in B). Negative means A suppresses intercalation."""
+    def rate(T):
+        n = T.n_rows()
+        cells = float(np.mean([T.nF(t) for t in range(n)]))
+        return t1_total(T)[-1] / max(cells * max(n - 1, 1), 1e-9)
+    return [rate(A) - rate(B)]
+
+
+def t1_rate_per_cell_per_frame(T, **kw):
+    n = T.n_rows()
+    cells = float(np.mean([T.nF(t) for t in range(n)]))
+    return [t1_total(T)[-1] / max(cells * max(n - 1, 1), 1e-9)]
+
+
+# ============================================================================== particle measures
+def particle_count(T, **kw):
+    return [T.nF(t) for t in range(T.n_rows())]
+
+
+def out_of_box(T, lo=0.03125, hi=0.96875, **kw):
+    """Particles outside the clamp `mpm_gather` enforces, `[2dx, 1-2dx]` at n_grid 64.
+
+    THE CLAMP IS THE OPERATOR'S OWN, so a particle outside it means the clamp did not run, not that
+    the material moved: this is a bookkeeping row about the code, not a statement about the block.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        p = T.pos(t)
+        out.append(int(((p < lo) | (p > hi)).any(axis=1).sum()))
+    return out
+
+
+def centroid_height(T, axis=1, **kw):
+    """The block's centre of mass along `axis`. Every particle carries the same mass here (one
+    `p_vol` from a uniform seed), so the mean position IS the centre of mass."""
+    return [float(T.pos(t)[:, axis].mean()) for t in range(T.n_rows())]
+
+
+def free_fall_acceleration(T, dt=0.0032, axis=1, frames=60, **kw):
+    """The acceleration of the centroid over the opening frames, in box units per second squared.
+
+    THE CLOSED-FORM ROW OF THIS GATE, in the paper's exact sense: does the implementation reproduce
+    the physics it was GIVEN? The spec hands `gravity` g = 2.5 and nothing else acts until the block
+    reaches the floor, so the centroid must follow y0 - g t^2 / 2 and a quadratic fit must return
+    -2.5. It is not a statement about matrices; it is a statement about whether a force declared once
+    per tick and consumed by sixteen substeps is applied once or sixteen times -- which is precisely
+    the error the paper names, "a force applied once per substep where it should be applied once per
+    step", and which would show up here as -40.0 rather than -2.5.
+
+    `frames` is bounded well before the first impact (frame ~287 in the archived runs).
+    """
+    y = np.asarray(centroid_height(T, axis=axis)[:frames], float)
+    t = np.arange(len(y)) * float(dt)
+    if len(y) < 3:
+        return [0.0]
+    c = np.polyfit(t, y, 2)                      # y = c0 t^2 + c1 t + c2  ->  a = 2 c0
+    return [float(2.0 * c[0])]
+
+
+def min_centroid_height(T, axis=1, **kw):
+    return [min(centroid_height(T, axis=axis))]
+
+
+def strand_length(T, per_strand=60, **kw):
+    """Mean end-to-end length of the seeded fibres, in box units.
+
+    `ecm_seed` lays `n_fibres` strands of `per_strand` CONTIGUOUS particles, so strand i is the slice
+    [i*per_strand : (i+1)*per_strand] and its end-to-end length is the distance between the two ends.
+    Measured at frame 0 this is the seeded fibre length; later it is what the deformation did to it.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        p = T.pos(t)
+        n = (len(p) // per_strand) * per_strand
+        q = p[:n].reshape(-1, per_strand, 3)
+        out.append(float(np.linalg.norm(q[:, -1] - q[:, 0], axis=1).mean()))
+    return out
+
+
+def strand_length_um(T, per_strand=60, **kw):
+    return strand_length(T, per_strand=per_strand)
+
+
+def min_radius_from_centre(T, centre=(0.5, 0.5, 0.5), **kw):
+    """The closest any material point comes to the domain centre, per frame.
+
+    THE NON-PENETRATION STATEMENT, in the one form a prescribed surface allows. `mesh_contact`
+    replays a tissue whose radius is known per frame, so "no matrix inside the epithelium" is
+    exactly "min |p - centre| >= the tissue's radius". It needs no stress, no contact counter and no
+    module global -- only the positions the trajectory already holds.
+    """
+    c = np.asarray(centre, float)
+    return [float(np.linalg.norm(T.pos(t) - c, axis=1).min()) for t in range(T.n_rows())]
+
+
+def contact_penetration_um(T, surface_radius=0.15, centre=(0.5, 0.5, 0.5), **kw):
+    """How far the nearest material point sits INSIDE the prescribed surface, at the last frame.
+
+    THE NUMBER THAT ONLY MEANS SOMETHING IN MICROMETRES. As a fraction of a unit box a penetration of
+    0.0146 reads as a rounding error; at this calibration it is 17 um, which is two cell diameters.
+    That conversion is the paper's own worked example of why the measurement tier needs a `units:`
+    block -- the same quantity was once reported as "0.82 grid cells", sounded small, and was
+    described as an improvement.
+
+    Returned in SIMULATION units; the row's `unit: um` converts it through the spec's `units:`.
+    """
+    c = np.asarray(centre, float)
+    t = T.n_rows() - 1
+    return [max(0.0, float(surface_radius) - float(np.linalg.norm(T.pos(t) - c, axis=1).min()))]
+
+
+def median_displacement(T, **kw):
+    """Median |p(t) - p(0)| over the material points that are present at both ends.
+
+    A MEDIAN, not a mean: a handful of points flicked out of a contact zone move by a box width and
+    would carry a mean on their own. The failure this guards against is a matrix that is being
+    FLICKED rather than pushed -- measured once at k = 4000, where the median displacement collapsed
+    from 0.085 to 0.0005 while the peak grew, because a huge acceleration on the contact layer
+    accelerates that layer out of the zone before it can transmit anything to the material behind.
+    """
+    p0 = T.pos(0)
+    out = []
+    for t in range(T.n_rows()):
+        p = T.pos(t)
+        n = min(len(p), len(p0))
+        out.append(float(np.median(np.linalg.norm(p[:n] - p0[:n], axis=1))))
+    return out
+
+
+def final_stress_p99_Pa(T, band_scale=2.0, bands=8, pct=99, **kw):
+    """p99 of the final frame's von Mises stress, from the recorded colour band.
+
+    THE BAND IS WHAT REACHES DISK, and it is a lossy readout: `ecm_stress` writes
+    `round(clip(vm / band_scale, 0, 1) * (bands - 1))` into `node_type`, so the stress is recovered
+    as `band * band_scale / (bands - 1)` and is quantised to `band_scale / (bands - 1)` = 0.286
+    stress units. That is coarse and it is stated rather than hidden: this row can distinguish 100 Pa
+    from 1000 Pa, which is what its literature interval asks, and it cannot resolve 10%.
+
+    IT IS THE FINAL FRAME ONLY, because `node_type` is a per-node buffer written once into the npz
+    rather than a per-frame array -- the run's last state. A stress TRACE would need `ecm_stress` to
+    publish into a recorded state block instead of into a colour channel and a module global.
+    """
+    z, sname = getattr(T, "z", None), getattr(T, "s", None)
+    k = f"{sname}__node_type"
+    if z is None or k not in z.files:
+        raise KeyError("no node_type in this trajectory -- ecm_stress did not run, or the writer "
+                       "did not record it")
+    band = np.asarray(z[k], float)
+    return [float(np.percentile(band, pct) * band_scale / max(bands - 1, 1))]
+
+
+MEASURES = {
+    "myosin_aligned": myosin_aligned,
+    "myosin_mean": myosin_mean,
+    "myosin_dispersion": myosin_dispersion,
+    "hot_junction_fraction": hot_junction_fraction,
+    "myosin_length_correlation": myosin_length_correlation,
+    "mean_junction_length": mean_junction_length,
+    "mean_junction_length_fold": mean_junction_length_fold,
+    "junction_persistence": junction_persistence,
+    "pos_max_delta": pos_max_delta,
+    "t1_rate_delta": t1_rate_delta,
+    "t1_rate_per_cell_per_frame": t1_rate_per_cell_per_frame,
+    "particle_count": particle_count,
+    "out_of_box": out_of_box,
+    "centroid_height": centroid_height,
+    "free_fall_acceleration": free_fall_acceleration,
+    "min_centroid_height": min_centroid_height,
+    "strand_length": strand_length,
+    "strand_length_um": strand_length_um,
+    "min_radius_from_centre": min_radius_from_centre,
+    "contact_penetration_um": contact_penetration_um,
+    "median_displacement": median_displacement,
+    "final_stress_p99_Pa": final_stress_p99_Pa,
+    "cell_count": cell_count,
+    "cell_count_delta": cell_count_delta,
+    "vertex_count": vertex_count,
+    "occ_vs_mesh": occ_vs_mesh,
+    "cap_area_ratio": cap_area_ratio,
+    "cap_area_ratio_vs_measured_geometry": cap_area_ratio_vs_measured_geometry,
+    "cell_shape_index": cell_shape_index,
+    "cell_height_to_width": cell_height_to_width,
+    "prism_volume_excess": prism_volume_excess,
+    "prism_volume_excess_convergence": prism_volume_excess_convergence,
+    "shell_asphericity": shell_asphericity,
+    "basal_cap_collapse_fraction": basal_cap_collapse_fraction,
+    "cell_thickness_fold": cell_thickness_fold,
+    "cell_face_count_residual": cell_face_count_residual,
+    "scutoid_fraction": scutoid_fraction,
+    "apicobasal_span_zero_fraction": apicobasal_span_zero_fraction,
+    "pos_max_delta_rel": pos_max_delta_rel,
+    "polyhedron_volume_closure": polyhedron_volume_closure,
+    "apicobasal_span_recorded_fraction": apicobasal_span_recorded_fraction,
+    "apicobasal_span_invalid_count": apicobasal_span_invalid_count,
+    "renumber_did_not_act": renumber_did_not_act,
+    "topology_ledger": topology_ledger,
+    "nonfinite_count": nonfinite_count,
+    "reservoir_fraction": reservoir_fraction,
+    "euler_closed": euler_closed,
+    "valence_fraction": valence_fraction,
+    "mean_neighbours_residual": mean_neighbours_residual,
+    "apical_radius": apical_radius,
+    "apical_radius_fold": apical_radius_fold,
+    "aspect_ratio": aspect_ratio,
+    "t1_total": t1_total,
+    "t1_total_inferred": t1_total_inferred,
+    "n_apop": n_apop,
+    "divisions_refused": divisions_refused,
+    "apop_spill": apop_spill,
+    "t1_rail_fraction": t1_rail_fraction,
+    "doubling_time_hours": doubling_time_hours,
+    "mean_cell_diameter_um": mean_cell_diameter,
+    "spheroid_diameter_um": spheroid_diameter,
+}
+
+# WHICH MEASURES ARE PHYSICAL, and what they are measured in. The reducer converts through the
+# spec's `units:` block and RAISES if none is declared -- which is what stops a dimensionless run
+# from quoting a micrometre. A name absent from here is dimensionless by declaration.
+PHYSICAL = {
+    "strand_length_um": ("length", "um"),
+    "final_stress_p99_Pa": ("stress", "Pa"),
+    "contact_penetration_um": ("length", "um"),
+    "doubling_time_hours": ("time", "hours"),
+    "mean_cell_diameter_um": ("length", "um"),
+    "spheroid_diameter_um": ("length", "um"),
+}
+
+REDUCERS = {
+    "all": lambda s: s,
+    "first": lambda s: s[0],
+    "last": lambda s: s[-1],
+    "min": lambda s: min(s),
+    "max": lambda s: max(s),
+    "mean": lambda s: float(np.mean(s)),
+    "count": lambda s: len(s),
+    "series": lambda s: s,
+}
+
+
+def _all(v, pred):
+    return all(pred(x) for x in v) if isinstance(v, (list, tuple)) else pred(v)
+
+
+ASSERTS = {
+    "eq": lambda v, a: _all(v, lambda x: x == a),
+    "ne": lambda v, a: _all(v, lambda x: x != a),
+    "ge": lambda v, a: _all(v, lambda x: x >= a),
+    "le": lambda v, a: _all(v, lambda x: x <= a),
+    "gt": lambda v, a: _all(v, lambda x: x > a),
+    "lt": lambda v, a: _all(v, lambda x: x < a),
+    "within": lambda v, a: _all(v, lambda x: abs(x - a[0]) <= a[1]),
+    "interval": lambda v, a: _all(v, lambda x: a[0] <= x <= a[1]),
+}
+
+# EVERY GATE MEASURE IS ALSO A REGISTRY ENTRY, under its own name, kind "row".
+from plexus.measures import register_rows as _register_rows  # noqa: E402
+_register_rows(MEASURES)
