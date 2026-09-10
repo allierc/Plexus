@@ -1147,7 +1147,7 @@ class SeedMeshApicoBasal(SeedMesh3D):
         wedge-targeted and warning about them would be the checker inventing a defect. The default
         is `polyhedron` because a cell with a separation normally IS one.
         """
-        conv = "wedge" if str(params.get("v0_from", "polyhedron")).lower() == "wedge" else "polyhedron"
+        conv = "polyhedron" if str(params.get("v0_from", "wedge")).lower() == "polyhedron" else "wedge"
         return {"V0f": f"volume[{conv}]", "Vbirth": f"volume[{conv}]",
                 "A0": "area[midsurface]", "P0": "length"}
 
@@ -1164,7 +1164,13 @@ class SeedMeshApicoBasal(SeedMesh3D):
         # against 2.5433 for the same cell on the reference spheroid. A spec may still write
         # `v0_from: wedge` to reproduce an archived run, and the loader will then tell it what it
         # disagrees with.
-        self.v0_from = str(params.get("v0_from", "polyhedron")).lower()
+        # THE DEFAULT IS `wedge`, AND IT IS A WORKING-POINT DECISION. c671fb31 flipped it to
+        # `polyhedron` and thereby re-targeted every apico-basal spec that had never named a
+        # convention -- about eighty of them, cvd2_adder_tension included: V0f 2.57 -> 1.36 on
+        # the reference spheroid, the shell shrank from r 4.33 to 3.65 by frame 3 and division
+        # started 300 frames early. A spec that wants the polyhedron says `v0_from: polyhedron`
+        # (the apop2_abfix_* family does); a default may not move a corpus.
+        self.v0_from = str(params.get("v0_from", "wedge")).lower()
         if self.v0_from not in ("wedge", "polyhedron"):
             raise ValueError(f"seed_mesh[apicobasal]: v0_from must be wedge|polyhedron, "
                              f"not {self.v0_from!r}")
