@@ -143,6 +143,7 @@ operators:
   cap_frac: 0.12
   K_bend: 0.0
   K_lumen: 0.0
+  plane_axis: 2
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -200,25 +201,23 @@ descriptions:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
-    description: The simulation begins with a flat sheet of hexagonal cells where small clusters of red
-      cells start to appear and expand. As time progresses, these red clusters grow larger and begin to
-      exert mechanical force on the surrounding white cells. The sheet undergoes significant buckling
-      and folding as the red regions expand, creating three-dimensional protrusions. By the final frames,
-      the sheet has collapsed into a complex, crumpled structure with deep folds and high curvature.
-    objects: The primary objects are 374 hexagonal cells arranged in a continuous, interconnected mesh.
-      The cells are colored in a gradient from white to various shades of red, representing different
-      biological or physical states. The red cells form distinct, expanding clusters that drive the deformation
-      of the overall sheet. The mesh transitions from a flat, two-dimensional geometry into a highly distorted,
-      three-dimensional crumpled shape.
+    description: The simulation begins with a large, uniform sheet of hexagonal cells where small clusters
+      of red cells begin to emerge and expand. As time progresses, these red clusters grow significantly
+      in size and number, eventually merging into large, distinct regions. A blue phase appears in the
+      middle of the sequence, appearing to compete with or separate the red regions. In the final frames,
+      the sheet undergoes a dramatic structural collapse, with the cell count decreasing as the mesh fragments
+      and shrinks.
+    objects: 'The primary objects are a collection of hexagonal cells arranged in a continuous, interconnected
+      mesh. The cells are colored in three distinct states: white (neutral), red (active/growing), and
+      blue (competing/different phase). The size of the individual cells remains relatively consistent,
+      but the overall size of the collective sheet decreases as cells are removed. The topology transitions
+      from a regular, uniform tiling to a highly irregular, fragmented geometry as the simulation concludes.'
   movie_kburns:
-    description: A cluster of red polygonal cells undergoes significant morphological changes and structural
-      reorganization over time. The cells initially form a relatively flat, compact sheet before beginning
-      to buckle and fold into complex three-dimensional shapes. As the simulation progresses, the internal
-      stresses cause the sheet to warp, creating deep ridges and protruding peaks. By the final frames,
-      the structure has transformed into a highly convoluted, crumpled geometry with significant vertical
-      displacement.
-    objects: The scene contains a collection of interconnected polygonal cells forming a continuous, sheet-like
-      mesh. These cells are colored in varying shades of red and pink, with some faces appearing lighter
-      due to the simulated lighting. The individual cells are small and vary in size, creating a heterogeneous
-      texture across the surface. The overall structure is a single, unified object that maintains its
-      topological connectivity while changing its spatial configuration.
+    description: A cellular mesh structure undergoes a dynamic morphological transformation over time.
+      The red-shaded regions shift and migrate across the surface of the sheet as the geometry deforms.
+      The overall shape of the mesh expands and contracts, exhibiting fluid-like movement. The concentration
+      of the red morphogen appears to pulse and redistribute across the interconnected cells.
+    objects: The scene contains a single interconnected mesh composed of polygonal cells. The cells are
+      colored in a gradient ranging from white to deep red, representing a morphogen concentration. The
+      mesh maintains a continuous topology where each cell shares edges with its neighbors. The size of
+      the individual cells varies slightly as the sheet undergoes mechanical deformation.

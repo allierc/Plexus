@@ -108,6 +108,7 @@ operators:
   cap_frac: 0.12
   K_bend: 0.0
   K_lumen: 0.0
+  plane_axis: 2
 - op: cell_die
   at: vertex
   p0: 3.5
@@ -164,3 +165,25 @@ descriptions:
       pattern to form a continuous surface. The mesh is colored in a light grey or
       off-white shade against a solid black background. Each individual hexagon is
       uniform in size and shape, creating a repetitive geometric texture.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a hexagonal mesh undergoing a deformation process from a jagged,
+      star-like shape into a smooth circle. Initially, the outer boundary is highly irregular with sharp
+      points protruding outward. As the frames progress, these points retract and the boundary smooths
+      out significantly. By the final frame, the mesh has reached a nearly perfect circular geometry.
+    objects: The primary object is a large, circular mesh composed of hundreds of small hexagonal cells.
+      Most of the cells are light gray, while a single cell at the center is highlighted in bright blue.
+      The cells are arranged in a dense, repeating honeycomb pattern that fills the entire shape. The
+      overall size of the mesh remains constant while its outer perimeter changes shape.
+  movie_kburns:
+    description: The simulation shows a hexagonal mesh structure undergoing a gradual expansion and deformation.
+      As time progresses, the individual cells of the mesh stretch and shift to accommodate a larger surface
+      area. The overall shape of the mesh transitions from a compact oval to a more elongated, flattened
+      elliptical form. The movement appears smooth and continuous, representing a physical expansion or
+      a geometric transformation of the sheet.
+    objects: The primary object is a large, two-dimensional sheet composed of a dense hexagonal mesh.
+      Each individual cell in the mesh is a small, light-grey hexagon with dark outlines. The mesh is
+      arranged in a continuous, repeating pattern that forms a large, elliptical shape. The size of the
+      entire mesh increases significantly over the duration of the simulation as it expands outward.

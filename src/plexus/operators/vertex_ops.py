@@ -179,10 +179,29 @@ def cell_size(lvl, m, nF, pos_np=None):
             # different population from the same spec.
             if "v_ref_poly" not in m:
                 m["v_ref_poly"] = float(_np.median(v))
+            m["size_convention"] = "polyhedron"
             return v, float(m["v_ref_poly"])
-    _, _, _, vf = face_geometry_3d(P.cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
-                                   m["E_face"].cpu(), nF, apex=wedge_apex(m, P.cpu()))
-    return vf.numpy().astype(_np.float64), float(m.get("v_ref", 1.0))
+    area, _, _, vf = face_geometry_3d(P.cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
+                                      m["E_face"].cpu(), nF, apex=wedge_apex(m, P.cpu()))
+    v_ref = float(m.get("v_ref", 1.0))
+    # A FLAT SHEET HAS NO WEDGE. `seed_mesh shape: disc` lays the patch in the plane of its own
+    # `centre`, which is the wedge apex, so every cone over it has zero volume: V0f, `V0` and
+    # `v_ref` were all seeded at exactly 0 on every `sheet_*` run. Everything stated "as a fraction
+    # of v_ref" then reads as a fraction of nothing -- `cell_die`'s extrusion threshold was 0, so a
+    # cell shrunk to the 1e-9 floor was never "small enough" and not one cell was ever extruded
+    # from a sheet (sheet_morphogen_die, 2026-09-09: 171 dying cells, 0 removed, and the patches
+    # of unremovable dead cells buckled the sheet). On a sheet the cell's size IS its area, the
+    # convention the paper's 2D model uses, and the reference is the seed-time median area,
+    # cached at the first call exactly as `v_ref_poly` is. Decided by the geometry -- a seeded
+    # wedge reference of zero -- and not by a parameter, like the other two conventions.
+    if v_ref <= 1e-12:
+        a = area.numpy().astype(_np.float64)
+        if "a_ref" not in m:
+            m["a_ref"] = float(_np.median(a[:nF]))
+        m["size_convention"] = "area"
+        return a, float(m["a_ref"])
+    m["size_convention"] = "wedge"
+    return vf.numpy().astype(_np.float64), v_ref
 
 
 def cell_block(H, cat, name, nF):
@@ -2611,6 +2630,10 @@ class Apoptosis3D(Structural):
         # volume it does not have.
         _vn, v_ref = cell_size(lvl, m, nF, pos_t)
         crit = self.crit * v_ref
+        # THE TARGET THAT IS SHRUNK, IN THE SAME CONVENTION AS `crit`: the volume target on a
+        # shell, the area target on a flat sheet (where V0f is identically zero -- see
+        # `cell_size`). Read AFTER the shrink below, through `size_tgt()`.
+        _by_area = m.get("size_convention") == "area"
         # 1. SHRINK. cell_mechanics contracts the cell toward the smaller target; T1 then finds its
         #    edges short and sheds neighbours. Nothing is removed here.
         for f in marked:
@@ -2619,6 +2642,7 @@ class Apoptosis3D(Structural):
                 A0[f] = max(A0[f] * (1.0 - self.shrink) ** (2.0 / 3.0), 1e-9)
         m["V0f"] = torch.as_tensor(V0f, dtype=dt, device=dev)
         m["A0"] = torch.as_tensor(A0, dtype=dt, device=dev)
+        size_tgt = A0 if _by_area else V0f
         # THE SHRINK HAS TO SURVIVE `cell_grow`, AND WRITING `V0f` ALONE DOES NOT. `cell_grow`
         # recomputes the target wholesale every frame -- `m["V0f"] = m["V0f_init"] * s**3` -- from
         # the cell's own growth scale, so a shrink written only to `V0f` is DISCARDED on the next
@@ -2673,14 +2697,14 @@ class Apoptosis3D(Structural):
         for f in sorted(marked, reverse=True):
             if f >= nF or rings[f] is None or len(rings[f]) != 3:
                 continue
-            if V0f[f] > crit:
+            if size_tgt[f] > crit:
                 continue
             nbrs = [int(g) for g in self._ring_neighbours(rings, f) if g < nF]
             if face_collapse_3d(rings, pos_t, f, births=births):
                 gone += 1
                 if _has_chem and nbrs:
                     h0, h1 = clvl_c.state_schema["chem"]
-                    amt = clvl_c.state[f, h0:h1].detach().clone() * float(V0f[f])
+                    amt = clvl_c.state[f, h0:h1].detach().clone() * float(size_tgt[f])
                     _bequest.append((nbrs, amt))
         if gone == 0:
             return {}
@@ -2694,7 +2718,7 @@ class Apoptosis3D(Structural):
                 # concentration many orders of magnitude too large in one step, and a few of those
                 # compound. Without this guard the conservation rule above becomes an AMPLIFIER,
                 # by dividing by a number the model allows to reach zero.
-                live = [g for g in nbrs if float(V0f[g]) >= crit]
+                live = [g for g in nbrs if float(size_tgt[g]) >= crit]
                 if not live:
                     # every neighbour is on its way out too: the material leaves with the cell,
                     # which is what happened before conservation existed and is the honest
@@ -2731,7 +2755,7 @@ class Apoptosis3D(Structural):
                 # maximum. Each column is bounded by its own.
                 ceil = torch.nan_to_num(cs[:nF, h0:h1], nan=0.0).amax(dim=0) if nF else None
                 for g in live:
-                    inc = share / float(V0f[g])
+                    inc = share / float(size_tgt[g])       # the recipient's size, in the run's convention
                     if ceil is None:
                         cs[g, h0:h1] += inc
                         continue
@@ -3954,9 +3978,17 @@ def _polygon_simple_2d(Q):
     return True
 
 
-def _face_ok_3d(ring, getp):
+def _face_ok_3d(ring, getp, normal=None):
     """Face is valid: >=3 verts, non-zero area, Newell normal points OUTWARD (dot with centroid > 0),
-    and the polygon is SIMPLE when projected onto its own plane. `getp(i)` returns vertex i's 3-vector."""
+    and the polygon is SIMPLE when projected onto its own plane. `getp(i)` returns vertex i's 3-vector.
+
+    `normal` -- THE SHEET'S OWN NORMAL, for a flat tissue. "Outward" is a vesicle's word: the Newell
+    normal is compared with the centroid, i.e. the radial from the origin. A sheet built by
+    `build_sheet_mesh` lies IN the plane z = 0 through the origin, so that dot product is exactly
+    zero for every face and every T1 was refused as "inward-facing" -- the four `sheet_*` runs of
+    2026-09-09 flipped nothing while planar and only began to flip once they had buckled. With the
+    plane declared (`cell_mechanics.plane_axis`), the orientation to keep is the one the builder
+    fixed, CCW seen from +axis, and that is what `normal` compares against."""
     P = np.array([np.asarray(getp(i), float) for i in ring])
     k = len(P)
     if k < 3:
@@ -3964,7 +3996,7 @@ def _face_ok_3d(ring, getp):
     c = P.mean(0)
     N = 0.5 * np.cross(P, np.roll(P, -1, 0)).sum(0)          # Newell area vector (|N| = area)
     a = np.linalg.norm(N)
-    if a < 1e-9 or float(np.dot(N, c)) <= 0.0:               # degenerate, or inward-facing
+    if a < 1e-9 or float(np.dot(N, c if normal is None else normal)) <= 0.0:   # degenerate, or flipped over
         return False
     n = N / a                                                # project to the face plane, test simplicity
     e1 = P[0] - c; e1 = e1 - np.dot(e1, n) * n
@@ -4058,7 +4090,7 @@ def t1_flip_3d(rings, pos, e_uv, new_len=None, emap=None, vf=None, plane_axis=No
                 nu[int(plane_axis)] = mid[int(plane_axis)]
                 nv[int(plane_axis)] = mid[int(plane_axis)]
             getp = lambda i: (nu if i == u else nv if i == v else pos[i])
-            if all(_face_ok_3d(r, getp) for r in (nA, nB, nC, nD)):
+            if all(_face_ok_3d(r, getp, normal=None if plane_axis is None else n) for r in (nA, nB, nC, nD)):
                 for fid, ro, rn in ((A, rA, nA), (B, rB, nB), (C, rC, nC), (D, rD, nD)):
                     for i in range(len(ro)):                # keep the passed maps in sync: only A,B,C,D changed
                         emap.pop((ro[i], ro[(i + 1) % len(ro)]), None)

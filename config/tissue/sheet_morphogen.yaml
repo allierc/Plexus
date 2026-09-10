@@ -134,6 +134,7 @@ operators:
   cap_frac: 0.12
   K_bend: 0.0
   K_lumen: 0.0
+  plane_axis: 2
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -159,3 +160,26 @@ plotting:
   camera:
     elev: 90.0
     azim: 0.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a hexagonal mesh of cells where red color intensity represents a
+      morphogen concentration. Initially, small, isolated clusters of high concentration appear sporadically
+      across the sheet. As time progresses, these clusters expand and merge into larger, more defined
+      regions of high concentration. By the final frames, the morphogen has organized into three distinct,
+      large, and stable domains.
+    objects: The scene consists of a large, roughly circular sheet composed of 374 individual hexagonal
+      cells. The cells are arranged in a continuous, interlocking honeycomb lattice. The color of the
+      cells ranges from white (low concentration) to deep red (high concentration). The size of the individual
+      hexagonal cells remains constant throughout the entire simulation.
+  movie_kburns:
+    description: The simulation shows a 2D hexagonal mesh representing a morphogen concentration field
+      on a sheet. Over time, the red regions of high concentration expand and merge while the white regions
+      of low concentration are compressed. The overall shape of the sheet remains relatively stable while
+      the internal patterns shift dynamically. The concentration gradients evolve as the red "islands"
+      grow and eventually dominate more of the surface area.
+    objects: The scene consists of a single continuous sheet composed of a hexagonal grid of cells. The
+      cells are colored in a gradient ranging from white (low concentration) to deep red (high concentration).
+      The mesh forms an irregular, roughly elliptical shape centered in the frame. Each individual hexagon
+      is small and uniform in size, creating a smooth transition between the different concentration zones.

@@ -415,7 +415,7 @@ plotting:
 <p class="opk-ref">Reference — active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/sheet_die.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/sheet_die_p.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">a death inside mechanics<span class="sim-spec"><pre>general:
   name: sheet_die
@@ -527,6 +527,7 @@ operators:
   cap_frac: 0.12
   K_bend: 0.0
   K_lumen: 0.0
+  plane_axis: 2
 - op: cell_die
   at: vertex
   p0: 3.5
@@ -558,11 +559,11 @@ plotting:
   camera:
     elev: 90.0
     azim: 0.0</pre></span></span>
-      <span class="sim-cap">374 cells on a flat disc, two sets. Seed, shape energy (lateral), junction flips (rewire), one cell marked to die (structural). It shrinks to nothing and the sheet closes over it.</span>
+      <span class="sim-cap">374 cells on a flat disc, two sets. Seed, shape energy (lateral), junction flips (rewire), one cell marked to die (structural). It shrinks, its junctions flip until three remain, and the sheet closes over the point.</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/sheet_morphogen.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/sheet_morphogen_p.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">chemistry gates growth<span class="sim-spec"><pre>general:
   name: sheet_morphogen
@@ -700,6 +701,7 @@ operators:
   cap_frac: 0.12
   K_bend: 0.0
   K_lumen: 0.0
+  plane_axis: 2
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -729,7 +731,7 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/sheet_divide2.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/sheet_divide3.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">growth and division added<span class="sim-spec"><pre>general:
   name: sheet_divide
@@ -850,6 +852,7 @@ operators:
   cap_frac: 0.12
   K_bend: 0.0
   K_lumen: 0.0
+  plane_axis: 2
 - op: cell_divide
   at: vertex
   cycle_cv: 0.4
@@ -888,7 +891,7 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/sheet_morphogen_die.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/sheet_morphogen_die_p.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">death where the activator is low<span class="sim-spec"><pre>general:
   name: sheet_morphogen_die
@@ -1035,6 +1038,7 @@ operators:
   cap_frac: 0.12
   K_bend: 0.0
   K_lumen: 0.0
+  plane_axis: 2
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -1061,7 +1065,7 @@ plotting:
   camera:
     elev: 90.0
     azim: 0.0</pre></span></span>
-      <span class="sim-cap"><code>cell_die</code> with <code>model: chem_low</code> added to the morphogen sheet: a cell whose activator is below a fraction of the peak is marked and shrinks away. 171 of 374 collapse; what survives is the pattern.</span>
+      <span class="sim-cap"><code>cell_die</code> with <code>model: chem_low</code> added to the morphogen sheet: a cell whose activator is below a fraction of the peak is marked and shrinks away. 180 of 374 are extruded, the sheet closes over each and contracts; what survives is the pattern.</span>
     </figcaption>
   </figure>
 </div>
