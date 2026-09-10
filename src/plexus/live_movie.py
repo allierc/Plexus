@@ -425,6 +425,25 @@ class LiveMovie:
         pxw = max(16, int(px * _asp) // 16 * 16)
         self.aspect = pxw / float(px)
         self.p = pv.Plotter(off_screen=True, window_size=(pxw, px), border=False)
+        # `surface_env: true` -- IMAGE-BASED LIGHTING, so a reflective surface has something to
+        # reflect. A PBR material with `metallic`/`roughness` and no environment map reads as dark
+        # plastic with a few white flecks: there is nothing in the scene for it to pick up except
+        # the point lights. `plexus.morph` already builds a synthetic sky (there is no HDRI on a
+        # cluster node) and a key/fill/rim/back rig for exactly this look; both are reused here
+        # rather than copied, so the movie and the morphing script cannot drift apart.
+        if bool((self.style or {}).get("surface_env", False)):
+            try:
+                from plexus.morph import build_lights, default_settings, env_texture
+                _es = default_settings()
+                _es["env_bright"] = float((self.style or {}).get("surface_env_bright",
+                                                                 _es["env_bright"]))
+                self.p.set_environment_texture(env_texture(_es["env_bright"]))
+                build_lights(self.p, _es)
+                print(f"[live-movie] environment map + 4-light rig (bright {_es['env_bright']:g})",
+                      flush=True)
+            except Exception as _e:                                  # noqa: BLE001
+                print(f"[live-movie] surface_env unavailable ({type(_e).__name__}: {_e})",
+                      flush=True)
         self.p.set_background("black")
         self.p.enable_anti_aliasing("msaa", multi_samples=8)
 
@@ -1800,9 +1819,17 @@ class LiveMovie:
                 # -- you look through the near surface at the organelles, not at the far surface
                 # through the near one.
                 _m = (_per.get(nm) or {})
+                # `surface_pbr: true` -- A PHYSICALLY-BASED MATERIAL: `metallic` and `roughness`
+                # instead of the Phong specular/ambient/diffuse below, which VTK ignores under PBR.
+                # Pair it with `surface_env`, or the metal has nothing to reflect.
+                _pbr = {}
+                if bool(_m.get("pbr", st.get("surface_pbr", False))):
+                    _pbr = dict(pbr=True,
+                                metallic=float(_m.get("metallic", st.get("surface_metallic", 0.3))),
+                                roughness=float(_m.get("roughness", st.get("surface_roughness", 0.25))))
                 _act = self.p.add_mesh(surf, color=col,
                                 opacity=float(opa.get(nm, _dflt_op)),
-                                smooth_shading=True,
+                                smooth_shading=True, **_pbr,
                                 specular=float(_m.get("specular", st.get("surface_specular", 0.3))),
                                 # CLAMPED, because VTK's range is (0, 128] and pyvista RAISES
                                 # outside it -- which this class swallows, so a spec asking for a

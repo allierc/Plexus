@@ -1,0 +1,241 @@
+general:
+  name: si_obj_spot
+  seed: 1
+  n_frames: 900
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 30
+    start:
+    - - 0.06
+      - 0.2
+      - 0.17
+    - - 0.155
+      - 0.2
+      - 0.17
+    - - 0.25
+      - 0.2
+      - 0.17
+    - - 0.345
+      - 0.2
+      - 0.17
+    - - 0.44
+      - 0.2
+      - 0.17
+    - - 0.06
+      - 0.3
+      - 0.17
+    - - 0.155
+      - 0.3
+      - 0.17
+    - - 0.25
+      - 0.3
+      - 0.17
+    - - 0.345
+      - 0.3
+      - 0.17
+    - - 0.44
+      - 0.3
+      - 0.17
+    - - 0.06
+      - 0.4
+      - 0.17
+    - - 0.155
+      - 0.4
+      - 0.17
+    - - 0.25
+      - 0.4
+      - 0.17
+    - - 0.345
+      - 0.4
+      - 0.17
+    - - 0.44
+      - 0.4
+      - 0.17
+    - - 0.06
+      - 0.2
+      - 0.33
+    - - 0.155
+      - 0.2
+      - 0.33
+    - - 0.25
+      - 0.2
+      - 0.33
+    - - 0.345
+      - 0.2
+      - 0.33
+    - - 0.44
+      - 0.2
+      - 0.33
+    - - 0.06
+      - 0.3
+      - 0.33
+    - - 0.155
+      - 0.3
+      - 0.33
+    - - 0.25
+      - 0.3
+      - 0.33
+    - - 0.345
+      - 0.3
+      - 0.33
+    - - 0.44
+      - 0.3
+      - 0.33
+    - - 0.06
+      - 0.4
+      - 0.33
+    - - 0.155
+      - 0.4
+      - 0.33
+    - - 0.25
+      - 0.4
+      - 0.33
+    - - 0.345
+      - 0.4
+      - 0.33
+    - - 0.44
+      - 0.4
+      - 0.33
+    types:
+      a:
+        fraction: 0.1667
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        shape: obj
+        obj: spot
+      b:
+        fraction: 0.1667
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        shape: obj
+        obj: spot
+      c:
+        fraction: 0.1667
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        shape: obj
+        obj: spot
+      d:
+        fraction: 0.1667
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        shape: obj
+        obj: spot
+      e:
+        fraction: 0.1666
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        shape: obj
+        obj: spot
+      f:
+        fraction: 0.1666
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        shape: obj
+        obj: spot
+  mpm_particle:
+    parent: cell
+    per_parent: 40000
+    density: 1000.0
+    vel_init: 0.6
+    vel_init_axes:
+    - 0
+    - 1
+    particle_mass: 1.81376e-06
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  implementation: warp
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+  implementation: warp
+schedule:
+- gravity
+- substep_dt: 4.385965e-05
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: compartments
+  surface_pbr: true
+  surface_metallic: 0.35
+  surface_roughness: 0.2
+  surface_env: true
+  surface_env_bright: 2.3
+  surface_opacity: 1.0
+  splat_res: 600
+  box_frame: true
+  hide_sets:
+  - cell
+  colors:
+    a:
+    - 0.9
+    - 0.9
+    - 0.35
+    b:
+    - 0.4
+    - 0.9
+    - 0.7
+    c:
+    - 0.95
+    - 0.5
+    - 0.35
+    d:
+    - 0.5
+    - 0.7
+    - 1.0
+    e:
+    - 0.9
+    - 0.6
+    - 0.9
+    f:
+    - 0.6
+    - 0.95
+    - 0.4
+  slow_motion: 4
