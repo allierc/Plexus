@@ -1126,7 +1126,14 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         D = H.dim                                                # the child's pos dimension (the global dim contract)
         if has_pos:
             px0, px1 = schema["pos"]
-            ppos = parent.get("pos")[parent_idx][:, :D]              # parent position, projected to the child's dim
+            # A PARENT WITHOUT `pos` NAMES THE BLOCK ITS CHILDREN SCATTER ABOUT. A cell of a vertex
+            # tissue carries `centroid`, not `pos` (its position is the mesh's); `parent_pos: centroid`
+            # on the child set says so. Default `pos`, so nothing archived moves.
+            _pp = str(s.get("parent_pos", "pos"))
+            if _pp not in parent.state_schema:
+                raise ValueError(f"set {sname!r}: parent {pname!r} has no {_pp!r} block to scatter about; "
+                                 f"declare `parent_pos: <block>` on the child set")
+            ppos = parent.get(_pp)[parent_idx][:, :D]                # parent position, projected to the child's dim
             # scatter each child uniformly in a ball of `radius` about its parent. The 2D
             # polar path is kept verbatim (bit-identical MPM particle seeding); 3D+ uses a
             # random unit direction so true 3D child sets are not collapsed onto a plane.
