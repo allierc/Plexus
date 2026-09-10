@@ -184,8 +184,8 @@ seed:
   tissue: vertex
   density: 3.0
   seed: 0
-  s: 0.6
-  tau: 400.0
+  s: 0.02
+  tau: 300.0
 plotting:
   renderer: vtk_points
   background: black
@@ -226,7 +226,7 @@ plotting:
     ylabel: integrins
     ticks: 4
     ymin: 0
-    ymax: 20000
+    ymax: 10000
   scale_bar_corner: right
   scale_bar_lift: -0.07
   colors:
@@ -235,4 +235,3 @@ plotting:
     - 0.15
     - 0.15
   mesh_opacity: 0.45
-  zoom: 2.2

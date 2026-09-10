@@ -889,6 +889,16 @@ class LiveMovie:
         # both the host copy and VTK's resident buffer (10 M points: 240 MB against 120 MB) to carry
         # digits that never survive the projection to a 1280 px frame.
         _p = lvl.get("pos")[self.idx].detach()
+        # DORMANT SLOTS ARE NOT DRAWN. A set with a reserve parks its unused slots far off-domain
+        # (-1e6 for integrins); a cloud that carried them stretched the camera's depth range by a
+        # million and VTK culled the whole scene -- blank frames exactly while the reserve was not
+        # yet used up, a picture that appeared at frame 350 when the buffer filled. A dormant slot
+        # is drawn ON TOP of the first live one: same point, same colour, invisible.
+        _o = getattr(lvl, "occ", None)
+        if _o is not None:
+            _ol = torch.as_tensor(_o)[self.idx].to(_p.device) > 0
+            if bool(_ol.any()) and not bool(_ol.all()):
+                _p = torch.where(_ol[:, None], _p, _p[_ol][:1].expand_as(_p))
         if getattr(self, "cs_only", False):
             # OUTSIDE THE SLAB IS PARKED, NOT REMOVED. The drawn cloud has a fixed length -- its
             # colours were bound to it at t=0 and `cloud.points = ...` replaces an array of the same
