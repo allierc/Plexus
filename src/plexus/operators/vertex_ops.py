@@ -181,7 +181,7 @@ def cell_size(lvl, m, nF, pos_np=None):
                 m["v_ref_poly"] = float(_np.median(v))
             return v, float(m["v_ref_poly"])
     _, _, _, vf = face_geometry_3d(P.cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
-                                   m["E_face"].cpu(), nF)
+                                   m["E_face"].cpu(), nF, apex=wedge_apex(m, P.cpu()))
     return vf.numpy().astype(_np.float64), float(m.get("v_ref", 1.0))
 
 
@@ -623,7 +623,7 @@ def build_strip_mesh(n, r=1.0, jitter=0.0, seed=0, kind="plane", width=0.5, twis
             np.array(ef, np.int64), nF)
 
 
-def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
+def face_geometry_3d(pos, es, et, ef, nF, eocc=None, apex=None):
     """Per-face 3D area (Newell area-vector magnitude), perimeter, centroid, and the PER-CELL wedge
     volume v_f = (1/3)(cen_f . N_f) -- the volume of the pyramid from the sphere centre to the face.
     The lumen volume is just sum_f v_f, but keeping it per-cell lets each cell carry its own volume
@@ -641,17 +641,40 @@ def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
     perim = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, length)
     cnt = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, w)
     centroid = torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, sw) / cnt.clamp(min=1)[:, None]
-    vf = (1.0 / 3.0) * (centroid * N).sum(dim=-1)                 # per-cell wedge volume (sum = lumen volume)
+    # THE WEDGE'S APEX IS DECLARED, NOT THE WORLD ORIGIN. `apex=None` keeps the origin -- and
+    # every run seeded there bit-identical, since x - 0.0 == x -- while a tissue seeded elsewhere
+    # passes its own centre through `wedge_apex(m, pos)`. About the origin, a cell's wedge grows
+    # with its distance from (0, 0, 0): at a box centre 43 away the far side of a shell carried
+    # ~26% more wedge than the near side, so cell_grow's targets, cell_divide's trigger and the
+    # calibrations' V_eq all depended on where the tissue sat. Measured: a 40-frame run at
+    # [25, 25, 25] diverged from the same run at the origin by 0.42 in vertex position by frame
+    # 10 with no division yet, then divided 310 cells against 319.
+    cen = centroid if apex is None else centroid - apex
+    vf = (1.0 / 3.0) * (cen * N).sum(dim=-1)                      # per-cell wedge volume (sum = lumen volume)
     return area, perim, centroid, vf
 
 
+def wedge_apex(m, like):
+    """The apex `face_geometry_3d` measures its wedges from: the tissue's declared seed centre,
+    carried on the mesh table as `centre` by seed_mesh, as a tensor on `like`'s device and dtype.
+    None -- the world origin, the historical formula -- when the mesh carries no centre."""
+    try:
+        c = m.get("centre") if m is not None else None
+    except Exception:                                    # noqa: BLE001 -- a view without .get
+        c = None
+    if c is None:
+        return None
+    return torch.as_tensor([float(v) for v in c], device=like.device, dtype=like.dtype)
+
+
 def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R, Lam, Gam,
-                       eocc, vocc, K_bend=0.0, twin_face=None, K_lumen=0.0, myo_e=None, Gam_l=0.0):
+                       eocc, vocc, K_bend=0.0, twin_face=None, K_lumen=0.0, myo_e=None, Gam_l=0.0,
+                       apex=None):
     """Explicit-arg vertex-model shape energy on a FIXED-size RESERVOIR (torch.compile-friendly: shapes never
     change, so it compiles once even under division). Dead slots are masked out: `alive` (faces),
     `eocc` (half-edges), `vocc` (vertices, for the radial term). R0 is a tensor (changes each frame);
     the K_* / Lam / Gam coefficients are compile-time constants."""
-    area, perim, centroid, vf = face_geometry_3d(pos, es, et, ef, nF, eocc)
+    area, perim, centroid, vf = face_geometry_3d(pos, es, et, ef, nF, eocc, apex=apex)
     E = (K_A * (area - A0) ** 2 + K_P * (perim - P0) ** 2 + 0.5 * Gam * perim ** 2) * alive
     line = (pos[et] - pos[es]).norm(dim=-1) * eocc          # line tension over live half-edges only
     # PER-JUNCTION MYOSIN, when a junction operator has supplied it. `Lam` alone is one number for the
@@ -701,7 +724,7 @@ def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_
     return E
 
 
-def _relax_subset(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, mech, move_mask, iters):
+def _relax_subset(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, mech, move_mask, iters, apex=None):
     """Bounded-Euler shape-energy descent that moves ONLY the vertices in `move_mask` (the fresh
     daughters + their one-ring after a division). Heals the just-cut caps in place so a division never
     leaves an inverted cap for the global relaxation to (fail to) fix. Reuses `_shape_energy_core`."""
@@ -716,7 +739,7 @@ def _relax_subset(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, mech, move_mask, 
         with torch.enable_grad():
             xg = x.detach().requires_grad_(True)
             E = _shape_energy_core(xg, es, et, ef, nF, A0, P0, V0f, alive, R0t, mech["K_A"], mech["K_P"],
-                                   mech["K_V"], mech["K_R"], mech["Lambda"], mech["Gamma"], eocc, vocc)
+                                   mech["K_V"], mech["K_R"], mech["Lambda"], mech["Gamma"], eocc, vocc, apex=apex)
             g = torch.nan_to_num(torch.autograd.grad(E, xg)[0])
         step = -mech["eta"] * g
         step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
@@ -921,7 +944,8 @@ class SeedMesh3D(Structural):
             occ = torch.zeros(Nbuf, device=dev); occ[:Nv] = 1.0; lvl.occ = occ
         est = torch.as_tensor(es, device=dev); ett = torch.as_tensor(et, device=dev)
         eft = torch.as_tensor(ef, device=dev)
-        area, perim, centroid, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
+        area, perim, centroid, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF,
+                                                     apex=torch.as_tensor(self.centre, device=dev, dtype=pos.dtype))
         A_seed = float(area.mean())
         A0 = A_seed * self.a0_scale; P0 = self.p0 * (A0 ** 0.5)
         if self.a0_scale != 1.0:
@@ -976,6 +1000,7 @@ class SeedMesh3D(Structural):
                 print(f"[mesh_seed] type_layout={self.type_layout}: {nF} cells cut at the "
                       f"{'xyz'[_ax]} equator -> {_tally}", flush=True)
         seeded = dict(E_srce=est, E_trgt=ett, E_face=eft, nF=nF, Nv=Nv,
+                         centre=tuple(float(v) for v in self.centre),   # the wedge apex, see face_geometry_3d
                          A0=torch.full((nF,), A0, dtype=dt, device=dev),
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
@@ -1303,7 +1328,7 @@ class ShapeEnergy3D(Lateral):
         i.e. block moves that push a face toward inversion, allow recovering moves. A few backtracks."""
         scale = torch.ones(x.shape[0], 1, device=x.device, dtype=x.dtype)
         for _ in range(5):
-            _, _, _, vf = face_geometry_3d(x + step * scale, es, et, ef, nF, eocc)
+            _, _, _, vf = face_geometry_3d(x + step * scale, es, et, ef, nF, eocc, apex=getattr(self, "_apex", None))
             bad = (vf < floor) & (vf < vf_ref)                   # per-face: inverting and getting worse
             if not bool(bad.any()):
                 break
@@ -1359,7 +1384,8 @@ class ShapeEnergy3D(Lateral):
                 p_e = p
             E = _shape_energy_core(p_e, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
                                    self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc,
-                                   self.K_bend, twin_face, self.K_lumen, myo_e, self.Gam_l)
+                                   self.K_bend, twin_face, self.K_lumen, myo_e, self.Gam_l,
+                                   apex=getattr(self, "_apex", None))
             g = torch.autograd.grad(E, p)[0]
         return torch.nan_to_num(g)
 
@@ -1423,16 +1449,17 @@ class ShapeEnergy3D(Lateral):
         eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
         twin = self._twin_faces(es, et, ef, Nv) if self.K_bend > 0 else None   # dihedral neighbour faces
         x = x0.clone()
+        self._apex = wedge_apex(m, x)                        # the wedge apex for this solve, see face_geometry_3d
         floor = None
         if self.antiinv > 0:                                 # anti-inversion floor = frac of median live wedge vol
-            _, _, _, vf0 = face_geometry_3d(x, es, et, ef, nF, eocc)
+            _, _, _, vf0 = face_geometry_3d(x, es, et, ef, nF, eocc, apex=self._apex)
             floor = self.antiinv * (vf0[vf0 > 0].median() if (vf0 > 0).any() else vf0.new_tensor(1e-9)).clamp(min=1e-9)
         for _ in range(max(1, self.relax_iters)):
             step = -(self.eta * self.mu) * self._grad_myo(m, x, es, et, ef, nF, m["A0"], m["P0"],
                                                       m["V0f"], m["alive"], R0t, eocc, vocc, twin)
             step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
             if floor is not None:                            # block any substep that drives a face toward inversion
-                _, _, _, vf_cur = face_geometry_3d(x, es, et, ef, nF, eocc)
+                _, _, _, vf_cur = face_geometry_3d(x, es, et, ef, nF, eocc, apex=self._apex)
                 step = step * self._antiinv_scale(x, step, es, et, ef, nF, eocc, vf_cur, floor)
             if self.plane_axis is not None:                   # 2D vertex model: no motion off the sheet
                 step[:, self.plane_axis] = 0.0
@@ -1658,7 +1685,8 @@ class Divide3D(Structural):
         es = m["E_srce"].detach().cpu().numpy(); et = m["E_trgt"].detach().cpu().numpy()
         ef = m["E_face"].detach().cpu().numpy(); nF = int(m["nF"])
         _, _, _, vf = face_geometry_3d(torch.as_tensor(pos_np), torch.as_tensor(es),
-                                       torch.as_tensor(et), torch.as_tensor(ef), nF)
+                                       torch.as_tensor(et), torch.as_tensor(ef), nF,
+                                       apex=wedge_apex(m, torch.as_tensor(pos_np)))
         vf = vf.numpy()                                          # per-cell CURRENT wedge volume
         # THE TRIGGER HAS TO READ THE VOLUME THE MODEL DEFENDS. `vf` above is the origin-referenced
         # WEDGE volume -- the cone from the world origin out to the cell's mid-surface ring -- and
@@ -1959,7 +1987,7 @@ class Divide3D(Structural):
             ring = newv.clone(); ring[etT[touch]] = True; ring[esT[touch]] = True         # + their one-ring
             posf = lvl.state[:Nv2, px0:px1].detach().clone()
             xr = _relax_subset(posf, esT, etT, efT, nF2, m["A0"], m["P0"], m["V0f"], m["alive"],
-                               float(m["R0"]), m["mech"], ring, self.local_relax)
+                               float(m["R0"]), m["mech"], ring, self.local_relax, apex=wedge_apex(m, posf))
             st2 = lvl.state.clone(); st2[:Nv2, px0:px1] = xr; lvl.state = st2
         # propagate the cell morphogen to daughters: each appended cell (new index nF+i) inherits its
         # mother's cell state so the RD pattern rides along through division (seg_A keeps the mother's).
@@ -4644,7 +4672,7 @@ class MonolayerShapeEnergy3D(Lateral):
             if self.mono_k is not None:
                 m["mono_k"] = self.mono_k                     # declared: see __init__
             else:
-                wedge = face_geometry_3d(x0, es, et, ef, nF, eocc)[3]
+                wedge = face_geometry_3d(x0, es, et, ef, nF, eocc, apex=wedge_apex(m, x0))[3]
                 m["mono_k"] = float((v_rest.median() / wedge.median().clamp(min=1e-9)).item())
         V_eq = (m["mono_k"] * m["V0f"]).clamp(min=1e-9)
         if self.rest_calibration == "force_balance":
@@ -4881,7 +4909,7 @@ class ApicoBasalShapeEnergy3D(Lateral):
             if self.mono_k is not None:
                 m["mono_k"] = self.mono_k                     # declared: see the monolayer's __init__
             else:
-                wedge = face_geometry_3d(x0, es, et, ef, nF, eocc)[3]
+                wedge = face_geometry_3d(x0, es, et, ef, nF, eocc, apex=wedge_apex(m, x0))[3]
                 m["mono_k"] = float((v_rest.median() / wedge.median().clamp(min=1e-9)).item())
         V_eq = (m["mono_k"] * m["V0f"]).clamp(min=1e-9)
         if self.rest_calibration == "force_balance":

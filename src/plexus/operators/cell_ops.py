@@ -2319,13 +2319,14 @@ class MeshFromRun(Seed):
         if nv < int(v.n):                      # the reservoir tail, parked where it is harmless
             v.state[nv:, p0:p1] = cT
         if self.retarget:
-            from plexus.operators.vertex_ops import face_geometry_3d
+            from plexus.operators.vertex_ops import face_geometry_3d, wedge_apex
             m = getattr(v, "_mesh", None)
             if m is None:
                 raise ValueError(f"mesh_from_run: `retarget: {self.retarget}` but {self.at!r} "
                                  f"carries no half-edge mesh to measure.")
             es, et, ef, nF = m["E_srce"], m["E_trgt"], m["E_face"], int(m["nF"])
-            area, perim, _cen, vf = face_geometry_3d(v.state[:, p0:p1], es, et, ef, nF)
+            area, perim, _cen, vf = face_geometry_3d(v.state[:, p0:p1], es, et, ef, nF,
+                                                    apex=wedge_apex(m, v.state))
             fl = H.level(self.retarget)
             for blk, val in (("A0", area), ("P0", self.p0 * area.clamp_min(1e-20).sqrt()),
                              ("V0f", vf.abs())):
