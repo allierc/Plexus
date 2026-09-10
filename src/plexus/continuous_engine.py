@@ -103,6 +103,15 @@ class MPMEmit(Operator):
         # same reason the studio's knobs rescale geometry. [lo0, lo1, hi0, hi1] over the two axes
         # that are not the inlet normal, default the middle third.
         self.patch = [float(x) for x in (params.get("patch") or [0.33, 0.33, 0.67, 0.67])]
+        # `aperture: disc` -- A ROUND INLET INSCRIBED IN THE PATCH, instead of the patch itself. A
+        # square nozzle is not what any tap, syringe or bottle has, and the honey-coiling instability
+        # this operator exists to feed starts from the jet's cross-section: a square jet buckles
+        # with a fourfold bias the real one does not have. The disc is centred on the patch and its
+        # radius is half the patch's SHORTER side, so the emitted flux scales by pi/4 and the count
+        # below is scaled with it. Default `square` is the inlet as it always was, byte-identical.
+        self.aperture = str(params.get("aperture", "square")).lower()
+        if self.aperture not in ("square", "disc", "circle"):
+            raise ValueError(f"mpm_emit: aperture must be square|disc, got {self.aperture!r}")
         self.ppc = float(params.get("ppc", 8.0))
         self.type_name = params.get("type")
         self._cursor = 0
@@ -146,6 +155,9 @@ class MPMEmit(Operator):
         for i, k in enumerate(lat):
             A *= float(box[k]) * max(self.patch[i + len(lat)] - self.patch[i], 1e-9)
         depth = self.speed * dt                               # the slab that enters this frame
+        _disc = self.aperture in ("disc", "circle") and len(lat) == 2
+        if _disc:
+            A *= math.pi / 4.0                                # the inscribed disc's share of the patch
         k_frame = int(round(self.ppc * A * depth / dx ** D))
         if k_frame < 1:
             return {}
@@ -174,9 +186,18 @@ class MPMEmit(Operator):
         # ---- place them in a SLAB, not on a plane ----
         u = torch.rand(k_frame, D, device=dev, generator=getattr(H, "rng", None))
         pos = torch.empty(k_frame, D, device=dev, dtype=p.state.dtype)
-        for i, k in enumerate(lat):
-            lo, hi = self.patch[i], self.patch[i + len(lat)]
-            pos[:, k] = (lo + (hi - lo) * u[:, k]) * box[k]
+        if _disc:
+            # UNIFORM IN THE DISC, not in its radius: r = R sqrt(u) and a uniform angle, or the
+            # jet would be densest on its axis before it had moved.
+            c0 = [0.5 * (self.patch[i] + self.patch[i + 2]) * float(box[k]) for i, k in enumerate(lat)]
+            R = 0.5 * min((self.patch[i + 2] - self.patch[i]) * float(box[k]) for i, k in enumerate(lat))
+            r = R * torch.sqrt(u[:, lat[0]]); th = 2.0 * math.pi * u[:, lat[1]]
+            pos[:, lat[0]] = c0[0] + r * torch.cos(th)
+            pos[:, lat[1]] = c0[1] + r * torch.sin(th)
+        else:
+            for i, k in enumerate(lat):
+                lo, hi = self.patch[i], self.patch[i + len(lat)]
+                pos[:, k] = (lo + (hi - lo) * u[:, k]) * box[k]
         # the inlet plane sits 2 cells inside the wall -- the gather clamps positions to
         # [2*dx, box - 2*dx], so anything emitted outside that is snapped and piles up on the face.
         edge = (float(box[self.axis]) - 2.5 * dx) if self.sign < 0 else 2.5 * dx
