@@ -108,7 +108,7 @@ _gate:
         the new geometry is wrong before any curvature is involved.
 
         THE ROW IS GRADED OVER THE FIRST FRAME ONLY (`until: 1`), AND THAT IS A CORRECTION TO WHAT
-        APICOBASAL_PROMOTION.md DECLARED, MADE FOR A REASON THAT IS ITSELF A MEASUREMENT. The
+        notes/apicobasal/APICOBASAL_PROMOTION.md DECLARED, MADE FOR A REASON THAT IS ITSELF A MEASUREMENT. The
         identity is a statement about the FORCE: one energy, one gradient, one step. It is NOT a
         statement that the two trajectories stay together over twenty frames, because that is a
         property of the DYNAMICS -- of this patch under this relaxation -- and not of the two models.
@@ -140,7 +140,7 @@ _gate:
         across arms, so what remains is the difference between two energies.
 
         THE BOUND IS A FRACTION OF AN EDGE AND NOT 1e-9 OF A SIM LENGTH, and that is a correction to
-        what APICOBASAL_PROMOTION.md declared. Plexus state is float32: on a patch with coordinates
+        what notes/apicobasal/APICOBASAL_PROMOTION.md declared. Plexus state is float32: on a patch with coordinates
         of O(5) the smallest representable difference is already ~5e-7, so a raw 1e-9 could only be
         met by two arms that were BIT-identical, which two different expressions for the same volume
         will never be. The bound comes from the arithmetic on both sides of it. Measured before this

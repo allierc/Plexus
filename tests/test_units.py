@@ -2,7 +2,7 @@
 
 WHY THESE TESTS AND NOT OTHERS. `plexus.units` describes quantities and never touches a tensor, so
 there is nothing here about the engine. What has to hold is the four things the campaign was written
-for -- see `UNITS_REFACTOR.md`:
+for -- see `notes/campaigns/UNITS_REFACTOR.md`:
 
   1. a dimension catches `rate` meaning per-frame where per-unit-time was meant;
   2. a CONVENTION catches wedge-versus-polyhedron, which is dimensionally perfect and was the defect

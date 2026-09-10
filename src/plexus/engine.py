@@ -28,7 +28,7 @@ LEGACY COMPATIBILITY. A `kind="seed"` operator declared the pre-`seed:` way
 (under `operators:`, referenced in `schedule:`) is still accepted: `run`'s
 `_seed_window`/`_gate` mechanism, unchanged, still confines it to the opening
 frames. `schema.py` warns this spelling is deprecated; it is not yet rejected,
-per the migration order in SEED_MIGRATION.md. New specs should use `seed:`.
+per the migration order in notes/campaigns/SEED_MIGRATION.md. New specs should use `seed:`.
 """
 from __future__ import annotations
 

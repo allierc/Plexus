@@ -117,7 +117,7 @@ _gate:
         nothing downstream of it means anything.
 
         THE BOUND IS 1e-5 AND NOT `eq: 0.0`, and that is a correction to what
-        APICOBASAL_PROMOTION.md declared. Plexus state is float32 -- the buffers are
+        notes/apicobasal/APICOBASAL_PROMOTION.md declared. Plexus state is float32 -- the buffers are
         `torch.zeros(...)` and there is no dtype knob -- so two different expressions for the same
         volume (a divergence-theorem sum over ten triangles, against a Newell area times a
         thickness) can agree to about 1e-7 relative and never to zero. `eq: 0.0` was a threshold in

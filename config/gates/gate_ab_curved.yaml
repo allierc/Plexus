@@ -114,7 +114,7 @@ _gate:
         radius it was seeded at, not the radius it has.
 
         THE ROW IS GRADED ON THE FIRST RECORDED ROW (`reduce: first`), AND THAT IS A CORRECTION TO
-        WHAT APICOBASAL_PROMOTION.md DECLARED -- the same correction, for the same reason, as AB-C3's
+        WHAT notes/apicobasal/APICOBASAL_PROMOTION.md DECLARED -- the same correction, for the same reason, as AB-C3's
         reducer moving from `mean` to `first` at R2. A convergence claim is a statement about the
         DISCRETISATION of one surface, so it is a comparison at all only while the two arms are two
         meshes OF THE SAME SPHERE. Note that the first row is NOT the seed: `engine.py` records row 0

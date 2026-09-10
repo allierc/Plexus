@@ -126,7 +126,7 @@ schedule: [cell_geometry, cell_grow, cell_mechanics, edge_flip, cell_divide, top
 #  claim: the representation is sound, not that it is right about a tissue. The
 #  measurement tier arrives at R5, when `sep` stops being a declared constant.
 #
-#  EVERY THRESHOLD HERE WAS WRITTEN IN APICOBASAL_PROMOTION.md BEFORE ANY OF THESE ROWS
+#  EVERY THRESHOLD HERE WAS WRITTEN IN notes/apicobasal/APICOBASAL_PROMOTION.md BEFORE ANY OF THESE ROWS
 #  WAS RUN, and `tools/run_gates.py --freeze-reference` now actually enforces that: since
 #  R1(d) the runner re-hashes this block and refuses to grade if it has moved.
 # =====================================================================================

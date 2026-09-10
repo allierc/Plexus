@@ -50,7 +50,7 @@ loader warns rather than fails.
 WHAT WAS ADDED LATER, AND WHY THE SENTENCE ABOVE NEEDED ONE WORD OF QUALIFICATION. The arithmetic is
 still unchecked. What is checked is the BOUNDARY: what a spec hands an operator, and what the plot
 reports back out. Neither is arithmetic, both are one comparison at load, and both had failed in
-production by the time this was written -- see `UNITS_REFACTOR.md`. `Dim` and `Quantity` below are
+production by the time this was written -- see `notes/campaigns/UNITS_REFACTOR.md`. `Dim` and `Quantity` below are
 that vocabulary. They describe quantities and never touch a tensor, so nothing is wrapped and the
 zero-copy path into warp is untouched.
 """

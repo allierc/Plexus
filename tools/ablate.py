@@ -220,7 +220,7 @@ def main():
         else:
             print("\n  every rung agrees -- the divergence is not in the operator set. "
                   "Check the comparison itself (crop, frame set, an unfinished side) before "
-                  "the model; see PROMOTION_PROCESS.md.")
+                  "the model; see notes/campaigns/PROMOTION_PROCESS.md.")
         return 0
 
     if a.dry:

@@ -59,7 +59,7 @@ class Block:
     # WHAT THIS BLOCK'S NUMBERS ARE -- a `plexus.units` quantity string such as `"volume"`,
     # `"1/T"` or `"volume[polyhedron]"`. `None` means UNDECLARED, which is silent: it is the
     # absence of a claim, not a claim of dimensionlessness, and every block in every spec written
-    # before this key existed is in that state. See `plexus/units.py` and `UNITS_REFACTOR.md`.
+    # before this key existed is in that state. See `plexus/units.py` and `notes/campaigns/UNITS_REFACTOR.md`.
     unit: Optional[str] = None
 
     def __post_init__(self):
