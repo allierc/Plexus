@@ -1,0 +1,224 @@
+general:
+  name: sheet_morphogen_die
+  seed: 0
+  n_frames: 400
+  dt: 1.0
+  record_cap: 402
+  boundary: free
+  dim: 3
+  world:
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 4000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 2000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+      chem:
+        width: 2
+        integration: first_order
+  half_edge:
+    n: 16000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  shape: disc
+  n_cells: 400
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+- op: seed_cell_chem
+  at: cell
+  seed: 0
+  seed_frac: 0.03
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_neighbours
+  at: cell
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.3
+- op: cell_chem_react
+  at: cell
+  model: gray_scott
+  F: 0.046
+  kk: 0.062
+  rate: 1.0
+- op: cell_grow
+  at: vertex
+  rate: 0.002
+  a_sw: 0.35
+  hill: 4.0
+  rho: 0.0
+  vth_frac: 2.5
+  conserve_amount: false
+- op: cell_die
+  at: vertex
+  p0: 3.5
+  model: chem_low
+  shrink_rate: 0.05
+  critical_frac: 0.15
+  a_sw: 0.15
+  after_frame: 150
+  max_mark_frac: 0.6
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_neighbours
+- cell_chem_diffuse
+- cell_chem_react
+- cell_grow
+- cell_die
+- cell_mechanics
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_mesh
+  background: black
+  mesh_mark_division: true
+  mesh_apop_color: '#e8c33a'
+  camera:
+    elev: 90.0
+    azim: 0.0
+descriptions:
+  movie:
+    description: The simulation shows a hexagonal mesh of cells where red regions
+      expand and merge over time. Initially, small clusters of red cells appear sporadically
+      across the white mesh. As the frames progress, these clusters grow in size and
+      intensity, eventually forming three large, distinct lobes. By the final frames,
+      the red regions have stabilized into a large, multi-lobed structure occupying
+      a significant portion of the sheet.
+    objects: The primary objects are 374 hexagonal cells arranged in a large, roughly
+      circular sheet. The cells are colored in a gradient ranging from white to deep
+      red, representing different concentration levels. The red regions start as small,
+      isolated clusters and evolve into large, interconnected lobes. The overall mesh
+      maintains a consistent topology while the internal color distribution shifts
+      dynamically.
+  movie_kburns:
+    description: The simulation shows a cellular sheet where red and white regions
+      are dynamically shifting and merging. Over time, the red areas expand and contract,
+      creating a pulsating effect across the mesh. The boundaries between the red
+      and white cells fluctuate as the underlying morphogen field evolves. By the
+      final frame, the distribution of colors has shifted significantly, showing a
+      continuous reorganization of the tissue pattern.
+    objects: The scene consists of a 2D mesh of hexagonal cells representing a biological
+      tissue sheet. The cells are colored in varying shades of red and white, indicating
+      different morphogen concentrations. The cells are arranged in a dense, interconnected
+      honeycomb topology that maintains a cohesive structure. The overall sheet is
+      roughly elliptical in shape, with individual cells being small and uniform in
+      size.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation begins with a flat sheet of hexagonal cells where small clusters of red
+      cells start to appear and expand. As time progresses, these red clusters grow larger and begin to
+      exert mechanical force on the surrounding white cells. The sheet undergoes significant buckling
+      and folding as the red regions expand, creating three-dimensional protrusions. By the final frames,
+      the sheet has collapsed into a complex, crumpled structure with deep folds and high curvature.
+    objects: The primary objects are 374 hexagonal cells arranged in a continuous, interconnected mesh.
+      The cells are colored in a gradient from white to various shades of red, representing different
+      biological or physical states. The red cells form distinct, expanding clusters that drive the deformation
+      of the overall sheet. The mesh transitions from a flat, two-dimensional geometry into a highly distorted,
+      three-dimensional crumpled shape.
+  movie_kburns:
+    description: A cluster of red polygonal cells undergoes significant morphological changes and structural
+      reorganization over time. The cells initially form a relatively flat, compact sheet before beginning
+      to buckle and fold into complex three-dimensional shapes. As the simulation progresses, the internal
+      stresses cause the sheet to warp, creating deep ridges and protruding peaks. By the final frames,
+      the structure has transformed into a highly convoluted, crumpled geometry with significant vertical
+      displacement.
+    objects: The scene contains a collection of interconnected polygonal cells forming a continuous, sheet-like
+      mesh. These cells are colored in varying shades of red and pink, with some faces appearing lighter
+      due to the simulated lighting. The individual cells are small and vary in size, creating a heterogeneous
+      texture across the surface. The overall structure is a single, unified object that maintains its
+      topological connectivity while changing its spatial configuration.
