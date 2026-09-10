@@ -126,13 +126,47 @@ sets:
     state:
       area:
         width: 1
-      cen:
+      centroid:
         width: 3
       chem:
-        integration: first_order
         width: 2
+        integration: first_order
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      inhib_frac:
+        width: 1
   vertex:
     n: 41616
+    mesh: half_edge
   mpm_particle:
     n: 200000
     types:
@@ -224,6 +258,12 @@ sets:
         - 117.232297261556
         - 117.232297261556
         - 117.232297261556
+  half_edge:
+    n: 166400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
 seed:
 - at: vertex
   cell_set: cell
