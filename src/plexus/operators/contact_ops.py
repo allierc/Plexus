@@ -348,7 +348,28 @@ class MeshContact(Lateral):
 
     # ---- the contact ----------------------------------------------------------------------
     def _query(self, M, x, u, r):
-        """For each candidate particle, the outermost triangle its own direction hits.
+        """For each candidate particle, the outermost triangle its own direction hits -- in slices
+        of candidates sized to a fixed scratch budget.
+
+        THE ALLOCATION IS [n, 9K] PER CANDIDATE, six such tensors of 3 floats, and n grows with the
+        matrix around the surface while K grows with the surface's faces: spheroid_ecm_04 at
+        frame 50 (9,588 sub-triangles, 78 per bucket, 74,035 candidates) asked for 5.2e7 entries,
+        3.7 GB, and the guard that used to stand here refused the frame on an 80 GB card. Nothing
+        in the query couples two candidates -- each row takes its own argmax -- so it runs in
+        slices whose n*9K stays under `PLEXUS_CONTACT_MAX_ENTRIES` (default 2e7 entries, ~1.4 GB
+        of scratch) and the slices are concatenated. Bit-identical to the one-shot answer.
+        """
+        n = x.shape[0]
+        budget = float(os.environ.get("PLEXUS_CONTACT_MAX_ENTRIES", "2.0e7"))
+        step = max(1, int(budget // max(9.0 * float(M["K"]), 1.0)))
+        if n <= step:
+            return self._query_chunk(M, x, u, r)
+        outs = [self._query_chunk(M, x[i:i + step], u[i:i + step], r[i:i + step])
+                for i in range(0, n, step)]
+        return tuple(torch.cat([o[j] for o in outs], dim=0) for j in range(4))
+
+    def _query_chunk(self, M, x, u, r):
+        """One slice of `_query`: the outermost triangle each candidate's direction hits.
 
         Returns (hit, tri, t, w) -- whether a face was found, which one, the radius of the surface
         along the particle's ray, and the three barycentric weights.
@@ -367,17 +388,6 @@ class MeshContact(Lateral):
         # peak is a handful of those plus the intermediates. A single [n, 9K, 3] of 2.75e8 entries
         # is 3.3 GB, which is what the run actually asked for and the guard waved through. At 5e7
         # the largest single allocation is ~600 MB and the peak a few GB.
-        _cap = float(os.environ.get("PLEXUS_CONTACT_MAX_ENTRIES", "5.0e7"))
-        _need = float(x.shape[0]) * 9.0 * float(M["K"])
-        if _need > _cap:
-            raise ValueError(
-                f"mesh_contact: this frame's lookup would allocate [{x.shape[0]:,}, "
-                f"9x{M['K']}] = {_need:.3g} entries, about {_need * 72 / 1e9:.1f} GB. The surface "
-                f"is too COARSE for the number of particles near it: {M['G']['nrow']} bin rows "
-                f"(floor 4) over {M['n_tri']:,} sub-triangles, up to {M['K']} per bucket, so the "
-                f"premise that a triangle spans at most one bin does not hold. Give the surface "
-                f"more faces, or move `centre` further from it. "
-                f"(PLEXUS_CONTACT_MAX_ENTRIES overrides; expect the memory.)")
         cand = M["table"][bn].reshape(x.shape[0], -1)                          # [n, 9K]
         ok = cand >= 0
         ci = cand.clamp_min(0)
