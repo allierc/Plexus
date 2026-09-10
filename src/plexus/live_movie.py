@@ -3711,33 +3711,40 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
     if ws is None or len(ws) != D:
         w = float(z["world"]) if "world" in z.files else float(getattr(sim, "world", 1.0))
         ws = np.full(D, w, np.float64)
-    flat = P.reshape(-1, D).numpy()
+    # THE BOX IS MEASURED OVER LIVE ROWS ONLY. A set with a dormant reserve parks its unused slots
+    # far off-domain (integrins at -1e6), and a box that read them framed a 50-unit tissue in a
+    # 10-metre cube. `occ` is what says which rows are content.
+    _occ = getattr(lvl, "_occ", None)
+    if _occ is not None and tuple(_occ.shape[:2]) == tuple(P.shape[:2]) and bool(_occ.any()):
+        flat = P[_occ.bool()].reshape(-1, D).numpy()
+    else:
+        flat = P.reshape(-1, D).numpy()
     fp = style.get("frame_percentile")
+    shift = None                                            # added to EVERY level's positions
     if fp is not None:
         q = 0.5 * (100.0 - float(fp))
         lo = np.percentile(flat, q, axis=0)
         hi = np.percentile(flat, 100.0 - q, axis=0)
         box = (hi - lo) * 1.06
-        lvl._pos = P - torch.as_tensor((0.5 * (lo + hi) - 0.5 * box), dtype=P.dtype)
+        shift = -(0.5 * (lo + hi) - 0.5 * box)
     else:
         lo, hi = flat.min(0), flat.max(0)
-        # A CENTRED RUN STILL HAS A DECLARED BOX, and falling back to the data bounds threw it away.
-        # The test was "does the content sit in [0, world]" -- true for a walled run and false for
-        # every `boundary: free` one, whose content is about the ORIGIN -- so a free run was always
-        # framed on its own extent. Two runs of one model at different sizes then filled the frame
-        # identically and the size difference, which is the entire experiment, was invisible. If the
-        # content fits in [-world/2, +world/2] the declared box is used and the cloud is shifted into
-        # it; only content that fits NEITHER convention falls back to its own bounds.
         if not bool(((hi - lo) > ws * 1.02).any()) and not bool((lo < -1e-6 * ws.max()).any()):
             box = ws                                            # already in [0, world]
         elif not bool(((hi - lo) > ws * 1.02).any()):
             box = ws                                            # fits [-world/2, world/2]
-            lvl._pos = P + torch.as_tensor(0.5 * box, dtype=P.dtype)
+            shift = 0.5 * box
         else:
             box = (hi - lo) * 1.06
-            lvl._pos = P - torch.as_tensor((0.5 * (lo + hi) - 0.5 * box), dtype=P.dtype)
-    # `movie.mp4`, NOT `movie_<set>.mp4`. Every other path in this codebase writes `movie.mp4`, so a
-    # re-render under `-o plot` left the folder holding both and neither obviously the current one.
+            shift = -(0.5 * (lo + hi) - 0.5 * box)
+    # THE SHIFT MOVES EVERY SET, NOT ONLY THE ONE THE BOX WAS MEASURED ON. Shifting the subject
+    # alone drew a tissue's mesh 25 units from the particles riding on it (integrins on a
+    # free-boundary spheroid: the dots framed, the surface out of the frustum).
+    if shift is not None:
+        for _lv in H.levels.values():
+            _p = getattr(_lv, "_pos", None)
+            if _p is not None:
+                _lv._pos = _p + torch.as_tensor(np.asarray(shift, np.float64), dtype=_p.dtype, device=_p.device)
     out = out or os.path.join(data_dir, "movie.mp4")
     # UNITS ONLY WHEN THEY WERE DECLARED. `Units` defaults to length_um 1.0 / time_s 1.0 with
     # `declared: False`, and handing those to the renderer would put a scale bar and a wall clock on
