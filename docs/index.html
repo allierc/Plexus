@@ -6793,7 +6793,7 @@ run:
 <p class="opk">Four more families, decomposed the same way and shown in full on the <a href="other.html">other models</a> page: stigmergy as five operators over a set and a field, a chaotic flow as one operator on a cloud, agent sorting as a rewire and a lateral along it, and gravity as one lateral over every pair. The same eight kinds, over sets that are not tissue.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card figure">
-    <video src="gallery/slime.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/slime_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">a set and a field<span class="sim-spec"><pre># slime_default -- one species, the canonical Physarum transport network.
 # The monolithic `slime` operator decomposed into 5 primitives over 1 set + 1 scalar
@@ -6804,47 +6804,20 @@ general: {name: slime_default, seed: 0, n_frames: 400, dt: 1.0, boundary: wall}
 sets:
   cell:
     n: 12000
-    spawn: disc
-    spawn_radius: 0.3
     types:
       a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
 fields:
   chemical: {frame: grid, res: 220, couples_to: cell}
+seed:
+- {op: seed_positions, at: cell, mode: disc, radius: 0.3, seed: 0}
 operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.045}
-- {op: diffuse, at: chemical,            rate: 0.0175}
-- {op: decay,   at: chemical,            rate: 0.0006}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
+- {op: diffuse, at: chemical, rate: 0.0175}
+- {op: decay, at: chemical, rate: 0.0006}
+- {op: sense, at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce, at: cell}
 - {op: glide, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  colors: {a: [0.2, 0.95, 0.65]}
-  background: black
-  gamma: 0.7
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_cell:
-    description: A dense cloud of green particles initially forms a roughly spherical shape. Over time,
-      the particles begin to organize into a complex, interconnected network of filaments. These filaments
-      form a web-like structure that maintains a spherical overall boundary. The network becomes increasingly
-      defined as the particles align into distinct paths.
-    objects: The primary objects are small, bright green particles. These particles are arranged in a
-      spherical cluster that occupies the center of the frame. They transition from a random distribution
-      into a connected topology of curved lines and loops. The overall size of the cluster remains constant
-      while the internal structure evolves from a cloud to a web.
-  movie_chemical:
-    description: The simulation begins with a dense, uniform cloud of green particles forming a circular
-      shape. Over time, these particles begin to organize into a complex, interconnected network of filaments.
-      The network structure becomes increasingly defined, forming a dense web of loops and strands within
-      the central sphere. Finally, long, thin filaments extend outward from the central mass into the
-      surrounding black space.
-    objects: The primary object is a large, circular cluster of green filaments located in the center
-      of the frame. These filaments are interconnected in a complex, web-like topology, creating a porous
-      internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
-      outward in all directions. All objects are a consistent teal-green color and are set against a solid
-      black background.</pre></span></span>
+schedule: [deposit, diffuse, decay, sense, bounce, glide]</pre></span></span>
       <span class="sim-cap">12,000 agents, one scalar field. Deposit and sense (exchange), diffuse and decay (field), glide. A transport network.</span>
     </figcaption>
   </figure>
@@ -6940,15 +6913,15 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/galaxy_collision_3d.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/galaxy_collision_3d_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">two discs, one set<span class="sim-spec"><pre># galaxy_collision_3d -- TWO 3D galaxies on a grazing prograde passage. The same `squared_law`
 # (law: gravity, all_pairs) that holds one disc together is what pulls the two discs into each
 # other: the pair is ONE set with two types, not two sets, and that is the point -- an all-pairs
 # law sums over the whole set, so mutual gravity between the galaxies is not a second operator.
 #
-# Initialization stays a SPEC concern (no operator): `spawn: two_disks` places two flat discs
-# `spawn_separation` apart along x, the second tilted `spawn_tilt` radians out of the first's
+# Initialization is the `seed_positions` operator: `mode: two_disks` places two flat discs
+# `separation` apart along x, the second tilted `tilt` radians out of the first's
 # plane; `vel_init: {mode: circular_orbit}` then spins EACH disc about its own centre in its own
 # plane (from that disc's enclosed mass + its `central_mass` core) and adds the encounter velocity
 # as two half-speeds -- `approach` closing along the separation axis, `swirl` tangential to it.
@@ -6967,54 +6940,23 @@ plotting:
 # `type_layout: split_x` types the set by x, and at frame 0 the two discs are disjoint in x (each
 # 2.4 wide, 6.0 apart), so the low-x disc is `red` and the high-x disc is `blue`: the colours ARE
 # the two galaxies, and every later mixing of red into blue is stars changing galaxy.
-general: {name: galaxy_collision_3d, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, dim: 3,
-          world: [12.0, 12.0, 12.0], record_cap: 1000}
+general: {name: galaxy_collision_3d, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, dim: 3, world: [12.0, 12.0, 12.0], record_cap: 1000}
 sets:
   star:
     n: 25000
-    spawn: two_disks                                # two flat discs, one tilted, placed to meet
-    spawn_radius: 1.2                               # disc radius (each galaxy)
-    spawn_thickness: 0.06                           # out-of-plane scatter: a thin disc, not a sheet
-    spawn_separation: 6.0                           # distance between the two disc centres at frame 0
-    spawn_offset: 0.0                               # no lateral offset: `swirl` carries the angular momentum
-    spawn_tilt: 0.6                                 # the blue disc's plane, tilted 0.6 rad about x
     type_layout: split_x                            # low-x disc -&gt; red, high-x disc -&gt; blue
-    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.15,
-               central_mass: 0.75, jitter: 0.06, approach: 0.18, swirl: 0.26}
+    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.15, central_mass: 0.75, jitter: 0.06, approach: 0.18, swirl: 0.26}
     types:                                          # 12500 stars per galaxy: disc mass 0.75 each
-      red:  {fraction: 0.5, mass: 0.00006}
+      red: {fraction: 0.5, mass: 0.00006}
       blue: {fraction: 0.5, mass: 0.00006}
 fields: {}
+seed:
+- {op: seed_positions, at: star, mode: two_disks, radius: 1.2, thickness: 0.06, separation: 6.0, offset: 0.0, tilt: 0.6, seed: 2}
 operators:
   # softening 0.15 = 1/8 of a disc radius: the pericentre is 2.0, so the two cores never come
   # near it, and halving dt to 0.002 reproduces the same trajectory to three digits.
-  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.15, all_pairs: true, compile: true}
-schedule: [squared_law]
-plotting: {background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55, 1.0]},
-           splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
-           # frame to the central 90% of the stars: the ~20% thrown out by the passage reach
-           # several times the size of what is worth watching, and framing on the full extent
-           # would leave the two discs 130 px wide in an 820 px frame.
-           frame_percentile: 90,
-           # camera pitch SWEEP: 0.25 rad -&gt; 1.1 rad (~63 deg), so the encounter starts near
-           # face-on and ends nearly edge-on -- the tails read as 3D structure.
-           camera_azim: 0.7, camera_elev: 0.25, camera_elev_end: 1.1, camera_turns: 0.15,
-           camera_zoom: 0.15, camera_pan: [0.03, 0.02]}
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_star:
-    description: Two distinct clusters of particles, one red and one blue, begin as separate, compact
-      spheres. As time progresses, the clusters begin to rotate and stretch into spiral shapes while moving
-      toward each other. The two spirals eventually collide and intertwine, creating a complex, turbulent
-      mixture of red and blue points. In the final frames, the particles have merged into a single, chaotic
-      cloud where the two colors are heavily overlapped and diffused.
-    objects: The scene contains two primary sets of particles, one colored red and the other colored blue.
-      Initially, the red particles form a large, solid circular mass in the lower-left, while the blue
-      particles form a smaller, slightly elongated oval in the upper-right. As the simulation evolves,
-      both sets transform into elongated, spiral-shaped structures that maintain their respective colors.
-      By the end of the sequence, the particles are distributed in a dense, overlapping cluster where
-      the red and blue points are intermingled.</pre></span></span>
+- {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.15, all_pairs: true}
+schedule: [squared_law]</pre></span></span>
       <span class="sim-cap">25,000 stars under one pairwise lateral. They raise tidal tails in one another.</span>
     </figcaption>
   </figure>
