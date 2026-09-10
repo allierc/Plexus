@@ -720,7 +720,7 @@ plotting:
 </div>
 
 <h3 class="anchored">Epithelial mechanics — a vertex model</h3>
-<p class="opk">A vertex model decomposed into six operators over two sets: seeds for the vertices and for the cells that own them, an aggregate that builds each cell’s area and perimeter from its vertices, a lateral shape energy that returns a force to those vertices, a rewire that flips a junction, and a structural that removes a cell. Because the two sets share a containment map, a junction is state held once, not copied into every cell that touches it. Shown on a flat disc: one cell dying while the sheet closes over it, a morphogen gating growth where it is high, and the sheet growing and dividing, each cell on its own clock.</p>
+<p class="opk">A vertex model decomposed into six operators over two sets: seeds for the vertices and for the cells that own them, an aggregate that builds each cell’s area and perimeter from its vertices, a lateral shape energy that returns a force to those vertices, a rewire that flips a junction, and a structural that removes a cell. Because the two sets share a containment map, a junction is state held once, not copied into every cell that touches it. Shown on a flat disc: one cell dying while the sheet closes over it, a morphogen gating growth where it is high, the sheet growing and dividing, each cell on its own clock — and the same operators seeded as a Möbius band, because the seed’s shape is a value, not a model.</p>
 <p class="opk-ref">Reference — active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
@@ -1194,6 +1194,142 @@ plotting:
     elev: 90.0
     azim: 0.0</pre></span></span>
       <span class="sim-cap"><code>cell_grow</code> ungated and <code>cell_divide</code> (structural) on the same disc, each cell seeded at its own point in the cycle. 440 → 1,250 cells, never more than twenty dividing in a frame; the sheet spreads and stays a sheet.</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/sheet_moebius.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">shape is a value<span class="sim-spec"><pre>general:
+  name: sheet_moebius
+  seed: 0
+  n_frames: 200
+  dt: 1.0
+  record_cap: 202
+  boundary: free
+  dim: 3
+  world:
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 4000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 2000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+      chem:
+        width: 2
+        integration: first_order
+  half_edge:
+    n: 16000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  shape: moebius
+  width: 0.6
+  n_cells: 400
+  radius: 5.0
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_mechanics
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_mesh
+  background: black
+  camera:
+    elev: 28.0
+    azim: 35.0</pre></span></span>
+      <span class="sim-cap"><code>seed_mesh</code> with <code>shape: moebius</code> in place of the disc: 455 cells on a band with one side. The same shape energy and junction flips relax it; nothing else changes.</span>
     </figcaption>
   </figure>
 </div>
