@@ -65,6 +65,61 @@ class Particle:
 _NU = 0.2                          # Poisson ratio (shared; near-incompressible MPM materials)
 
 
+def _obj_points(t, nb, vol, D, H, device, cache):
+    """`nb` points uniform inside the mesh named by `t["obj"]`, scaled to volume `vol`, centred at 0.
+
+    Returns `(points [nb, D] on `device`, longest extent after scaling)`. 3-D only: an OBJ is a
+    surface in space and a 2-D run has nothing for it to enclose.
+
+    THE HOLE IS THE FIRST THING TO DEAL WITH. The Stanford bunny is open at its base (223 open
+    edges) and the Utah teapot at its spout and lid (160); a ray from an interior point escapes
+    through the opening and parity reports "outside" for half the body. `fill_holes` closes them,
+    and `compute_normals(auto_orient_normals=True)` makes inside/outside consistent, which the
+    enclosure test then relies on. The five files in papers/morph_models were checked: bunny
+    and teapot need the fill, cow, spot and armadillo are watertight.
+
+    REJECTION AGAINST THE SURFACE, NOT A VOXELISATION, so the sample is the solid and the density
+    is uniform in it -- MPM resolves a material by how evenly its particles fill the cells, and a
+    voxel grid would put an aliasing pattern into the first frame's stress.
+    """
+    import os
+    import numpy as np
+    import pyvista as pv
+    if D != 3:
+        raise ValueError(f"shape: obj needs a 3-D run, this one is {D}-D")
+    name = str(t.get("obj", "")).strip()
+    if not name:
+        raise ValueError("shape: obj needs `obj: <name or path>` on the same type")
+    path = name if (os.sep in name or name.endswith(".obj")) else \
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+                         os.path.abspath(__file__))))), "papers", "morph_models", f"{name}.obj")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"shape: obj -- {path} does not exist")
+    if path not in cache:
+        m = pv.read(path).clean().triangulate().fill_holes(1e9).clean()
+        m = m.compute_normals(auto_orient_normals=True, consistent_normals=True)
+        if m.volume <= 0:
+            raise ValueError(f"{path}: non-positive volume after hole filling -- surface not closed")
+        cache[path] = m
+    m = cache[path]
+    lo, hi = np.array(m.bounds).reshape(3, 2).T
+    ctr = 0.5 * (lo + hi)
+    sc = (float(vol) / float(m.volume)) ** (1.0 / 3.0)         # so the SCALED mesh has volume `vol`
+    seed = int(torch.randint(0, 2 ** 31 - 1, (1,), generator=H.rng, device=device).item())
+    rng = np.random.default_rng(seed)
+    out, have = [], 0
+    while have < nb:
+        q = rng.random((4 * max(nb, 1), 3)) * (hi - lo) + lo
+        sel = pv.PolyData(q).select_enclosed_points(m, tolerance=0.0, check_surface=False)
+        keep = q[np.asarray(sel["SelectedPoints"]) > 0]
+        if len(keep) == 0:
+            raise ValueError(f"{path}: no interior points found -- is the surface closed?")
+        out.append(keep); have += len(keep)
+    pts = (np.concatenate(out)[:nb] - ctr) * sc
+    return (torch.as_tensor(pts, dtype=torch.float32, device=device),
+            float((hi - lo).max() * sc))
+
+
 def _lame(E, nu: float = _NU):
     """Young's modulus E -> Lame parameters (mu shear, la bulk) at Poisson ratio nu."""
     mu = E / (2 * (1 + nu))
@@ -247,6 +302,7 @@ class MPMParticle:
         # and m_p fixes the volume; declaring N and a block fixes the mass. Both together is one
         # statement too many, which is what `_volume_conflict` below is for.
         _pm = s.get("particle_mass")
+        _mesh_cache: dict = {}                             # `shape: obj`: one load per file per build
         if _pm is not None and float(_pm) <= 0:
             raise ValueError(f"particle_mass must be > 0, got {_pm}")
         if _pm is not None:
@@ -281,8 +337,23 @@ class MPMParticle:
                     _side = _vol ** (1.0 / D)
                     _u = torch.rand(nb, D, generator=H.rng, device=device) - 0.5
                     pos[bm] = cpos[bm] + _u * _side           # a cube of the derived size
+                elif _shape in ("obj", "mesh"):
+                    # `shape: obj` -- THE VOLUME TAKES THE SHAPE OF A MESH FILE. Same contract as
+                    # ball and cube: `V = per_parent * p_vol` is fixed by the mass, and the mesh is
+                    # scaled so that ITS volume equals V, so a bunny and a cow of the same
+                    # `particle_mass` weigh the same and displace the same, whatever their extent.
+                    # Scaling to a longest axis instead -- what `morph.sample_inside` does for the
+                    # morphing script -- would make the density a function of the file's aspect
+                    # ratio, which is not a property of any material.
+                    #
+                    # `obj:` is a bare name under papers/morph_models, or a path. The mesh is loaded
+                    # once per spec however many bodies wear it, and the points are drawn with a
+                    # numpy generator seeded from `H.rng`, so the run stays reproducible under the
+                    # same seed it always had.
+                    _pts, _side = _obj_points(t, nb, _vol, D, H, device, _mesh_cache)
+                    pos[bm] = cpos[bm] + _pts
                 else:
-                    raise ValueError(f"shape must be 'cube' or 'ball', got {_shape!r}")
+                    raise ValueError(f"shape must be 'cube', 'ball' or 'obj', got {_shape!r}")
             if _side is not None:
                 print(f"[build] {lvl.name}: particle_mass {float(_pm):.4g} / density -> p_vol "
                       f"{float(_pm) / float(rho if not torch.is_tensor(rho) else 1.0):.4g}, "
