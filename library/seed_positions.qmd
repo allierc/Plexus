@@ -1,0 +1,171 @@
+---
+title: "seed_positions"
+subtitle: "Write every position of a set, once, at the opening of the trajectory."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Write every position of a set, once, at the opening of the trajectory.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `cell` (the set the operator acts on).
+- **Reads** &mdash; `mode`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+set -> set: writes `pos`, and nothing else.
+
+    x_i = placement(mode, radius, i)          i = 1 .. n, n the set's own size
+
+`mode` is the placement rule and `radius` its one length, in world units, measured from the
+centre of the world box. In 2D: `sunflower` (a Vogel golden-angle spiral -- even coverage of a
+disc, every cell the same distance from its neighbours, which is what a reaction-diffusion
+graph wants), `disc` (uniform random in the disc), `ring_in` / `ring_out` (on the circle,
+headed in or out), `point`, `random` (uniform in the box). In 3D: `ball`, `disk`, `point`,
+`random`. The rules are the engine's own `_spawn` / `_spawn3d`, called here rather than
+copied, so a set placed by this seed and one placed by the legacy `spawn:` key land on the
+same coordinates for the same `seed`.
+
+`seed` is this operator's own generator seed, so the placement does not move when an
+unrelated operator draws from the run's generator first.
+
+Reference: Vogel, H. (1979). A better way to construct the sunflower head. Math. Biosci.
+44:179-189, for the golden-angle spiral; the rest is Plexus (this work).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `mode` | placement_rule | **required** |
+| `radius` | placement_radius | 0.3 |
+| `seed` | rng_seed | 0 |
+| `thickness` | &ndash; | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: seed_positions, at: cell, mode: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`initial_condition`]{.op-badge} [`placement`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/seed_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/seed_ops.py) &mdash; the registered operator.
+
+```python
+# -*- coding: utf-8 -*-
+"""seed_positions -- WHERE THE ENTITIES OF A SET START, as a seed operator.
+
+Placement used to be a property of the set: `sets.cell.spawn: sunflower` and `spawn_radius`,
+read by the engine while it builds the level, before any operator exists. That put the one
+thing a seed is for -- writing x_0 -- outside the operator algebra: a reader of the spec saw a
+disc of cells appear with no operator responsible, and the page's own vocabulary ("seed: the
+initial state, written once and never again") had nothing to point at. This operator is that
+seed. The set declares how many entities it holds; the seed declares where they are.
+
+The set-level `spawn:` keys still work, because hundreds of archived specs carry them; a spec
+that declares both gets the seed, which runs after the build and overwrites.
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import Seed
+from plexus.models.registry import register_operator
+
+
+@register_operator("seed_positions", family="seed", set="cell", kind="seed")
+class SeedPositions(Seed):
+    """Write every position of a set, once, at the opening of the trajectory.
+
+    set -> set: writes `pos`, and nothing else.
+
+        x_i = placement(mode, radius, i)          i = 1 .. n, n the set's own size
+
+    `mode` is the placement rule and `radius` its one length, in world units, measured from the
+    centre of the world box. In 2D: `sunflower` (a Vogel golden-angle spiral -- even coverage of a
+    disc, every cell the same distance from its neighbours, which is what a reaction-diffusion
+    graph wants), `disc` (uniform random in the disc), `ring_in` / `ring_out` (on the circle,
+    headed in or out), `point`, `random` (uniform in the box). In 3D: `ball`, `disk`, `point`,
+    `random`. The rules are the engine's own `_spawn` / `_spawn3d`, called here rather than
+    copied, so a set placed by this seed and one placed by the legacy `spawn:` key land on the
+    same coordinates for the same `seed`.
+
+    `seed` is this operator's own generator seed, so the placement does not move when an
+    unrelated operator draws from the run's generator first.
+
+    Reference: Vogel, H. (1979). A better way to construct the sunflower head. Math. Biosci.
+    44:179-189, for the golden-angle spiral; the rest is Plexus (this work).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["mode"]
+    MECHANISM_TAGS = ["initial_condition", "placement"]
+    PARAM_ROLES = {"mode": "placement_rule", "radius": "placement_radius", "seed": "rng_seed"}
+    PARAM_UNITS = {"radius": "length"}
+    REFERENCE = ("Vogel, H. (1979). A better way to construct the sunflower head. "
+                 "Math. Biosci. 44:179-189; Plexus (this work).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.mode = str(params["mode"]).lower()
+        self.radius = float(params.get("radius", 0.3))
+        self.thickness = float(params.get("thickness", 0.0))      # (3D `disk`) out-of-plane scatter
+        self.seed = int(params.get("seed", 0))
+
+    def forward(self, H, mask=None):
+        from plexus.engine import _spawn, _spawn3d                 # the engine's own placement rules
+        lvl = H.level(self.at)
+        if "pos" not in lvl.state_schema:
+            raise ValueError(f"seed_positions: set {self.at!r} has no `pos` block to place")
+        p0, p1 = lvl.state_schema["pos"]
+        n, D = int(lvl.occ.sum().item()), p1 - p0
+        dev = lvl.state.device
+        rng = torch.Generator(device=dev).manual_seed(self.seed)
+        if D == 3:
+            pos, _ = _spawn3d(self.mode, n, H.world_size, self.radius, rng, dev, thickness=self.thickness)
+        else:
+            pos, _ = _spawn(self.mode, n, H.world_size, self.radius, rng, dev)
+        st = lvl.state.clone()
+        st[:n, p0:p1] = pos.to(st.dtype)
+        lvl.state = st
+        return {}
+```

@@ -432,11 +432,11 @@ window.Quarto = {
 </style>
 
 <h3 class="anchored">Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">Reaction–diffusion decomposed into four operators over one set: a seed (positions, numbers, states), a rewire (the cell graph) and two laterals, diffusion and reaction. Changing the number of states, the reaction named, or one of its constants changes the pattern; nothing beneath the spec changes. Shown on a disc of 4,000 cells: stripes, spots one constant away, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
+<p class="opk">Reaction–diffusion decomposed into five operators over one set: two seeds (where the cells are, what they carry), a rewire (the cell graph) and two laterals, diffusion and reaction. Changing the number of states, the reaction named, or one of its constants changes the pattern; nothing beneath the spec changes. Shown on a disc of 4,000 cells: stripes, spots one constant away, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card figure">
-    <video src="gallery/turing2d_gs_kappa.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/turing2d_gs_kappa2.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">one set, two states, four operators<span class="sim-spec"><pre>general:
   name: turing2d_gs_kappa
@@ -452,8 +452,6 @@ window.Quarto = {
 sets:
   cell:
     n: 4000
-    spawn: sunflower
-    spawn_radius: 19.0
     state:
       pos:
         width: 2
@@ -465,6 +463,11 @@ sets:
         boundary: free
 fields: {}
 seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 19.0
+  seed: 0
 - op: seed_cell_chem
   at: cell
   seed: 0
@@ -493,11 +496,11 @@ plotting:
   renderer: mpl2d
   background: black
   dot_fill: 0.9</pre></span></span>
-      <span class="sim-cap">4,000 cells carrying two concentrations. A seed, the neighbour graph (rewire), diffusion and reaction (lateral). Stripes.</span>
+      <span class="sim-cap">4,000 cells carrying two concentrations. Two seeds (the positions, the chemistry), the neighbour graph (rewire), diffusion and reaction (lateral). Stripes.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/turing2d_gs_eta.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/turing2d_gs_eta2.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">one constant changed<span class="sim-spec"><pre>general:
   name: turing2d_gs_eta
@@ -513,8 +516,6 @@ plotting:
 sets:
   cell:
     n: 4000
-    spawn: sunflower
-    spawn_radius: 19.0
     state:
       pos:
         width: 2
@@ -526,6 +527,11 @@ sets:
         boundary: free
 fields: {}
 seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 19.0
+  seed: 0
 - op: seed_cell_chem
   at: cell
   seed: 0
@@ -558,7 +564,7 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/turing2d_coupled.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/turing2d_coupled2.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">a second chemistry added<span class="sim-spec"><pre>general:
   name: turing2d_coupled
@@ -574,8 +580,6 @@ plotting:
 sets:
   cell:
     n: 4000
-    spawn: sunflower
-    spawn_radius: 19.0
     state:
       pos:
         width: 2
@@ -587,6 +591,11 @@ sets:
         boundary: free
 fields: {}
 seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 19.0
+  seed: 0
 - op: seed_cell_chem
   at: cell
   seed: 0
@@ -638,7 +647,7 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/turing2d_rps.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/turing2d_rps2.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">three species, one reaction<span class="sim-spec"><pre>general:
   name: turing2d_rps
@@ -654,8 +663,6 @@ plotting:
 sets:
   cell:
     n: 4000
-    spawn: sunflower
-    spawn_radius: 19.0
     state:
       pos:
         width: 2
@@ -667,6 +674,11 @@ sets:
         boundary: free
 fields: {}
 seed:
+- op: seed_positions
+  at: cell
+  mode: sunflower
+  radius: 19.0
+  seed: 0
 - op: seed_cell_chem
   at: cell
   model: simplex
@@ -708,7 +720,7 @@ plotting:
 </div>
 
 <h3 class="anchored">Epithelial mechanics — a vertex model</h3>
-<p class="opk">A vertex model decomposed into six operators over two sets: seeds for the vertices and for the cells that own them, an aggregate that builds each cell’s area and perimeter from its vertices, a lateral shape energy that returns a force to those vertices, a rewire that flips a junction, and a structural that removes a cell. Because the two sets share a containment map, a junction is state held once, not copied into every cell that touches it. Shown on a flat disc of 374 cells: one cell dying while the sheet closes over it, a morphogen gating growth where it is high, the sheet growing and dividing until it outgrows its plane, and the same growth with one bending stiffness added.</p>
+<p class="opk">A vertex model decomposed into six operators over two sets: seeds for the vertices and for the cells that own them, an aggregate that builds each cell’s area and perimeter from its vertices, a lateral shape energy that returns a force to those vertices, a rewire that flips a junction, and a structural that removes a cell. Because the two sets share a containment map, a junction is state held once, not copied into every cell that touches it. Shown on a flat disc: one cell dying while the sheet closes over it, a morphogen gating growth where it is high, and the sheet growing and dividing, each cell on its own clock.</p>
 <p class="opk-ref">Reference — active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
@@ -1026,7 +1038,7 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/sheet_divide.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/sheet_divide2.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">growth and division added<span class="sim-spec"><pre>general:
   name: sheet_divide
@@ -1119,7 +1131,8 @@ seed:
   jitter: 0.15
   p0: 3.5
   seed: 0
-  vseed_cv: 0.15
+  vseed_cv: 0.5
+  age_seed: 60.0
 operators:
 - op: cell_geometry
   at: cell
@@ -1148,14 +1161,15 @@ operators:
   K_lumen: 0.0
 - op: cell_divide
   at: vertex
-  factor: 2.0
-  cycle_cv: 0.15
+  cycle_cv: 0.4
   min_cycle: 4
   p0: 3.5
   every: 4
   engine_clock: true
   reset_noise: 0.12
   max_cycle: 1000000000
+  model: timer
+  cycle: 60.0
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -1179,170 +1193,13 @@ plotting:
   camera:
     elev: 90.0
     azim: 0.0</pre></span></span>
-      <span class="sim-cap"><code>cell_grow</code> ungated and <code>cell_divide</code> (structural) on the same disc. 374 → 1,364 cells; the sheet outgrows its plane and crumples.</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card figure">
-    <video src="gallery/sheet_divide_stiff.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">one constant: bending stiffness<span class="sim-spec"><pre>general:
-  name: sheet_divide_stiff
-  seed: 0
-  n_frames: 400
-  dt: 1.0
-  record_cap: 402
-  boundary: free
-  dim: 3
-  world:
-  - 18.0
-  - 18.0
-  - 18.0
-  units:
-    length_um: 10.0
-    time_s: 600.0
-sets:
-  vertex:
-    n: 4000
-    mesh: half_edge
-    state:
-      pos:
-        width: 3
-        role: coordinate
-        integration: second_order_coordinate
-        boundary: world
-      vel:
-        width: 3
-        role: rate
-        integration: second_order_rate
-        record: false
-  cell:
-    n: 2000
-    state:
-      area:
-        width: 1
-      centroid:
-        width: 3
-      A0:
-        width: 1
-      P0:
-        width: 1
-      V0f:
-        width: 1
-      alive:
-        width: 1
-        record: false
-      age:
-        width: 1
-      ndiv:
-        width: 1
-      Vbirth:
-        width: 1
-        record: false
-      divjit:
-        width: 1
-        record: false
-      mg_scale:
-        width: 1
-        record: false
-      A0_init:
-        width: 1
-        record: false
-      P0_init:
-        width: 1
-        record: false
-      V0f_init:
-        width: 1
-        record: false
-      apop_flag:
-        width: 1
-      inhib_frac:
-        width: 1
-      chem:
-        width: 2
-        integration: first_order
-  half_edge:
-    n: 16000
-    maps:
-      srce: vertex
-      trgt: vertex
-      face: cell
-fields: {}
-seed:
-- op: seed_mesh
-  at: vertex
-  shape: disc
-  n_cells: 400
-  radius: 5.0
-  jitter: 0.15
-  p0: 3.5
-  seed: 0
-  vseed_cv: 0.15
-operators:
-- op: cell_geometry
-  at: cell
-- op: cell_grow
-  at: vertex
-  rate: 0.002
-  a_sw: 0.0
-  hill: 4.0
-  rho: 1.0
-  vth_frac: 2.5
-  conserve_amount: false
-- op: cell_mechanics
-  at: vertex
-  K_A: 1.0
-  K_P: 1.0
-  K_V: 20.0
-  K_R: 0.0
-  Lambda: 0.5
-  Gamma: 0.4
-  p0: 3.5
-  mu: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-  K_bend: 0.05
-  K_lumen: 0.0
-- op: cell_divide
-  at: vertex
-  factor: 2.0
-  cycle_cv: 0.15
-  min_cycle: 4
-  p0: 3.5
-  every: 4
-  engine_clock: true
-  reset_noise: 0.12
-  max_cycle: 1000000000
-- op: edge_flip
-  at: vertex
-  l_th_frac: 0.28
-  every: 1
-  max_flips: 300
-- op: topo_record
-  at: vertex
-  every: 1
-schedule:
-- cell_geometry
-- cell_grow
-- cell_mechanics
-- cell_divide
-- edge_flip
-- topo_record
-plotting:
-  renderer: vtk_mesh
-  background: black
-  mesh_mark_division: true
-  mesh_apop_color: '#e8c33a'
-  camera:
-    elev: 90.0
-    azim: 0.0</pre></span></span>
-      <span class="sim-cap">The same run with <code>K_bend: 0 → 0.05</code> in the shape energy. 374 → 1,364 cells again, and the sheet stays flat.</span>
+      <span class="sim-cap"><code>cell_grow</code> ungated and <code>cell_divide</code> (structural) on the same disc, each cell seeded at its own point in the cycle. 440 → 1,250 cells, never more than twenty dividing in a frame; the sheet spreads and stays a sheet.</span>
     </figcaption>
   </figure>
 </div>
 
 <h3 class="anchored">Cell death — sculpting an epithelial surface</h3>
-<p class="opk">The vertex model above with one operator added: a structural death. A marked cell shrinks, loses its junctions through the rewire until it leaves the set, and the lateral mechanics closes the surface behind it — the mechanics is never told that death exists. Only the seeded pattern of deaths differs between the three clips: a patch pulled into an invagination, nine bands closed over one by one, and half the sheet removed.</p>
+<p class="opk">The vertex model above with one operator added: a structural death. A marked cell shrinks, loses its junctions through the rewire until it leaves the set, and the lateral mechanics closes the surface behind it — the mechanics is never told that death exists. Only the seeded pattern of deaths differs between the four clips: a patch pulled into an invagination, nine bands closed over one by one, half the sheet removed, and two hundred deaths scattered with no pattern at all.</p>
 <p class="opk-ref">Reference — apoptotic force driving epithelial folding after Monier et&nbsp;al., <i>Nature</i> <b>518</b>:245 (2015).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
@@ -1871,6 +1728,381 @@ plotting:
   mesh_mark_division: true
   mesh_apop_color: '#e8c33a'</pre></span></span>
       <span class="sim-cap">One 45° band. 2,000 → 1,243; a sphere becomes an ellipsoid.</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/apop2_many.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">the same, scattered<span class="sim-spec"><pre>general:
+  name: apop2_sheet_many
+  seed: 0
+  n_frames: 600
+  dt: 1.0
+  record_cap: 602
+  boundary: free
+  dim: 3
+  world:
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 120000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 60000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+  half_edge:
+    n: 480000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  n_cells: 2000
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: cell_die
+  at: vertex
+  p0: 3.5
+  model: prescribed
+  region: list
+  cells:
+  - 3
+  - 13
+  - 23
+  - 33
+  - 43
+  - 53
+  - 63
+  - 73
+  - 83
+  - 93
+  - 103
+  - 113
+  - 123
+  - 133
+  - 143
+  - 153
+  - 163
+  - 173
+  - 183
+  - 193
+  - 203
+  - 213
+  - 223
+  - 233
+  - 243
+  - 253
+  - 263
+  - 273
+  - 283
+  - 293
+  - 303
+  - 313
+  - 323
+  - 333
+  - 343
+  - 353
+  - 363
+  - 373
+  - 383
+  - 393
+  - 403
+  - 413
+  - 423
+  - 433
+  - 443
+  - 453
+  - 463
+  - 473
+  - 483
+  - 493
+  - 503
+  - 513
+  - 523
+  - 533
+  - 543
+  - 553
+  - 563
+  - 573
+  - 583
+  - 593
+  - 603
+  - 613
+  - 623
+  - 633
+  - 643
+  - 653
+  - 663
+  - 673
+  - 683
+  - 693
+  - 703
+  - 713
+  - 723
+  - 733
+  - 743
+  - 753
+  - 763
+  - 773
+  - 783
+  - 793
+  - 803
+  - 813
+  - 823
+  - 833
+  - 843
+  - 853
+  - 863
+  - 873
+  - 883
+  - 893
+  - 903
+  - 913
+  - 923
+  - 933
+  - 943
+  - 953
+  - 963
+  - 973
+  - 983
+  - 993
+  - 1003
+  - 1013
+  - 1023
+  - 1033
+  - 1043
+  - 1053
+  - 1063
+  - 1073
+  - 1083
+  - 1093
+  - 1103
+  - 1113
+  - 1123
+  - 1133
+  - 1143
+  - 1153
+  - 1163
+  - 1173
+  - 1183
+  - 1193
+  - 1203
+  - 1213
+  - 1223
+  - 1233
+  - 1243
+  - 1253
+  - 1263
+  - 1273
+  - 1283
+  - 1293
+  - 1303
+  - 1313
+  - 1323
+  - 1333
+  - 1343
+  - 1353
+  - 1363
+  - 1373
+  - 1383
+  - 1393
+  - 1403
+  - 1413
+  - 1423
+  - 1433
+  - 1443
+  - 1453
+  - 1463
+  - 1473
+  - 1483
+  - 1493
+  - 1503
+  - 1513
+  - 1523
+  - 1533
+  - 1543
+  - 1553
+  - 1563
+  - 1573
+  - 1583
+  - 1593
+  - 1603
+  - 1613
+  - 1623
+  - 1633
+  - 1643
+  - 1653
+  - 1663
+  - 1673
+  - 1683
+  - 1693
+  - 1703
+  - 1713
+  - 1723
+  - 1733
+  - 1743
+  - 1753
+  - 1763
+  - 1773
+  - 1783
+  - 1793
+  - 1803
+  - 1813
+  - 1823
+  - 1833
+  - 1843
+  - 1853
+  - 1863
+  - 1873
+  - 1883
+  - 1893
+  - 1903
+  - 1913
+  - 1923
+  - 1933
+  - 1943
+  - 1953
+  - 1963
+  - 1973
+  - 1983
+  - 1993
+  shrink_rate: 0.05
+  critical_frac: 0.15
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_mechanics
+- cell_die
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: '#cfd8e3'
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 2.0
+    span: 12.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: '#e8e8e8'
+    mid: true
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: volume
+    xlabel: frame
+    ylabel: cell volume
+    ticks: 4
+  scale_bar_corner: right_face
+  scale_bar_lift: -0.07
+  mesh_mark_division: true
+  mesh_apop_color: '#e8c33a'</pre></span></span>
+      <span class="sim-cap">Every tenth cell marked, 200 deaths with no pattern. 2,000 → 1,804; the vesicle shrinks evenly and stays round.</span>
     </figcaption>
   </figure>
 </div>

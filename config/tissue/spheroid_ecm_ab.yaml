@@ -339,10 +339,14 @@ plotting:
     xlabel: frame
     ylabel: cells
     ticks: 4
+    ymin: 0
+    ymax: 1000
   - quantity: volume
     xlabel: frame
     ylabel: cell volume
     ticks: 4
+    ymin: 0
+    ymax: 3000
   scale_bar_corner: right
   scale_bar_lift: -0.07
   color_field: strain

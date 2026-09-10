@@ -396,7 +396,13 @@ class LiveMovie:
         # only the REPLAY can build them -- and the live path was still reserving the column, giving
         # a frame a third wider than it needed with a band of black down the right. `can_curve` is
         # the caller saying which path this is, not a guess from the style.
-        _cv = (style or {}).get("curve") if can_curve else None
+        # ...OR WHEN EVERY PANEL DECLARES ITS RANGE. `_curves_setup` draws live exactly then, so the
+        # column has to be reserved then too, or the chart is placed at x = 1.005 and pyvista
+        # refuses it -- which disabled the whole movie after frame 0 the first time this ran.
+        _cv = (style or {}).get("curve")
+        _cvl = [_cv] if isinstance(_cv, dict) else list(_cv or [])
+        if not can_curve and not (_cvl and all(("ymin" in c and "ymax" in c) for c in _cvl)):
+            _cv = None
         _ncv = 0 if not _cv else (1 if isinstance(_cv, dict) else len(_cv))
         # THE COLUMN IS THE PANEL PLUS A MARGIN, and the ASPECT is what makes the scene fit beside
         # it -- 1 + column is not enough. Parallel projection fits the box to the frame's HEIGHT, so
@@ -1014,7 +1020,7 @@ class LiveMovie:
         self._skin_update(H, lvl, self.cloud.points)
         self._graph_update(H, tick)
         self._update_meshes(H)
-        self._curves_update(tick)
+        self._curves_update(tick, H)
         # A FIELD COLOUR IS A PROPERTY OF NOW, so unlike the body hue it is recomputed each frame.
         if str(self.style.get("color_field", "") or ""):
             _c = self._rgb_field(H, lvl)
@@ -1117,121 +1123,135 @@ class LiveMovie:
         out = np.full((T, nt, 2), np.nan)
         for t in range(T):
             lvl.t = t
-            m = getattr(lvl, "mesh", None)
-            if m is None or not int(m.get("nF", 0) or 0):
-                continue
-            nF = int(m["nF"])
-            # THE CELL SET'S BLOCKS, on the curve path too. `phase` is a block on the cell set and
-            # not a face column, and this is the only reader of it outside `_mesh_face_rgb`; the
-            # panel is the one that says what fraction of the tissue is in G1/S/G2/M, so without
-            # the overlay it would draw four empty series and look like a run with no cycle.
-            m = _MeshView(m, self._cell_cols(H, lvl, nF))
-            k = (np.zeros(nF, int) if ntype is None
-                 else np.asarray(ntype)[np.clip(np.arange(nF), 0, len(ntype) - 1)].astype(int))
-            if q == "cells":
-                for j in range(nt):
-                    out[t, j] = (float((k == j).sum()), 0.0)
-                continue
-            if q == "phase":
-                # PERCENT OF THE POPULATION IN EACH PHASE, four series in one panel. A cycle is
-                # read as a DISTRIBUTION -- what fraction is where -- and the count of cells does
-                # not show it: a tissue cycling steadily and one frozen in G1 both just grow. The
-                # four fractions sum to 100 at every frame, so the panel is also its own check.
-                #
-                # It ignores `ntype`: the partition here is the PHASE, and splitting phases by cell
-                # type as well would be sixteen series in one panel, which is a different plot.
-                v = m.get("phase")
-                if v is None:
-                    continue
-                a = np.rint(np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach")
-                                       else v, float).ravel()[:nF]).astype(int)
-                for j in range(min(nt, 4)):
-                    out[t, j] = (100.0 * float(np.mean(a == j)) if a.size else np.nan, 0.0)
-                continue
-            if q == "cycle_progress":
-                v = m.get("cycle_progress")
-                if v is None:
-                    continue
-                vv = np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach") else v,
-                                float).ravel()[:nF]
-                for j in range(nt):
-                    sel = k == j
-                    if sel.any():
-                        out[t, j] = (float(np.nanmean(vv[sel])), float(np.nanstd(vv[sel])))
-                continue
-            if q == "myosin":
-                v = m.get("e_myo")
-                if v is None:
-                    continue
-                ef = np.asarray(m["E_face"]); live = ef < nF
-                vv = np.asarray(v, float)[live]
-                ke = k[np.clip(ef[live].astype(int), 0, nF - 1)]
-                for j in range(nt):
-                    sel = ke == j
-                    if sel.any():
-                        out[t, j] = (float(np.nanmean(vv[sel])), float(np.nanstd(vv[sel])))
-                continue
-            import torch
-            if q == "radius":
-                nv = int(m["Nv"])
-                P = np.asarray(lvl.get("pos")[:nv])
-                r = np.linalg.norm(P - P.mean(0), axis=1)
-                for j in range(nt):                   # per VERTEX, so the type split is by face
-                    out[t, j] = (float(np.mean(r)), float(np.std(r)))
-                continue
-            from plexus.operators.vertex_ops import face_geometry_3d
-            nv = int(m["Nv"])
-            pos = torch.as_tensor(lvl.get("pos")[:nv], dtype=torch.float64)
-            a, _p, _c, _v = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], nF)
-            a = a.numpy()
-            # `area` FOLLOWS `volume`'S RULE, AND FOR THE SAME REASON. What `face_geometry_3d`
-            # returns is the MID-SURFACE area, and on an apico-basal run the mid-surface is not a
-            # boundary of anything: the cell's surface is the polyhedron's -- two caps and one wall
-            # per ring edge -- and that is the `S` the energy's `kappa_s` integrates. A panel
-            # labelled "cell area" showing the area of a surface the cell does not have is the same
-            # defect the volume branch below documents, one term along in the same functional.
+            out[t] = self._curve_row(H, lvl, q, ntype, nt)
+        lvl.t = 0
+        return out
+
+    def _curve_row(self, H, lvl, q, ntype, nt):
+        """[nt, 2] of (mean, sd) for `q` at the level's CURRENT frame -- one row of `_curve_series`.
+
+        THE SAME BODY SERVES THE REPLAY AND THE LIVE PASS. The replay sets `lvl.t` and calls this per
+        recorded frame with numpy arrays behind `lvl.get`; the live pass calls it once per frame with
+        CUDA tensors behind the same accessors, so everything that feeds numpy or a CPU geometry call
+        goes through `_np`, a no-op on an array and `.detach().cpu().numpy()` on a tensor.
+        """
+        import torch
+        def _np(v):
+            return v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
+        row = np.full((nt, 2), np.nan)
+        m = getattr(lvl, "mesh", None)
+        if m is None or not int(m.get("nF", 0) or 0):
+            return row
+        _es, _et, _ef = (torch.as_tensor(_np(m[k])) for k in ("E_srce", "E_trgt", "E_face"))
+        nF = int(m["nF"])
+        # THE CELL SET'S BLOCKS, on the curve path too. `phase` is a block on the cell set and
+        # not a face column, and this is the only reader of it outside `_mesh_face_rgb`; the
+        # panel is the one that says what fraction of the tissue is in G1/S/G2/M, so without
+        # the overlay it would draw four empty series and look like a run with no cycle.
+        m = _MeshView(m, self._cell_cols(H, lvl, nF))
+        k = (np.zeros(nF, int) if ntype is None
+             else np.asarray(ntype)[np.clip(np.arange(nF), 0, len(ntype) - 1)].astype(int))
+        if q == "cells":
+            for j in range(nt):
+                row[j] = (float((k == j).sum()), 0.0)
+            return row
+        if q == "phase":
+            # PERCENT OF THE POPULATION IN EACH PHASE, four series in one panel. A cycle is
+            # read as a DISTRIBUTION -- what fraction is where -- and the count of cells does
+            # not show it: a tissue cycling steadily and one frozen in G1 both just grow. The
+            # four fractions sum to 100 at every frame, so the panel is also its own check.
             #
-            # Falls back to the mid-surface when the run carries no `sep`, where it IS the cell.
-            if q == "area":
-                _sa = lvl.get("sep")
-                if _sa is not None and int(_sa.shape[0]) >= nv:
-                    from plexus.operators.vertex_ops import apicobasal_geometry_3d
-                    _ss = torch.as_tensor(np.asarray(_sa[:nv].detach().cpu()
-                                                     if hasattr(_sa, "detach") else _sa[:nv]),
-                                          dtype=torch.float64)
-                    a = apicobasal_geometry_3d(pos, _ss, m["E_srce"], m["E_trgt"],
-                                               m["E_face"], nF)[1].numpy()
-            if q == "volume":
-                # THE VOLUME THE ENERGY DEFENDS, WHICH ON AN APICO-BASAL RUN IS NOT `_v`.
-                # `face_geometry_3d` returns the origin-referenced WEDGE volume -- the cone from
-                # the world origin out to the cell's mid-surface ring -- and that is the quantity
-                # `cell_grow` scales and `cell_divide` triggers on, but it is NOT the cell. It
-                # rises when the SHELL's radius rises, with the cell unchanged, which is how a
-                # tissue comes to divide without growing. `cell_mechanics[model: apicobasal]`
-                # defends the polyhedron: two caps and one wall per ring edge, by the divergence
-                # theorem, and that is what a plot labelled "cell volume" has to show.
-                #
-                # Falls back to the wedge when the run carries no `sep`, so a mid-surface spec
-                # asking for this curve still gets the only volume it has.
-                try:
-                    _sp = lvl.get("sep")
-                except Exception:                                # noqa: BLE001
-                    _sp = None
-                if _sp is not None and int(_sp.shape[0]) >= nv:
-                    from plexus.operators.vertex_ops import apicobasal_geometry_3d
-                    _s = torch.as_tensor(np.asarray(_sp[:nv].detach().cpu()
-                                                    if hasattr(_sp, "detach") else _sp[:nv]),
-                                         dtype=torch.float64)
-                    a = apicobasal_geometry_3d(pos, _s, m["E_srce"], m["E_trgt"],
-                                               m["E_face"], nF)[0].numpy()
-                else:
-                    a = _v.numpy()
+            # It ignores `ntype`: the partition here is the PHASE, and splitting phases by cell
+            # type as well would be sixteen series in one panel, which is a different plot.
+            v = m.get("phase")
+            if v is None:
+                return row
+            a = np.rint(np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach")
+                                   else v, float).ravel()[:nF]).astype(int)
+            for j in range(min(nt, 4)):
+                row[j] = (100.0 * float(np.mean(a == j)) if a.size else np.nan, 0.0)
+            return row
+        if q == "cycle_progress":
+            v = m.get("cycle_progress")
+            if v is None:
+                return row
+            vv = np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach") else v,
+                            float).ravel()[:nF]
             for j in range(nt):
                 sel = k == j
                 if sel.any():
-                    out[t, j] = (float(np.nanmean(a[sel])), float(np.nanstd(a[sel])))
-        lvl.t = 0
-        return out
+                    row[j] = (float(np.nanmean(vv[sel])), float(np.nanstd(vv[sel])))
+            return row
+        if q == "myosin":
+            v = m.get("e_myo")
+            if v is None:
+                return row
+            ef = _np(m["E_face"]); live = ef < nF
+            vv = np.asarray(v, float)[live]
+            ke = k[np.clip(ef[live].astype(int), 0, nF - 1)]
+            for j in range(nt):
+                sel = ke == j
+                if sel.any():
+                    row[j] = (float(np.nanmean(vv[sel])), float(np.nanstd(vv[sel])))
+            return row
+        import torch
+        if q == "radius":
+            nv = int(m["Nv"])
+            P = _np(lvl.get("pos")[:nv])
+            r = np.linalg.norm(P - P.mean(0), axis=1)
+            for j in range(nt):                   # per VERTEX, so the type split is by face
+                row[j] = (float(np.mean(r)), float(np.std(r)))
+            return row
+        from plexus.operators.vertex_ops import face_geometry_3d
+        nv = int(m["Nv"])
+        pos = torch.as_tensor(_np(lvl.get("pos")[:nv]), dtype=torch.float64)
+        a, _p, _c, _v = face_geometry_3d(pos, _es, _et, _ef, nF)
+        a = a.numpy()
+        # `area` FOLLOWS `volume`'S RULE, AND FOR THE SAME REASON. What `face_geometry_3d`
+        # returns is the MID-SURFACE area, and on an apico-basal run the mid-surface is not a
+        # boundary of anything: the cell's surface is the polyhedron's -- two caps and one wall
+        # per ring edge -- and that is the `S` the energy's `kappa_s` integrates. A panel
+        # labelled "cell area" showing the area of a surface the cell does not have is the same
+        # defect the volume branch below documents, one term along in the same functional.
+        #
+        # Falls back to the mid-surface when the run carries no `sep`, where it IS the cell.
+        if q == "area":
+            _sa = lvl.get("sep")
+            if _sa is not None and int(_sa.shape[0]) >= nv:
+                from plexus.operators.vertex_ops import apicobasal_geometry_3d
+                _ss = torch.as_tensor(np.asarray(_sa[:nv].detach().cpu()
+                                                 if hasattr(_sa, "detach") else _sa[:nv]),
+                                      dtype=torch.float64)
+                a = apicobasal_geometry_3d(pos, _ss, _es, _et, _ef, nF)[1].numpy()
+        if q == "volume":
+            # THE VOLUME THE ENERGY DEFENDS, WHICH ON AN APICO-BASAL RUN IS NOT `_v`.
+            # `face_geometry_3d` returns the origin-referenced WEDGE volume -- the cone from
+            # the world origin out to the cell's mid-surface ring -- and that is the quantity
+            # `cell_grow` scales and `cell_divide` triggers on, but it is NOT the cell. It
+            # rises when the SHELL's radius rises, with the cell unchanged, which is how a
+            # tissue comes to divide without growing. `cell_mechanics[model: apicobasal]`
+            # defends the polyhedron: two caps and one wall per ring edge, by the divergence
+            # theorem, and that is what a plot labelled "cell volume" has to show.
+            #
+            # Falls back to the wedge when the run carries no `sep`, so a mid-surface spec
+            # asking for this curve still gets the only volume it has.
+            try:
+                _sp = lvl.get("sep")
+            except Exception:                                # noqa: BLE001
+                _sp = None
+            if _sp is not None and int(_sp.shape[0]) >= nv:
+                from plexus.operators.vertex_ops import apicobasal_geometry_3d
+                _s = torch.as_tensor(np.asarray(_sp[:nv].detach().cpu()
+                                                if hasattr(_sp, "detach") else _sp[:nv]),
+                                     dtype=torch.float64)
+                a = apicobasal_geometry_3d(pos, _s, _es, _et, _ef, nF)[0].numpy()
+            else:
+                a = _v.numpy()
+        for j in range(nt):
+            sel = k == j
+            if sel.any():
+                row[j] = (float(np.nanmean(a[sel])), float(np.nanstd(a[sel])))
+        return row
 
     def _curve_types(self, H, lvl):
         """The per-cell type ids, or None. `mesh_cell_set` names which set a face belongs to."""
@@ -1285,19 +1305,30 @@ class LiveMovie:
                 break
         lvl = lq
         ntype = self._curve_types(H, lvl)
-        if not hasattr(lvl, "_pos"):
+        # LIVE WHEN THE AXES ARE DECLARED. The replay has the whole clip and fixes each panel's
+        # range from it; a live generate has only the current frame, so it can draw the same
+        # panels only if the spec says the range -- `ymin`/`ymax` on every curve -- and the series
+        # is then filled one row a frame in `_curves_update`. Without them it declines, as before.
+        live = not hasattr(lvl, "_pos")
+        if live and not all(("ymin" in c and "ymax" in c) for c in cfgs):
             print("[live-movie] plotting.curve needs the whole clip to fix its axes and a live "
-                  "generate has only the current frame -- re-render with `-o plot`", flush=True)
+                  "generate has only the current frame -- declare `ymin`/`ymax` on every curve to "
+                  "draw it live, or re-render with `-o plot`", flush=True)
             return
+        T_live = int(self.n_frames) + 1
         for _i, cfg in enumerate(cfgs):
             cfg = dict(cfg)
             q = str(cfg.get("quantity", "cells")).lower()
             if q not in self._CURVE_Q:
                 raise ValueError(f"plotting.curve.quantity: {q!r} is not one of "
                                  f"{', '.join(self._CURVE_Q)}")
-            S = self._curve_series(H, lvl, q, ntype)
-            if not np.isfinite(S[..., 0]).any():
-                continue
+            if live:
+                nt0 = 4 if q == "phase" else (1 if ntype is None else int(np.max(ntype)) + 1)
+                S = np.full((T_live, nt0, 2), np.nan)
+            else:
+                S = self._curve_series(H, lvl, q, ntype)
+                if not np.isfinite(S[..., 0]).any():
+                    continue
             # CONVERT ONCE, HERE, AND EVERY SURFACE FOLLOWS. The y-axis range, the +-SD band, the
             # lines and the on-panel `mean +- SD` readout are all derived from `S`, so scaling it
             # at the source is what keeps them from disagreeing -- which is exactly how the label
@@ -1306,7 +1337,8 @@ class LiveMovie:
             _scale = _units_to_physical(1.0, self._CURVE_UNITS.get(q), self._units)
             if _scale is not None and _scale != 1.0:
                 S = S * float(_scale)
-            lo = float(np.nanmin(S[..., 0] - S[..., 1])); hi = float(np.nanmax(S[..., 0] + S[..., 1]))
+            lo, hi = ((float(cfg["ymin"]), float(cfg["ymax"])) if live else
+                      (float(np.nanmin(S[..., 0] - S[..., 1])), float(np.nanmax(S[..., 0] + S[..., 1]))))
             # THE ENDS ARE ROUND NUMBERS, AND THE FLOOR IS ZERO WHERE ZERO IS THE FLOOR. An 8% pad
             # below the minimum put the `cells` axis at -317, i.e. a tick labelled with a negative
             # count of cells, and left the top at 7181 -- five digits of a bound that is a padding
@@ -1459,16 +1491,22 @@ class LiveMovie:
                                            y=float(_loc[1]) + float(_sz[1]) + 0.004,
                                            fs=int(cfg.get("value_font_size", 11))))
             self._curves.append({"S": S, "bands": bands, "lines": lines, "nt": nt,
-                                 "sd": bool(cfg.get("sd", q not in ("cells", "phase")))})
+                                 "sd": bool(cfg.get("sd", q not in ("cells", "phase"))),
+                                 "live": live, "lvl": lvl, "q": q, "ntype": ntype,
+                                 "scale": (float(_scale) if (_scale is not None and _scale != 1.0) else None)})
             print(f"[live-movie] curve {q}: {S.shape[0]} frames, {nt} "
                   f"{'series by type' if nt > 1 else 'series'}, "
                   f"y [{ch.y_axis.range[0]:.4g}, {ch.y_axis.range[1]:.4g}]", flush=True)
 
-    def _curves_update(self, tick):
+    def _curves_update(self, tick, H=None):
         """Reveal each series up to the current RECORDED row -- the band is mean-SD .. mean+SD."""
         for i, cv in enumerate(getattr(self, "_curves", []) or []):
             S = cv["S"]
             t = min(int(tick), S.shape[0] - 1)
+            if cv.get("live") and H is not None:
+                # THE ROW FOR THIS FRAME, from the live level, in the units the axis was declared in.
+                r = self._curve_row(H, cv["lvl"], cv["q"], cv["ntype"], cv["nt"])
+                S[t] = r * cv["scale"] if cv["scale"] else r
             if t < 1:
                 continue
             x = np.arange(t + 1, dtype=float)
