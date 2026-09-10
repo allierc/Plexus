@@ -172,7 +172,13 @@ change the model, so they stay together.
 2. Attach the plaques to the basal surface of the apico-basal tissue. This is the payoff the
    apico-basal promotion note announced: the archive attached the membrane to a recorded
    mid-surface because the old tissue had no inner surface. The live tissue has one, but no
-   operator can bind to it yet.
+   operator can bind to it yet. **Open finding (2026-09-10):** on the archived spheroids the
+   apical ring is the outer one, so the basal surface faces the lumen, while a basement membrane
+   needs the basal side facing out. The seed option `apical: in` flips the rings but does not
+   reproduce the working point (r 4.85 instead of 4.53 at frame 0, no division by frame 75, cell
+   area 30 percent off): something in the seeded targets or the growth readers takes the apical
+   ring as the outer one. This has to be found before a membrane is attached outside. The
+   integrin demo (`config/tissue/spheroid_integrins.yaml`) uses the model's basal surface as it is.
 3. Run the control with the plaque stiffness set to zero. The tissue must then reproduce the
    cvd2_adder_tension working point exactly, cell count and shell radius at every checkpoint.
    Once the coupled run is looked at and accepted, register it as a working point.

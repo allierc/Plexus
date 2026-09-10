@@ -410,7 +410,9 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
             return row
         occ = getattr(lv, "_occ", None)
         if occ is not None and getattr(occ, "ndim", 1) == 2:
-            occ = occ[int(getattr(lv, "t", 0))]
+            # the replay advances `t` on the level the curves read (the mesh set); a counted set
+            # follows that frame, not its own `t`, which the series loop never touches
+            occ = occ[int(getattr(lvl, "t", getattr(lv, "t", 0)))]
         if occ is None:
             occ = getattr(lv, "occ", None)
         if occ is None:

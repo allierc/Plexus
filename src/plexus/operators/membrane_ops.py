@@ -21,7 +21,7 @@ In the order they appear below:
     bm_secrete                  structural  new material as the surface it sits on grows
     bm_crosslink                rewire      new bonds between nodes that have drifted into range
     integrin_particle           entity      a material point of an integrin fibre
-    integrin_seed / _track / _pull          fibres from the surface outward, bound at the tip
+    integrin_fibre_seed / _track / _pull   (renamed 2026-09-10: `integrin_*` now names the receptor clusters in integrin_ops.py)          fibres from the surface outward, bound at the tip
 
 THE TWO INTEGRIN FAMILIES ARE ONE HOP APART IN THE SAME CHAIN AND ARE NOT THE SAME THING.
 `integrin_adhesion` anchors the MEMBRANE to the EPITHELIUM. `integrin_seed`, `integrin_track` and
@@ -2055,7 +2055,7 @@ def _radius(M, u):
              (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
 
 
-@register_operator("integrin_seed", family="seed", set="particle", kind="seed")
+@register_operator("integrin_fibre_seed", family="seed", set="particle", kind="seed")
 class IntegrinSeed(Structural):
     """Lay the integrin fibres down once: `layers` particles per fibre, running outward from the
     epithelial surface.
@@ -2133,7 +2133,7 @@ class IntegrinSeed(Structural):
         return {}
 
 
-@register_operator("integrin_track", family="mechanics", set="particle", kind="structural")
+@register_operator("integrin_fibre_track", family="mechanics", set="particle", kind="structural")
 class IntegrinTrack(Structural):
     """Ride the fibres' cell ends on the epithelial surface: a prescribed constraint on one row
     of particles, rather than on the grid.
@@ -2213,7 +2213,7 @@ class IntegrinTrack(Structural):
         return {}
 
 
-@register_operator("integrin_pull", family="mechanics", set="particle", kind="lateral")
+@register_operator("integrin_fibre_pull", family="mechanics", set="particle", kind="lateral")
 class IntegrinPull(Lateral):
     """The force the fibre's OUTER end exerts on the membrane patch it binds -- and the equal and
     opposite reaction on the fibre.
