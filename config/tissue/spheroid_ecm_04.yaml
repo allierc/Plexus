@@ -7,20 +7,20 @@ fields:
     frame: mpm_grid
     n_grid: 64
 general:
-  boundary: wall
+  boundary: free
   dim: 3
-  dt: 1.0
+  dt: 0.0032
   n_frames: 401
   name: spheroid_ecm_04
   record_cap: 403
   seed: 0
   world:
-  - 117.232297261556
-  - 117.232297261556
-  - 117.232297261556
+  - 1.0
+  - 1.0
+  - 1.0
   units:
-    length_um: 10.0
-    time_s: 600.0
+    length_um: 1172.323322082937
+    time_s: 187500.0
 operators:
 - at: cell
   op: cell_geometry
@@ -29,7 +29,7 @@ operators:
   cell_set: cell
   hill: 4.0
   op: cell_grow
-  rate: 0.03
+  rate: 9.375
   rho: 1.0
   vth_frac: 2.5
 - Gamma: 0.4
@@ -40,7 +40,7 @@ operators:
   Lambda: 3.0
   at: vertex
   cap_frac: 0.12
-  dt: 1.0
+  dt: 0.0032
   eta: 0.08
   mu: 1.0
   op: cell_mechanics
@@ -73,10 +73,14 @@ operators:
   surface: vertex
   k_frac: 0.9
   mu: 0.4
-  dt: 1.0
+  dt: 0.0032
   n_grid: 64
   a_max: 100000.0
-  centre: centroid
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  scale: 0.00853007
 - op: mpm_strain
   at: mpm_particle
   implementation: warp
@@ -93,7 +97,7 @@ operators:
   at: mpm_particle
   from: mpm_grid
   wall_damp: 0.7
-  wall_contact: 4.68929189046224
+  wall_contact: 0.04
   vmax: 1000000000.0
   implementation: warp
 - op: ecm_stress
@@ -111,7 +115,7 @@ schedule:
 - edge_flip
 - cell_divide
 - topo_record
-- substep_dt: 0.05
+- substep_dt: 0.0004
   steps:
   - mesh_contact
   - mpm_strain
@@ -178,9 +182,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 117.232297261556
-        - 117.232297261556
-        - 117.232297261556
+        - 1.0
+        - 1.0
+        - 1.0
       s1:
         fraction: 0.125
         youngs: 15.0
@@ -189,9 +193,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 117.232297261556
-        - 117.232297261556
-        - 117.232297261556
+        - 1.0
+        - 1.0
+        - 1.0
       s2:
         fraction: 0.125
         youngs: 15.0
@@ -200,9 +204,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 117.232297261556
-        - 117.232297261556
-        - 117.232297261556
+        - 1.0
+        - 1.0
+        - 1.0
       s3:
         fraction: 0.125
         youngs: 15.0
@@ -211,9 +215,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 117.232297261556
-        - 117.232297261556
-        - 117.232297261556
+        - 1.0
+        - 1.0
+        - 1.0
       s4:
         fraction: 0.125
         youngs: 15.0
@@ -222,9 +226,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 117.232297261556
-        - 117.232297261556
-        - 117.232297261556
+        - 1.0
+        - 1.0
+        - 1.0
       s5:
         fraction: 0.125
         youngs: 15.0
@@ -233,9 +237,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 117.232297261556
-        - 117.232297261556
-        - 117.232297261556
+        - 1.0
+        - 1.0
+        - 1.0
       s6:
         fraction: 0.125
         youngs: 15.0
@@ -244,9 +248,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 117.232297261556
-        - 117.232297261556
-        - 117.232297261556
+        - 1.0
+        - 1.0
+        - 1.0
       s7:
         fraction: 0.125
         youngs: 15.0
@@ -255,9 +259,9 @@ sets:
         - 0.0
         - 0.0
         - 0.0
-        - 117.232297261556
-        - 117.232297261556
-        - 117.232297261556
+        - 1.0
+        - 1.0
+        - 1.0
   half_edge:
     n: 166400
     maps:
@@ -274,31 +278,27 @@ seed:
   radius: 5.0
   seed: 0
   vseed_cv: 0.15
-  centre:
-  - 58.616148630778
-  - 58.616148630778
-  - 58.616148630778
 - op: seed_ecm
   at: mpm_particle
   centre:
-  - 58.616148630778
-  - 58.616148630778
-  - 58.616148630778
-  cavity_r: 5.275453376770019
-  cavity_h: 5.275453376770019
+  - 0.5
+  - 0.5
+  - 0.5
+  cavity_r: 0.045
+  cavity_h: 0.045
   cavity_sphere: true
   axis: 2
-  shell_r: 46.892918904622405
-  margin: 2.34464594523112
+  shell_r: 0.4
+  margin: 0.02
   n_fibres: 10000
-  fibre_len: 14.06787567138672
+  fibre_len: 0.12
   align: 0.0
   align_dir:
   - 1.0
   - 0.0
   - 0.0
   seed: 0
-  jitter: 0.468929189046224
+  jitter: 0.004
 plotting:
   renderer: vtk_points
   background: black
@@ -322,7 +322,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 105.5090675354004
+    span: 0.9
     points: true
   curve:
   - quantity: cells
