@@ -231,8 +231,18 @@ def face_collapse_3d(rings, pos, f, births=None):
         if len(ded) < 3:
             return False
         trial[g] = ded
-    ok, _V, _E, _F, euler = _check_closed(trial)
-    if not ok or euler != 2:
+    # COMMIT ONLY IF THE SURFACE IS STILL THE SAME SURFACE. The gate used to be `_check_closed`
+    # with euler == 2, i.e. "the result is a sphere" -- which an OPEN sheet (`build_sheet_mesh`,
+    # every `sheet_*` spec) fails at frame 0, so on a sheet no cell was ever extruded: a dying cell
+    # shrank to nothing, was walked to a triangle by `edge_flip`, and stayed, and a patch of such
+    # cells buckled the sheet out of its plane (sheet_morphogen_die, 2026-09-09). The invariant
+    # that actually matters is that the collapse changes nothing but V-2, E-3, F-1: same Euler
+    # characteristic, same number of rim loops, still edge-manifold. On a closed surface that is
+    # the old test exactly (euler 2 -> 2, no rim); on a sheet it admits the collapse and still
+    # refuses one that would pinch the rim or tear a hole.
+    ok0, _V, _E, _F, euler0, loops0 = _check_surface(rings)
+    ok, _V, _E, _F, euler, loops = _check_surface(trial)
+    if not (ok0 and ok) or euler != euler0 or loops != loops0:
         return False
     for g in range(len(rings)):
         rings[g] = None if trial[g] is None else np.asarray(trial[g], dtype=np.int64)
@@ -240,6 +250,45 @@ def face_collapse_3d(rings, pos, f, births=None):
     if births is not None:                      # the survivor is reborn from all three of them
         births.append((keep, (keep,) + tuple(sorted(drop))))
     return True
+
+
+def _check_surface(rings):
+    """Validate an orientable surface WITH OR WITHOUT A RIM: every directed edge appears at most
+    once, no duplicate vertices within a ring. Rim edges (a directed edge with no opposite) are
+    allowed and counted; the rim is followed into loops. Returns (ok, V, E, F, euler, n_rim_loops)
+    with E counting each undirected edge once, so euler = V - E + F is 2 for a closed sphere and 1
+    for a disc. `_check_closed` is this test plus "no rim edge at all"."""
+    seen = {}
+    verts = set()
+    F = 0
+    for r in rings:
+        if r is None or len(r) < 3:
+            continue
+        F += 1
+        if len(set(r)) != len(r):
+            return False, 0, 0, 0, 0, 0
+        k = len(r)
+        for i in range(k):
+            e = (int(r[i]), int(r[(i + 1) % k]))
+            if e in seen:
+                return False, 0, 0, 0, 0, 0             # a directed edge used twice -> non-manifold
+            seen[e] = True
+            verts.add(e[0])
+    rim = {}                                             # rim edge, oriented the way the face walks it
+    for (u, v) in seen:
+        if (v, u) not in seen:
+            if u in rim:
+                return False, 0, 0, 0, 0, 0             # two rim edges leave one vertex -> pinched rim
+            rim[u] = v
+    loops = 0
+    left = set(rim)
+    while left:
+        loops += 1
+        u = next(iter(left))
+        while u in left:
+            left.discard(u); u = rim[u]
+    V = len(verts); E = (len(seen) + len(rim)) // 2
+    return True, V, E, F, V - E + F, loops
 
 
 def _check_closed(rings):

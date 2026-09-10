@@ -117,6 +117,7 @@ operators:
   cap_frac: 0.12
   K_bend: 0.0
   K_lumen: 0.0
+  plane_axis: 2
 - op: cell_divide
   at: vertex
   cycle_cv: 0.4
@@ -156,22 +157,21 @@ plotting:
 descriptions:
   movie:
     description: The simulation shows a cellular mesh expanding and subdividing over time. Initially,
-      the mesh consists of large, irregular polygons that gradually refine into smaller, more uniform
-      hexagonal cells. Red and blue markers appear at specific vertices, indicating points of active division
-      or structural change. As the frame count increases, the total cell count grows significantly while
-      the overall circular shape remains relatively stable.
-    objects: The primary objects are white polygonal cells arranged in a dense, packed tessellation. These
-      cells vary in size, starting large and becoming progressively smaller as the mesh subdivides. Red
-      and blue markers are located at the junctions where multiple cells meet, highlighting specific interaction
-      points. The entire collection of cells forms a roughly circular cluster against a solid black background.
+      the mesh consists of large, irregular polygons that gradually transition into a more uniform hexagonal
+      structure. As the number of cells increases, internal divisions occur, creating smaller polygons
+      throughout the cluster. The overall shape remains roughly circular while the internal complexity
+      and cell count grow significantly.
+    objects: The scene contains a cluster of polygonal cells arranged in a dense, packed mesh. Most cells
+      are white or light gray, while specific active division sites are highlighted in red and blue. The
+      cells vary in size, starting as large polygons and becoming progressively smaller as the mesh subdivides.
+      The topology is a continuous tiling where each cell shares edges with its immediate neighbors.
   movie_kburns:
-    description: The simulation shows a 2D Voronoi-like mesh undergoing a continuous refinement process.
-      Over time, the individual cells within the sheet divide into smaller, more numerous polygons. This
-      subdivision occurs uniformly across the entire surface, increasing the density of the mesh. The
-      final frames show a highly complex, fine-grained network of small cells compared to the initial
-      coarse state.
-    objects: The scene contains a single large, elliptical sheet composed of numerous polygonal cells.
-      These cells are arranged in a contiguous, non-overlapping tiling pattern that covers the entire
-      surface. The objects are light gray or off-white in color with thin black outlines defining their
-      boundaries. The size of the individual cells decreases significantly as the simulation progresses
-      from the first to the last frame.
+    description: The simulation shows a 2D Voronoi-like mesh of cells undergoing a dynamic reorganization
+      process. Over time, the cells appear to shift and adjust their boundaries, suggesting a relaxation
+      or growth process. The overall shape of the cluster remains relatively stable while the internal
+      cell sizes and shapes fluctuate. The final frames show a highly complex, irregular tiling that maintains
+      a dense, continuous structure.
+    objects: The scene contains a large, roughly elliptical cluster of polygonal cells. Each cell is a
+      light gray color with thin black outlines defining its boundaries. The cells vary significantly
+      in size, with smaller polygons concentrated in some areas and larger ones on the periphery. The
+      topology is a continuous tiling where each polygon shares edges with its neighbors to fill the space.
