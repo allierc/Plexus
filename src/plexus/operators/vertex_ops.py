@@ -624,6 +624,15 @@ def build_strip_mesh(n, r=1.0, jitter=0.0, seed=0, kind="plane", width=0.5, twis
 
 
 def face_geometry_3d(pos, es, et, ef, nF, eocc=None, apex=None):
+    # CENTRED ON THE APEX FIRST, and not only for the wedge. The Newell area vector is a sum of
+    # cross products of positions; about a box centre 58 units out each product is ~3400 and
+    # they cancel to a face area of order 1, which in float32 keeps three digits of it (K_A's
+    # energy moved by 1.2e-3 relative under a pure translation on the certification sphere).
+    # Subtracting the apex costs one pass and makes every term below bit-identical to the same
+    # tissue at the origin, up to the round-off already baked into the stored positions.
+    if apex is not None:
+        pos = pos - apex
+        apex = None
     """Per-face 3D area (Newell area-vector magnitude), perimeter, centroid, and the PER-CELL wedge
     volume v_f = (1/3)(cen_f . N_f) -- the volume of the pyramid from the sphere centre to the face.
     The lumen volume is just sum_f v_f, but keeping it per-cell lets each cell carry its own volume
@@ -674,6 +683,15 @@ def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_
     change, so it compiles once even under division). Dead slots are masked out: `alive` (faces),
     `eocc` (half-edges), `vocc` (vertices, for the radial term). R0 is a tensor (changes each frame);
     the K_* / Lam / Gam coefficients are compile-time constants."""
+    # CENTRED ON THE APEX before any term is formed. The edge-length terms are translation-
+    # invariant on paper and not in float32: the unit vector of a short Voronoi edge, both ends
+    # near 58.6, kept two digits -- the line-tension gradient alone differed by 15% relative
+    # between the origin and a shift of 58.6 on the certification sphere, 6.6e-3 at a shift
+    # of 1.0. That was the base model's 0.12 per-vertex divergence between the same cellfix
+    # tissue at the origin and at the box centre. No-op at the origin (x - 0 == x).
+    if apex is not None:
+        pos = pos - apex
+        apex = None
     area, perim, centroid, vf = face_geometry_3d(pos, es, et, ef, nF, eocc, apex=apex)
     E = (K_A * (area - A0) ** 2 + K_P * (perim - P0) ** 2 + 0.5 * Gam * perim ** 2) * alive
     line = (pos[et] - pos[es]).norm(dim=-1) * eocc          # line tension over live half-edges only
@@ -5105,7 +5123,7 @@ if HAVE_WARP:
                      CNT: wp.array(dtype=float), CSUM: wp.array(dtype=wp.vec3),
                      A0: wp.array(dtype=float), P0: wp.array(dtype=float),
                      V0F: wp.array(dtype=float), ALIVE: wp.array(dtype=float),
-                     K_A: float, K_P: float, K_V: float, Gam: float,
+                     K_A: float, K_P: float, K_V: float, Gam: float, APEX: wp.vec3,
                      G: wp.array(dtype=wp.vec3), DP: wp.array(dtype=float),
                      CG: wp.array(dtype=wp.vec3)):
         """The three per-face derivatives, folded into what the half-edge pass actually needs:
@@ -5115,7 +5133,11 @@ if HAVE_WARP:
         Nf = N[f] * 0.5                             # the half-sum, applied once
         area = wp.length(Nf)
         cnt = wp.max(CNT[f], 1.0)
-        centroid = CSUM[f] / cnt
+        # THE WEDGE APEX IS THE DECLARED CENTRE, NOT THE ORIGIN -- the same `apex` that
+        # `face_geometry_3d` takes. About the origin, a tissue seeded at a box centre 58 units
+        # away had wedge volumes ~12x its own, and K_V crushed it from r 5.0 to 3.2 in one frame
+        # while dragging it toward (0, 0, 0); the torch body, which had the apex, held r 4.66.
+        centroid = CSUM[f] / cnt - APEX
         vf = wp.dot(centroid, Nf) / 3.0
 
         dA = 2.0 * K_A * (area - A0[f]) * a
@@ -5171,13 +5193,15 @@ if HAVE_WARP:
 
     @wp.kernel
     def vertex_radial(POS: wp.array(dtype=wp.vec3), VOCC: wp.array(dtype=float),
-                      R0: float, K_R: float, GRAD: wp.array(dtype=wp.vec3)):
-        """K_R (|x| - R0)^2 over live vertices -- the one term that is not a sum over faces."""
+                      R0: float, K_R: float, C: wp.vec3, GRAD: wp.array(dtype=wp.vec3)):
+        """K_R (|x - c| - R0)^2 over live vertices, `c` the live occupancy-weighted centroid --
+        the one term that is not a sum over faces, and the same reference `_shape_energy_core`
+        uses (about the origin it pinned a tissue to the world corner)."""
         v = wp.tid()
         w = VOCC[v]
         if w <= 0.0:
             return
-        x = POS[v]
+        x = POS[v] - C
         r = wp.length(x)
         if r > 1.0e-20:
             wp.atomic_add(GRAD, v, x * (2.0 * K_R * (r - R0) * w / r))
@@ -5194,7 +5218,8 @@ def _warn_once(key, msg):
 
 
 def shape_energy_grad_warp(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R,
-                           Lam, Gam, eocc, vocc, myo_e=None, Gam_l=0.0, buffers=None):
+                           Lam, Gam, eocc, vocc, myo_e=None, Gam_l=0.0, buffers=None,
+                           apex=None, rcentre=None):
     """dE/d(pos) for `_shape_energy_core`, in four warp kernels instead of an autograd backward.
 
     `buffers` -- an optional dict reused across the relax loop's iterations, so the per-face and
@@ -5226,17 +5251,37 @@ def shape_energy_grad_warp(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P
     wGRAD = wp.from_torch(b["GRAD"], dtype=wp.vec3)
     has_myo = 1 if myo_e is not None else 0
     wmyo = wp.from_torch((myo_e if myo_e is not None else eocc).contiguous())
+    # `apex` -- the wedge apex (None: the origin, as face_geometry_3d). `rcentre` -- the point the
+    # radial term is measured from (None: the live occupancy-weighted centroid, as the torch body).
+    _apex = wp.vec3(0.0, 0.0, 0.0) if apex is None else wp.vec3(*[float(v) for v in apex])
+    rcentre_coupled = rcentre is None                     # a live centroid, not a declared point
+    if rcentre is None:
+        _w = vocc.to(pos.dtype).reshape(-1, 1)
+        rcentre = ((pos * _w).sum(dim=0) / _w.sum().clamp(min=1.0)).tolist()
+    _rc = wp.vec3(*[float(v) for v in rcentre])
 
     _wp_launch(face_accum, E, dev, [wpos, wes, wet, wef, weo, wN, wP, wC, wCS])
     _wp_launch(face_scalars, nF, dev,
                [wN, wP, wC, wCS, wp.from_torch(A0.contiguous()), wp.from_torch(P0.contiguous()),
                 wp.from_torch(V0f.contiguous()), wp.from_torch(alive.contiguous()),
-                float(K_A), float(K_P), float(K_V), float(Gam), wG, wDP, wCG])
+                float(K_A), float(K_P), float(K_V), float(Gam), _apex, wG, wDP, wCG])
     _wp_launch(edge_grad, E, dev,
                [wpos, wes, wet, wef, weo, wmyo, wG, wDP, wCG,
                 float(Lam), float(Gam_l), int(has_myo), wGRAD])
     _wp_launch(vertex_radial, Nv, dev,
-               [wpos, wp.from_torch(vocc.contiguous()), float(R0), float(K_R), wGRAD])
+               [wpos, wp.from_torch(vocc.contiguous()), float(R0), float(K_R), _rc, wGRAD])
+    if rcentre_coupled and K_R != 0.0:
+        # THE CENTROID MOVES WITH THE VERTICES. `_shape_energy_core` measures the radial term
+        # from the live occupancy-weighted centroid c(x), and autograd differentiates through
+        # c as well: dE/dx_i gains -(w_i / W) * sum_j g_j, the mean radial force, which is
+        # zero only on a perfectly balanced shell. The kernel holds c fixed, so the term is
+        # added here in torch (Nv vectors, one reduction); without it the K_R-only gradient
+        # disagreed with autograd by 2.6e-3 relative on the certification sphere.
+        _w = vocc.to(pos.dtype).reshape(-1, 1)
+        _x = pos - torch.as_tensor(rcentre, device=dev, dtype=pos.dtype)
+        _r = _x.norm(dim=1, keepdim=True).clamp_min(1e-20)
+        _g = (2.0 * float(K_R)) * (_r - float(R0)) * _w * _x / _r
+        b["GRAD"] -= (_w / _w.sum().clamp(min=1.0)) * _g.sum(dim=0, keepdim=True)
     return b["GRAD"]
 
 
@@ -5288,6 +5333,9 @@ def try_shape_energy_grad(op, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, 
         # energy on `p - centre`; d/dp and d/d(p-centre) are the same map, so shifting the positions
         # here reproduces it exactly.
         p = p - op._centre.to(p.device, p.dtype)
+    _ap = getattr(op, "_apex", None)
+    if _ap is not None:                                   # centred first, as _shape_energy_core is
+        p = p - _ap.to(p.device, p.dtype)
     if not hasattr(op, "_wbuf"):
         op._wbuf = {}
     g = shape_energy_grad_warp(p, es, et, ef, nF, A0, P0, V0f, alive, float(R0t),

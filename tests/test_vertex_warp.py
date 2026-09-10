@@ -135,3 +135,46 @@ def test_dead_slots_contribute_nothing():
 def test_operator_selects_the_warp_variant():
     from plexus.models.registry import get_operator
     assert get_operator("cell_mechanics", variant="warp") is warp_mod.ShapeEnergy3DWarp
+
+
+def _energy_grad(m, coef, apex, dtype=torch.float32):
+    c = lambda x: x.to(dtype) if torch.is_tensor(x) and x.is_floating_point() else x   # noqa: E731
+    p = c(m["pos"]).detach().clone().requires_grad_(True)
+    E = _shape_energy_core(p, m["es"], m["et"], m["ef"], m["nF"], c(m["A0"]), c(m["P0"]),
+                           c(m["V0f"]), c(m["alive"]), torch.as_tensor(coef["R0"], device=p.device,
+                           dtype=dtype), coef["K_A"], coef["K_P"], coef["K_V"], coef["K_R"],
+                           coef["Lam"], coef["Gam"], c(m["eocc"]), c(m["vocc"]), Gam_l=coef["Gam_l"],
+                           apex=None if apex is None else apex.to(dtype))
+    return torch.autograd.grad(E, p)[0]
+
+
+@pytest.mark.parametrize("term", ["K_A", "K_P", "K_V", "K_R", "Lam", "Gam", "Gam_l"])
+def test_energy_is_translation_invariant_with_apex(term):
+    """The formula, in float64 so round-off is out of the picture: the same tissue 58.6 units from
+    the origin with its apex declared has the same gradient as at the origin, term by term. This is
+    what failed physically when the wedge and the radial term were measured from (0, 0, 0)."""
+    coef = ONLY[term]
+    m0 = _mesh()
+    m1 = _mesh()
+    shift = torch.tensor([58.6, 58.6, 58.6], device=m1["pos"].device, dtype=torch.float64)
+    m1["pos"] = m1["pos"].to(torch.float64) + shift
+    g0 = _energy_grad(m0, coef, None, torch.float64)
+    g1 = _energy_grad(m1, coef, shift, torch.float64)
+    _agree(g1, g0, f"translation invariance of {term}", tol=1e-5)   # the fixture's targets are float32
+
+
+def test_shifted_tissue_matches_autograd_with_apex():
+    """The kernels, in float32, on the case that crushed `cellfix` at a box centre 58 units out:
+    wedges and the radial term were measured from the origin in warp while the torch body had
+    moved to the apex and the live centroid, and the two gradients disagreed by the whole tissue.
+    Both sides now centre on the apex first, so they see the same numbers and agree to round-off."""
+    m = _mesh()
+    shift = torch.tensor([58.6, 58.6, 58.6], device=m["pos"].device)
+    m["pos"] = m["pos"] + shift
+    coef = FARHADIFAR
+    ref = _energy_grad(m, coef, shift)
+    got = warp_mod.shape_energy_grad_warp(
+        m["pos"] - shift, m["es"], m["et"], m["ef"], m["nF"], m["A0"], m["P0"], m["V0f"],
+        m["alive"], coef["R0"], coef["K_A"], coef["K_P"], coef["K_V"], coef["K_R"], coef["Lam"],
+        coef["Gam"], m["eocc"], m["vocc"], Gam_l=coef["Gam_l"])
+    _agree(got, ref, "shifted tissue with apex")
