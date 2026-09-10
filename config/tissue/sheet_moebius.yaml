@@ -1,0 +1,175 @@
+general:
+  name: sheet_moebius
+  seed: 0
+  n_frames: 200
+  dt: 1.0
+  record_cap: 202
+  boundary: free
+  dim: 3
+  world:
+  - 18.0
+  - 18.0
+  - 18.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  vertex:
+    n: 4000
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+  cell:
+    n: 2000
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      apop_flag:
+        width: 1
+      inhib_frac:
+        width: 1
+      chem:
+        width: 2
+        integration: first_order
+  half_edge:
+    n: 16000
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+fields: {}
+seed:
+- op: seed_mesh
+  at: vertex
+  shape: moebius
+  width: 0.6
+  n_cells: 400
+  radius: 5.0
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: edge_flip
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- cell_geometry
+- cell_mechanics
+- edge_flip
+- topo_record
+plotting:
+  renderer: vtk_mesh
+  background: black
+  camera:
+    elev: 28.0
+    azim: 35.0
+descriptions:
+  movie:
+    description: A blue particle is initially located at the center of a large, flat,
+      elliptical mesh of grey cells. As the simulation progresses, the blue particle
+      rapidly moves outward from the center toward the right edge of the mesh. The
+      mesh itself remains stationary and maintains its shape throughout the entire
+      duration of the video. By the final frame, the blue particle has reached the
+      outer boundary of the grey cell structure.
+    objects: The primary object is a large, elliptical mesh composed of hundreds of
+      small, interconnected grey cells. These cells are arranged in a dense, repeating
+      pattern to form a flat, disc-like surface. A single, small blue particle is
+      positioned at the center of this mesh at the start of the sequence. The blue
+      particle is significantly smaller than the individual grey cells and moves independently
+      across the surface.
+  movie_kburns:
+    description: The simulation shows a collection of hexagonal cells forming a flat,
+      elliptical sheet. Over time, the sheet undergoes a subtle expansion and slight
+      deformation in its overall shape. The internal structure of the mesh remains
+      consistent as the cells shift slightly to accommodate the growth. The final
+      frames show a slightly larger and more elongated version of the initial mesh.
+    objects: The scene contains a large, elliptical mesh composed of numerous small
+      hexagonal cells. These cells are arranged in a dense, interlocking honeycomb
+      pattern to form a continuous surface. The mesh is colored in a light grey or
+      off-white shade against a solid black background. Each individual hexagon is
+      uniform in size and shape, creating a repetitive geometric texture.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The video shows a static 3D mesh of a Möbius strip. The mesh remains completely stationary
+      throughout the entire sequence of frames. There is no movement, deformation, or change in the geometry
+      of the object. The simulation appears to be a steady-state visualization of a mathematical surface.
+    objects: The primary object is a single Möbius strip represented as a polygonal mesh. It is composed
+      of 455 hexagonal and pentagonal cells that form a continuous, non-orientable surface. The mesh is
+      colored in a light grey or off-white shade against a solid black background. The object is large
+      enough to occupy the central portion of the frame, showing a clear twist in its topology.
+  movie_kburns:
+    description: The video shows a 3D mesh of a Möbius strip rotating slowly around its central axis.
+      As it rotates, the twist of the surface becomes more apparent from different viewing angles. The
+      hexagonal tiling of the mesh remains consistent throughout the entire animation. The lighting and
+      shading on the surface shift dynamically as the geometry turns.
+    objects: The primary object is a single continuous surface with the topology of a Möbius strip. It
+      is rendered as a grey mesh composed of numerous small hexagonal faces. The strip is large enough
+      to occupy a significant portion of the central frame. The background is a solid, uniform black color
+      that provides high contrast for the mesh.
