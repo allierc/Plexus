@@ -938,8 +938,22 @@ class LiveMovie:
         L /= max(np.linalg.norm(L), 1e-12)
         amb = float(st.get("dot_ambient", 0.35))
         shade = amb + (1.0 - amb) * np.clip(nrm @ L, 0.0, 1.0)
+        # SPECULAR, ADDED TO THE HUE RATHER THAN SCALING IT: a highlight is the light's colour, not
+        # the body's, so it is white pushed on top. Blinn-Phong on the same body normal, with the
+        # half-vector between the light and a fixed view direction -- the camera does not move in
+        # these clips, so a constant `dot_view` is the honest approximation and a per-frame camera
+        # query would buy nothing. `dot_specular` is the strength and `dot_specular_power` the
+        # tightness, the same two keys sprite lighting reads.
+        spec = float(st.get("dot_specular", 0.0))
+        if spec > 0.0:
+            V = np.asarray(st.get("dot_view", [0.0, 0.25, 1.0]), np.float64)
+            Hv = L + V / max(np.linalg.norm(V), 1e-12)
+            Hv /= max(np.linalg.norm(Hv), 1e-12)
+            hl = spec * np.clip(nrm @ Hv, 0.0, 1.0) ** float(st.get("dot_specular_power", 24))
+        else:
+            hl = np.zeros(n)
         out = np.asarray(base).copy()
-        out[:n] = np.clip(B * shade[:, None], 0, 255).astype(out.dtype)
+        out[:n] = np.clip(B * shade[:, None] + 255.0 * hl[:, None], 0, 255).astype(out.dtype)
         return out
 
     def _frame(self, H, tick):
