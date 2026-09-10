@@ -1,0 +1,14 @@
+{
+ "rest_frames": 86,
+ "rest_A_rms": 0.000755184271838516,
+ "rest_u_rms": 3.265096529503353e-05,
+ "covered_cells": 176,
+ "peak_frame": 13,
+ "shortening_corr": -0.04005074501037598,
+ "axis_agreement": 0.08272092789411545,
+ "curve_corr": 0.9917933344841003,
+ "displacement_corr": 0.17196856439113617,
+ "tracker_dA_rms": 0.01877329871058464,
+ "tracker_du_rms": 0.0005171943339519203,
+ "signal_A_rms_peak": 0.026157032698392868
+}
