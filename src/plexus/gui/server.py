@@ -325,7 +325,26 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return self.wfile.write(body)
 
-        if route == "/api/studio/session":
+        if route == "/bio":
+            from plexus.gui import bio
+            body = bio.page().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+
+        if route == "/api/bio/seed":
+            from plexus.gui import bio, studio
+            name = (q.get("name") or [""])[0]
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            if not name or not os.path.exists(sp):
+                return self._send_json({"error": "no such spec"}, 404)
+            try:
+                return self._send_json(bio.seed_scene(sp))
+            except Exception as e:                       # noqa: BLE001 -- the page shows the cause
+                return self._send_json({"error": f"seed failed: {type(e).__name__}: {e}"[:800]}, 400)
+
             from plexus.gui import studio
             S = studio.SESSION
             return self._send_json({"state": S.get("state"), "chars": S.get("chars"),
@@ -399,7 +418,60 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             return self._send_json({"error": f"bad json: {e}"}, 400)
 
-        if route == "/api/studio/author":
+        if route == "/api/bio/build":
+            from plexus.gui import bio, studio
+            try:
+                spec = bio.build_spec(data)
+            except Exception as e:                       # noqa: BLE001
+                return self._send_json({"error": f"form: {e}"}, 400)
+            ok, err = _validate(spec)
+            if not ok:
+                return self._send_json({"error": "schema rejected the spec", "detail": err}, 400)
+            os.makedirs(studio.CONFIG_DIR, exist_ok=True)
+            name = spec["general"]["name"]
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            raw = _dump_yaml(spec)
+            open(sp, "w").write(raw)
+            return self._send_json({"name": name, "raw": raw, "valid": True})
+
+        if route == "/api/bio/save":
+            from plexus.gui import bio, studio
+            name = str(data.get("name") or "")
+            try:
+                spec = yaml.safe_load(data.get("raw") or "")
+            except Exception as e:                       # noqa: BLE001
+                return self._send_json({"error": f"not YAML: {e}"}, 400)
+            if not isinstance(spec, dict) or not name:
+                return self._send_json({"error": "no spec or no name"}, 400)
+            ok, err = _validate(spec)
+            if not ok:
+                return self._send_json({"error": "schema rejected the spec", "detail": err}, 400)
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            open(sp, "w").write(_dump_yaml(spec))
+            return self._send_json({"name": name, "valid": True, "form": bio.form_from_spec(spec)})
+
+        if route == "/api/bio/refine":
+            from plexus.gui import bio, studio
+            name = str(data.get("name") or ""); prompt = str(data.get("prompt") or "").strip()
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            if not prompt or not os.path.exists(sp):
+                return self._send_json({"error": "no prompt or no spec"}, 400)
+            current = open(sp).read()
+            res = studio.author_spec(prompt, name, current=current, model=str(data.get("model") or "sonnet"))
+            if not res["yaml"]:
+                return self._send_json({"error": f"Claude returned no YAML (rc={res['rc']})", "detail": res["log"][-1200:]})
+            try:
+                spec = yaml.safe_load(res["yaml"])
+            except Exception as e:                       # noqa: BLE001
+                return self._send_json({"error": f"the reply is not YAML: {e}", "seconds": res["seconds"]})
+            ok, err = _validate(spec)
+            if not ok:
+                return self._send_json({"error": "schema rejected the edited spec", "detail": err, "seconds": res["seconds"]})
+            raw = _dump_yaml(spec)
+            open(sp, "w").write(raw)
+            return self._send_json({"name": name, "raw": raw, "seconds": res["seconds"], "valid": True,
+                                    "form": bio.form_from_spec(spec)})
+
             # THE SERVER OWNS THE FILE. Claude runs read-only and hands back text; nothing reaches
             # config/studio/ until `plexus.schema.load` -- the same validator the engine trusts --
             # has accepted it. An invalid spec is returned as an error with the schema's own
