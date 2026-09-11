@@ -1,0 +1,140 @@
+# Cell size and cell cycle: the alignment plan
+
+Branch `size-cycle-align`, opened 2026-09-11 from the two audits of the same day. Reference for
+what "size control" has to mean: Ginzberg, Kafri & Kirschner, *On being the right (cell) size*,
+Science 348:1245075 (2015), with Cadart et al. Nat. Commun. 9:3275 (2018) for the mammalian
+near-adder and the two-channel finding, Schmoller et al. Nature 526:268 (2015) and Zatulovskiy et
+al. Science 369:466 (2020) for inhibitor dilution, Smith & Martin PNAS 70:1263 (1973) for the
+constant hazard. The test those papers give is one regression per run: volume added over a cycle
+against volume at birth, both in units of the seed-time median cell volume `v_ref`. Slope -1 is a
+sizer, 0 an adder, +1 a timer under exponential growth -- and the population median must be
+stationary, or the rule is not controlling anything.
+
+## 0. What the audits found
+
+Measured on the archives that this branch withdrew (`tools/size_report.py` reproduces the numbers
+on any replacement run):
+
+1. **`cv_*` measured target tracking, not size.** No growth, no division: `CV(V) = CV(V0f) + lag`,
+   the lag set by `kappa_s / (k_v h0)`. Two of ten arms were rails -- `p0` is not read by the
+   apico-basal energy (`cv_shape_low` equal to the baseline to four decimals), and `k_v >= 8` at
+   `eta 0.08` sat past the explicit-Euler bound (CV 0.10 in the frame-0 record, thickness spread
+   0.05 -> 0.16 over the run: the solver, not the model).
+2. **The adder arms behaved as sizers.** Slope -1.05, CV of division volume 0.04, on
+   `cvd2_adder_tension`. `Vbirth` at a division is the arithmetic half `vf * p` with `p = 0.5`
+   ([vertex_ops.py:1979](../../src/plexus/operators/vertex_ops.py#L1979)), so in a converged
+   population every stored birth volume is `v_ref` and `Vbirth + delta v_ref` is `2 v_ref`, the
+   sizer's threshold. The realised daughter volumes did vary (CV 0.27 at the septum, 0.16 twelve
+   frames later); the rule never read them. The doubler collapsed the same way.
+3. **The four cycle arms were four timers.** Growth `rate 0.003457` on the linear scale is a volume
+   rate of `3 * rate = 0.0104` per frame: x3.9 over the 130-frame S+G2+M clock, x12 over a
+   240-frame cycle. Division removes x2, so 85-96 % of daughters were born above the G1 checkpoint
+   after frame 200, the G1 fraction was 0-5 %, and the median volume ran 1.3 -> 6.0 `v_ref` in
+   400 frames. Condition for a checkpoint to act at all: `exp(3 rate (t_s + t_g2 + t_m)) < 2`.
+4. **The cycle sizer is an adder for small cells.**
+   [vertex_ops.py:3304](../../src/plexus/operators/vertex_ops.py#L3304) divides added volume by
+   `(g1_size - 1) v_ref`, not by `v* - V_b`: a cell born below `v_ref` leaves G1 after adding
+   `0.6 v_ref`, below the checkpoint. Chosen because `Vbirth` and `v_now` were in two volume
+   conventions; `cell_size()` has since unified them.
+5. **Inhibitor dilution carries no size information.** Concentration reset to 1.0 at every birth
+   ([vertex_ops.py:3421](../../src/plexus/operators/vertex_ops.py#L3421)), exit at `c <= 0.6`, so
+   G1 ends at `V = V_b / 0.6` for every cell -- a relative rule. The mechanism works because a
+   size-independent *amount* gives `c_birth = A / V_b`, higher in small cells.
+6. **Three size readers, two conventions, one switch that reaches two of them.** `cell_divide`
+   reads the polyhedron whenever `sep` exists ([:1786](../../src/plexus/operators/vertex_ops.py#L1786));
+   `cell_cycle` and `cell_die` only under `v0_from: polyhedron`
+   ([:182](../../src/plexus/operators/vertex_ops.py#L182)); `cell_grow[sizer]` reads the target
+   `V0f`. And the growth-rate channel (`cell_grow` sizer / balance) was used by no tissue spec.
+
+## 1. What this branch has already done
+
+- Withdrawn: 36 specs (`cv_*`, `cvd_*`, `cvd2_*`, `cyc4_*`, `cycle_phases`), their 35 archives,
+  the fingerprints of the five that were working points, `tools/cv_report.py`,
+  `tools/cycle_report.py`. The regression registry, `tests/README.md`, `REGRESSION_PLAN.md` and
+  the ECM roadmap point at the replacements.
+- Written: `tools/size_report.py`, the one report (slope, `r(cycle length, V_b)`, CV of division
+  volume, median drift over the last two cycles, CV of the population).
+- Written: eleven specs, one growth rate for all of them -- `rate 0.00096`, one volume doubling
+  per 240 frames, so a rule that is a sizer has exactly x2 to remove -- with `vseed_cv 0.15` and
+  `split_cv 0.12` so there is birth-size variance for the rule to act on, and
+  `v0_from: polyhedron` so every reader is in the cell's own volume:
+
+  | spec | rule under test | expected after R1 |
+  |---|---|---|
+  | `size_sizer` | `cell_divide` sizer, factor 2 | slope -1, CV(V_d) = cycle_cv 0.15 |
+  | `size_adder` | `cell_divide` adder, delta 1 | slope 0 |
+  | `size_doubler` | `cell_divide` doubler (the null) | slope ~ +1, CV grows |
+  | `size_timer` | `cell_divide` timer, 60 calls x every 4 | slope ~ +1, CV grows |
+  | `size_grow_sizer` | `cell_grow` sizer under a timer division | slope < 0 with no checkpoint: the growth channel alone |
+  | `size_two_channel` | `cell_grow` sizer + `cell_cycle` sizer | tightest CV: Kafri 2013 / Cadart 2018 |
+  | `cycle_sizer` | `cell_cycle` G1 size checkpoint | slope -1, G1 fraction ~ 45 % |
+  | `cycle_timer` | `cell_cycle` all-clock | slope ~ +1 |
+  | `cycle_hazard` | Smith-Martin constant hazard | slope ~ +1, exponential tail in L |
+  | `cycle_dilution` | Whi5 / Rb dilution | slope -1 once c_birth = v_ref / V_b |
+  | `mech_target_percell` | twin of `mech_uniform_target`, per-cell targets | CV(V) = CV(V0f) + 0.006 |
+
+## 2. The target design
+
+**One volume.** `cell_size()` is the only reader of a cell's size. `cell_grow`, `cell_divide`,
+`cell_cycle`, `cell_die` all call it; `cell_divide`'s private polyhedron branch and the
+`v0_from` switch go. The convention is decided by geometry -- a set with `sep` is a set of
+polyhedra, a sheet's size is its area, else the wedge -- and nothing in a spec chooses it.
+
+**Birth volume is measured, not bookkept.** `Vbirth` is written from `cell_size()` on the first
+tick after the septum. `split_cv` moves the septum or is withdrawn; it does not perturb targets.
+
+**One "when".** The size rules live in `cell_cycle` and nowhere else: G1 rules `sizer`, `adder`,
+`timer`, `hazard`, `dilution`; S, G2, M one clock. `cell_divide` keeps the septum and the trigger
+`phase >= M` only -- its `sizer / adder / doubler / timer / concerted` models, `factor`, `delta`,
+`cycle`, `min_cycle`, `max_cycle`, `cycle_cv`, `reset_noise`, `divjit` are withdrawn; the
+"divide when big" runs are a cycle with `t_s = t_g2 = t_m = 0`. Then grow says how fast, cycle
+says when, divide does the topology, and each model exists once.
+
+**Correct G1 rules.** Sizer `dp/dt = f_G1 (dV/dt) / (v* - V_b)`; adder
+`f_G1 (dV/dt) / (delta v_ref)`; dilution reset `c_birth = v_ref / V_b` (fixed amount), exit at
+`c <= thresh`, which is the sizer with a molecule under it and should reproduce its slope; timer
+and hazard unchanged.
+
+**Growth.** Exponential default, `sizer` and `balance` variants kept; `cell_grow[timer]` (a
+proportional controller on a target, which is what `cell_mechanics` already is) withdrawn. At
+build, the engine prints the implied volume growth per cycle, `exp(3 rate T)`, whenever a
+`cell_cycle` is scheduled, and refuses above x4: that is the number finding 3 was missing.
+
+**Time, not calls.** `every`, `min_cycle`, `cycle`, `age` in simulation time. A rule stated in
+division-calls changes meaning with `every`.
+
+**Representation.** Every per-cell quantity is a block on the cell set: `V0f`, `A0`, `P0`, `age`,
+`ndiv`, `alive`, `mg_scale`, the `*_init` triplet leave the mesh table, which keeps topology only
+(finishes the S2b move). `Vbirth`, `phase`, `cycle_progress` recorded by default. A `cell_id`
+block, assigned at seed and at birth, so lineage is read and not reconstructed from index
+stability.
+
+**Engine.** Seed-time writes go to seed operators -- `cell_cycle.seed_async` becomes
+`seed_mesh cycle_async`, the `V0f (1+u)/1.5` rescale with it -- so `cell_cycle` and `cell_grow`
+drop `MAY_MUTATE_INTEGRATED_STATE` (29 operators carry it today; division stays structural). The
+`_k` tick counters and `_engine_owns_clock` shim go once every rate is a rate. `p0` leaves the
+apico-basal contract. The apico-basal step prints its stability number `eta k_v A_med^2` and
+refuses above 1.
+
+**Measurement.** `tools/size_report.py` is the report; the eleven specs are registered as working
+points when the R1 gate passes; `QUICK` becomes `size_adder 60 + mech_uniform_target 60 +
+apop2_ks0p1 60`.
+
+## 3. The ladder
+
+Each rung is one commit series with a gate measured by `tools/size_report.py` on the eleven
+specs; a rung that moves a number it did not mean to move is a working-point change and is
+reviewed as one (`tests/REGRESSION_PLAN.md`).
+
+| rung | change | gate |
+|---|---|---|
+| R0 | run the eleven specs on HEAD; record the table in this note | the defects reproduce: `size_adder` slope -1, `cycle_dilution` slope > 0, `cycle_sizer` slope between |
+| R1 | findings 2, 4, 5: measured `Vbirth`; sizer denominator `v* - V_b`; dilution reset `v_ref / V_b` | `size_sizer` -1 +- 0.15, `size_adder` 0 +- 0.15, `size_timer` > +0.5, `cycle_dilution` = `cycle_sizer` within 0.15; median drift < 10 % over the last two cycles on every checkpoint arm |
+| R2 | finding 6: one reader (`cell_size` in `cell_divide`; `v0_from` withdrawn); growth-per-cycle print and refusal | byte-identical on `apop2_ks0p1`, `sheet_*`, `mech_uniform_target` (their convention does not change); R1 numbers within bands |
+| R3 | one "when": divide-family models into `cell_cycle`; `cell_divide` keeps septum + trigger; `cell_grow[timer]` withdrawn | `size_*` rewritten as degenerate cycles reproduce R1 within bands; five operators and eight parameters fewer in `catalog_summary()` |
+| R4 | representation: cell-set blocks, `cell_id`, time units, default recording | trajectory keys renamed once, in their own commit; `size_report` reads lineage from `cell_id` and gives R3's numbers |
+| R5 | engine: seed-time writes to seed ops; flags off; tick shims out; `p0` off the apico-basal contract; stability print | tick-0 invariant passes for `cell_cycle` and `cell_grow`; `MAY_MUTATE_INTEGRATED_STATE` count 29 -> <= 20 |
+| R6 | register the eleven working points; regenerate `library/`; `QUICK` re-pointed | `pytest tests/regression -m regression --quick` green; nightly archive has one row per new point |
+
+Out of scope: MPM, ECM, the apoptosis series -- touched only through the shared reader in R2, and
+gated there.

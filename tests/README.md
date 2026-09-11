@@ -65,7 +65,7 @@ own commit.
 
 ## One working point by hand
 
-    python tools/fingerprint.py diff cvd2_adder_tension --device cuda:1
-    PLEXUS_REGRESSION_DEVICE=cuda:1 python -m pytest tests/regression -m regression -k cvd2_adder_tension
+    python tools/fingerprint.py diff apop2_ks0p1 --device cuda:1
+    PLEXUS_REGRESSION_DEVICE=cuda:1 python -m pytest tests/regression -m regression -k apop2_ks0p1
 
 Design and the bands: `tests/REGRESSION_PLAN.md`. Status of the old suite: `tests/TEST_KNOWN_FAILURES.md`.

@@ -8,7 +8,7 @@ checkpoint is compared within the bands in `tools/regression_lib.BANDS`. Frame t
 only on the same GPU model as the fingerprint, reported otherwise.
 
     pytest tests/regression -m regression            the whole registry, ~15 min on an A6000 (deselected by default)
-    pytest tests/regression -m regression -k cvd2    one working point
+    pytest tests/regression -m regression -k apop2_ks0p1    one working point
     PLEXUS_REGRESSION_DEVICE=cuda:1 pytest ...       pick the card
 
 Refreshing a fingerprint: `python tools/fingerprint.py refresh <name> --because "..."`, in a commit
@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 import regression_lib as R  # noqa: E402
 
 DEVICE = os.environ.get("PLEXUS_REGRESSION_DEVICE", "cuda:0")
-QUICK = {"cvd2_adder_tension": 60, "cv_kv_double": 60, "apop2_ks0p1": 60}
+QUICK = {"mech_uniform_target": 60, "apop2_ks0p1": 60}   # size_adder joins once registered (SIZE_CYCLE_PLAN R6)
 
 pytestmark = pytest.mark.regression
 
