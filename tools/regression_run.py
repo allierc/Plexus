@@ -2,7 +2,7 @@
 
     python tools/regression_run.py --device cuda:0                 the whole series (~20 min on an A6000)
     python tools/regression_run.py --device cuda:1 --quick         three short working points + the rest
-    python tools/regression_run.py --only cvd2_adder_tension       one working point
+    python tools/regression_run.py --only apop2_ks0p1              one working point
     python tools/regression_run.py ... --open                      open the dashboard when done
 
     nohup python tools/regression_run.py --device cuda:0 > log/regression/nightly.log 2>&1 &
@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 import regression_lib as R  # noqa: E402
 
 ARCHIVE = os.path.join(ROOT, "log", "regression", "archive.jsonl")
-QUICK = {"cvd2_adder_tension": 60, "cv_kv_double": 60, "apop2_ks0p1": 60}
+QUICK = {"mech_uniform_target": 60, "apop2_ks0p1": 60}   # size_adder joins once registered (SIZE_CYCLE_PLAN R6)
 
 
 def _git(*args):

@@ -34,7 +34,7 @@ there is no rule set for mechanical constraint to influence growth." There is no
 arrow points back at the tissue.
 
 **What changed this week.** The apico-basal tissue is now a live engine model with a working point
-under regression protection (`cvd2_adder_tension`, `tests/regression/`), and the tissue + matrix
+under regression protection (`size_adder`, pending re-registration per `notes/size_cycle/SIZE_CYCLE_PLAN.md`; was `cvd2_adder_tension`; `tests/regression/`), and the tissue + matrix
 pair runs live in one spec (`config/tissue/spheroid_ecm_ab.yaml`: 801 frames, the tissue tracks
 its reference exactly, the matrix is pushed out to 0.95 of the shell radius). That is the first
 rung of the archive rebuilt without a replay. The membrane and the chemistry are next.
@@ -176,11 +176,11 @@ change the model, so they stay together.
    basal surface faces the lumen; a basement membrane needs it facing out. `seed_mesh apical: in`
    flips the rings, and the one thing that broke under the flip was the sign of the polyhedron
    volume (an oriented triangulation with the apical cap outward); the sign is now the tissue's,
-   taken once over the whole tissue, and the flipped spheroid reproduces the cvd2 working point
+   taken once over the whole tissue, and the flipped spheroid reproduced the former cvd2_adder_tension working point
    to the fingerprint through frame 112. The integrin demo (`config/tissue/spheroid_integrins.yaml`)
    runs apical-in with `surface: basal`, clusters on the outside.
 3. Run the control with the plaque stiffness set to zero. The tissue must then reproduce the
-   cvd2_adder_tension working point exactly, cell count and shell radius at every checkpoint.
+   `size_adder` working point exactly, cell count and shell radius at every checkpoint.
    Once the coupled run is looked at and accepted, register it as a working point.
 4. Re-measure what the old rig could not. The archived membrane runs held the tissue in place
    with an artificial restoring force of stiffness 50 toward the recorded positions, so the
