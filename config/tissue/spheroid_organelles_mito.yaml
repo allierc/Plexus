@@ -104,6 +104,7 @@ sets:
         radius: 0.06
         region: interior
         on_divide: halve
+        tau: 150.0
 fields: {}
 operators:
 - op: cell_geometry
@@ -154,6 +155,10 @@ operators:
   at: organelle
   tissue: vertex
   seed: 0
+- op: organelle_express
+  at: organelle
+  tissue: vertex
+  seed: 0
 schedule:
 - cell_geometry
 - cell_grow
@@ -162,6 +167,7 @@ schedule:
 - cell_divide
 - topo_record
 - organelle_project
+- organelle_express
 seed:
 - op: seed_mesh
   at: vertex
@@ -206,6 +212,7 @@ plotting:
     wall_color: '#e8e8e8'
     mid: false
     points: false
+    spheres: true
   cross_section_height: 0.24
   curve:
   - quantity: cells
@@ -242,16 +249,16 @@ plotting:
   dot_radius:
     nucleus: 0.3
     mitochondria: 0.06
-
-# --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
-    description: The simulation shows a spherical cluster of particles that gradually expands in size
-      over time. As the cluster grows, the number of cells and nuclei within the structure increases significantly.
-      The mitochondrial count remains relatively stable throughout the observed sequence. The overall
-      volume of the spheroid increases as it occupies more space within the 600 $\mu$m cube.
-    objects: The primary object is a spherical cluster composed of numerous small, blue and red particles.
-      These particles are densely packed together to form a cohesive, rounded mass in the center of the
-      frame. A smaller, inset view shows a cross-section of the spheroid, revealing a hollow-like interior
-      with a ring of particles. The entire scene is set within a large, black cubic bounding box with
-      white wireframe edges.
+    description: The simulation shows a spherical cluster of particles that gradually
+      expands in size over time. As the cluster grows, the number of cells and nuclei
+      within the structure increases significantly. The mitochondrial count remains
+      relatively stable throughout the observed sequence. The overall volume of the
+      spheroid increases as it occupies more space within the 600 $\mu$m cube.
+    objects: The primary object is a spherical cluster composed of numerous small,
+      blue and red particles. These particles are densely packed together to form
+      a cohesive, rounded mass in the center of the frame. A smaller, inset view shows
+      a cross-section of the spheroid, revealing a hollow-like interior with a ring
+      of particles. The entire scene is set within a large, black cubic bounding box
+      with white wireframe edges.
