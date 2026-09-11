@@ -575,7 +575,8 @@ class LiveMovie:
             #
             # A PLAIN SEGMENT: no end ticks, and the label in the same font and size as the
             # top-left print, so it reads as one annotation rather than two competing ones.
-            if self.time_s is not None and getattr(self, "length_um", None):
+            if self.time_s is not None and getattr(self, "length_um", None) \
+                    and bool((self.style or {}).get("scale_bar", True)):   # the bio page draws its own, view-fixed bar
                 _m = float(self.length_um) / 1.0e6            # metres per simulation length unit
                 _ax0 = [i for i in range(3) if i != self.up][0]
                 # THE ROUND NUMBER IS CHOSEN IN THE PHYSICAL UNIT, NOT IN BOX UNITS. It used to
