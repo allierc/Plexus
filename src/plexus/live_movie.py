@@ -90,6 +90,14 @@ def _biggest_particle_set(H):
         # present, and the present is what is being drawn.
         occ = getattr(lvl, "occ", None)
         k = int(occ.sum()) if occ is not None else int(lvl.n)
+        # A MESH IS DRAWN AS A MESH, NOT AS THE CLOUD. `_add_meshes` draws every level that carries
+        # a half-edge table whatever the subject is, so choosing the vertex set as the subject only
+        # costs the picture its point sets: a tissue of 396 vertices holding 200 nuclei chose the
+        # vertices and drew no nucleus. A mesh level is the subject only when nothing else has a
+        # position: then the dots are its corners, as before.
+        _m = getattr(lvl, "mesh", None)
+        if _m is not None and int(_m.get("nF", 0) or 0):
+            k = -0.5                                        # below any live count, above "none"
         if k <= bn:
             continue
         best, bn = name, k
