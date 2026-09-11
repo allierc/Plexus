@@ -77,31 +77,40 @@ def row(name, group="tissue", birth_lag=12):
     if p is None:
         return None
     z = np.load(p)
-    T = len(z["vertex__mesh_nF"])
-    V = [_volumes(z, t) for t in range(T)]
+    nFs = z["vertex__mesh_nF"]; T = len(nFs)
+    # AGES FIRST, VOLUMES ONLY WHERE THEY ARE READ. Lineage comes from the recorded `age`, which is
+    # cheap; the polyhedron geometry is not, and a run of 800 frames and 2,000 cells took minutes
+    # per spec when every frame was rebuilt. The volumes are needed at each birth's read frame,
+    # at the frame before each division, and on a stride for the population medians.
     ages = [_age(z, t) for t in range(T)]
     births = []                                   # (index, frame) of every birth after frame 0
     for t in range(1, T):
-        n0, a0, a1 = len(V[t - 1]), ages[t - 1], ages[t]
-        for i in range(len(V[t])):
+        n0, a0, a1 = len(ages[t - 1]), ages[t - 1], ages[t]
+        for i in range(len(ages[t])):
             if i >= n0 or a1[i] < a0[i]:
                 births.append((i, t))
     resets = {}
     for i, t in births:
         resets.setdefault(i, []).append(t)
-    v_ref = float(np.median(V[0]))
-    cyc = []
+    pairs = []
     for i, tb in births:
         later = [t for t in resets[i] if t > tb]
-        if not later:
-            continue
-        td = later[0]
-        tr = min(tb + birth_lag, td - 1)
-        cyc.append((V[tr][i] / v_ref, V[td - 1][i] / v_ref, td - tb))
-    out = dict(name=name, T=T, n0=len(V[0]), nT=len(V[-1]), cycles=len(cyc))
-    med = np.array([np.median(v) for v in V]) / v_ref
+        if later:
+            td = later[0]
+            pairs.append((i, tb, min(tb + birth_lag, td - 1), td))
+    # the settle window: the reference is the median once the size rules start reading
+    ref_frame = int(z["vertex__mesh_scalar_ref_frame"][0]) if "vertex__mesh_scalar_ref_frame" in z.files else 0
+    stride = max(1, T // 80)
+    need = {0, T - 1, min(ref_frame, T - 1)} | set(range(0, T, stride)) \
+        | {tr for _, _, tr, _ in pairs} | {td - 1 for _, _, _, td in pairs}
+    V = {t: _volumes(z, t) for t in sorted(need)}
+    v_ref = float(np.median(V[min(ref_frame, T - 1)]))
+    cyc = [(V[tr][i] / v_ref, V[td - 1][i] / v_ref, td - tb) for i, tb, tr, td in pairs]
+    out = dict(name=name, T=T, n0=int(nFs[0]), nT=int(nFs[-1]), cycles=len(cyc))
+    med_t = sorted(t for t in V if t % stride == 0 or t == T - 1)
+    med = np.array([np.median(V[t]) for t in med_t]) / v_ref
     out["med_end"] = float(med[-1])
-    out["cv_end"] = float(V[-1].std() / V[-1].mean())
+    out["cv_end"] = float(V[T - 1].std() / V[T - 1].mean())
     if len(cyc) >= 10:
         c = np.array(cyc)
         Vb, Vd, L = c[:, 0], c[:, 1], c[:, 2]
@@ -111,7 +120,8 @@ def row(name, group="tissue", birth_lag=12):
         out["mean_L"] = float(L.mean())
         # drift of the median volume over the last two mean cycle lengths, as a fraction
         w = int(min(T - 1, 2 * L.mean()))
-        out["drift"] = float(med[-1] / med[-1 - w] - 1.0) if w > 0 else float("nan")
+        t0 = min(med_t, key=lambda t: abs(t - (T - 1 - w)))
+        out["drift"] = float(med[-1] / med[med_t.index(t0)] - 1.0) if w > 0 else float("nan")
     return out
 
 

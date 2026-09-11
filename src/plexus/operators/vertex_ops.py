@@ -146,7 +146,25 @@ def size_ref(m):
     return float(m.get("v_ref", 1.0))
 
 
-def cell_size(lvl, m, nF, pos_np=None):
+def settling(H, m):
+    """True while the tissue is inside its seed's `ref_frame` window: the size rules hold."""
+    return int(getattr(H, "frame", 0) or 0) < int(m.get("ref_frame", 0) or 0)
+
+
+def reset_vbirth_at_reference(H, m, at, v, nF):
+    """At the reference frame, once: every seeded cell's `Vbirth` becomes the volume it has now,
+    in the convention `v` is in. Before this the block held the seed's TARGET, which on an
+    apico-basal shell is 0.6 of the settled volume -- a first generation born 40% small."""
+    if int(m.get("ref_frame", 0) or 0) <= 0 or m.get("vbirth_at_reference"):
+        return
+    cat = resolve_cell_set(H, at)
+    vb = cell_block(H, cat, "Vbirth", nF)
+    if vb is not None and len(vb) == nF:
+        set_cell_block(H, cat, "Vbirth", np.asarray(v[:nF], np.float64), nF)
+    m["vbirth_at_reference"] = True
+
+
+def cell_size(lvl, m, nF, pos_np=None, H=None, at="vertex"):
     """A cell's volume AND the reference to compare it against, IN ONE CONVENTION.
 
     THE DEFECT THIS EXISTS TO END. A cell's volume has two definitions in this tree and both are
@@ -194,6 +212,8 @@ def cell_size(lvl, m, nF, pos_np=None):
             # different population from the same spec.
             if "v_ref_poly" not in m:
                 m["v_ref_poly"] = float(_np.median(v))
+                if H is not None:
+                    reset_vbirth_at_reference(H, m, at, v, nF)
             m["size_convention"] = "polyhedron"
             return v, float(m["v_ref_poly"])
     area, _, _, vf = face_geometry_3d(P.cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
@@ -1196,6 +1216,14 @@ class SeedMeshApicoBasal(SeedMesh3D):
         # started 300 frames early. A spec that wants the polyhedron says `v0_from: polyhedron`
         # (the apop2_abfix_* family does); a default may not move a corpus.
         self.v0_from = str(params.get("v0_from", "wedge")).lower()
+        # `ref_frame` -- THE FRAME AT WHICH THE SIZE RULES FIRST READ THE TISSUE. A seeded shell
+        # is not at rest in its polyhedron volume: the energy's rest offset inflates every cell
+        # over the opening frames (x1.4-1.7 on the reference spheroid, settling in 30-50 frames,
+        # `tools/equilibrium_h.py`), and a reference taken on that ramp is a different number on
+        # every spec. Until this frame `cell_divide` and `cell_cycle` hold; at it, `v_ref` is
+        # cached and every seeded cell's `Vbirth` becomes the volume it actually has. Declared,
+        # so it is the same frame on every run; 0 (the default) is the old behaviour.
+        self.ref_frame = int(params.get("ref_frame", 0))
         if self.v0_from not in ("wedge", "polyhedron"):
             raise ValueError(f"seed_mesh[apicobasal]: v0_from must be wedge|polyhedron, "
                              f"not {self.v0_from!r}")
@@ -1275,6 +1303,7 @@ class SeedMeshApicoBasal(SeedMesh3D):
         # they say. (The wider reconciliation -- one volume for growth, division, death AND the
         # energy -- is AB_R7R8_TODO section 0a and is not settled here.)
         m["v0_from"] = self.v0_from                  # read by cell_size / size_ref
+        m["ref_frame"] = self.ref_frame              # read by cell_divide / cell_cycle / cell_size
         if self.v0_from == "polyhedron":
             _wedge = float(m.get("v_ref", 0.0))     # what the mid-surface model would have used
             vp, _ap, _cp, _hp = apicobasal_geometry_3d(
@@ -1620,7 +1649,7 @@ class Divide3D(Structural):
     # what makes them portable across mesh scales -- so they are dimensionless. The cycle bounds
     # are counts of CALLS, not durations, which is why they are `count` and not `time`.
     PARAM_UNITS = {"factor": "fraction", "delta": "fraction", "p0": "fraction",
-                   "cycle_cv": "fraction", "split_cv": "fraction", "reset_noise": "fraction",
+                   "cycle_cv": "fraction", "reset_noise": "fraction",
                    "min_cycle": "count", "max_cycle": "count"}
     # `V0f` IS DELIBERATELY UNDECLARED HERE, and this is the clearest case in the tree for why
     # UNKNOWN had to exist. The division trigger reads the POLYHEDRON volume when the run carries a
@@ -1648,27 +1677,12 @@ class Divide3D(Structural):
         # the rest of the run.
         self.max_cells = int(params.get("max_cells", 0) or 0)
         self.factor = float(params.get("factor", 2.0))           # divide when volume >= factor x birth volume
-        # `split_cv` -- ASYMMETRIC DIVISION, AND IT IS A PARAMETER AND NOT A MODEL. The two daughters
-        # were given `vf/2` each, exactly, at every division; real cells do not split down the
-        # middle. Cadart et al. measure the asymmetry in mammalian cells and find it small but not
-        # zero, and it matters here for the same reason `cycle_cv` does: a perfectly even split is a
-        # noise-free channel, and a size-control rule that only ever has to correct deviations IT
-        # created cannot be told apart from one that corrects deviations it did not.
-        #
-        # Randomising how a cell splits is not a different hypothesis about what a cell IS, so by
-        # by the axis test it is a value -- the same axis as `cycle_cv`, `vseed_cv` and `age_seed`, not a
-        # `model:` of its own.
-        #
-        # WHAT IT PERTURBS IS THE TARGET, NOT THE SEPTUM, and that limit is stated rather than
-        # papered over: `divide_face_3d` still cuts the ring between the two edges furthest apart
-        # across the cell's short axis, so the GEOMETRIC halves are what they were. `split_cv` sets
-        # the two daughters' target volumes to `p*v` and `(1-p)*v`, and the mechanics then pulls the
-        # real volumes apart to match. A faithful asymmetry would move the septum itself, which is a
-        # change to `divide_face_3d` and to every spec's topology, not to a target.
-        #
-        # The fraction is drawn per division, clipped to [0.2, 0.8]: outside that a "daughter" is a
-        # fragment and the pair is not a division, it is an extrusion with extra steps.
-        self.split_cv = float(params.get("split_cv", 0.0))
+        # `split_cv` and `g1_ramp`: WITHDRAWN (R1 of notes/size_cycle/SIZE_CYCLE_PLAN.md), not read.
+        # Both perturbed the daughters' TARGETS while the septum stayed where `divide_face_3d` put
+        # it. The daughters' birth volumes are now MEASURED on the rebuilt mesh (see forward), so
+        # the asymmetry the septum actually produces -- CV 0.27 of the two pieces on the reference
+        # spheroid -- is the asymmetry the size rules see, and there is nothing left for a
+        # target perturbation to add.
         self.cycle_cv = float(params.get("cycle_cv", 0.0))       # STOCHASTIC CELL CYCLE: Gaussian CV of each daughter's
         #   cell-cycle length (fresh division threshold). >0 keeps division waves broken up (desynchronised) as the
         #   tissue proliferates -- essential at scale so max-rate division never outruns relaxation. 0 -> uniform reset_noise.
@@ -1687,14 +1701,6 @@ class Divide3D(Structural):
         # this many calls even if volume < 2x (a stalled cell still cycles). 0/inf = pure volume-doubling.
         self.min_cycle = int(params.get("min_cycle", 0)); self.max_cycle = int(params.get("max_cycle", 10 ** 9))
         self._cat = params.get("cell_set")          # override only; resolved from the set in forward()
-        # G1 RAMP (SimuCell3D/tyssue "birth-at-target"): set each daughter's TARGET volume v_eq to its ACTUAL
-        # birth volume instead of mother_target/2. The division trigger is ACTUAL volume (vf>=2*Vbirth) but v_eq
-        # is set by ramped morphogen growth, so an actively-growing tip cell has mother_V0f >> vf; halving it
-        # leaves a fresh daughter with target >> actual and (since K_V dominates tension 5-50x) K_V drives the
-        # tiny face hard -> inverted/hollow caps at the proliferating tip. Birth-at-target removes the mismatch;
-        # cell_grow then re-ramps activated daughters as their G1 regrowth. Off by default so other
-        # presets (vesicle_divide/fig4) are unchanged; the tube preset turns it on.
-        self.g1_ramp = bool(params.get("g1_ramp", False))
         # ORIENTED division at the red/white interface (Okuda's tube mechanism, user issue 3): the dividing
         # plane of an ACTIVATED (red) cell is oriented so the daughters stack ALONG the bud axis (the
         # direction from the vesicle centre to the activated tip) instead of by the cell's own long axis.
@@ -1729,6 +1735,23 @@ class Divide3D(Structural):
         """
         return v_now >= self.factor * jit * v_ref
 
+    def _realised_volumes(self, lvl, m, nF):
+        """Every cell's volume on the mesh as it stands, in the convention the trigger reads:
+        the polyhedron where the run carries a separation, the wedge otherwise. None on a mesh
+        with no live vertices."""
+        Nv = int(m["Nv"])
+        if Nv <= 0:
+            return None
+        P = lvl.get("pos")[:Nv].detach().to(torch.float32).cpu()
+        es, et, ef = m["E_srce"].cpu(), m["E_trgt"].cpu(), m["E_face"].cpu()
+        s = lvl.get("sep") if "sep" in getattr(lvl, "state_schema", {}) else None
+        if s is not None and int(s.shape[0]) >= Nv:
+            v, _, _, _ = apicobasal_geometry_3d(P, s[:Nv].detach().to(torch.float32).cpu(),
+                                                es, et, ef, nF)
+        else:
+            _, _, _, v = face_geometry_3d(P, es, et, ef, nF, apex=wedge_apex(m, P))
+        return v.numpy().astype(np.float64)
+
     def _fresh_djit(self, rng, n=1):
         """Fresh per-cell division-threshold multiplier. Gaussian CV (cycle_cv) when set -> desynchronised
         cell cycles; otherwise the legacy uniform +/-reset_noise jitter. Clamped so thresholds stay sane."""
@@ -1751,7 +1774,7 @@ class Divide3D(Structural):
         # tuples per division and a conditional would be one more thing to get wrong.
         births: list = []
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
-        if m is None:
+        if m is None or settling(H, m):
             return {}
         self._k += 1                    # monotonic tick only -- D1: the engine owns the period
         dev = lvl.state.device; dt = lvl.state.dtype; buf = lvl.state.shape[0]
@@ -1815,6 +1838,7 @@ class Divide3D(Structural):
                 # rest state and needs no window, no tolerance and no freeze.
                 if "v_ref_poly" not in m:
                     m["v_ref_poly"] = float(np.median(vf))
+                    reset_vbirth_at_reference(H, m, self.at, vf, nF)
                     print(f"[cell_divide] this run carries a separation, so the trigger reads the "
                           f"POLYHEDRON volume; reference {m['v_ref_poly']:.4f} "
                           f"(the wedge reference is {float(m.get('v_ref', 1.0)):.4f})", flush=True)
@@ -1833,6 +1857,16 @@ class Divide3D(Structural):
         djit = require_cell_block(H, self.cell_set, "divjit", nF, "cell_divide").tolist()
         age = m.get("age")                                       # per-cell age in division-calls since birth
         age = ([0] * nF) if (age is None or age.shape[0] != nF) else (age.detach().cpu().numpy() + 1).tolist()
+        # THE BIRTH VOLUME, RE-READ ONCE THE MECHANICS HAS ANSWERED THE SEPTUM. A cell at age 1 was
+        # cut at this operator's previous call; the piece the septum made is not the volume it
+        # settles to (the rest offset above inflates a fresh daughter by a third within a few
+        # frames), and the size rules compare against what the daughter HAS at the start of its
+        # cycle. `vf` is in the trigger's own convention, so `Vbirth` and the threshold agree.
+        if ndiv_seen := any(a == 1 for a in age):
+            for f in range(nF):
+                if age[f] == 1 and alive[f] > 0:
+                    Vbirth[f] = float(vf[f])
+            set_cell_block(H, self.cell_set, "Vbirth", np.asarray(Vbirth, np.float64), nF)
         # HAS THIS CELL EVER DIVIDED? `age` alone cannot answer it: it starts at 0 for every SEEDED
         # cell and is only RESET to 0 by a division, so in the opening frames a whole untouched
         # tissue looks "just divided" -- the movie flashed entirely green in p1_ph_rd_only, a run in
@@ -1964,19 +1998,11 @@ class Divide3D(Structural):
                                  births=births)
             if res is None:
                 continue
-            # THE SPLIT FRACTION, 0.5 UNLESS `split_cv` SAYS OTHERWISE -- see __init__ for why this
-            # is a parameter and what it does and does not move.
-            _p = 0.5 if self.split_cv <= 0 else float(
-                np.clip(0.5 + self.split_cv * 0.5 * rng.standard_normal(), 0.2, 0.8))
-            half = vf[f] * _p                                     # daughter A's share of the actual volume
-            other = vf[f] * (1.0 - _p)                            # daughter B's
-            if self.g1_ramp:                                     # birth-at-target: v_eq = actual birth volume (no K_V mismatch);
-                iso = A0[f] / max(V0f[f], 1e-12) ** (2.0 / 3.0)  # keep A0 isoperimetric-consistent A0 ~ v_eq^{2/3}
-                a0d = iso * half ** (2.0 / 3.0); v0d = half       # (P0 = p0*sqrt(A0) recomputed below)
-                a0e = iso * other ** (2.0 / 3.0); v0e = other
-            else:
-                a0d = A0[f] * _p; v0d = V0f[f] * _p               # legacy: the mother's targets, split
-                a0e = A0[f] * (1.0 - _p); v0e = V0f[f] * (1.0 - _p)
+            # PROVISIONAL: the mother's targets and volume split evenly. Re-split below, once the
+            # mesh is rebuilt, in proportion to what each daughter ACTUALLY encloses -- see the
+            # block after `_carry_face_state`.
+            half = other = 0.5 * vf[f]
+            a0d = a0e = 0.5 * A0[f]; v0d = v0e = 0.5 * V0f[f]
             A0[f] = a0d; V0f[f] = v0d; Vbirth[f] = half           # daughter A (kept at index f)
             djit[f] = self._fresh_djit(rng); age[f] = 0           # fresh (desync'd) thresholds; reset cell-cycle age
             ndiv[f] = ndiv[f] + 1
@@ -2055,6 +2081,42 @@ class Divide3D(Structural):
             carry = np.array([born.get(int(o), int(o)) for o in keep], np.int64)
         _carry_face_state(m, carry, dt, dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
+        # BIRTH VOLUME IS MEASURED, NOT BOOKKEPT (R1 of notes/size_cycle/SIZE_CYCLE_PLAN.md). The
+        # stored `Vbirth` used to be the arithmetic half `vf * p` of the mother, so in a converged
+        # population every cell's birth volume read `v_ref` and the adder's threshold
+        # `Vbirth + delta v_ref` was the sizer's `2 v_ref`: measured on the withdrawn
+        # cvd2_adder_tension, slope -1.05 of added volume on birth volume where an adder is 0,
+        # while the daughters the septum actually made varied by CV 0.27.
+        #
+        # TWO WRITES, IN TWO CURRENCIES. The mother's TARGETS (`V0f`, `A0`) are split between the
+        # daughters in proportion to the volumes the septum actually gave them, so their sum is
+        # conserved and the asymmetry the cut produced is the asymmetry the mechanics holds. The
+        # targets are NOT set to the realised volumes themselves: under `cell_mechanics[apicobasal]`
+        # a cell rests at `mono_k * V0f + mono_delta`, an affine map with an additive rest offset,
+        # and writing an actual volume into a target inflated every daughter by that offset --
+        # measured, the tissue's total volume x2.25 in 60 frames with no growth to speak of.
+        # `Vbirth` is the ACTUAL volume, in the trigger's convention: provisionally the piece the
+        # septum made, re-read at this operator's next call (see the top of forward) once the
+        # mechanics has answered the cut. A flat sheet whose wedge volumes are zero keeps the even
+        # split: there is no volume to measure.
+        if daughter_mothers:
+            vm = self._realised_volumes(lvl, m, nF2)
+            if vm is not None and float(np.median(vm)) > 1e-12:
+                pos_of = {int(o): j for j, o in enumerate(keep)}   # old index -> new index
+                for i, mo in enumerate(daughter_mothers):
+                    ja, jb = pos_of.get(int(mo)), pos_of.get(nF + i)
+                    if ja is None or jb is None:
+                        continue
+                    va, vb_ = max(float(vm[ja]), 1e-9), max(float(vm[jb]), 1e-9)
+                    pa = va / (va + vb_)
+                    v0m, a0m = V0fa[ja] + V0fa[jb], A0a[ja] + A0a[jb]     # the mother's, re-summed
+                    V0fa[ja], V0fa[jb] = v0m * pa, v0m * (1.0 - pa)
+                    A0a[ja], A0a[jb] = a0m * pa, a0m * (1.0 - pa)
+                    Vba[ja], Vba[jb] = va, vb_
+                P0a = self.p0 * np.sqrt(np.maximum(A0a, 1e-9))
+                m["A0"] = torch.as_tensor(A0a, dtype=dt, device=dev)
+                m["P0"] = torch.as_tensor(P0a, dtype=dt, device=dev)
+                m["V0f"] = torch.as_tensor(V0fa, dtype=dt, device=dev)
         if self.local_relax > 0 and "mech" in m and Nv2 > Nv:    # heal the fresh caps in place at birth
             esT = m["E_srce"]; etT = m["E_trgt"]; efT = m["E_face"]
             newv = torch.zeros(Nv2, dtype=torch.bool, device=dev); newv[Nv:Nv2] = True   # appended septum verts
@@ -3293,24 +3355,23 @@ class CellCycle3D(Lateral):
         # ever accumulated would be a ratchet the predicate never had. Measured with the ratchet in
         # place, the sizer's population reached 2,289 cells against the predicate's 1,493 over 401
         # frames, because cells banked every transient inflation and never paid it back.
-        # ONE VOLUME CONVENTION, AND `Vbirth` IS NOT IN IT. `v_now` and `v_ref` are WEDGE volumes --
-        # `face_geometry_3d`'s origin-referenced cones, which is what the predicate compared -- while
-        # `Vbirth` is the POLYHEDRON volume `cell_divide` records (measured on this spec: v_ref
-        # 2.5433 against a Vbirth median of 1.6374, so `v* - Vbirth` was 2.43 where the wedge answer
-        # is 1.53, and G1 was 60% too long). The distance a cell has to cover is stated in the
-        # reference's own units instead: it must add `(g1_size - 1)` of `v_ref` to pass, which is
-        # what an absolute size checkpoint at `g1_size * v_ref` means for a cell born at `v_ref`.
-        # (The two conventions are AB_R7R8_TODO section 0a and are not settled here.)
+        # THE DISTANCE IS THE CELL'S OWN: `v* - V_b`, its birth volume to the checkpoint. It used
+        # to be `(g1_size - 1) v_ref`, the same number for every cell, because `Vbirth` was in a
+        # different volume convention from `v_now`; that made G1 an ADDER of `0.6 v_ref` for any
+        # cell born below `v_ref` (R1 of notes/size_cycle/SIZE_CYCLE_PLAN.md, finding 4).
+        # `cell_size` and the measured `Vbirth` are in one convention now, so the sizer can say what
+        # it means. A cell born at or past `v*` is carried over the boundary in this step.
         v_star = self.g1_size * ctx["v_ref"]
-        need = max((self.g1_size - 1.0) * ctx["v_ref"], 1e-9)
+        need = np.maximum(v_star - ctx["v_birth"], 1e-9)
         r = ctx["f"][self.G1] * ctx["dv_dt"] / need
-        return np.where(ctx["v_now"] >= v_star, np.maximum(r, ctx["to_boundary"]), r)
+        past = (ctx["v_now"] >= v_star) | (ctx["v_birth"] >= v_star)
+        return np.where(past, np.maximum(r, ctx["to_boundary"]), r)
 
     def forward(self, H, mask=None):
         # THE PAIRING IS READ FROM THE SET, ONCE PER CALL -- see `resolve_cell_set`.
         self.cat = resolve_cell_set(H, self.at, getattr(self, "_cat", None))
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
-        if m is None:
+        if m is None or settling(H, m):
             return {}
         nF = int(m["nF"]); dev = lvl.state.device; dt = lvl.state.dtype
         _np = lambda k: (m[k].detach().cpu().numpy().astype(np.float64)     # noqa: E731
@@ -3406,7 +3467,7 @@ class CellCycle3D(Lateral):
         # volume unconditionally, so on an apicobasal run the sizer's checkpoint, the dilution
         # model's `cyc_vprev` and `g1_size * v_ref` were all stated in a volume the cell does not
         # have, while `cell_mechanics[apicobasal]` was defending the polyhedron.
-        v_now, v_ref = cell_size(lvl, m, nF)
+        v_now, v_ref = cell_size(lvl, m, nF, H=H, at=self.at)
         _dt = float(getattr(H, "dt", 1.0))
         vb0 = cell_block(H, self.cat, "Vbirth", nF)
         _rate_prev = cell_block(H, self.cat, "cyc_rate", nF)
@@ -3419,7 +3480,6 @@ class CellCycle3D(Lateral):
             born = (age <= 0) & (ph >= self.M)
             ph = np.where(born, float(self.G1), ph)
             pt = np.where(born, 0.0, pt)
-            cc = np.where(born, 1.0, cc)
         # DILUTION IS APPLIED TO EVERY CELL EVERY FRAME, whatever the model, because it is a
         # statement about volume and not about the rule: a concentration in a growing cell falls.
         #
@@ -3434,10 +3494,22 @@ class CellCycle3D(Lateral):
         # THE INHIBITOR JUST BEFORE THE DILUTION, which is what `inhibitor_dilution` spends: taken
         # AFTER the birth reset, so a daughter's first frame dilutes from the 1.0 it was reset to
         # rather than from the mother's spent concentration.
+        # THE INHIBITOR AT BIRTH ENCODES SIZE, or the dilution model is not one. A size-
+        # independent AMOUNT `A` synthesised per cycle (Schmoller 2015, Zatulovskiy 2020) gives a
+        # birth concentration `A / V_b`, higher in a small cell; resetting every daughter to 1.0
+        # made G1 end at `V = V_b / inhib_thresh` for every cell -- a relative rule (finding 5 of
+        # notes/size_cycle/SIZE_CYCLE_PLAN.md). With `A = v_ref` a cell born at the reference starts
+        # at 1.0 and the threshold keeps its reading. And the birth frame is NOT diluted against
+        # `cyc_vprev`, which is the MOTHER's volume the daughter inherited -- that doubled the
+        # inhibitor of every newborn.
+        if age is not None and len(age) == nF:
+            vb_now = vb0 if (vb0 is not None and len(vb0) == nF) else v_now
+            cc = np.where(born, v_ref / np.maximum(vb_now, 1e-12), cc)
         cc0 = cc.copy()
         vp = cell_block(H, self.cat, "cyc_vprev", nF)
         if vp is not None and len(vp) == nF:
-            cc = cc * np.where(vp > 0.0, np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0), 1.0)
+            fac = np.where(vp > 0.0, np.clip(vp / np.maximum(v_now, 1e-12), 0.0, 4.0), 1.0)
+            cc = cc * np.where(born, 1.0, fac)
         # `cyc_vprev` IS RETURNED AS A DELTA NOW rather than written here, and the arithmetic is
         # unchanged by that: the engine adds `dt * (v_now - vp)/dt` to `vp`, which is `v_now`.
 
@@ -3518,7 +3590,16 @@ class CellCycle3D(Lateral):
         # (a `transition_probability` cell whose drawn waiting time is a fraction of a frame reached
         # p = 3.76 before this cap). `p` has no meaning beyond the start of M, because M is left by
         # dividing and not by progressing, so the crossing step lands exactly on the boundary.
-        p_next = np.clip(p + _dt * rate, 0.0, cut[self.G2])
+        p_next = p + _dt * rate
+        # A G1 EXIT LANDS ON THE G1/S BOUNDARY AND NOT PAST IT. The G1 rules return a rate with
+        # no upper bound -- the sizer's `dV/dt / (v* - V_b)` for a cell born a hair under `v*`,
+        # the dilution rule's `-dc/dt` for a small cell whose inhibitor is concentrated -- and
+        # a single clip at M's doorstep let such a cell cross S and G2 in the same step. Measured
+        # on cycle_dilution: 200 -> 2,927 cells in 300 frames with a mean cycle of 28 frames
+        # against an S+G2+M clock of 130, and the median volume at zero. S and G2 are clocks and
+        # take their own time from the boundary on.
+        p_next = np.where(g1, np.minimum(p_next, cut[self.G1]), p_next)
+        p_next = np.clip(p_next, 0.0, cut[self.G2])
         ph_next = np.searchsorted(cut, p_next, side="right").astype(np.float64).clip(0, self.M)
         # `phase_t` IS A READOUT NOW, NOT A DRIVER. Nothing above consults it -- the models spend
         # volume, inhibitor or a drawn waiting time, and `timer` spends `p` itself -- but it is
@@ -3699,7 +3780,13 @@ class CellCycleInhibitorDilution(CellCycle3D):
         # the drop at zero made progress a ratchet and let the population run to 2,532 cells against
         # the predicate's 727 over 401 frames.
         drop = (ctx["conc_prev"] - ctx["conc"]) / max(ctx["dt"], 1e-12)
-        span = max(1.0 - self.inhib_thresh, 1e-9)
+        # THE SPAN IS THE CELL'S OWN: from ITS birth concentration `v_ref / V_b` down to the
+        # threshold. Normalised by `1 - inhib_thresh` it was the same span for every cell, so a
+        # cell born small -- concentrated, `c_b` 1.5 -- left G1 after diluting by 0.4, at `c` 1.1,
+        # never reaching the threshold at all: mean cycle 129 frames against an S+G2+M clock of
+        # 130 on cycle_dilution, i.e. no G1. Same defect, same fix, as the sizer's denominator.
+        c_b = ctx["v_ref"] / np.maximum(ctx["v_birth"], 1e-12)
+        span = np.maximum(c_b - self.inhib_thresh, 1e-9)
         r = ctx["f"][self.G1] * drop / span
         return np.where(ctx["conc"] <= self.inhib_thresh, np.maximum(r, ctx["to_boundary"]), r)
 
@@ -5045,6 +5132,15 @@ class ApicoBasalShapeEnergy3D(Lateral):
         if "mono_k" not in m:
             if self.mono_k is not None:
                 m["mono_k"] = self.mono_k                     # declared: see the monolayer's __init__
+            elif str(m.get("v0_from", "wedge")).lower() == "polyhedron":
+                # `mono_k` CONVERTS A WEDGE-UNIT TARGET INTO THE POLYHEDRON VOLUME THIS ENERGY
+                # DEFENDS. A seed that declared `v0_from: polyhedron` wrote `V0f` in that volume
+                # already; scaling it by v_rest/wedge (0.53 on the reference spheroid) a second
+                # time put the target at half the seeded volume, the rest solve then added the
+                # difference back as `mono_delta`, and every cell inflated x1.7 over the opening
+                # frames while the size readers cached a reference from the un-inflated seed
+                # (R1 of notes/size_cycle/SIZE_CYCLE_PLAN.md, finding 7).
+                m["mono_k"] = 1.0
             else:
                 # measured ONCE, here: it was computed on every frame and read on this one
                 v_rest, _, _, _ = apicobasal_geometry_3d(x0, s0, es, et, ef, nF, eocc)

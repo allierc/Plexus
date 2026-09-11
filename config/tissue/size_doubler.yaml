@@ -115,7 +115,6 @@ operators:
   min_cycle: 4
   max_cycle: 1000000000
   p0: 3.5
-  split_cv: 0.12
   model: doubler
   factor: 2.0
 - op: topo_record
@@ -138,7 +137,8 @@ seed:
   seed: 0
   vseed_cv: 0.15
   model: apicobasal
-  h0: 0.88
+  h0: 1.38
+  ref_frame: 60
   v0_from: polyhedron
 plotting:
   renderer: vtk_points
