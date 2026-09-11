@@ -1,348 +1,346 @@
 ---
 title: "Language"
-subtitle: "A typed intermediate representation for biological mechanisms"
+subtitle: "Entities, activities and their organization, written down to be run"
 ---
 
 ::: {.callout-note appearance="simple"}
-We introduce *Plexus*, a typed intermediate representation for biological
-mechanisms. Rather than defining yet another simulator, Plexus defines a common
-language whose primary objects are biological operators. Every operator specifies
-the biological entities it acts upon, the states it requires, the relations between
-these entities, and one or more numerical implementations. The Plexus research
-program has three objectives. First, to define an algebra of biological operators.
-Second, to decompose the existing corpus of simulation models into this common
-language. Third, to construct differentiable implementations of these operators so
-that mechanistic models can be directly inferred from biological data.
+A mechanism is *entities and activities organized such that they are productive of regular
+changes from start or set-up to finish or termination conditions* (Machamer, Darden & Craver,
+2000, p. 3). Plexus is a language for
+writing a mechanism down in exactly those terms — the entities with their states and
+relations, the activities that act on them, and their organization in space, in time and
+across levels — completely enough that the description can be run, fitted to observations,
+and shown to be missing an activity. Every activity is an *operator*: it names the entities
+it acts on, the state it needs, the relations between those entities, and one or more
+numerical implementations. The research programme has three objectives. First, an algebra of
+activities. Second, to decompose the existing corpus of simulation models into that
+language. Third, to build differentiable implementations of every operator, so that
+mechanistic models can be inferred from biological data.
 :::
 
 ## Introduction
 
-Computational biology has produced a rich ecosystem of simulation frameworks.
-Neural simulators model electrical activity, reaction–diffusion systems model
-chemical transport, particle and continuum methods model mechanics, while vertex,
-Cellular Potts and active-matter models describe multicellular tissues. These
-frameworks remain however largely incompatible. Combining electrical signalling,
-mechanics, metabolism and development often requires coupling multiple specialized
-simulators whose underlying abstractions differ fundamentally. Each simulator
-introduces its own representation of biological mechanisms, making models difficult
-to compare, compose and extend. This fragmentation is not primarily a numerical
-problem but more a language problem.
+Computational biology has produced a rich ecosystem of simulation frameworks. Neural
+simulators model electrical activity, reaction–diffusion systems model chemical transport,
+particle and continuum methods model mechanics, while vertex, Cellular Potts and
+active-matter models describe multicellular tissues. These frameworks remain largely
+incompatible. Combining electrical signalling, mechanics, metabolism and development
+requires coupling several specialized simulators whose underlying abstractions differ
+fundamentally, and each simulator carries its own representation of what a mechanism is,
+so that models are hard to compare, compose and extend. This fragmentation is not primarily
+a numerical problem. It is a language problem.
 
-Instead of treating simulation frameworks as fundamental, we treat biological
-mechanisms as the primary objects. To this aim, Plexus introduces an intermediate
-representation whose central elements are biological operators. Operators describe
-mechanisms such as adhesion, diffusion, division, chemotaxis, electrical
-propagation or active stress independently of their numerical implementation. In
-this perspective, biological modeling becomes analogous to compiler design. Just as
-modern compilers separate programming languages from their implementations through
-an intermediate representation, Plexus separates biological mechanisms from their
-numerical implementations.
+Biology already has an account of what a mechanism is, even if it is rarely written out.
+In the account of Machamer, Darden and Craver, a mechanism has two halves. *Entities* are
+the things: they have properties and stand in spatial relations to one another. *Activities*
+are what the things do: they are the producers of change. And the two are *organized* —
+spatially, by location, shape and contact; temporally, by order, rate and duration; and
+hierarchically, because what the parts do at one level constitutes what the whole does at
+the next. A mechanism starts from set-up conditions and ends at termination conditions, and
+the description bottoms out in activities that the field takes as fundamental. This is the
+account a cell biologist uses tacitly whenever a paper ends with a summary cartoon: named
+parts, arrows between them, boxes inside boxes. The paper also gives that cartoon its two
+names. A *mechanism schema* is an abstract description whose placeholders can be filled
+with known parts and activities; a *mechanism sketch* is one with gaps — black boxes that
+no known activity yet fills. A complete description exhibits *productive continuity without
+gaps* from set-up to termination conditions, and the continuity lies in the arrows.
 
-Biological systems must be decomposed not only into operators, but also into the
-entities on which those operators act. These entities are heterogeneous — receptors,
-signalling proteins, cells, extracellular matrices, tissues, fields — and are organized
-across biological levels. Plexus makes this organization explicit as a compositional
-hierarchy: each level carries its own entities and states, operators act between entities
-within a level, and **aggregate ↑** and **broadcast ↓** connect levels by mapping state
-upward and downward. Decomposition therefore does not flatten biology into a single
-collection of variables; it preserves the organization through which mechanisms at one
-level are composed with mechanisms at another.
+Plexus takes that account literally. Instead of treating simulation frameworks as
+fundamental, it treats entities and activities as the primary objects. An activity —
+adhesion, diffusion, division, chemotaxis, electrical propagation, active stress — is
+written as an *operator*, independently of how it is computed. The two words mean the same
+thing in two dialects, and this page uses both. In this perspective biological modelling
+becomes analogous to compiler design: just as a compiler separates a programming language
+from its implementations through an intermediate representation, Plexus separates the
+mechanism from its numerical realization.
 
-The purpose of this decomposition is ultimately recomposition: to construct complete
-mechanistic models from reusable entities and operators. Making such compositions
-executable requires strong structural choices. Plexus separates the language that
-specifies the biological model from the code that interprets and executes it. The language
-declares entities, states, relations, hierarchy and operators; the interpreter resolves
-this description into concrete numerical implementations and schedules their execution.
+Entities are heterogeneous — receptors, signalling proteins, cells, extracellular matrices,
+tissues, fields — and they are organized across levels. Plexus makes this organization
+explicit: each level carries its own entities and states, operators act between entities
+within a level, and **aggregate ↑** and **broadcast ↓** connect the levels by carrying
+state from parts to whole and from whole to parts. Decomposition therefore does not
+flatten a tissue into one collection of variables. It keeps the organization through which
+a mechanism at one level is composed with a mechanism at another.
+
+The purpose of the decomposition is recomposition: to build complete mechanistic models
+from reusable entities and activities. Making such compositions executable requires a
+strong structural choice, and Plexus makes it by separating the language that states the
+hypothesis from the code that runs it. The language declares entities, states, relations,
+organization and activities; the interpreter resolves the declaration into numerical
+implementations and runs them in the declared order. What the language guarantees is that
+a hypothesis is well formed and complete. Whether it is *productive of* the change observed
+is what running it establishes.
 
 ## The language
 
-Plexus defines a typed language for expressing biological mechanisms independently
-of their numerical realization. The language is built around four fundamental
-concepts: *operators*, *sets*, *states*, and *fields*. Biological models are
-therefore represented as compositions of operators acting on discrete and
-continuous biological objects rather than simulator-specific algorithms.
+Plexus is built around four kinds of object. Two describe what exists — **sets** and their
+**states**, together with the **fields** that make up the microenvironment — and one
+describes what happens — the **operators**. A model is a composition of operators acting on
+discrete and continuous biological objects, not a simulator-specific algorithm.
 
-### Operators
+### Sets — the entities
 
-Operators are the fundamental objects of the language. An operator represents a
-single biological mechanism, such as adhesion, chemotaxis, diffusion, electrical
-propagation, active stress, metabolism, growth, or cell division. Every operator is
-defined by a typed signature and one or more numerical implementations. The
-signature specifies *what* biological transformation is performed, whereas
-implementations specify *how* it is numerically realized. The signature specifies
+A set is a collection of entities of one kind at one level of organization: genes,
+proteins, cells, neurons, synapses, tissues, organs, organisms. Sets organize into
+hierarchies that reflect biological organization — genes regulate proteins, proteins
+determine what a cell does, cells assemble into tissues, tissues into organs — and each
+level is represented uniformly as a set, so that the same language describes intracellular
+signalling, multicellular mechanics, development and organ physiology. A set need not be
+a whole organism's worth of one thing: the vertices of a cell sheet are a set, the
+material points of a gel are a set, and both can be parts of the same cell.
 
-- the input sets,
-- the output sets,
-- the state variables consumed and produced,
+### States — the properties
+
+Every entity carries a state describing its current condition. Sets say *what exists*;
+states say *what each entity carries*. The state schema is specific to each set. A protein
+may carry a position, a binding state and the load it bears; a material point a position,
+a velocity and a deformation gradient; a neuron a membrane voltage and a calcium level; a
+cell a polarity, a stiffness and its gene-expression levels; a synapse a conductance and a
+plastic weight. Operators transform states: they read selected state variables and write
+updates to others, while the entities themselves remain what they were.
+
+### Fields — the microenvironment
+
+A field is a continuous quantity defined over space rather than over entities: a morphogen
+concentration, a pressure, an extracellular signal, an electric potential, a matrix
+density. Fields complement sets. Sets describe the discrete entities, fields the
+continuous environment those entities live in, and operators couple the two through
+explicit maps from entities to positions in space.
+
+### Operators — the activities
+
+An operator is one activity, and it is the fundamental object of the language. It
+represents a single mechanism — adhesion, chemotaxis, diffusion, electrical propagation,
+active stress, metabolism, growth, division — by a typed signature and one or more
+numerical implementations. The signature states *what* change the activity produces; the
+implementations state *how* it is computed. The signature declares
+
+- the sets the activity acts on,
+- the sets it changes,
+- the state variables it reads and the ones it writes,
 - the maps relating the participating sets.
 
-Maps define the relations required by the mechanism. They determine, for example,
-which protein belongs to which cell, which synapses connect which neurons, or how
-cells relate to a continuous field. Plexus incorporates maps into the operator,
-making operators typed morphisms between biological sets.
-
-### Sets
-
-Sets represent collections of biological entities. Examples include genes, proteins,
-cells, neurons, synapses, tissues, organs and organisms. Sets naturally
-organize into hierarchies reflecting biological organization. Genes regulate
-proteins, proteins determine cellular behaviour, cells assemble into tissues,
-tissues form organs, and organs compose organisms. Each level is represented
-uniformly as a set, allowing the same language to describe intracellular
-signalling, multicellular mechanics, developmental processes and organ-level
-physiology.
-
-### States
-
-Every element of a set carries a state describing its current biological condition.
-While sets define *what* biological entities exist, states define *what each entity
-carries*. The state schema is specific to each set. A protein may carry position,
-binding state and the load it bears; a material point position, velocity and
-deformation gradient; a neuron membrane voltage and calcium; a cell
-polarity, stiffness and gene-expression levels; a synapse conductance and plastic
-weight. Operators transform states. They consume selected state variables and
-produce updates to others, while leaving the underlying biological entities
-unchanged.
-
-### Fields
-
-Fields represent continuous quantities defined over space rather than over discrete
-biological entities. Examples include morphogen concentrations, pressure,
-extracellular signalling molecules, electric potentials, and material properties.
-Fields complement sets. While sets describe discrete biological entities, fields
-describe the continuous environment in which these entities evolve. Operators couple
-sets and fields through explicit maps relating discrete entities to continuous
-spatial representations.
+The maps are the relations the mechanism needs. They say which protein belongs to which
+cell, which synapses connect which neurons, or how cells relate to a field. Because the
+relations are part of the signature, an operator is a typed morphism between sets, and the
+spatial organization of the mechanism is declared with the activity rather than assumed by
+the code.
 
 ## The operator algebra
 
-The language introduced in the previous section defines the objects manipulated by
-Plexus. We now define the elementary operator families from which biological models
-are constructed. The central hypothesis of Plexus is that a large fraction of
-existing biological simulation models can be expressed as compositions of a small
-number of elementary operator families. Rather than introducing a new operator for
-every biological phenomenon, Plexus identifies a compact operator algebra that can
-be reused across mechanics, signalling, metabolism, development and physiology.
+The central hypothesis of Plexus is that a large fraction of the activities in the
+simulation literature can be composed from a small number of elementary kinds. Rather
+than introducing a new operator for every phenomenon, Plexus identifies a compact algebra
+that is reused across mechanics, signalling, metabolism, development and physiology. There
+are **eight** kinds, and here each is named first in a biologist's words:
 
-The proposed operator algebra consists of eight elementary kinds (see the figure
-below):
+- **lateral** — what neighbours do to each other within one set.
+- **aggregate ↑** — integration: a whole reading its parts.
+- **broadcast ↓** — top-down control: a whole imposing on its parts.
+- **exchange** — traffic between entities and their microenvironment.
+- **field** — the microenvironment's own life: diffusion, decay, reaction.
+- **rewire** — remodelling: the relations change, the entities do not.
+- **structural** — turnover: **divide** and **die**.
+- **seed** — the set-up conditions, written once and never again.
 
-- **Lateral**: interactions within a biological set.
-- **Aggregate**: many-to-one transformations across biological scales.
-- **Broadcast**: one-to-many transformations across biological scales.
-- **Exchange**: transformations between sets and fields.
-- **Field**: a field's own dynamics — diffusion, decay, reaction.
-- **Rewire**: modification of relations between biological entities.
-- **structural**: creation and removal of biological entities — **divide** and **die**.
-- **Seed**: the initial state, written once and never again.
-
-The first four kinds transform the state of a set while preserving the underlying
-biological organization, and the field kind does the same for a field. Rewire modifies the
-interaction graph, whereas structural modifies the biological entities themselves.
-Seed stands apart: it writes what the others then evolve. Together they form the
-elementary computational vocabulary of Plexus, and the implementation recognises
-exactly these eight.
+The first five kinds change state and leave the organization intact. Rewire changes the
+relations, structural changes the entities themselves, and seed writes what the others go
+on to evolve. Together they are the elementary vocabulary of Plexus, and the
+implementation recognizes exactly these eight.
 
 ![](figures/fig_ops.png){width=100% fig-align="center"}
 
-**Lateral.** Lateral operators describe interactions between entities belonging to
-the same set. Typical examples include mechanical forces between proteins, adhesion
-between neighbouring cells, electrical communication between neurons, or biochemical
-interactions within a metabolic network.
+**Lateral.** What entities of one set do to one another: mechanical forces between
+proteins, adhesion and tension between neighbouring cells, juxtacrine signalling, contact
+inhibition, gap-junction coupling, synaptic transmission, the reactions of a metabolic
+network.
 
-**Aggregate.** Aggregate operators propagate information from many entities to a
-higher level of biological organization. Examples include computing cellular
-properties from their constituent proteins or accumulating synaptic currents acting
-on a neuron.
+**Aggregate.** Integration. A whole reads its parts: a cell's shape from its vertices, a
+cell's properties from its proteins, a neuron's input as the sum of its synaptic currents,
+a tissue's shape as the collective consequence of its cells. This is the upward direction of
+causation, the one usually called emergence.
 
-**Broadcast.** Broadcast operators perform the complementary transformation,
-propagating information from higher organizational levels toward their constituents.
-Aggregate and broadcast therefore define the upward and downward flow of information
-across biological scales.
+**Broadcast.** Top-down control. A whole imposes on its parts: a cell's polarity on its
+cytoskeleton, a material property on every point the cell owns, a fate decision on
+everything the cell contains, a constraint the tissue places on its cells. Aggregate and
+broadcast together are the upward and downward flow across levels of organization.
 
-**Exchange.** Exchange operators couple discrete biological entities with continuous
-fields. Typical examples include secretion, sensing, transport, uptake, or
-particle–grid transfer.
+**Exchange.** A cell's traffic with its microenvironment: secretion, uptake, sensing,
+transport, and mechanical load carried to and from the matrix — in numerical terms the
+transfer between entities and a grid.
 
-**Rewire.** Rewire operators modify the relations between biological entities without
-changing the entities themselves. They update neighbour graphs, contact networks,
-developmental connectivity or other interaction structures, determining which
-entities participate in subsequent operator evaluations.
+**Field.** The microenvironment's own dynamics — diffusion, decay, extracellular reaction
+— mapping a field to itself without touching any set.
 
-**Structural.** Living systems continuously modify their own composition. This kind has
-two operators: divide creates new biological entities, whereas die removes existing ones.
-They modify the biological organization itself rather than only its state.
+**Rewire.** Remodelling. Neighbour exchange in an epithelium, junction turnover, synaptic
+plasticity, matrix remodelling: the relations between entities change, the entities do not,
+and which entities take part in the next activity changes with them.
 
-**Field.** Field operators are the self-dynamics of a continuous field — diffusion, decay,
-reaction — mapping a field to itself without touching any set.
+**Structural.** Turnover. A living tissue continuously changes its own composition:
+**divide** creates entities and **die** removes them — proliferation, apoptosis,
+extrusion. These operators change the organization itself, not only its state, and they
+are what makes a tissue different from any inert material.
 
-**Seed.** Seed operators write a set's initial state, once. They are gated to the first frame,
-so an initial condition cannot silently become a boundary condition applied at every step.
+**Seed.** The set-up conditions: the egg, the pre-pattern, the segmentation a model starts
+from. A seed writes a set's initial state once. It is confined to the first frame, so that
+a starting condition cannot silently become a boundary condition applied at every step.
 
-## Composing biological mechanisms
+## Organization in time
 
-Biological models are expressed as compositions of elementary operators. Rather than
-embedding all mechanisms within a monolithic simulator, Plexus represents a model as
-an ordered sequence of operator applications. This sequence, called the *schedule*,
-specifies both the order and the frequency with which operators are evaluated.
-Formally, one simulation step is the composition
+A model is written as an ordered list of activities, the *schedule*, which says both in
+what order and how often each runs. Formally, one step is the composition
 
 $$\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1,$$
 
-whose repeated application generates the system dynamics
+of the operators, whose repeated application generates the dynamics
 
-$$x_{t+1} = \Phi(x_t).$$
+$$x_{t+1} = \Phi(x_t),$$
 
-The schedule therefore describes the temporal organization of biological mechanisms.
-Different operators may evolve on different time scales. Mechanical interactions may
-be evaluated every simulation step, whereas diffusion, growth or cell division may
-occur less frequently. A biological model therefore becomes a multi-rate composition
-of biological mechanisms rather than a monolithic numerical solver.
+where $x$ is the whole state — every set and every field at once. The schedule is the
+temporal organization of the mechanism: its order, rate and duration. Activities run at
+their own tempo — mechanics every step, diffusion, growth or division less often — so a
+model is a multi-rate composition of mechanisms rather than one monolithic solver.
 
-Operators are pure transformations. Rather than modifying biological state directly,
-every operator returns its contribution to the system evolution. If operator
-$\mathcal{O}_i$ produces the increment $\Delta_i$, the complete update is obtained by
+Operators are pure. None modifies state directly; each returns its contribution to the
+change. If operator $\mathcal{O}_i$ produces the increment $\Delta_i$, the complete update
+is
 
 $$\Delta = \sum_i \Delta_i,$$
 
-before being passed to the numerical implementation. This formulation has two
-important consequences. First, biological mechanisms remain independent and
-composable: introducing a new mechanism simply requires adding a new operator to the
-schedule. Second, the language remains independent of its numerical realization. The
-schedule specifies the biological model, whereas the numerical implementation
-specifies how that model is evaluated.
+before it is passed to the numerical implementation. Two things follow. Activities stay
+independent and composable: adding a mechanism is adding an operator to the schedule.
+And the language stays independent of its numerical realization: the schedule states the
+hypothesis, the implementation states how it is evaluated.
 
-## Composing hierarchy
+## Organization across levels
 
-A set may be contained in another — proteins in a cell, cells in a tissue, tissues in
-an organism — through an explicit child → parent map. Importantly, a parent may contain
-several distinct sets: the same cell can contain receptors, signalling proteins,
-cytoskeletal elements and particles. These sets remain distinct objects, with their own
-state and operators, while sharing the same parent. Each level can also run at its own
-rate: no level is reduced to a parameter of the one above it.
+A cell is a compartment, and a compartment holds parts of different kinds. A set may be
+contained in another — proteins in a cell, cells in a tissue, tissues in an organism —
+through an explicit part → whole map, and one whole may contain several distinct sets: the
+same cell can hold receptors, signalling proteins, cytoskeletal elements and material
+points. These sets remain distinct, with their own state and their own activities, while
+sharing the same parent. A vertex model that treats a cell as a polygon and a
+reaction–diffusion model that treats it as a well-mixed bag are each a caricature; here the
+same cell is both at once, because both are sets under one parent. Each level also runs at
+its own tempo, and no level is reduced to a parameter of the one above it.
 
 ![](figures/fig_hier.png){width=70% fig-align="center"}
 
-Operators can act within a level or across levels. Within a cell, for example, operators
-may couple receptors → signalling proteins → cytoskeleton. Across the containment map,
-**aggregate ↑** builds parent state from children — a cell position from its particles, or
-a neuron input from its synapses — while **broadcast ↓** propagates parent state to
-children — a material property to every particle owned by a cell, or a constraint imposed
-by the parent.
+Activities run within a level or across it. Within a cell, operators couple receptors →
+signalling proteins → cytoskeleton. Across the part → whole map, **aggregate ↑** builds
+the whole's state from its parts — a cell's position from its material points, a neuron's
+input from its synapses — and **broadcast ↓** carries the whole's state to its parts — a
+material property to every point a cell owns, a constraint imposed by the tissue. Causation
+runs both ways, and both directions are operators like any other.
 
-Fields are level-specific too. **Exchange** couples a set to a field at the appropriate
-level, allowing a protein concentration field, a cellular morphogen field and a tissue
-mechanical grid to coexist as distinct objects.
+Fields belong to levels too. **Exchange** couples a set to the field at its own level, so
+that a protein concentration inside the cell, a morphogen among cells and a mechanical grid
+under the tissue coexist as distinct objects.
 
-The consequence is that proteins → cells → tissues is not a pipeline of separate
-simulators. It is one compositional graph: multiple sets may coexist inside each parent,
-operators connect them locally, and aggregate/broadcast connect the levels. The same
-operator kinds are reused throughout; adding another biological scale requires no new
-engine.
+Proteins → cells → tissues is therefore not a pipeline of separate simulators. It is one
+compositional graph: several sets inside each whole, operators joining them locally,
+aggregate and broadcast joining the levels. The same eight kinds serve throughout, and
+another level of organization needs no new machinery.
 
-## Numerical implementations
+## Bottoming out: numerical implementations
 
-The operator algebra defines the biological semantics of a model independently of
-its numerical realization. Every operator may admit multiple implementations
-satisfying the same typed signature. These implementations differ in numerical
-realization while preserving identical biological semantics. Selecting an
-implementation is therefore a numerical decision rather than a biological one.
+Every mechanistic description stops somewhere: it bottoms out in activities the field is
+content to take as given. In Plexus that floor is the numerical implementation. The
+operator algebra states the biological meaning of a model; every operator may admit
+several implementations satisfying the same typed signature, which differ in how they
+compute and not in what they mean. Choosing an implementation is a numerical decision,
+never a biological one.
 
-This abstraction naturally accommodates a broad range of computational methods.
-Mechanical operators may be implemented using Material Point Methods, finite
-elements, vertex models, phase-field methods, Cellular Potts models or
-optimal-transport formulations. Signalling operators may employ Hodgkin–Huxley
-equations, graph neural networks or Neural ODEs. Likewise, field operators may use
-finite differences, finite elements, neural implicit representations or spectral
-methods. These implementations coexist within the same language because they satisfy
-identical operator contracts.
+This accommodates a broad range of methods. A mechanical activity may be implemented with
+the material point method, finite elements, a vertex model, a phase field, a Cellular Potts
+model or an optimal-transport formulation. A signalling activity may use Hodgkin–Huxley
+equations, a graph neural network or a neural ordinary differential equation. A field
+activity may use finite differences, finite elements, a neural implicit representation or a
+spectral method. These coexist in one language because they satisfy the same contracts.
 
-Different implementations may also employ different numerical integration schemes.
-Depending on the operator, implementations may evolve first-order states such as
-concentrations or membrane voltages, second-order states such as mechanical
-accelerations, or rely on explicit, implicit or adaptive solvers. These choices
-affect computational efficiency and numerical accuracy but not the biological
-interpretation of the model.
+Implementations may also integrate differently. Depending on the activity, an
+implementation may advance first-order states such as concentrations or membrane voltages,
+second-order states such as mechanical accelerations, and rely on explicit, implicit or
+adaptive solvers. These choices affect cost and accuracy, not the biological reading of the
+model.
 
-This distinction fundamentally changes how biological simulations are compared.
-Traditional frameworks compare complete simulators, intertwining biological
-mechanisms with numerical algorithms. Plexus instead separates these two questions.
-Biological models are compared through the operators they compose, whereas numerical
-methods are compared through the implementations realizing those operators.
-
-This separation establishes two independent axes of scientific progress. Biological
-innovation corresponds to discovering new operators or new operator compositions,
-whereas numerical innovation corresponds to developing more efficient or more
-accurate implementations of existing operators. Existing simulation frameworks
-therefore become complementary backends implementing a common intermediate
-representation rather than competing modelling paradigms.
+The distinction changes how models are compared. Traditional frameworks compare complete
+simulators, which entangle the mechanism with the numerics. Plexus separates the two
+questions: hypotheses are compared through the activities they compose, numerical methods
+through the implementations that realize those activities. There are then two independent
+axes of progress. Biological innovation is discovering a new activity or a new
+composition; numerical innovation is a faster or more accurate implementation of an
+activity that already exists. Existing simulation frameworks become complementary backends
+of one intermediate representation rather than competing paradigms.
 
 ## Mechanistic inverse modelling
 
-One of the primary motivations for introducing a formal language of biological
-mechanisms is to identify mechanistic models directly from experimental
-observations. Rather than calibrating simulations manually, the objective is to
-infer the parameters, spatial organization and constitutive laws governing
-biological systems from imaging data.
+A formal language of mechanisms exists first of all so that mechanisms can be identified
+from observations. Rather than calibrating simulations by hand, the aim is to infer the
+parameters, the spatial organization and the constitutive laws of a biological system from
+imaging data.
 
-Plexus makes this possible by associating every biological operator with one or more
-differentiable implementations satisfying the same typed signature. Differentiability
-therefore becomes a property of the language rather than of a particular simulator.
-Regardless of the numerical backend, gradients propagate through compositions of
-explicit biological operators rather than through monolithic simulation code.
+Plexus makes this possible by giving every operator at least one differentiable
+implementation satisfying its signature. Differentiability is then a property of the
+language rather than of a particular simulator: whatever the backend, gradients propagate
+through a composition of explicit activities rather than through monolithic code.
 
-This distinction fundamentally changes the role of inverse modelling. Traditional
-approaches assume that the underlying mechanism is already correct and seek the
-parameter values that best reproduce the observations. Such parameter optimization is
-effective when the forward model is complete, but it becomes misleading when
-important biological mechanisms are absent. Optimizing existing parameters may
-improve the fit while merely compensating for missing mechanisms.
+This changes what inverse modelling means. The traditional approach assumes the mechanism
+is already right and searches for the parameter values that best reproduce the
+observations. That works when the forward model is complete and misleads when an activity
+is missing: tuning the parameters that exist improves the fit while merely compensating
+for the activity that does not.
 
-In Plexus, parameters remain attached to explicit biological operators rather than to
-opaque numerical models. Mechanical properties belong to mechanical operators,
-reaction rates to biochemical operators, conductances to signalling operators, and
-spatial fields to the mechanisms generating them. Parameter estimation therefore
-preserves the mechanistic interpretation of the model.
+In Plexus, parameters stay attached to explicit activities rather than to an opaque model.
+Mechanical properties belong to mechanical operators, reaction rates to biochemical ones,
+conductances to signalling ones, and spatial fields to the activities that generate them,
+so that estimation keeps the mechanistic reading of the model.
 
-Residuals likewise acquire a mechanistic interpretation. A persistent mismatch
-between simulation and experiment no longer indicates only poor parameter values; it
-may also indicate that the current operator composition is unable to explain the
-observations. Differentiability thus provides more than efficient optimization: it
-enables quantitative comparison between competing mechanistic models while preserving
-their explicit biological structure.
+Residuals acquire the same reading. A persistent mismatch between simulation and
+experiment no longer means only that the parameters are wrong; it may mean that the
+present composition of activities cannot produce the observed change. In the paper's terms,
+a residual that will not go away is the mark of a sketch: a black box where an activity
+belongs. Differentiability therefore does more than make optimization efficient. It lets competing mechanistic
+hypotheses be compared quantitatively while each keeps its explicit structure.
 
 ## Agentic mechanistic discovery
 
-The explicit representation of biological mechanisms transforms scientific discovery
-from a parameter optimization problem into a language exploration problem. Because
-mechanisms are represented as explicit operators rather than embedded in
-simulator-specific code, they become directly accessible to agentic systems.
+Writing mechanisms as explicit activities turns discovery from a parameter-optimization
+problem into a language-exploration problem. Because activities are operators rather than
+code buried in a simulator, they are directly accessible to an agent.
 
-Plexus proposes a three-loop strategy for mechanistic discovery. Each loop operates
-at a different level of abstraction, progressively moving from existing models toward
-new biological knowledge.
+Plexus proposes a three-loop strategy, each loop at a different level of abstraction,
+moving from existing models toward new biological knowledge.
 
-**Loop I: Understanding.** The first loop analyses an existing simulation model.
-Rather than treating the simulator as opaque code, the agent decomposes it into
-Plexus operators, identifies the biological mechanisms it implements, and
-reconstructs an explicit mechanistic description. Existing simulation frameworks
-therefore become repositories of reusable biological operators.
+**Loop I: Understanding.** The first loop reads an existing simulation model. Rather than
+treating the simulator as opaque code, the agent decomposes it into Plexus operators,
+names the activities it implements and the entities they act on, and reconstructs an
+explicit mechanistic description. Existing frameworks become repositories of reusable
+entities and activities.
 
-**Loop II: Fitting.** The second loop estimates the parameters, spatial fields and
-initial conditions of the resulting mechanistic model by fitting it directly to
-experimental observations. Because every operator admits a differentiable
-implementation, optimization preserves an explicit correspondence between parameters
-and biological mechanisms.
+**Loop II: Fitting.** The second loop estimates the parameters, spatial fields and set-up
+conditions of the resulting mechanism by fitting it directly to experimental observations.
+Because every operator has a differentiable implementation, optimization keeps an explicit
+correspondence between parameters and activities.
 
-**Loop III: Discovery.** The third loop analyses the residual remaining after
-optimization. Persistent discrepancies are interpreted as evidence that the current
-operator composition is incomplete rather than simply poorly parameterized. The agent
-therefore proposes alternative operators, compares competing mechanistic hypotheses,
-and extends the operator algebra whenever existing mechanisms fail to explain the
-observations.
+**Loop III: Discovery.** The third loop reads the residual that remains after fitting.
+A persistent discrepancy is taken as evidence that the composition is incomplete rather
+than poorly parameterized. The agent proposes alternative activities, compares competing
+mechanistic hypotheses, and extends the algebra whenever the activities it has cannot
+produce the change observed — turning a sketch into a schema, one filled box at a time.
 
-Together, these three loops transform simulation, inverse modelling and hypothesis
-generation into successive stages of a single scientific workflow. The language
-itself becomes the object of discovery: new biological knowledge is represented by
-extending the operator algebra rather than merely adjusting parameter values.
+Together the three loops make simulation, inverse modelling and hypothesis generation
+successive stages of one workflow. The language itself becomes the object of discovery:
+new biological knowledge is a new activity, or a new composition of activities, and not
+merely a new parameter value.
+
+## References
+
+Machamer, P., Darden, L. & Craver, C. F. (2000). Thinking about mechanisms.
+*Philosophy of Science* 67:1–25. <https://doi.org/10.1086/392759>
+
+Craver, C. F. (2007). *Explaining the Brain: Mechanisms and the Mosaic Unity of
+Neuroscience*. Oxford University Press.
+
+Craver, C. F. & Darden, L. (2013). *In Search of Mechanisms: Discoveries across the Life
+Sciences*. University of Chicago Press.
