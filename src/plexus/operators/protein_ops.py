@@ -1,43 +1,42 @@
-"""Integrins on the basal surface of an epithelium: a contained set of point entities, one per
-receptor cluster, that ride the tissue, are born and retire at the cell's own rates, and are
-shared between daughters at division.
+"""Proteins on a surface of an epithelium: contained point sets, one particle per cluster, that
+ride a cap of the tissue, are born and retire at the cell's own rates, and are shared between
+daughters at division. Integrins on the basal cap and myosin on the apical cap are the same three
+operators with a different `surface:`; what differs between proteins -- a bond for an integrin, a
+tension for a myosin -- is a separate operator on top, not a copy of the placement.
 
-THE OBJECT. An integrin cluster is a POINT with a position and a parent cell. It is not matter:
-no deformation gradient, no grid, no mass -- so no MPM operator ever touches this set. It is a
+THE OBJECT. A cluster is a POINT with a position and a parent cell. It is not matter: no
+deformation gradient, no grid, no mass -- so no MPM operator ever touches such a set. It is a
 contained set (`parent: cell`, `parent_pos: centroid`) with a dormant reserve, exactly the
 mechanism every other cardinality-changing set uses (`occ`, `spawn`, `kill`).
 
-THREE OPERATORS, EACH ANSWERING ONE QUESTION.
-  integrin_seed      where do they start: on each cell's basal face, uniformly by area (a seed;
-                     runs once).
-  integrin_project   how do they stay on the tissue: every frame each particle is moved to the
-                     nearest point of its parent's basal face. The face is the corral -- a
-                     particle pushed past the cell's edge by the repulsion between integrins is
-                     put back on the boundary, not handed to the neighbour. A division hands the
-                     daughter exactly half of the mother's particles, the half nearest the
-                     daughter's basal centroid; a T1 swap changes no count. (structural on the
-                     integrin set: it writes positions and parents in place.)
-  integrin_express   how many there are: per cell, birth at `integrin_s` per unit basal area per
-                     unit time and retirement with probability dt / `integrin_tau` per particle,
-                     the rate law of archive rung 05d (`dN/dt = s_i - N/tau_i`, receptor
-                     conserved under binding) with the receptor now countable. Writes the count
-                     back as `n_integrin` on the cell. (structural on the integrin set.)
+THREE OPERATORS, EACH ANSWERING ONE QUESTION, on the set the spec names (`at:`):
+  protein_seed      where do they start: on each cell's face of the chosen surface, uniformly by
+                    area (a seed; runs once). Writes the cell's starting rates.
+  protein_project   how do they stay on the tissue: every frame each particle is moved to the
+                    nearest point of its parent's face on that surface. The face is the corral --
+                    a particle pushed past the cell's edge by the repulsion between clusters is put
+                    back on the boundary, not handed to the neighbour. A division hands the
+                    daughter exactly half of the mother's particles, the half nearest the
+                    daughter's centroid; a T1 swap changes no count.
+  protein_express   how many there are: per cell, birth at `<set>_s` per unit area of that surface
+                    per unit time and retirement with probability dt / `<set>_tau` per particle --
+                    the rate law of archive rung 05d (`dN/dt = s_i - N/tau_i`, receptor conserved
+                    under binding) with the receptor now countable. Writes the count back as
+                    `n_<set>` on the cell.
 
-THE CELL CARRIES THE RATES, `integrin_s` and `integrin_tau` (state blocks, width 1), so they can
-differ per cell and per region and be written later by a signalling operator; the particle
-carries nothing but its position. Both operators read the parent's blocks through the
-containment map (`lvl.parent`), the engine's broadcast, and write the count through the
-aggregate (a scatter-add of `occ` along the same map).
+THE CELL CARRIES THE RATES, `<set>_s` and `<set>_tau` (state blocks, width 1, named after the
+protein set), so they can differ per cell and per region and be written later by a signalling
+operator; the particle carries nothing but its position. The operators read the parent's blocks
+through the containment map (`lvl.parent`), the engine's broadcast, and write the count through
+the aggregate (a scatter-add of `occ` along the same map).
 
-WHICH SURFACE IS BASAL. `basal = pos - sep` on an apico-basal tissue, the model's own convention
-(`vertex_ops.apicobasal_geometry_3d`). On the archived spheroids the apical ring is the outer
-one, so this is the surface facing the lumen; `seed_mesh[apicobasal] apical: in` flips it and
-does NOT yet reproduce the working point (r 4.85 vs 4.53 at frame 0, no division by frame 75:
-something in the seeded targets reads the apical ring as the outer one). Until that is
-settled, this module reads whichever surface the tissue says is basal.
+WHICH SURFACE. `basal = pos - sep`, `apical = pos + sep`, `mid = pos` on an apico-basal tissue,
+the model's own convention (`vertex_ops.apicobasal_geometry_3d`). A cyst in a matrix is seeded
+`apical: in` so its basal cap faces out.
 
 Reference: the receptor rate law and its conservation gate, discovery_okuda/ops/adhesion_ops.py
-(rung 05d, G30); integrin cluster spacing ~555 nm, Changede & Sheetz (2017) Dev. Cell 40:1.
+(rung 05d, G30); integrin cluster spacing ~555 nm, Changede & Sheetz (2017) Dev. Cell 40:1;
+medioapical and junctional myosin pools, Munjal et al. (2015) Nature 524:351.
 """
 from __future__ import annotations
 
@@ -49,7 +48,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.vertex_ops import resolve_cell_set
 
 # DORMANT SLOTS ARE PARKED FAR OFF-DOMAIN. A neighbour graph over the buffer (`radius_graph`) sees
-# every slot; a million dormant integrins left at one point are a million neighbours of each
+# every slot; a million dormant clusters left at one point are a million neighbours of each
 # other and of nothing else, and the pairwise block mask alone was 29 GB. Parked here they
 # neighbour nothing; a slot that wakes is placed on its face before anything reads it.
 PARK = -1.0e6
@@ -58,8 +57,8 @@ PARK = -1.0e6
 # ---------------------------------------------------------------------------------------------
 # the basal surface of a tissue, as fans of triangles: (basal centroid, b[es], b[et]) per half-edge
 # ---------------------------------------------------------------------------------------------
-def _basal_fans(H, tissue_set):
-    """The tissue's basal surface as one triangle per live half-edge: corners A (the face's basal
+def _surface_fans(H, tissue_set, surface="basal"):
+    """The tissue's chosen surface as one triangle per live half-edge: corners A (the face's basal
     centroid), B (the source vertex), C (the target vertex), and the face each triangle belongs
     to. Returns None when the tissue carries no mesh yet."""
     lvl = H.level(tissue_set)
@@ -69,7 +68,7 @@ def _basal_fans(H, tissue_set):
     Nv, nF = int(m["Nv"]), int(m["nF"])
     pos = lvl.get("pos")[:Nv]
     sep = lvl.get("sep")[:Nv] if "sep" in lvl.state_schema else torch.zeros_like(pos)
-    b = pos - sep                                            # the basal ring, the model's convention
+    b = {"basal": pos - sep, "apical": pos + sep, "mid": pos}[surface]   # the ring, the model's convention
     es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]
     eocc = m.get("eocc", None)
     live = (ef >= 0) & (ef < nF) & (es >= 0) & (et >= 0)
@@ -84,7 +83,7 @@ def _basal_fans(H, tissue_set):
 
 
 def _face_area(fans):
-    """Basal area per face, summed over its fan."""
+    """Area per face on the chosen surface, summed over its fan."""
     a = torch.zeros(fans["nF"], device=fans["A"].device, dtype=fans["A"].dtype)
     return a.index_add_(0, fans["face"], fans["area"])
 
@@ -167,17 +166,17 @@ def _project_to_faces(fans, faces, x):
 
 
 # ---------------------------------------------------------------------------------------------
-@register_operator("integrin_seed", family="seed", set="particle", kind="seed")
-class IntegrinSeed(Seed):
-    """Place each cell's seeded integrins uniformly on its basal face, once.
+@register_operator("protein_seed", family="seed", set="particle", kind="seed")
+class ProteinSeed(Seed):
+    """Place each cell's seeded clusters uniformly on its face of the chosen surface, once.
 
     `density` (per unit basal area, in the run's length units) decides how many of the
-    `per_parent` slots each cell wakes; the rest stay dormant for `integrin_express`. Any count
+    `per_parent` slots each cell wakes; the rest stay dormant for `protein_express`. Any count
     above the cell's block is refused, printed, and the block is filled -- a spec that wants more
     declares a larger `per_parent`."""
     SUPPORTED_DIMS = (3,)                                 # a basal surface is a surface in space
-    REQUIRES_PARAMS = ["tissue"]
-    PARAM_ROLES = {"tissue": "tissue_set", "density": "receptor_density"}
+    REQUIRES_PARAMS = ["tissue", "surface"]
+    PARAM_ROLES = {"tissue": "tissue_set", "surface": "tissue_surface", "density": "cluster_density"}
     READS = ["pos"]
     WRITES = ["pos"]
     MECHANISM_TAGS = ["seed", "receptor_placement"]
@@ -187,6 +186,9 @@ class IntegrinSeed(Seed):
         super().__init__(params, device)
         self.at = params.get("_at", "integrin")
         self.tissue = str(params["tissue"])
+        self.surface = str(params["surface"]).lower()
+        if self.surface not in ("basal", "apical", "mid"):
+            raise ValueError(f"{type(self).__name__}: surface must be basal|apical|mid, not {self.surface!r}")
         self.density = float(params.get("density", 2.0))
         self.seed = int(params.get("seed", 0))
         # THE CELL'S RATES START HERE. `integrin_s` (births per unit basal area per unit time) and
@@ -198,14 +200,14 @@ class IntegrinSeed(Seed):
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
-        fans = _basal_fans(H, self.tissue)
+        fans = _surface_fans(H, self.tissue, self.surface)
         if fans is None:
-            raise ValueError(f"integrin_seed: {self.tissue!r} carries no mesh at seed time; put seed_mesh before it")
+            raise ValueError(f"protein_seed: {self.tissue!r} carries no mesh at seed time; put seed_mesh before it")
         dev = lvl.state.device
         gen = torch.Generator(device=dev).manual_seed(self.seed)
         par = lvl.parent
         if par is None:
-            raise ValueError(f"integrin_seed: set {self.at!r} declares no parent; it needs `parent: cell`")
+            raise ValueError(f"protein_seed: set {self.at!r} declares no parent; it needs `parent: cell`")
         area = _face_area(fans)
         nF = fans["nF"]
         want = torch.round(area * self.density).long()               # per live face
@@ -221,7 +223,7 @@ class IntegrinSeed(Seed):
             if k:
                 wake.append(slots[offset[f]: offset[f] + k])
         if not wake:
-            print(f"[integrin_seed] density {self.density} put no integrin on any of {nF} faces", flush=True)
+            print(f"[protein_seed] density {self.density} put no {self.at} on any of {nF} faces", flush=True)
             return {}
         wake = torch.cat(wake)
         lvl.occ[wake] = 1.0
@@ -231,35 +233,36 @@ class IntegrinSeed(Seed):
             v0, v1 = lvl.state_schema["vel"]; lvl.state[wake, v0:v1] = 0.0
         cs = resolve_cell_set(H, self.tissue, None)
         clvl = H.level(cs)
-        for name, val in (("integrin_s", self.s0), ("integrin_tau", self.tau0)):
+        for name, val in ((f"{self.at}_s", self.s0), (f"{self.at}_tau", self.tau0)):
             if name in clvl.state_schema:
                 c0, _c1 = clvl.state_schema[name]
                 clvl.state[:, c0] = val
         refused = int((want[:nF] - blk[:nF]).clamp_min(0).sum().item())
-        print(f"[integrin_seed] {int(wake.numel())} integrins on {nF} basal faces "
+        print(f"[protein_seed] {int(wake.numel())} {self.at} clusters on {nF} {self.surface} faces "
               f"({self.density:g} per unit area; {refused} refused by the per-cell block)", flush=True)
-        _write_count(H, lvl, self.tissue)
+        _write_count(H, lvl, self.tissue, self.at)
         return {}
 
 
-def _write_count(H, lvl, tissue_set):
-    """n_integrin on the cell set: live children per parent (the aggregate along the map)."""
+def _write_count(H, lvl, tissue_set, name):
+    """`n_<set>` on the cell set: live children per parent (the aggregate along the map)."""
     cs = resolve_cell_set(H, tissue_set, None)
     try:
         clvl = H.level(cs)
     except Exception:                                        # noqa: BLE001
         return
-    if "n_integrin" not in clvl.state_schema:
+    key = f"n_{name}"
+    if key not in clvl.state_schema:
         return
-    c0, c1 = clvl.state_schema["n_integrin"]
+    c0, c1 = clvl.state_schema[key]
     n = torch.bincount(lvl.parent[lvl.occ > 0], minlength=clvl.state.shape[0]).to(clvl.state.dtype)
     clvl.state[:, c0] = n[: clvl.state.shape[0]]
 
 
 # ---------------------------------------------------------------------------------------------
-@register_operator("integrin_project", family="mechanics", set="particle", kind="structural")
-class IntegrinProject(Structural):
-    """Keep every integrin on its parent cell's basal face; share them at division.
+@register_operator("protein_project", family="mechanics", set="particle", kind="structural")
+class ProteinProject(Structural):
+    """Keep every cluster on its parent cell's face of the chosen surface; share them at division.
 
     Each frame, after the engine has integrated whatever velocity the repulsion emitted, each
     live particle is moved to the nearest point of its parent's basal fan. A particle whose
@@ -272,8 +275,8 @@ class IntegrinProject(Structural):
     READS = ["pos"]
     WRITES = ["pos"]
     SUPPORTED_DIMS = (3,)                                 # a basal surface is a surface in space
-    REQUIRES_PARAMS = ["tissue"]
-    PARAM_ROLES = {"tissue": "tissue_set"}
+    REQUIRES_PARAMS = ["tissue", "surface"]
+    PARAM_ROLES = {"tissue": "tissue_set", "surface": "tissue_surface"}
     MECHANISM_TAGS = ["surface_constraint", "inheritance_at_division"]
     REFERENCE = "Plexus (this work)."
 
@@ -281,12 +284,15 @@ class IntegrinProject(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "integrin")
         self.tissue = str(params["tissue"])
+        self.surface = str(params["surface"]).lower()
+        if self.surface not in ("basal", "apical", "mid"):
+            raise ValueError(f"{type(self).__name__}: surface must be basal|apical|mid, not {self.surface!r}")
         self._prev_live = None                                # cell occupancy on the previous frame
         self._prev_age = None                                 # cell age on the previous frame
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
-        fans = _basal_fans(H, self.tissue)
+        fans = _surface_fans(H, self.tissue, self.surface)
         if fans is None:
             return {}
         dev = lvl.state.device
@@ -341,14 +347,14 @@ class IntegrinProject(Structural):
             lvl.state[idx, p0:p1] = _project_to_faces(fans, par[idx], lvl.state[idx, p0:p1])
             if "vel" in lvl.state_schema:
                 v0, v1 = lvl.state_schema["vel"]; lvl.state[idx, v0:v1] = 0.0
-        _write_count(H, lvl, self.tissue)
+        _write_count(H, lvl, self.tissue, self.at)
         return {}
 
 
 # ---------------------------------------------------------------------------------------------
-@register_operator("integrin_express", family="population", set="particle", kind="structural")
-class IntegrinExpress(Structural):
-    """Birth and retirement of integrins at the cell's own rates: `dN/dt = s_i A_i - N / tau_i`.
+@register_operator("protein_express", family="population", set="particle", kind="structural")
+class ProteinExpress(Structural):
+    """Birth and retirement of clusters at the cell's own rates: `dN/dt = s_i A_i - N / tau_i`.
 
     Per cell, `integrin_s` (births per unit basal area per unit time) and `integrin_tau` (mean
     lifetime, in the run's time unit) are read off the cell set through the containment map.
@@ -358,8 +364,8 @@ class IntegrinExpress(Structural):
     READS = ["pos"]
     WRITES = ["pos"]
     SUPPORTED_DIMS = (3,)                                 # a basal surface is a surface in space
-    REQUIRES_PARAMS = ["tissue"]
-    PARAM_ROLES = {"tissue": "tissue_set"}
+    REQUIRES_PARAMS = ["tissue", "surface"]
+    PARAM_ROLES = {"tissue": "tissue_set", "surface": "tissue_surface"}
     MECHANISM_TAGS = ["synthesis", "turnover", "receptor_number"]
     REFERENCE = ("The receptor rate law of discovery_okuda/ops/adhesion_ops.py (rung 05d, gate G30: "
                  "receptor conserved under binding).")
@@ -368,6 +374,9 @@ class IntegrinExpress(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "integrin")
         self.tissue = str(params["tissue"])
+        self.surface = str(params["surface"]).lower()
+        if self.surface not in ("basal", "apical", "mid"):
+            raise ValueError(f"{type(self).__name__}: surface must be basal|apical|mid, not {self.surface!r}")
         self.seed = int(params.get("seed", 0))
         self.s_default = float(params.get("s", 0.0))         # used when the cell set carries no integrin_s
         self.tau_default = float(params.get("tau", float("inf")))
@@ -376,7 +385,7 @@ class IntegrinExpress(Structural):
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
-        fans = _basal_fans(H, self.tissue)
+        fans = _surface_fans(H, self.tissue, self.surface)
         if fans is None:
             return {}
         dev = lvl.state.device
@@ -387,8 +396,9 @@ class IntegrinExpress(Structural):
         clvl = H.level(cs)
         nF = fans["nF"]
         n_cells = clvl.state.shape[0]
-        s = clvl.get("integrin_s")[:, 0] if "integrin_s" in clvl.state_schema else torch.full((n_cells,), self.s_default, device=dev)
-        tau = clvl.get("integrin_tau")[:, 0] if "integrin_tau" in clvl.state_schema else torch.full((n_cells,), self.tau_default, device=dev)
+        ks, kt = f"{self.at}_s", f"{self.at}_tau"
+        s = clvl.get(ks)[:, 0] if ks in clvl.state_schema else torch.full((n_cells,), self.s_default, device=dev)
+        tau = clvl.get(kt)[:, 0] if kt in clvl.state_schema else torch.full((n_cells,), self.tau_default, device=dev)
         par = lvl.parent
         occ = lvl.occ > 0
         # ---- retirement: each live particle with probability dt / tau of its parent ----------
@@ -422,8 +432,8 @@ class IntegrinExpress(Structural):
                 if "vel" in lvl.state_schema:
                     v0, v1 = lvl.state_schema["vel"]; lvl.state[free, v0:v1] = 0.0
             if n_born < total and not getattr(self, "_said_full", False):
-                print(f"[integrin_express] buffer exhausted: {total - n_born} births refused this frame "
+                print(f"[protein_express] {self.at}: buffer exhausted: {total - n_born} births refused this frame "
                       f"(declare a larger grow_reserve)", flush=True)
                 self._said_full = True
-        _write_count(H, lvl, self.tissue)
+        _write_count(H, lvl, self.tissue, self.at)
         return {}
