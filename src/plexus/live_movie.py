@@ -2801,6 +2801,15 @@ class LiveMovie:
                     _sep = _np_(_v)[:P.shape[0]].astype(np.float64)
                     break
             if _sep is not None and np.isfinite(_sep).all() and np.abs(_sep).max() > 0.0:
+                # `pd.points` IS THE DRAWN CAP, NOT THE MID-SURFACE. With `mesh_surface: basal` the
+                # actor's points are `pos - sep`, and offsetting THEM by +-sep put the section's two
+                # rings around the basal cap: "apical" one thickness outside the real basal cap,
+                # nuclei that sit between the true caps drawn hugging the inner ring. Undo the
+                # drawn cap's offset first so the rings are the caps themselves, pos +- sep.
+                _k = {"apical": 1.0, "basal": -1.0, "mid": 0.0}.get(
+                    str((self.style or {}).get("mesh_surface", "mid")).lower(), 0.0)
+                if _k:
+                    P = P - _k * _sep
                 _, _, nmid, _hv0 = monolayer_shells(_t.as_tensor(P, dtype=_t.float32),
                                                     _as(es), _as(et), _as(ef), nF,
                                                     _t.ones(nF, dtype=_t.float32))
@@ -2978,7 +2987,7 @@ class LiveMovie:
                 Xall = Xall[live] if live is not None else Xall
                 dplane = (Xall[:, ax] - y0).abs()
                 _span = float(self._cs_rng[0][1] - self._cs_rng[0][0])
-                _px_per_unit = 0.8 * float(self.p.window_size[1]) * float(
+                _px_per_unit = 0.85 * float(self.p.window_size[1]) * float(
                     (self.style or {}).get("cross_section_height", 0.24)) / max(_span, 1e-9)
                 for tid, nm in enumerate(names):
                     r = _rad.get(nm)

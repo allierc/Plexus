@@ -209,7 +209,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 34.0
+    span: 18.0
     walls: 64
     loc:
     - 0.015
@@ -218,7 +218,7 @@ plotting:
     mid: false
     points: false
     spheres: true
-  cross_section_height: 0.24
+  cross_section_height: 0.34
   curve:
   - quantity: cells
     xlabel: frame
@@ -270,3 +270,17 @@ descriptions:
       small blue and orange particles. A smaller inset box in the bottom left shows
       a zoomed-in view of the spheroid's surface. Three line graphs on the right track
       the quantities of cells, radius, and mitochondria over time.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a spherical cluster of particles evolving within a large cubic domain.
+      Over time, the internal structure of the sphere remains relatively stable while the surrounding
+      environment stays constant. The graphs on the right indicate that the number of cells, mitochondria,
+      and mito-chondria remain steady throughout the sequence. The overall scene depicts a steady-state
+      configuration of biological organelles within a defined spatial volume.
+    objects: A large, transparent wireframe cube defines the primary simulation space. Inside this cube,
+      a dense spherical cluster of orange and blue particles is centered. A smaller inset shows a cross-sectional
+      view of the sphere, revealing a ring-like arrangement of blue and red components. The three graphs
+      on the right track the quantities of cells, mitochondria, and mito-chondria over the course of the
+      frames.
