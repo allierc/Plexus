@@ -32,7 +32,7 @@ from plexus.engine import run                                 # noqa: E402
 # `mg_scale` and the three `*_init` baselines are NOT here: that rung is parked on
 # `s2c-2-growth-baseline` because it moves three of `gate_00_spheroid`'s reference pins.
 MOVED = {
-    "cycle_phases": ["phase", "phase_t", "cyc_inhib", "cyc_vprev", "Vbirth", "divjit"],
+    "cycle_sizer": ["phase", "phase_t", "cyc_inhib", "cyc_vprev", "Vbirth", "divjit"],
     "divide_growing_ball": ["Vbirth", "divjit"],
     "mech_shell_free": ["Vbirth", "divjit"],
 }
