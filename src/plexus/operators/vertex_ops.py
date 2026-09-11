@@ -4482,7 +4482,18 @@ def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
     v6 = v6.index_add(0, ef, tri(cb[ef], b_t, b_s))                              # basal cap, reversed
     v6 = v6.index_add(0, ef, tri(a_s, b_s, b_t))                                 # wall, triangle 1
     v6 = v6.index_add(0, ef, tri(a_s, b_t, a_t))                                 # wall, triangle 2
+    # THE MAGNITUDE, NOT THE SIGNED SUM. The triangulation is oriented with the apical cap
+    # outward and the basal cap reversed, so a tissue seeded apical-in (`seed_mesh apical: in`,
+    # the polarity of a cyst in a matrix) returned every volume NEGATIVE (-1.3515 against +1.3515
+    # on the reference spheroid), the volume term pulled each cell toward a volume of the wrong
+    # sign and the shell relaxed to r 4.85 instead of 4.53. The polarity is the TISSUE's, so the
+    # sign is taken once, from the sum over the tissue, and applied to every cell: a single
+    # inverted cell (an extruding one in the apoptosis runs) keeps its own negative volume, as
+    # it always did, and the K_V term keeps seeing it. Bit-identical for every apical-out run
+    # (multiplying by +1.0) and the whole tissue flips for an apical-in one.
     v_f = v6 / 6.0
+    _sgn = torch.sign(v_f.detach().sum())
+    v_f = v_f * torch.where(_sgn == 0, torch.ones_like(_sgn), _sgn)
     # THE CAP'S AREA IS MEASURED ON THE SURFACE ITS VOLUME IS MEASURED ON -- the SAME centroid fan,
     # summed as true triangle areas, NOT the Newell magnitude ||1/2 sum a_s x a_t||. The Newell
     # form makes the caps the same arithmetic as the monolayer's on a right prism, so AB-C1 comes
