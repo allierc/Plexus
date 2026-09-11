@@ -73,6 +73,7 @@ class View:
         self.azim, self.elev, self.zoom = 30.0, 20.0, 1.0
         self.pick = None
         self.hidden: set = set()
+        self.RUN = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}}
         self.seconds = round(time.time() - t0, 2)
         self.set_camera(self.azim, self.elev, self.zoom)
 
@@ -202,7 +203,82 @@ class View:
                     names.append(n)
         return names
 
+    # ------------------------------------------------------------------ running the engine
+    def run(self, frames: int | None = None, device: str | None = None) -> dict:
+        """Simulate the spec forward in a thread, the picture following every frame.
+
+        `engine.run` builds and seeds its own hierarchy and loops internally, so a run always
+        starts from the seed (frame 0) and there is no "continue from here" yet; `frames` caps the
+        number of frames, `stop()` aborts. Each frame the movie renderer is fed the run's
+        hierarchy exactly as a generate does (`lm(H, tick)`), so what the page shows during the run
+        is the movie's frame; the scene dict used for picking is refreshed every 10 frames."""
+        import torch
+        if self.RUN.get("running"):
+            return {"error": "already running; STOP it first"}
+        dev = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
+        n = int(frames or self.sim.n_frames)
+        self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev, started=time.time())
+
+        class _Stop(Exception):
+            pass
+
+        def _on_frame(H, tick):
+            if self.RUN.get("stop") or tick > n:
+                raise _Stop()
+            with LOCK:
+                self.H = H
+                self.lm(H, tick)
+                if tick % 10 == 0 or tick == n:
+                    from plexus.gui import bio
+                    self.scene = bio.scene_from(H, self.sim, self.spec_path)
+                    if self.pick:
+                        self.highlight(self.pick)
+            self.RUN["frame"] = int(tick)
+            self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
+            self.RUN["counts"] = self.counts_live(H)
+
+        def _go():
+            from plexus import engine
+            try:
+                engine.run(self.sim, out_path=None, device=dev, on_frame=_on_frame)
+            except _Stop:
+                pass
+            except Exception as e:                                   # noqa: BLE001
+                self.RUN["error"] = f"{type(e).__name__}: {e}"[:600]
+            finally:
+                self.RUN["running"] = False
+                self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
+        threading.Thread(target=_go, daemon=True).start()
+        return {"started": True, "frames": n, "device": dev}
+
+    def stop(self) -> dict:
+        self.RUN["stop"] = True
+        return {"stopping": True}
+
+    def counts_live(self, H=None) -> dict:
+        """Live count per set and per species, straight off the hierarchy (cheap, every frame)."""
+        import torch
+        H = H or self.H
+        out = {"sets": {}, "species": {}}
+        for name, lv in H.levels.items():
+            occ = getattr(lv, "active", None)
+            if occ is None:
+                occ = getattr(lv, "occ", None)
+            if occ is None:
+                continue
+            live = torch.as_tensor(occ) > 0
+            out["sets"][name] = int(live.sum())
+            names = list(getattr(lv, "type_names", []) or [])
+            nt = getattr(lv, "node_type", None)
+            if names and nt is not None:
+                for i, nm in enumerate(names):
+                    out["species"][nm] = int((live & (torch.as_tensor(nt) == i)).sum())
+        return out
+
+    RUN: dict = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}}
+
     def close(self):
+        self.RUN["stop"] = True
         with LOCK:
             try:
                 self.lm.close()

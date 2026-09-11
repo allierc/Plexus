@@ -453,6 +453,10 @@ Your ONLY tool is `curl` against the local server at http://127.0.0.1:{port} . T
                           steps of 30 degrees or less with `sleep 1` between them so the viewer can
                           follow; zoom no faster than x1.5 per step.
   POST /api/bio/visible   {species, on} -> hide or show one species in the picture
+  POST /api/bio/run       {frames, device} -> simulate the spec from its seed, the picture following
+                          each frame; {stop: true} aborts.  GET /api/bio/run -> progress and the
+                          live counts per set and species (poll it with sleep 2 between calls)
+  GET  /api/bio/open?path=<spec.yaml or run folder> -> import an existing spec into the session
   GET  /api/bio/state     -> the session state
 The build form also takes organelles: [{name, count (per cell), radius, region
 (interior|apical_side|basal_side), on_divide (duplicate|halve|none), tau (optional, frames to
@@ -600,6 +604,10 @@ PAGE = r"""<!doctype html>
  <table class="sp" id="species"><tr><th>name</th><th>region</th><th>density</th><th>s</th><th>tau</th><th></th></tr></table>
  <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button><button class="dim" onclick="reseed()">RE-SEED</button></div>
  <div id="status">form a scene, then BUILD</div>
+ <h2>Run the engine</h2>
+ <div class="row"><label>frames</label><input id="run_frames" class="short" value="200"> <label style="width:60px">device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select></div>
+ <div class="row"><button onclick="runGo()" id="runbtn">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
+ <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
  <h2>Claude takes over <span style="color:#778;font-weight:normal;text-transform:none">drives this page through its own routes</span></h2>
  <div class="row"><input id="task" style="width:100%" placeholder="e.g. build a 120-cell cyst with one nucleus per cell and integrins outside, then show me one cell" onkeydown="if(event.key==='Enter')claudeGo()"></div>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button> <span id="cstat" style="color:#8c8"></span></div>
@@ -669,6 +677,15 @@ async function poll(){try{const st=await (await fetch('/api/bio/state')).json();
  if(st.cam_version!==seen.cam_version){seen.cam_version=st.cam_version;CAM.azim=st.azim;CAM.elev=st.elev;CAM.zoom=st.zoom;if(st.pick){const j=await (await fetch('/api/bio/info?pick='+encodeURIComponent(st.pick))).json();if(!j.error)showInfo(j);}render();}
  if(st.message)$('rstat').textContent=st.message;}catch(e){}finally{setTimeout(poll,1500);}}
 poll();
+// RUN: the engine simulates the spec from its seed; the picture follows every frame through the
+// same renderer a generate uses, so the page shows the movie's frames as they are computed.
+let running=false;
+window.runGo=async function(){const j=await post('/api/bio/run',{frames:+$('run_frames').value,device:$('run_device').value});if(j.error){$('runstat').textContent=j.error;return;}running=true;$('runbtn').disabled=true;$('runstat').textContent=`running ${j.frames} frames on ${j.device}...`;rpoll();};
+window.runStop=async function(){await post('/api/bio/run',{stop:true});};
+async function rpoll(){try{const j=await (await fetch('/api/bio/run')).json();if(j.error&&!j.running){$('runstat').textContent='error: '+j.error;}
+ else $('runstat').textContent=(j.running?'running: ':'done: ')+`frame ${j.frame}/${j.n_frames}, ${j.seconds}s`+(j.frame&&j.seconds?` (${(j.seconds/j.frame*1000).toFixed(0)} ms/frame)`:'');
+ if(j.counts&&j.counts.sets)$('runcounts').textContent=Object.entries(j.counts.sets).filter(([k])=>k!=='half_edge').map(([k,v])=>`${k} ${v}`).join('  ')+(Object.keys(j.counts.species||{}).length?'  |  '+Object.entries(j.counts.species).map(([k,v])=>`${k} ${v}`).join('  '):'');
+ render();if(j.running){setTimeout(rpoll,700);}else{running=false;$('runbtn').disabled=false;}}catch(e){setTimeout(rpoll,1500);}}
 let cseen=0;
 window.claudeGo=async function(){const t=$('task').value.trim();if(!t)return;$('claude').textContent='';cseen=0;const j=await post('/api/bio/claude',{task:t});if(j.error){$('cstat').textContent=j.error;return;}$('cstat').textContent='running...';$('cbtn').disabled=true;};
 window.claudeStop=async function(){await post('/api/bio/claude',{stop:true});};

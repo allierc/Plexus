@@ -371,6 +371,30 @@ class Handler(BaseHTTPRequestHandler):
             from plexus.gui import bio
             return self._send_json(dict(bio.STATE))
 
+        if route == "/api/bio/run":                      # GET -> progress of the engine run
+            from plexus.gui import bio_view
+            v = bio_view.current()
+            if v is None:
+                return self._send_json({"running": False, "error": "no scene is open"})
+            r = dict(v.RUN); r.pop("stop", None); r.pop("started", None)
+            return self._send_json(r)
+
+        if route == "/api/bio/open":                     # GET ?path=<spec.yaml or run folder> -> import into config/studio, open it
+            from plexus.gui import bio, studio
+            import shutil
+            path = (q.get("path") or [""])[0]
+            if os.path.isdir(path):
+                path = os.path.join(path, "spec.yaml")
+            if not path or not os.path.exists(path):
+                return self._send_json({"error": f"no spec at {path!r}"}, 404)
+            spec = yaml.safe_load(open(path))
+            name = str(((spec.get("general") or {}).get("name")) or os.path.basename(os.path.dirname(path)) or "opened").strip()
+            dst = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            os.makedirs(studio.CONFIG_DIR, exist_ok=True)
+            shutil.copyfile(path, dst)
+            bio.bump(name, f"opened {path}")
+            return self._send_json({"name": name, "spec": dst, "form": bio.form_from_spec(spec)})
+
         if route == "/api/bio/view":                     # GET ?azim&elev&zoom&pick&message -- drive the page's view
             from plexus.gui import bio, bio_view
             g = lambda k: (q.get(k) or [None])[0]        # noqa: E731
@@ -520,6 +544,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"error": "empty task"}, 400)
             return self._send_json(bio.claude_start(task, int(self.server.server_address[1]),
                                                     model=str(data.get("model") or "sonnet")))
+
+        if route == "/api/bio/run":                      # POST {frames, device} | {stop: true}
+            from plexus.gui import bio_view
+            v = bio_view.current()
+            if v is None:
+                return self._send_json({"error": "no scene is open; seed one first"}, 400)
+            if data.get("stop"):
+                return self._send_json(v.stop())
+            return self._send_json(v.run(frames=data.get("frames"), device=data.get("device")))
 
         if route == "/api/bio/visible":
             from plexus.gui import bio_view
