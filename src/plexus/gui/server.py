@@ -617,7 +617,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"error": "no scene is open; seed one first"}, 400)
             if data.get("stop"):
                 return self._send_json(v.stop())
-            return self._send_json(v.run(frames=data.get("frames"), device=data.get("device"), keep=data.get("keep")))
+            return self._send_json(v.run(frames=data.get("frames"), device=data.get("device"), keep=data.get("keep"), live=data.get("live")))
 
         if route == "/api/bio/visible":
             from plexus.gui import bio_view

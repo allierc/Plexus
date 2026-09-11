@@ -201,9 +201,9 @@ class View:
         iio.imwrite(buf, np.asarray(img), extension=".png")
         return buf.getvalue()
 
-    SNAPS_MAX = 20                                               # frames kept per run by default (PLAY re-renders each)
+    SNAPS_MAX = 300                                              # frames kept per run by default: live_movie's max_frames
+    LIVE_PICS = 20                                               # pictures shown while the run goes
     SNAP_BUDGET = 1_500_000_000                                  # bytes of kept positions per run
-    DRAW_INTERVAL = 0.25                                         # seconds between redraws during a run
     SCENE_INTERVAL = 3.0                                         # seconds between pick-scene rebuilds
 
     def _snapshot(self, H):
@@ -389,7 +389,8 @@ class View:
         return names
 
     # ------------------------------------------------------------------ running the engine
-    def run(self, frames: int | None = None, device: str | None = None, keep: int | None = None) -> dict:
+    def run(self, frames: int | None = None, device: str | None = None, keep: int | None = None,
+            live: int | None = None) -> dict:
         """Simulate the spec forward in a thread, the picture following every frame.
 
         `engine.run` builds and seeds its own hierarchy and loops internally, so a run always
@@ -418,11 +419,18 @@ class View:
                     if key in sch:
                         a, b = sch[key]
                         per_frame += int(lv.state.shape[0]) * (b - a) * 4
-        keep_n = max(2, int(keep or self.SNAPS_MAX))              # frames kept for PLAY, whatever the run length
+        # TWO STRIDES. `live`: how many times the page's picture is refreshed DURING the run (20 by
+        # default: drawing is the cost, and a run is watched, not filmed). `keep`: how many frames
+        # the run keeps for PLAY -- the movie's own rule, every frame up to 300 (live_movie's
+        # max_frames), so a 400-frame run keeps every 2nd, a 2400-frame one every 8th; a memory
+        # budget on the kept positions can widen that stride.
+        keep_n = max(2, int(keep or self.SNAPS_MAX))
         by_count = max(1, -(-(n + 1) // keep_n))
         by_mem = max(1, -(-((n + 1) * max(per_frame, 1)) // self.SNAP_BUDGET))
         self._keep_every = max(by_count, by_mem)
+        self._draw_every = max(1, -(-(n + 1) // max(1, int(live or self.LIVE_PICS))))
         self.RUN["keep_every"] = self._keep_every
+        self.RUN["draw_every"] = self._draw_every
         self._last_draw = 0.0
         self._last_scene = 0.0
 
@@ -450,7 +458,7 @@ class View:
             if self.RUN.get("stop") or tick > n:
                 raise _Stop()
             now = time.time()
-            draw = tick == n or tick == 0 or (now - self._last_draw) >= self.DRAW_INTERVAL
+            draw = tick == n or tick % self._draw_every == 0
             scene = tick == n or (now - self._last_scene) >= self.SCENE_INTERVAL
             _vtk(_draw, H, tick, draw, scene)
             self.RUN["frame"] = int(tick)
