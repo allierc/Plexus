@@ -4,98 +4,125 @@ resources:
   - gallery/
 ---
 
-We introduce **Plexus**, a typed intermediate representation for biological
-mechanisms. Rather than defining yet another simulator, Plexus defines a common
-language whose primary objects are **biological operators**. Every operator specifies
-the biological entities it acts upon, the states it requires, the relations between
-these entities, and one or more numerical implementations. The Plexus research program
-has three objectives. First, to define an **algebra of biological operators**. Second,
-to **decompose the existing corpus** of simulation models into this common language.
-Third, to construct **differentiable implementations** of these operators so that
-mechanistic models can be directly inferred from biological data.
+A mechanism, in the account that philosophers of biology have converged on, is
+*entities and activities organized such that they are productive of regular changes from
+start or set-up to finish or termination conditions* (Machamer, Darden &amp; Craver, 2000, p. 3). Entities have properties and stand in
+relations; activities are what entities do; and the organization is spatial, temporal and
+hierarchical, because what a part does at one level constitutes what the whole does at the
+next. This is the account a cell biologist uses tacitly every time a paper ends with a
+summary cartoon: named parts, arrows between them, boxes drawn inside boxes. The cartoon
+cannot be run, cannot be fitted to data, and cannot be shown to be missing an arrow.
 
-Biological systems must be decomposed not only into operators, but also into the
-entities on which those operators act. These entities are heterogeneous — receptors,
-signalling proteins, cells, extracellular matrices, tissues, fields — and are organized
-across biological levels. Plexus makes this organization explicit as a compositional
-hierarchy: each level carries its own entities and states, operators act between entities
-within a level, and **aggregate ↑** and **broadcast ↓** connect levels by mapping state
-upward and downward. Decomposition therefore does not flatten biology into a single
-collection of variables; it preserves the organization through which mechanisms at one
-level are composed with mechanisms at another.
+**Plexus** is a language for writing that cartoon down completely enough to run it. A
+model is a mechanistic hypothesis stated in two halves. *What exists*: the **sets** of
+entities — receptors, cells, the vertices of a sheet, the material points of a gel — the
+**state** each entity carries, the **relations** between entities, and the **fields** that
+make up their microenvironment. *What happens*: the **operators**, one per activity —
+adhesion, diffusion, secretion, division, death — each declared by the entities it acts
+on, the state it reads and writes and the relations it traverses, and each realized by
+one or more numerical implementations. The organization is declared as well: in space,
+by positions, contacts and fields; in time, by the order and tempo in which activities
+run; across levels, by explicit part–whole maps, with **aggregate ↑** carrying state from
+parts to whole and **broadcast ↓** from whole to parts. Decomposition therefore does not
+flatten a tissue into one collection of variables. It keeps the organization through which
+a mechanism at one level is composed with a mechanism at another.
 
-The purpose of this decomposition is ultimately recomposition: to construct complete
-mechanistic models from reusable entities and operators. Making such compositions
-executable requires strong structural choices. Plexus separates the language that
-specifies the biological model from the code that interprets and executes it. The
-language declares entities, states, relations, hierarchy and operators; the interpreter
-resolves this description into concrete numerical implementations and schedules their
-execution.
+The research programme has three objectives. First, an **algebra of activities**: a small
+number of operator kinds from which the mechanisms of the simulation literature can be
+composed. Second, to **decompose the existing corpus** of simulation models into that
+language, so that each becomes a repository of reusable entities and activities rather than
+a program. Third, **differentiable implementations** of every operator, so that a
+hypothesis written in the language can be fitted to observations, and a residual that will
+not go away can be read as a missing activity rather than a wrong parameter. The language
+guarantees that a hypothesis is well formed and complete. Whether it is *productive of* the
+change observed is what running it establishes.
 
 ## The language
 
-Plexus defines a typed language for expressing biological mechanisms independently of
-their numerical realization. The language is built around four fundamental concepts:
-**operators**, **sets**, **states**, and **fields**. Biological models are therefore
-represented as compositions of operators acting on discrete and continuous biological
-objects rather than simulator-specific algorithms.
+Plexus separates the description of a mechanism from the code that runs it. The
+description has four kinds of object. A **set** is a collection of entities of one kind at
+one level of organization — proteins, cells, neurons, synapses, the vertices of a cell
+sheet. The **state** is what each entity carries: a position, a membrane voltage, a
+polarity, a level of gene expression. A **field** is a continuous quantity over space — a
+morphogen, a pressure, a matrix density — the microenvironment the entities live in. An
+**operator** is one activity: it names the sets it acts on, the state it reads and the
+state it writes, the relations it traverses, and how it is computed. Operator and activity
+are one word in two dialects, and the paper uses both.
 
-A **set** is a collection of biological entities at one scale — proteins, cells, neurons,
-synapses, tissues; the **state** is what each element of a set carries; a **field** is a
-continuous quantity defined over space — a morphogen, a pressure, a potential.
-
-The central hypothesis of Plexus is that a large fraction of existing biological
-simulation models can be expressed as compositions of a small number of elementary
-operator kinds. The proposed algebra consists of **eight**:
+The central hypothesis is that the activities of the simulation literature reduce to a
+small number of kinds. Plexus has **eight**. Here they are in a biologist's words first:
 
 ![](figures/fig_ops.png){width=100% fig-align="center"}
 
-- **lateral** — interactions within a biological set.
-- **aggregate ↑** and **broadcast ↓** — many-to-one and one-to-many transformations
-  across biological scales.
-- **exchange** — transformations between sets and fields.
-- **field** — a field's own dynamics: diffusion, decay, reaction.
-- **rewire** — modification of relations between biological entities.
-- **structural** — creation and removal of biological entities: **divide** and **die**.
-- **seed** — the initial state, written once and never again.
+- **lateral** — what neighbours do to each other within one set: adhesion, tension,
+  juxtacrine signalling, synaptic transmission.
+- **aggregate ↑** — integration: a whole reading its parts, as a neuron sums its synaptic
+  inputs or a cell's shape follows from its vertices.
+- **broadcast ↓** — top-down control: a whole imposing on its parts, as a cell's polarity is
+  imposed on its cytoskeleton or a fate decision is inherited by everything the cell owns.
+- **exchange** — traffic between entities and their microenvironment: secretion, uptake,
+  sensing, a load carried to and from the matrix.
+- **field** — the microenvironment's own life: transport, decay, extracellular reaction.
+- **rewire** — remodelling: neighbour exchange, junction turnover, synaptic plasticity. The
+  relations change; the entities do not.
+- **structural** — turnover: **divide** and **die**. The entities themselves change, which
+  is what makes a tissue different from an inert material.
+- **seed** — the set-up conditions: the egg, the pre-pattern, the initial state written
+  once and never again.
 
-The first four kinds transform the state of a set and the field kind that of a field, all
-while preserving the underlying organization; rewire modifies the interaction graph;
-structural modifies the entities themselves; seed writes what the others evolve. Details in **[Language](language.qmd)**.
+The first five kinds change state and leave the organization intact; rewire changes the
+relations; structural changes the entities; seed writes what the others go on to evolve.
+Details in **[Language](language.qmd)**.
 
-## Composing mechanisms
+## Organization in time
 
-Biological models are expressed as compositions of elementary operators. Plexus
-represents a model as an ordered sequence of operator applications — a **schedule** —
-specifying both the order and the frequency with which operators are evaluated.
-Formally, one simulation step is the composition
-$\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1$, whose repeated application
-generates the system dynamics $x_{t+1}=\Phi(x_t)$, where $x$ is the whole state — every
-set and every field at once. Different operators may evolve on
-different time scales — mechanical interactions every step, diffusion, growth or
-division less often — so a model is a *multi-rate* composition of biological
-mechanisms rather than a monolithic solver.
+A model lists its activities in the order and at the tempo they run — a **schedule**.
+Formally, one step is the composition
+$\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1$ of the operators, and repeating it
+generates the dynamics $x_{t+1}=\Phi(x_t)$, where $x$ is the whole state — every set and
+every field at once. Activities run at their own tempo: mechanics every step, diffusion,
+growth or division less often, so a model is a *multi-rate* composition of mechanisms
+rather than one solver.
 
-Operators are **pure** transformations: rather than modifying state in place, each
-returns its contribution $\Delta_i$ to the system evolution, and the complete update
-$\Delta = \sum_i \Delta_i$ is passed to the numerical implementation. Introducing a
-new mechanism is therefore adding a new operator, never editing an
-implementation — and because nothing is mutated in place, gradients propagate through the
-composition and the whole rollout stays **differentiable**.
+Operators are **pure**: none modifies state in place. Each returns its contribution
+$\Delta_i$ to the change, and the complete update $\Delta = \sum_i \Delta_i$ is passed to
+the numerical implementation. Adding a mechanism is therefore adding an operator, never
+editing an implementation — and because nothing is mutated in place, gradients propagate
+through the composition and the whole rollout stays **differentiable**.
 
-## Composing hierarchy
+## Organization across levels
 
-A set may be contained in another — proteins in a cell, cells in a tissue, tissues in an organism — through an explicit child → parent map. Importantly, a parent may contain several distinct sets: the same cell can contain receptors, signalling proteins, cytoskeletal elements and particles. These sets remain distinct objects, with their own state and operators, while sharing the same parent. Each level can also run at its own rate: no level is reduced to a parameter of the one above it.
+A cell is a compartment, and a compartment holds parts of different kinds. In Plexus a set
+may be contained in another — proteins in a cell, cells in a tissue — through an explicit
+part → whole map, and one whole may contain several distinct sets: the same cell can hold
+receptors, signalling proteins, cytoskeletal elements and material points. None of them
+gives up its own state or its own activities to take part. A vertex model that treats a
+cell as a polygon and a reaction–diffusion model that treats it as a well-mixed bag are each
+a caricature; here the same cell is both at once, because both are sets under one parent.
+Each level also runs at its own tempo; no level is reduced to a parameter of the one above.
 
-Operators can act within a level or across levels. Within a cell, for example, operators may couple receptors → signalling proteins → cytoskeleton. Across the containment map, **aggregate ↑** builds parent state from children — a cell position from its particles, or a neuron input from its synapses — while **broadcast ↓** propagates parent state to children — a material property to every particle owned by a cell, or a constraint imposed by the parent.
+Activities run within a level or across it. Within a cell, operators couple receptors →
+signalling proteins → cytoskeleton. Across the part–whole map, **aggregate ↑** is
+integration — a cell's position from its material points, a neuron's input from its
+synapses — and **broadcast ↓** is control — a material property handed to every point a
+cell owns, a constraint the tissue puts on its cells. Causation runs both ways, up by
+integration and down by control, and both directions are operators like any other.
 
-Fields are level-specific too. **Exchange** couples a set to a field at the appropriate level, allowing a protein concentration field, a cellular morphogen field and a tissue mechanical grid to coexist as distinct objects.
-
-The consequence is that proteins → cells → tissues is not a pipeline of separate simulators. It is one compositional graph: multiple sets may coexist inside each parent, operators connect them locally, and aggregate/broadcast connect the levels. The same operator kinds are reused throughout; adding another biological scale requires no new machinery.
+Fields belong to levels too. **Exchange** couples a set to the field at its own level, so a
+protein concentration inside the cell, a morphogen among cells and a mechanical grid under
+the tissue coexist as distinct objects. Proteins → cells → tissues is therefore not a
+pipeline of separate simulators. It is one compositional graph: several sets inside each
+whole, operators joining them locally, aggregate and broadcast joining the levels. The same
+eight kinds serve throughout, and another level of organization needs no new machinery.
 
 ## Examples
 
-Every clip below was generated from the spec shown when you hover (or tab to) its title. Within each family the first card is the decomposition; every card after it differs from its neighbour by a line of that spec — an operator added or removed, a constant changed, a set enlarged — and the caption says which line and what it did.
+Every clip below was generated from the spec shown when you hover (or tab to) its title.
+Within each family the first card is the decomposition, a mechanism written out as its
+entities and activities; every card after it differs from its neighbour by one line of that
+spec — an activity added or removed, a constant changed, a set enlarged — and the caption
+says which line and what it did. Each is a perturbation experiment, the unit of evidence
+experimental biology already uses.
 
 ```{=html}
 <style>
@@ -122,8 +149,8 @@ Every clip below was generated from the spec shown when you hover (or tab to) it
 .opk-ref{font-size:.76em;color:#999;font-style:italic;margin:.1rem 0 .2rem}
 </style>
 
-<h3>Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">Reaction–diffusion decomposed into five operators over one set: two seeds (where the cells are, what they carry), a rewire (the cell graph) and two laterals, diffusion and reaction. Changing the number of states, the reaction named, or one of its constants changes the pattern; nothing beneath the spec changes. Shown on a disc of 4,000 cells: stripes, spots one constant away, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
+<h3>Pattern from two chemistries — reaction–diffusion</h3>
+<p class="opk">One kind of entity, a cell carrying two chemical states, and two activities: cells exchange their chemistry with their neighbours (diffusion, a lateral) and each cell converts one chemical into the other (reaction, a lateral). Five operators over one set: two seeds (where the cells are, what they carry), a rewire (who neighbours whom) and the two laterals. Changing the number of states, the reaction named, or one of its constants changes the pattern; nothing beneath the spec changes. Shown on a disc of 4,000 cells: stripes, spots one constant away, two chemistries coupled through their reaction, and three species in cyclic competition.</p>
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
@@ -410,8 +437,8 @@ plotting:
   </figure>
 </div>
 
-<h3>Epithelial mechanics — a vertex model</h3>
-<p class="opk">A vertex model decomposed into six operators over two sets: seeds for the vertices and for the cells that own them, an aggregate that builds each cell’s area and perimeter from its vertices, a lateral shape energy that returns a force to those vertices, a rewire that flips a junction, and a structural that removes a cell. Because the two sets share a containment map, a junction is state held once, not copied into every cell that touches it. Shown on a flat disc: one cell dying while the sheet closes over it, a morphogen gating growth where it is high, the sheet growing and dividing, each cell on its own clock — and death gated by the same morphogen, so the chemistry sculpts the sheet by removal.</p>
+<h3>A sheet that remodels and turns over — a vertex model</h3>
+<p class="opk">Two kinds of entity across two levels, vertices and the cells that own them, and the activities of an epithelium: a cell reads its shape from its vertices (integration, an aggregate), the shape energy pushes the vertices back (a lateral), neighbours exchange a junction (remodelling, a rewire), and a cell leaves the tissue (turnover, a structural). Six operators over two sets. Because the two sets share a part–whole map, a junction is state held once, not copied into every cell that touches it. Shown on a flat disc: one cell dying while the sheet closes over it, a morphogen gating growth where it is high, the sheet growing and dividing with each cell on its own clock — and death gated by the same morphogen, so the chemistry sculpts the sheet by removal.</p>
 <p class="opk-ref">Reference — active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
@@ -1073,8 +1100,8 @@ plotting:
 <!-- vertex-turing rows: hand-authored 2026-09-07 as ONE gallery so eleven clips flow 4+4+3;
      the three generated blocks (shapes / rate / second-field) each opened their own grid and
      drew a short row. No longer regenerated by discovery_okuda/ops/minisite_section.py. -->
-<h3>Growing tissue + Turing pattern</h3>
-<p class="opk">The two decompositions above, composed. The reaction–diffusion operators now act on cells that grow, divide and die under their own mechanics, and nothing had to be added to make them meet: division rewires the graph diffusion runs over, and the chemistry gates which cells grow, so the coupling runs both ways. Each clip differs from its neighbour by one line — a constant, a rate, a lateral tension added or removed — and in the last two a second gate that sends cells to die instead of to grow.</p>
+<h3>Pattern and growth composed</h3>
+<p class="opk">The two mechanisms above, composed into one. The chemistry now runs on cells that grow, divide and die under their own mechanics, and nothing had to be added to make them meet: division redraws the neighbour relations diffusion runs over, and the chemistry gates which cells grow, so the coupling runs both ways through relations the entities already had. Each clip differs from its neighbour by one line — a constant, a rate, a lateral tension added or removed — and in the last two a second gate that sends cells to die instead of to grow.</p>
 <p class="opk-ref">Reference — this is the experiment of <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018), <i>Sci. Rep.</i> 8:2386</a> — Turing patterning on a 3D vertex model — rebuilt as Plexus operators on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> mesh; the chemistry is the Gray–Scott system cited in the Turing section above.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
@@ -3049,8 +3076,8 @@ _sculpt:
     </figcaption>
   </figure>
 </div>
-<h3>Continuum mechanics — MLS-MPM</h3>
-<p class="opk">MLS-MPM decomposed into six operators over two sets and one field: particles are children of a cell, an aggregate builds the cell from them, a constitutive law turns each particle’s deformation into a stress, an exchange scatters it to the grid, the grid advances under its own dynamics (field), and a second exchange gathers the result back. Elastic, fluid and granular matter are constitutive laws named in the spec. First row: what one line of the spec changes. Second row: only the size, from 1.3&nbsp;million particles to a billion.</p>
+<h3>Deformable matter — the microenvironment as a continuum</h3>
+<p class="opk">The matter a tissue pushes on, shown on its own before a tissue touches it. Material points are the entities, a grid is their field, and the activities are those of any continuum: a point turns its deformation into a stress (a constitutive law, a lateral), hands it to the grid (an exchange), the grid advances under its own dynamics (a field) and hands the result back (a second exchange), while an aggregate builds each cell from the points it owns. Six operators over two sets and one field, the material point method of the reference. Elastic, fluid and granular matter are constitutive laws named in the spec. First row: what one line of the spec changes. Second row: only the size, from 1.3&nbsp;million points to a billion.</p>
 <p class="opk-ref">Reference — the MLS-MPM solver is our PyTorch port (<a href="https://github.com/saalfeldlab/MPM_pytorch">saalfeldlab/MPM_pytorch</a>) of Yuanming&nbsp;Hu’s <a href="https://github.com/yuanming-hu/taichi_mpm">taichi_mpm</a>, implementing MLS-MPM (Hu et&nbsp;al. 2018).</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
@@ -4662,8 +4689,8 @@ sets:
   </figure>
 </div>
 <!-- vertex-mpm: hand-authored 2026-09-07 from graphs_data/mesh_mpm; no longer generated by discovery_okuda/ops/minisite_section.py -->
-<h3>Vertex + MPM</h3>
-<p class="opk">A vertex surface and a material point continuum, kept as two sets with their own states. One operator joins them — an exchange carrying contact force across the interface in both directions — so neither has to become the other to touch it. Only the surface differs between clips: a plate, a sphere, a shell that reaches the material by inflating, and a tissue that reaches it by dividing. All four are coloured by deviatoric strain in the material, so the load each surface puts in can be read off the clip.</p>
+<h3>A tissue against its matrix — vertex + continuum</h3>
+<p class="opk">A cell sheet and the deformable matter around it, kept as two sets with their own states and their own activities. One activity joins them — contact, an exchange carrying force across the interface in both directions — so neither has to become the other to touch it. Only the sheet differs between clips: a plate, a sphere, a shell that reaches the matter by inflating, and a tissue that reaches it by dividing. All four are coloured by deviatoric strain in the matter, so the load each sheet puts in can be read off the clip.</p>
 <p class="opk-ref">Reference — contact:
 <a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>).</p>
 <div class="sim-gallery g4">
@@ -5405,8 +5432,8 @@ schedule:
 </div>
 
 <!-- BEGIN spheroid-bm-ecm (generated by discovery_okuda/ops/minisite_section.py) -->
-<h3>Cell tissue + basement membrane + extracellular matrix</h3>
-<p class="opk">The pieces recomposed into one hierarchy: epithelial cells, a basement membrane with its own nodes and faces, adhesion plaques, and the proteins carried on the membrane — four sets across three levels, joined by aggregates upward and broadcasts downward. No set gives up its own representation to take part. Between clips only the protease chemistry differs: absent, many sources, one source, and degradation left unopposed.</p>
+<h3>A layer on its membrane — cells, basement membrane, matrix</h3>
+<p class="opk">The pieces recomposed into one organized whole: epithelial cells, a basement membrane with its own nodes and faces, the adhesion plaques that bind the two, and the proteins carried on the membrane — four sets across three levels, joined by integration upward (aggregates) and control downward (broadcasts). No set gives up its own representation to take part. Between clips only one activity differs, the protease chemistry that degrades the membrane: absent, many sources, one source, and degradation left unopposed.</p>
 <p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
@@ -5828,7 +5855,7 @@ run:
 <!-- END spheroid-bm-ecm -->
 
 <h3>Other</h3>
-<p class="opk">Four more families, decomposed the same way and shown in full on the <a href="other.html">other models</a> page: stigmergy as five operators over a set and a field, a chaotic flow as one operator on a cloud, agent sorting as a rewire and a lateral along it, and gravity as one lateral over every pair. The same eight kinds, over sets that are not tissue.</p>
+<p class="opk">Four more families, decomposed the same way and shown in full on the <a href="other.html">other models</a> page: stigmergy as five activities over a set and a field, a chaotic flow as one activity on a cloud, agent sorting as a rewire and a lateral along it, and gravity as one lateral over every pair. The same eight kinds, over entities that are not cells.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card">
     <video src="gallery/slime_s.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -6000,3 +6027,28 @@ schedule: [squared_law]</pre></span></span>
   </figure>
 </div>
 ```
+
+## The same thing in four vocabularies
+
+Readers arrive from mathematics, physics and programming as often as from biology, and each
+field has its own word for every construct. The biological column is the one that says why
+the construct exists; the other three are ways of computing it.
+
+| Plexus | Biology | Mathematics | Physics | Programming |
+|---|---|---|---|---|
+| set | a kind of part: cells, synapses, matrix | carrier set, indexed family | a species of particle | a table of entities |
+| state | physiological state, phenotype | a point in a product space | degrees of freedom | the columns of that table |
+| field | microenvironment, gradient, matrix | a function on a domain | a continuum field | a grid-backed resource |
+| part → whole map | compartment membership | a function whose fibres partition the parts | coarse-graining index | a foreign key |
+| relation | contact, junction, connectivity | a span between two sets | the interaction graph | a join table |
+| operator | activity, mechanism | a typed morphism | interaction, coupling, source | a pure function |
+| model vs. implementation | competing hypotheses in one slot | a different function of the same type | a different constitutive law | a different program vs. a different compiler |
+| schedule | the order and tempo of activities | operator splitting | multi-rate integration | the program |
+| aggregate ↑ / broadcast ↓ | integration / top-down control | pushforward / pullback, an adjoint pair | coarse-graining / an imposed constraint | reduce / scatter |
+| rewire | remodelling, plasticity | graph rewriting | no analogue: the interaction graph is state | mutating the join table |
+| divide / die | proliferation / apoptosis, turnover | a change of carrier set | creation / annihilation | inserting / deleting rows |
+| seed | the set-up conditions, the pre-pattern | the initial condition | the initial condition | a constructor, run once |
+
+Machamer, P., Darden, L. &amp; Craver, C. F. (2000). Thinking about mechanisms.
+<i>Philosophy of Science</i> 67:1–25. <https://doi.org/10.1086/392759>.
+Craver, C. F. (2007). <i>Explaining the Brain</i>. Oxford University Press.
