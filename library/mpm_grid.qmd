@@ -43,13 +43,13 @@ Channels: m (mass), mv (momentum [.,dim]), c (liquid colour for CSF), v (velocit
 [.,dim]). Pure scratch: p2g zeroes + scatters into it each substep, grid_update
 solves on it, g2p reads it back.
 
-THE CELL SIZE COMES FROM THE WORLD, which it did not before. This used to read
-`dx = 1.0 / n_grid` with axes 1.. assumed to span [0,1] and only axis 0 scaled by `width`, so
-`n_grid` meant "cells per unit length". On a box that is not 1 unit across -- a 0.1 m water
-scene, say -- that puts a 1.0-wide grid on a 0.1-wide world: the cell is 10x too large, only
-~10 of 96 cells per axis carry any mass, and the failure is not subtle. `MPMGather` clamps
-positions into [2*dx, box[k] - 2*dx] with `box` correct and `dx` wrong, which crushes a 0.1 m
-cube into a 0.058 m slab on the first substep.
+THE CELL SIZE COMES FROM THE WORLD: dx = world_size[1] / n_grid, so `n_grid` is CELLS ACROSS
+AXIS 1 and not cells per unit length. The two readings agree only on a box one unit across.
+Deriving dx from a fixed 1.0 instead would put a unit-wide grid on whatever world the
+specification declared: on a box a tenth of a unit across the cell is ten times too large,
+a tenth of the cells per axis carry any mass, and `mpm_gather` -- which clamps positions into
+[2 dx, box - 2 dx] -- would be clamping with a correct box and a wrong dx, crushing the body
+into a slab on the first substep.
 
 `n_grid` means CELLS ACROSS AXIS 1, not cells per unit length. The two readings coincide when
 the world is one unit across on that axis, which is the default, so a specification that does
@@ -60,6 +60,10 @@ inv_dx IS NOT 1.0/dx. `1.0 / (1.0 / n) != float(n)` for 640 of the first 4,096 i
 first offender is n = 49 -- so the reciprocal round-trip is exact only by luck at the n_grid
 values in use (48, 64, 96, 128, 192). Deriving it from the integer directly keeps byte-identity
 on the corpus, and keeps it for a spec that picks n_grid = 49 tomorrow.
+
+Reference: the grid, the quadratic B-spline kernel and the CFL ceiling dt < dx / sqrt(E/rho)
+are those of Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994).
+Comput. Methods Appl. Mech. Eng. 118:179-196.
 
 ## Source
 
@@ -73,13 +77,13 @@ class MPMGrid(Field):
     [.,dim]). Pure scratch: p2g zeroes + scatters into it each substep, grid_update
     solves on it, g2p reads it back.
 
-    THE CELL SIZE COMES FROM THE WORLD, which it did not before. This used to read
-    `dx = 1.0 / n_grid` with axes 1.. assumed to span [0,1] and only axis 0 scaled by `width`, so
-    `n_grid` meant "cells per unit length". On a box that is not 1 unit across -- a 0.1 m water
-    scene, say -- that puts a 1.0-wide grid on a 0.1-wide world: the cell is 10x too large, only
-    ~10 of 96 cells per axis carry any mass, and the failure is not subtle. `MPMGather` clamps
-    positions into [2*dx, box[k] - 2*dx] with `box` correct and `dx` wrong, which crushes a 0.1 m
-    cube into a 0.058 m slab on the first substep.
+    THE CELL SIZE COMES FROM THE WORLD: dx = world_size[1] / n_grid, so `n_grid` is CELLS ACROSS
+    AXIS 1 and not cells per unit length. The two readings agree only on a box one unit across.
+    Deriving dx from a fixed 1.0 instead would put a unit-wide grid on whatever world the
+    specification declared: on a box a tenth of a unit across the cell is ten times too large,
+    a tenth of the cells per axis carry any mass, and `mpm_gather` -- which clamps positions into
+    [2 dx, box - 2 dx] -- would be clamping with a correct box and a wrong dx, crushing the body
+    into a slab on the first substep.
 
     `n_grid` means CELLS ACROSS AXIS 1, not cells per unit length. The two readings coincide when
     the world is one unit across on that axis, which is the default, so a specification that does
@@ -90,6 +94,10 @@ class MPMGrid(Field):
     first offender is n = 49 -- so the reciprocal round-trip is exact only by luck at the n_grid
     values in use (48, 64, 96, 128, 192). Deriving it from the integer directly keeps byte-identity
     on the corpus, and keeps it for a spec that picks n_grid = 49 tomorrow.
+
+    Reference: the grid, the quadratic B-spline kernel and the CFL ceiling dt < dx / sqrt(E/rho)
+    are those of Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994).
+    Comput. Methods Appl. Mech. Eng. 118:179-196.
     """
 
     RECORD = False                                   # transient scratch -- not recorded/rendered

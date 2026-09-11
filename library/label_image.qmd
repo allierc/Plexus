@@ -1,6 +1,6 @@
 ---
 title: "label_image"
-subtitle: "An integer instance map read from a TIFF. NOT normalised, NEVER interpolated."
+subtitle: "An integer instance map read from a TIFF: NOT normalised, and NEVER interpolated."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "An integer instance map read from a TIFF. NOT normalised, NEVER inter
 
 [`field`]{.op-badge} [`frame: label_image`]{.op-badge}
 
-An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.
+An integer instance map read from a TIFF: NOT normalised, and NEVER interpolated.
 :::
 
 ```{=html}
@@ -39,9 +39,11 @@ An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.
 
 ## Description
 
-The one job it has that `image` cannot do: return the id that is actually there. Bilinear
-weights between label 7 and label 12 are a number that means nothing and points at a cell that
+The one thing it does that `image` cannot is return the id that is actually there. A bilinear
+weight between label 7 and label 12 is a number that means nothing and points at a cell that
 may not exist, so `sample_label` indexes rather than interpolates.
+
+Reference: none -- a measured segmentation is data, not a model.
 
 ## Source
 
@@ -50,11 +52,13 @@ may not exist, so `sample_label` indexes rather than interpolates.
 ```python
 @register_field("label_image", frame="label_image")
 class LabelImageField(Field):
-    """An integer instance map read from a TIFF. NOT normalised, NEVER interpolated.
+    """An integer instance map read from a TIFF: NOT normalised, and NEVER interpolated.
 
-    The one job it has that `image` cannot do: return the id that is actually there. Bilinear
-    weights between label 7 and label 12 are a number that means nothing and points at a cell that
+    The one thing it does that `image` cannot is return the id that is actually there. A bilinear
+    weight between label 7 and label 12 is a number that means nothing and points at a cell that
     may not exist, so `sample_label` indexes rather than interpolates.
+
+    Reference: none -- a measured segmentation is data, not a model.
     """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu", **kw):

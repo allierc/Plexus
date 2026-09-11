@@ -1,0 +1,235 @@
+---
+title: "deform_control"
+subtitle: "A declared rate of rest-shape change: the control variable of a shape-morphing optimisation."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+A declared rate of rest-shape change: the control variable of a shape-morphing optimisation.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `F`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+particle -> particle: multiplies the deformation gradient by G = expm(-A dt) every frame, with
+A a symmetric 3x3 rate given as six numbers.
+
+    A = [[a_xx, a_xy, a_xz], [a_xy, a_yy, a_yz], [a_xz, a_yz, a_zz]]
+    F <- G F,     G = expm(-A dt)
+
+`polar_growth` is this with A constrained to a stretch along one direction; this is the general
+linear rate, and it exists because it is what an OPTIMISER produces. `tools/shape_control.py`
+differentiates a rollout with respect to these six numbers against a target shape, and writes
+the answer into a spec as this operator -- so the optimisation's result is a runnable model
+rather than a number in a log.
+
+SYMMETRIC, because the antisymmetric part is a rotation: it moves the material without changing
+its shape, so it is not a control and is not given one.
+
+THE SIGN IS THE ONE `polar_growth` DOCUMENTS. F is the ELASTIC deformation, so the growth F_g
+enters as its inverse -- expm(-A dt) rather than expm(+A dt) -- and a positive a_xx makes the
+material get LONGER in x rather than shorter.
+
+Reference: Xu, M., Song, C. Y., Levin, D. I. W. & Hyde, D. (2025). A Differentiable Material
+Point Method Framework for Shape Morphing. IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746);
+papers/Xu_2024_mpm_shape_morphing.pdf. Rodriguez, E. K. et al. (1994). J. Biomech. 27:455-467
+for the multiplicative split itself.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `rate` | symmetric_3x3_rate_as_six_numbers | &ndash; |
+| `over` | frames_of_action | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: deform_control, at: particle}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`shape_control`]{.op-badge} [`growth`]{.op-badge} [`rest_shape`]{.op-badge} [`inverse_design`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`cohesion`](cohesion.qmd), [`separation`](separation.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/cell_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/cell_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("deform_control", family="motility", set="particle", kind="lateral")
+class DeformControl(Lateral):
+    """A declared rate of rest-shape change: the control variable of a shape-morphing optimisation.
+
+    particle -> particle: multiplies the deformation gradient by G = expm(-A dt) every frame, with
+    A a symmetric 3x3 rate given as six numbers.
+
+        A = [[a_xx, a_xy, a_xz], [a_xy, a_yy, a_yz], [a_xz, a_yz, a_zz]]
+        F <- G F,     G = expm(-A dt)
+
+    `polar_growth` is this with A constrained to a stretch along one direction; this is the general
+    linear rate, and it exists because it is what an OPTIMISER produces. `tools/shape_control.py`
+    differentiates a rollout with respect to these six numbers against a target shape, and writes
+    the answer into a spec as this operator -- so the optimisation's result is a runnable model
+    rather than a number in a log.
+
+    SYMMETRIC, because the antisymmetric part is a rotation: it moves the material without changing
+    its shape, so it is not a control and is not given one.
+
+    THE SIGN IS THE ONE `polar_growth` DOCUMENTS. F is the ELASTIC deformation, so the growth F_g
+    enters as its inverse -- expm(-A dt) rather than expm(+A dt) -- and a positive a_xx makes the
+    material get LONGER in x rather than shorter.
+
+    Reference: Xu, M., Song, C. Y., Levin, D. I. W. & Hyde, D. (2025). A Differentiable Material
+    Point Method Framework for Shape Morphing. IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746);
+    papers/Xu_2024_mpm_shape_morphing.pdf. Rodriguez, E. K. et al. (1994). J. Biomech. 27:455-467
+    for the multiplicative split itself.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = True
+    # NOT `REQUIRES_PARAMS = ["rate"]`. The schema checks that list against the raw YAML BEFORE the
+    # operator is constructed, so a `field:` line -- which needs no rate at all -- was refused
+    # unless it carried a dead `rate: [0, 0, 0, 0, 0, 0]` that nothing ever read. The requirement is
+    # really "rate OR field", which only __init__ can see, and that is where it is enforced.
+    REQUIRES_PARAMS = []
+    REQUIRES_BUFFERS = ["F"]
+    MECHANISM_TAGS = ["shape_control", "growth", "rest_shape", "inverse_design"]
+    PARAM_ROLES = {"rate": "symmetric_3x3_rate_as_six_numbers", "over": "frames_of_action"}
+    REFERENCE = ("Xu, M. et al. (2025). IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746); "
+                 "Rodriguez, E. K. et al. (1994). J. Biomech. 27:455-467.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        # A LEARNED FIELD INSTEAD OF SIX NUMBERS. `field:` names an .npz written by
+        # tools/morph_gallery.py: a K^3 x 6 cube of symmetric rates, read at each particle's own
+        # MATERIAL coordinate -- its position the first time this operator runs, never its current
+        # one. That is what makes the control Lagrangian, and it is why a control optimised on a
+        # 50,000-point proxy can be applied to a 2.4 M-point cell: the field means the same thing
+        # at any resolution because it is indexed by where the material STARTED.
+        self.field = params.get("field")
+        self.extent = params.get("extent")            # [cx, cy, cz, half_width] of the control cube
+        self._W = None
+        if self.field is None and params.get("rate") is None:
+            raise ValueError("deform_control: give `rate` (six numbers, a symmetric 3x3) or "
+                             "`field` (a .npz holding an optimised K^3 x 6 cube) -- one of them.")
+        r = [float(v) for v in (params.get("rate") or [0.0] * 6)]
+        if self.field is None and len(r) != 6:
+            raise ValueError("deform_control: `rate` is six numbers -- the diagonal a_xx, a_yy, "
+                             f"a_zz then the off-diagonals a_xy, a_xz, a_yz -- got {len(r)}")
+        self.r = r
+        # HOW LONG IT ACTS. Unset, forever; a morph that reached its target and then kept going
+        # would be a different answer from the one that was optimised.
+        self.over = int(params.get("over", 0))
+        self._G = None
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        if self.over and int(getattr(H, "frame", 0) or 0) >= self.over:
+            return {}
+        if self.field is not None:
+            return self._field_forward(H, p)
+        if self._G is None:
+            a = self.r
+            A = torch.tensor([[a[0], a[3], a[4]], [a[3], a[1], a[5]], [a[4], a[5], a[2]]],
+                             device=p.F.device, dtype=p.F.dtype)
+            self._G = torch.matrix_exp(-A * float(getattr(H, "dt", 0.002)))
+            print(f"[deform_control] {self.at}: rate {a}, acting for "
+                  f"{self.over or 'the whole run'} frames", flush=True)
+        F = torch.matmul(self._G, p.F)
+        if torch.is_grad_enabled():
+            p.F = F
+        else:
+            p.F.copy_(F)
+        return {}
+
+    def _field_forward(self, H, p):
+        """The learned rate cube, applied per particle."""
+        import numpy as np
+        if self._W is None:
+            z = np.load(self.field)
+            A6 = torch.as_tensor(np.asarray(z["control"], np.float32), device=p.F.device)
+            K = int(round(A6.shape[0] ** (1.0 / 3.0)))
+            cx, cy, cz, half = [float(v) for v in (self.extent or [0.5, 0.5, 0.5, 0.05])]
+            X0 = p.get("pos").detach()
+            u = ((X0 - torch.tensor([cx, cy, cz], device=X0.device)) / (2 * half) + 0.5) \
+                .clamp(0, 1) * (K - 1)
+            b = u.floor().long().clamp(0, K - 1)
+            f = (u - b).clamp(0, 1)
+            a = torch.zeros(p.n, 6, device=X0.device)
+            for dx in (0, 1):
+                for dy in (0, 1):
+                    for dz in (0, 1):
+                        w = (((1 - f[:, 0]) if dx == 0 else f[:, 0])
+                             * ((1 - f[:, 1]) if dy == 0 else f[:, 1])
+                             * ((1 - f[:, 2]) if dz == 0 else f[:, 2]))
+                        i = (((b[:, 0] + dx).clamp(0, K - 1) * K
+                              + (b[:, 1] + dy).clamp(0, K - 1)) * K
+                             + (b[:, 2] + dz).clamp(0, K - 1))
+                        a = a + w[:, None] * A6[i]
+            dt = float(getattr(H, "dt", 0.002))
+            A = torch.zeros(p.n, 3, 3, device=X0.device) + torch.diag_embed(a[:, :3])
+            A[:, 0, 1] = A[:, 1, 0] = a[:, 3]
+            A[:, 0, 2] = A[:, 2, 0] = a[:, 4]
+            A[:, 1, 2] = A[:, 2, 1] = a[:, 5]
+            Adt = -A * dt
+            eye = torch.eye(3, device=X0.device)[None]
+            self._W = eye + Adt + 0.5 * torch.bmm(Adt, Adt)   # 2nd order, as the optimiser used
+            # SAY WHAT WAS CLAMPED. A point outside the cube silently takes the nearest edge's
+            # rate, which is how a mismatched `extent:` applies the wrong deformation to a whole
+            # body without anything looking wrong. The fraction is the number that catches it.
+            out = float(((u < 0) | (u > (K - 1))).any(dim=1).to(torch.float32).mean()) \
+                if u.numel() else 0.0
+            print(f"[deform_control] {self.at}: a {K}^3 rate field from "
+                  f"{os.path.basename(str(self.field))} over {p.n:,} points; "
+                  f"{100 * out:.2f}% of them fall outside the control cube "
+                  f"(centre {cx:g},{cy:g},{cz:g} half-width {half:g}) and take its edge rate",
+                  flush=True)
+            if out > 0.05:
+                print(f"[deform_control] {self.at}: MORE THAN 5% OF THE MATERIAL IS OUTSIDE THE "
+                      f"CONTROL CUBE. `extent:` almost certainly does not match where this body "
+                      f"actually is -- check its bounding box against the cube.", flush=True)
+        F = torch.bmm(self._W, p.F)
+        if torch.is_grad_enabled():
+            p.F = F
+        else:
+            p.F.copy_(F)
+        return {}
+```

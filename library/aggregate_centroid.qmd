@@ -206,10 +206,9 @@ class AggregateCentroid(Aggregate):
             # THE FORWARD PATH WRITES IN PLACE, AND MUST. Reassigning `parent.state` allocates a
             # new tensor, and the engine's graph signature is the set of buffer ADDRESSES the
             # captured substep baked in: one reassignment anywhere in the tick invalidates the
-            # capture and the run finishes eager. Measured on the 48,780-point smoke test, the
-            # clone path printed "a state buffer was reallocated after the substep was captured;
-            # dropping the CUDA graph" on the first tick -- for a write to `compartment`, a set
-            # the substep never touches.
+            # capture and the run finishes eager. The clone path drops the graph on the FIRST
+            # tick, reporting a state buffer reallocated after the substep was captured -- for a
+            # write to `compartment`, a set the substep never touches.
             old = parent.state[:, px0:px1]
             parent.state[:, px0:px1] = torch.where(den[:, None] > 0, centroid, old)
         return {}

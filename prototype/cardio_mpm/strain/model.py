@@ -165,6 +165,9 @@ class Params:
         # PER-CELL ADHESION: kappa_j = kappa_0 exp(logkappa_j); zero = the shared substrate spring.
         self.logkappa = torch.zeros(C, device=device, requires_grad=True)
         self.kappa0 = 1e4
+        # ... and the SHEET's substrate stiffness as one learnable number, kappa = kappa0 exp(logkappa0):
+        # the long-range displacement response is set by sqrt(E/kappa), which no per-cell number moves.
+        self.logkappa0 = torch.zeros((), device=device, requires_grad=True)
         self.n_modes = int(n_modes)
         self.psi = torch.zeros(max(self.n_modes, 1), max(n_frames, 2), device=device, requires_grad=True)
         self.amode = torch.zeros(C, max(self.n_modes, 1), device=device, requires_grad=True)
@@ -183,7 +186,8 @@ class Params:
     def leaves(self):
         clk = self.gfree if self.clock_mode == "free" else self.clock
         d = dict(g=self.g, phi=self.phi, logE=self.logE, clock=clk, delay=self.delay, g2=self.g2,
-                 logtau=self.logtau, logtr=self.logtr, logdur=self.logdur, logkappa=self.logkappa)
+                 logtau=self.logtau, logtr=self.logtr, logdur=self.logdur, logkappa=self.logkappa,
+                 logkappa0=self.logkappa0)
         if self.n_modes > 0:
             d["psi"] = self.psi; d["amode"] = self.amode
         return d
@@ -255,6 +259,9 @@ class Params:
                 if k in ("clock_mode", "n_modes"):
                     continue
                 if k in ("delay", "g2", "logtau", "logtr", "logdur", "logkappa") and np.asarray(v).shape != tuple(self.delay.shape):
+                    continue
+                if k == "logkappa0":
+                    with torch.no_grad(): self.logkappa0.fill_(float(np.asarray(v))); 
                     continue
                 if k in ("psi", "amode"):
                     if self.n_modes == 0:
@@ -347,7 +354,7 @@ def rollout(sim, params, device, n_cells, grad=True, prescribe=None, keep_pos=Fa
             # the stiffness LEAF, bound after the seed wrote its own per-cell value
             E_p = params.logE.exp()[cid - 1]
             q.mu, q.la = params.lame(E_p)
-            q.kappa = params.kappa0 * params.logkappa.exp()[cid - 1]     # read by anchor_percell, if present
+            q.kappa = params.kappa0 * params.logkappa0.exp() * params.logkappa.exp()[cid - 1]   # read by anchor_percell
         else:
             cid = box["cid"]
             gam = params.gamma_cells(tick)[cid - 1]

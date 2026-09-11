@@ -125,7 +125,7 @@ Other **field** operators: [`hash_encoding`](hash_encoding.qmd), [`diffuse`](dif
 
 ```python
 @register_operator("mpm_grid_update", family="mpm", set="field", kind="field")
-class MPMGridUpdate(FieldUpdate):
+class MPMGridUpdate(MPMWrites, FieldUpdate):
     """The grid solve: the second step of the MLS-MPM cycle, and the only place the whole system
     is coupled. Momentum becomes velocity, body forces are added, and the walls are imposed.
 
@@ -608,23 +608,38 @@ class MPMGridUpdate(FieldUpdate):
             if not periodic:
                 shape = g.shape; bnd = 3
                 gv = gv.view(*shape, D)
+                # THE COMPONENTS AS A LIST UNDER GRAD, and the same numbers either way. The values
+                # are already computed with `torch.where`; it is writing them back with
+                # `gv[..., k] = ck` that autograd cannot take -- an in-place index_put into a VIEW,
+                # which is the AsStridedBackward an inverse rollout dies on. Keeping the three
+                # components as separate tensors and stacking them at the end is the same
+                # arithmetic in the same order: each axis clamps its own component, then damps the
+                # others, reading whatever the previous axis left.
+                _grad = self.FUNCTIONAL          # an implementation flag, not a mode
+                comps = [gv[..., k] for k in range(D)] if _grad else None
                 for k in range(D):
                     n_k = shape[k]
                     idx = torch.arange(n_k, device=dev)
                     shp = [1] * D; shp[k] = n_k
                     lo_m = (idx < bnd).view(shp); hi_m = (idx > n_k - bnd).view(shp)
-                    ck = gv[..., k]
+                    ck = comps[k] if _grad else gv[..., k]
                     ck = torch.where(lo_m, ck.clamp(min=0), ck)     # don't penetrate the wall
                     ck = torch.where(hi_m, ck.clamp(max=0), ck)
-                    gv[..., k] = ck
+                    if _grad:
+                        comps[k] = ck
+                    else:
+                        gv[..., k] = ck
                     if wd != 1.0:                                   # tangential friction on the wall slabs
                         slab = lo_m | hi_m
                         for j in range(D):
                             if j == k:
                                 continue
-                            cj = gv[..., j]
-                            gv[..., j] = torch.where(slab, cj * wd, cj)
-                gv = gv.view(g.n_cells, D)
+                            cj = comps[j] if _grad else gv[..., j]
+                            if _grad:
+                                comps[j] = torch.where(slab, cj * wd, cj)
+                            else:
+                                gv[..., j] = torch.where(slab, cj * wd, cj)
+                gv = (torch.stack(comps, -1) if _grad else gv).view(g.n_cells, D)
             if self.plate_axis is not None and self.plate_gap_half > 0.0:
                 gv = self._plate_bc(H, g, gv, dev, dt)
             walls = self._walls3d(H, g, dev)                        # solid 3D obstacles (box / sphere)
@@ -665,16 +680,15 @@ class MPMGridUpdate(FieldUpdate):
                         _v[_i] = float(_x)
                 else:
                     # DOWN IS WHEREVER GRAVITY SAYS IT IS, and `gravity` says -y: it defaults to
-                    # `gy = -g, gz = 0` in 3D as well as in 2D. This line used to read -z in 3D, so
-                    # on every 3D spec buoyancy pushed at RIGHT ANGLES to the weight it is supposed
-                    # to oppose -- a bubble drifting sideways rather than rising. One shipped spec
-                    # would push at right angles to the weight it opposes. `buoyancy_dir`
-                    # overrides the default axis for a specification that needs another.
+                    # `gy = -g, gz = 0` in 3D as well as in 2D. Buoyancy must use the SAME axis or
+                    # it pushes at right angles to the weight it is meant to oppose, and a bubble
+                    # drifts sideways instead of rising. `buoyancy_dir` overrides the axis for a
+                    # specification that needs another.
                     _v[1] = -1.0
                 self._dir_cache = torch.tensor(_v, device=dev, dtype=gv.dtype)
                 self._dir_key = _key
             _dir = self._dir_cache
             gv = gv + dt * self.buoyancy * _f[:, None] * _dir[None, :]
-        g.v.copy_(gv)                       # in place: a captured graph holds this address
+        self._write_v(g, gv)            # in place: a captured graph holds this address
         return {}
 ```

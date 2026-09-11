@@ -1,6 +1,6 @@
 ---
 title: "image"
-subtitle: "A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1]."
+subtitle: "A 1-channel scalar map read from a 2D image (TIFF/PNG), normalised to [0, 1]."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised 
 
 [`field`]{.op-badge} [`frame: image`]{.op-badge}
 
-A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1].
+A 1-channel scalar map read from a 2D image (TIFF/PNG), normalised to [0, 1].
 :::
 
 ```{=html}
@@ -39,9 +39,13 @@ A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1].
 
 ## Description
 
-A STATIC map (no dynamics): it holds only its grid `[1, nx, ny]` and the
-world<->pixel geometry, sampled by `apply_material_map`. Same orientation
-convention as `PrescribedField` (flip vertical so image-top maps to domain-top).
+Pure state and no dynamics: it holds its grid `[1, nx, ny]` and the world-to-pixel geometry,
+and `apply_material_map` samples it. Normalising to [0, 1] is what makes the image carry the
+PATTERN and the operator reading it carry the units. Same orientation convention as
+`PrescribedField` -- flipped vertically, so image-top maps to domain-top and a gradient read
+from it does not point the wrong way.
+
+Reference: none -- a measured map is data, not a model.
 
 ## Source
 
@@ -50,10 +54,16 @@ convention as `PrescribedField` (flip vertical so image-top maps to domain-top).
 ```python
 @register_field("image", frame="image")
 class ImageField(Field):
-    """A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1].
-    A STATIC map (no dynamics): it holds only its grid `[1, nx, ny]` and the
-    world<->pixel geometry, sampled by `apply_material_map`. Same orientation
-    convention as `PrescribedField` (flip vertical so image-top maps to domain-top)."""
+    """A 1-channel scalar map read from a 2D image (TIFF/PNG), normalised to [0, 1].
+
+    Pure state and no dynamics: it holds its grid `[1, nx, ny]` and the world-to-pixel geometry,
+    and `apply_material_map` samples it. Normalising to [0, 1] is what makes the image carry the
+    PATTERN and the operator reading it carry the units. Same orientation convention as
+    `PrescribedField` -- flipped vertically, so image-top maps to domain-top and a gradient read
+    from it does not point the wrong way.
+
+    Reference: none -- a measured map is data, not a model.
+    """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu",
                  normalize=True, **kw):

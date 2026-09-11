@@ -1,6 +1,6 @@
 ---
 title: "vector_grid"
-subtitle: "A 2-channel UNIT-VECTOR field d(x) = (dx, dy) read from a TIFF -- the contraction DIRECTION / active-stress-orientation map."
+subtitle: "A 2-channel UNIT-VECTOR map d(x) = (dx, dy) read from a TIFF: the contraction direction, or the active-stress orientation."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A 2-channel UNIT-VECTOR field d(x) = (dx, dy) read from a TIFF -- the
 
 [`field`]{.op-badge} [`frame: vector_grid`]{.op-badge}
 
-A 2-channel UNIT-VECTOR field d(x) = (dx, dy) read from a TIFF -- the contraction DIRECTION / active-stress-orientation map.
+A 2-channel UNIT-VECTOR map d(x) = (dx, dy) read from a TIFF: the contraction direction, or the active-stress orientation.
 :::
 
 ```{=html}
@@ -39,9 +39,14 @@ A 2-channel UNIT-VECTOR field d(x) = (dx, dy) read from a TIFF -- the contractio
 
 ## Description
 
-DIRECTION / active-stress-orientation map. A 2-channel TIFF `[ny,nx,2]` is read as
-(dx, dy); a 1-channel TIFF as an angle theta in [0,1]->[0,2pi) -> (cos, sin). Every
-vector is normalised to unit length. Same vertical-flip convention as ImageField.
+or the active-stress orientation.
+
+A 2-channel TIFF `[ny, nx, 2]` is read as (dx, dy); a 1-channel one as an angle, theta in
+[0, 1] rescaled to [0, 2pi) and converted to (cos theta, sin theta). Every vector is
+normalised to unit length, so the map carries a DIRECTION only and the operator reading it
+carries the magnitude. Same vertical flip as `ImageField`.
+
+Reference: none -- a measured orientation map is data, not a model.
 
 ## Source
 
@@ -50,10 +55,16 @@ vector is normalised to unit length. Same vertical-flip convention as ImageField
 ```python
 @register_field("vector_grid", frame="vector_grid")
 class VectorGrid(Field):
-    """A 2-channel UNIT-VECTOR field d(x) = (dx, dy) read from a TIFF -- the contraction
-    DIRECTION / active-stress-orientation map. A 2-channel TIFF `[ny,nx,2]` is read as
-    (dx, dy); a 1-channel TIFF as an angle theta in [0,1]->[0,2pi) -> (cos, sin). Every
-    vector is normalised to unit length. Same vertical-flip convention as ImageField."""
+    """A 2-channel UNIT-VECTOR map d(x) = (dx, dy) read from a TIFF: the contraction direction,
+    or the active-stress orientation.
+
+    A 2-channel TIFF `[ny, nx, 2]` is read as (dx, dy); a 1-channel one as an angle, theta in
+    [0, 1] rescaled to [0, 2pi) and converted to (cos theta, sin theta). Every vector is
+    normalised to unit length, so the map carries a DIRECTION only and the operator reading it
+    carries the magnitude. Same vertical flip as `ImageField`.
+
+    Reference: none -- a measured orientation map is data, not a model.
+    """
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu", **kw):
         super().__init__(name)

@@ -84,6 +84,7 @@ def main():
     ap.add_argument("--iters", type=int, default=150)
     ap.add_argument("--anchor-percell", action="store_true", help="per-cell substrate stiffness (prototype operator)")
     ap.add_argument("--kappa-shrink", type=float, default=0.1, help="weight on mean(logkappa^2)")
+    ap.add_argument("--u-weight", type=float, default=1.0, help="multiplies the displacement term of the loss (1 = A and u weigh alike)")
     ap.add_argument("--n-modes", type=int, default=0, help="K shared temporal activation modes with per-cell weights")
     ap.add_argument("--mode-shrink", type=float, default=1e-2, help="weight on the modes' smoothness + weights' size")
     ap.add_argument("--fit-frames", type=int, default=0,
@@ -91,7 +92,7 @@ def main():
                          "particles x substeps, so a denser sheet (200/cell, ~60 GB over 57 frames) fits in memory "
                          "over the 36 frames that hold 97% of the signal; scoring always uses the whole window")
     ap.add_argument("--free", default="g,phi,logE,clock")
-    ap.add_argument("--lr", default="g=2e-3,phi=0.03,logE=0.03,clock=0.05,delay=0.1,g2=2e-3,logtau=0.05,logtr=0.05,logdur=0.05,psi=0.01,amode=0.02,logkappa=0.05")
+    ap.add_argument("--lr", default="g=2e-3,phi=0.03,logE=0.03,clock=0.05,delay=0.1,g2=2e-3,logtau=0.05,logtr=0.05,logdur=0.05,psi=0.01,amode=0.02,logkappa=0.05,logkappa0=0.02")
     ap.add_argument("--cell-clock-shrink", type=float, default=0.0,
                     help="weight on mean(logtau^2 + logtr^2 + logdur^2): keeps per-cell time courses near the shared clock")
     ap.add_argument("--delay-shrink", type=float, default=0.0,
@@ -197,7 +198,7 @@ def main():
                 getattr(P, k).copy_(truth[k])
     eye = torch.eye(2, device=dev)
     w_A = 1.0 / ((A_t - eye) ** 2).mean()
-    w_u = 1.0 / (u_t ** 2).mean()
+    w_u = args.u_weight / (u_t ** 2).mean()
     sim = M.load_sim(M.build_spec(label_tif=LTIF, differentiable=True, name="fit", **kw))
     groups = [dict(params=[getattr(P, k)], lr=lrs[k]) for k in free]
     opt = torch.optim.Adam(groups)
@@ -259,6 +260,7 @@ def main():
             P.logtr.clamp_(min=-1.5, max=1.5)
             P.logdur.clamp_(min=-1.0, max=1.0)
             P.logkappa.clamp_(min=-2.0, max=2.0)
+            P.logkappa0.clamp_(min=-2.0, max=2.0)
             last_ok = {k: v.detach().clone() for k, v in P.leaves().items()}
         rowd = dict(it=it, loss=float(loss), seconds=time.time() - t0, recovery=recovery(P, truth),
                     lr=[g_["lr"] for g_ in opt.param_groups])

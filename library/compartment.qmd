@@ -20,6 +20,9 @@ mitochondria" unanswerable without clustering the point cloud.
 `depth=1` is the same scale hint `cell` carries, and that is not a contradiction: depth is a
 hint used only in `Level.__repr__`, while the containment chain that the engine and the
 operators actually traverse is `parent`/`parent_name`. Nothing dispatches on depth.
+
+Reference: the piece counts are those of the cell atlas in `figures/cell_atlas.png`; the
+level itself is plexus2 sec. Hierarchy, a parent holding several distinct sets at once.
 :::
 
 ```{=html}
@@ -70,5 +73,8 @@ class Compartment:
     `depth=1` is the same scale hint `cell` carries, and that is not a contradiction: depth is a
     hint used only in `Level.__repr__`, while the containment chain that the engine and the
     operators actually traverse is `parent`/`parent_name`. Nothing dispatches on depth.
+
+    Reference: the piece counts are those of the cell atlas in `figures/cell_atlas.png`; the
+    level itself is plexus2 sec. Hierarchy, a parent holding several distinct sets at once.
     """
 ```

@@ -98,6 +98,7 @@ The surface is Okuda, S. et al. (2018). Sci. Rep. 8:2386.
 | `band_cells` | &ndash; | 3.0 |
 | `n_grid` | &ndash; | 64 |
 | `cap_rows` | &ndash; | 2 |
+| `side` | &ndash; | "outside" |
 | `map_theta` | &ndash; | 32 |
 | `map_phi` | &ndash; | 64 |
 | `verbose` | &ndash; | True |
@@ -215,6 +216,14 @@ class MeshContact(Lateral):
         self.band_cells = float(params.get("band_cells", 3.0))   # prefilter width, in grid cells
         self.n_grid = int(params.get("n_grid", 64))
         self.cap_rows = int(params.get("cap_rows", 2))
+        # WHICH SIDE OF THE SURFACE IS FORBIDDEN. `outside` (the default, and what every indenter
+        # spec means) treats the surface's INTERIOR as solid and pushes material out of it. `inside`
+        # is the membrane's reading: the material belongs in the interior and the surface pushes
+        # back anything that has left. The two differ by the sign of the penetration and of the
+        # direction it is corrected along, and by nothing else -- but running a cell with the wrong
+        # one expels its own cytoplasm, which is what it did: 26 um of cytoplasm became 62 in five
+        # frames while the membrane it had been pushed through collapsed from 13 um to 6.
+        self.side = str(params.get("side", "outside"))
         self.map_theta = int(params.get("map_theta", 32))        # the pressure map's own resolution
         self.map_phi = int(params.get("map_phi", 64))
         self.verbose = bool(params.get("verbose", True))
@@ -491,7 +500,8 @@ class MeshContact(Lateral):
         idx, tri, t, w = idx[hit], tri[hit], t[hit], w[hit]
         n_hat = M["nrm"][tri]
         xs = c + t[:, None] * u[idx]                       # the point on the surface, on the ray
-        depth = ((xs - pos[idx]) * n_hat).sum(1).clamp_min(0.0)
+        _sgn = -1.0 if self.side == "inside" else 1.0
+        depth = (_sgn * ((xs - pos[idx]) * n_hat).sum(1)).clamp_min(0.0)
         inside = depth > 0
         idx, tri, w, n_hat, depth = idx[inside], tri[inside], w[inside], n_hat[inside], depth[inside]
         if idx.numel() == 0:
@@ -515,7 +525,7 @@ class MeshContact(Lateral):
         # REGULARISED COULOMB: saturates at mu*a_n, linear below `eps_v`, so a resting contact does
         # not chatter. `eps_v` is a slip velocity and not a fudge factor.
         a_t = torch.minimum(self.mu * a_n, self.mu * a_n * speed / self.eps_v)
-        a_par = a_n[:, None] * n_hat - a_t[:, None] * dv_t / speed.clamp_min(1e-12)[:, None]
+        a_par = (_sgn * a_n[:, None]) * n_hat - a_t[:, None] * dv_t / speed.clamp_min(1e-12)[:, None]
         # THE CLAMP IS HERE, not in the scatter, so what is recorded as the reaction is what acts.
         mag = a_par.norm(dim=1)
         a_par = a_par * (self.a_max / mag.clamp_min(1e-20)).clamp(max=1.0)[:, None]

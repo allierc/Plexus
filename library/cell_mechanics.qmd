@@ -58,6 +58,11 @@ ClosedMonolayer), not a single global lumen term: it keeps every cell inflated a
 buckling, so growth (ramping v_eq per cell) inflates the shell smoothly. Force = -grad E by one 3D
 autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity.
 
+Reference: Farhadifar, R., Roper, J.-C., Aigouy, B., Eaton, S. & Julicher, F. (2007). The
+influence of cell mechanics, cell-cell interactions, and proliferation on epithelial packing.
+Curr. Biol. 17:2095-2104 (the area, perimeter and line-tension energy); Okuda, S. et al.
+(2013). Biomech. Model. Mechanobiol. 12(4):627-644 (its 3D form on a closed surface).
+
 ## Parameters
 
 | parameter | role | default |
@@ -119,8 +124,25 @@ class ShapeEnergy3D(Lateral):
     K_V is a PER-CELL volume elasticity on each cell's wedge volume v_f (Turing_vertex Eq.3 / tyssue
     ClosedMonolayer), not a single global lumen term: it keeps every cell inflated and resists local
     buckling, so growth (ramping v_eq per cell) inflates the shell smoothly. Force = -grad E by one 3D
-    autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity."""
+    autograd pass; bounded overdamped Euler (displacement capped at cap_frac x mean edge). EMIT=velocity.
+
+    Reference: Farhadifar, R., Roper, J.-C., Aigouy, B., Eaton, S. & Julicher, F. (2007). The
+    influence of cell mechanics, cell-cell interactions, and proliferation on epithelial packing.
+    Curr. Biol. 17:2095-2104 (the area, perimeter and line-tension energy); Okuda, S. et al.
+    (2013). Biomech. Model. Mechanobiol. 12(4):627-644 (its 3D form on a closed surface)."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
+    # FORCED BY THE ENERGY, NOT CHOSEN. With E = sum_f [K_A(A-A0)^2 + K_P(P-P0)^2 + K_V(v-v_eq)^2]
+    # + Lam sum_e l_e an energy (F*L): K_A L^4 = F L gives K_A = F/L^3, K_P L^2 = F L gives F/L,
+    # K_V L^6 = F L gives F/L^5, and Lam L = F L gives Lam = F -- a line tension IS a force.
+    # `mu` multiplies a force to make a velocity, so it is a mobility, L/(F*T).
+    PARAM_UNITS = {"K_A": "F/L^3", "K_P": "F/L", "K_V": "F/L^5", "K_R": "F/L",
+                   "Lambda": "line_tension", "Gamma": "tension",
+                   "p0": "fraction", "mu": "mobility", "eta": "fraction",
+                   "cap_frac": "fraction", "relax_iters": "count"}
+    # THE MID-SURFACE MODEL DEFENDS THE WEDGE VOLUME, as this class's own docstring says: "K_V is a
+    # PER-CELL volume elasticity on each cell's wedge volume v_f". So `V0f` here IS a wedge volume,
+    # and that is consistent with the seed.
+    BLOCK_UNITS = {"V0f": "volume[wedge]", "A0": "area[midsurface]", "P0": "length"}
     REQUIRES_PARAMS = ["p0"]
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]

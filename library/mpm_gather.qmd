@@ -103,7 +103,7 @@ Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qm
 
 ```python
 @register_operator("mpm_gather", "g2p", family="mpm", set="particle", kind="exchange")
-class MPMGather(Exchange):                 
+class MPMGather(MPMWrites, Exchange):                 
     """Grid to particle: the third step of the MLS-MPM cycle. Each particle reads back a
     velocity and a velocity GRADIENT from the nodes around it, and is advected.
 
@@ -256,8 +256,6 @@ class MPMGather(Exchange):
         # MAY_MUTATE_INTEGRATED_STATE, so the engine's tick-0 integration-invariant guard does not
         # apply to it. The clone-and-rebind it replaces gave `p.state` a new address every substep.
         pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
-        p.state[:, pa:pb] = Xn
-        p.state[:, va:vb] = new_V
-        p.C.copy_(new_C)
+        self._write_particles(p, pa, pb, va, vb, Xn, new_V, new_C)
         return {}
 ```

@@ -78,6 +78,10 @@ the pressure, is what a van 't Hoff term would have to carry; that form is a str
 operator and is deliberately not built until something needs a cell to shrink in hypertonic
 medium.
 
+Reference: van 't Hoff, J. H. (1887). Die Rolle des osmotischen Druckes in der Analogie
+zwischen Losungen und Gasen. Z. Phys. Chem. 1:481-508 (the osmotic pressure a turgor is);
+the balance against the cortex is Young-Laplace, P = 2 gamma / R.
+
 ## Parameters
 
 | parameter | role | default |
@@ -143,6 +147,10 @@ class MPMTurgor(Lateral):
     the pressure, is what a van 't Hoff term would have to carry; that form is a strictly larger
     operator and is deliberately not built until something needs a cell to shrink in hypertonic
     medium.
+
+    Reference: van 't Hoff, J. H. (1887). Die Rolle des osmotischen Druckes in der Analogie
+    zwischen Losungen und Gasen. Z. Phys. Chem. 1:481-508 (the osmotic pressure a turgor is);
+    the balance against the cortex is Young-Laplace, P = 2 gamma / R.
     """
 
     EMIT = None                 # particle->particle: writes the `turgor` buffer in place; no delta
