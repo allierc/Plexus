@@ -12,7 +12,10 @@ centroid, a vertex) is projected through the plotter's own camera to the screen 
 to the click within a few pixels wins, nearer-to-camera on a tie. That works for glyph actors
 (whose point ids are the sphere's, not the piece's) and costs one matrix product.
 
-VTK is not thread-safe and the server is threaded, so every call holds one lock.
+VTK is not thread-safe and its off-screen OpenGL context belongs to the thread that made it; the
+server handles each request on its own thread, and a second view built on a different thread
+than the first died in VTK with `std::bad_array_new_length`. So EVERY call that touches the
+plotter runs on one dedicated thread (`_vtk`), whichever request thread asks.
 """
 from __future__ import annotations
 
@@ -24,8 +27,23 @@ import time
 
 import numpy as np
 
+from concurrent.futures import ThreadPoolExecutor
+
 LOCK = threading.RLock()
 CURRENT: dict = {"view": None}
+_EXEC = ThreadPoolExecutor(max_workers=1, thread_name_prefix="plexus-vtk")
+_VTK_THREAD: dict = {"ident": None}
+
+
+def _vtk(fn, *args, **kwargs):
+    """Run `fn` on the one VTK thread and return its result (a call from that thread runs inline)."""
+    if _VTK_THREAD["ident"] == threading.get_ident():
+        return fn(*args, **kwargs)
+
+    def _wrapped():
+        _VTK_THREAD["ident"] = threading.get_ident()
+        return fn(*args, **kwargs)
+    return _EXEC.submit(_wrapped).result()
 
 
 class View:
@@ -88,6 +106,9 @@ class View:
 
     # ------------------------------------------------------------------ camera and picture
     def set_camera(self, azim=None, elev=None, zoom=None):
+        return _vtk(self._set_camera, azim, elev, zoom)
+
+    def _set_camera(self, azim=None, elev=None, zoom=None):
         with LOCK:
             if azim is not None: self.azim = float(azim)
             if elev is not None: self.elev = max(-89.0, min(89.0, float(elev)))
@@ -141,13 +162,16 @@ class View:
         self.p.add_text(_si_length(len_m), position=(0.80, 0.065), viewport=True, font_size=11, color="white", name="scale_label")
 
     def png(self) -> bytes:
-        with LOCK:
-            self.p.render()                                      # screenshot() alone returns the stale frame
-            img = self.p.screenshot(return_img=True)
+        img = _vtk(self._grab)
         import imageio.v3 as iio
         buf = io.BytesIO()
         iio.imwrite(buf, np.asarray(img), extension=".png")
         return buf.getvalue()
+
+    def _grab(self):
+        with LOCK:
+            self.p.render()                                      # screenshot() alone returns the stale frame
+            return np.asarray(self.p.screenshot(return_img=True)).copy()
 
     # ------------------------------------------------------------------ picking by projection
     def _candidates(self):
@@ -173,11 +197,11 @@ class View:
 
     def pick_at(self, fx: float, fy: float, tol: float = 0.012) -> str | None:
         """The object under the click at screen fractions (fx from the left, fy from the top)."""
-        with LOCK:
+        def _proj():
             W, Hh = self.p.window_size
-            cam = self.p.camera
-            M = cam.GetCompositeProjectionTransformMatrix(float(W) / float(Hh), -1.0, 1.0)
-            A = np.array([[M.GetElement(i, j) for j in range(4)] for i in range(4)], float)
+            M = self.p.camera.GetCompositeProjectionTransformMatrix(float(W) / float(Hh), -1.0, 1.0)
+            return W, Hh, np.array([[M.GetElement(i, j) for j in range(4)] for i in range(4)], float)
+        W, Hh, A = _vtk(_proj)
         P, ids = self._candidates()
         if not ids:
             return None
@@ -193,6 +217,9 @@ class View:
         return ids[int(np.argmin(score))]
 
     def highlight(self, pick: str | None):
+        return _vtk(self._highlight, pick)
+
+    def _highlight(self, pick: str | None):
         """A yellow dot on a cluster or vertex; the cell's rings and lateral edges for a cell."""
         import pyvista as pv
         from plexus.gui import bio
@@ -231,6 +258,9 @@ class View:
 
     # ------------------------------------------------------------------ visibility by species
     def set_visible(self, species: str, on: bool):
+        return _vtk(self._set_visible, species, on)
+
+    def _set_visible(self, species: str, on: bool):
         with LOCK:
             acts = [a for n, a in self.p.renderer.actors.items() if n.startswith("glyph_") and n.endswith("_" + species)]
             if not acts:
@@ -267,9 +297,7 @@ class View:
         class _Stop(Exception):
             pass
 
-        def _on_frame(H, tick):
-            if self.RUN.get("stop") or tick > n:
-                raise _Stop()
+        def _draw(H, tick):
             with LOCK:
                 self.H = H
                 self.lm(H, tick)
@@ -277,7 +305,12 @@ class View:
                     from plexus.gui import bio
                     self.scene = bio.scene_from(H, self.sim, self.spec_path)
                     if self.pick:
-                        self.highlight(self.pick)
+                        self._highlight(self.pick)
+
+        def _on_frame(H, tick):
+            if self.RUN.get("stop") or tick > n:
+                raise _Stop()
+            _vtk(_draw, H, tick)
             self.RUN["frame"] = int(tick)
             self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
             self.RUN["counts"] = self.counts_live(H)
@@ -324,23 +357,28 @@ class View:
 
     def close(self):
         self.RUN["stop"] = True
-        with LOCK:
-            try:
-                self.lm.close()
-            except Exception:                                    # noqa: BLE001
-                pass
+
+        def _c():
+            with LOCK:
+                try:
+                    self.lm.close()
+                except Exception:                                # noqa: BLE001
+                    pass
+        _vtk(_c)
 
 
 def open_view(spec_path: str, device: str = "cpu") -> View:
-    """Replace the session's view with a fresh one for `spec_path`."""
-    with LOCK:
-        old = CURRENT.get("view")
-        if old is not None:
-            old.close()
-        CURRENT["view"] = None
-        v = View(spec_path, device)
-        CURRENT["view"] = v
-        return v
+    """Replace the session's view with a fresh one for `spec_path`, built on the VTK thread."""
+    def _open():
+        with LOCK:
+            old = CURRENT.get("view")
+            if old is not None:
+                old.close()
+            CURRENT["view"] = None
+            v = View(spec_path, device)
+            CURRENT["view"] = v
+            return v
+    return _vtk(_open)
 
 
 def current() -> View | None:
