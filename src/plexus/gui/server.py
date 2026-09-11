@@ -607,7 +607,8 @@ class Handler(BaseHTTPRequestHandler):
                 from plexus.gui import material
                 brief = material.MATERIAL_BRIEF
             return self._send_json(bio.claude_start(task, int(self.server.server_address[1]),
-                                                    model=str(data.get("model") or "sonnet"), brief=brief))
+                                                    model=str(data.get("model") or "sonnet"), brief=brief,
+                                                    mode=str(data.get("mode") or "bio")))
 
         if route == "/api/bio/run":                      # POST {frames, device} | {stop: true}
             from plexus.gui import bio_view
