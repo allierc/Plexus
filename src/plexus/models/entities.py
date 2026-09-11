@@ -588,6 +588,22 @@ class MPMParticle:
 
 
 @register_entity(
+    # AN ORGANELLE PIECE IS A POINT WITH A RADIUS, contained in a cell (see
+    # operators/organelle_ops.py): one nucleus, one mitochondrion. Its species are the set's
+    # `types:` with a `count:` per cell. The reserve holds the pieces a division will spawn
+    # (`on_divide: duplicate`), one extra block per seeded one.
+    "organelle", depth=0,
+    state_schema=spatial_schema,
+    reserve_factor=1,
+    render={"color_by": "node_type", "arrows": None},
+)
+class OrganellePiece:
+    """A subcellular body reduced to its pose: position and radius, inside a vertex-model cell.
+    What the piece is made of (nothing, a mesh, or MPM particles) is a child set declared in the
+    spec, see notes/organelles/ORGANELLE_PLAN.md section 2a."""
+
+
+@register_entity(
     # A PROTEIN CLUSTER IS A POINT, NOT MATTER: position and velocity, contained in a cell, no
     # deformation gradient and no grid (see operators/protein_ops.py). `integrin` and `myosin`
     # are the same layout under the names the specs use.

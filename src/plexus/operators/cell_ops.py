@@ -59,7 +59,7 @@ from plexus.models.state import spatial_schema
 
 # --------------------------------------------------------------------------- the entity
 @register_entity(
-    "compartment", "organelle", depth=1,
+    "compartment", depth=1,
     state_schema=spatial_schema,                 # dim -> StateSchema (pos|vel, D-wide each)
     render={"color_by": "node_type", "arrows": None},
 )

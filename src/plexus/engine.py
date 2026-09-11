@@ -704,6 +704,17 @@ def _resolve_emit(sim: Spec, H: "Hierarchy" = None) -> dict:
 # --------------------------------------------------------------------------- #
 #  build: spec -> Hierarchy
 # --------------------------------------------------------------------------- #
+def _default_reserve(s: dict, sname: str, per: int) -> int:
+    """Dormant slots per parent block: the spec's `grow_reserve`, else the entity's
+    `reserve_factor` times `per_parent`, else zero. One function for the allocation and for the
+    per-block type assignment, so the two cannot disagree about the block length."""
+    if "grow_reserve" in s:
+        return int(s["grow_reserve"])
+    _ecls = _ENTITY_REGISTRY.get(str(s.get("entity") or sname))
+    _rf = float(getattr(_ecls, "RESERVE_FACTOR", 0.0) or 0.0) if _ecls is not None else 0.0
+    return int(round(_rf * int(per)))
+
+
 def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
     """Assign node_type by per-type fraction over the buffer, and build the per-type
     parameter table the operator indexes (the inverse-problem target)."""
@@ -758,16 +769,25 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
     # matrix rather than a python loop over parents.
     _per = s.get("per_parent")
     if counted and "parent" in s and _per is not None and not isinstance(_per, dict):
-        per = int(_per) + int(s.get("grow_reserve", 0))
+        # THE BLOCK IS `per_parent` PLUS THE RESERVE, and the reserve may come from the ENTITY
+        # (`reserve_factor`, see `build`) rather than from a `grow_reserve` line: an organelle set
+        # with counted species and no reserve line still allocates its dormant tail per parent, so
+        # dividing `lvl.n` by `per_parent` alone reported "do not divide into blocks".
+        per = int(_per) + _default_reserve(s, lvl.name, int(_per))
         nblk = lvl.n // per
         if nblk * per != lvl.n:
             raise ValueError(f"{lvl.name}: {lvl.n} elements do not divide into blocks of {per}")
         pat = torch.cat([torch.full((int(t["count"]),), tid, dtype=torch.long, device=device)
                          for tid, t in enumerate(type_list)])
-        if pat.numel() < per:                       # a `grow_reserve` tail: dormant slots take type 0
-            pat = torch.cat([pat, torch.zeros(per - pat.numel(), dtype=torch.long, device=device)])
-        order = torch.argsort(torch.rand(nblk, per, generator=H.rng, device=device), dim=1)
-        node_type = pat[order].reshape(-1)
+        # THE SHUFFLE STAYS INSIDE THE LIVE HEAD OF THE BLOCK. The reserve tail (dormant, type 0
+        # until an operator wakes it) is appended AFTER the shuffle: shuffling the whole block
+        # mixed the tail's type-0 padding into the live rows, so a cell declared with one nucleus
+        # and thirty mitochondria woke up with sixteen nuclei.
+        live_n = min(int(pat.numel()), per)
+        order = torch.argsort(torch.rand(nblk, live_n, generator=H.rng, device=device), dim=1)
+        head = pat[:live_n][order]                                        # [nblk, live_n]
+        tail = torch.zeros(nblk, per - live_n, dtype=torch.long, device=device)
+        node_type = torch.cat([head, tail], 1).reshape(-1)
     else:
         start = 0
         for tid, t in enumerate(type_list):
@@ -1112,9 +1132,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         # ENTITY (`reserve_factor`, a multiple of `per_parent`): a protein reservoir carries three
         # dormant slots per seeded one without every spec writing a number for it; entities that
         # declare no factor keep the old default of zero.
-        _ecls = _ENTITY_REGISTRY.get(str(s.get("entity") or sname))
-        _rf = float(getattr(_ecls, "RESERVE_FACTOR", 0.0) or 0.0) if _ecls is not None else 0.0
-        reserve = int(s.get("grow_reserve", int(round(_rf * per)) if per is not None else 0))
+        reserve = _default_reserve(s, sname, per) if per is not None else int(s.get("grow_reserve", 0))
         per_tot = None if per is None else per + reserve
         _, render, depth = _entity_meta(sname, H.dim, s.get("entity"))  # render + depth from the registry
         schema = _resolve_schema(s, H.dim, sname)      # StateSchema: `state:` block, else the entity's, else pos/vel
