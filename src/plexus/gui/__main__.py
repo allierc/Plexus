@@ -27,18 +27,20 @@ def main(argv=None):
                     help="open the prompt-to-scene studio instead of the node editor")
     ap.add_argument("--bio", action="store_true",
                     help="open the bio-objects page: define a tissue and its proteins, seed, click")
+    ap.add_argument("--material", action="store_true",
+                    help="open the material page: MPM bodies in a box, seed, run (always on 8798)")
     args = ap.parse_args(argv)
 
     if args.port is None:
-        args.port = 8799 if args.bio else 8765     # http://127.0.0.1:8799/bio is the bookmark
+        args.port = 8799 if args.bio else 8798 if args.material else 8765   # /bio on 8799, /material on 8798: bookmarks
     httpd = serve(args.host, args.port)
-    url = f"http://{args.host}:{args.port}/" + ("bio" if args.bio else "studio" if args.studio else "")
+    url = f"http://{args.host}:{args.port}/" + ("bio" if args.bio else "material" if args.material else "studio" if args.studio else "")
     if args.spec and not args.studio:
         sp = os.path.abspath(os.path.expanduser(args.spec))
         if os.path.isfile(sp):
             url += f"?spec={quote(sp)}"
 
-    print(f"  {'Plexus bio objects' if args.bio else 'Plexus Studio' if args.studio else 'Plexus spec editor'}  ->  {url}")
+    print(f"  {'Plexus bio objects' if args.bio else 'Plexus material' if args.material else 'Plexus Studio' if args.studio else 'Plexus spec editor'}  ->  {url}")
     print("  (Ctrl-C to stop)")
 
     if not args.no_browser:

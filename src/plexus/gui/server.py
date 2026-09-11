@@ -351,6 +351,29 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return self.wfile.write(body)
 
+        if route == "/material":
+            from plexus.gui import material
+            body = material.page().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+
+        if route == "/api/material/spec":
+            from plexus.gui import material, studio
+            name = (q.get("name") or [""])[0]
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            if not name or not os.path.exists(sp):
+                return self._send_json({"error": "no such spec"}, 404)
+            raw = open(sp).read()
+            try:
+                form = material.form_from_spec(yaml.safe_load(raw))
+            except Exception as e:                       # noqa: BLE001
+                form = None
+                print(f"[material] form_from_spec: {e}", flush=True)
+            return self._send_json({"name": name, "raw": raw, "form": form})
+
         if route == "/api/bio/counts":
             from plexus.gui import bio, studio
             name = (q.get("name") or [""])[0]
@@ -542,8 +565,12 @@ class Handler(BaseHTTPRequestHandler):
             task = str(data.get("task") or "").strip()
             if not task:
                 return self._send_json({"error": "empty task"}, 400)
+            brief = None
+            if str(data.get("mode") or "") == "material":
+                from plexus.gui import material
+                brief = material.MATERIAL_BRIEF
             return self._send_json(bio.claude_start(task, int(self.server.server_address[1]),
-                                                    model=str(data.get("model") or "sonnet")))
+                                                    model=str(data.get("model") or "sonnet"), brief=brief))
 
         if route == "/api/bio/run":                      # POST {frames, device} | {stop: true}
             from plexus.gui import bio_view
@@ -561,6 +588,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"error": "no scene is open"}, 400)
             ok = v.set_visible(str(data.get("species") or ""), bool(data.get("on", True)))
             return self._send_json({"ok": ok, "hidden": sorted(v.hidden)})
+
+        if route == "/api/material/build":
+            from plexus.gui import bio, material, studio
+            try:
+                spec = material.build_spec(data)
+            except Exception as e:                       # noqa: BLE001
+                return self._send_json({"error": f"form: {e}"}, 400)
+            ok, err = _validate(spec)
+            if not ok:
+                return self._send_json({"error": "schema rejected the spec", "detail": err}, 400)
+            os.makedirs(studio.CONFIG_DIR, exist_ok=True)
+            name = spec["general"]["name"]
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            raw = _dump_yaml(spec)
+            open(sp, "w").write(raw)
+            bio.bump(name, f"built {name}")
+            return self._send_json({"name": name, "raw": raw, "valid": True})
 
         if route == "/api/bio/build":
             from plexus.gui import bio, studio
