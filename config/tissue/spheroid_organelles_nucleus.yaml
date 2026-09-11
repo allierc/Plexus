@@ -193,7 +193,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 34.0
+    span: 18.0
     walls: 64
     loc:
     - 0.015
@@ -202,7 +202,7 @@ plotting:
     mid: false
     points: false
     spheres: true
-  cross_section_height: 0.24
+  cross_section_height: 0.34
   curve:
   - quantity: cells
     xlabel: frame

@@ -204,7 +204,7 @@ plotting:
     axis: y
     at: 0.5
     thickness: 6
-    span: 34.0
+    span: 18.0
     walls: 64
     loc:
     - 0.015
@@ -213,7 +213,7 @@ plotting:
     mid: false
     points: false
     spheres: true
-  cross_section_height: 0.24
+  cross_section_height: 0.34
   curve:
   - quantity: cells
     xlabel: frame
@@ -262,3 +262,17 @@ descriptions:
       a cross-section of the spheroid, revealing a hollow-like interior with a ring
       of particles. The entire scene is set within a large, black cubic bounding box
       with white wireframe edges.
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a spheroid-shaped cluster of particles expanding and increasing
+      in density over time. As the frames progress, the number of cells and mitochondria within the structure
+      grows significantly. The internal components of the spheroid become more packed and complex as the
+      simulation reaches its final frames. The graphs on the right confirm a steady upward trend in cell
+      count, mitochondria, and mitochondrial bonds.
+    objects: The primary object is a spherical cluster of small, multi-colored particles located in the
+      center of a large 3D bounding box. These particles are primarily blue and red, forming a dense,
+      interconnected network. A smaller inset in the bottom left shows a cross-sectional view of the spheroid,
+      revealing a hollow-like core with a thick outer shell. The bounding box is a large, transparent
+      white wireframe cube that defines the simulation space.
