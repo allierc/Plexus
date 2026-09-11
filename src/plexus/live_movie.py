@@ -564,7 +564,7 @@ class LiveMovie:
             # thing this renderer was unified to stop. Drawn at `lo..hi`, which is [0, world] for a
             # walled run and centred on the origin for a free one.
             _b = np.asarray(self.lo), np.asarray(self.hi)
-            if abs(self.zoom - 1.0) < 1e-9:
+            if abs(self.zoom - 1.0) < 1e-9 and bool((self.style or {}).get("box_frame", True)):
                 self.p.add_mesh(pv.Box((_b[0][0], _b[1][0], _b[0][1], _b[1][1],
                                         _b[0][2], _b[1][2])).extract_all_edges(),
                                 color="#4a4a4a", line_width=1.0, lighting=False)

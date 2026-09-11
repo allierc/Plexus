@@ -43,12 +43,19 @@ class View:
         for k in ("curve", "stills"):                       # the curves need a clip; the section inset stays
             style.pop(k, None)
         style["real_time"] = False
+        style["box_frame"] = False                               # the page frames the objects, not the box
+        style["cross_section_height"] = min(float(style.get("cross_section_height", 0.24) or 0.24), 0.2)
+        u = getattr(sim, "units", None)
+        dec = bool(getattr(u, "declared", False))                # the scale bar needs declared units, as the movie does
         self._tmp = tempfile.mkdtemp(prefix="plexus_bio_")
         free = str(getattr(sim, "boundary", "") or "").lower() == "free"
         self.lm = LiveMovie(out=os.path.join(self._tmp, "view.mp4"), world=list(sim.world_size), n_frames=1,
                             up=int(style.get("up_axis", 2)), name=sim.name, sim=sim, style=style,
                             centred=free and not any(k in (sim.sets or {}) for k in ("mpm_particle", "cytosol", "nucleus")),
-                            can_curve=False, render_n=400_000, stills=0, px=int(px))
+                            can_curve=False, render_n=400_000, stills=0, px=int(px),
+                            dt=getattr(sim, "dt", None),
+                            time_s=(float(u.time_s) if dec else None),
+                            length_um=(float(u.length_um) if dec else None))
         self.lm(H, 0)                                            # builds every actor, writes one frame
         if self.lm.failed:
             raise RuntimeError(f"renderer: {self.lm.failed}")
@@ -96,6 +103,42 @@ class View:
             if bool(cam.parallel_projection):
                 cam.parallel_scale = self.scale0 / self.zoom
             self.p.renderer.ResetCameraClippingRange()
+            self._scale_bar(cam, d)
+
+    def _scale_bar(self, cam, view_dir):
+        """A bar of a round length, fixed at the bottom-left of the VIEW whatever the camera does.
+
+        The movie's bar is a line at the world box's edge, sized to a third of the box; the page
+        frames the objects and zooms, so that bar is off-screen or the wrong length here. This one
+        is a world-space line rebuilt on every camera move: it lies in the screen plane at the
+        bottom of the view, its length the largest 1-2-2.5-5 x 10^n metres under a third of the
+        view width, labelled in SI. Needs `general.units` (length_um), as the movie's bar does."""
+        Lum = getattr(self.lm, "length_um", None)
+        if not Lum:
+            return
+        from plexus.live_movie import _si_length
+        import pyvista as pv
+        up = np.array([0.0, 0.0, 1.0])
+        right = np.cross(up, view_dir); right /= max(np.linalg.norm(right), 1e-12)
+        vup = np.cross(view_dir, right); vup /= max(np.linalg.norm(vup), 1e-12)
+        half_h = float(cam.parallel_scale) if cam.parallel_projection else float(self.dist0 / self.zoom) * np.tan(np.radians(float(cam.view_angle) / 2))
+        W, Hh = self.p.window_size
+        half_w = half_h * float(W) / float(Hh)
+        m_per_unit = float(Lum) / 1.0e6
+        tgt_m = (2.0 * half_w / 3.0) * m_per_unit
+        p10 = 10.0 ** np.floor(np.log10(max(tgt_m, 1e-30)))
+        len_m = max([f * p10 for f in (1.0, 2.0, 2.5, 5.0) if f * p10 <= tgt_m] or [p10])
+        L = len_m / m_per_unit
+        # bottom-RIGHT: the section inset owns the bottom-left corner
+        b = self.focal + right * (half_w * 0.92) - vup * (half_h * 0.9) + view_dir * (0.5 * half_h)
+        a = b - right * L
+        for nm in ("scale_bar", "scale_label"):
+            try:
+                self.p.remove_actor(nm, render=False)
+            except Exception:                                    # noqa: BLE001
+                pass
+        self.p.add_mesh(pv.Line(a, b), color="white", line_width=4.0, lighting=False, name="scale_bar")
+        self.p.add_text(_si_length(len_m), position=(0.80, 0.065), viewport=True, font_size=11, color="white", name="scale_label")
 
     def png(self) -> bytes:
         with LOCK:
