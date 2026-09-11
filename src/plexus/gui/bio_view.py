@@ -202,6 +202,9 @@ class View:
         return buf.getvalue()
 
     SNAPS_MAX = 400                                              # frames kept per run (strided beyond)
+    SNAP_BUDGET = 1_500_000_000                                  # bytes of kept positions per run
+    DRAW_INTERVAL = 0.25                                         # seconds between redraws during a run
+    SCENE_INTERVAL = 3.0                                         # seconds between pick-scene rebuilds
 
     def _snapshot(self, H):
         """What the renderer reads, per level, copied to the CPU: the position (and separation)
@@ -401,29 +404,54 @@ class View:
         n = int(frames or self.sim.n_frames)
         self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev, started=time.time(), frames_kept=0)
         self.snaps = []
-        self._keep_every = max(1, (n + 1) // self.SNAPS_MAX + (1 if (n + 1) % self.SNAPS_MAX else 0))
+        # THE RUN IS NOT THE MOVIE. Drawing every frame of a 570k-particle waterfall cost 650 ms a
+        # frame on top of the engine's 55 ms; a generate renders every 8th. Here the picture is
+        # refreshed on a clock (DRAW_INTERVAL seconds), so the engine sets the pace and the page
+        # sees the latest frame; the pick scene is rebuilt at most every SCENE_INTERVAL seconds.
+        # Kept frames for PLAY are strided to SNAPS_MAX and to a memory budget (SNAP_BUDGET bytes,
+        # from the seeded hierarchy's own position columns).
+        per_frame = 0
+        for lv in self.H.levels.values():
+            sch = getattr(lv, "state_schema", None)
+            if sch is not None and "pos" in sch:
+                for key in ("pos", "sep"):
+                    if key in sch:
+                        a, b = sch[key]
+                        per_frame += int(lv.state.shape[0]) * (b - a) * 4
+        by_count = max(1, -(-(n + 1) // self.SNAPS_MAX))
+        by_mem = max(1, -(-((n + 1) * max(per_frame, 1)) // self.SNAP_BUDGET))
+        self._keep_every = max(by_count, by_mem)
+        self.RUN["keep_every"] = self._keep_every
+        self._last_draw = 0.0
+        self._last_scene = 0.0
 
         class _Stop(Exception):
             pass
 
-        def _draw(H, tick):
+        def _draw(H, tick, draw, scene):
             with LOCK:
                 self.H = H
-                self.lm(H, tick)
-                if getattr(self.lm, "cs", None) is not None and tick == 0:
-                    self.lm._update_cross_section(H)
-                if tick % self._keep_every == 0:
+                if draw:
+                    self.lm(H, tick)
+                    if getattr(self.lm, "cs", None) is not None and tick == 0:
+                        self.lm._update_cross_section(H)
+                    self._last_draw = time.time()
+                if tick % self._keep_every == 0 or tick == n:
                     self._snapshot(H)
-                if tick % 10 == 0 or tick == n:
+                if scene:
                     from plexus.gui import bio
                     self.scene = bio.scene_from(H, self.sim, self.spec_path)
                     if self.pick:
                         self._highlight(self.pick)
+                    self._last_scene = time.time()
 
         def _on_frame(H, tick):
             if self.RUN.get("stop") or tick > n:
                 raise _Stop()
-            _vtk(_draw, H, tick)
+            now = time.time()
+            draw = tick == n or tick == 0 or (now - self._last_draw) >= self.DRAW_INTERVAL
+            scene = tick == n or (now - self._last_scene) >= self.SCENE_INTERVAL
+            _vtk(_draw, H, tick, draw, scene)
             self.RUN["frame"] = int(tick)
             self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
             self.RUN["counts"] = self.counts_live(H)
