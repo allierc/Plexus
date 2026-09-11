@@ -151,13 +151,15 @@ operators:
 - op: attraction_repulsion
   at: integrin
   sigma: 0.35
-- op: integrin_project
+- op: protein_project
   at: integrin
   tissue: vertex
-- op: integrin_express
+  surface: basal
+- op: protein_express
   at: integrin
   tissue: vertex
   seed: 0
+  surface: basal
 schedule:
 - cell_geometry
 - cell_grow
@@ -167,8 +169,8 @@ schedule:
 - topo_record
 - radius_graph
 - attraction_repulsion
-- integrin_project
-- integrin_express
+- protein_project
+- protein_express
 seed:
 - op: seed_mesh
   at: vertex
@@ -181,13 +183,14 @@ seed:
   model: apicobasal
   h0: 0.88
   apical: in
-- op: integrin_seed
+- op: protein_seed
   at: integrin
   tissue: vertex
   density: 3.0
   seed: 0
   s: 0.02
   tau: 300.0
+  surface: basal
 plotting:
   renderer: vtk_points
   background: black

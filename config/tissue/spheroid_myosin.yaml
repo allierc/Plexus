@@ -1,5 +1,5 @@
 general:
-  name: spheroid_integrins_10x
+  name: spheroid_myosin
   seed: 0
   n_frames: 801
   dt: 1.0
@@ -32,7 +32,7 @@ sets:
         width: 3
         integration: first_order
   cell:
-    n: 1024
+    n: 2048
     state:
       area:
         width: 1
@@ -44,12 +44,6 @@ sets:
       divjit:
         width: 1
         record: false
-      integrin_s:
-        width: 1
-      integrin_tau:
-        width: 1
-      n_integrin:
-        width: 1
       A0:
         width: 1
       P0:
@@ -79,20 +73,26 @@ sets:
         width: 1
       inhib_frac:
         width: 1
+      myosin_s:
+        width: 1
+      myosin_tau:
+        width: 1
+      n_myosin:
+        width: 1
   half_edge:
     n: 102400
     maps:
       srce: vertex
       trgt: vertex
       face: cell
-  integrin:
-    entity: integrin
+  myosin:
+    entity: myosin
     parent: cell
     parent_pos: centroid
-    per_parent: 60
-    grow_reserve: 60
+    per_parent: 6
+    grow_reserve: 10
     types:
-      integrin:
+      myosin:
         fraction: 1.0
         p:
         - 0.0
@@ -123,7 +123,7 @@ operators:
   eta: 0.08
   cap_frac: 0.12
   sep_mu: 1.0
-  surface: basal
+  surface: apical
 - op: edge_flip
   at: vertex
   every: 4
@@ -146,20 +146,20 @@ operators:
   at: vertex
   every: 1
 - op: radius_graph
-  at: integrin
+  at: myosin
   radius: 0.7
 - op: attraction_repulsion
-  at: integrin
+  at: myosin
   sigma: 0.35
 - op: protein_project
-  at: integrin
+  at: myosin
   tissue: vertex
-  surface: basal
+  surface: apical
 - op: protein_express
-  at: integrin
+  at: myosin
   tissue: vertex
+  surface: apical
   seed: 0
-  surface: basal
 schedule:
 - cell_geometry
 - cell_grow
@@ -182,15 +182,14 @@ seed:
   vseed_cv: 0.0
   model: apicobasal
   h0: 0.88
-  apical: in
 - op: protein_seed
-  at: integrin
+  at: myosin
   tissue: vertex
-  density: 30.0
-  seed: 0
-  s: 0.2
+  surface: apical
+  density: 3.0
+  s: 0.02
   tau: 300.0
-  surface: basal
+  seed: 0
 plotting:
   renderer: vtk_points
   background: black
@@ -199,7 +198,7 @@ plotting:
   camera_elev: 1.18
   camera_turns: 0.0
   camera_zoom: 0.0
-  dot_size: 0.6
+  dot_size: 0.9
   fps: 30
   mesh_color: '#cfd8e3'
   mesh_style: surface
@@ -226,18 +225,18 @@ plotting:
     ticks: 4
     ymin: 0
     ymax: 1000
-  - quantity: count:integrin
+  - quantity: count:myosin
     xlabel: frame
-    ylabel: integrins
+    ylabel: myosin clusters
     ticks: 4
     ymin: 0
-    ymax: 60000
+    ymax: 10000
   scale_bar_corner: right
   scale_bar_lift: -0.07
   colors:
-    integrin:
-    - 0.95
-    - 0.15
-    - 0.15
+    myosin:
+    - 0.25
+    - 0.6
+    - 1.0
   mesh_opacity: 0.45
-  mesh_surface: basal
+  mesh_surface: apical

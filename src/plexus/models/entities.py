@@ -588,9 +588,10 @@ class MPMParticle:
 
 
 @register_entity(
-    # A RECEPTOR CLUSTER IS A POINT, NOT MATTER: position and velocity, contained in a cell,
-    # no deformation gradient and no grid (see operators/integrin_ops.py).
-    "integrin", depth=0,
+    # A PROTEIN CLUSTER IS A POINT, NOT MATTER: position and velocity, contained in a cell, no
+    # deformation gradient and no grid (see operators/protein_ops.py). `integrin` and `myosin`
+    # are the same layout under the names the specs use.
+    "protein_cluster", "integrin", "myosin", depth=0,
     state_schema=spatial_schema,
     render={"color_by": "node_type", "arrows": None},
 )
