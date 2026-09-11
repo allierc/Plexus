@@ -61,7 +61,7 @@ def main():
     z = np.load(args.params)
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
     P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["clock"].shape[0]) if mode == "free" else 0)
-    P.load({k: z[k] for k in ("g", "phi", "logE", "clock", "delay", "g2") if k in z.files})
+    P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"})
     win = R.beat_window(rec, args.beat); T = len(win["frames"])
     A_ref, u_ref = R.window_affine(rec, win)
     trunc = (win["onset"] - win["span"][0]) - R.PRE

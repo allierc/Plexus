@@ -1,0 +1,184 @@
+{
+ "params": "out/fits/hcm_r3b_p121_d150_g2_seed1/params.npz",
+ "config": {
+  "params": "out/fits/hcm_r3b_p121_d150_g2_seed1/params.npz",
+  "device": "cuda:1",
+  "per_parent": 121,
+  "n_grid": 128,
+  "anchor": 10000.0,
+  "drag": 150.0,
+  "band": 0.03,
+  "nu": 0.3,
+  "fit_beat": 3,
+  "beats": "1,2,4,3",
+  "no_realign": false,
+  "specimen": "hcm",
+  "out": null
+ },
+ "results": {
+  "1": {
+   "window": [
+    53,
+    117
+   ],
+   "held_out": true,
+   "t0_shift": 1,
+   "model": {
+    "r2_A": 0.8477921485900879,
+    "r2_u": 0.8725717067718506,
+    "loss": 0.27071046829223633,
+    "n_cells": 297,
+    "shortening_corr": 0.947523832321167,
+    "axis_agreement": 0.9496011137962341,
+    "peak_frame": 15,
+    "peak_frame_ref": 14,
+    "median_shortening_ratio": 1.0281964540481567
+   },
+   "replay": {
+    "r2_A": 0.9637972116470337,
+    "r2_u": 0.9499300122261047,
+    "loss": 0.08279693871736526,
+    "n_cells": 297,
+    "shortening_corr": 0.9967794418334961,
+    "axis_agreement": 0.9967710971832275,
+    "peak_frame": 15,
+    "peak_frame_ref": 14,
+    "median_shortening_ratio": 0.9949032664299011
+   },
+   "nothing": {
+    "r2_A": -0.001326918601989746,
+    "r2_u": -0.07349300384521484,
+    "loss": 2.0,
+    "n_cells": 297,
+    "shortening_corr": NaN,
+    "axis_agreement": 0.2252371907234192,
+    "peak_frame": 0,
+    "peak_frame_ref": 14,
+    "median_shortening_ratio": -0.0
+   }
+  },
+  "2": {
+   "window": [
+    113,
+    177
+   ],
+   "held_out": true,
+   "t0_shift": 0,
+   "model": {
+    "r2_A": 0.8494825959205627,
+    "r2_u": 0.8862178325653076,
+    "loss": 0.25637900829315186,
+    "n_cells": 297,
+    "shortening_corr": 0.9493874907493591,
+    "axis_agreement": 0.9531148076057434,
+    "peak_frame": 16,
+    "peak_frame_ref": 15,
+    "median_shortening_ratio": 1.0456517934799194
+   },
+   "replay": {
+    "r2_A": 0.9917280077934265,
+    "r2_u": 0.9976308345794678,
+    "loss": 0.010469907894730568,
+    "n_cells": 297,
+    "shortening_corr": 0.9972910284996033,
+    "axis_agreement": 0.9955371022224426,
+    "peak_frame": 15,
+    "peak_frame_ref": 15,
+    "median_shortening_ratio": 1.0074642896652222
+   },
+   "nothing": {
+    "r2_A": -0.0012357234954833984,
+    "r2_u": -0.0729374885559082,
+    "loss": 2.0,
+    "n_cells": 297,
+    "shortening_corr": NaN,
+    "axis_agreement": 0.21714521944522858,
+    "peak_frame": 0,
+    "peak_frame_ref": 15,
+    "median_shortening_ratio": -0.0
+   }
+  },
+  "4": {
+   "window": [
+    233,
+    294
+   ],
+   "held_out": true,
+   "t0_shift": 0,
+   "model": {
+    "r2_A": 0.8496080636978149,
+    "r2_u": 0.8918584585189819,
+    "loss": 0.25083035230636597,
+    "n_cells": 297,
+    "shortening_corr": 0.9466971755027771,
+    "axis_agreement": 0.9477090239524841,
+    "peak_frame": 16,
+    "peak_frame_ref": 15,
+    "median_shortening_ratio": 1.0395135879516602
+   },
+   "replay": {
+    "r2_A": 0.9933794140815735,
+    "r2_u": 0.9985364675521851,
+    "loss": 0.007973670028150082,
+    "n_cells": 297,
+    "shortening_corr": 0.9967743754386902,
+    "axis_agreement": 0.9965381026268005,
+    "peak_frame": 15,
+    "peak_frame_ref": 15,
+    "median_shortening_ratio": 1.0014581680297852
+   },
+   "nothing": {
+    "r2_A": -0.0013539791107177734,
+    "r2_u": -0.07451987266540527,
+    "loss": 2.0,
+    "n_cells": 297,
+    "shortening_corr": NaN,
+    "axis_agreement": 0.22821609675884247,
+    "peak_frame": 0,
+    "peak_frame_ref": 15,
+    "median_shortening_ratio": -0.0
+   }
+  },
+  "3": {
+   "window": [
+    173,
+    237
+   ],
+   "held_out": false,
+   "t0_shift": 0.0,
+   "model": {
+    "r2_A": 0.8509026169776917,
+    "r2_u": 0.8950330018997192,
+    "loss": 0.24754229187965393,
+    "n_cells": 297,
+    "shortening_corr": 0.9504709243774414,
+    "axis_agreement": 0.9494966864585876,
+    "peak_frame": 16,
+    "peak_frame_ref": 15,
+    "median_shortening_ratio": 1.038109540939331
+   },
+   "replay": {
+    "r2_A": 1.0,
+    "r2_u": 1.0,
+    "loss": 8.729184486355734e-09,
+    "n_cells": 297,
+    "shortening_corr": 1.0,
+    "axis_agreement": 1.0,
+    "peak_frame": 15,
+    "peak_frame_ref": 15,
+    "median_shortening_ratio": 0.9999995231628418
+   },
+   "nothing": {
+    "r2_A": -0.0012927055358886719,
+    "r2_u": -0.06417059898376465,
+    "loss": 2.0,
+    "n_cells": 297,
+    "shortening_corr": NaN,
+    "axis_agreement": 0.2217661291360855,
+    "peak_frame": 0,
+    "peak_frame_ref": 15,
+    "median_shortening_ratio": -0.0
+   }
+  }
+ }
+}

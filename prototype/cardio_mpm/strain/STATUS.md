@@ -369,3 +369,56 @@ movie `out/movies/s4_live_r8_p120_d150_g2_beat1.mp4`. Score anything with
 `s4_score.py --per-parent 120 --drag 150`. Next per PLAN_R2: read the g2 and τ gates, HCM with g2
 (`compare_sheets.py --healthy out/fits/s4_live_r8_p120_d150_g2 --hcm out/fits/hcm_r3_p120_d150_g2`),
 then step 5 (seeds).
+
+## 2026-09-11, resumed — gates, per-cell relaxation, HCM with the second axis, and a retraction
+
+**Gates (planted, rest noise, 120/cell, drag 150, seed 0).** With g2 in the truth (−0.9 g) and free:
+g **0.32** (r 0.68), g2 **0.42** (r 0.53), φ 12°, log E **0.64** — g and g2 ship under the 0.5 rule,
+but the two are entangled (rank-1 gate had g at 0.10 and φ at 5°), and **per-cell E no longer
+ships** once the second axis is in the model. With a planted per-cell relaxation time as well:
+log τ **0.80** — not recoverable; g/g2/φ unchanged.
+
+**Per-cell relaxation (step 3a, `s4_live_r9_p120_d150_g2_tau`):** held-out R²(A) **0.83**, R²(u)
+**0.90** (r8: 0.82 / 0.87). Worth +0.01–0.03 and not identifiable per cell → τ stays SHARED in the
+reporting model; the small gain is left on the table.
+
+**HCM with the second axis (`hcm_r3_p120_d150_g2`):** held-out beats 1, 2, 4: **R²(A) 0.85, R²(u)
+0.87–0.89, shortening r 0.95, axis 0.94** — the best fit of the project, on the diseased sheet.
+
+**Healthy vs HCM, both with g2** (`compare_sheets.py`, `fig5_healthy_vs_hcm_withE_g2.png`):
+
+| | healthy (331) | HCM (298) |
+|---|---|---|
+| fitted g (along the fibre), median | 0.033 | **0.062** |
+| fitted g2 (across; < 0 = thickening), median | −0.041 | −0.042 |
+| g2 / g over active cells, median | **−0.91** | **−0.61** |
+| silent cells (g < 0.01) | 26% | 13% |
+| axis order | 0.09 | 0.18 |
+| clock delay sd | 0.089 s | 0.084 s |
+| fitted E, median (p10 / p90) | 207 (178 / 246) | 226 (200 / 261) |
+
+**Retraction.** With the rank-1 active strain the sheets came out at E 37 vs 96 ("HCM 2.6× stiffer").
+With the second axis the two E distributions coincide (207 vs 226), and the E gate fails. The
+stiffness difference was the rank-1 model's way of producing transverse thickening it could not
+express; it is withdrawn. What stands, and is stronger than before: HCM cells shorten about **twice
+as hard** along the fibre with the SAME absolute thickening across it, so they **lose area** during
+contraction where healthy cells conserve it (g2/g −0.61 vs −0.91); half as many are silent; their
+axes are twice as aligned locally; the excitation clock is the same. Absolute E is the same for both
+sheets and set by the substrate spring, not by the tissue.
+
+Running (step 5): second seeds for both sheets (`*_seed1`, optimiser seed 1 and layout 121/cell).
+
+### Step 5 — seeds (2026-09-11)
+
+Same fit, optimiser seed 1 and layout 121/cell (`*_seed1`): held-out R² within 0.005 of seed 0 on
+both sheets. Per-cell agreement between the two fits (`fig_seeds.py`, `fig7_seed_agreement.png`):
+g r 0.94 / 0.96, g2 r 0.93 / 0.95, delay r 0.88 / 0.87, axis 6.7° / 4.9° (healthy / HCM); median
+cell-to-cell difference ~0.15 of the map's spread. **That is the error bar on every map.** All
+figures regenerated from the second-axis models (`figures.py BEST`, `fig_alignment.py`,
+`compare_sheets.py`); the reporting model is `s4_live_r8_p120_d150_g2` / `hcm_r3_p120_d150_g2`.
+
+Toward 0.95 (Cedric's target): per-cell excitation time course (delay, rise, plateau, decay per
+cell, shrunk to the shared clock; `model.Params.logtr/logdur`) — `s4_live_r10_cellclock`,
+`hcm_r4_cellclock` running. Rank ceiling: 0.94 with two temporal modes, 0.97 with three; the
+discretisation floor is 0.958 at 120/cell, so 0.95 also needs the density raised (200/cell ≈ 60 GB
+a fit: alone on a GPU with a smaller grid, or a two-half rollout).

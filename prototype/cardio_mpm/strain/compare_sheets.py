@@ -38,6 +38,7 @@ def sheet(fit_dir, specimen, beat):
     d = dict(specimen=specimen, n_cells=int(inter.sum()), n_all=int(z["g"].shape[0]),
              g=z["g"][inter], delay_s=z["delay"][inter] * R.DT_S, phi=phi, peak_cell=peak_cell[inter],
              logE=z["logE"][inter], E_free=bool(np.std(z["logE"]) > 1e-6),
+             g2=(z["g2"][inter] if "g2" in z.files else np.zeros(int(inter.sum()))),
              E_shrink=cfg.get("E_shrink", 0.0),
              gamma=gam, t_s=t * R.DT_S, axis_order=order,
              clock=dict(t0_s=float(t0 * R.DT_S), rise_s=float(tr * R.DT_S), dur_s=float(du * R.DT_S), decay_s=float(td * R.DT_S)),
@@ -69,6 +70,8 @@ def main():
             ("recorded peak shortening/cell, median", f"{np.median(H['peak_cell']):.4f}", f"{np.median(D['peak_cell']):.4f}"),
             ("fitted g, median", f"{np.median(H['g']):.4f}", f"{np.median(D['g']):.4f}"),
             ("fitted g, p10 / p90", f"{np.percentile(H['g'],10):.3f} / {np.percentile(H['g'],90):.3f}", f"{np.percentile(D['g'],10):.3f} / {np.percentile(D['g'],90):.3f}"),
+            ("fitted g2 (across the fibre; <0 = thickening), median", f"{np.median(H['g2']):.4f}", f"{np.median(D['g2']):.4f}"),
+            ("g2 / g, median over active cells", f"{np.median(H['g2'][H['g']>0.01]/H['g'][H['g']>0.01]):.2f}", f"{np.median(D['g2'][D['g']>0.01]/D['g'][D['g']>0.01]):.2f}"),
             ("cells with g < 0.01 (silent)", f"{(H['g']<0.01).mean():.2f}", f"{(D['g']<0.01).mean():.2f}"),
             ("clock delay sd (s)", f"{H['delay_s'].std():.3f}", f"{D['delay_s'].std():.3f}"),
             ("axis order (0 random, 1 parallel)", f"{H['axis_order']:.2f}", f"{D['axis_order']:.2f}"),
@@ -82,11 +85,14 @@ def main():
         print(f"{a:<34s}{b:>12s}{c:>12s}")
 
     withE = H["E_free"] and D["E_free"]
-    fig, ax = plt.subplots(1, 5 if withE else 4, figsize=(22 if withE else 18, 4.4), gridspec_kw=dict(wspace=0.32))
+    npan = 4 + int(withE) + int(np.std(H["g2"]) > 1e-6)
+    fig, ax = plt.subplots(1, npan, figsize=(4.4 * npan + 1, 4.4), gridspec_kw=dict(wspace=0.32))
     keys = [("peak_cell", "recorded peak shortening per cell (strain)"), ("g", "fitted g per cell (strain at full activation)"),
             ("delay_s", "fitted clock delay per cell (s)")]
     if withE:
         keys.append(("logE", f"fitted log E per cell (80 = init; shrink lambda {H['E_shrink']:g})"))
+    if np.std(H["g2"]) > 1e-6:
+        keys.append(("g2", "fitted g2 per cell (strain across the fibre; < 0 = thickening)"))
     for a, (key, xl) in zip(ax[:len(keys)], keys):
         lo = min(H[key].min(), D[key].min()); hi = max(np.percentile(H[key], 99), np.percentile(D[key], 99))
         bins = np.linspace(lo, hi, 36)
@@ -101,10 +107,10 @@ def main():
     a.plot(D["t_s"], D["mean_curve"] / D["mean_curve"].max(), color=RED, lw=1, ls="--", label="HCM recorded (normalised)")
     a.set_xlabel("time in the beat window (s)"); a.set_ylabel("fitted clock gamma(t), 0-1\n(dashed: recorded mean shortening, normalised)")
     a.legend(loc="upper right", fontsize=8)
-    for a, s in zip(ax, "ABCDE"):
+    for a, s in zip(ax, "ABCDEF"):
         a.text(-0.02, 1.01, s, transform=a.transAxes, fontsize=13, fontweight="bold", va="bottom", ha="right")
     os.makedirs(os.path.join(HERE, "out", "figures"), exist_ok=True)
-    name = "fig5_healthy_vs_hcm" + ("_withE" if withE else "")
+    name = "fig5_healthy_vs_hcm" + ("_withE" if withE else "") + ("_g2" if np.std(H["g2"]) > 1e-6 else "")
     fig.savefig(os.path.join(HERE, "out", "figures", f"{name}.png"), dpi=130, bbox_inches="tight")
     json.dump(table, open(os.path.join(HERE, "out", f"compare_sheets{'_withE' if withE else ''}.json"), "w"), indent=1)
     print(f"  -> out/figures/{name}.png")
