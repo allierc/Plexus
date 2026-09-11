@@ -252,3 +252,15 @@ plotting:
     nucleus: 0.3
     golgi: 0.12
     mitochondria: 0.06
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of particles is centered within a large cubic domain. Over time,
+      the number of cells and the radius of the spheroid increase significantly. The number of mitochondria
+      remains constant throughout the simulation. The spheroid expands outward while maintaining its overall
+      spherical shape.
+    objects: The scene contains a large, transparent white wireframe cube representing the simulation
+      box. Inside the cube is a spherical cluster composed of many small blue and orange particles. A
+      smaller inset box in the bottom left shows a zoomed-in view of the spheroid's surface. Three line
+      graphs on the right track the quantities of cells, radius, and mitochondria over time.
