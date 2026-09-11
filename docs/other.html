@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.8.26">
+<meta name="generator" content="quarto-1.8.27">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -37,9 +37,9 @@ ul.task-list li input[type="checkbox"] {
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-b758ccaa5987ceb1b75504551e579abf.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-ed96de9b727972fe78a7b5d16c58bf87.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-4d9afe2b8d18ee9fa5d0d57b5ed4214d.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-ed96de9b727972fe78a7b5d16c58bf87.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
@@ -330,7 +330,7 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p>The same decomposition, on models that are not biological tissue. Each family below is taken apart into the operator kinds of the <a href="./index.html">main page</a> — a stigmergic colony over a set and a field, a chaotic flow as one operator, agent interaction as a rewire and its laterals, and gravity as a single lateral summed over every pair. Hover (or tab to) a title to read the exact spec that generated it.</p>
+<p>The same decomposition, on models that are not biological tissue. Each family below is taken apart into the kinds of activity of the <a href="./index.html">main page</a>: a stigmergic colony over entities and a field, a chaotic flow as one activity, agent interaction as a rewire and its laterals, and gravity as a single lateral summed over every pair. Hover (or tab to) a title to read the exact spec that generated it.</p>
 <style>
 /* Four clips per row everywhere; `g3` is an alias of `g4` so a gallery carried over from the main
    page keeps its width. A section whose clip count is not a multiple of four ends on a short row. */
@@ -352,14 +352,14 @@ ul.task-list li input[type="checkbox"] {
 .opk-ref{font-size:.76em;color:#999;font-style:italic;margin:.1rem 0 .2rem}
 </style>
 
-<h3 class="anchored">Stigmergy — Physarum slime (one species, a disc colony)</h3>
-<p class="opk">Stigmergy has been decomposed into five operators over one set and one field: the agents deposit a trail into the field and sense it back (exchange), the field diffuses and decays under its own dynamics (field), and a move carries each agent along its heading. By composing these with different turn rates and sensor geometries we can build different transport networks out of the same five. Shown here is a single species seeded in a disc, so the colony stays a bounded circular web.</p>
-<p class="opk-ref">Reference — the model is <a href="https://doi.org/10.1162/artl.2010.16.2.16202">Jones (2010), <i>Artificial Life</i> 16(2):127–153</a>, whose sense-and-deposit agent this is; the implementation we adapted is <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>, and the name for the mechanism is Grassé’s (1959) stigmergy.</p>
+<h3 class="anchored">Stigmergy: Physarum slime (one species, a disc colony)</h3>
+<p class="opk">Stigmergy has been decomposed into five activities over one kind of entity and one field: the agents deposit a trail into the field and sense it back (exchange), the field diffuses and decays under its own dynamics (field), and a move carries each agent along its heading. By composing these with different turn rates and sensor geometries we can build different transport networks out of the same five. Shown here is a single species seeded in a disc, so the colony stays a bounded circular web.</p>
+<p class="opk-ref">Reference: the model is <a href="https://doi.org/10.1162/artl.2010.16.2.16202">Jones (2010), <i>Artificial Life</i> 16(2):127–153</a>, whose sense-and-deposit agent this is; the implementation we adapted is <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>, and the name for the mechanism is Grassé’s (1959) stigmergy.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/slime_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a set and a field<span class="sim-spec"><pre># slime_default -- one species, the canonical Physarum transport network.
+      <span class="sim-name" tabindex="0">entities and a field<span class="sim-spec"><pre># slime_default -- one species, the canonical Physarum transport network.
 # The monolithic `slime` operator decomposed into 5 primitives over 1 set + 1 scalar
 # field: deposit (set-&gt;field) | diffuse, decay (field-&gt;field) | sense (field-&gt;set,
 # turns the heading) | glide (self-propelled move). Agents spawn in a central disc;
@@ -382,13 +382,13 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]</pre></span></span>
-      <span class="sim-cap">12,000 agents and one scalar field. Five operators: a trail deposited and sensed back (exchange), diffusion and decay (field), and a move along the heading.</span>
+      <span class="sim-cap">12,000 agents and one scalar field. Five activities: a trail deposited and sensed back (exchange), diffusion and decay (field), and a move along the heading.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/slime_curly_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the same five operators<span class="sim-spec"><pre># slime_curly -- one species, high turn rate + short sensors -&gt; tight curly filaments
+      <span class="sim-name" tabindex="0">the same five activities<span class="sim-spec"><pre># slime_curly -- one species, high turn rate + short sensors -&gt; tight curly filaments
 # (a fine, meandering network). Same 5 operators; only the `types:` scalars change.
 general: {name: slime_curly, seed: 1, n_frames: 400, dt: 1.0, boundary: wall}
 sets:
@@ -408,7 +408,7 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]</pre></span></span>
-      <span class="sim-cap">The same agents and the same five operators. The turn rate and the sensor geometry differ. The trails curl.</span>
+      <span class="sim-cap">The same agents and the same five activities. The turn rate and the sensor geometry differ. The trails curl.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -439,9 +439,9 @@ schedule: [deposit, diffuse, decay, sense, bounce, glide]</pre></span></span>
   </figure>
 </div>
 
-<h3 class="anchored">Stigmergy — Physarum slime (many species, space-filling)</h3>
-<p class="opk">The same five operators, with the agents seeded across the whole field instead of in a disc and split into several species, each depositing and sensing its own trail channel while inhibiting the others. By composing them with different numbers of species we fill the plane instead of bounding a colony. Shown here are four, six and eight species, segregating into interwoven networks.</p>
-<p class="opk-ref">Reference — the model is <a href="https://doi.org/10.1162/artl.2010.16.2.16202">Jones (2010), <i>Artificial Life</i> 16(2):127–153</a>, whose sense-and-deposit agent this is; the implementation we adapted is <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>, and the name for the mechanism is Grassé’s (1959) stigmergy.</p>
+<h3 class="anchored">Stigmergy: Physarum slime (many species, space-filling)</h3>
+<p class="opk">The same five activities, with the agents seeded across the whole field instead of in a disc and split into several species, each depositing and sensing its own trail channel while inhibiting the others. By composing them with different numbers of species we fill the plane instead of bounding a colony. Shown here are four, six and eight species, segregating into interwoven networks.</p>
+<p class="opk-ref">Reference: the model is <a href="https://doi.org/10.1162/artl.2010.16.2.16202">Jones (2010), <i>Artificial Life</i> 16(2):127–153</a>, whose sense-and-deposit agent this is; the implementation we adapted is <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>, and the name for the mechanism is Grassé’s (1959) stigmergy.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/slime_four_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
@@ -469,7 +469,7 @@ operators:
 - {op: bounce, at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]</pre></span></span>
-      <span class="sim-cap">14,000 agents over four trail channels. The same five operators, one channel per type. Four networks segregate.</span>
+      <span class="sim-cap">14,000 agents over four trail channels. The same five activities, one channel per type. Four networks segregate.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -539,13 +539,13 @@ schedule: [deposit, diffuse, decay, sense, bounce, glide]</pre></span></span>
 </div>
 
 <h3 class="anchored">Strange attractors</h3>
-<p class="opk">A dissipative chaotic flow has been decomposed into a single operator: it carries every point of a set along its own velocity field, ẋ&nbsp;=&nbsp;f(x) — the flow f names the system — with no relation between the points at all. By composing that one operator with different flows named in the spec we get every attractor in the family — ten of them ship. Shown here are six, each a seed cube stretched and folded until the cloud is the attractor itself.</p>
-<p class="opk-ref">Reference — <a href="https://doi.org/10.1175/1520-0469(1963)020%3C0130:DNF%3E2.0.CO;2">Lorenz (1963), <i>J. Atmos. Sci.</i> 20:130–141</a>; <a href="https://doi.org/10.1142/S0218127499001383">Thomas (1999), <i>Int. J. Bifurc. Chaos</i> 9:1889–1905</a>; <a href="https://doi.org/10.1103/PhysRevE.50.R647">Sprott (1994), <i>Phys. Rev. E</i> 50:R647–R650</a>; <a href="https://doi.org/10.1016/j.physleta.2009.07.088">Dadras &amp; Momeni (2009), <i>Phys. Lett. A</i> 373:3637–3642</a>. The Halvorsen and Aizawa systems have no primary paper we can point at — they are catalogued rather than published, Halvorsen in Sprott’s <i>Chaos and Time-Series Analysis</i> (2003) — and are named here as folklore rather than cited as literature.</p>
+<p class="opk">A dissipative chaotic flow has been decomposed into a single activity: it carries every point along its own velocity field, ẋ&nbsp;=&nbsp;f(x), where the flow f names the system, with no relation between the points at all. By composing that one activity with different flows named in the spec we get every attractor in the family. Ten of them ship. Shown here are six, each a seed cube stretched and folded until the cloud is the attractor itself.</p>
+<p class="opk-ref">Reference: <a href="https://doi.org/10.1175/1520-0469(1963)020%3C0130:DNF%3E2.0.CO;2">Lorenz (1963), <i>J. Atmos. Sci.</i> 20:130–141</a>; <a href="https://doi.org/10.1142/S0218127499001383">Thomas (1999), <i>Int. J. Bifurc. Chaos</i> 9:1889–1905</a>; <a href="https://doi.org/10.1103/PhysRevE.50.R647">Sprott (1994), <i>Phys. Rev. E</i> 50:R647–R650</a>; <a href="https://doi.org/10.1016/j.physleta.2009.07.088">Dadras &amp; Momeni (2009), <i>Phys. Lett. A</i> 373:3637–3642</a>. The Halvorsen and Aizawa systems have no primary paper we can point at. They are catalogued rather than published, Halvorsen in Sprott’s <i>Chaos and Time-Series Analysis</i> (2003), and are named here as folklore rather than cited as literature.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/attractor_lorenz.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one operator: Lorenz<span class="sim-spec"><pre># lorenz attractor -- Lorenz (1963) convection: THE butterfly, two spiralling lobes.
+      <span class="sim-name" tabindex="0">one activity: Lorenz<span class="sim-spec"><pre># lorenz attractor -- Lorenz (1963) convection: THE butterfly, two spiralling lobes.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -581,13 +581,13 @@ plotting:
   camera_elev: 0.95
   camera_elev_end: 1.4
   camera_turns: 0.08</pre></span></span>
-      <span class="sim-cap">60,000 points in one set, with no relation between them. One operator carries each along the flow. The seed unfolds into the attractor.</span>
+      <span class="sim-cap">60,000 points, one kind of entity, with no relation between them. One activity carries each along the flow. The seed unfolds into the attractor.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/attractor_halvorsen.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the same operator: Halvorsen<span class="sim-spec"><pre># halvorsen attractor -- cyclically-symmetric (x-&gt;y-&gt;z) quadratic flow: a fat three-armed folded knot.
+      <span class="sim-name" tabindex="0">the same activity: Halvorsen<span class="sim-spec"><pre># halvorsen attractor -- cyclically-symmetric (x-&gt;y-&gt;z) quadratic flow: a fat three-armed folded knot.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -623,13 +623,13 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">The same set and the same one operator. Only the flow named in the spec differs. Halvorsen.</span>
+      <span class="sim-cap">The same entities and the same one activity. Only the flow named in the spec differs. Halvorsen.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/attractor_aizawa.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the same operator: Aizawa<span class="sim-spec"><pre># aizawa attractor -- a torus with an axial spike drilling through a sphere.
+      <span class="sim-name" tabindex="0">the same activity: Aizawa<span class="sim-spec"><pre># aizawa attractor -- a torus with an axial spike drilling through a sphere.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -665,13 +665,13 @@ plotting:
   camera_elev: 0.9
   camera_elev_end: 1.3
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">The same set and the same one operator. Only the flow named in the spec differs. Aizawa.</span>
+      <span class="sim-cap">The same entities and the same one activity. Only the flow named in the spec differs. Aizawa.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/attractor_sprott_b.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the same operator: Sprott B<span class="sim-spec"><pre># sprott_b attractor -- Sprott (1994) case B: one of the algebraically simplest chaotic flows.
+      <span class="sim-name" tabindex="0">the same activity: Sprott B<span class="sim-spec"><pre># sprott_b attractor -- Sprott (1994) case B: one of the algebraically simplest chaotic flows.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -707,13 +707,13 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">The same set and the same one operator. Only the flow named in the spec differs. Sprott B.</span>
+      <span class="sim-cap">The same entities and the same one activity. Only the flow named in the spec differs. Sprott B.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/attractor_dadras.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the same operator: Dadras<span class="sim-spec"><pre># dadras attractor -- Dadras-Momeni (2009): a swooping multi-wing bird.
+      <span class="sim-name" tabindex="0">the same activity: Dadras<span class="sim-spec"><pre># dadras attractor -- Dadras-Momeni (2009): a swooping multi-wing bird.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -749,13 +749,13 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">The same set and the same one operator. Only the flow named in the spec differs. Dadras.</span>
+      <span class="sim-cap">The same entities and the same one activity. Only the flow named in the spec differs. Dadras.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/attractor_thomas.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the same operator: Thomas<span class="sim-spec"><pre># thomas attractor -- Thomas' cyclically-symmetric attractor: a woven cage of interlinked loops.
+      <span class="sim-name" tabindex="0">the same activity: Thomas<span class="sim-spec"><pre># thomas attractor -- Thomas' cyclically-symmetric attractor: a woven cage of interlinked loops.
 # A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
 # operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
 # the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
@@ -791,14 +791,14 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.5</pre></span></span>
-      <span class="sim-cap">The same set and the same one operator. Only the flow named in the spec differs. Thomas.</span>
+      <span class="sim-cap">The same entities and the same one activity. Only the flow named in the spec differs. Thomas.</span>
     </figcaption>
   </figure>
 </div>
 
 <h3 class="anchored">Interaction &amp; flocking</h3>
-<p class="opk">Agent interaction has been decomposed into a rewire that rebuilds a radius neighbour graph from the current positions, and lateral operators that act along it. By composing different laterals on that one graph we can build different collective behaviours: a per-type force law, or the three boids rules, or alignment with self-propulsion. Shown here are particles sorting themselves by type, a flock, and an ordered swarm.</p>
-<p class="opk-ref">Reference — boids is <a href="https://doi.org/10.1145/37402.37406">Reynolds (1987), <i>SIGGRAPH Comput. Graph.</i> 21(4):25–34</a>, the soft-core pair potential is <a href="https://doi.org/10.1103/PhysRevLett.96.104302">D’Orsogna et&nbsp;al. (2006), <i>Phys. Rev. Lett.</i> 96:104302</a>, and the alignment model is <a href="https://doi.org/10.1103/PhysRevLett.75.1226">Vicsek et&nbsp;al. (1995), <i>Phys. Rev. Lett.</i> 75:1226–1229</a>; the implementations are adapted from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a> (Allier et&nbsp;al.).</p>
+<p class="opk">Agent interaction has been decomposed into a rewire that rebuilds a radius neighbour graph from the current positions, and lateral activities that act along it. By composing different laterals on that one graph we can build different collective behaviours: a per-type force law, or the three boids rules, or alignment with self-propulsion. Shown here are particles sorting themselves by type, a flock, and an ordered swarm.</p>
+<p class="opk-ref">Reference: boids is <a href="https://doi.org/10.1145/37402.37406">Reynolds (1987), <i>SIGGRAPH Comput. Graph.</i> 21(4):25–34</a>, the soft-core pair potential is <a href="https://doi.org/10.1103/PhysRevLett.96.104302">D’Orsogna et&nbsp;al. (2006), <i>Phys. Rev. Lett.</i> 96:104302</a>, and the alignment model is <a href="https://doi.org/10.1103/PhysRevLett.75.1226">Vicsek et&nbsp;al. (1995), <i>Phys. Rev. Lett.</i> 75:1226–1229</a>; the implementations are adapted from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a> (Allier et&nbsp;al.).</p>
 <div class="sim-gallery">
   <figure class="sim-card figure">
     <video src="gallery/attraction.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
@@ -846,13 +846,13 @@ descriptions:
       particles are initially scattered randomly but eventually form large, circular clusters. Each cluster
       features a dark, empty center surrounded by a dense ring of multicolored particles. The final topology
       consists of a repeating, honeycomb-like pattern of these interconnected circular structures.</pre></span></span>
-      <span class="sim-cap">30,000 particles in one set. Two operators: a radius neighbour graph rebuilt from the positions (rewire) and a per-type force along it (lateral). They sort themselves into cells.</span>
+      <span class="sim-cap">30,000 particles, one kind of entity. Two activities: a radius neighbour graph rebuilt from the positions (rewire) and a per-type force along it (lateral). They sort themselves into cells.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/boids.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">three operators make flocking<span class="sim-spec"><pre># Exact reproduction of ParticleGraph boids reference graphs_data/boids/boids:
+      <span class="sim-name" tabindex="0">three activities make flocking<span class="sim-spec"><pre># Exact reproduction of ParticleGraph boids reference graphs_data/boids/boids:
 # 1792 particles, 16 types (112 each), 4000 frames, min_radius=0.001,
 # max_radius=0.04, dt=0.5, periodic, 2nd_derivative, mean aggregation.
 # Per-type p = [cohesion, alignment, separation].
@@ -1008,7 +1008,7 @@ descriptions:
       are colored in a variety of hues, including white, red, blue, green, orange, and pink. Initially,
       the particles are arranged in a random, scattered topology across the entire frame. As the simulation
       progresses, they form dense, concentric circular clusters that stand out against the black background.</pre></span></span>
-      <span class="sim-cap">1,792 particles in sixteen types. Three laterals on that one graph: cohesion, alignment, separation. Flocking is their composition, not an operator.</span>
+      <span class="sim-cap">1,792 particles in sixteen types. Three laterals on that one graph: cohesion, alignment, separation. Flocking is their composition, not an activity.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -1052,14 +1052,14 @@ descriptions:
   </figure>
 </div>
 
-<h3 class="anchored">Inverse-square law — self-gravity</h3>
-<p class="opk">Gravity has been decomposed into a single lateral operator summed over every pair of a set: mass, always attracting. By composing it over sets of different composition we can build different systems without ever writing a second law — two galaxies placed in one set pull on each other through the same operator that condensed each of them. Shown here are a disc condensing in 2D and in 3D, a heavier central mass, four clumps merging, and two galaxies meeting on a grazing and on a head-on course.</p>
-<p class="opk-ref">Reference — softened self-gravity after Philip Mocz’s <em>Create Your Own N-body Simulation</em> (2020); the encounter geometry after Toomre &amp; Toomre, <em>Galactic Bridges and Tails</em> (1972).</p>
+<h3 class="anchored">Inverse-square law: self-gravity</h3>
+<p class="opk">Gravity has been decomposed into a single lateral activity summed over every pair of entities: mass, always attracting. By composing it over populations of different composition we can build different systems without ever writing a second law. Two galaxies placed among the same entities pull on each other through the same activity that condensed each of them. Shown here are a disc condensing in 2D and in 3D, a heavier central mass, four clumps merging, and two galaxies meeting on a grazing and on a head-on course.</p>
+<p class="opk-ref">Reference: softened self-gravity after Philip Mocz’s <em>Create Your Own N-body Simulation</em> (2020); the encounter geometry after Toomre &amp; Toomre, <em>Galactic Bridges and Tails</em> (1972).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/spiral_galaxy_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one operator, every pair<span class="sim-spec"><pre># spiral_galaxy (2D) -- a rotating self-gravitating disk on `squared_law` (law: gravity, all_pairs).
+      <span class="sim-name" tabindex="0">one activity, every pair<span class="sim-spec"><pre># spiral_galaxy (2D) -- a rotating self-gravitating disk on `squared_law` (law: gravity, all_pairs).
 # Initialization is the `seed_positions` operator: `mode: disc` places the disc, and
 # `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds v = spin*sqrt(G*M(&lt;r)/r)
 # from the enclosed mass, plus an optional central point mass (`central_mass`). This replaces the
@@ -1079,13 +1079,13 @@ seed:
 operators:
 - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true}
 schedule: [squared_law]</pre></span></span>
-      <span class="sim-cap">25,000 stars in one set. One lateral operator summed over every pair. A disc condenses into a galaxy.</span>
+      <span class="sim-cap">25,000 stars, one kind of entity. One lateral activity summed over every pair. A disc condenses into a galaxy.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/spiral_galaxy_3d_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the same operator, in 3D<span class="sim-spec"><pre># spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS on
+      <span class="sim-name" tabindex="0">the same activity, in 3D<span class="sim-spec"><pre># spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS on
 # `squared_law` (law: gravity, all_pairs). Initialization is a SPEC concern (no operator):
 # `mode: disk` places a FLAT xy disc with out-of-plane `thickness` scatter, and
 # `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds from the enclosed mass
@@ -1105,7 +1105,7 @@ seed:
 operators:
 - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true}
 schedule: [squared_law]</pre></span></span>
-      <span class="sim-cap">The same 25,000 stars and the same one operator. Three dimensions instead of two.</span>
+      <span class="sim-cap">The same 25,000 stars and the same one activity. Three dimensions instead of two.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -1139,7 +1139,7 @@ plotting: {renderer: vtk_points, background: black, colors: {s: [1.0, 1.0, 1.0]}
   <figure class="sim-card figure">
     <video src="gallery/nbody_cluster.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">one set, four clumps<span class="sim-spec"><pre># nbody_cluster -- gravitational N-body collapse via the unified `squared_law` operator
+      <span class="sim-name" tabindex="0">one kind of entity, four clumps<span class="sim-spec"><pre># nbody_cluster -- gravitational N-body collapse via the unified `squared_law` operator
 # (law: gravity, all_pairs). After Philip Mocz, "Create Your Own N-body Simulation
 # (With Python)" (2020), vendored at papers/nbody-python/ (MIT).
 # N=10000 stars (dense), total mass ~20 (mass/star = 0.002), softened Newtonian gravity
@@ -1174,13 +1174,13 @@ descriptions:
       simulation progresses, the particles move closer together, changing the topology from a multi-peaked
       chain to a single unified cluster. The size of each individual particle remains constant throughout
       the entire sequence.</pre></span></span>
-      <span class="sim-cap">10,000 stars in four clumps, all in one set. One operator over the whole set. They merge into a single cluster.</span>
+      <span class="sim-cap">10,000 stars in four clumps, all entities of one kind. One activity over all of them. They merge into a single cluster.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/galaxy_collision_3d_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">two discs, one set<span class="sim-spec"><pre># galaxy_collision_3d -- TWO 3D galaxies on a grazing prograde passage. The same `squared_law`
+      <span class="sim-name" tabindex="0">two discs, one kind of entity<span class="sim-spec"><pre># galaxy_collision_3d -- TWO 3D galaxies on a grazing prograde passage. The same `squared_law`
 # (law: gravity, all_pairs) that holds one disc together is what pulls the two discs into each
 # other: the pair is ONE set with two types, not two sets, and that is the point -- an all-pairs
 # law sums over the whole set, so mutual gravity between the galaxies is not a second operator.
@@ -1222,13 +1222,13 @@ operators:
   # near it, and halving dt to 0.002 reproduces the same trajectory to three digits.
 - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.15, all_pairs: true}
 schedule: [squared_law]</pre></span></span>
-      <span class="sim-cap">25,000 stars, two discs inside one set. The same one operator. They raise tidal tails in one another.</span>
+      <span class="sim-cap">25,000 stars, two discs among entities of one kind. The same one activity. They raise tidal tails in one another.</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
     <video src="gallery/galaxy_merger_3d_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the same set, head-on<span class="sim-spec"><pre># galaxy_merger_3d -- the SAME two galaxies, head-on: one knob apart from `galaxy_collision_3d`
+      <span class="sim-name" tabindex="0">the same entities, head-on<span class="sim-spec"><pre># galaxy_merger_3d -- the SAME two galaxies, head-on: one knob apart from `galaxy_collision_3d`
 # (`swirl: 0.26` -&gt; `0.0`), and that knob is the encounter's angular momentum. L = 0 makes the
 # orbit radial, so the pericentre is 0 instead of 2.0 disc radii: the two discs fall straight
 # through each other, the cores sink and merge on the first passage, and what is left is one
@@ -1263,7 +1263,7 @@ operators:
   # core-core force finite; halving dt to 0.002 reproduces the same trajectory to three digits.
 - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.15, all_pairs: true}
 schedule: [squared_law]</pre></span></span>
-      <span class="sim-cap">25,000 stars, two discs in one set. The encounter head-on. They fall through each other and leave one remnant.</span>
+      <span class="sim-cap">25,000 stars, two discs among entities of one kind. The encounter head-on. They fall through each other and leave one remnant.</span>
     </figcaption>
   </figure>
 </div>

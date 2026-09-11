@@ -6,15 +6,14 @@ subtitle: "Entities, activities and their organization, written down to be run"
 ::: {.callout-note appearance="simple"}
 A mechanism is *entities and activities organized such that they are productive of regular
 changes from start or set-up to finish or termination conditions* (Machamer, Darden & Craver,
-2000, p. 3). Plexus is a language for
-writing a mechanism down in exactly those terms — the entities with their states and
-relations, the activities that act on them, and their organization in space, in time and
-across levels — so that the description can be run, fitted to observations, and shown
-to be missing an activity. Every activity is an *operator*: it names the entities
-it acts on, the state it needs, the relations between those entities, and one or more
-numerical implementations. The research programme has three objectives. First, an algebra of
-activities. Second, to decompose the existing corpus of simulation models into that
-language. Third, to build differentiable implementations of every operator, so that
+2000, p. 3). Plexus is a language for writing a mechanism down in exactly those terms: the
+entities with their states and relations, the activities that act on them, and their
+organization in space, in time and across levels, so that the description can be run,
+fitted to observations, and shown to be missing an activity. Every activity names the
+entities it acts on, the state it needs, the relations between those entities, and one or
+more numerical implementations. The research programme has three objectives. First, an
+algebra of activities. Second, to decompose the existing corpus of simulation models into
+that language. Third, to build differentiable implementations of every activity, so that
 mechanistic models can be inferred from biological data.
 :::
 
@@ -32,31 +31,32 @@ a numerical problem. It is a language problem.
 
 Biology already has an account of what a mechanism is, even if it is rarely written out.
 In the account of Machamer, Darden and Craver, a mechanism has two halves. *Entities* are
-the things: they have properties and stand in spatial relations to one another. *Activities*
-are what the things do: they are the producers of change. And the two are *organized* —
-spatially, by location, shape and contact; temporally, by order, rate and duration; and
-hierarchically, because what the parts do at one level constitutes what the whole does at
-the next. A mechanism starts from set-up conditions and ends at termination conditions, and
-the description bottoms out in activities that the field takes as fundamental. This is the
-account a cell biologist uses tacitly whenever a paper ends with a summary cartoon: named
-parts, arrows between them, boxes inside boxes. The paper also gives that cartoon its two
-names. A *mechanism schema* is an abstract description whose placeholders can be filled
-with known parts and activities; a *mechanism sketch* is one with gaps — black boxes that
-no known activity yet fills. A complete description exhibits *productive continuity without
-gaps* from set-up to termination conditions, and the continuity lies in the arrows.
+the things: they have properties and stand in spatial relations to one another.
+*Activities* are what the things do: they are the producers of change. And the two are
+*organized*. Spatially, by location, shape and contact. Temporally, by order, rate and
+duration. Hierarchically, because what the parts do at one level constitutes what the whole
+does at the next. A mechanism starts from set-up conditions and ends at termination
+conditions, and its description bottoms out in activities that the field takes as
+fundamental. This is the account a cell biologist uses tacitly whenever a paper ends with a
+summary figure: named parts, arrows between them, boxes inside boxes. The paper has exact
+words for that figure. A *mechanism sketch* is a description with gaps, black boxes that no
+known activity yet fills. A *mechanism schema* is an abstract description whose
+placeholders can all be filled with known parts and activities. A complete description
+exhibits *productive continuity without gaps* from set-up to termination conditions, and
+the continuity lies in the arrows.
 
 Plexus takes that account literally. Instead of treating simulation frameworks as
-fundamental, it treats entities and activities as the primary objects. An activity —
-adhesion, diffusion, division, chemotaxis, electrical propagation, active stress — is
-written as an *operator*, independently of how it is computed. The two words mean the same
-thing in two dialects, and this page uses both. In this perspective biological modelling
-becomes analogous to compiler design: just as a compiler separates a programming language
-from its implementations through an intermediate representation, Plexus separates the
-mechanism from its numerical realization.
+fundamental, it treats entities and activities as the primary objects. An activity, such as
+adhesion, diffusion, division, chemotaxis, electrical propagation or active stress, is
+written down independently of how it is computed. In a spec an activity is written as an
+operator; the two words name the same thing, and this page uses the paper's. In this
+perspective biological modelling becomes analogous to compiler design. Just as a compiler
+separates a programming language from its implementations through an intermediate
+representation, Plexus separates the mechanism from its numerical realization.
 
-Entities are heterogeneous — receptors, signalling proteins, cells, extracellular matrices,
-tissues, fields — and they are organized across levels. Plexus makes this organization
-explicit: each level carries its own entities and states, operators act between entities
+Entities are heterogeneous, receptors, signalling proteins, cells, extracellular matrices,
+tissues, fields, and they are organized across levels. Plexus makes this organization
+explicit: each level carries its own entities and states, activities act between entities
 within a level, and **aggregate ↑** and **broadcast ↓** connect the levels by carrying
 state from parts to whole and from whole to parts. Decomposition therefore does not
 flatten a tissue into one collection of variables. It keeps the organization through which
@@ -73,75 +73,75 @@ is what running it establishes.
 
 ## The language
 
-Plexus is built around four kinds of object. Two describe what exists — **sets** and their
-**states**, together with the **fields** that make up the microenvironment — and one
-describes what happens — the **operators**. A model is a composition of operators acting on
-discrete and continuous biological objects, not a simulator-specific algorithm.
+Plexus is built around four kinds of object. Three describe what exists: the **entities**,
+their **states**, and the **fields** that make up the microenvironment. One describes what
+happens: the **activities**. A model is a composition of activities acting on discrete and
+continuous biological objects, not a simulator-specific algorithm.
 
-### Sets — the entities
+### Entities
 
-A set is a collection of entities of one kind at one level of organization: genes,
-proteins, cells, neurons, synapses, tissues, organs, organisms. Sets organize into
-hierarchies that reflect biological organization — genes regulate proteins, proteins
-determine what a cell does, cells assemble into tissues, tissues into organs — and each
-level is represented uniformly as a set, so that the same language describes intracellular
-signalling, multicellular mechanics, development and organ physiology. A set need not be
-a whole organism's worth of one thing: the vertices of a cell sheet are a set, the
-material points of a gel are a set, and both can be parts of the same cell.
+Entities come in kinds, and each kind lives at one level of organization: genes, proteins,
+cells, neurons, synapses, tissues, organs, organisms. The kinds organize into hierarchies
+that reflect biological organization. Genes regulate proteins, proteins determine what a
+cell does, cells assemble into tissues, tissues into organs. Every kind is represented in
+the same way, so that one language describes intracellular signalling, multicellular
+mechanics, development and organ physiology. A kind need not be a whole organism's worth of
+one thing: the vertices of a cell sheet are entities of one kind, the material points of a
+gel are entities of another, and both can be parts of the same cell.
 
-### States — the properties
+### States
 
-Every entity carries a state describing its current condition. Sets say *what exists*;
-states say *what each entity carries*. The state schema is specific to each set. A protein
-may carry a position, a binding state and the load it bears; a material point a position,
-a velocity and a deformation gradient; a neuron a membrane voltage and a calcium level; a
+Every entity carries a state describing its current condition. Entities say *what exists*;
+states say *what each entity carries*. The state schema is specific to each kind. A protein
+may carry a position, a binding state and the load it bears; a material point a position, a
+velocity and a deformation gradient; a neuron a membrane voltage and a calcium level; a
 cell a polarity, a stiffness and its gene-expression levels; a synapse a conductance and a
-plastic weight. Operators transform states: they read selected state variables and write
+plastic weight. Activities transform states: they read selected state variables and write
 updates to others, while the entities themselves remain what they were.
 
-### Fields — the microenvironment
+### Fields
 
 A field is a continuous quantity defined over space rather than over entities: a morphogen
 concentration, a pressure, an extracellular signal, an electric potential, a matrix
-density. Fields complement sets. Sets describe the discrete entities, fields the
-continuous environment those entities live in, and operators couple the two through
-explicit maps from entities to positions in space.
+density. Fields complement entities. Entities are the discrete parts, fields the
+continuous environment those parts live in, and activities couple the two through explicit
+maps from entities to positions in space.
 
-### Operators — the activities
+### Activities
 
-An operator is one activity, and it is the fundamental object of the language. It
-represents a single mechanism — adhesion, chemotaxis, diffusion, electrical propagation,
-active stress, metabolism, growth, division — by a typed signature and one or more
-numerical implementations. The signature states *what* change the activity produces; the
-implementations state *how* it is computed. The signature declares
+An activity is the fundamental object of the language. It represents a single mechanism,
+such as adhesion, chemotaxis, diffusion, electrical propagation, active stress, metabolism,
+growth or division, by a typed signature and one or more numerical implementations. The
+signature states *what* change the activity produces; the implementations state *how* it
+is computed. The signature declares
 
-- the sets the activity acts on,
-- the sets it changes,
+- the entities the activity acts on,
+- the entities it changes,
 - the state variables it reads and the ones it writes,
-- the maps relating the participating sets.
+- the maps relating the participating entities.
 
 The maps are the relations the mechanism needs. They say which protein belongs to which
 cell, which synapses connect which neurons, or how cells relate to a field. Because the
-relations are part of the signature, an operator is a typed morphism between sets, and the
-spatial organization of the mechanism is declared with the activity rather than assumed by
-the code.
+relations are part of the signature, an activity is a typed morphism between kinds of
+entities, and the spatial organization of the mechanism is declared with the activity
+rather than assumed by the code.
 
-## The operator algebra
+## The algebra of activities
 
 The central hypothesis of Plexus is that a large fraction of the activities in the
 simulation literature can be composed from a small number of elementary kinds. Rather
-than introducing a new operator for every phenomenon, Plexus identifies a compact algebra
+than introducing a new activity for every phenomenon, Plexus identifies a compact algebra
 that is reused across mechanics, signalling, metabolism, development and physiology. There
 are **eight** kinds, and here each is named first in a biologist's words:
 
-- **lateral** — what neighbours do to each other within one set.
-- **aggregate ↑** — integration: a whole reading its parts.
-- **broadcast ↓** — top-down control: a whole imposing on its parts.
-- **exchange** — traffic between entities and their microenvironment.
-- **field** — the microenvironment's own life: diffusion, decay, reaction.
-- **rewire** — remodelling: the relations change, the entities do not.
-- **structural** — turnover: **divide** and **die**.
-- **seed** — the set-up conditions, written once and never again.
+- **lateral**: what neighbours do to each other among entities of one kind.
+- **aggregate ↑**: integration. A whole reads its parts.
+- **broadcast ↓**: top-down control. A whole imposes on its parts.
+- **exchange**: traffic between entities and their microenvironment.
+- **field**: the microenvironment's own life. Diffusion, decay, reaction.
+- **rewire**: remodelling. The relations change, the entities do not.
+- **structural**: turnover. **divide** and **die**.
+- **seed**: the set-up conditions, written once and never again.
 
 The first five kinds change state and leave the organization intact. Rewire changes the
 relations, structural changes the entities themselves, and seed writes what the others go
@@ -150,15 +150,15 @@ implementation recognizes exactly these eight.
 
 ![](figures/fig_ops.png){width=100% fig-align="center"}
 
-**Lateral.** What entities of one set do to one another: mechanical forces between
+**Lateral.** What entities of one kind do to one another: mechanical forces between
 proteins, adhesion and tension between neighbouring cells, juxtacrine signalling, contact
 inhibition, gap-junction coupling, synaptic transmission, the reactions of a metabolic
 network.
 
 **Aggregate.** Integration. A whole reads its parts: a cell's shape from its vertices, a
 cell's properties from its proteins, a neuron's input as the sum of its synaptic currents,
-a tissue's shape as the collective consequence of its cells. This is the upward direction of
-causation, the one usually called emergence.
+a tissue's shape as the collective consequence of its cells. This is the upward direction
+of causation, the one usually called emergence.
 
 **Broadcast.** Top-down control. A whole imposes on its parts: a cell's polarity on its
 cytoskeleton, a material property on every point the cell owns, a fate decision on
@@ -166,24 +166,25 @@ everything the cell contains, a constraint the tissue places on its cells. Aggre
 broadcast together are the upward and downward flow across levels of organization.
 
 **Exchange.** A cell's traffic with its microenvironment: secretion, uptake, sensing,
-transport, and mechanical load carried to and from the matrix — in numerical terms the
+transport, and mechanical load carried to and from the matrix. In numerical terms, the
 transfer between entities and a grid.
 
-**Field.** The microenvironment's own dynamics — diffusion, decay, extracellular reaction
-— mapping a field to itself without touching any set.
+**Field.** The microenvironment's own dynamics, diffusion, decay and extracellular
+reaction, mapping a field to itself without touching any entity.
 
 **Rewire.** Remodelling. Neighbour exchange in an epithelium, junction turnover, synaptic
 plasticity, matrix remodelling: the relations between entities change, the entities do not,
 and which entities take part in the next activity changes with them.
 
 **Structural.** Turnover. A living tissue continuously changes its own composition:
-**divide** creates entities and **die** removes them — proliferation, apoptosis,
-extrusion. These operators change the organization itself, not only its state, and they
+**divide** creates entities and **die** removes them, as in proliferation, apoptosis and
+extrusion. These activities change the organization itself, not only its state, and they
 are what makes a tissue different from any inert material.
 
 **Seed.** The set-up conditions: the egg, the pre-pattern, the segmentation a model starts
-from. A seed writes a set's initial state once. It is confined to the first frame, so that
-a starting condition cannot silently become a boundary condition applied at every step.
+from. A seed writes the initial state of entities of one kind, once. It is confined to the
+first frame, so that a starting condition cannot silently become a boundary condition
+applied at every step.
 
 ## Organization in time
 
@@ -192,61 +193,62 @@ what order and how often each runs. Formally, one step is the composition
 
 $$\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1,$$
 
-of the operators, whose repeated application generates the dynamics
+of the activities, whose repeated application generates the dynamics
 
 $$x_{t+1} = \Phi(x_t),$$
 
-where $x$ is the whole state — every set and every field at once. The schedule is the
+where $x$ is the whole state, every entity and every field at once. The schedule is the
 temporal organization of the mechanism: its order, rate and duration. Activities run at
-their own tempo — mechanics every step, diffusion, growth or division less often — so a
+their own tempo, mechanics every step, diffusion, growth or division less often, so a
 model is a multi-rate composition of mechanisms rather than one monolithic solver.
 
-Operators are pure. None modifies state directly; each returns its contribution to the
-change. If operator $\mathcal{O}_i$ produces the increment $\Delta_i$, the complete update
+Activities are pure. None modifies state directly; each returns its contribution to the
+change. If activity $\mathcal{O}_i$ produces the increment $\Delta_i$, the complete update
 is
 
 $$\Delta = \sum_i \Delta_i,$$
 
 before it is passed to the numerical implementation. Two things follow. Activities stay
-independent and composable: adding a mechanism is adding an operator to the schedule.
+independent and composable: adding a mechanism is adding an activity to the schedule.
 And the language stays independent of its numerical realization: the schedule states the
 hypothesis, the implementation states how it is evaluated.
 
 ## Organization across levels
 
-A cell is a compartment, and a compartment holds parts of different kinds. A set may be
-contained in another — proteins in a cell, cells in a tissue, tissues in an organism —
-through an explicit part → whole map, and one whole may contain several distinct sets: the
-same cell can hold receptors, signalling proteins, cytoskeletal elements and material
-points. These sets remain distinct, with their own state and their own activities, while
-sharing the same parent. A vertex model that treats a cell as a polygon and a
-reaction–diffusion model that treats it as a well-mixed bag are each a caricature; here the
-same cell is both at once, because both are sets under one parent. Each level also runs at
-its own tempo, and no level is reduced to a parameter of the one above it.
+A cell is a compartment, and a compartment holds parts of different kinds. Entities of one
+kind may be contained in entities of another, proteins in a cell, cells in a tissue,
+tissues in an organism, through an explicit part-to-whole map, and one whole may contain
+parts of several kinds: the same cell can hold receptors, signalling proteins,
+cytoskeletal elements and material points. These kinds remain distinct, with their own
+state and their own activities, while sharing the same parent. A vertex model that treats a
+cell as a polygon and a reaction–diffusion model that treats it as a well-mixed bag are
+each a caricature. Here the same cell is both at once, because both kinds of parts belong to
+one parent. Each level also runs at its own tempo, and no level is reduced to a parameter
+of the one above it.
 
 ![](figures/fig_hier.png){width=70% fig-align="center"}
 
-Activities run within a level or across it. Within a cell, operators couple receptors →
-signalling proteins → cytoskeleton. Across the part → whole map, **aggregate ↑** builds
-the whole's state from its parts — a cell's position from its material points, a neuron's
-input from its synapses — and **broadcast ↓** carries the whole's state to its parts — a
-material property to every point a cell owns, a constraint imposed by the tissue. Causation
-runs both ways, and both directions are operators like any other.
+Activities run within a level or across it. Within a cell, activities couple receptors →
+signalling proteins → cytoskeleton. Across the part-to-whole map, **aggregate ↑** builds
+the whole's state from its parts, a cell's position from its material points, a neuron's
+input from its synapses. **Broadcast ↓** carries the whole's state to its parts, a material
+property to every point a cell owns, a constraint imposed by the tissue. Causation runs
+both ways, and both directions are activities like any other.
 
-Fields belong to levels too. **Exchange** couples a set to the field at its own level, so
-that a protein concentration inside the cell, a morphogen among cells and a mechanical grid
-under the tissue coexist as distinct objects.
+Fields belong to levels too. **Exchange** couples entities to the field at their own level,
+so that a protein concentration inside the cell, a morphogen among cells and a mechanical
+grid under the tissue coexist as distinct objects.
 
 Proteins → cells → tissues is therefore not a pipeline of separate simulators. It is one
-compositional graph: several sets inside each whole, operators joining them locally,
-aggregate and broadcast joining the levels. The same eight kinds serve throughout, and
-another level of organization needs no new machinery.
+compositional graph: parts of several kinds inside each whole, activities joining them
+locally, aggregate and broadcast joining the levels. The same eight kinds serve
+throughout, and another level of organization needs no new machinery.
 
 ## Bottoming out: numerical implementations
 
-Every mechanistic description stops somewhere: it bottoms out in activities the field is
+Every mechanistic description stops somewhere. It bottoms out in activities the field is
 content to take as given. In Plexus that floor is the numerical implementation. The
-operator algebra states the biological meaning of a model; every operator may admit
+algebra of activities states the biological meaning of a model; every activity may admit
 several implementations satisfying the same typed signature, which differ in how they
 compute and not in what they mean. Choosing an implementation is a numerical decision,
 never a biological one.
@@ -280,7 +282,7 @@ from observations. Rather than calibrating simulations by hand, the aim is to in
 parameters, the spatial organization and the constitutive laws of a biological system from
 imaging data.
 
-Plexus makes this possible by giving every operator at least one differentiable
+Plexus makes this possible by giving every activity at least one differentiable
 implementation satisfying its signature. Differentiability is then a property of the
 language rather than of a particular simulator: whatever the backend, gradients propagate
 through a composition of explicit activities rather than through monolithic code.
@@ -292,42 +294,42 @@ is missing: tuning the parameters that exist improves the fit while merely compe
 for the activity that does not.
 
 In Plexus, parameters stay attached to explicit activities rather than to an opaque model.
-Mechanical properties belong to mechanical operators, reaction rates to biochemical ones,
+Mechanical properties belong to mechanical activities, reaction rates to biochemical ones,
 conductances to signalling ones, and spatial fields to the activities that generate them,
 so that estimation keeps the mechanistic reading of the model.
 
 Residuals acquire the same reading. A persistent mismatch between simulation and
 experiment no longer means only that the parameters are wrong; it may mean that the
-present composition of activities cannot produce the observed change. In the paper's terms,
-a residual that will not go away is the mark of a sketch: a black box where an activity
-belongs. Differentiability therefore does more than make optimization efficient. It lets competing mechanistic
-hypotheses be compared quantitatively while each keeps its explicit structure.
+present composition of activities cannot produce the observed change. In the paper's
+terms, a residual that will not go away is the mark of a sketch: a black box where an
+activity belongs. Differentiability therefore does more than make optimization efficient.
+It lets competing mechanistic hypotheses be compared quantitatively while each keeps its
+explicit structure.
 
 ## Agentic mechanistic discovery
 
 Writing mechanisms as explicit activities turns discovery from a parameter-optimization
-problem into a language-exploration problem. Because activities are operators rather than
-code buried in a simulator, they are directly accessible to an agent.
+problem into a language-exploration problem. Because activities are declared rather than
+buried in a simulator's code, they are directly accessible to an agent.
 
 Plexus proposes a three-loop strategy, each loop at a different level of abstraction,
 moving from existing models toward new biological knowledge.
 
 **Loop I: Understanding.** The first loop reads an existing simulation model. Rather than
-treating the simulator as opaque code, the agent decomposes it into Plexus operators,
-names the activities it implements and the entities they act on, and reconstructs an
-explicit mechanistic description. Existing frameworks become repositories of reusable
-entities and activities.
+treating the simulator as opaque code, the agent decomposes it into Plexus activities,
+names the entities they act on, and reconstructs an explicit mechanistic description.
+Existing frameworks become repositories of reusable entities and activities.
 
 **Loop II: Fitting.** The second loop estimates the parameters, spatial fields and set-up
 conditions of the resulting mechanism by fitting it directly to experimental observations.
-Because every operator has a differentiable implementation, optimization keeps an explicit
+Because every activity has a differentiable implementation, optimization keeps an explicit
 correspondence between parameters and activities.
 
 **Loop III: Discovery.** The third loop reads the residual that remains after fitting.
 A persistent discrepancy is taken as evidence that the composition is incomplete rather
 than poorly parameterized. The agent proposes alternative activities, compares competing
 mechanistic hypotheses, and extends the algebra whenever the activities it has cannot
-produce the change observed — turning a sketch into a schema, one filled box at a time.
+produce the change observed. It turns a sketch into a schema, one filled box at a time.
 
 Together the three loops make simulation, inverse modelling and hypothesis generation
 successive stages of one workflow. The language itself becomes the object of discovery:
