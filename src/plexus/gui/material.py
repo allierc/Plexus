@@ -193,7 +193,7 @@ PAGE = r"""<!doctype html>
  <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:170px" oninput="showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
  <h2>Claude takes over <span style="color:#778;font-weight:normal;text-transform:none">drives this page through its own routes</span></h2>
  <div class="row"><input id="task" style="width:100%" placeholder="e.g. drop a snow ball onto a water slab, then run 100 frames" onkeydown="if(event.key==='Enter')claudeGo()"></div>
- <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button> <span id="cstat" style="color:#8c8"></span></div>
+ <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button><button class="dim" onclick="claudeNew()" title="forget the conversation so far">NEW SESSION</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
  <div id="rstat" style="color:#9ab;min-height:14px"></div>
  <div id="yaml"><textarea id="yamltext"></textarea><div><button onclick="saveYaml()">SAVE YAML</button></div></div>
@@ -272,6 +272,7 @@ poll();
 let cseen=0;
 window.claudeGo=async function(){const t=$('task').value.trim();if(!t)return;$('claude').textContent='';cseen=0;const j=await post('/api/bio/claude',{task:t,mode:'material'});if(j.error){$('cstat').textContent=j.error;return;}$('cstat').textContent='running...';$('cbtn').disabled=true;};
 window.claudeStop=async function(){await post('/api/bio/claude',{stop:true});};
+window.claudeNew=async function(){await post('/api/bio/claude',{new_session:true});$('claude').textContent+='[new session]\n';};
 async function cpoll(){try{const j=await (await fetch('/api/bio/claude?since='+cseen)).json();if(j.lines&&j.lines.length){const el=$('claude');el.textContent+=j.lines.join('\n')+'\n';el.scrollTop=el.scrollHeight;cseen=j.n;}
  $('cstat').textContent=j.running?'running... '+j.seconds+'s':(j.error?'error: '+j.error.slice(0,200):(j.n?'done in '+j.seconds+'s':''));$('cbtn').disabled=!!j.running;$('cbtn').classList.toggle('on',!!j.running);}catch(e){}finally{setTimeout(cpoll,1200);}}
 cpoll();
