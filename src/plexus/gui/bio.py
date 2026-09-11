@@ -63,6 +63,7 @@ def set_view(azim=None, elev=None, zoom=None, pick=None, message=None) -> dict:
     STATE["cam_version"] += 1
     return dict(STATE)
 REGIONS = ("basal", "apical", "mid", "interior")
+SCENE_MAX = 60_000
 ORG_REGIONS = ("interior", "apical_side", "basal_side")
 ORG_COLORS = {"nucleus": [0.55, 0.75, 1.0], "mitochondria": [0.95, 0.35, 0.2], "golgi": [1.0, 0.8, 0.25],
               "centrosome": [0.8, 0.95, 0.3], "lysosome": [0.85, 0.4, 0.95]}
@@ -310,6 +311,12 @@ def scene_from(H, sim, spec_path: str) -> dict:
         entry["entity"] = sd.get("entity")
         if "pos" in lvl.state_schema:
             live = np.nonzero(occ)[0] if occ is not None else np.arange(lvl.n)
+            # A MILLION MATERIAL POINTS DO NOT GO INTO A JSON. The scene dict serves picking and
+            # the info panel; past SCENE_MAX live rows a set is subsampled by a stride, `idx`
+            # keeping the buffer index of every row kept so a pick still names the real row.
+            if len(live) > SCENE_MAX:
+                live = live[:: len(live) // SCENE_MAX + 1]
+                entry["subsampled"] = True
             P = _np(lvl.get("pos"))[live]
             entry["idx"] = live.tolist()
             entry["pos"] = np.round(P, 4).tolist()
@@ -508,7 +515,7 @@ def _ev_lines(ev: dict) -> list:
     return out
 
 
-def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900) -> dict:
+def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900, brief: str | None = None) -> dict:
     """Launch the CLI on the task in a thread; the transcript fills `CLAUDE['lines']` as it runs."""
     import subprocess
     import threading
@@ -518,7 +525,7 @@ def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900
 
     def _go():
         cmd = [studio._claude_bin(), "-p", task,
-               "--append-system-prompt", BIO_BRIEF.replace("{port}", str(port)),
+               "--append-system-prompt", (brief or BIO_BRIEF).replace("{port}", str(port)),
                "--allowedTools", "Bash(curl:*)", "Bash(sleep:*)", "Bash(jq:*)",
                "--disallowedTools", "Write", "Edit", "NotebookEdit", "Read", "Glob", "Grep", "WebFetch", "WebSearch", "Task",
                "--model", model, "--effort", "low",
