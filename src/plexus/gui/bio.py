@@ -557,8 +557,8 @@ def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900
         ref = _corpus.corpus(mode)
         prompt = ("REFERENCE -- the Plexus framework you are working in. Read it once and keep it "
                   "for every task of this session.\n\n" + ref + "\n\n=== END OF REFERENCE ===\n\n" + prompt)
-        CLAUDE["lines"].append(f"[session primed with {len(ref):,} chars: framework, operator atlas, entities, references]")
-    CLAUDE.update(running=True, task=task, lines=[f"task: {task}" + ("" if fresh else f"  (session turn {CLAUDE['turns'] + 1})")],
+        primed_line = f"[session primed with {len(ref):,} chars: framework, operator atlas, entities, references]"
+    CLAUDE.update(running=True, task=task, lines=([primed_line] if fresh else []) + [f"task: {task}" + ("" if fresh else f"  (session turn {CLAUDE['turns'] + 1})")],
                   seconds=0.0, error=None, started=time.time())
 
     def _go():

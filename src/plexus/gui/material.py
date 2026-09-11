@@ -34,6 +34,7 @@ def build_spec(form: dict) -> dict:
     frames = int(form.get("n_frames", 200))
     dt = float(form.get("dt", s["general"]["dt"]))
     g = float(form.get("gravity", 9.81))
+    bounce = float(form.get("bounce", 0.9))                  # wall restitution: 1 elastic, 0 dead
     per = int(form.get("particles", 20000))
     bodies = form.get("bodies") or []
     if not bodies:
@@ -79,6 +80,14 @@ def build_spec(form: dict) -> dict:
     for o in s["operators"]:
         if o["op"] == "gravity":
             o["g"] = g
+        # THE TEMPLATE'S 0.9 IS A DECAY RATE, NOT A RESTITUTION: applied per SUBSTEP by both the grid
+        # update and the gather, it took 10% of the wall-normal momentum 13-126 times a frame, so
+        # nothing ever bounced. The wall's restitution is one number, applied once per impact.
+        if o["op"] == "mpm_grid_update":
+            o["wall_damp"] = 1.0
+        if o["op"] == "mpm_gather":
+            o["wall_damp"] = bounce
+            o["wall_damp_mode"] = "per_impact"
     p = s["plotting"]
     p["colors"] = colors
     p["box_frame"] = True
@@ -107,8 +116,9 @@ def form_from_spec(spec: dict) -> dict:
         bodies.append(b)
     gen = spec.get("general") or {}
     g = next((o.get("g", 9.81) for o in spec.get("operators") or [] if o.get("op") == "gravity"), 9.81)
+    bounce = next((o.get("wall_damp", 0.9) for o in spec.get("operators") or [] if o.get("op") == "mpm_gather"), 0.9)
     return {"name": gen.get("name", ""), "world": (gen.get("world") or [0.1])[0], "n_frames": gen.get("n_frames", 200),
-            "dt": gen.get("dt", 8.3e-4), "gravity": g,
+            "dt": gen.get("dt", 8.3e-4), "gravity": g, "bounce": bounce,
             "n_grid": ((spec.get("fields") or {}).get("mpm_grid") or {}).get("n_grid", 96),
             "particles": mp.get("per_parent", 20000), "bodies": bodies}
 
@@ -125,7 +135,8 @@ Your ONLY tool is `curl` against the local server at http://127.0.0.1:{port} . T
                           metres), n_grid, n_frames, dt, gravity, particles (per body),
                           bodies: [{name, shape (ball|block), centre [x,y,z] and radius for a ball,
                           block [x0,y0,z0,x1,y1,z1] for a slab, material (elastic|liquid|snow),
-                          youngs (elastic/snow) or bulk_modulus (liquid), density}]
+                          youngs (elastic/snow) or bulk_modulus (liquid), density}], bounce (wall
+                          restitution 0-1). A ball deforms visibly below ~30,000 Pa; 1,000,000 is rigid.
   POST /api/bio/refine    {name, prompt} -> an English edit of the current spec (another Claude
                           applies it; 20-40 s)
   GET  /api/bio/counts?name= -> live count per set and per body type
@@ -181,6 +192,7 @@ PAGE = r"""<!doctype html>
  <div class="row"><label>box side (m)</label><input id="world" class="short" value="0.1"> <label style="width:60px">grid</label><input id="n_grid" class="short" value="96"></div>
  <div class="row"><label>frames</label><input id="n_frames" class="short" value="400"> <label style="width:60px">dt (s)</label><input id="dt" class="short" value="0.00083"></div>
  <div class="row"><label>gravity</label><input id="gravity" class="short" value="9.81"> <label style="width:60px">particles</label><input id="particles" class="short" value="10000" title="material points per body"></div>
+ <div class="row"><label>bounce</label><input id="bounce" class="short" value="0.9" title="wall restitution: 1 = elastic wall, 0 = dead"> <span style="color:#778;font-size:11px">wall restitution, per impact</span></div>
  <h2>Bodies <button class="dim" onclick="addBody()">+ body</button></h2>
  <table class="sp" id="bodies"><tr><th>name</th><th>shape</th><th>centre x y z | block x0 y0 z0 x1 y1 z1</th><th>radius</th><th>material</th><th>stiffness</th><th>density</th><th></th></tr></table>
  <div style="color:#778;font-size:11px">a ball is placed at its centre with the radius; a block spans its six numbers (metres). stiffness = Young's modulus (elastic, snow) or bulk modulus (liquid), Pa.</div>
@@ -213,8 +225,8 @@ function bodies(){const out=[];for(const tr of $('bodies').rows){if(!tr.cells[0]
  const nums=c[2].firstChild.value.trim().split(/[\s,]+/).map(Number);const shape=c[1].firstChild.value;const mat=c[4].firstChild.value;
  const b={name,shape,material:mat,density:+c[6].firstChild.value};if(shape==='ball'){b.centre=nums.slice(0,3);b.radius=+c[3].firstChild.value;}else{b.block=nums.slice(0,6);}
  if(mat==='liquid')b.bulk_modulus=+c[5].firstChild.value;else b.youngs=+c[5].firstChild.value;out.push(b);}return out;}
-function form(){return {name:$('name').value,world:+$('world').value,n_grid:+$('n_grid').value,n_frames:+$('n_frames').value,dt:+$('dt').value,gravity:+$('gravity').value,particles:+$('particles').value,bodies:bodies()};}
-function fillForm(f){$('name').value=f.name;$('world').value=f.world;$('n_grid').value=f.n_grid;$('n_frames').value=f.n_frames;$('dt').value=f.dt;$('gravity').value=f.gravity;$('particles').value=f.particles;
+function form(){return {name:$('name').value,world:+$('world').value,n_grid:+$('n_grid').value,n_frames:+$('n_frames').value,dt:+$('dt').value,gravity:+$('gravity').value,bounce:+$('bounce').value,particles:+$('particles').value,bodies:bodies()};}
+function fillForm(f){$('name').value=f.name;$('world').value=f.world;$('n_grid').value=f.n_grid;$('n_frames').value=f.n_frames;$('dt').value=f.dt;$('gravity').value=f.gravity;if(f.bounce!==undefined)$('bounce').value=f.bounce;$('particles').value=f.particles;
  const tb=$('bodies');while(tb.rows.length>1)tb.deleteRow(-1);(f.bodies||[]).forEach(addBody);}
 // THE PICKER IS THE SERVER'S LISTING: a browser file dialog hands the page bytes, never a path, and
 // the specs live where the server runs. Folders that hold a spec.yaml (run archives) open as one.
@@ -247,7 +259,7 @@ function tree(j){const h=j.hierarchy;let out='';for(const n of h.sets){const cnt
  out+=`<div style="color:#778;margin-top:4px">schedule: ${h.schedule.map(x=>typeof x==='string'?x:'{substeps: '+(x.steps||[]).join(' > ')+'}').join(' > ')}</div>`;$('tree').innerHTML=out;}
 window.setInfo=function(name){const s=SCENE.sets[name];const n=SCENE.hierarchy.sets.find(x=>x.name===name);
  $('info').textContent=`set ${name}\n  entity: ${n.entity||'(by name)'}\n  buffer ${s.n_buffer}, live ${s.n_live}\n  blocks: ${s.blocks.join(', ')}\n`+(n.parent?`  contained in: ${n.parent} (${n.per_parent??'?'} per parent)\n`:'')+(n.types.length?`  bodies: ${n.types.join(', ')}\n`:'')+`  operators on it: ${SCENE.hierarchy.operators.filter(o=>o.at===name).map(o=>o.op).join(', ')||'-'}`;};
-addBody({name:'red',shape:'ball',centre:[0.03,0.062,0.05],radius:0.012,material:'elastic',youngs:1000000,density:1000});addBody({name:'blue',shape:'ball',centre:[0.05,0.074,0.05],radius:0.012,material:'elastic',youngs:1000000,density:1000});addBody({name:'green',shape:'ball',centre:[0.07,0.058,0.05],radius:0.012,material:'elastic',youngs:1000000,density:1000});
+addBody({name:'red',shape:'ball',centre:[0.03,0.062,0.05],radius:0.012,material:'elastic',youngs:20000,density:1000});addBody({name:'blue',shape:'ball',centre:[0.05,0.074,0.05],radius:0.012,material:'elastic',youngs:20000,density:1000});addBody({name:'green',shape:'ball',centre:[0.07,0.058,0.05],radius:0.012,material:'elastic',youngs:20000,density:1000});
 let running=false, playing=null, nframes=0;
 // REPLAY: every frame the run drew was kept as an image on the server; PLAY steps through them.
 // REPLAY AT ANY CAMERA: a kept frame is the levels' state, re-drawn by the renderer at the
