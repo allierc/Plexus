@@ -688,7 +688,7 @@ function fillForm(f){$('name').value=f.name;$('shape').value=f.shape;$('n_cells'
  tb=$('organelles');while(tb.rows.length>1)tb.deleteRow(-1);(f.organelles||[]).forEach(addOrganelle);}
 // THE PICKER IS THE SERVER'S LISTING: a browser file dialog hands the page bytes, never a path, and
 // the specs live where the server runs. Folders that hold a spec.yaml (run archives) open as one.
-window.pickOpen=async function(path){$('picker').style.display='block';const j=await (await fetch('/api/bio/ls?path='+encodeURIComponent(path||''))).json();if(j.error){$('picklist').textContent=j.error;return;}
+window.pickOpen=async function(path){$('picker').style.display='block';const j=await (await fetch('/api/bio/ls?path='+encodeURIComponent(path||'/workspace/Plexus/config/tissue'))).json();if(j.error){$('picklist').textContent=j.error;return;}
  $('pickroots').innerHTML=Object.entries(j.roots).map(([k,v])=>`<button class="dim" onclick="pickOpen('${v}')">${k}</button>`).join('');$('pickpath').textContent=j.path;
  let h=`<div style="cursor:pointer;color:#9ac" onclick="pickOpen('${j.parent}')">.. (up)</div>`;
  for(const d of j.dirs)h+=`<div style="cursor:pointer;padding:1px 0"><span style="color:#7fb3ff" onclick="pickOpen('${j.path}/${d.name}')">&#128193; ${d.name}/</span>${d.spec?` <button class="dim" style="padding:1px 6px;font-size:11px" onclick="openSpec('${j.path}/${d.name}')">open run</button>`:''}</div>`;
