@@ -62,6 +62,7 @@ class View:
             style.pop(k, None)
         style["real_time"] = False
         style["box_frame"] = False                               # the page frames the objects, not the box
+        style["scale_bar"] = False                               # the movie's bar sits at the box edge; ours follows the view
         style["cross_section_height"] = min(float(style.get("cross_section_height", 0.24) or 0.24), 0.2)
         u = getattr(sim, "units", None)
         dec = bool(getattr(u, "declared", False))                # the scale bar needs declared units, as the movie does
