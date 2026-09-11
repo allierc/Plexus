@@ -408,6 +408,29 @@ class Handler(BaseHTTPRequestHandler):
             r = dict(v.RUN); r.pop("stop", None); r.pop("started", None)
             return self._send_json(r)
 
+        if route == "/api/bio/ls":                       # GET ?path= -> folders and spec files there (a picker)
+            from plexus.gui import studio
+            from plexus.paths import graphs_data_path
+            roots = {"config": os.path.join(studio.REPO, "config"), "studio": studio.CONFIG_DIR,
+                     "graphs_data": graphs_data_path()}
+            path = (q.get("path") or [""])[0] or roots["config"]
+            path = os.path.abspath(path)
+            if not os.path.isdir(path):
+                return self._send_json({"error": f"not a folder: {path}"}, 404)
+            dirs, files = [], []
+            try:
+                for e in sorted(os.listdir(path)):
+                    if e.startswith("."):
+                        continue
+                    fp = os.path.join(path, e)
+                    if os.path.isdir(fp):
+                        dirs.append({"name": e, "spec": os.path.exists(os.path.join(fp, "spec.yaml"))})
+                    elif e.endswith((".yaml", ".yml")):
+                        files.append(e)
+            except PermissionError:
+                return self._send_json({"error": f"no access to {path}"}, 403)
+            return self._send_json({"path": path, "parent": os.path.dirname(path), "dirs": dirs, "files": files, "roots": roots})
+
         if route == "/api/bio/open":                     # GET ?path=<spec.yaml or run folder> -> import into config/studio, open it
             from plexus.gui import bio, studio
             import shutil
