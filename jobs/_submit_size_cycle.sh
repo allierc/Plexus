@@ -1,0 +1,11 @@
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J size_sizer -o jobs/logs/size_sizer.out -e jobs/logs/size_sizer.err bash -l jobs/size_sizer.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J size_adder -o jobs/logs/size_adder.out -e jobs/logs/size_adder.err bash -l jobs/size_adder.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J size_doubler -o jobs/logs/size_doubler.out -e jobs/logs/size_doubler.err bash -l jobs/size_doubler.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J size_timer -o jobs/logs/size_timer.out -e jobs/logs/size_timer.err bash -l jobs/size_timer.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J size_grow_sizer -o jobs/logs/size_grow_sizer.out -e jobs/logs/size_grow_sizer.err bash -l jobs/size_grow_sizer.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J size_two_channel -o jobs/logs/size_two_channel.out -e jobs/logs/size_two_channel.err bash -l jobs/size_two_channel.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J cycle_sizer -o jobs/logs/cycle_sizer.out -e jobs/logs/cycle_sizer.err bash -l jobs/cycle_sizer.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J cycle_timer -o jobs/logs/cycle_timer.out -e jobs/logs/cycle_timer.err bash -l jobs/cycle_timer.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J cycle_hazard -o jobs/logs/cycle_hazard.out -e jobs/logs/cycle_hazard.err bash -l jobs/cycle_hazard.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J cycle_dilution -o jobs/logs/cycle_dilution.out -e jobs/logs/cycle_dilution.err bash -l jobs/cycle_dilution.sh
+bsub -n 8 -gpu "num=1" -R "hname!=<node>" -R "hname!=<node>" -q gpu_l4 -W 240 -J mech_target_percell -o jobs/logs/mech_target_percell.out -e jobs/logs/mech_target_percell.err bash -l jobs/mech_target_percell.sh
