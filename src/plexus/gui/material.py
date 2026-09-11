@@ -210,11 +210,11 @@ function fillForm(f){$('name').value=f.name;$('world').value=f.world;$('n_grid')
  const tb=$('bodies');while(tb.rows.length>1)tb.deleteRow(-1);(f.bodies||[]).forEach(addBody);}
 async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
 window.build=async function(){status('building the spec...');const j=await post('/api/material/build',form());if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}specName=j.name;$('yamltext').value=j.raw;status(`spec saved: config/studio/${j.name}.yaml -- seeding and rendering...`);await reseed();};
-window.reseed=async function(){if(!specName){status('no spec yet',true);return;}status('seeding and building the renderer...');const r=await fetch('/api/bio/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){status(j.error,true);return;}SCENE=j;tree(j);status(`seeded in ${j.seconds}s: `+Object.entries(j.sets).map(([k,v])=>`${k} ${v.n_live}`).join(', '));render(true);};
+window.reseed=async function(){playStop();FRAME=null;if(!specName){status('no spec yet',true);return;}status('seeding and building the renderer...');const r=await fetch('/api/bio/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){status(j.error,true);return;}SCENE=j;tree(j);status(`seeded in ${j.seconds}s: `+Object.entries(j.sets).map(([k,v])=>`${k} ${v.n_live}`).join(', '));render(true);};
 window.toggleYaml=function(){const y=$('yaml');y.style.display=y.style.display==='none'?'block':'none';};
 window.saveYaml=async function(){const j=await post('/api/bio/save',{name:specName,raw:$('yamltext').value});if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}status('saved; seeding...');await reseed();};
 let inflight=false, dirty=false;
-async function render(force){if(inflight){dirty=true;return;}inflight=true;try{const r=await fetch(`/api/bio/render?azim=${CAM.azim}&elev=${CAM.elev}&zoom=${CAM.zoom}&t=${Date.now()}`);if(r.ok){const b=await r.blob();const u=URL.createObjectURL(b);const im=$('view');const old=im.src;im.src=u;if(old.startsWith('blob:'))URL.revokeObjectURL(old);}else if(force){status((await r.json()).error||'render failed',true);}}catch(e){}finally{inflight=false;if(dirty){dirty=false;render();}}}
+async function render(force){if(inflight){dirty=true;return;}inflight=true;try{const r=await fetch(`/api/bio/render?azim=${CAM.azim}&elev=${CAM.elev}&zoom=${CAM.zoom}${FRAME===null?'':'&frame='+FRAME}&t=${Date.now()}`);if(r.ok){const b=await r.blob();const u=URL.createObjectURL(b);const im=$('view');const old=im.src;im.src=u;if(old.startsWith('blob:'))URL.revokeObjectURL(old);}else if(force){status((await r.json()).error||'render failed',true);}}catch(e){}finally{inflight=false;if(dirty){dirty=false;render();}}}
 const im=$('view');let drag=null;
 im.addEventListener('mousedown',e=>{drag={x:e.clientX,y:e.clientY,moved:false};im.style.cursor='grabbing';});
 window.addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>2)drag.moved=true;CAM.azim-=dx*0.4;CAM.elev=Math.max(-89,Math.min(89,CAM.elev+dy*0.4));drag.x=e.clientX;drag.y=e.clientY;render();});
@@ -233,15 +233,19 @@ window.setInfo=function(name){const s=SCENE.sets[name];const n=SCENE.hierarchy.s
 addBody({name:'red',shape:'ball',centre:[0.03,0.062,0.05],radius:0.012,material:'elastic',youngs:1000000,density:1000});addBody({name:'blue',shape:'ball',centre:[0.05,0.074,0.05],radius:0.012,material:'elastic',youngs:1000000,density:1000});addBody({name:'green',shape:'ball',centre:[0.07,0.058,0.05],radius:0.012,material:'elastic',youngs:1000000,density:1000});
 let running=false, playing=null, nframes=0;
 // REPLAY: every frame the run drew was kept as an image on the server; PLAY steps through them.
-function showFrame(i){$('frame').value=i;$('framelab').textContent=`frame ${i}/${Math.max(nframes-1,0)}`;$('view').src=`/api/bio/frame?i=${i}`;}
-window.playGo=async function(){const j=await (await fetch('/api/bio/frames')).json();nframes=j.n||0;if(!nframes){$('framelab').textContent='no frames yet: RUN first';return;}$('frame').max=nframes-1;if(playing)clearInterval(playing);let i=0;playing=setInterval(()=>{showFrame(i);i=(i+1)%nframes;},66);};
-window.playStop=function(){if(playing){clearInterval(playing);playing=null;}};
-window.runGo=async function(){playStop();const j=await post('/api/bio/run',{frames:+$('run_frames').value,device:$('run_device').value});if(j.error){$('runstat').textContent=j.error;return;}running=true;$('runbtn').disabled=true;$('runstat').textContent=`running ${j.frames} frames on ${j.device}...`;rpoll();};
+// REPLAY AT ANY CAMERA: a kept frame is the levels' state, re-drawn by the renderer at the
+// camera the page holds NOW, so orbit and zoom work while it plays (one frame in flight at a time).
+let FRAME=null;
+async function showFrame(i){FRAME=i;$('frame').value=i;$('framelab').textContent=`frame ${i}/${Math.max(nframes-1,0)}`;await render();}
+window.playGo=async function(){const j=await (await fetch('/api/bio/frames')).json();nframes=j.n||0;if(!nframes){$('framelab').textContent='no frames yet: RUN first';return;}$('frame').max=nframes-1;playing=true;let i=0;
+ while(playing){await showFrame(i);i=(i+1)%nframes;await new Promise(r=>setTimeout(r,30));}};
+window.playStop=function(){playing=null;};
+window.runGo=async function(){playStop();FRAME=null;const j=await post('/api/bio/run',{frames:+$('run_frames').value,device:$('run_device').value});if(j.error){$('runstat').textContent=j.error;return;}running=true;$('runbtn').disabled=true;$('runstat').textContent=`running ${j.frames} frames on ${j.device}...`;rpoll();};
 window.runStop=async function(){await post('/api/bio/run',{stop:true});};
 async function rpoll(){try{const j=await (await fetch('/api/bio/run')).json();if(j.error&&!j.running){$('runstat').textContent='error: '+j.error;}
  else $('runstat').textContent=(j.running?'running: ':'done: ')+`frame ${j.frame}/${j.n_frames}, ${j.seconds}s`+(j.frame&&j.seconds?` (${(j.seconds/j.frame*1000).toFixed(0)} ms/frame)`:'');
  if(j.counts&&j.counts.sets)$('runcounts').textContent=Object.entries(j.counts.sets).map(([k,v])=>`${k} ${v}`).join('  ');
- render();if(j.running){setTimeout(rpoll,700);}else{running=false;$('runbtn').disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);$('framelab').textContent=nframes?`${nframes} frames kept: PLAY`:'';}}catch(e){setTimeout(rpoll,1500);}}
+ render();if(j.running){setTimeout(rpoll,700);}else{running=false;$('runbtn').disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);$('framelab').textContent=nframes?`${nframes} frames kept: PLAY (orbit and zoom while it plays)`:'';}}catch(e){setTimeout(rpoll,1500);}}
 let seen={version:-1,cam_version:-1};
 async function poll(){try{const st=await (await fetch('/api/bio/state')).json();
  if(st.name&&st.version!==seen.version){seen.version=st.version;specName=st.name;$('name').value=st.name;const j=await (await fetch('/api/material/spec?name='+encodeURIComponent(st.name))).json();if(j.raw)$('yamltext').value=j.raw;if(j.form)fillForm(j.form);await reseed();}

@@ -105,7 +105,7 @@ class View:
         self.pick = None
         self.hidden: set = set()
         self.RUN = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}, "frames_kept": 0}
-        self.frames: list = []                                   # the run's frames as JPEG bytes, for PLAY
+        self.snaps: list = []                                    # the run's frames as level states, for PLAY at any camera
         self.seconds = round(time.time() - t0, 2)
         self.set_camera(self.azim, self.elev, self.zoom)
 
@@ -201,19 +201,70 @@ class View:
         iio.imwrite(buf, np.asarray(img), extension=".png")
         return buf.getvalue()
 
-    FRAMES_MAX = 1200                                            # ~100 KB a JPEG: 120 MB at most
+    SNAPS_MAX = 400                                              # frames kept per run (strided beyond)
 
-    def _keep_frame(self):
-        """One JPEG of the current picture, appended to the run's frames (on the VTK thread)."""
-        if len(self.frames) >= self.FRAMES_MAX:
+    def _snapshot(self, H):
+        """What the renderer reads, per level, copied to the CPU: the position (and separation)
+        columns, occupancy, type, parent, and the half-edge tables of a mesh level. Enough to put
+        the picture back at that frame later from ANY camera; not the whole state."""
+        import torch
+        snap = {}
+        for name, lv in H.levels.items():
+            try:
+                sch = lv.state_schema
+            except Exception:                                    # noqa: BLE001
+                continue
+            if "pos" not in sch:
+                continue
+            e = {}
+            for key in ("pos", "sep"):
+                if key in sch:
+                    a, b = sch[key]
+                    e[key] = lv.state[:, a:b].detach().cpu().clone()
+            for key in ("occ", "node_type", "parent"):
+                v = getattr(lv, key, None)
+                if v is not None and torch.is_tensor(v):
+                    e[key] = v.detach().cpu().clone()
+            m = getattr(lv, "_mesh", None)
+            if m:
+                e["mesh"] = {k: (v.detach().cpu().clone() if torch.is_tensor(v) else v) for k, v in m.items()}
+            snap[name] = e
+        self.snaps.append(snap)
+        self.RUN["frames_kept"] = len(self.snaps)
+
+    def show_frame(self, i: int):
+        """Put the picture at kept frame `i` (on the VTK thread): the levels of the view's own
+        hierarchy take the snapshot's columns, then the movie renderer redraws them as it would
+        have during the run. The camera is whatever the page set, so a replay can be orbited."""
+        return _vtk(self._show_frame, i)
+
+    def _show_frame(self, i: int):
+        if not self.snaps:
             return
-        import imageio.v3 as iio
-        self.p.render()
-        img = np.asarray(self.p.screenshot(return_img=True))
-        buf = io.BytesIO()
-        iio.imwrite(buf, img, extension=".jpg", quality=85)
-        self.frames.append(buf.getvalue())
-        self.RUN["frames_kept"] = len(self.frames)
+        i = max(0, min(int(i), len(self.snaps) - 1))
+        snap = self.snaps[i]
+        with LOCK:
+            H = self.H
+            for name, e in snap.items():
+                if name not in H.levels:
+                    continue
+                lv = H.level(name)
+                dev = lv.state.device
+                for key in ("pos", "sep"):
+                    if key in e and key in lv.state_schema:
+                        a, b = lv.state_schema[key]
+                        lv.state[:, a:b] = e[key].to(dev)
+                for key in ("occ", "node_type", "parent"):
+                    v = getattr(lv, key, None)
+                    if key in e and v is not None and v.shape == e[key].shape:
+                        v.copy_(e[key].to(dev))
+                if "mesh" in e and getattr(lv, "_mesh", None) is not None:
+                    for k, v in e["mesh"].items():
+                        lv._mesh[k] = v.to(dev) if hasattr(v, "to") else v
+            self.lm(H, i * self._keep_every)
+            if getattr(self.lm, "cs", None) is not None:
+                self.lm._update_cross_section(H)
+            self.frame_shown = i
 
     def _grab(self):
         with LOCK:
@@ -349,7 +400,8 @@ class View:
         dev = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
         n = int(frames or self.sim.n_frames)
         self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev, started=time.time(), frames_kept=0)
-        self.frames = []
+        self.snaps = []
+        self._keep_every = max(1, (n + 1) // self.SNAPS_MAX + (1 if (n + 1) % self.SNAPS_MAX else 0))
 
         class _Stop(Exception):
             pass
@@ -360,7 +412,8 @@ class View:
                 self.lm(H, tick)
                 if getattr(self.lm, "cs", None) is not None and tick == 0:
                     self.lm._update_cross_section(H)
-                self._keep_frame()
+                if tick % self._keep_every == 0:
+                    self._snapshot(H)
                 if tick % 10 == 0 or tick == n:
                     from plexus.gui import bio
                     self.scene = bio.scene_from(H, self.sim, self.spec_path)
