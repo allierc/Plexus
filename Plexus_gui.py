@@ -3,6 +3,7 @@
 
     python Plexus_gui.py                 # the studio, http://127.0.0.1:8765/studio
     python Plexus_gui.py --editor        # the node editor instead
+    python Plexus_gui.py --bio           # define a tissue and its proteins, seed it, click objects
     python Plexus_gui.py --port 8790 --no-browser
 
 Type a scene in English and press PREVIEW: Claude writes a Plexus2 spec grounded in a real
@@ -32,6 +33,8 @@ if __name__ == "__main__":
     argv = sys.argv[1:]
     if "--editor" in argv:
         argv.remove("--editor")
+    elif "--bio" in argv:
+        pass                               # the bio-objects page: define, seed, click
     elif "--studio" not in argv:
         argv.append("--studio")            # the studio is the default page for this entry point
     main(argv)
