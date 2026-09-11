@@ -262,19 +262,8 @@ class View:
                 return
             T = self.scene.get("tissue")
             f = info.get("cell") if info.get("kind") == "cell" else (info.get("parent_cell"))
-            if info.get("kind") != "cell" and info.get("position") is not None:
-                # A HALO AT THE OBJECT'S OWN SIZE, not a fixed 0.25-unit ball: on a 0.12-thick sheet
-                # that ball was twice the cell and hid what was picked. A cluster or piece gets a
-                # wireframe sphere 1.4x its declared radius; a vertex a ball of a fifth of the local
-                # cell thickness.
-                rad = (self.sim.plotting or {}).get("dot_radius") or {}
-                if info.get("kind") == "vertex":
-                    r = 0.2 * float(self._thickness())
-                    self.p.add_mesh(pv.Sphere(radius=r, center=info["position"]), color="#ffee33", name="pick_dot")
-                else:
-                    r = 1.4 * float(rad.get(info.get("species"), 0.05))
-                    self.p.add_mesh(pv.Sphere(radius=r, center=info["position"], theta_resolution=16, phi_resolution=12),
-                                    color="#ffee33", style="wireframe", line_width=2, name="pick_dot")
+            # no marker on the object itself: the cell outline below says which cell, and the
+            # info panel says which object; a ball or halo only hid what was picked
             if T and f is not None:
                 seg = []
                 ring = set()
