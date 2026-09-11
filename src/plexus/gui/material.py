@@ -199,7 +199,8 @@ PAGE = r"""<!doctype html>
  <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button><button class="dim" onclick="reseed()">RE-SEED</button></div>
  <div id="status">form a scene, then BUILD</div>
  <h2>Run the engine</h2>
- <div class="row"><label>frames</label><input id="run_frames" class="short" value="400"> <label style="width:60px">device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> <label style="width:70px" title="frames kept for PLAY, spread over the run">keep</label><input id="run_keep" class="short" value="20"></div>
+ <div class="row"><label>frames</label><input id="run_frames" class="short" value="400"> <label style="width:60px">device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
+ <div class="row"><label title="how many times the picture is refreshed while the run goes">live pics</label><input id="run_live" class="short" value="20"> <label style="width:70px" title="frames kept for PLAY: every frame up to this many, then every 2nd, 4th... (the movie's rule)">movie frames</label><input id="run_keep" class="short" value="300"></div>
  <div class="row"><button onclick="runGo()" id="runbtn">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
  <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:170px" oninput="showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
@@ -269,12 +270,12 @@ async function showFrame(i){FRAME=i;$('frame').value=i;$('framelab').textContent
 window.playGo=async function(){const j=await (await fetch('/api/bio/frames')).json();nframes=j.n||0;if(!nframes){$('framelab').textContent='no frames yet: RUN first';return;}$('frame').max=nframes-1;playing=true;let i=0;
  while(playing){await showFrame(i);i=(i+1)%nframes;await new Promise(r=>setTimeout(r,30));}};
 window.playStop=function(){playing=null;};
-window.runGo=async function(){playStop();FRAME=null;const j=await post('/api/bio/run',{frames:+$('run_frames').value,device:$('run_device').value,keep:+$('run_keep').value});if(j.error){$('runstat').textContent=j.error;return;}running=true;$('runbtn').disabled=true;$('runstat').textContent=`running ${j.frames} frames on ${j.device}...`;rpoll();};
+window.runGo=async function(){playStop();FRAME=null;const j=await post('/api/bio/run',{frames:+$('run_frames').value,device:$('run_device').value,keep:+$('run_keep').value,live:+$('run_live').value});if(j.error){$('runstat').textContent=j.error;return;}running=true;$('runbtn').disabled=true;$('runstat').textContent=`running ${j.frames} frames on ${j.device}...`;rpoll();};
 window.runStop=async function(){await post('/api/bio/run',{stop:true});};
 async function rpoll(){try{const j=await (await fetch('/api/bio/run')).json();if(j.error&&!j.running){$('runstat').textContent='error: '+j.error;}
  else $('runstat').textContent=(j.running?'running: ':'done: ')+`frame ${j.frame}/${j.n_frames}, ${j.seconds}s`+(j.frame&&j.seconds?` (${(j.seconds/j.frame*1000).toFixed(0)} ms/frame)`:'');
  if(j.counts&&j.counts.sets)$('runcounts').textContent=Object.entries(j.counts.sets).map(([k,v])=>`${k} ${v}`).join('  ');
- render();if(j.running){setTimeout(rpoll,700);}else{running=false;$('runbtn').disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);$('framelab').textContent=nframes?`${nframes} frames kept: PLAY (orbit and zoom while it plays)`:'';}}catch(e){setTimeout(rpoll,1500);}}
+ render();if(j.running){setTimeout(rpoll,700);}else{running=false;$('runbtn').disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);$('framelab').textContent=nframes?`${nframes} frames kept (every ${j.keep_every||1}): PLAY (orbit and zoom while it plays)`:'';}}catch(e){setTimeout(rpoll,1500);}}
 let seen={version:-1,cam_version:-1};
 async function poll(){try{const st=await (await fetch('/api/bio/state')).json();
  if(st.name&&st.version!==seen.version){seen.version=st.version;specName=st.name;$('name').value=st.name;const j=await (await fetch('/api/material/spec?name='+encodeURIComponent(st.name))).json();if(j.raw)$('yamltext').value=j.raw;if(j.form)fillForm(j.form);await reseed();}
