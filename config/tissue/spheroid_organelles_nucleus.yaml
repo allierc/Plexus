@@ -201,6 +201,7 @@ plotting:
     wall_color: '#e8e8e8'
     mid: false
     points: false
+    spheres: true
   cross_section_height: 0.24
   curve:
   - quantity: cells
@@ -226,17 +227,17 @@ plotting:
   mesh_surface: basal
   dot_radius:
     nucleus: 0.3
-
-# --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
-    description: The simulation shows a spherical cluster of blue particles that gradually expands in
-      size over time. The number of particles within the cluster increases as the simulation progresses
-      from frame 3 to frame 702. Simultaneously, the graphs on the right indicate a steady rise in the
-      count of "cells" and "nucleus" components. The expansion of the central sphere is the primary visual
-      change throughout the sequence.
-    objects: A large, central spherical cluster is composed of numerous small, light-blue particles. This
-      cluster is situated within a large, black 3D bounding box with white wireframe edges. In the bottom-left
-      corner, a smaller inset shows a cross-sectional view of a ring-like structure with red and blue
-      segments. Two line graphs on the right side track the numerical growth of "cells" and "nucleus"
-      over the course of the frames.
+    description: The simulation shows a spherical cluster of blue particles that gradually
+      expands in size over time. The number of particles within the cluster increases
+      as the simulation progresses from frame 3 to frame 702. Simultaneously, the
+      graphs on the right indicate a steady rise in the count of "cells" and "nucleus"
+      components. The expansion of the central sphere is the primary visual change
+      throughout the sequence.
+    objects: A large, central spherical cluster is composed of numerous small, light-blue
+      particles. This cluster is situated within a large, black 3D bounding box with
+      white wireframe edges. In the bottom-left corner, a smaller inset shows a cross-sectional
+      view of a ring-like structure with red and blue segments. Two line graphs on
+      the right side track the numerical growth of "cells" and "nucleus" over the
+      course of the frames.

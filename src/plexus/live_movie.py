@@ -2959,7 +2959,48 @@ class LiveMovie:
             # It is a key rather than a rule because on a PARTICLE run the scatter is the section:
             # an MPM slab has nothing else in it, and every existing cross_section spec is one of
             # those. Default true, so none of them moves.
-            if (self.style or {}).get("cross_section", {}).get("points", True) is False:
+            # `cross_section.spheres: true` -- THE SECTION CUTS THE SPHERES. A piece drawn as a
+            # sphere of world radius r (`plotting.dot_radius`) that sits at distance d from the
+            # section plane shows in the section as a DISC of radius sqrt(r^2 - d^2), in its own
+            # type's colour; a piece farther than r from the plane is not cut and not drawn. That
+            # is what a histological section of a nucleus looks like, and it is the only way the
+            # inset can say whether the nucleus fits inside the cell's two caps. Discs are binned
+            # by radius into a few scatter series per type (a chart scatter has one size).
+            _cs_sty = (self.style or {}).get("cross_section", {}) or {}
+            _rad = (self.style or {}).get("dot_radius") or {}
+            if _cs_sty.get("spheres") and _rad and getattr(lvl, "node_type", None) is not None:
+                from matplotlib.colors import to_rgb
+                names = list(getattr(lvl, "type_names", []) or [])
+                pal = (self.style or {}).get("colors") or {}
+                ntI = _t.as_tensor(lvl.node_type)[I].to(X.device)
+                ntI = ntI[live] if live is not None else ntI
+                Xall = lvl.get("pos").detach()[I]
+                Xall = Xall[live] if live is not None else Xall
+                dplane = (Xall[:, ax] - y0).abs()
+                _span = float(self._cs_rng[0][1] - self._cs_rng[0][0])
+                _px_per_unit = 0.8 * float(self.p.window_size[1]) * float(
+                    (self.style or {}).get("cross_section_height", 0.24)) / max(_span, 1e-9)
+                for tid, nm in enumerate(names):
+                    r = _rad.get(nm)
+                    if r is None:
+                        continue
+                    cut = (ntI == tid) & (dplane < float(r))
+                    if not bool(cut.any()):
+                        continue
+                    disc = (float(r) ** 2 - dplane[cut] ** 2).clamp_min(0.0).sqrt().cpu().numpy()
+                    Pc = Xall[cut]
+                    xc, yc = Pc[:, a].cpu().numpy(), Pc[:, b].cpu().numpy()
+                    col = to_rgb(tuple(pal[nm]) if isinstance(pal.get(nm), (list, tuple)) else pal[nm]) if nm in pal else (0.9, 0.9, 0.9)
+                    col = (int(col[0] * 255), int(col[1] * 255), int(col[2] * 255), 255)
+                    nb = 6
+                    q = np.clip((disc / float(r) * nb).astype(int), 0, nb - 1)
+                    for k in range(nb):
+                        m_ = q == k
+                        if not m_.any():
+                            continue
+                        pxs = max(1.0, 2.0 * (k + 0.5) / nb * float(r) * _px_per_unit)
+                        self._cs_series.append(self.cs.scatter(xc[m_], yc[m_], size=pxs, style="o", color=col))
+            if _cs_sty.get("points", True) is False:
                 pass                                  # neither branch: no scatter at all
             elif val is not None:
                 import matplotlib.pyplot as _plt

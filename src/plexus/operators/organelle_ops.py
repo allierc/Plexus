@@ -27,7 +27,7 @@ What a piece is MADE OF (nothing, a mesh, or MPM particles) is a child set of th
 not this file's business; see notes/organelles/ORGANELLE_PLAN.md section 2a. Here the piece is
 prescribed: it follows its cell and is kept in its region.
 
-TWO OPERATORS:
+THREE OPERATORS:
   organelle_seed     where they start: every live piece, at a uniform point of its species'
                      region of its cell, at least two radii from any other piece of the cell
                      (a few attempts, then the last draw); writes `n_organelle` on the cell.
@@ -37,6 +37,12 @@ TWO OPERATORS:
                      newborn face and the reset-age mother nearest to it) assigns each of the
                      mother's pieces to the daughter whose centroid is nearer, then applies
                      `on_divide`; orphans (a parent that died) are retired.
+
+  organelle_express  how many there are: per cell and species with a `tau`, the number relaxes
+                     to the declared `count` with that time constant, `dN/dt = (count - N) / tau`
+                     (biogenesis after a division halved the mitochondria, retirement after an
+                     excess), with a fractional carry per cell so slow rates still act. A species
+                     without `tau` keeps whatever number division left it.
 
 Dormant slots are parked far off-domain (`PARK`), as protein clusters are.
 
@@ -75,7 +81,8 @@ def _species(lvl, params):
         if rule not in DIVIDE_RULES:
             raise ValueError(f"organelle species {n!r}: on_divide must be one of {DIVIDE_RULES}, not {rule!r}")
         out.append(dict(id=i, name=n, region=region, rule=rule, count=int(t.get("count", 0)),
-                        radius=float(t.get("radius", params.get("radius", 0.0)))))
+                        radius=float(t.get("radius", params.get("radius", 0.0))),
+                        tau=float(t.get("tau", params.get("tau", float("inf"))))))
     return out
 
 
@@ -378,3 +385,89 @@ class OrganelleProject(Structural):
                     _set_block(lvl, "age", new, 0.0)
             else:                                               # none: the daughter holding it keeps it
                 par[mine[nearer_d]] = d
+
+
+# ---------------------------------------------------------------------------------------------
+@register_operator("organelle_express", family="population", set="particle", kind="structural")
+class OrganelleExpress(Structural):
+    """Per cell and species, relax the number of pieces to the declared `count`: `dN/dt = (count - N) / tau`."""
+    REQUIRES_PARAMS = ["tissue"]
+    PARAM_ROLES = {"tissue": "tissue_set"}
+    OPTIONAL_TYPE_PROPS = ["count", "radius", "region", "on_divide", "body", "tau"]
+    SUPPORTED_DIMS = (3,)
+    READS = ["pos"]
+    WRITES = ["pos"]
+    MECHANISM_TAGS = ["biogenesis", "turnover", "organelle_number"]
+    REFERENCE = ("Mitochondrial mass restored over the cell cycle after its halving at division: "
+                 "Posakony et al. (1977) J. Cell Biol. 74:468; the set-point law is this work's.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "organelle")
+        self.tissue = str(params["tissue"])
+        self.seed = int(params.get("seed", 0))
+        self.params = dict(params)
+        self._carry = None
+        self._gen = None
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        fans = _fans(H, self.tissue)
+        if fans is None:
+            return {}
+        species = [sp for sp in _species(lvl, self.params) if sp["tau"] != float("inf")]
+        if not species:
+            return {}
+        dev = lvl.state.device
+        if self._gen is None:
+            self._gen = torch.Generator(device=dev).manual_seed(self.seed)
+        dt = float(getattr(H, "dt", 1.0) or 1.0)
+        cs = resolve_cell_set(H, self.tissue, None); clvl = H.level(cs)
+        nF = fans["nF"]
+        n_sp = len(getattr(lvl, "type_names", []) or [])
+        if self._carry is None or self._carry.shape != (clvl.state.shape[0], n_sp):
+            self._carry = torch.zeros(clvl.state.shape[0], n_sp, device=dev, dtype=lvl.state.dtype)
+        live_cells = clvl.occ[:nF] > 0 if getattr(clvl, "occ", None) is not None else torch.ones(nF, dtype=torch.bool, device=dev)
+        par = lvl.parent
+        p0, p1 = lvl.state_schema["pos"]
+        park = torch.full((3,), PARK, device=dev, dtype=lvl.state.dtype)
+        if "age" in lvl.state_schema:
+            a, b = lvl.state_schema["age"]; lvl.state[lvl.occ > 0, a:b] += dt
+        for sp in species:
+            i = sp["id"]
+            occ = lvl.occ > 0
+            mine = occ & (lvl.node_type == i)
+            N = torch.bincount(par[mine], minlength=clvl.state.shape[0])[:nF].to(lvl.state.dtype)
+            want = (sp["count"] - N) * (dt / sp["tau"]) * live_cells.to(lvl.state.dtype) + self._carry[:nF, i]
+            k = torch.where(want >= 0, torch.floor(want), -torch.floor(-want)).long()     # toward zero
+            self._carry[:nF, i] = want - k.to(want.dtype)
+            # births, at a uniform point of the species' region of the cell
+            born = k.clamp_min(0)
+            total = int(born.sum().item())
+            if total:
+                free = lvl.free_slots(total)
+                n_born = int(free.numel())
+                if n_born < total:
+                    print(f"[organelle_express] reserve exhausted: {total - n_born} {sp['name']} not born", flush=True)
+                if n_born:
+                    parents = torch.repeat_interleave(torch.arange(nF, device=dev), born)[:n_born]
+                    par[free] = parents
+                    lvl.occ[free] = 1.0
+                    lvl.node_type[free] = i
+                    lvl.state[free, p0:p1] = _sample(fans, parents, sp["region"], sp["radius"], self._gen)
+                    _set_block(lvl, "vel", free, 0.0)
+                    _set_block(lvl, "age", free, 0.0)
+            # retirements, the oldest first, where the cell holds more than its count
+            over = (-k).clamp_min(0)
+            if int(over.sum().item()):
+                cells = torch.nonzero(over > 0).flatten()
+                age = lvl.get("age")[:, 0] if "age" in lvl.state_schema else torch.zeros(par.shape[0], device=dev)
+                kill = []
+                for c in cells.tolist():
+                    rows = torch.nonzero(mine & (par == c)).flatten()
+                    if rows.numel():
+                        kill.append(rows[torch.argsort(age[rows], descending=True)[: int(over[c].item())]])
+                if kill:
+                    lvl.kill(torch.cat(kill), park=park)
+        _write_count(H, lvl, self.tissue, _species(lvl, self.params))
+        return {}
