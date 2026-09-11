@@ -22,9 +22,6 @@ _run:
   target_cells: 50000
   seed_cells: 2000
 sets:
-  vertex:
-    n: 130004
-    mesh: half_edge
   cell:
     n: 65004
     state:
@@ -52,6 +49,9 @@ sets:
         record: false
       age:
         width: 1
+  vertex:
+    n: 130004
+    mesh: half_edge
   half_edge:
     n: 520032
     maps:

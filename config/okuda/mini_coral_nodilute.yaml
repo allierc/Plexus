@@ -11,9 +11,6 @@ general:
     - 50.0
     - 50.0
 sets:
-  vertex:
-    n: 4996
-    mesh: half_edge
   cell:
     n: 2500
     state:
@@ -43,6 +40,9 @@ sets:
         width: 1
       ndiv:
         width: 1
+  vertex:
+    n: 4996
+    mesh: half_edge
   half_edge:
     n: 20000
     maps:

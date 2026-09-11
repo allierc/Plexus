@@ -53,6 +53,12 @@ sets:
   vertex:
     n: 4096
     mesh: half_edge
+  half_edge:
+    n: 18432
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: plate_face
   plate_face:
     n: 2304
   mpm_particle:
@@ -69,12 +75,6 @@ sets:
         - 0.85
         - 0.45
         - 0.85
-  half_edge:
-    n: 18432
-    maps:
-      srce: vertex
-      trgt: vertex
-      face: plate_face
 fields:
   mpm_grid:
     frame: mpm_grid

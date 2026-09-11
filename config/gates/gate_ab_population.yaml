@@ -14,23 +14,6 @@ general:
     length_um: 10.0
     time_s: 600.0
 sets:
-  vertex:
-    n: 25584
-    mesh: half_edge
-    state:
-      pos:
-        width: 3
-        role: coordinate
-        integration: second_order_coordinate
-        boundary: world
-      vel:
-        width: 3
-        role: rate
-        integration: second_order_rate
-        record: false
-      sep:
-        width: 3
-        integration: first_order
   cell:
     n: 12800
     state:
@@ -73,6 +56,23 @@ sets:
         width: 1
       inhib_frac:
         width: 1
+  vertex:
+    n: 25584
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
   half_edge:
     n: 102400
     maps:

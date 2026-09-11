@@ -11,23 +11,6 @@ general:
   - 16.0
   - 16.0
 sets:
-  vertex:
-    n: 4096
-    mesh: half_edge
-    state:
-      pos:
-        width: 3
-        role: coordinate
-        integration: second_order_coordinate
-        boundary: world
-      vel:
-        width: 3
-        role: rate
-        integration: second_order_rate
-        record: false
-      sep:
-        width: 3
-        integration: first_order
   cell:
     n: 1024
     state:
@@ -66,6 +49,23 @@ sets:
       V0f_init:
         width: 1
         record: false
+  vertex:
+    n: 4096
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
   half_edge:
     n: 8192
     maps:

@@ -462,6 +462,29 @@ sets:
         record: false
         role: rate
         width: 3
+  vertex:
+    n: 16384
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  half_edge:
+    n: 16384
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: membrane_face
   centriole:
     parent: cell
     per_parent: 2
@@ -720,23 +743,6 @@ sets:
     parent: cytoskeleton
     per_parent: 1200
     radius: 0.1
-  vertex:
-    n: 16384
-    mesh: half_edge
-    state:
-      pos:
-        width: 3
-        role: coordinate
-        integration: second_order_coordinate
-        boundary: world
-      vel:
-        width: 3
-        role: rate
-        integration: second_order_rate
-        record: false
-      sep:
-        width: 3
-        integration: first_order
   membrane_face:
     n: 2048
     state:
@@ -761,12 +767,6 @@ sets:
       divjit:
         width: 1
         record: false
-  half_edge:
-    n: 16384
-    maps:
-      srce: vertex
-      trgt: vertex
-      face: membrane_face
 descriptions:
   movie:
     description: The simulation shows a complex multi-colored structure at the bottom

@@ -50,9 +50,6 @@ general:
     length_um: 10.0
     time_s: 600.0
 sets:
-  vertex:
-    n: 25584
-    mesh: half_edge
   cell:
     n: 12800
     state:
@@ -96,6 +93,9 @@ sets:
         record: false
       inhib_frac:
         width: 1
+  vertex:
+    n: 25584
+    mesh: half_edge
   half_edge:
     n: 102400
     maps:
