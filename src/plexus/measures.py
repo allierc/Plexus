@@ -412,10 +412,11 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
         except Exception:                                # noqa: BLE001
             return row
         occ = getattr(lv, "_occ", None)
+        frame = int(getattr(lvl, "t", getattr(lv, "t", 0)))
         if occ is not None and getattr(occ, "ndim", 1) == 2:
             # the replay advances `t` on the level the curves read (the mesh set); a counted set
             # follows that frame, not its own `t`, which the series loop never touches
-            occ = occ[int(getattr(lvl, "t", getattr(lv, "t", 0)))]
+            occ = occ[frame]
         if occ is None:
             occ = getattr(lv, "occ", None)
         if occ is None:
@@ -426,7 +427,13 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
                 names = list(getattr(lv, "type_names", None) or [])
                 if species not in names:
                     raise ValueError(f"count:{name}:{species}: {name!r} has no species {species!r} (types: {names})")
-                nt = getattr(lv, "node_type", None)
+                # THE TYPE COLUMN AT THE SAME FRAME AS THE OCCUPANCY. A reserve slot is typed 0
+                # until an operator wakes it with its species; `lv.node_type` reads the level's OWN
+                # `t`, which the series loop never advances, so every slot born after frame 0 was
+                # counted under type 0: 7,910 "nuclei" for 670 cells, the mitochondria born by
+                # organelle_express. The per-frame column, when the archive kept one, at `frame`.
+                ntt = getattr(lv, "_node_type_t", None)
+                nt = ntt[frame] if ntt is not None else getattr(lv, "node_type", None)
                 if nt is None:
                     return row
                 live = live & (_np(nt).astype(int) == names.index(species))
