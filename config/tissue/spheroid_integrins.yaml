@@ -123,6 +123,7 @@ operators:
   eta: 0.08
   cap_frac: 0.12
   sep_mu: 1.0
+  surface: basal
 - op: edge_flip
   at: vertex
   every: 4
@@ -179,6 +180,7 @@ seed:
   vseed_cv: 0.0
   model: apicobasal
   h0: 0.88
+  apical: in
 - op: integrin_seed
   at: integrin
   tissue: vertex
