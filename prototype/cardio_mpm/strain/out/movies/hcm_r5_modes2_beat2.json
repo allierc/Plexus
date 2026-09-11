@@ -1,0 +1,11 @@
+{
+ "params": "out/fits/hcm_r5_modes2/params.npz",
+ "beat": 2,
+ "window": [
+  113,
+  177
+ ],
+ "r2_A": 0.8961698412895203,
+ "frames": 65,
+ "fps": 8
+}

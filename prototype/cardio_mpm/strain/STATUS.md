@@ -462,3 +462,18 @@ floor 0.958. The remaining gap is the spatial pattern of the plateau. If r13 doe
 next candidates are fibre-aligned passive anisotropy (needs an operator, like `anchor_percell`) and
 a per-cell noise-weighted loss; the per-cell claims stay g, g2, φ, δ (seeds agree at r 0.9+), E and
 the time-course numbers are prediction machinery only.
+
+## 2026-09-11 morning — an engine change broke every score, and the fix is in the spec
+
+Engine commit `369dd3eb` (2026-09-10 21:57, another session's protein work) gives a contained set
+3 DORMANT slots per seeded one by default. Our `cell` set went 472 → 1888 slots, the seed mapped the
+dormant cells' particles onto real cells (56,640 → 226,560 particles) and every held-out R²,
+including yesterday's r8, fell from 0.83 to 0.36 with unchanged parameters — first seen as
+`hcm_r5` scoring 0.37 at 22:01 while `r13` had scored 0.87 at 21:56. `build_spec` now pins
+`grow_reserve: 0` on both contained sets; r8 scores 0.824 again. Nothing in the core was touched.
+Movies rendered between 21:57 and the fix were discarded and re-rendered.
+
+**Rescored:** `hcm_r5_modes2` (two temporal modes) — held-out beats 1, 2, 4: **R²(A) 0.894–0.897,
+R²(u) 0.943–0.961, shortening r 0.96, axis 0.95**. `s4_live_r13_modes2_kappa` (per-cell adhesion on
+top of r12): 0.866 / 0.913 — adhesion adds +0.004: not a lever. **Best models: healthy r13
+(0.87 / 0.91), HCM r5 (0.90 / 0.95).** All figures and movies regenerated from these two.

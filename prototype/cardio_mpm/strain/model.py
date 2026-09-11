@@ -77,9 +77,14 @@ def build_spec(n_grid=128, per_parent=100, n_frames=50, dt=0.002, sub=2e-4, n_ce
             tissue=dict(n=1, start=[[0.5, 0.5]],
                         types=dict(sheet=dict(block=[DOM_LO, DOM_LO, DOM_HI, DOM_HI],
                                               fraction=1.0, youngs=youngs))),
-            cell=dict(parent="tissue", per_parent=n_cells, radius=0.02,
+            cell=dict(parent="tissue", per_parent=n_cells, radius=0.02, grow_reserve=0,
                       types=dict(myocyte=dict(fraction=1.0, youngs=youngs))),
-            mpm_particle=dict(density=float(density), parent="cell", per_parent=per_parent)),
+            # `grow_reserve: 0` on BOTH contained sets: since engine commit 369dd3eb (2026-09-10 21:57) a
+            # contained set may get 3 DORMANT slots per seeded one unless the spec says otherwise. Here the
+            # cell set went 472 -> 1888 slots, the seed mapped the dormant cells' particles onto real cells
+            # (56,640 -> 226,560 particles) and every held-out R^2 fell from 0.83 to 0.36 with unchanged
+            # parameters. The spec pins the reserve; nothing in the core is touched.
+            mpm_particle=dict(density=float(density), parent="cell", per_parent=per_parent, grow_reserve=0)),
         fields=dict(mpm_grid=dict(frame="mpm_grid", n_grid=n_grid),
                     cells=dict(frame="label_image", source=label_tif)),
         operators=[
