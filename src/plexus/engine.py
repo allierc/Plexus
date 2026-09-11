@@ -68,7 +68,7 @@ if STRICT_DETERMINISM:
 
 from plexus.models.base import Hierarchy, Level
 from plexus.models.state import spatial_schema, schema_from_spec, StateSchema, BOUNDARY_WORLD
-from plexus.models.registry import get_operator, get_entity, get_field
+from plexus.models.registry import _ENTITY_REGISTRY, get_operator, get_entity, get_field
 import plexus.operators        # noqa: F401  self-registers the operator library
 import plexus.models.entities  # noqa: F401  self-registers entity state-schemas
 from plexus.models.entities import DEFAULT_STATE_SCHEMA, DEFAULT_RENDER
@@ -796,6 +796,9 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
         tab = torch.tensor([float(t.get(k, 0.0)) for t in type_list], device=device)
         lvl.register_buffer(k, tab[node_type.clamp(min=0, max=tab.numel() - 1)])
         lvl._type_scalars[k] = tab
+    # THE RAW TABLE TOO, for the string properties (`region: basal`) an operator reads per type;
+    # `_type_scalars` keeps only what converts to a float.
+    lvl._type_table = [dict(t) for t in type_list]
     lvl._type_fracs = torch.tensor([float(t.get("fraction", 1.0 / max(len(type_list), 1)))
                                     for t in type_list], device=device)
 
@@ -1105,7 +1108,13 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         # radius is close to its outer one. Zero (the default) is the old solid ball, so nothing
         # archived moves.
         r_in = float(s.get("radius_inner", 0.0))
-        reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for agent_grow to wake
+        # DORMANT SLOTS PER PARENT, for the operators that wake them. The default comes from the
+        # ENTITY (`reserve_factor`, a multiple of `per_parent`): a protein reservoir carries three
+        # dormant slots per seeded one without every spec writing a number for it; entities that
+        # declare no factor keep the old default of zero.
+        _ecls = _ENTITY_REGISTRY.get(str(s.get("entity") or sname))
+        _rf = float(getattr(_ecls, "RESERVE_FACTOR", 0.0) or 0.0) if _ecls is not None else 0.0
+        reserve = int(s.get("grow_reserve", int(round(_rf * per)) if per is not None else 0))
         per_tot = None if per is None else per + reserve
         _, render, depth = _entity_meta(sname, H.dim, s.get("entity"))  # render + depth from the registry
         schema = _resolve_schema(s, H.dim, sname)      # StateSchema: `state:` block, else the entity's, else pos/vel
@@ -1550,6 +1559,7 @@ def _setup_recording(sim: Spec, H: Hierarchy):
     rec_sets = {name: np.zeros((n_rec, lvl.n, H.dim), np.float32)
                 for name, lvl in H.levels.items() if "pos" in lvl.state_schema}
     occ_sets = {name: np.zeros((n_rec, lvl.n), bool) for name, lvl in H.levels.items()}               # live mask  [n_rec, N]
+    H._type_hist = {}                                                                                   # per-row node_type, typed sets only
     # the state/ group: every recorded block that is NOT the spatial `pos` (empty for a
     # pos/vel set, since `vel` is record=False) -> [n_rec, N, width]. This is how a neuron's
     # voltage / calcium timeseries is stored without overloading pos.
@@ -1605,6 +1615,21 @@ def _print_run_summary(sim: Spec, H: Hierarchy) -> None:
 SEED_MAX = 10          # a seed runs on the opening frames; it can never span the run
 
 
+def _type_rows(hist, lvl):
+    """[n_rec, n] int16 of the type column per recorded row, or None when it never differed from the
+    final column (the common case: types are static, and a static column is already recorded once)."""
+    if not hist or getattr(lvl, "node_type", None) is None:
+        return None
+    final = lvl.node_type.detach().cpu().numpy().astype(np.int16)
+    if all(np.array_equal(v, final) for v in hist.values()):
+        return None
+    rows = max(hist) + 1
+    out = np.tile(final, (rows, 1))
+    for ri, v in hist.items():
+        out[ri] = v
+    return out
+
+
 def _seed_window(sim):
     """LEGACY COMPATIBILITY ONLY -- the pre-`seed:`-section mechanism, kept so a `kind="seed"`
     operator still declared under `operators:`/`schedule:` (deprecated; schema.py warns) keeps
@@ -1656,6 +1681,8 @@ def _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, n_rows=None, re
                            "node_type": (H.level(name).node_type.cpu().numpy()
                                          if hasattr(H.level(name), "node_type") else None),
                            "type_names": getattr(H.level(name), "type_names", None),
+                           # the per-row type column, only if some row differs from the final one
+                           "node_type_t": _type_rows(getattr(H, "_type_hist", {}).get(name), H.level(name)),
                            # containment: which parent set + the per-node parent index, so a
                            # plotter can render a container set as its merged child cloud.
                            "parent_name": getattr(H.level(name), "parent_name", None),
@@ -2315,6 +2342,11 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     if name in rec_sets:                              # spatial: the pos trajectory
                         rec_sets[name][ri] = lvl.get("pos").detach().cpu().numpy()
                     occ_sets[name][ri] = lvl.active.detach().cpu().numpy()
+                    # THE TYPE COLUMN PER ROW, for a set whose types change during the run (a
+                    # protein reservoir labels a slot with its species at birth). Kept only
+                    # when it actually changed -- see the assembly below.
+                    if getattr(lvl, "node_type", None) is not None and getattr(lvl, "_type_table", None) is not None:
+                        H._type_hist.setdefault(name, {})[ri] = lvl.node_type.detach().cpu().numpy().astype(np.int16)
                     if name in rec_state:                            # non-pos recorded state blocks (voltage, ...)
                         for bname, arr in rec_state[name].items():
                             arr[ri] = lvl.get(bname).detach().cpu().numpy()

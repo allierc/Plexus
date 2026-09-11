@@ -14,23 +14,6 @@ general:
     length_um: 10.0
     time_s: 600.0
 sets:
-  vertex:
-    n: 25584
-    mesh: half_edge
-    state:
-      pos:
-        width: 3
-        role: coordinate
-        integration: second_order_coordinate
-        boundary: world
-      vel:
-        width: 3
-        role: rate
-        integration: second_order_rate
-        record: false
-      sep:
-        width: 3
-        integration: first_order
   cell:
     n: 1024
     state:
@@ -44,12 +27,6 @@ sets:
       divjit:
         width: 1
         record: false
-      integrin_s:
-        width: 1
-      integrin_tau:
-        width: 1
-      n_integrin:
-        width: 1
       A0:
         width: 1
       P0:
@@ -79,21 +56,60 @@ sets:
         width: 1
       inhib_frac:
         width: 1
+      protein_s:
+        width: 1
+      protein_tau:
+        width: 1
+      n_protein:
+        width: 1
+  vertex:
+    n: 25584
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
   half_edge:
     n: 102400
     maps:
       srce: vertex
       trgt: vertex
       face: cell
-  integrin:
-    entity: integrin
+  protein:
+    entity: protein_cluster
     parent: cell
     parent_pos: centroid
     per_parent: 60
-    grow_reserve: 60
+    state:
+      pos:
+        width: 3
+      vel:
+        width: 3
+      activated:
+        width: 1
+      folded:
+        width: 1
+      bound:
+        width: 1
+      age:
+        width: 1
     types:
       integrin:
         fraction: 1.0
+        region: basal
+        density: 30.0
+        s: 0.2
+        tau: 300.0
         p:
         - 0.0
         - 1.0
@@ -146,20 +162,18 @@ operators:
   at: vertex
   every: 1
 - op: radius_graph
-  at: integrin
+  at: protein
   radius: 0.7
 - op: attraction_repulsion
-  at: integrin
+  at: protein
   sigma: 0.35
 - op: protein_project
-  at: integrin
+  at: protein
   tissue: vertex
-  surface: basal
 - op: protein_express
-  at: integrin
+  at: protein
   tissue: vertex
   seed: 0
-  surface: basal
 schedule:
 - cell_geometry
 - cell_grow
@@ -183,14 +197,11 @@ seed:
   model: apicobasal
   h0: 0.88
   apical: in
+  cell_set: cell
 - op: protein_seed
-  at: integrin
+  at: protein
   tissue: vertex
-  density: 30.0
   seed: 0
-  s: 0.2
-  tau: 300.0
-  surface: basal
 plotting:
   renderer: vtk_points
   background: black
@@ -226,7 +237,7 @@ plotting:
     ticks: 4
     ymin: 0
     ymax: 1000
-  - quantity: count:integrin
+  - quantity: count:protein:integrin
     xlabel: frame
     ylabel: integrins
     ticks: 4

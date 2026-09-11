@@ -404,6 +404,9 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
         # THE LIVE COUNT OF A NAMED SET, mesh or not: `quantity: count:integrin`. Live, `occ` is the
         # engine's occupancy vector; on replay `_ReplayLevel._occ` is [T, n] and `t` picks the row.
         name = q[len("count:"):]
+        species = None
+        if ":" in name:                                  # `count:protein:integrin` -- one species of a typed set
+            name, species = name.split(":", 1)
         try:
             lv = H.level(name)
         except Exception:                                # noqa: BLE001
@@ -418,7 +421,16 @@ def curve_row(H, lvl, q, ntype, nt, cell_cols):
         if occ is None:
             n = float(getattr(lv, "n", 0))
         else:
-            n = float(_np(occ).astype(bool).sum())
+            live = _np(occ).astype(bool)
+            if species is not None:
+                names = list(getattr(lv, "type_names", None) or [])
+                if species not in names:
+                    raise ValueError(f"count:{name}:{species}: {name!r} has no species {species!r} (types: {names})")
+                nt = getattr(lv, "node_type", None)
+                if nt is None:
+                    return row
+                live = live & (_np(nt).astype(int) == names.index(species))
+            n = float(live.sum())
         row[0] = (n, 0.0)
         return row
     m = getattr(lvl, "mesh", None)

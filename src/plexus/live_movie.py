@@ -1348,7 +1348,7 @@ class LiveMovie:
             if q not in self._CURVE_Q and not str(q).startswith("count:"):
                 raise ValueError(f"plotting.curve.quantity: {q!r} is not one of "
                                  f"{', '.join(self._CURVE_Q)} or count:<set>")
-            if str(q).startswith("count:") and q[len("count:"):] not in getattr(H, "levels", {}):
+            if str(q).startswith("count:") and q[len("count:"):].split(":", 1)[0] not in getattr(H, "levels", {}):
                 raise ValueError(f"plotting.curve.quantity: {q!r} names a set this run does not have")
             if live:
                 nt0 = 4 if q == "phase" else (1 if ntype is None else int(np.max(ntype)) + 1)
@@ -3471,9 +3471,15 @@ class _ReplayLevel:
         self.t = 0
         for k in ("node_type", "parent"):
             v = z[f"{name}__{k}"] if f"{name}__{k}" in z.files else None
-            setattr(self, k, None if v is None else torch.as_tensor(np.asarray(v), device=dev))
+            setattr(self, "_node_type" if k == "node_type" else k,
+                    None if v is None else torch.as_tensor(np.asarray(v), device=dev))
         pn = z[f"{name}__parent_name"] if f"{name}__parent_name" in z.files else None
         self.parent_name = None if pn is None else str(pn)
+        tn = z[f"{name}__type_names"] if f"{name}__type_names" in z.files else None
+        self.type_names = None if tn is None else [str(x) for x in np.asarray(tn).tolist()]
+        # a type column that changed during the run is recorded per row; `node_type` follows `t`
+        nt_t = z[f"{name}__node_type_t"] if f"{name}__node_type_t" in z.files else None
+        self._node_type_t = None if nt_t is None else torch.as_tensor(np.asarray(nt_t), device=dev)
         # THE PER-CHILD PARENT INDEX, WHICH THE TRAJECTORY HAS ALWAYS RECORDED AND THIS CLASS NEVER
         # READ. `dot_shading: body` groups dots by the body they belong to, so on the replay path --
         # every `-o plot` re-render -- it silently did nothing while the live path shaded. Same
@@ -3601,6 +3607,11 @@ class _ReplayLevel:
         for k, v in getattr(self, "_scalar_cols", {}).items():
             d[k] = v[self.t]                             # one number a frame; no offsets to cut
         return d
+
+    @property
+    def node_type(self):
+        t = getattr(self, "_node_type_t", None)
+        return t[self.t] if t is not None else getattr(self, "_node_type", None)
 
     @property
     def occ(self):

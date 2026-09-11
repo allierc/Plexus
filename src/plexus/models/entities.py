@@ -593,6 +593,7 @@ class MPMParticle:
     # are the same layout under the names the specs use.
     "protein_cluster", "integrin", "myosin", depth=0,
     state_schema=spatial_schema,
+    reserve_factor=3,                        # dormant slots per seeded one, unless the spec says `grow_reserve`
     render={"color_by": "node_type", "arrows": None},
 )
 

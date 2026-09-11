@@ -1,5 +1,5 @@
 general:
-  name: spheroid_integrins
+  name: spheroid_proteins
   seed: 0
   n_frames: 801
   dt: 1.0
@@ -57,11 +57,11 @@ sets:
       inhib_frac:
         width: 1
       protein_s:
-        width: 1
+        width: 2
       protein_tau:
-        width: 1
+        width: 2
       n_protein:
-        width: 1
+        width: 2
   vertex:
     n: 25584
     mesh: half_edge
@@ -89,7 +89,7 @@ sets:
     entity: protein_cluster
     parent: cell
     parent_pos: centroid
-    per_parent: 6
+    per_parent: 12
     state:
       pos:
         width: 3
@@ -105,8 +105,19 @@ sets:
         width: 1
     types:
       integrin:
-        fraction: 1.0
+        fraction: 0.5
         region: basal
+        density: 3.0
+        s: 0.02
+        tau: 300.0
+        p:
+        - 0.0
+        - 1.0
+        - 0.6
+        - 0.35
+      myosin:
+        fraction: 0.5
+        region: apical
         density: 3.0
         s: 0.02
         tau: 300.0
@@ -243,6 +254,12 @@ plotting:
     ticks: 4
     ymin: 0
     ymax: 10000
+  - quantity: count:protein:myosin
+    xlabel: frame
+    ylabel: myosin clusters
+    ticks: 4
+    ymin: 0
+    ymax: 10000
   scale_bar_corner: right
   scale_bar_lift: -0.07
   colors:
@@ -250,5 +267,9 @@ plotting:
     - 0.95
     - 0.15
     - 0.15
+    myosin:
+    - 0.25
+    - 0.6
+    - 1.0
   mesh_opacity: 0.45
   mesh_surface: basal
