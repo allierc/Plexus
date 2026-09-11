@@ -352,10 +352,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.wfile.write(body)
 
         if route == "/api/bio/counts":
-            from plexus.gui import bio
+            from plexus.gui import bio, studio
             name = (q.get("name") or [""])[0]
-            path = studio.spec_path(name) if name else None
-            if not path or not os.path.exists(path):
+            path = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            if not name or not os.path.exists(path):
                 return self._send_json({"error": f"no spec {name!r}"}, 404)
             return self._send_json(bio.counts(bio.seed_scene(path)))
 
