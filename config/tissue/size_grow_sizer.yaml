@@ -140,7 +140,7 @@ seed:
   seed: 0
   vseed_cv: 0.15
   model: apicobasal
-  h0: 1.38
+  h0: 0.88
   ref_frame: 60
   v0_from: polyhedron
 plotting:
