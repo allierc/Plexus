@@ -14,23 +14,6 @@ general:
     length_um: 10.0
     time_s: 600.0
 sets:
-  vertex:
-    n: 25584
-    mesh: half_edge
-    state:
-      pos:
-        width: 3
-        role: coordinate
-        integration: second_order_coordinate
-        boundary: world
-      vel:
-        width: 3
-        role: rate
-        integration: second_order_rate
-        record: false
-      sep:
-        width: 3
-        integration: first_order
   cell:
     n: 2048
     state:
@@ -73,27 +56,60 @@ sets:
         width: 1
       inhib_frac:
         width: 1
-      myosin_s:
+      protein_s:
         width: 1
-      myosin_tau:
+      protein_tau:
         width: 1
-      n_myosin:
+      n_protein:
         width: 1
+  vertex:
+    n: 25584
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
   half_edge:
     n: 102400
     maps:
       srce: vertex
       trgt: vertex
       face: cell
-  myosin:
-    entity: myosin
+  protein:
+    entity: protein_cluster
     parent: cell
     parent_pos: centroid
     per_parent: 6
-    grow_reserve: 10
+    state:
+      pos:
+        width: 3
+      vel:
+        width: 3
+      activated:
+        width: 1
+      folded:
+        width: 1
+      bound:
+        width: 1
+      age:
+        width: 1
     types:
       myosin:
         fraction: 1.0
+        region: apical
+        density: 3.0
+        s: 0.02
+        tau: 300.0
         p:
         - 0.0
         - 1.0
@@ -146,19 +162,17 @@ operators:
   at: vertex
   every: 1
 - op: radius_graph
-  at: myosin
+  at: protein
   radius: 0.7
 - op: attraction_repulsion
-  at: myosin
+  at: protein
   sigma: 0.35
 - op: protein_project
-  at: myosin
+  at: protein
   tissue: vertex
-  surface: apical
 - op: protein_express
-  at: myosin
+  at: protein
   tissue: vertex
-  surface: apical
   seed: 0
 schedule:
 - cell_geometry
@@ -182,13 +196,10 @@ seed:
   vseed_cv: 0.0
   model: apicobasal
   h0: 0.88
+  cell_set: cell
 - op: protein_seed
-  at: myosin
+  at: protein
   tissue: vertex
-  surface: apical
-  density: 3.0
-  s: 0.02
-  tau: 300.0
   seed: 0
 plotting:
   renderer: vtk_points
@@ -225,7 +236,7 @@ plotting:
     ticks: 4
     ymin: 0
     ymax: 1000
-  - quantity: count:myosin
+  - quantity: count:protein:myosin
     xlabel: frame
     ylabel: myosin clusters
     ticks: 4
