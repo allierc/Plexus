@@ -201,7 +201,7 @@ class View:
         iio.imwrite(buf, np.asarray(img), extension=".png")
         return buf.getvalue()
 
-    SNAPS_MAX = 400                                              # frames kept per run (strided beyond)
+    SNAPS_MAX = 20                                               # frames kept per run by default (PLAY re-renders each)
     SNAP_BUDGET = 1_500_000_000                                  # bytes of kept positions per run
     DRAW_INTERVAL = 0.25                                         # seconds between redraws during a run
     SCENE_INTERVAL = 3.0                                         # seconds between pick-scene rebuilds
@@ -389,7 +389,7 @@ class View:
         return names
 
     # ------------------------------------------------------------------ running the engine
-    def run(self, frames: int | None = None, device: str | None = None) -> dict:
+    def run(self, frames: int | None = None, device: str | None = None, keep: int | None = None) -> dict:
         """Simulate the spec forward in a thread, the picture following every frame.
 
         `engine.run` builds and seeds its own hierarchy and loops internally, so a run always
@@ -418,7 +418,8 @@ class View:
                     if key in sch:
                         a, b = sch[key]
                         per_frame += int(lv.state.shape[0]) * (b - a) * 4
-        by_count = max(1, -(-(n + 1) // self.SNAPS_MAX))
+        keep_n = max(2, int(keep or self.SNAPS_MAX))              # frames kept for PLAY, whatever the run length
+        by_count = max(1, -(-(n + 1) // keep_n))
         by_mem = max(1, -(-((n + 1) * max(per_frame, 1)) // self.SNAP_BUDGET))
         self._keep_every = max(by_count, by_mem)
         self.RUN["keep_every"] = self._keep_every
