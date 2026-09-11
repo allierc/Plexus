@@ -21,6 +21,7 @@ import posixpath
 import re
 import subprocess
 import tempfile
+import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote, quote
@@ -192,6 +193,22 @@ def _validate(spec: dict):
 # --------------------------------------------------------------------------- #
 #  spec discovery
 # --------------------------------------------------------------------------- #
+def _seed_check(spec: dict, name: str):
+    """Build and seed the spec on the CPU on a temp copy. Returns (ok, error)."""
+    from plexus.gui import bio
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write(_dump_yaml(spec)); tmp = f.name
+        bio.seed_scene(tmp)
+        return True, None
+    except Exception as e:                               # noqa: BLE001
+        return False, f"{type(e).__name__}: {e}"
+    finally:
+        if tmp and os.path.exists(tmp):
+            os.unlink(tmp)
+
+
 def _list_specs():
     out = []
     scan = [
@@ -334,6 +351,51 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return self.wfile.write(body)
 
+        if route == "/api/bio/counts":
+            from plexus.gui import bio
+            name = (q.get("name") or [""])[0]
+            path = studio.spec_path(name) if name else None
+            if not path or not os.path.exists(path):
+                return self._send_json({"error": f"no spec {name!r}"}, 404)
+            return self._send_json(bio.counts(bio.seed_scene(path)))
+
+        if route == "/api/bio/claude":
+            from plexus.gui import bio
+            since = int((q.get("since") or ["0"])[0])
+            C = bio.CLAUDE
+            secs = round(time.time() - C["started"], 1) if C["running"] else C["seconds"]
+            return self._send_json({"running": C["running"], "task": C["task"], "n": len(C["lines"]),
+                                    "lines": C["lines"][since:], "seconds": secs, "error": C["error"]})
+
+        if route == "/api/bio/state":
+            from plexus.gui import bio
+            return self._send_json(dict(bio.STATE))
+
+        if route == "/api/bio/view":                     # GET ?azim&elev&zoom&pick&message -- drive the page's view
+            from plexus.gui import bio
+            g = lambda k: (q.get(k) or [None])[0]        # noqa: E731
+            return self._send_json(bio.set_view(azim=g("azim"), elev=g("elev"), zoom=g("zoom"), pick=g("pick"), message=g("message")))
+
+        if route in ("/api/bio/snapshot", "/api/bio/info"):
+            from plexus.gui import bio, studio
+            name = (q.get("name") or [""])[0]
+            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+            if not name or not os.path.exists(sp):
+                return self._send_json({"error": "no such spec"}, 404)
+            try:
+                scene = bio.seed_scene(sp)
+                if route == "/api/bio/info":
+                    return self._send_json(bio.resolve_pick(scene, (q.get("pick") or [""])[0]) or {"error": "no such object"})
+                png = bio.snapshot(scene, azim=float((q.get("azim") or ["30"])[0]), elev=float((q.get("elev") or ["20"])[0]),
+                                   zoom=float((q.get("zoom") or ["1"])[0]), pick=(q.get("pick") or [None])[0])
+            except Exception as e:                       # noqa: BLE001
+                return self._send_json({"error": f"{type(e).__name__}: {e}"[:800]}, 400)
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(png)))
+            self.end_headers()
+            return self.wfile.write(png)
+
         if route == "/api/bio/seed":
             from plexus.gui import bio, studio
             name = (q.get("name") or [""])[0]
@@ -366,7 +428,13 @@ class Handler(BaseHTTPRequestHandler):
                 ok, err = _validate(yaml.safe_load(raw) or {})
             except Exception as e:                                       # noqa: BLE001
                 ok, err = False, str(e)
-            return self._send_json({"name": name, "path": sp, "raw": raw,
+            _form = None
+            try:
+                from plexus.gui import bio
+                _form = bio.form_from_spec(yaml.safe_load(raw))
+            except Exception:                            # noqa: BLE001
+                _form = None
+            return self._send_json({"name": name, "path": sp, "raw": raw, "form": _form,
                                     "valid": ok, "error": err, **studio.artefacts(name)})
 
         if route == "/api/studio/progress":
@@ -418,10 +486,20 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             return self._send_json({"error": f"bad json: {e}"}, 400)
 
+        if route == "/api/bio/claude":
+            from plexus.gui import bio
+            if data.get("stop"):
+                return self._send_json(bio.claude_stop())
+            task = str(data.get("task") or "").strip()
+            if not task:
+                return self._send_json({"error": "empty task"}, 400)
+            return self._send_json(bio.claude_start(task, int(self.server.server_address[1]),
+                                                    model=str(data.get("model") or "sonnet")))
+
         if route == "/api/bio/build":
             from plexus.gui import bio, studio
             try:
-                spec = bio.build_spec(data)
+                spec = bio.normalise(bio.build_spec(data))
             except Exception as e:                       # noqa: BLE001
                 return self._send_json({"error": f"form: {e}"}, 400)
             ok, err = _validate(spec)
@@ -432,6 +510,7 @@ class Handler(BaseHTTPRequestHandler):
             sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
             raw = _dump_yaml(spec)
             open(sp, "w").write(raw)
+            bio.bump(name, f"built {name}")
             return self._send_json({"name": name, "raw": raw, "valid": True})
 
         if route == "/api/bio/save":
@@ -443,11 +522,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"error": f"not YAML: {e}"}, 400)
             if not isinstance(spec, dict) or not name:
                 return self._send_json({"error": "no spec or no name"}, 400)
+            spec = bio.normalise(spec)
             ok, err = _validate(spec)
             if not ok:
                 return self._send_json({"error": "schema rejected the spec", "detail": err}, 400)
             sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
             open(sp, "w").write(_dump_yaml(spec))
+            bio.bump(name, f"saved {name}")
             return self._send_json({"name": name, "valid": True, "form": bio.form_from_spec(spec)})
 
         if route == "/api/bio/refine":
@@ -461,14 +542,32 @@ class Handler(BaseHTTPRequestHandler):
             if not res["yaml"]:
                 return self._send_json({"error": f"Claude returned no YAML (rc={res['rc']})", "detail": res["log"][-1200:]})
             try:
-                spec = yaml.safe_load(res["yaml"])
+                spec = bio.normalise(yaml.safe_load(res["yaml"]))
             except Exception as e:                       # noqa: BLE001
                 return self._send_json({"error": f"the reply is not YAML: {e}", "seconds": res["seconds"]})
+            # ACCEPTED ONLY IF IT LOADS AND SEEDS. The schema cannot see a seed-time failure (a
+            # region the operators refuse, a block the seed needs); seeding is cheap, so it is
+            # part of the check, and a failure goes back to Claude once with the error.
             ok, err = _validate(spec)
+            if ok:
+                ok, err = _seed_check(spec, name)
             if not ok:
-                return self._send_json({"error": "schema rejected the edited spec", "detail": err, "seconds": res["seconds"]})
+                res2 = studio.author_spec(prompt, name, current=_dump_yaml(spec), error=str(err),
+                                          model=str(data.get("model") or "sonnet"))
+                try:
+                    spec2 = bio.normalise(yaml.safe_load(res2["yaml"])) if res2["yaml"] else None
+                except Exception:                        # noqa: BLE001
+                    spec2 = None
+                ok2, err2 = (_validate(spec2) if spec2 else (False, "no YAML on the fix pass"))
+                if ok2:
+                    ok2, err2 = _seed_check(spec2, name)
+                if not ok2:
+                    return self._send_json({"error": "the edited spec does not load or seed", "detail": f"{err}\n-- fix pass: {err2}",
+                                            "seconds": res["seconds"] + res2.get("seconds", 0)})
+                spec = spec2; res["seconds"] += res2.get("seconds", 0)
             raw = _dump_yaml(spec)
             open(sp, "w").write(raw)
+            bio.bump(name, f"applied: {prompt[:80]} ({res['seconds']:.0f}s)")
             return self._send_json({"name": name, "raw": raw, "seconds": res["seconds"], "valid": True,
                                     "form": bio.form_from_spec(spec)})
 
