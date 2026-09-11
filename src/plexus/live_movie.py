@@ -3428,43 +3428,77 @@ class LiveMovie:
             out.append((tid, nm, float(r), col))
         return out or None
 
-    def _glyph_points(self, lvl, tid):
-        own = getattr(lvl, "node_type", None)
-        occ = getattr(lvl, "occ", None)
+    def _glyph_points(self, lv, tid, subject):
+        """Live positions of one type: the drawn subset for the subject, every live row otherwise."""
         import torch
-        nt = torch.as_tensor(own)[self.idx]
+        own = getattr(lv, "node_type", None)
+        occ = getattr(lv, "occ", None)
+        if subject:
+            nt = torch.as_tensor(own)[self.idx]
+            sel = nt == tid
+            if occ is not None:
+                sel = sel & (torch.as_tensor(occ)[self.idx].to(nt.device) > 0)
+            return np.asarray(self.cloud.points)[sel.cpu().numpy()]
+        nt = torch.as_tensor(own)
         sel = nt == tid
         if occ is not None:
-            sel = sel & (torch.as_tensor(occ)[self.idx].to(nt.device) > 0)
-        return np.asarray(self.cloud.points)[sel.cpu().numpy()]
+            sel = sel & (torch.as_tensor(occ).to(nt.device) > 0)
+        P = lv.get("pos").detach()[sel.to(lv.get("pos").device)]
+        P = P.cpu().numpy().astype(np.float32)
+        if P.shape[1] == 2:
+            P = np.concatenate([P, np.zeros((P.shape[0], 1), np.float32)], 1)
+        return P
 
     def _glyph_build(self, H, lvl):
-        types = self._glyph_types(lvl)
-        if not types:
-            return False
+        """EVERY typed point set with a `dot_radius`, not only the subject. A tissue holds its
+        proteins in one set and its organelles in another; the subject is the larger of them and
+        the other was not drawn at all. One glyph actor per (set, type), named `glyph_<set>_<type>`."""
         self._glyphs = {}
-        for tid, nm, r, col in types:
-            self._glyph_geom = getattr(self, "_glyph_geom", {})
-            self._glyph_geom[nm] = self.pv.Sphere(radius=r, theta_resolution=14, phi_resolution=10)
-            self._glyphs[nm] = (tid, col, None)
-        self._glyph_update(lvl)
-        print(f"[live-movie] dot_radius: {', '.join(f'{nm} r={r:g}' for _, nm, r, _ in types)} drawn as spheres", flush=True)
+        self._glyph_geom = getattr(self, "_glyph_geom", {})
+        said = []
+        for lname, lv in H.levels.items():
+            try:
+                if lv.get("pos") is None:
+                    continue
+            except Exception:                                    # noqa: BLE001
+                continue
+            types = self._glyph_types(lv)
+            if not types:
+                continue
+            for tid, nm, r, col in types:
+                key = f"{lname}_{nm}"
+                self._glyph_geom[key] = self.pv.Sphere(radius=r, theta_resolution=14, phi_resolution=10)
+                self._glyphs[key] = (lname, tid, col, None)
+                said.append(f"{lname}.{nm} r={r:g}")
+        if not self._glyphs:
+            return False
+        self._glyph_update_all(H)
+        print(f"[live-movie] dot_radius: {', '.join(said)} drawn as spheres", flush=True)
         return True
 
     def _glyph_update(self, lvl):
+        """Per-frame refresh; `lvl` is the subject (its points are the cloud's)."""
+        H = getattr(self, "_glyph_H", None)
+        if H is not None:
+            self._glyph_update_all(H)
+
+    def _glyph_update_all(self, H):
         g = getattr(self, "_glyphs", None)
         if not g:
             return
-        for nm, (tid, col, actor) in list(g.items()):
-            pts = self._glyph_points(lvl, tid)
+        self._glyph_H = H
+        subject = getattr(self, "_sname", None)
+        for key, (lname, tid, col, actor) in list(g.items()):
+            lv = H.level(lname)
+            pts = self._glyph_points(lv, tid, lname == subject)
             if actor is not None:
                 self.p.remove_actor(actor, render=False)
                 actor = None
             if len(pts):
-                pd = self.pv.PolyData(pts).glyph(geom=self._glyph_geom[nm], scale=False, orient=False)
+                pd = self.pv.PolyData(pts).glyph(geom=self._glyph_geom[key], scale=False, orient=False)
                 actor = self.p.add_mesh(pd, color=col, smooth_shading=True, lighting=True, ambient=0.35,
-                                        diffuse=0.7, specular=0.2, name=f"glyph_{nm}")
-            g[nm] = (tid, col, actor)
+                                        diffuse=0.7, specular=0.2, name=f"glyph_{key}")
+            g[key] = (lname, tid, col, actor)
 
     def _dot_px(self, pos):
         """Dot diameter in pixels such that a dot spans `fill` of the local spacing of the DRAWN

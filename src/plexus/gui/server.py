@@ -372,38 +372,63 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(dict(bio.STATE))
 
         if route == "/api/bio/view":                     # GET ?azim&elev&zoom&pick&message -- drive the page's view
-            from plexus.gui import bio
+            from plexus.gui import bio, bio_view
             g = lambda k: (q.get(k) or [None])[0]        # noqa: E731
-            return self._send_json(bio.set_view(azim=g("azim"), elev=g("elev"), zoom=g("zoom"), pick=g("pick"), message=g("message")))
+            st = bio.set_view(azim=g("azim"), elev=g("elev"), zoom=g("zoom"), pick=g("pick"), message=g("message"))
+            v = bio_view.current()
+            if v is not None:
+                v.set_camera(st["azim"], st["elev"], st["zoom"])
+                if g("pick") is not None:
+                    v.highlight(st["pick"])
+            return self._send_json(st)
 
-        if route in ("/api/bio/snapshot", "/api/bio/info"):
-            from plexus.gui import bio, studio
+        if route in ("/api/bio/snapshot", "/api/bio/render", "/api/bio/info", "/api/bio/pick"):
+            # ALL FOUR READ THE SESSION'S VIEW, the movie renderer on the seeded spec. `?name=`
+            # opens it when none is open (or a different spec is named).
+            from plexus.gui import bio, bio_view, studio
             name = (q.get("name") or [""])[0]
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            if not name or not os.path.exists(sp):
-                return self._send_json({"error": "no such spec"}, 404)
+            v = bio_view.current()
             try:
-                scene = bio.seed_scene(sp)
+                if name and (v is None or os.path.basename(v.spec_path) != name + ".yaml"):
+                    sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
+                    if not os.path.exists(sp):
+                        return self._send_json({"error": "no such spec"}, 404)
+                    v = bio_view.open_view(sp)
+                    bio.STATE["name"] = name
+                if v is None:
+                    return self._send_json({"error": "no scene is open; seed one first (BUILD + SEED, or ?name=)"}, 400)
                 if route == "/api/bio/info":
-                    return self._send_json(bio.resolve_pick(scene, (q.get("pick") or [""])[0]) or {"error": "no such object"})
-                png = bio.snapshot(scene, azim=float((q.get("azim") or ["30"])[0]), elev=float((q.get("elev") or ["20"])[0]),
-                                   zoom=float((q.get("zoom") or ["1"])[0]), pick=(q.get("pick") or [None])[0])
+                    return self._send_json(bio.resolve_pick(v.scene, (q.get("pick") or [""])[0]) or {"error": "no such object"})
+                if route == "/api/bio/pick":
+                    pk = v.pick_at(float((q.get("x") or ["0.5"])[0]), float((q.get("y") or ["0.5"])[0]))
+                    v.highlight(pk)
+                    bio.STATE["pick"] = pk
+                    return self._send_json({"pick": pk, "info": bio.resolve_pick(v.scene, pk) if pk else None})
+                if q.get("azim") or q.get("elev") or q.get("zoom"):
+                    v.set_camera(*(float((q.get(k) or [str(getattr(v, k))])[0]) for k in ("azim", "elev", "zoom")))
+                if q.get("pick"):
+                    v.highlight((q.get("pick") or [None])[0])
+                png = v.png()
             except Exception as e:                       # noqa: BLE001
                 return self._send_json({"error": f"{type(e).__name__}: {e}"[:800]}, 400)
             self.send_response(200)
             self.send_header("Content-Type", "image/png")
             self.send_header("Content-Length", str(len(png)))
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             return self.wfile.write(png)
 
         if route == "/api/bio/seed":
-            from plexus.gui import bio, studio
+            from plexus.gui import bio, bio_view, studio
             name = (q.get("name") or [""])[0]
             sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
             if not name or not os.path.exists(sp):
                 return self._send_json({"error": "no such spec"}, 404)
             try:
-                return self._send_json(bio.seed_scene(sp))
+                v = bio_view.open_view(sp)                # seeded once: the scene and the picture share it
+                bio.STATE["name"] = name
+                out = dict(v.scene); out["seconds"] = v.seconds
+                return self._send_json(out)
             except Exception as e:                       # noqa: BLE001 -- the page shows the cause
                 return self._send_json({"error": f"seed failed: {type(e).__name__}: {e}"[:800]}, 400)
 
@@ -495,6 +520,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"error": "empty task"}, 400)
             return self._send_json(bio.claude_start(task, int(self.server.server_address[1]),
                                                     model=str(data.get("model") or "sonnet")))
+
+        if route == "/api/bio/visible":
+            from plexus.gui import bio_view
+            v = bio_view.current()
+            if v is None:
+                return self._send_json({"error": "no scene is open"}, 400)
+            ok = v.set_visible(str(data.get("species") or ""), bool(data.get("on", True)))
+            return self._send_json({"ok": ok, "hidden": sorted(v.hidden)})
 
         if route == "/api/bio/build":
             from plexus.gui import bio, studio
