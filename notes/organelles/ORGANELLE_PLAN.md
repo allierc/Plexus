@@ -147,6 +147,58 @@ A real nucleus is BOTH: a mesh envelope with an mpm chromatin content inside it,
 {body: mesh}`, `chromatin: {body: mpm, parent_region: inner of envelope}`), not a fourth body.
 The plan keeps bodies to three words and composes the rest in the spec.
 
+### 2b. What happens at a cell division
+
+**How a division is seen.** `cell_divide` (`vertex_ops.py:1593`, Hertwig long-axis rule) splits
+the mother face along a plane through its centroid, inserts the new vertices and edges, and
+creates one newborn face; the mother keeps its face id, the newborn gets a fresh one, and both
+have their `age` reset. `protein_project` already detects this from the mesh alone: a face that
+is live now and was not last frame is the newborn, and the reset-age face nearest to it is the
+mother (`protein_ops.py:357-380`). The organelle operators reuse that detection unchanged; the
+division plane is recovered as the plane through the two daughters' centroids' midpoint, normal
+to the line between them.
+
+**Which daughter gets a piece.** The primary rule is geometric, not "nearest centroid": a piece
+belongs to the daughter whose prism contains it (the point-in-prism test of section 3). This is
+what the physics would say, and it makes the mother/newborn distinction irrelevant for pieces
+that were already on one side of the plane. Only a piece the plane passes through, or a piece
+that is transiently outside both prisms in the frame of the split, falls back to the nearest
+centroid. Then `on_divide` decides what the count does:
+
+| `on_divide` | point | mesh | mpm |
+|-------------|-------|------|-----|
+| `duplicate` (nucleus, centrosome, Golgi) | the mother's piece stays where the plane put it; a new piece is spawned in the other daughter at the same relative position (same region, mirrored through the plane) | the mother's envelope is KILLED and two icospheres are re-seeded, one per daughter, at the daughters' nuclear positions: open mitosis, where the envelope breaks down at prometaphase and reforms around each daughter's chromatin | the cloud is CUT by the division plane: particles on each side become the two daughters' pieces (chromatin segregation); each half is topped up to the species' `per_parent` by re-seeding inside its own half so the daughters' nuclei have the same mass as the mother's within one frame |
+| `halve` (mitochondria, vesicles) | each piece goes to the daughter containing it; if the counts differ by more than one, the nearest pieces to the smaller daughter's centroid are re-assigned until the split is equal, as proteins do | not used | whole pieces go by the side of the plane their centroid is on; no cloud is cut |
+| `none` | the daughter containing it keeps it; nothing is spawned | same | same |
+
+`duplicate` therefore happens AT the division, not before it. The biological order (the nucleus
+replicates in S phase, then mitosis, then cytokinesis) is a refinement for O5: a `phase` block on
+the cell already exists in the cell-cycle operators, and a nucleus species can read it to swell
+before the split and to migrate apically (interkinetic nuclear migration) so that the plane
+`cell_divide` chooses passes through the nucleus. In O1 the nucleus reacts to the division; in O5
+it helps decide it.
+
+**Proteins on organelles at a division.** Two cases, both handled by the same halving rule
+`protein_project` already applies to cell-parented species:
+
+- the organelle is kept whole (`halve`, `none`, or `duplicate` for a `point` body): its proteins
+  keep their parent index; nothing to do, since the parent row itself moved to the daughter.
+- the organelle is split or re-seeded (`duplicate` for `mesh` and `mpm`, and the spawned twin for
+  `point`): the mother organelle's proteins are halved by nearest-to-the-new-piece exactly as a
+  cell's proteins are halved, then `protein_project` moves each half onto its own piece's
+  `surface` or `inner` region. For a re-seeded envelope this is a projection onto new faces,
+  which is what the region provider does every frame anyway.
+
+**What the engine needs for this.** Spawning and killing pieces is what `spawn`/`kill` on a
+contained set already do (dormant slots, `reserve_factor`). The new requirement is on the mesh
+body: `organelle_vertex` must be able to kill a closed component and seed a new one at run time,
+which means the half-edge level's edge occupancy (`eocc`) must extend to whole components; the
+tissue mesh only ever adds faces. For the mpm body, cutting a cloud is a relabel of `parent` on
+the particle rows plus a top-up seed, both of which exist. The counts the movie panel shows
+(`count:organelle:nucleus`) then step by exactly one per division, which is the O1 acceptance
+test: over a 100-division run, live nuclei equal live cells at every frame, and the mitochondria
+total is conserved at every division to within the express law's birth and turnover.
+
 **Where the body's rows go at seeding.** `organelle_body_seed` runs after `organelle_seed`: it
 reads each piece's pose and radius and fills the child set for that piece. For `mesh` it writes an
 icosphere scaled to the radius, its faces registered in the child level's half-edge mesh as one
@@ -235,7 +287,7 @@ reports per cell per species. Pieces draw as spheres of their radius, not dots.
 | stage | delivers | closes when |
 |-------|----------|-------------|
 | O0 | point body: `organelle_seed` + `organelle_project` with the interior providers; spec `config/tissue/spheroid_organelles.yaml` (nucleus 1, mitochondria 40 per cell) | every cell has exactly its counts at frame 0 and at frame 800, overlap fraction 0, no piece outside its prism; registered as a working point |
-| O1 | `on_divide` rules and `organelle_express` (shared with `protein_express`) | a dividing spheroid keeps one nucleus per cell and conserves mitochondria at division; count curves in the movie panel |
+| O1 | `on_divide` rules (section 2b) and `organelle_express` (shared with `protein_express`) | over a 100-division run, live nuclei equal live cells at every frame and the mitochondria total is conserved at each division; count curves in the movie panel |
 | O2 | proteins parented to organelles, `point` body providers | nuclear-pore species on the nucleus surface, count and projection verified; proteins follow the nucleus through a division |
 | O3 | `mesh` body: icosphere envelope per nucleus, proteins on its faces | the envelope stays closed and inside the cell over 800 frames; face-region proteins verified like the cell caps |
 | O4 | `mpm` body: atlas shapes per piece inside vertex-model cells | a compressed cell shows nuclear resistance (nucleus strain smaller than cell strain by a measured ratio); the atlas archive runs re-registered on the new path |
