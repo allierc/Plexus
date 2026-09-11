@@ -168,6 +168,9 @@ PAGE = r"""<!doctype html>
 </style></head><body>
 <div id="left">
  <h1>Plexus material</h1>
+ <h2>Open a spec</h2>
+ <div class="row"><input id="openpath" style="width:100%" placeholder="path to a spec.yaml or a run folder, e.g. config/si_material/si_waterfall.yaml" onkeydown="if(event.key==='Enter')openSpec()"></div>
+ <div class="row"><button class="dim" onclick="openSpec()">OPEN</button> <span style="color:#778;font-size:11px">copies it into config/studio and seeds it as is; the form shows what it can read</span></div>
  <h2>Box</h2>
  <div class="row"><label>name</label><input id="name" value="bouncing_balls"></div>
  <div class="row"><label>box side (m)</label><input id="world" class="short" value="0.1"> <label style="width:60px">grid</label><input id="n_grid" class="short" value="96"></div>
@@ -208,6 +211,7 @@ function bodies(){const out=[];for(const tr of $('bodies').rows){if(!tr.cells[0]
 function form(){return {name:$('name').value,world:+$('world').value,n_grid:+$('n_grid').value,n_frames:+$('n_frames').value,dt:+$('dt').value,gravity:+$('gravity').value,particles:+$('particles').value,bodies:bodies()};}
 function fillForm(f){$('name').value=f.name;$('world').value=f.world;$('n_grid').value=f.n_grid;$('n_frames').value=f.n_frames;$('dt').value=f.dt;$('gravity').value=f.gravity;$('particles').value=f.particles;
  const tb=$('bodies');while(tb.rows.length>1)tb.deleteRow(-1);(f.bodies||[]).forEach(addBody);}
+window.openSpec=async function(){let pth=$('openpath').value.trim();if(!pth)return;if(!pth.startsWith('/'))pth='/workspace/Plexus/'+pth;status('opening '+pth+' ...');const j=await (await fetch('/api/bio/open?path='+encodeURIComponent(pth))).json();if(j.error){status(j.error,true);return;}status('opened '+j.name+' -- seeding...');};
 async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
 window.build=async function(){status('building the spec...');const j=await post('/api/material/build',form());if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}specName=j.name;$('yamltext').value=j.raw;status(`spec saved: config/studio/${j.name}.yaml -- seeding and rendering...`);await reseed();};
 window.reseed=async function(){playStop();FRAME=null;if(!specName){status('no spec yet',true);return;}status('seeding and building the renderer...');const r=await fetch('/api/bio/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){status(j.error,true);return;}SCENE=j;tree(j);status(`seeded in ${j.seconds}s: `+Object.entries(j.sets).map(([k,v])=>`${k} ${v.n_live}`).join(', '));render(true);};
