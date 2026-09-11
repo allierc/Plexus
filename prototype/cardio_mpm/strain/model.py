@@ -144,6 +144,11 @@ class Params:
         # late-positive: cells differ not only in WHEN they start (delay) but in how long they stay
         # contracted. logtau_j scales cell j's decay time: tau_d,j = tau_d * exp(logtau_j). Zero = shared.
         self.logtau = torch.zeros(C, device=device, requires_grad=True)
+        # ... and its own rise time and plateau duration: with delay and logtau this gives every cell
+        # its own 4-number excitation-contraction time course around the shared one (the recording's
+        # temporal modes 2-3 are per-cell time-course differences; rank ceiling 0.94 / 0.97).
+        self.logtr = torch.zeros(C, device=device, requires_grad=True)
+        self.logdur = torch.zeros(C, device=device, requires_grad=True)
         self.g = torch.full((C,), float(g0), device=device, requires_grad=True)
         phi = (torch.zeros(C, device=device) if phi0 is None
                else torch.as_tensor(phi0, device=device, dtype=torch.float32).clone())
@@ -159,12 +164,14 @@ class Params:
     def leaves(self):
         clk = self.gfree if self.clock_mode == "free" else self.clock
         return dict(g=self.g, phi=self.phi, logE=self.logE, clock=clk, delay=self.delay, g2=self.g2,
-                    logtau=self.logtau)
+                    logtau=self.logtau, logtr=self.logtr, logdur=self.logdur)
 
-    def _s(self, t, logtau=None):
+    def _s(self, t, logtau=None, percell=False):
         t0, tr, d, td = self.clock[0], self.clock[1].exp(), self.clock[2].exp(), self.clock[3].exp()
         if logtau is not None:
             td = td * logtau.exp()                     # per-cell decay time, [C]
+        if percell:
+            tr = tr * self.logtr.exp(); d = d * self.logdur.exp()     # per-cell rise and plateau
         t = torch.as_tensor(t, device=self.clock.device, dtype=self.clock.dtype)
         return torch.sigmoid((t - t0) / tr) * torch.sigmoid((t0 + d - t) / td)
 
@@ -179,8 +186,12 @@ class Params:
         if self.clock_mode == "free":
             return self.gamma(t).expand(self.delay.shape[0])
         tt = float(t) - self.shift - self.delay
-        s0 = self._s(0.0 - self.delay, self.logtau)
-        return ((self._s(tt, self.logtau) - s0) / (1.0 - s0)).clamp(min=0.0)
+        s0 = self._s(0.0 - self.delay, self.logtau, percell=True)
+        return ((self._s(tt, self.logtau, percell=True) - s0) / (1.0 - s0)).clamp(min=0.0)
+
+    def cell_clock_penalty(self):
+        """Mean squared log-scales of the per-cell time-course numbers (0 = the shared clock)."""
+        return (self.logtau.pow(2) + self.logtr.pow(2) + self.logdur.pow(2)).mean()
 
     def gamma(self, t):
         if self.clock_mode == "free":
@@ -210,7 +221,7 @@ class Params:
             for k, v in d.items():
                 if k == "clock_mode":
                     continue
-                if k in ("delay", "g2", "logtau") and np.asarray(v).shape != tuple(self.delay.shape):
+                if k in ("delay", "g2", "logtau", "logtr", "logdur") and np.asarray(v).shape != tuple(self.delay.shape):
                     continue
                 if k == "clock" and self.clock_mode == "free":
                     self.gfree = torch.as_tensor(np.asarray(v), device=self.g.device,

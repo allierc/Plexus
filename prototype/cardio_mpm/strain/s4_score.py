@@ -90,7 +90,7 @@ def main():
     interior = torch.as_tensor(z["interior"], device=dev) if "interior" in z.files else torch.ones(C, dtype=torch.bool, device=dev)
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
     P = M.Params(C, dev, nu=args.nu, clock_mode=mode, n_frames=int(z["clock"].shape[0]) if mode == "free" else 0)
-    P.load({k: z[k] for k in ("g", "phi", "logE", "clock", "delay", "g2") if k in z.files})
+    P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"})
     fit_win = R.beat_window(rec, args.fit_beat)
     A_fit, u_fit = R.window_affine(rec, fit_win)
 

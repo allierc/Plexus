@@ -17,7 +17,7 @@ plt.rcParams.update({"figure.facecolor": "black", "axes.facecolor": "black", "sa
                      "axes.edgecolor": GREY, "axes.labelcolor": WHITE, "xtick.color": WHITE, "ytick.color": WHITE,
                      "text.color": WHITE, "font.size": 10, "axes.spines.top": False, "axes.spines.right": False,
                      "legend.frameon": False})
-FITS = dict(healthy=("s4_live_r6_Eshrink0.3", "data"), hcm=("hcm_r2_Eshrink0.3", "data_hcm"))
+FITS = dict(healthy=("s4_live_r8_p120_d150_g2", "data"), hcm=("hcm_r3_p120_d150_g2", "data_hcm"))
 
 
 def sheet(name):

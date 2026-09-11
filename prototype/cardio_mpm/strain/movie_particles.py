@@ -29,7 +29,7 @@ args = ap.parse_args(); dev = args.device
 rec = R.load(device=dev, specimen=args.specimen); C = rec["n_cells"]
 z = np.load(args.params); mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
 P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["clock"].shape[0]) if mode == "free" else 0)
-P.load({k: z[k] for k in ("g", "phi", "logE", "clock", "delay", "g2") if k in z.files})
+P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"})
 win = R.beat_window(rec, args.beat); T = len(win["frames"])
 _, ref_nodes, pos, X0, cid = model_node_displacement(args, rec, P, win)          # pos [T,N,2] particles
 nodes_t = rec["pos"][win["frames"]].cpu().numpy()

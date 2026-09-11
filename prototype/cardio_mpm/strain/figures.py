@@ -30,9 +30,12 @@ def cell_map(values, lab_grid, C):
     return v[lab_grid]
 
 
-def fig_beat_and_maps():
-    z = np.load(os.path.join(HERE, "out", "s1_p100_g128_k10000_nu0.3_b0.03.npz"))
-    A, A_rec, u, u_rec = z["A"], z["A_rec"], z["u"], z["u_rec"]
+BEST = "s4_live_r8_p120_d150_g2"          # the reporting model: 120/cell, drag 150, lambda 0.3, g g2 phi E delta + clock
+
+
+def fig_beat_and_maps(tag=BEST):
+    z = np.load(os.path.join(HERE, "out", "fits", tag, "residual.npz"))
+    A, A_rec, u, u_rec = z["A"], z["A_ref"], z["u"], z["u_ref"]
     eye = np.eye(2)
     def short(A):
         E = A - eye; S = 0.5 * (E + np.swapaxes(E, -1, -2)); return -np.linalg.eigvalsh(S)[..., 0]
@@ -43,7 +46,7 @@ def fig_beat_and_maps():
     fig, ax = plt.subplots(1, 3, figsize=(15, 5.2), gridspec_kw=dict(width_ratios=[1.4, 1, 1], wspace=0.28))
     a = ax[0]
     a.plot(t, sr.mean(1), color=GREEN, lw=2, label="recording")
-    a.plot(t, sm.mean(1), color=WHITE, lw=2, label="model, nothing fitted")
+    a.plot(t, sm.mean(1), color=WHITE, lw=2, label="model, fitted on this beat")
     a.fill_between(t, np.percentile(sr, 25, 1), np.percentile(sr, 75, 1), color=GREEN, alpha=0.18, lw=0)
     a.set_xlabel("time since the window opened (s), fit beat, frames 144-200")
     a.set_ylabel("shortening strain per cell, mean over 472 cells\n(band = recording's 25-75% across cells)")
@@ -88,11 +91,11 @@ def fig_tracker():
     fig.savefig(os.path.join(OUT, "fig2_tracker_referee.png"), dpi=130, bbox_inches="tight"); plt.close(fig)
 
 
-def fig_recovery():
-    fits = sorted(glob.glob(os.path.join(HERE, "out", "fits", "planted_*nnone*", "params.npz")))
-    if not fits:
+def fig_recovery(tag="gate_g2neg_s0"):
+    f = os.path.join(HERE, "out", "fits", tag, "params.npz")
+    if not os.path.exists(f):
         return
-    z = np.load(fits[0])
+    z = np.load(f)
     fig, ax = plt.subplots(1, 3, figsize=(14, 4.6), gridspec_kw=dict(wspace=0.3))
     for a, k, name in zip(ax, ["g", "logE", "phi"],
                           ["fibre shortening g per cell\n(strain at full activation)",
@@ -104,7 +107,7 @@ def fig_recovery():
         a.scatter(tr, es, s=9, color=WHITE, alpha=0.7, lw=0)
         lo, hi = min(tr.min(), es.min()), max(tr.max(), es.max())
         a.plot([lo, hi], [lo, hi], color=GREEN, lw=1.5)
-        a.set_xlabel(f"planted truth: {name}"); a.set_ylabel("recovered by the fit\n(no noise, 150 iterations)")
+        a.set_xlabel(f"planted truth: {name}"); a.set_ylabel("recovered by the fit\n(rest-frame noise, 200 iterations, g2 in the truth)")
         if k == "phi":
             d = np.radians(np.minimum((es - tr) % 180, 180 - (es - tr) % 180))
             w = np.clip(z["true_g"], 0, None)
@@ -117,23 +120,26 @@ def fig_recovery():
     fig.savefig(os.path.join(OUT, "fig3_planted_recovery.png"), dpi=130, bbox_inches="tight"); plt.close(fig)
 
 
-def fig_fitted_maps(tag="s4_live_r4_delay_Efree"):
+def fig_fitted_maps(tag=BEST):
     """The fitted per-cell fields of the best live round, and where the model fails."""
     d = os.path.join(HERE, "out", "fits", tag)
     if not os.path.exists(os.path.join(d, "residual.npz")):
         return
     z = np.load(os.path.join(d, "params.npz")); rz = np.load(os.path.join(d, "residual.npz"))
     lab = np.load(os.path.join(HERE, "data", "labels_grid.npy")); C = int(lab.max())
+    inter = z["interior"].astype(bool) if "interior" in z.files else np.ones(C, bool)
+    def masked(v):
+        v = v.astype(float).copy(); v[~inter] = np.nan; return v
     fig, ax = plt.subplots(1, 4, figsize=(19, 4.9), gridspec_kw=dict(wspace=0.12))
-    panels = [(z["g"], "Greens", (0, np.percentile(z["g"], 98)),
-               "fitted g per cell\n(fibre shortening at full activation, strain)"),
-              (z["delay"], "RdBu_r", (-6, 6), "fitted clock delay per cell\n(frames of 42 ms; red = late, blue = early)"),
-              (np.log10(np.exp(z["logE"])), "PuOr", (np.log10(28) - 1.5, np.log10(28) + 1.5),
-               "fitted log10 E per cell\n(spec stress units; NOT a claim -- spread 3 to 600)"),
-              (np.clip(rz["r2_cell"], 0, 1), "Greens", (0, 1), "per-cell R^2 of the affine map over the beat\n(fit beat; 1 = fully explained)")]
+    panels = [(masked(z["g"]), "Greens", (0, np.nanpercentile(masked(z["g"]), 98)),
+               "fitted g per cell\n(shortening along the fibre at full activation, strain)"),
+              (masked(-z["g2"]) if "g2" in z.files else masked(z["g"] * 0), "Greens", (0, np.nanpercentile(masked(-z["g2"]), 98)),
+               "fitted thickening across the fibre per cell (-g2)\n(strain at full activation)"),
+              (masked(z["delay"]), "RdBu_r", (-6, 6), "fitted clock delay per cell\n(frames of 42 ms; red = late, blue = early)"),
+              (np.clip(masked(rz["r2_cell"]), 0, 1), "Greens", (0, 1), "per-cell R^2 of the affine map over the beat\n(fit beat; 1 = fully explained)")]
     for k, (vals, cmap, (lo, hi), name) in enumerate(panels):
         im = ax[k].imshow(cell_map(vals, lab, C), cmap=cmap, vmin=lo, vmax=hi, origin="lower", interpolation="nearest")
-        ax[k].set_xticks([]); ax[k].set_yticks([]); ax[k].set_xlabel(name); letter(ax[k], "ABCD"[k])
+        ax[k].set_xticks([]); ax[k].set_yticks([]); ax[k].set_xlabel(name + "\n(band cells blank: prescribed, not fitted)"); letter(ax[k], "ABCD"[k])
         cb = fig.colorbar(im, ax=ax[k], fraction=0.046, pad=0.02); cb.ax.tick_params(labelsize=8)
     fig.savefig(os.path.join(OUT, "fig4_fitted_maps.png"), dpi=130, bbox_inches="tight"); plt.close(fig)
 

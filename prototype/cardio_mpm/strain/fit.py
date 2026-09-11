@@ -83,7 +83,9 @@ def main():
     ap.add_argument("--youngs", type=float, default=80.0)
     ap.add_argument("--iters", type=int, default=150)
     ap.add_argument("--free", default="g,phi,logE,clock")
-    ap.add_argument("--lr", default="g=2e-3,phi=0.03,logE=0.03,clock=0.05,delay=0.1,g2=2e-3,logtau=0.05")
+    ap.add_argument("--lr", default="g=2e-3,phi=0.03,logE=0.03,clock=0.05,delay=0.1,g2=2e-3,logtau=0.05,logtr=0.05,logdur=0.05")
+    ap.add_argument("--cell-clock-shrink", type=float, default=0.0,
+                    help="weight on mean(logtau^2 + logtr^2 + logdur^2): keeps per-cell time courses near the shared clock")
     ap.add_argument("--delay-shrink", type=float, default=0.0,
                     help="weight on mean(delay^2) (frames^2): keeps per-cell timing near the shared clock")
     ap.add_argument("--seed", type=int, default=0)
@@ -208,6 +210,8 @@ def main():
             loss = loss + args.clock_smooth * P.smoothness()
         if args.E_shrink > 0:
             loss = loss + args.E_shrink * (P.logE - P.logE.mean()).pow(2).mean()
+        if args.cell_clock_shrink > 0:
+            loss = loss + args.cell_clock_shrink * P.cell_clock_penalty()
         if args.delay_shrink > 0:
             loss = loss + args.delay_shrink * P.delay.pow(2).mean()
         if not torch.isfinite(loss):
@@ -233,6 +237,8 @@ def main():
             P.delay.clamp_(min=-8.0, max=8.0)
             P.g2.clamp_(min=-0.2, max=0.2)
             P.logtau.clamp_(min=-1.5, max=1.5)
+            P.logtr.clamp_(min=-1.5, max=1.5)
+            P.logdur.clamp_(min=-1.0, max=1.0)
             last_ok = {k: v.detach().clone() for k, v in P.leaves().items()}
         rowd = dict(it=it, loss=float(loss), seconds=time.time() - t0, recovery=recovery(P, truth),
                     lr=[g_["lr"] for g_ in opt.param_groups])

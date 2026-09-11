@@ -15,7 +15,7 @@ ap.add_argument("--beat", type=int, default=1); ap.add_argument("--specimen", de
 args = ap.parse_args(); dev = args.device
 rec = R.load(device=dev, specimen=args.specimen); C = rec["n_cells"]; win = R.beat_window(rec, args.beat); T = len(win["frames"])
 A_rec, u_rec = R.window_affine(rec, win); z = np.load(args.params); P = M.Params(C, dev)
-P.load({k: z[k] for k in ("g", "phi", "logE", "clock", "delay")}); P.shift = -float((win["onset"] - win["span"][0]) - R.PRE)
+P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"}); P.shift = -float((win["onset"] - win["span"][0]) - R.PRE)
 inter = torch.as_tensor(z["interior"], device=dev); eye = torch.eye(2, device=dev)
 LTIF = os.path.join(HERE, "data_hcm" if args.specimen == "hcm" else "data", "cells_2560.tif")
 def r2(a, b):
