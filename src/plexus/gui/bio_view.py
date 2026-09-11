@@ -40,7 +40,7 @@ class View:
         self.sim, self.H, self.spec_path = sim, H, spec_path
         self.scene = bio.scene_from(H, sim, spec_path)
         style = dict(sim.plotting or {})
-        for k in ("curve", "cross_section", "cross_section_height", "stills"):
+        for k in ("curve", "stills"):                       # the curves need a clip; the section inset stays
             style.pop(k, None)
         style["real_time"] = False
         self._tmp = tempfile.mkdtemp(prefix="plexus_bio_")
@@ -52,6 +52,8 @@ class View:
         self.lm(H, 0)                                            # builds every actor, writes one frame
         if self.lm.failed:
             raise RuntimeError(f"renderer: {self.lm.failed}")
+        if getattr(self.lm, "cs", None) is not None:             # the first frame builds the inset but fills it from frame 1
+            self.lm._update_cross_section(H)
         self.p = self.lm.p
         cam = self.p.camera
         # FRAME THE OBJECTS, NOT THE BOX. The movie frames the world box (a 50-unit box around a

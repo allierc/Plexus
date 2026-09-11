@@ -2768,7 +2768,11 @@ class LiveMovie:
             # EITHER SPELLING: the operator writes `mono_h` on the live table, and the recorder
             # stores it as a SCALAR, so the replay gets it back as `scalar_mono_h`.
             _h = m.get("mono_h", m.get("scalar_mono_h"))
-            if _h is None:
+            _has_sep = "sep" in getattr(lvl, "state_schema", {})
+            # AN APICO-BASAL MESH CARRIES ITS THICKNESS IN `sep` FROM THE SEED; `scalar_mono_h` is
+            # written by cell_mechanics from frame 1. Refusing on a missing scalar left the section
+            # of a freshly seeded tissue without its rings (the bio page's first picture).
+            if _h is None and not _has_sep:
                 return None
             import torch as _t
             from plexus.operators.vertex_ops import monolayer_shells
@@ -2823,6 +2827,8 @@ class LiveMovie:
                 hv = 2.0 * L * float(sc)
                 return (P, n, hv, es.astype(np.int64), et.astype(np.int64))
 
+            if _h is None:
+                return None
             h = _t.full((nF,), float(np.asarray(_h).ravel()[0]) * float(sc), dtype=_t.float32)
             _, _, n, hv = monolayer_shells(_t.as_tensor(P, dtype=_t.float32),
                                            _as(es), _as(et), _as(ef), nF, h)
@@ -2859,7 +2865,11 @@ class LiveMovie:
                 if hasattr(fc, "dx"):
                     dx = float(fc.dx)
                     break
-            y0 = self.cs_at * float(self.world[ax])
+            # THE PLANE IS A FRACTION OF THE DRAWN BOX, WHICH IS NOT ALWAYS [0, world]. A free run
+            # is centred on the origin (`self.lo/hi` = +-world/2), and `cs_at * world` put the plane
+            # at +world/2, the far wall: the live section of every free-boundary tissue was empty
+            # and only the replay (which shifts positions into [0, world]) ever showed one.
+            y0 = float(self.lo[ax]) + self.cs_at * float(self.hi[ax] - self.lo[ax])
             keep = _t.nonzero((X[:, ax] - y0).abs() < self.cs_cells * dx).squeeze(1)
             if keep.numel() > self.cs_max:          # a slab of a big jet is tens of thousands
                 keep = keep[:: keep.numel() // self.cs_max + 1]
