@@ -1,0 +1,11 @@
+{
+ "params": "out/fits/s4_live_r13_modes2_kappa/params.npz",
+ "beat": 1,
+ "window": [
+  43,
+  97
+ ],
+ "r2_A": 0.8639156818389893,
+ "frames": 55,
+ "fps": 8
+}

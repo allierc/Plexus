@@ -30,7 +30,7 @@ def cell_map(values, lab_grid, C):
     return v[lab_grid]
 
 
-BEST = "s4_live_r8_p120_d150_g2"          # the reporting model: 120/cell, drag 150, lambda 0.3, g g2 phi E delta + clock
+BEST = "s4_live_r13_modes2_kappa"          # the best model: 120/cell, drag 150, lambda 0.3, g g2 phi E delta, per-cell clock, 2 temporal modes, per-cell adhesion
 
 
 def fig_beat_and_maps(tag=BEST):
