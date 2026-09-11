@@ -600,8 +600,13 @@ PAGE = r"""<!doctype html>
 <div id="left">
  <h1>Plexus bio objects</h1>
  <h2>Open a spec</h2>
- <div class="row"><input id="openpath" style="width:100%" placeholder="path to a spec.yaml or a run folder, e.g. config/si_material/si_waterfall.yaml" onkeydown="if(event.key==='Enter')openSpec()"></div>
- <div class="row"><button class="dim" onclick="openSpec()">OPEN</button> <span style="color:#778;font-size:11px">copies it into config/studio and seeds it as is; the form shows what it can read</span></div>
+ <div class="row"><button class="dim" onclick="pickOpen()">OPEN...</button> <span id="openlab" style="color:#778;font-size:11px">a spec.yaml or a run folder; copied into config/studio and seeded as is</span></div>
+ <div id="picker" style="display:none;position:fixed;left:60px;top:40px;width:560px;max-height:80vh;background:#1a1a20;border:1px solid #556;border-radius:6px;padding:10px;z-index:10;box-shadow:0 0 30px #000">
+  <div class="row"><b>Open a spec</b> <span style="float:right;cursor:pointer" onclick="$('picker').style.display='none'">&#10005;</span></div>
+  <div class="row" id="pickroots"></div>
+  <div class="row" id="pickpath" style="color:#9ab;font-family:monospace;font-size:11px;word-break:break-all"></div>
+  <div id="picklist" style="max-height:55vh;overflow:auto;background:#0e0e12;border:1px solid #2a2a30;padding:4px;font-size:12px"></div>
+ </div>
  <h2>Tissue</h2>
  <div class="row"><label>name</label><input id="name" value="bio_scene"></div>
  <div class="row"><label>shape</label><select id="shape"><option>sphere</option><option>disc</option><option>plane</option></select></div>
@@ -649,7 +654,15 @@ function form(){return {name:$('name').value,shape:$('shape').value,n_cells:+$('
 function fillForm(f){$('name').value=f.name;$('shape').value=f.shape;$('n_cells').value=f.n_cells;$('radius').value=f.radius;$('h0').value=f.h0;$('apical').value=f.apical;$('world').value=f.world;$('n_frames').value=f.n_frames;
  let tb=$('species');while(tb.rows.length>1)tb.deleteRow(-1);(f.species||[]).forEach(addSpecies);
  tb=$('organelles');while(tb.rows.length>1)tb.deleteRow(-1);(f.organelles||[]).forEach(addOrganelle);}
-window.openSpec=async function(){let pth=$('openpath').value.trim();if(!pth)return;if(!pth.startsWith('/'))pth='/workspace/Plexus/'+pth;status('opening '+pth+' ...');const j=await (await fetch('/api/bio/open?path='+encodeURIComponent(pth))).json();if(j.error){status(j.error,true);return;}status('opened '+j.name+' -- seeding...');};
+// THE PICKER IS THE SERVER'S LISTING: a browser file dialog hands the page bytes, never a path, and
+// the specs live where the server runs. Folders that hold a spec.yaml (run archives) open as one.
+window.pickOpen=async function(path){$('picker').style.display='block';const j=await (await fetch('/api/bio/ls?path='+encodeURIComponent(path||''))).json();if(j.error){$('picklist').textContent=j.error;return;}
+ $('pickroots').innerHTML=Object.entries(j.roots).map(([k,v])=>`<button class="dim" onclick="pickOpen('${v}')">${k}</button>`).join('');$('pickpath').textContent=j.path;
+ let h=`<div style="cursor:pointer;color:#9ac" onclick="pickOpen('${j.parent}')">.. (up)</div>`;
+ for(const d of j.dirs)h+=`<div style="cursor:pointer;padding:1px 0"><span style="color:#7fb3ff" onclick="pickOpen('${j.path}/${d.name}')">&#128193; ${d.name}/</span>${d.spec?` <button class="dim" style="padding:1px 6px;font-size:11px" onclick="openSpec('${j.path}/${d.name}')">open run</button>`:''}</div>`;
+ for(const f of j.files)h+=`<div style="cursor:pointer;padding:1px 0;color:#dde" onclick="openSpec('${j.path}/${f}')">&#128196; ${f}</div>`;
+ $('picklist').innerHTML=h||'(empty)';};
+window.openSpec=async function(pth){$('picker').style.display='none';status('opening '+pth+' ...');const j=await (await fetch('/api/bio/open?path='+encodeURIComponent(pth))).json();if(j.error){status(j.error,true);return;}$('openlab').textContent=pth;status('opened '+j.name+' -- seeding...');};
 async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
 window.build=async function(){status('building the spec...');const j=await post('/api/bio/build',form());if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}specName=j.name;$('yamltext').value=j.raw;status(`spec saved: config/studio/${j.name}.yaml -- seeding and rendering...`);await reseed();};
 window.reseed=async function(){playStop();FRAME=null;if(!specName){status('no spec yet',true);return;}status('seeding and building the renderer...');const r=await fetch('/api/bio/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){status(j.error,true);return;}SCENE=j;visPanel(j);tree(j);status(`seeded in ${j.seconds}s: `+Object.entries(j.sets).map(([k,v])=>`${k} ${v.n_live}`).join(', '));render(true);};
