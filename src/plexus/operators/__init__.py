@@ -50,6 +50,7 @@ from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cel
 #                                                 edge_flip, topo_record
 from . import seed_ops              # noqa: F401  seed_positions -- where a set's entities start
 from . import diffusion_reaction    # noqa: F401  seed_cell_chem, cell_chem_diffuse/react,
+from . import organelle_ops         # noqa: F401  organelle_seed / _project -- pieces with a radius inside a cell
 from . import protein_ops           # noqa: F401  protein_seed / _project / _express -- receptor and
                                     #              motor clusters as point entities on a cap of the tissue
 #                                                 cell_geometry, cell_grow, cell_chem_from_shape,

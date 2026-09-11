@@ -1136,6 +1136,8 @@ class LiveMovie:
                 if not self._contour_build(H, lvl, pos):
                     self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                     point_size=self._dot_px(pos))
+            elif (self.style or {}).get("dot_radius") and self._glyph_build(H, lvl):
+                pass                                          # spheres of world radius per type, below
             elif _r3d != "surface" or not self._skin_build(H, lvl, pos):
                 self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                 point_size=self._dot_px(pos))
@@ -1150,6 +1152,7 @@ class LiveMovie:
         if tick % self.stride:
             return
         self.cloud.points = self._xyz(lvl)
+        self._glyph_update(lvl)
         self._skin_update(H, lvl, self.cloud.points)
         self._contour_update(H, lvl, self.cloud.points)
         self._graph_update(H, tick)
@@ -3344,6 +3347,66 @@ class LiveMovie:
         self.colour_by = "height at t=0"
         return (np.stack([np.clip(1.4 - 1.6 * h, 0, 1), np.clip(0.35 + 0.5 * h, 0, 1),
                           np.clip(0.25 + 1.1 * h, 0, 1)], 1) * 255).astype(np.uint8)
+
+    # ------------------------------------------------------------------ spheres of a real radius
+    # `plotting.dot_radius: {nucleus: 0.3, mitochondria: 0.06}` draws each type of the subject set as
+    # lit spheres of that WORLD radius, one glyph actor per type, instead of pixel dots. A dot has no
+    # size in the world; an organelle does, and "does the nucleus fit inside the cell" is only
+    # visible if the picture draws it at its radius. Rebuilt each frame (a few thousand spheres).
+    def _glyph_types(self, lvl):
+        names = list(getattr(lvl, "type_names", []) or [])
+        rad = (self.style or {}).get("dot_radius") or {}
+        own = getattr(lvl, "node_type", None)
+        if not names or own is None:
+            return None
+        from matplotlib.colors import to_rgb
+        pal = (self.style or {}).get("colors") or {}
+        out = []
+        for tid, nm in enumerate(names):
+            r = rad.get(nm)
+            if r is None:
+                continue
+            col = to_rgb(tuple(pal[nm]) if isinstance(pal.get(nm), (list, tuple)) else pal[nm]) if nm in pal else (0.9, 0.9, 0.9)
+            out.append((tid, nm, float(r), col))
+        return out or None
+
+    def _glyph_points(self, lvl, tid):
+        own = getattr(lvl, "node_type", None)
+        occ = getattr(lvl, "occ", None)
+        import torch
+        nt = torch.as_tensor(own)[self.idx]
+        sel = nt == tid
+        if occ is not None:
+            sel = sel & (torch.as_tensor(occ)[self.idx].to(nt.device) > 0)
+        return np.asarray(self.cloud.points)[sel.cpu().numpy()]
+
+    def _glyph_build(self, H, lvl):
+        types = self._glyph_types(lvl)
+        if not types:
+            return False
+        self._glyphs = {}
+        for tid, nm, r, col in types:
+            self._glyph_geom = getattr(self, "_glyph_geom", {})
+            self._glyph_geom[nm] = self.pv.Sphere(radius=r, theta_resolution=14, phi_resolution=10)
+            self._glyphs[nm] = (tid, col, None)
+        self._glyph_update(lvl)
+        print(f"[live-movie] dot_radius: {', '.join(f'{nm} r={r:g}' for _, nm, r, _ in types)} drawn as spheres", flush=True)
+        return True
+
+    def _glyph_update(self, lvl):
+        g = getattr(self, "_glyphs", None)
+        if not g:
+            return
+        for nm, (tid, col, actor) in list(g.items()):
+            pts = self._glyph_points(lvl, tid)
+            if actor is not None:
+                self.p.remove_actor(actor, render=False)
+                actor = None
+            if len(pts):
+                pd = self.pv.PolyData(pts).glyph(geom=self._glyph_geom[nm], scale=False, orient=False)
+                actor = self.p.add_mesh(pd, color=col, smooth_shading=True, lighting=True, ambient=0.35,
+                                        diffuse=0.7, specular=0.2, name=f"glyph_{nm}")
+            g[nm] = (tid, col, actor)
 
     def _dot_px(self, pos):
         """Dot diameter in pixels such that a dot spans `fill` of the local spacing of the DRAWN
