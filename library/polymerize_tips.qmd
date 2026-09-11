@@ -1,0 +1,436 @@
+---
+title: "polymerize_tips"
+subtitle: "Add material at the growing end of every fibre, and let the cell be pushed by it."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Add material at the growing end of every fibre, and let the cell be pushed by it.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **structural**: change the entities themselves &mdash; divide, die, grow.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `cell_set`, `F`, `occ`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+particle -[containment]-> particle: finds each fibre's tip along the cell's polarity, wakes
+`rate` dormant points from that fibre's own pool, and lays them beyond the tip.
+
+HOW ADDING PARTICLES DEFORMS ANYTHING, which is the part that is not obvious and is easy to get
+wrong. It does not, by itself. The fixed-corotated stress a material point scatters is a
+function of its deformation gradient F alone -- at F = I it is exactly zero -- so a point woken
+with F = I contributes MASS to the grid and no force whatsoever, however crowded the place it
+was woken in. Nothing in the constitutive law counts particles.
+
+So the new material is woken PRE-COMPRESSED ALONG THE FIBRE:
+
+with d the growth direction. The point now behaves as if squeezed to a fraction c of its rest
+length along d, and the stress that relieves that -- through the ordinary scatter, grid solve
+and gather, with no new physics anywhere -- pushes its neighbours apart by the volume it is
+missing, p_vol (1 - c). That is the deformation, and it is momentum-conserving because it
+arrives as a stress divergence and not as an injected velocity.
+
+WHY NOT INJECT INTO THE GRID INSTEAD, which is the obvious alternative: an operator adding a
+divergence to the grid velocity field would also deform the material, since G2P hands the
+grid's velocity gradient to every nearby point's C and `mpm_strain` integrates
+F <- (I + dt C) F. But it creates momentum from nothing, and it deforms whatever is near the
+injection site -- cytoplasm, membrane, a passing mitochondrion -- rather than the thing that
+grew. The per-particle route reaches the same grid through the path the solver already has.
+
+WHAT THE POOL BUYS, IN VOLUME, because that is the binding constraint and not the rate. The
+cytoplasm is nearly incompressible, so the cell's shape changes by the volume inserted. A cell
+of 28 x 28 x 12 um is about 4,900 um^3 over 2.0 M points, i.e. 0.0025 um^3 a point; a
+protrusion 30 um long and 8 um across is about 1,500 um^3, which is 30% of the cell and some
+600,000 points. Trebling the cell by polymerisation alone would take twice its own volume in
+points. Taking material off the back at the same rate -- treadmilling -- moves the cell without
+paying that, which is what the real cytoskeleton does.
+
+Reference: Mogilner, A. & Oster, G. (1996). Cell motility driven by actin polymerization.
+Biophys. J. 71:3030-3045; Pollard, T. D. & Borisy, G. G. (2003). Cell 112:453-465.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `cell_set` | polarity_owner | **required** |
+| `rate` | points_per_fibre_per_frame | 1.0 |
+| `compress` | insertion_stretch | 0.6 |
+| `confine` | barrier_set | &ndash; |
+| `margin` | barrier_standoff | 0.005 |
+| `direction` | growth_axis | "fiber" |
+| `front_lo` | leading_region_extent | 0.15 |
+| `spacing` | insertion_step_length | &ndash; |
+| `front_only` | leading_edge_restriction | True |
+| `volume_scale` | network_coarse_graining | 1.0 |
+| `source` | existing_fibre_sets | &ndash; |
+| `gate` | phase_gate | &ndash; |
+| `block` | &ndash; | "polarity" |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: polymerize_tips, at: particle, cell_set: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`polymerization`]{.op-badge} [`protrusion`]{.op-badge} [`motility`]{.op-badge} [`cytoskeleton`]{.op-badge} [`growth`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`topo_record`](topo_record.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd), [`cell_exclude`](cell_exclude.qmd), [`bm_secrete`](bm_secrete.qmd), [`integrin_track`](integrin_track.qmd).
+
+## Source
+
+[`src/plexus/operators/cell_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/cell_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("polymerize_tips", family="motility", set="particle", kind="structural")
+class PolymerizeTips(Structural):
+    """Add material at the growing end of every fibre, and let the cell be pushed by it.
+
+    particle -[containment]-> particle: finds each fibre's tip along the cell's polarity, wakes
+    `rate` dormant points from that fibre's own pool, and lays them beyond the tip.
+
+    HOW ADDING PARTICLES DEFORMS ANYTHING, which is the part that is not obvious and is easy to get
+    wrong. It does not, by itself. The fixed-corotated stress a material point scatters is a
+    function of its deformation gradient F alone -- at F = I it is exactly zero -- so a point woken
+    with F = I contributes MASS to the grid and no force whatsoever, however crowded the place it
+    was woken in. Nothing in the constitutive law counts particles.
+
+    So the new material is woken PRE-COMPRESSED ALONG THE FIBRE:
+
+        F_new = I + (c - 1) d d^T,      c = `compress` < 1,   J = det F_new = c
+
+    with d the growth direction. The point now behaves as if squeezed to a fraction c of its rest
+    length along d, and the stress that relieves that -- through the ordinary scatter, grid solve
+    and gather, with no new physics anywhere -- pushes its neighbours apart by the volume it is
+    missing, p_vol (1 - c). That is the deformation, and it is momentum-conserving because it
+    arrives as a stress divergence and not as an injected velocity.
+
+    WHY NOT INJECT INTO THE GRID INSTEAD, which is the obvious alternative: an operator adding a
+    divergence to the grid velocity field would also deform the material, since G2P hands the
+    grid's velocity gradient to every nearby point's C and `mpm_strain` integrates
+    F <- (I + dt C) F. But it creates momentum from nothing, and it deforms whatever is near the
+    injection site -- cytoplasm, membrane, a passing mitochondrion -- rather than the thing that
+    grew. The per-particle route reaches the same grid through the path the solver already has.
+
+    WHAT THE POOL BUYS, IN VOLUME, because that is the binding constraint and not the rate. The
+    cytoplasm is nearly incompressible, so the cell's shape changes by the volume inserted. A cell
+    of 28 x 28 x 12 um is about 4,900 um^3 over 2.0 M points, i.e. 0.0025 um^3 a point; a
+    protrusion 30 um long and 8 um across is about 1,500 um^3, which is 30% of the cell and some
+    600,000 points. Trebling the cell by polymerisation alone would take twice its own volume in
+    points. Taking material off the back at the same rate -- treadmilling -- moves the cell without
+    paying that, which is what the real cytoskeleton does.
+
+    Reference: Mogilner, A. & Oster, G. (1996). Cell motility driven by actin polymerization.
+    Biophys. J. 71:3030-3045; Pollard, T. D. & Borisy, G. G. (2003). Cell 112:453-465.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True            # it writes positions, velocities and occupancy
+    REQUIRES_PARAMS = ["cell_set"]
+    REQUIRES_BUFFERS = ["F", "occ"]
+    INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
+    READS = ["polarity", "phase"]; WRITES = ["pos", "vel"]
+    MAPS = ["parent"]
+    MECHANISM_TAGS = ["polymerization", "protrusion", "motility", "cytoskeleton", "growth"]
+    PARAM_ROLES = {"rate": "points_per_fibre_per_frame", "compress": "insertion_stretch",
+                   "confine": "barrier_set", "margin": "barrier_standoff",
+                   "direction": "growth_axis", "front_lo": "leading_region_extent",
+                   "spacing": "insertion_step_length", "front_only": "leading_edge_restriction",
+                   "volume_scale": "network_coarse_graining", "source": "existing_fibre_sets",
+                   "cell_set": "polarity_owner", "gate": "phase_gate"}
+    REFERENCE = ("Mogilner, A. & Oster, G. (1996). Biophys. J. 71:3030-3045; "
+                 "Pollard, T. D. & Borisy, G. G. (2003). Cell 112:453-465.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        # THE POOL IS ITS OWN SET AND THE FIBRE IS ANOTHER. `at` is the dormant pool that grows;
+        # `source` names the set (or sets) whose points are already part of the fibre. Keeping them
+        # apart is what lets a settled run be loaded into this one -- `load_run` matches a set by
+        # name AND count, so enlarging `cytoskeleton_node` to carry its own reserve would stop it
+        # matching the run it continues -- and it gives the renderer a set holding exactly the
+        # newly polymerised material, in its own colour.
+        src = params.get("source") or []
+        self.source = [str(x) for x in ([src] if isinstance(src, str) else src)]
+        self.cell_set = str(params["cell_set"])
+        self.block = str(params.get("block", "polarity"))
+        self.rate = float(params.get("rate", 1.0))
+        self.compress = float(params.get("compress", 0.6))
+        # THE STEP IS THE MATERIAL'S OWN POINT SPACING, not a length in world units: a fibre whose
+        # points sit 0.0008 apart and receives them 0.01 apart is not a fibre, it is a dotted line
+        # the grid cannot see as connected. Left unset it is read from the set's own p_vol.
+        self.spacing = params.get("spacing")
+        self.front_only = bool(params.get("front_only", True))
+        # CONFINED BY THE MEMBRANE, or the fibre simply leaves. New material laid beyond a tip that
+        # is already outside the cell extends into empty space, where it meets nothing, pushes
+        # nothing, and deforms nothing: measured, 40 um of bare fibre outside a cell whose body had
+        # not moved. `confine: plasma_membrane_node` stops a fibre once its tip has reached the
+        # membrane's own reach in the growth direction, so the material that is added has to go
+        # where there is already cell -- and an incompressible cytoplasm must then bulge. As the
+        # membrane yields the tip is allowed forward again, which is the tethered-filament picture
+        # (Mogilner & Oster) rather than a beam growing out of a cell.
+        self.confine = params.get("confine")
+        # how far back the leading region reaches, as a fraction of the cell's own forward reach:
+        # 0.1 fills nearly the whole front half, 0.7 only the tip zone
+        self.front_lo = float(params.get("front_lo", 0.15))
+        # WHICH WAY A FIBRE GROWS. `polarity` lays every new point along the CELL's polarity, which
+        # is seeded in the plane of the substrate -- so all of it comes out parallel to the floor, a
+        # flat yellow sheet through the middle of the cell, which is not what a cytoskeleton looks
+        # like and not how a filament elongates. `fiber` (the default now) takes each fibre's OWN
+        # axis, tip minus its own centroid: the filament gets longer along itself, in whatever
+        # direction it already points, and the new material is indistinguishable in orientation from
+        # the network it grew from. The polarity still decides WHICH fibres grow -- the leading half
+        # -- it just no longer decides which way they point.
+        self.direction = str(params.get("direction", "fiber"))
+        self.margin = float(params.get("margin", 0.005))
+        # ONE MATERIAL POINT STANDS FOR MORE VOLUME THAN THE BARE FILAMENT IT GREW FROM, and this
+        # says how much more. The atlas's filaments are 0.6 um thick, so the whole cytoskeleton is
+        # 0.6% of the cell's volume: doubling it by polymerisation adds 0.6% and the cell does not
+        # notice. What a tip actually builds is a BRANCHED NETWORK filling the space it grows into,
+        # and `volume_scale` is the coarse-graining between the two -- it multiplies the woken
+        # point's p_vol and mass, so 20 means one new point makes room for twenty filament-widths
+        # of network. It decides whether this is a filopodium (1, a thin spike) or a lamellipodium.
+        self.volume_scale = float(params.get("volume_scale", 1.0))
+        self.gate = params.get("gate")
+        self._cursor = None
+        self._exhausted = False
+        self._scaled = False
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        cl = H.level(self.cell_set)
+        D = p.F.shape[-1]
+        par = p.parent
+        nP = int(par.max()) + 1
+
+        if self._cursor is None:
+            n_per = torch.bincount(par, minlength=nP)
+            self._start = torch.cumsum(n_per, 0) - n_per
+            self._n_per = n_per
+            self._cursor = torch.zeros(nP, dtype=torch.long, device=par.device)
+            # WHICH CELL EACH FIBRE BELONGS TO, resolved once: the containment map does not change,
+            # and asking per point per frame is 240,000 gathers for 400 answers.
+            self._cell_of = H.lift_index(p.name, self.cell_set)[self._start]
+            if self.spacing is None:
+                # AFTER the coarse-graining, not before: a point standing for 20x the filament's
+                # volume is 2.7x wider, and laying such points at the bare filament's spacing packs
+                # twenty times the material into the same length.
+                self.spacing = float((p.p_vol.mean() * self.volume_scale) ** (1.0 / 3.0))
+            print(f"[polymerize_tips] {self.at}: {nP:,} fibres, {p.n:,} points in the pool "
+                  f"({int((p.occ == 0).sum()):,} dormant), step {self.spacing:.2e} "
+                  f"({self.spacing * float(getattr(H, 'length_um', 100.0)):.3f} um); tips read "
+                  f"from {', '.join([self.at] + self.source)}", flush=True)
+            if self.volume_scale != 1.0:
+                p.p_vol.mul_(self.volume_scale)
+                if hasattr(p, "mass_rest"):
+                    p.mass_rest.mul_(self.volume_scale)
+                print(f"[polymerize_tips] each point of the pool stands for "
+                      f"{self.volume_scale:g}x the bare filament's volume -- the pool is worth "
+                      f"{float(p.p_vol.sum()):.3e} of volume in total", flush=True)
+
+        b0, b1 = cl.state_schema[self.block]
+        n_cell = cl.state[:, b0:b1][:, :D]
+        n_cell = n_cell / n_cell.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        dP = n_cell[self._cell_of]                             # the cell's polarity, per fibre
+
+        # ---- each fibre's TIP, over the fibre AND everything polymerised onto it so far ----
+        Xs, Vs, ps, ls = [], [], [], []
+        for nm in [self.at] + self.source:
+            q = H.level(nm)
+            Xs.append(q.get("pos")[:, :D]); Vs.append(q.get("vel")[:, :D])
+            ps.append(q.parent); ls.append(q.occ > 0)
+        Xa = torch.cat(Xs, 0); Va = torch.cat(Vs, 0)
+        pa = torch.cat(ps, 0); la = torch.cat(ls, 0)
+        proj = (Xa * dP[pa]).sum(1)
+        best = torch.full((nP,), torch.finfo(proj.dtype).min, device=Xa.device, dtype=proj.dtype)
+        best = best.scatter_reduce(0, pa[la], proj[la], "amax", include_self=True)
+        is_tip = la & (proj >= best[pa] - 1e-12)
+        tip = torch.full((nP,), -1, dtype=torch.long, device=Xa.device)
+        tip[pa[is_tip]] = torch.arange(Xa.shape[0], device=Xa.device)[is_tip]
+
+        grow = tip >= 0
+        tp = Xa[tip.clamp_min(0)]
+        nP_pol = dP
+        if self.direction == "fiber":
+            # each fibre's own axis: its tip minus the centroid of its own live points
+            cen = torch.zeros(nP, D, device=Xa.device, dtype=Xa.dtype)
+            cnt = torch.zeros(nP, device=Xa.device, dtype=Xa.dtype)
+            cen.index_add_(0, pa[la], Xa[la])
+            cnt.index_add_(0, pa[la], torch.ones_like(proj[la]))
+            cen = cen / cnt.clamp_min(1.0)[:, None]
+            ax = tp - cen
+            nrm = ax.norm(dim=1, keepdim=True)
+            # a fibre too short to have an axis of its own keeps the cell's polarity
+            dP = torch.where(nrm > 1e-6, ax / nrm.clamp_min(1e-12), dP)
+
+        # ---- which fibres grow: the leading edge, and the half of the cycle that extends ----
+        if self.front_only:
+            c0 = cl.state_schema["pos"][0]
+            ahead = ((tp - cl.state[self._cell_of, c0:c0 + D]) * nP_pol).sum(1)
+            grow = grow & (ahead > 0)
+        # A BLOCKED TIP BRANCHES, IT DOES NOT STOP. Refusing to grow at the barrier looks careful
+        # and is the reason the first version did nothing: every front fibre reached the membrane
+        # within about a hundred frames and never resumed, so 5% of the pool was ever spent, 0.7%
+        # of the cell's volume was added, and the front advanced 0.16 um over a cell that was
+        # polymerising nothing at all. A real leading edge does not idle when a filament touches the
+        # membrane -- Arp2/3 nucleates a daughter filament off its side and the NETWORK thickens
+        # behind the edge. So a blocked fibre lays its material just behind its own tip with a
+        # sideways offset, where there is already cell, and a near-incompressible cytoplasm has to
+        # take it somewhere.
+        blocked = torch.zeros(nP, dtype=torch.bool, device=Xa.device)
+        env = None                                   # the envelope a new point must land inside
+        if self.confine:
+            m = H.level(self.confine)
+            # THE BARRIER MAY BE A SURFACE RATHER THAN AN ORGANELLE, and a surface is not contained
+            # in the cell -- a mesh's vertices have no parent to lift through. With one cell in the
+            # model they all belong to it; with several, a barrier set must be contained, and saying
+            # so here is better than a lift that silently indexes the wrong cell.
+            try:
+                im = H.lift_index(m.name, self.cell_set)
+            except Exception:
+                if cl.n != 1:
+                    raise ValueError(
+                        f"polymerize_tips: `confine: {self.confine}` is not contained in "
+                        f"{self.cell_set!r}, and this model has {cl.n} cells, so there is no way to "
+                        f"tell which cell each barrier point belongs to.")
+                im = torch.zeros(m.n, dtype=torch.long, device=Xa.device)
+            Xm = m.get("pos")[:, :D]
+            lm = m.occ > 0
+            c_all = cl.state[:, cl.state_schema["pos"][0]:cl.state_schema["pos"][0] + D]
+            pm = ((Xm - c_all[im]) * n_cell[im]).sum(1)
+            reach = torch.full((cl.n,), torch.finfo(pm.dtype).min, device=Xa.device, dtype=pm.dtype)
+            reach = reach.scatter_reduce(0, im[lm], pm[lm], "amax", include_self=True)
+            p_tip = ((tp - cl.state[self._cell_of, cl.state_schema["pos"][0]:
+                                    cl.state_schema["pos"][0] + D]) * nP_pol).sum(1)
+            blocked = p_tip >= reach[self._cell_of] - self.margin
+            # AND THE INSERTION IS CLAMPED INTO THE CELL, not merely refused when the tip is out.
+            # Blocking the tip is not enough: once a single point gets outside -- and one always
+            # does, because the membrane moves -- it becomes the tip its own fibre grows from, and
+            # every point after it is laid further out still. Measured, that is the spray of
+            # material across the whole box. So the envelope of the membrane is computed here, per
+            # cell, and every new position is clamped inside it below. A point that cannot be put
+            # inside the cell is not polymerised at all.
+            lat = ((Xm - c_all[im]) - pm[:, None] * n_cell[im]).clone()
+            lat[:, 1] = 0.0
+            rad = lat.norm(dim=1)
+            half = torch.zeros(cl.n, device=Xa.device, dtype=pm.dtype).scatter_reduce(
+                0, im[lm], rad[lm], "amax", include_self=True)
+            ylo = torch.full((cl.n,), float("inf"), device=Xa.device, dtype=pm.dtype)
+            yhi = torch.full((cl.n,), -float("inf"), device=Xa.device, dtype=pm.dtype)
+            ylo = ylo.scatter_reduce(0, im[lm], Xm[lm, 1], "amin", include_self=True)
+            yhi = yhi.scatter_reduce(0, im[lm], Xm[lm, 1], "amax", include_self=True)
+            env = (reach, half, ylo, yhi)
+        k = torch.as_tensor(self.rate, device=Xa.device, dtype=Xa.dtype).expand(nP).clone()
+        gt = _gate(self, H, self._cell_of)
+        if gt is not None:
+            k = k * gt.clamp_min(0.0)
+        # A FRACTIONAL RATE IS A PROBABILITY, not a rounded-down zero: `rate: 0.3` must mean three
+        # points every ten frames, and int() would make it mean none, ever.
+        n_new = torch.floor(k + torch.rand(nP, device=Xa.device)).long().clamp_min(0)
+        n_new = torch.where(grow, n_new, torch.zeros_like(n_new))
+        room = (self._n_per - self._cursor).clamp_min(0)
+        n_new = torch.minimum(n_new, room)
+        if int(n_new.sum()) == 0:
+            if not self._exhausted and int(room.sum()) == 0:
+                self._exhausted = True
+                print("[polymerize_tips] the pool is spent -- every fibre has woken all of its "
+                      "dormant points. The cell cannot grow further without a bigger pool.",
+                      flush=True)
+            return {}
+
+        # ---- wake them: contiguous from each fibre's cursor, laid beyond its tip ----
+        f = torch.repeat_interleave(torch.arange(nP, device=Xa.device), n_new)
+        j = torch.arange(int(n_new.sum()), device=Xa.device) - \
+            torch.repeat_interleave(torch.cumsum(n_new, 0) - n_new, n_new)
+        slot = self._start[f] + self._cursor[f] + j
+        self._cursor = self._cursor + n_new
+        d = dP[f]
+        X_new = tp[f] + (j + 1).to(Xa.dtype)[:, None] * self.spacing * d
+        if bool(blocked.any()) and env is not None:
+            # A BLOCKED FIBRE FILLS THE LEADING REGION, it does not pile up at its own tip. Laying
+            # the material just behind a tip that is pinned against the membrane puts every frame's
+            # points in the same few hundred spots: measured, those spots reach the pressure cap and
+            # stop pushing while the cytoplasm around them never crowds at all -- turgor on the
+            # cytoplasm was a mean of 4.7 and FALLING while 71,616 points arrived. A branched network
+            # fills the volume behind the leading edge, and a pressure that is to move a front has to
+            # be raised over that whole volume rather than at a few points in it.
+            reach, half, ylo, yhi = env
+            ci = self._cell_of[f]
+            cpos = cl.state[ci, cl.state_schema["pos"][0]:cl.state_schema["pos"][0] + D]
+            u = torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype)
+            ax = (self.front_lo + (0.95 - self.front_lo) * u) * (reach[ci] - self.margin)
+            ang = 2.0 * math.pi * torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype)
+            rad = torch.sqrt(torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype)) * \
+                0.9 * (half[ci] - self.margin).clamp_min(0.0)
+            # WHERE the material goes is the CELL's leading region, in the cell's own frame; which
+            # WAY the filament that carries it points is the fibre's business. Using the fibre axis
+            # for both would scatter the fill over a different region for every fibre.
+            dc = nP_pol[f]
+            e1 = torch.stack([-dc[:, 2], torch.zeros_like(dc[:, 0]), dc[:, 0]], 1)
+            e1 = e1 / e1.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            e2 = torch.linalg.cross(dc, e1)
+            X_fill = cpos + ax[:, None] * dc + (rad * torch.cos(ang))[:, None] * e1 \
+                + (rad * torch.sin(ang))[:, None] * e2
+            X_fill[:, 1] = (ylo[ci] + self.margin +
+                            (yhi[ci] - ylo[ci] - 2 * self.margin).clamp_min(0.0) *
+                            torch.rand(f.numel(), device=Xa.device, dtype=Xa.dtype))
+            X_new = torch.where(blocked[f][:, None], X_fill, X_new)
+        if env is not None:
+            reach, half, ylo, yhi = env
+            ci = self._cell_of[f]
+            cpos = cl.state[ci, cl.state_schema["pos"][0]:cl.state_schema["pos"][0] + D]
+            rel = X_new - cpos
+            ax = (rel * d).sum(1).clamp(max=(reach[ci] - self.margin))
+            side = rel - (rel * d).sum(1)[:, None] * d
+            side = side.clone(); side[:, 1] = 0.0
+            sr = side.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            side = side * (sr.clamp(max=(half[ci] - self.margin).clamp_min(0.0)[:, None]) / sr)
+            X_new = cpos + ax[:, None] * d + side
+            X_new[:, 1] = X_new[:, 1].clamp(min=ylo[ci] + self.margin, max=yhi[ci] - self.margin)
+        p.state[slot, :D] = X_new
+        v0, v1 = p.state_schema["vel"]
+        p.state[slot, v0:v1] = Va[tip[f]][:, : v1 - v0]        # arrives moving with the tip
+        eye = torch.eye(D, device=Xa.device, dtype=p.F.dtype)
+        p.F[slot] = eye[None] + (self.compress - 1.0) * (d[:, :, None] * d[:, None, :])
+        p.C[slot] = 0.0
+        if getattr(p, "Jp", None) is not None:
+            p.Jp[slot] = 1.0
+        if hasattr(p, "mass_rest"):
+            p.mass[slot] = p.mass_rest[slot]
+        p.occ[slot] = 1.0
+        return {}
+```

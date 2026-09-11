@@ -94,7 +94,7 @@ operators:
 
 ## Related operators
 
-Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`seed_mesh`](seed_mesh.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd).
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`seed_positions`](seed_positions.qmd).
 
 ## Source
 
@@ -126,6 +126,17 @@ class SeedMesh3D(Structural):
     Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644.
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    # WHAT THE SEED'S NUMBERS ARE. `radius` and `h0` are lengths in the world box; `p0` is the
+    # dimensionless shape index P/sqrt(A); `vseed_cv` is a fraction of the quantity it perturbs.
+    # `n_cells` is a count. Anything not named here is UNDECLARED and therefore silent.
+    PARAM_UNITS = {"radius": "length", "h0": "length", "p0": "fraction",
+                   "vseed_cv": "fraction", "n_cells": "count", "seed": "count"}
+    # WHICH VOLUME THE SEEDED TARGET IS. `V0f` and `v_ref` come from `face_geometry_3d`, the WEDGE
+    # volume: a sum of origin-referenced cones over the cell's mid-surface ring. Everything
+    # downstream inherits that convention unless something re-seeds it, which is what the
+    # apicobasal seed's `v0_from: polyhedron` exists to do.
+    BLOCK_UNITS = {"V0f": "volume[wedge]", "Vbirth": "volume[wedge]",
+                   "A0": "area[midsurface]", "P0": "length"}
     MECHANISM_TAGS = ["vesicle", "epithelial_shell", "spherical", "half_edge_mesh", "initial_condition"]
     REFERENCE = "Okuda, S. et al. (2013). Reversible network reconnection model for simulating large deformation in 3D tissues. Biomech. Model. Mechanobiol. 12:627-644; tyssue (DamCB)."
 
@@ -156,12 +167,19 @@ class SeedMesh3D(Structural):
         # `build_hexagon_mesh`. It is a value for the same reason `disc` is -- the same hypothesis
         # about the tissue, seeded into a geometry chosen so a closed form is reachable.
         self.shape = str(params.get("shape", "sphere")).lower()
+        # THE APICO-BASAL AXIS OF A `prism`: the separation between its apical and its basal cap, in
+        # world units. Unset, a prism is as tall as it is wide -- which is a cuboidal cell, not a
+        # claim that height does not matter.
+        self.height = params.get("height")
+        if self.height is not None:
+            self.height = float(self.height)
         # `plane`, `ribbon` and `moebius` are three more VALUES on the same axis, for the reason
         # `disc` is one: the same hypothesis about the tissue, seeded into a different geometry.
         # See `build_strip_mesh` -- and note that `moebius` is the one seed on which "apical" is not
         # globally definable, which is what makes it a test rather than a picture.
         self.strip_width = float(params.get("width", 0.5))
-        if self.shape not in ("sphere", "disc", "hexagon", "plane", "ribbon", "moebius"):
+        if self.shape not in ("sphere", "disc", "hexagon", "plane", "ribbon", "moebius",
+                              "prism", "prisms"):
             raise ValueError(f"mesh_seed: shape must be 'sphere', 'disc', 'hexagon', 'plane', "
                              f"'ribbon' or 'moebius', "
                              f"got {self.shape!r}")
@@ -217,8 +235,12 @@ class SeedMesh3D(Structural):
                                                      kind=self.shape, width=self.strip_width)
         else:
             _build = {"sphere": build_sphere_mesh, "disc": build_disc_mesh,
-                      "hexagon": build_hexagon_mesh}[self.shape]
-            verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed)
+                      "hexagon": build_hexagon_mesh,
+                      "prism": build_prism_mesh,
+                      "prisms": build_prisms_mesh}[self.shape]
+            _kw = {"height": self.height} if (self.shape in ("prism", "prisms")
+                                              and self.height is not None) else {}
+            verts, es, et, ef, nF = _build(self.n, self.R, self.jitter, self.seed, **_kw)
         Nv = verts.shape[0]; Nbuf = lvl.state.shape[0]
         if Nv > Nbuf:
             raise ValueError(f"sphere mesh has {Nv} vertices but buffer n={Nbuf}")

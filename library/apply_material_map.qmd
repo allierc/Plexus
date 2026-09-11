@@ -1,6 +1,6 @@
 ---
 title: "apply_material_map"
-subtitle: "Field -> set: sample the map at each particle and write a per-particle material parameter."
+subtitle: "Paint a material parameter onto the particles from an image: the map says what each region is made of, so heterogeneity is measured rather than declared per type."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Field -> set: sample the map at each particle and write a per-particl
 
 [`exchange`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Field -> set: sample the map at each particle and write a per-particle material parameter.
+Paint a material parameter onto the particles from an image: the map says what each region is made of, so heterogeneity is measured rather than declared per type.
 :::
 
 ```{=html}
@@ -42,9 +42,24 @@ Field -> set: sample the map at each particle and write a per-particle material 
 
 ## Mechanism
 
-parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the
-Lame buffers mu/la (the MPM stress law reads them); any other `target` is written as
-a per-particle buffer of that name. Mutates per-particle buffers, returns {}.
+region is made of, so heterogeneity is measured rather than declared per type.
+
+field -> particle: samples the `from:` field at each particle's position, writes a
+per-particle material buffer in place.
+
+    v_i      = lo + c(x_i) (hi - lo),        c(x_i) in [0, 1], bilinear from the map
+    mu_i     = E_i / (2 (1 + nu))            when target: youngs
+
+c is the map intensity, normalised to [0, 1] on load, so `min` and `max` carry the units and
+the image carries only the pattern -- which is what lets one map drive a stiffness in one
+specification and a density in another. With `target: youngs` the sampled value is Young's
+modulus in the run's stress units and the two Lame parameters follow from it at the shared
+Poisson ratio nu; any other `target` is written straight through as a per-particle buffer of
+that name.
+
+Reference: Hu, Y. et al. (2018). A moving least squares material point method with
+displacement discontinuity and two-way rigid body coupling. ACM Trans. Graph. 37(4):150 (the
+material model whose mu and lambda this writes).
 
 $$
 E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
@@ -86,10 +101,27 @@ Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qm
 ```python
 @register_operator("apply_material_map", family="mpm", set="particle", kind="exchange")
 class ApplyMaterialMap(Exchange):
-    """field -> set: sample the map at each particle and write a per-particle material
-    parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the
-    Lame buffers mu/la (the MPM stress law reads them); any other `target` is written as
-    a per-particle buffer of that name. Mutates per-particle buffers, returns {}."""
+    """Paint a material parameter onto the particles from an image: the map says what each
+    region is made of, so heterogeneity is measured rather than declared per type.
+
+    field -> particle: samples the `from:` field at each particle's position, writes a
+    per-particle material buffer in place.
+
+        v_i      = lo + c(x_i) (hi - lo),        c(x_i) in [0, 1], bilinear from the map
+        mu_i     = E_i / (2 (1 + nu))            when target: youngs
+        lambda_i = E_i nu / ((1 + nu)(1 - 2 nu))
+
+    c is the map intensity, normalised to [0, 1] on load, so `min` and `max` carry the units and
+    the image carries only the pattern -- which is what lets one map drive a stiffness in one
+    specification and a density in another. With `target: youngs` the sampled value is Young's
+    modulus in the run's stress units and the two Lame parameters follow from it at the shared
+    Poisson ratio nu; any other `target` is written straight through as a per-particle buffer of
+    that name.
+
+    Reference: Hu, Y. et al. (2018). A moving least squares material point method with
+    displacement discontinuity and two-way rigid body coupling. ACM Trans. Graph. 37(4):150 (the
+    material model whose mu and lambda this writes).
+    """
 
     EMIT = None                              # sets material, emits no force
     REQUIRES_PARAMS = ["from", "target"]

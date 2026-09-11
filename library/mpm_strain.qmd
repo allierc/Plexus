@@ -106,7 +106,7 @@ Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd),
 
 ```python
 @register_operator("mpm_strain", family="mpm", set="particle", kind="lateral")
-class MPMStrain(Lateral):
+class MPMStrain(MPMWrites, Lateral):
     """The material update: the fourth step of the MLS-MPM cycle. Each particle advances its own
     deformation gradient from the velocity gradient it just gathered, then applies its material law.
 
@@ -233,7 +233,7 @@ class MPMStrain(Lateral):
                 F = F.clone(); F[sm] = U @ torch.diag_embed(sig_c) @ Vh
                 ratio = sig.prod(-1) / sig_c.prod(-1).clamp(min=1e-6)
                 Jp = p.Jp.clone(); Jp[sm] = (Jp[sm] * ratio).clamp(0.6, 20.0)
-                p.Jp.copy_(Jp)
+                self._write_Jp(p, Jp)
         # DORMANT PARTICLES DO NOT DEFORM. `mpm_scatter` masks its weights by occupancy and
         # `mpm_gather` freezes occ==0 rather than advecting it, but this operator integrated F for the
         # reserve regardless -- so a particle waiting to be spawned accumulated an arbitrary deformation
@@ -243,6 +243,6 @@ class MPMStrain(Lateral):
         if occ is not None:
             live = (occ > 0)[:, None, None]
             F = torch.where(live, F, p.F)
-        p.F.copy_(F)                        # in place; every read of p.F above precedes it
+        self._write_F(p, F)             # in place; every read of p.F above precedes it
         return {}
 ```

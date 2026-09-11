@@ -1,0 +1,224 @@
+---
+title: "seed_mpm_in_cells"
+subtitle: "Fill every cell of an apico-basal epithelium with material points."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Fill every cell of an apico-basal epithelium with material points.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `surface`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+particle -[containment]-> vertex: reads the half-edge mesh on a vertex set, and places each
+particle inside the PRISM of the cell it belongs to -- the volume between that cell's basal ring
+at `pos - sep/2` and its apical ring at `pos + sep/2`.
+
+HOW A POINT IS PUT INSIDE A CELL, given that a cell is a polygon and not a shape with a formula.
+The cell's ring is fanned into triangles from its own centroid, one per half-edge, which is the
+same fan `face_geometry_3d` integrates its area over -- so the sampling and the geometry agree by
+construction. A particle draws a half-edge of its cell in proportion to that triangle's area, a
+point in the triangle by the square-root barycentric rule (uniform, unlike raw barycentrics,
+which crowd the centroid), and a height uniformly across the thickness. The three together are
+uniform in the prism.
+
+    x = (1-u) c_j + u [(1-v) s_h + v t_h] + (w - 1/2) sep(x)
+
+with c_j the cell's centroid, s_h and t_h the half-edge's own two vertices, u = sqrt(a) for
+a ~ U(0,1), v ~ U(0,1), w ~ U(0,1), and sep interpolated the same way as the position.
+
+WHICH CELL A PARTICLE BELONGS TO is not decided here: it is the containment map the spec already
+declares, `parent: <the cell set>` with `per_parent: <n>`, so a spec that wants 2,000 points in
+each of twelve cells says so once and this operator reads it. That is also what makes the result
+a HIERARCHY rather than a cloud that happens to sit inside a mesh -- `aggregate_centroid` will
+give each cell its material's centre of mass, and every organelle-level operator in this library
+keeps working.
+
+`p_vol` AND `mass` ARE REWRITTEN from the cell's own volume divided by the number of points in
+it, for the reason `seed_cell_atlas` does the same: the entity provisions every point with an
+identical volume, and cells of a tissue are not identical.
+
+Reference: Plexus (this work); the prism geometry is `seed_mesh[apicobasal]`'s own
+(Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `surface` | vertex_set | **required** |
+| `sep_block` | thickness_state | "sep" |
+| `inset` | fraction_kept_from_the_wall | 0.9 |
+| `density` | material_density | 1.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: seed_mpm_in_cells, at: particle, surface: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`initial_condition`]{.op-badge} [`epithelium`]{.op-badge} [`encapsulation`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/cell_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/cell_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("seed_mpm_in_cells", family="cell", set="particle", kind="seed")
+class SeedMPMInCells(Seed):
+    """Fill every cell of an apico-basal epithelium with material points.
+
+    particle -[containment]-> vertex: reads the half-edge mesh on a vertex set, and places each
+    particle inside the PRISM of the cell it belongs to -- the volume between that cell's basal ring
+    at `pos - sep/2` and its apical ring at `pos + sep/2`.
+
+    HOW A POINT IS PUT INSIDE A CELL, given that a cell is a polygon and not a shape with a formula.
+    The cell's ring is fanned into triangles from its own centroid, one per half-edge, which is the
+    same fan `face_geometry_3d` integrates its area over -- so the sampling and the geometry agree by
+    construction. A particle draws a half-edge of its cell in proportion to that triangle's area, a
+    point in the triangle by the square-root barycentric rule (uniform, unlike raw barycentrics,
+    which crowd the centroid), and a height uniformly across the thickness. The three together are
+    uniform in the prism.
+
+        x = (1-u) c_j + u [(1-v) s_h + v t_h] + (w - 1/2) sep(x)
+
+    with c_j the cell's centroid, s_h and t_h the half-edge's own two vertices, u = sqrt(a) for
+    a ~ U(0,1), v ~ U(0,1), w ~ U(0,1), and sep interpolated the same way as the position.
+
+    WHICH CELL A PARTICLE BELONGS TO is not decided here: it is the containment map the spec already
+    declares, `parent: <the cell set>` with `per_parent: <n>`, so a spec that wants 2,000 points in
+    each of twelve cells says so once and this operator reads it. That is also what makes the result
+    a HIERARCHY rather than a cloud that happens to sit inside a mesh -- `aggregate_centroid` will
+    give each cell its material's centre of mass, and every organelle-level operator in this library
+    keeps working.
+
+    `p_vol` AND `mass` ARE REWRITTEN from the cell's own volume divided by the number of points in
+    it, for the reason `seed_cell_atlas` does the same: the entity provisions every point with an
+    identical volume, and cells of a tissue are not identical.
+
+    Reference: Plexus (this work); the prism geometry is `seed_mesh[apicobasal]`'s own
+    (Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644).
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["initial_condition", "epithelium", "encapsulation"]
+    PARAM_ROLES = {"surface": "vertex_set", "sep_block": "thickness_state",
+                   "inset": "fraction_kept_from_the_wall", "density": "material_density"}
+    REFERENCE = "Plexus (this work); Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "particle")
+        self.surface = str(params["surface"])
+        self.sep_block = str(params.get("sep_block", "sep"))
+        # A MARGIN OFF THE WALL, because a point exactly on a face is in contact with it from the
+        # first frame: 0.9 keeps the material to nine tenths of the cell's own cross-section.
+        self.inset = float(params.get("inset", 0.9))
+        self.density = float(params.get("density", 1.0))
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        v = H.level(self.surface)
+        m = getattr(v, "_mesh", None)
+        if m is None or not int(m.get("Nv", 0)):
+            raise ValueError(f"seed_mpm_in_cells: {self.surface!r} carries no half-edge mesh. "
+                             f"Declare `mesh: half_edge` on it and seed it first.")
+        es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]
+        nF = int(m["nF"])
+        dev = p.state.device
+        P0, P1 = v.state_schema["pos"]
+        X = v.state[:, P0:P1]
+        S0, S1 = v.state_schema[self.sep_block]
+        SEP = v.state[:, S0:S1]
+
+        # the fan: one triangle per half-edge, (centroid, srce, trgt), and its area
+        cnt = torch.bincount(ef, minlength=nF).clamp_min(1)
+        cen = torch.zeros(nF, 3, device=dev, dtype=X.dtype).index_add(0, ef, X[es]) / cnt[:, None]
+        A, B, C = cen[ef], X[es], X[et]
+        area = 0.5 * torch.linalg.cross(B - A, C - A, dim=1).norm(dim=1)
+
+        par = p.parent
+        nP = int(par.max()) + 1
+        if nP > nF:
+            raise ValueError(f"seed_mpm_in_cells: the particle set is contained in {nP} parents but "
+                             f"the surface has {nF} cells.")
+        # A HALF-EDGE OF ITS OWN CELL, PER PARTICLE. The builder keeps each cell's half-edges
+        # contiguous and in ring order, so a cell's fibre is the slice [first[j], first[j+1]) and
+        # drawing one is an offset into that run -- no search, and no per-cell list. Uniform over the
+        # ring rather than weighted by triangle area: a cell whose ring has one long edge is then
+        # slightly over-sampled near its short ones, which is a bias of a few percent in where the
+        # points sit and none at all in how many each cell gets.
+        counts = torch.bincount(ef, minlength=nF)
+        first = torch.zeros(nF + 1, dtype=torch.long, device=dev)
+        first[1:] = torch.cumsum(counts, 0)
+        pick = (torch.rand(p.n, device=dev) * counts[par].to(X.dtype)).long()
+        pick = torch.minimum(pick, (counts[par] - 1).clamp_min(0))
+        h = first[par] + pick
+        a = torch.rand(p.n, device=dev, dtype=X.dtype).sqrt()
+        b = torch.rand(p.n, device=dev, dtype=X.dtype)
+        w = torch.rand(p.n, device=dev, dtype=X.dtype) - 0.5
+        ca, cb, cc = cen[par], X[es[h]], X[et[h]]
+        base_pt = ca + self.inset * (a[:, None] * ((1 - b)[:, None] * (cb - ca)
+                                                   + b[:, None] * (cc - ca)))
+        sep_c = torch.zeros(nF, 3, device=dev, dtype=X.dtype).index_add(0, ef, SEP[es]) / cnt[:, None]
+        sep_pt = sep_c[par] + self.inset * (a[:, None] * ((1 - b)[:, None] * (SEP[es[h]] - sep_c[par])
+                                                          + b[:, None] * (SEP[et[h]] - sep_c[par])))
+        pos = base_pt + w[:, None] * sep_pt
+        p.state[:, p.state_schema["pos"][0]:p.state_schema["pos"][1]] = pos
+        if "vel" in p.state_schema:
+            v0, v1 = p.state_schema["vel"]
+            p.state[:, v0:v1] = 0.0
+
+        # the cell's own volume, shared out among the points that are in it
+        vol = torch.zeros(nF, device=dev, dtype=X.dtype).index_add(
+            0, ef, area * sep_pt.new_zeros(1).expand(area.shape[0]) if False else
+            area * SEP[es].norm(dim=1))
+        per = torch.bincount(par, minlength=nF).clamp_min(1)
+        if hasattr(p, "p_vol"):
+            p.p_vol.copy_((vol[par] / per[par].to(X.dtype)).clamp_min(1e-20))
+            if hasattr(p, "mass"):
+                p.mass.copy_(p.p_vol * self.density)
+        print(f"[seed_mpm_in_cells] {p.n:,} material points into {nP} of {nF} cells "
+              f"({p.n // max(nP,1):,} each), prisms of mean volume {float(vol[:nP].mean()):.3e}, "
+              f"inset {self.inset:g}", flush=True)
+        return {}
+```

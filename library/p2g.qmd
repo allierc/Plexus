@@ -122,7 +122,7 @@ Other **exchange** operators: [`voxelize`](voxelize.qmd), [`deposit`](deposit.qm
 
 ```python
 @register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
-class MPMScatter(Exchange):                
+class MPMScatter(MPMWrites, Exchange):                
     """Particle to grid: the first step of the MLS-MPM cycle. Every particle deposits its mass,
     its momentum, and the impulse of its own internal stress onto the grid nodes around it.
 
@@ -242,7 +242,9 @@ class MPMScatter(Exchange):
         a_ext = _hand_body_force_to_grid(self, H, a_ext, dev, D)
         V = V + dt * (a_ext - self.drag * V)                       # body force + Stokes drag (local; G2P resets V)
 
-        F, C, mass = p.F, p.C, p.mass
+        # mass CLONED AT THE POINT IT IS FIRST READ, not later: the momentum line below holds
+        # `mass[:, None, None]`, and a clone taken after that has already let the view into the tape.
+        F, C, mass = p.F, p.C, self._const_read(p.mass)
         # RESIDUAL STRESS / PRESTRESS (optional, default OFF): compute the fixed-corotated stress
         # relative to a non-identity per-particle REST tensor F_res (multiplicative morphoelastic split
         # F = Fe . F_res, so Fe = F @ F_res_inv is the elastic part). At the mesh rest state F=I this
@@ -259,7 +261,12 @@ class MPMScatter(Exchange):
             J = a * d - b * c
         else:
             J = torch.linalg.det(F)
-        mu, la = p.mu, p.la
+        # THE MATERIAL CONSTANTS THROUGH CLONES WHILE A TAPE IS KEPT. mu, la, p_vol and mass are
+        # buffers a seed operator is allowed to rewrite (`set_material` does), and a version counter
+        # that moves after a forward has read the buffer is what autograd reports as "[N, 1, 1] is
+        # at version 2; expected version 1" -- from a line that did nothing wrong. One vector each,
+        # per substep, and only under grad.
+        mu, la = self._const_read(p.mu), self._const_read(p.la)
         snow = getattr(p, "is_snow", None)
         if _const_any(self, "_c_snow", snow):                      # snow hardening from the plastic ratio Jp
             h = torch.exp((10.0 * (1.0 - p.Jp)).clamp(-6.0, 6.0))
@@ -342,7 +349,11 @@ class MPMScatter(Exchange):
             if getattr(p, "sigma", None) is None or p.sigma.shape != sig.shape:
                 p.register_buffer("sigma", torch.zeros_like(sig))
             p.sigma.copy_(sig.detach())
-        stress = (-dt * 4 * inv_dx * inv_dx) * p.p_vol[:, None, None] * stress
+        # p_vol THROUGH A CLONE UNDER GRAD, for the same reason as `mass` in the scatter: it is a
+        # buffer a seed may rewrite, and its version counter moving after this line is read is what
+        # a backward reports as "[4000, 1, 1] is at version 2; expected version 1".
+        _pv = self._const_read(p.p_vol)
+        stress = (-dt * 4 * inv_dx * inv_dx) * _pv[:, None, None] * stress
         affine = stress + mass[:, None, None] * C
 
         fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
@@ -374,27 +385,55 @@ class MPMScatter(Exchange):
         # scatter). Multi-SET MPM is what the composed cell introduced, and it is the only thing
         # this ever affected. With one set the stamp is always stale and the zeros are always
         # fresh, so single-set runs stay bit-identical.
-        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. This used to read
-        # `H.micro`, a python int the engine advances every substep, and compare it to a stamp on
-        # the field. That works, but it is a per-substep side effect no CUDA-graph replay can
-        # reproduce -- and it made dynamo recompile on every substep, because it specialises on
-        # integer attributes of an nn.Module. The engine binds the i-th OCCURRENCE of a token to
+        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. Deciding it from
+        # a per-substep counter -- a python int the engine advances, compared against a stamp on
+        # the field -- works, and it is a side effect no CUDA-graph replay can reproduce; it also
+        # makes dynamo recompile every substep, since it specialises on integer attributes of an
+        # nn.Module. The engine binds the i-th OCCURRENCE of a token to
         # the i-th INSTANCE, so occurrence 0 of `mpm_scatter` for a given grid is ALWAYS the first
         # one in a substep: the engine stamps `_zeroes_grid` on it when `inst` is built.
         _fresh = getattr(self, "_zeroes_grid", True)
         # STEP 2: WRITE INTO THE FIELD'S OWN BUFFERS, never a fresh allocation. Assigning
         # `g.m = torch.zeros(...)` rebinds the attribute to new storage every substep; a captured
         # graph holds the address it saw at capture time, so the replay silently writes somewhere
-        # the rest of the run no longer reads. Measured: capture SUCCEEDS with this left as it was,
-        # raises nothing, and produces a 6-tick checksum of 22816.79 against the correct 22132.22.
+        # the rest of the run no longer reads. That failure is SILENT: capture succeeds, nothing
+        # raises, and the checksum is simply wrong.
+        # FUNCTIONAL UNDER GRAD, IN PLACE OTHERWISE, and the two are the same numbers. The
+        # in-place form exists for CUDA-graph capture, which holds the addresses it saw -- and
+        # capture is off under `grad=True` by construction, since the warp bodies register no
+        # backward. Autograd cannot use it either way: the grid is zeroed and re-accumulated every
+        # substep, so the tensor a later substep needs for its backward has already been
+        # overwritten, and an inverse rollout dies with "a variable needed for gradient computation
+        # has been modified by an inplace operation ... [40, 40, 40]". Rebinding fresh tensors is
+        # what makes deformation-gradient control possible at all; it costs one grid allocation a
+        # substep, and only while a tape is being kept.
+        #
+        # WHAT IT IS FOR: papers/Xu_2024_mpm_shape_morphing.pdf makes the per-particle F the CONTROL
+        # variable of an optimisation and takes the loss on this grid's own nodal mass rather than on
+        # particle positions -- a target shape has no particle correspondence, so a position loss has
+        # nothing to match against exactly where the two shapes differ. Every line of that needs the
+        # rollout to be differentiable, and the rollout is not differentiable while the grid is
+        # rebuilt in place. See tools/shape_control.py for the smallest instance of the loop.
+        # Xu, M., Song, C. Y., Levin, D. I. W. & Hyde, D. (2025). A Differentiable Material Point
+        # Method Framework for Shape Morphing. IEEE TVCG 31(10):9140-9153 (arXiv:2409.15746);
+        # Xu, M. & Levin, D. I. W. (2023). Deformation Gradient Control of Physically Simulated
+        # Amorphous Solids. SCA '23, doi 10.1145/3606037.3606840; the render-guided variant is
+        # papers/Song_2025_physmorph_gs.pdf.
         gm, gmv, gc = g.m, g.mv, g.c
-        if _fresh:
+        liquid = getattr(p, "is_liquid", None)
+        lw = ((weight * (mass * liquid.to(mass.dtype))[:, None]).reshape(-1)
+              if _const_any(self, "_c_liquid", liquid) else None)
+        # THE DEPOSIT IS A HOOK, so an alternative IMPLEMENTATION can make it functional without
+        # this body changing at all -- see MPMScatterDiff. In place here, as it has always been.
+        self._deposit(g, gm, gmv, gc, flat, weight, mass, mom, D, _fresh, lw)
+        return {}
+
+    def _deposit(self, g, gm, gmv, gc, flat, weight, mass, mom, D, fresh, lw):
+        """Zero (if this is the substep's first scatter) and accumulate, IN PLACE."""
+        if fresh:
             gm.zero_(); gmv.zero_(); gc.zero_()
         gm.index_add_(0, flat, (weight * mass[:, None]).reshape(-1))
         gmv.index_add_(0, flat, (weight[..., None] * mom).reshape(-1, D))
-        liquid = getattr(p, "is_liquid", None)
-        if _const_any(self, "_c_liquid", liquid):                  # liquid colour for the CSF surface tension
-            lw = (weight * (mass * liquid.to(mass.dtype))[:, None]).reshape(-1)
+        if lw is not None:
             gc.index_add_(0, flat, lw)
-        return {}
 ```

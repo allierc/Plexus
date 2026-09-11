@@ -125,6 +125,25 @@ class Divide3D(Structural):
     division follows the sheet topology of Tyssue.
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    # MULTIPLES AND COUNTS. `factor` and `delta` are multiples of `v_ref`, not volumes -- which is
+    # what makes them portable across mesh scales -- so they are dimensionless. The cycle bounds
+    # are counts of CALLS, not durations, which is why they are `count` and not `time`.
+    PARAM_UNITS = {"factor": "fraction", "delta": "fraction", "p0": "fraction",
+                   "cycle_cv": "fraction", "split_cv": "fraction", "reset_noise": "fraction",
+                   "min_cycle": "count", "max_cycle": "count"}
+    # `V0f` IS DELIBERATELY UNDECLARED HERE, and this is the clearest case in the tree for why
+    # UNKNOWN had to exist. The division trigger reads the POLYHEDRON volume when the run carries a
+    # separation and the WEDGE volume when it does not -- the operator prints which on every run
+    # ("this run carries a separation, so the trigger reads the POLYHEDRON volume; reference 1.3550
+    # (the wedge reference is 2.5462)"). One block, two conventions, selected by the composition
+    # rather than by a parameter. A class attribute cannot express that, and declaring either would
+    # be wrong on half the specs in `config/tissue`.
+    # AND `Vbirth` IS UNDECLARED FOR THE SAME REASON. This operator writes it from whichever volume
+    # it just triggered on -- polyhedron where the run carries a separation, wedge where it does
+    # not -- so it propagates the run's convention rather than choosing one, exactly like `V0f`
+    # above. Declaring `wedge` made it disagree with the apicobasal seed that had just been made
+    # consistent, which is the checker accusing the operator that has no opinion.
+    BLOCK_UNITS: dict = {}
     MECHANISM_TAGS = ["division", "cell_division", "vesicle", "proliferation", "volume_doubling"]
     REFERENCE = "Hertwig, O. (1884) (long-axis division rule); tyssue cell_division (DamCB)."
 
@@ -146,7 +165,7 @@ class Divide3D(Structural):
         # created cannot be told apart from one that corrects deviations it did not.
         #
         # Randomising how a cell splits is not a different hypothesis about what a cell IS, so by
-        # AXES.md it is a value -- the same axis as `cycle_cv`, `vseed_cv` and `age_seed`, and not a
+        # by the axis test it is a value -- the same axis as `cycle_cv`, `vseed_cv` and `age_seed`, not a
         # `model:` of its own.
         #
         # WHAT IT PERTURBS IS THE TARGET, NOT THE SEPTUM, and that limit is stated rather than
@@ -284,7 +303,7 @@ class Divide3D(Structural):
                 vf = _vp.numpy().astype(np.float64)
                 # THE REFERENCE IS THE SEED-TIME MEDIAN, THE WAY THE WEDGE ONE ALWAYS WAS -- and
                 # that is only honest because `seed_mesh` now seeds `h0` at the thickness the energy
-                # wants. It was not always so. `h0` used to be an arbitrary number: 0.4 on this spec
+                # wants, and it is not free. Left as an arbitrary number, `h0` would be 0.4 on this spec
                 # against an equilibrium of 0.8796, 1.8 on `mech_shell_free` against 0.8001. The
                 # seeded shell then spent the opening of every run RELAXING toward a thickness
                 # nobody had asked for -- on `mech_shell_free` about 300 frames, with the mean
@@ -433,9 +452,9 @@ class Divide3D(Structural):
             try:                                                 # to the cell's longest axis -> compact daughters
                 _, _, vh = np.linalg.svd(P - c, full_matrices=False); u = vh[0]
                 n = c / (np.linalg.norm(c) + 1e-9)               # outward (radial) face normal on the sphere
-                # THE SAME RELATIVE THRESHOLD THAT BUILT THE AXIS. This test used to read
-                # `a_cells[f] > self.orient_asw` -- the ABSOLUTE value -- while the axis above was
-                # already relative to `amax`, so the two disagreed about which cells are the bud.
+                # THE SAME RELATIVE THRESHOLD THAT BUILT THE AXIS. Testing
+                # `a_cells[f] > self.orient_asw` -- the ABSOLUTE value -- while the axis above is
+                # already relative to `amax` makes the two disagree about which cells are the bud.
                 # At orient_asw 0.6 on a field peaking at 1.47 the axis takes the top 40% and this
                 # took everything above 0.6, a different and larger set; on any run whose field
                 # peaks below orient_asw the axis exists and NO cell passes here, which is the

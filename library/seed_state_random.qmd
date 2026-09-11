@@ -1,6 +1,6 @@
 ---
 title: "seed_state_random"
-subtitle: "Fill a named state block with U(lo, hi), once, at x_0."
+subtitle: "Fill a named state block with independent uniform noise, once, at x_0."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Fill a named state block with U(lo, hi), once, at x_0."
 
 [`seed`]{.op-badge} [`acts on: compartment`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Fill a named state block with U(lo, hi), once, at x_0.
+Fill a named state block with independent uniform noise, once, at x_0.
 :::
 
 ```{=html}
@@ -44,6 +44,12 @@ Fill a named state block with U(lo, hi), once, at x_0.
 
 set -> set: writes `block`, reads nothing.
 
+    v_i ~ U(lo, hi),   independently per element and per component of the block
+
+lo and hi are in the units of whatever `block` holds, so this operator has no units of its
+own; `seed` fixes the draw, on the CPU, so the same specification gives the same x_0 on any
+device.
+
 An initial condition with no structure is still an initial condition, and it has to be an
 operator rather than a `sets:` key for the reason `seed:` exists at all: `build` seeds
 POSITIONS from declarative placement rules, and every other block starts at zero. A network
@@ -74,7 +80,7 @@ operators:
 
 ## Related operators
 
-Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd).
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd).
 
 ## Source
 
@@ -83,9 +89,15 @@ Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd)
 ```python
 @register_operator("seed_state_random", family="seed", set="compartment", kind="seed")
 class SeedStateRandom(Seed):
-    """Fill a named state block with U(lo, hi), once, at x_0.
+    """Fill a named state block with independent uniform noise, once, at x_0.
 
     set -> set: writes `block`, reads nothing.
+
+        v_i ~ U(lo, hi),   independently per element and per component of the block
+
+    lo and hi are in the units of whatever `block` holds, so this operator has no units of its
+    own; `seed` fixes the draw, on the CPU, so the same specification gives the same x_0 on any
+    device.
 
     An initial condition with no structure is still an initial condition, and it has to be an
     operator rather than a `sets:` key for the reason `seed:` exists at all: `build` seeds

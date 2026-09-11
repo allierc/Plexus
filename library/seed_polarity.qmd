@@ -44,6 +44,9 @@ A unit direction per element, lying IN the substrate plane, written to `block`.
 
 cell -> cell: writes `polarity`, reads nothing.
 
+e_a and e_b are the two axes perpendicular to `axis`, the substrate normal, so p_i is a unit
+vector in the plane by construction. theta_0 is one shared heading drawn per run.
+
 In the plane and not isotropic in 3D, because a polarity with a vertical component asks the
 cell to crawl into the floor or off it -- the traction below would then drive material through
 the substrate, which the wall condition resists rather than converts, and the cell would
@@ -76,7 +79,7 @@ operators:
 
 ## Related operators
 
-Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd).
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd).
 
 ## Source
 
@@ -88,6 +91,12 @@ class SeedPolarity(Seed):
     """A unit direction per element, lying IN the substrate plane, written to `block`.
 
     cell -> cell: writes `polarity`, reads nothing.
+
+        theta_i = theta_0 + spread * pi * u_i,        u_i ~ U(-1, 1)
+        p_i     = cos(theta_i) e_a + sin(theta_i) e_b
+
+    e_a and e_b are the two axes perpendicular to `axis`, the substrate normal, so p_i is a unit
+    vector in the plane by construction. theta_0 is one shared heading drawn per run.
 
     In the plane and not isotropic in 3D, because a polarity with a vertical component asks the
     cell to crawl into the floor or off it -- the traction below would then drive material through

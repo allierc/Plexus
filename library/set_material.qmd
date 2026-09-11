@@ -95,7 +95,7 @@ operators:
 
 ## Related operators
 
-Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd).
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_positions`](seed_positions.qmd).
 
 ## Source
 
@@ -127,6 +127,9 @@ class SetMaterial(Seed):
                                 and long is one that returns it.
         density                 rewrites `mass` as p_vol * density, so a re-stated density is
                                 consistent with the volumes the geometry gave.
+
+        mu     = E / (2 (1 + nu))
+        lambda = E nu / ((1 + nu)(1 - 2 nu))        or lambda = K directly, for a liquid
 
     WHAT IT DOES NOT TOUCH: `p_vol`, `F`, `C` and `Jp`. The volumes belong to the geometry that
     seeded them, and F/C/Jp are the deformation history -- which a continuation from a trajectory

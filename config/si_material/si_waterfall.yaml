@@ -120,3 +120,17 @@ plotting:
     - 0.3
     - 0.62
     - 1.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A blue fluid substance flows from the top surface and cascades down through a series
+      of stacked horizontal plates. As the fluid falls, it spreads out and splashes onto each subsequent
+      level, creating thin layers of liquid. The flow becomes increasingly dispersed and turbulent as
+      it moves toward the bottom of the structure. By the final frame, the fluid has accumulated on the
+      lowest plate and begun to pool and spread across its surface.
+    objects: The scene contains five large, rectangular grey plates arranged in a vertical, staggered
+      stack. These plates are uniform in thickness and are positioned at different depths to create a
+      cascading path. A blue particle-based fluid is introduced at the top and moves downward through
+      the gaps between the plates. A white bounding box and a scale bar of 100 mm define the spatial dimensions
+      of the simulation environment.

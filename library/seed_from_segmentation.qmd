@@ -1,6 +1,6 @@
 ---
 title: "seed_from_segmentation"
-subtitle: "Populate tissue -> cell -> particle from a measured instance segmentation."
+subtitle: "Build a hierarchy from a measured instance segmentation: the cells are the ones in the image, not a lattice, and each carries its own material."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "Populate tissue -> cell -> particle from a measured instance segmenta
 
 [`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-Populate tissue -> cell -> particle from a measured instance segmentation.
+Build a hierarchy from a measured instance segmentation: the cells are the ones in the image, not a lattice, and each carries its own material.
 :::
 
 ```{=html}
@@ -42,12 +42,29 @@ Populate tissue -> cell -> particle from a measured instance segmentation.
 
 ## Mechanism
 
-Was `kind="exchange"` (an `Exchange` subclass reusing the field-sampling machinery for
-its numerics) with a `family="seed"` tag that already said what it actually was; the
-mismatch let it masquerade as ordinary dynamics and skip the seed lifecycle guarantees
-(never scheduled, runs once, before frame 0) -- exactly the case `Seed` exists to rule
-out. The numerics (reading a field, scattering onto particles) are unchanged; only the
-lifecycle classification is corrected.
+image, not a lattice, and each carries its own material.
+
+label_image -> (cell, particle): reads an integer label map, writes the particle positions,
+their cell assignment, and each cell's Lame parameters. Runs once, at x_0.
+
+    cell j     = the pixels carrying label j
+    x_i        ~ uniform over the pixels of the cell that owns i
+    E_j        = y_lo + f_j (y_hi - y_lo),      f_j in [0, 1], one per cell
+    mu_j, la_j from E_j at the shared Poisson ratio
+
+y_lo and y_hi are `youngs_min` and `youngs_max`, in the run's stress units, so f_j is the only
+dimensionless quantity and it is what the measurement supplies. Given a `props` file, f_j
+comes from the recording -- a cell that moved little in it is stiff, one that moved a lot is
+compliant -- and without one it is drawn at random, `jitter` setting how far cells may differ.
+The label map is INDEXED and never interpolated, a bilinear weight between two labels being a
+number that means nothing.
+
+It is a `seed` and not an `exchange`, though its numerics are a field sample and a scatter: it
+establishes x_0, so it must carry the seed lifecycle -- never scheduled, run once, before
+frame 0 -- which is what that kind guarantees and a dynamics kind does not.
+
+Reference: the segmentation is measured, not modelled. The material model whose mu and lambda
+this writes is Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150.
 
 ## Parameters
 
@@ -72,7 +89,7 @@ operators:
 
 ## Related operators
 
-Other **seed** operators: [`set_material`](set_material.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cell_chem`](seed_cell_chem.qmd), [`cell_chem_seed`](cell_chem_seed.qmd), [`ecm_seed`](ecm_seed.qmd).
+Other **seed** operators: [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_positions`](seed_positions.qmd).
 
 ## Source
 
@@ -81,14 +98,30 @@ Other **seed** operators: [`set_material`](set_material.qmd), [`seed_mesh`](seed
 ```python
 @register_operator("seed_from_segmentation", family="seed", set="particle", kind="seed")
 class SeedFromSegmentation(Seed):
-    """Populate tissue -> cell -> particle from a measured instance segmentation. Runs once.
+    """Build a hierarchy from a measured instance segmentation: the cells are the ones in the
+    image, not a lattice, and each carries its own material.
 
-    Was `kind="exchange"` (an `Exchange` subclass reusing the field-sampling machinery for
-    its numerics) with a `family="seed"` tag that already said what it actually was; the
-    mismatch let it masquerade as ordinary dynamics and skip the seed lifecycle guarantees
-    (never scheduled, runs once, before frame 0) -- exactly the case `Seed` exists to rule
-    out. The numerics (reading a field, scattering onto particles) are unchanged; only the
-    lifecycle classification is corrected.
+    label_image -> (cell, particle): reads an integer label map, writes the particle positions,
+    their cell assignment, and each cell's Lame parameters. Runs once, at x_0.
+
+        cell j     = the pixels carrying label j
+        x_i        ~ uniform over the pixels of the cell that owns i
+        E_j        = y_lo + f_j (y_hi - y_lo),      f_j in [0, 1], one per cell
+        mu_j, la_j from E_j at the shared Poisson ratio
+
+    y_lo and y_hi are `youngs_min` and `youngs_max`, in the run's stress units, so f_j is the only
+    dimensionless quantity and it is what the measurement supplies. Given a `props` file, f_j
+    comes from the recording -- a cell that moved little in it is stiff, one that moved a lot is
+    compliant -- and without one it is drawn at random, `jitter` setting how far cells may differ.
+    The label map is INDEXED and never interpolated, a bilinear weight between two labels being a
+    number that means nothing.
+
+    It is a `seed` and not an `exchange`, though its numerics are a field sample and a scatter: it
+    establishes x_0, so it must carry the seed lifecycle -- never scheduled, run once, before
+    frame 0 -- which is what that kind guarantees and a dynamics kind does not.
+
+    Reference: the segmentation is measured, not modelled. The material model whose mu and lambda
+    this writes is Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150.
     """
 
     EMIT = None

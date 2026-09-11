@@ -45,7 +45,7 @@ G1 -> S -> G2 -> M as per-cell STATE, advanced by a declared rule.
 WHY THIS IS ITS OWN CONTRACT AND NOT A `model:` OF `cell_divide`, by this repo's own two tests.
 `cell_divide._trigger`'s docstring says "THE ONLY THING A `model=` VARIANT OF cell_divide
 CHANGES" is the trigger, and a four-phase machine is not a trigger -- it is state, transitions
-and its own couplings. And AXES.md's second test is decisive: "a variant that needs a second SET
+and its own couplings. And the axis test's second question is decisive: a variant that needs a second SET
 or a second state BLOCK is making a different claim". A cycle needs `phase`. So it cannot live
 on that contract, and the split is the same one already drawn between `cell_grow` (what the cell
 ASKS for) and `cell_divide` (what the topology DOES): this operator says when a cell is ready,
@@ -83,6 +83,10 @@ RESET IS DETECTED, NOT SIGNALLED. A cell that has just divided is the one carryi
 while its inherited phase is still M -- `cell_divide` zeroes `age` for both daughters and the
 carry copies M onto them -- so the reset needs no second channel between the two operators and
 cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.
+
+Reference: Howard, A. & Pelc, S. R. (1953). Synthesis of desoxyribonucleic acid in normal and
+irradiated cells and its relation to chromosome breakage. Heredity 6(suppl.):261-273 (the
+G1-S-G2-M division of the cycle this carries as state).
 
 ## Parameters
 
@@ -124,7 +128,7 @@ class CellCycle3D(Lateral):
     WHY THIS IS ITS OWN CONTRACT AND NOT A `model:` OF `cell_divide`, by this repo's own two tests.
     `cell_divide._trigger`'s docstring says "THE ONLY THING A `model=` VARIANT OF cell_divide
     CHANGES" is the trigger, and a four-phase machine is not a trigger -- it is state, transitions
-    and its own couplings. And AXES.md's second test is decisive: "a variant that needs a second SET
+    and its own couplings. And the axis test's second question is decisive: a variant that needs a second SET
     or a second state BLOCK is making a different claim". A cycle needs `phase`. So it cannot live
     on that contract, and the split is the same one already drawn between `cell_grow` (what the cell
     ASKS for) and `cell_divide` (what the topology DOES): this operator says when a cell is ready,
@@ -162,6 +166,10 @@ class CellCycle3D(Lateral):
     while its inherited phase is still M -- `cell_divide` zeroes `age` for both daughters and the
     carry copies M onto them -- so the reset needs no second channel between the two operators and
     cannot desynchronise from one. A freshly seeded cell has phase G1 already and is not caught.
+
+    Reference: Howard, A. & Pelc, S. R. (1953). Synthesis of desoxyribonucleic acid in normal and
+    irradiated cells and its relation to chromosome breakage. Heredity 6(suppl.):261-273 (the
+    G1-S-G2-M division of the cycle this carries as state).
     """
     # `MAY_MUTATE_INTEGRATED_STATE` IS STILL TRUE AFTER S4, AND THE DYNAMICS IS NO LONGER WHY.
     # Every per-frame quantity this operator produces -- `cycle_progress`, `phase`, `phase_t`,
@@ -176,6 +184,17 @@ class CellCycle3D(Lateral):
     # So the flag now names a seeding write rather than a dynamics one, which is a much smaller
     # claim than the one it used to make.
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    # DURATIONS IN SIMULATION TIME AFTER S4, not counts of frames. The cycle is one continuous
+    # coordinate whose rate is 1/T, so a phase of fraction f_k traversed at 1/T takes f_k*T, and
+    # `t_g1`...`t_m` ARE those durations. `p_g1` is the hazard of leaving G1, a true 1/T whose
+    # reciprocal is the mean waiting time. `g1_size` is a multiple of `v_ref`, not a volume.
+    PARAM_UNITS = {"t_g1": "time", "t_s": "time", "t_g2": "time", "t_m": "time",
+                   "p_g1": "rate", "g1_size": "fraction", "phase_cv": "fraction",
+                   "inhib_thresh": "fraction"}
+    # `cyc_vprev` HOLDS LAST FRAME'S VOLUME AND IT IS THE WEDGE ONE, from `face_geometry_3d` in
+    # `forward`. It is what the dilution model spends and what the sizer's dV/dt is built from, so
+    # the convention matters even though nothing outside this operator reads the block.
+    BLOCK_UNITS = {"cyc_vprev": "volume[wedge]"}
     MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "phase_progression", "restriction_point",
                       "size_checkpoint"]
     REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
@@ -341,10 +360,11 @@ class CellCycle3D(Lateral):
         # `phase` is here now; the other three are blocks on the cell set and are carried by
         # `Hierarchy.renumber_set` and by `cell_divide`'s mother-row copy instead.
 
-        _, _, _, vf = face_geometry_3d(lvl.get("pos")[:int(m["Nv"])].detach(),
-                                       m["E_srce"], m["E_trgt"], m["E_face"], nF)
-        v_now = vf.detach().cpu().numpy().astype(np.float64)
-        v_ref = float(m.get("v_ref", 1.0))
+        # ONE CONVENTION, CHOSEN BY THE RUN'S GEOMETRY -- see `cell_size`. This read the WEDGE
+        # volume unconditionally, so on an apicobasal run the sizer's checkpoint, the dilution
+        # model's `cyc_vprev` and `g1_size * v_ref` were all stated in a volume the cell does not
+        # have, while `cell_mechanics[apicobasal]` was defending the polyhedron.
+        v_now, v_ref = cell_size(lvl, m, nF)
         _dt = float(getattr(H, "dt", 1.0))
         vb0 = cell_block(H, self.cat, "Vbirth", nF)
         _rate_prev = cell_block(H, self.cat, "cyc_rate", nF)
@@ -385,7 +405,7 @@ class CellCycle3D(Lateral):
             if self.phase_cv > 0 else np.ones(nF)
 
         # ============================================================ the cycle as a rate, not a jump
-        # WHAT S4 CHANGED, in one sentence: the cycle used to be four integers and a per-phase
+        # THE CYCLE IS STATE, NOT A COUNTER. Rather than four integers and a per-phase
         # counter advanced by a predicate, and it is now ONE continuous coordinate `p` -- position
         # through the cycle, 0 at birth, 1 at the end of M -- whose RATE the models set. `phase` is
         # read off `p` by the phase boundaries and no longer holds anything `p` does not.

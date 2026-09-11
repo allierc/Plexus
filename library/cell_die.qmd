@@ -143,6 +143,21 @@ class Apoptosis3D(Structural):
     11:1847-1857.
     """
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    # `shrink_rate` IS PER CALL AND IS DECLARED AS WHAT IT IS. It multiplies the target volume by
+    # (1 - shrink_rate) once per invocation, so it is a dimensionless fraction per call and NOT a
+    # rate in 1/T -- exactly the confusion S3 removed from `cell_grow`. Declaring it `rate` would
+    # be a claim this code does not honour: `cell_die` is `kind: die` and has not been converted.
+    # The angles are degrees, which are dimensionless.
+    PARAM_UNITS = {"shrink_rate": "fraction", "critical_frac": "fraction",
+                   "max_mark_frac": "fraction", "frac": "fraction", "field_frac": "fraction",
+                   "band_deg": "angle", "cone_deg": "angle",
+                   "n_max": "count", "min_age": "count", "p0": "fraction"}
+    # `V0f` IS UNDECLARED BECAUSE DEATH PROPAGATES A CONVENTION RATHER THAN IMPOSING ONE. It reads
+    # whatever the seed put there and compares it against the matching reference through
+    # `cell_size`, so its convention is the run's, not its own. Declaring `wedge` here -- as this
+    # did while the mismatch was being surfaced -- would now be the checker accusing the one
+    # operator that has no opinion.
+    BLOCK_UNITS = {"A0": "area[midsurface]"}
     MECHANISM_TAGS = ["apoptosis", "cell_elimination", "extrusion", "delamination", "die"]
     REFERENCE = ("Monier, B. et al. (2015). Apico-basal forces exerted by apoptotic cells drive "
                  "epithelium folding. Nature 518:245-248; tyssue B-Apoptosis (DamCB).")
@@ -261,17 +276,15 @@ class Apoptosis3D(Structural):
     def _nb(self, m, nF, q):
         """(neighbour mean of `q`, neighbour count) on the CELL ADJACENCY GRAPH.
 
-        Cedric, 9 August: "we could make a comparison graph network between adjacent cells to make
-        a proper rule of cell competition?" -- and then: "this death operator could have different
-        modes: game of life, too small vs others, too slow growth vs others, cell duration too long
-        vs others". They are one mechanism: every useful death rule is a LOCAL comparison, and they
-        differ only in which per-cell quantity is compared. So the graph is built once, here.
+        Every useful death rule -- game of life, too small vs others, too slow vs others, too long
+        since dividing vs others -- is a LOCAL comparison between a cell and its neighbours, and the
+        rules differ only in which per-cell quantity is compared. So the graph is built once, here.
 
-        WHY LOCAL AND NOT GLOBAL. `chem_low` compared each cell against the whole field and marked
-        the tissue when the pattern weakened -- 2,000 cells shrank to 21.6% of their volume and not
-        one was extruded. `stalled` compared growth against the population median and marked NOBODY
-        on r010_12, because at rho = 0.1 every white cell grows at the SAME slow rate and none sits
-        below half the median. Uniformly slow is not the same as losing, and only the neighbour
+        WHY LOCAL AND NOT GLOBAL. `chem_low` compares each cell against the whole field and marks
+        the whole tissue when the pattern weakens -- every cell shrinks and not one is extruded. A
+        rule comparing growth against the population median marks NOBODY when every cell grows at
+        the SAME slow rate, since none then sits below half the median. Uniformly slow is not the
+        same as losing, and only the neighbour
         graph can tell them apart. A local rule is also self-limiting: it cannot mark a uniform
         field however extreme that field is.
 
@@ -446,7 +459,7 @@ class Apoptosis3D(Structural):
             if v is None:
                 return set()
             vv = v.detach().cpu().numpy()[:nF]
-            v_ref = float(m.get("v_ref", 1.0))
+            v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))   # see `cell_size`
             return set(np.where(vv < self.small_frac * v_ref)[0].tolist())
         if self.mode == "stalled":
             # CELL COMPETITION: a cell that is not growing while its neighbours are gets removed.
@@ -652,7 +665,10 @@ class Apoptosis3D(Structural):
             return {}
         V0f = m["V0f"].detach().cpu().numpy().astype(np.float64)
         A0 = m["A0"].detach().cpu().numpy().astype(np.float64)
-        v_ref = float(m.get("v_ref", 1.0))
+        # `critical_frac * v_ref` IN THE CONVENTION `V0f` IS ACTUALLY IN -- see `cell_size`. It was
+        # the wedge reference on every run, so an apicobasal cell was extruded at a fraction of a
+        # volume it does not have.
+        _vn, v_ref = cell_size(lvl, m, nF, pos_t)
         crit = self.crit * v_ref
         # 1. SHRINK. cell_mechanics contracts the cell toward the smaller target; T1 then finds its
         #    edges short and sheds neighbours. Nothing is removed here.
