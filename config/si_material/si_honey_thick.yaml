@@ -68,7 +68,7 @@ operators:
   implementation: warp
 - op: mpm_viscosity
   at: mpm_particle
-  eta: 48.0
+  eta: 64.0
 - op: mpm_scatter
   at: mpm_particle
   to: mpm_grid
@@ -90,7 +90,7 @@ schedule:
 - gravity
 - mpm_emit
 - mpm_drain
-- substep_dt: 3.5e-07
+- substep_dt: 3.499930e-07
   steps:
   - mpm_strain
   - mpm_viscosity
