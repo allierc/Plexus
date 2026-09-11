@@ -394,6 +394,25 @@ class Handler(BaseHTTPRequestHandler):
             from plexus.gui import bio
             return self._send_json(dict(bio.STATE))
 
+        if route == "/api/bio/frames":                   # GET -> how many frames the last run kept
+            from plexus.gui import bio_view
+            v = bio_view.current()
+            return self._send_json({"n": len(v.frames) if v is not None else 0})
+
+        if route == "/api/bio/frame":                    # GET ?i= -> one kept frame (JPEG)
+            from plexus.gui import bio_view
+            v = bio_view.current()
+            i = int((q.get("i") or ["0"])[0])
+            if v is None or not v.frames:
+                return self._send_json({"error": "no frames; RUN first"}, 404)
+            data_ = v.frames[max(0, min(i, len(v.frames) - 1))]
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(data_)))
+            self.send_header("Cache-Control", "max-age=3600")
+            self.end_headers()
+            return self.wfile.write(data_)
+
         if route == "/api/bio/run":                      # GET -> progress of the engine run
             from plexus.gui import bio_view
             v = bio_view.current()

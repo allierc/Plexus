@@ -82,6 +82,10 @@ def build_spec(form: dict) -> dict:
     p = s["plotting"]
     p["colors"] = colors
     p["box_frame"] = True
+    # the template's section keeps ONLY a slab (`only: true`), which is right for a splash movie
+    # and wrong for looking at bodies: every ball became a disc. No section on the material page.
+    p.pop("cross_section", None)
+    p["dot_shading"] = "body"                               # lit by depth in the body, so a ball reads as a ball
     return s
 
 
@@ -178,6 +182,7 @@ PAGE = r"""<!doctype html>
  <div class="row"><label>frames</label><input id="run_frames" class="short" value="400"> <label style="width:60px">device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select></div>
  <div class="row"><button onclick="runGo()" id="runbtn">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
+ <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:170px" oninput="showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
  <h2>Claude takes over <span style="color:#778;font-weight:normal;text-transform:none">drives this page through its own routes</span></h2>
  <div class="row"><input id="task" style="width:100%" placeholder="e.g. drop a snow ball onto a water slab, then run 100 frames" onkeydown="if(event.key==='Enter')claudeGo()"></div>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button> <span id="cstat" style="color:#8c8"></span></div>
@@ -226,13 +231,17 @@ function tree(j){const h=j.hierarchy;let out='';for(const n of h.sets){const cnt
 window.setInfo=function(name){const s=SCENE.sets[name];const n=SCENE.hierarchy.sets.find(x=>x.name===name);
  $('info').textContent=`set ${name}\n  entity: ${n.entity||'(by name)'}\n  buffer ${s.n_buffer}, live ${s.n_live}\n  blocks: ${s.blocks.join(', ')}\n`+(n.parent?`  contained in: ${n.parent} (${n.per_parent??'?'} per parent)\n`:'')+(n.types.length?`  bodies: ${n.types.join(', ')}\n`:'')+`  operators on it: ${SCENE.hierarchy.operators.filter(o=>o.at===name).map(o=>o.op).join(', ')||'-'}`;};
 addBody({name:'red',shape:'ball',centre:[0.03,0.062,0.05],radius:0.012,material:'elastic',youngs:1000000,density:1000});addBody({name:'blue',shape:'ball',centre:[0.05,0.074,0.05],radius:0.012,material:'elastic',youngs:1000000,density:1000});addBody({name:'green',shape:'ball',centre:[0.07,0.058,0.05],radius:0.012,material:'elastic',youngs:1000000,density:1000});
-let running=false;
-window.runGo=async function(){const j=await post('/api/bio/run',{frames:+$('run_frames').value,device:$('run_device').value});if(j.error){$('runstat').textContent=j.error;return;}running=true;$('runbtn').disabled=true;$('runstat').textContent=`running ${j.frames} frames on ${j.device}...`;rpoll();};
+let running=false, playing=null, nframes=0;
+// REPLAY: every frame the run drew was kept as an image on the server; PLAY steps through them.
+function showFrame(i){$('frame').value=i;$('framelab').textContent=`frame ${i}/${Math.max(nframes-1,0)}`;$('view').src=`/api/bio/frame?i=${i}`;}
+window.playGo=async function(){const j=await (await fetch('/api/bio/frames')).json();nframes=j.n||0;if(!nframes){$('framelab').textContent='no frames yet: RUN first';return;}$('frame').max=nframes-1;if(playing)clearInterval(playing);let i=0;playing=setInterval(()=>{showFrame(i);i=(i+1)%nframes;},66);};
+window.playStop=function(){if(playing){clearInterval(playing);playing=null;}};
+window.runGo=async function(){playStop();const j=await post('/api/bio/run',{frames:+$('run_frames').value,device:$('run_device').value});if(j.error){$('runstat').textContent=j.error;return;}running=true;$('runbtn').disabled=true;$('runstat').textContent=`running ${j.frames} frames on ${j.device}...`;rpoll();};
 window.runStop=async function(){await post('/api/bio/run',{stop:true});};
 async function rpoll(){try{const j=await (await fetch('/api/bio/run')).json();if(j.error&&!j.running){$('runstat').textContent='error: '+j.error;}
  else $('runstat').textContent=(j.running?'running: ':'done: ')+`frame ${j.frame}/${j.n_frames}, ${j.seconds}s`+(j.frame&&j.seconds?` (${(j.seconds/j.frame*1000).toFixed(0)} ms/frame)`:'');
  if(j.counts&&j.counts.sets)$('runcounts').textContent=Object.entries(j.counts.sets).map(([k,v])=>`${k} ${v}`).join('  ');
- render();if(j.running){setTimeout(rpoll,700);}else{running=false;$('runbtn').disabled=false;}}catch(e){setTimeout(rpoll,1500);}}
+ render();if(j.running){setTimeout(rpoll,700);}else{running=false;$('runbtn').disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);$('framelab').textContent=nframes?`${nframes} frames kept: PLAY`:'';}}catch(e){setTimeout(rpoll,1500);}}
 let seen={version:-1,cam_version:-1};
 async function poll(){try{const st=await (await fetch('/api/bio/state')).json();
  if(st.name&&st.version!==seen.version){seen.version=st.version;specName=st.name;$('name').value=st.name;const j=await (await fetch('/api/material/spec?name='+encodeURIComponent(st.name))).json();if(j.raw)$('yamltext').value=j.raw;if(j.form)fillForm(j.form);await reseed();}

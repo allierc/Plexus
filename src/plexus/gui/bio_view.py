@@ -61,7 +61,9 @@ class View:
         for k in ("curve", "stills"):                       # the curves need a clip; the section inset stays
             style.pop(k, None)
         style["real_time"] = False
-        style["box_frame"] = False                               # the page frames the objects, not the box
+        # a walled box IS the scene (the balls bounce on its floor): keep its frame; a free tissue has
+        # no wall, and its box was only a camera hint that shrank the cyst to a tenth of the picture
+        style["box_frame"] = str(getattr(sim, "boundary", "") or "").lower() == "wall"
         style["scale_bar"] = False                               # the movie's bar sits at the box edge; ours follows the view
         style["cross_section_height"] = min(float(style.get("cross_section_height", 0.24) or 0.24), 0.2)
         u = getattr(sim, "units", None)
@@ -102,7 +104,8 @@ class View:
         self.up_axis = int(style.get("up_axis", 2))              # a material box is y-up, a tissue z-up
         self.pick = None
         self.hidden: set = set()
-        self.RUN = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}}
+        self.RUN = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}, "frames_kept": 0}
+        self.frames: list = []                                   # the run's frames as JPEG bytes, for PLAY
         self.seconds = round(time.time() - t0, 2)
         self.set_camera(self.azim, self.elev, self.zoom)
 
@@ -197,6 +200,20 @@ class View:
         buf = io.BytesIO()
         iio.imwrite(buf, np.asarray(img), extension=".png")
         return buf.getvalue()
+
+    FRAMES_MAX = 1200                                            # ~100 KB a JPEG: 120 MB at most
+
+    def _keep_frame(self):
+        """One JPEG of the current picture, appended to the run's frames (on the VTK thread)."""
+        if len(self.frames) >= self.FRAMES_MAX:
+            return
+        import imageio.v3 as iio
+        self.p.render()
+        img = np.asarray(self.p.screenshot(return_img=True))
+        buf = io.BytesIO()
+        iio.imwrite(buf, img, extension=".jpg", quality=85)
+        self.frames.append(buf.getvalue())
+        self.RUN["frames_kept"] = len(self.frames)
 
     def _grab(self):
         with LOCK:
@@ -331,7 +348,8 @@ class View:
             return {"error": "already running; STOP it first"}
         dev = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
         n = int(frames or self.sim.n_frames)
-        self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev, started=time.time())
+        self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev, started=time.time(), frames_kept=0)
+        self.frames = []
 
         class _Stop(Exception):
             pass
@@ -340,6 +358,9 @@ class View:
             with LOCK:
                 self.H = H
                 self.lm(H, tick)
+                if getattr(self.lm, "cs", None) is not None and tick == 0:
+                    self.lm._update_cross_section(H)
+                self._keep_frame()
                 if tick % 10 == 0 or tick == n:
                     from plexus.gui import bio
                     self.scene = bio.scene_from(H, self.sim, self.spec_path)
