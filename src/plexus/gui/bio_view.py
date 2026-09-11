@@ -99,6 +99,7 @@ class View:
         else:
             self.scale0 = float(cam.parallel_scale)
         self.azim, self.elev, self.zoom = 30.0, 20.0, 1.0
+        self.up_axis = int(style.get("up_axis", 2))              # a material box is y-up, a tissue z-up
         self.pick = None
         self.hidden: set = set()
         self.RUN = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}}
@@ -115,14 +116,18 @@ class View:
             if elev is not None: self.elev = max(-89.0, min(89.0, float(elev)))
             if zoom is not None: self.zoom = max(0.05, min(60.0, float(zoom)))
             a, e = np.radians(self.azim), np.radians(self.elev)
-            d = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
+            # the orbit is about the spec's `up_axis`: elevation climbs along it, azimuth turns around it
+            up = self.up_axis
+            h = [i for i in range(3) if i != up]
+            d = np.zeros(3); d[h[0]] = np.cos(e) * np.cos(a); d[h[1]] = np.cos(e) * np.sin(a); d[up] = np.sin(e)
+            U = np.zeros(3); U[up] = 1.0
             cam = self.p.camera
             cam.focal_point = tuple(self.focal)
             # under a parallel projection the distance does not change the picture, so the camera
             # stays far away and only the parallel scale zooms: the near plane never cuts the scene
             par = bool(cam.parallel_projection)
             cam.position = tuple(self.focal + d * (self.dist0 if par else self.dist0 / self.zoom))
-            cam.up = (0.0, 0.0, 1.0)
+            cam.up = tuple(U)
             # THE MOVIE'S CAMERA IS ORTHOGRAPHIC (`parallel_projection`, live_movie.py:547), so
             # zoom is the parallel scale (half the view height in world units), not the distance.
             if bool(cam.parallel_projection):
@@ -162,7 +167,7 @@ class View:
             return
         from plexus.live_movie import _si_length
         import pyvista as pv
-        up = np.array([0.0, 0.0, 1.0])
+        up = np.zeros(3); up[self.up_axis] = 1.0
         right = np.cross(up, view_dir); right /= max(np.linalg.norm(right), 1e-12)
         vup = np.cross(view_dir, right); vup /= max(np.linalg.norm(vup), 1e-12)
         half_h = float(cam.parallel_scale) if cam.parallel_projection else float(self.dist0 / self.zoom) * np.tan(np.radians(float(cam.view_angle) / 2))
