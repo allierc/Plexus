@@ -9,8 +9,8 @@ changes from start or set-up to finish or termination conditions* (Machamer, Dar
 2000, p. 3). Plexus is a language for
 writing a mechanism down in exactly those terms — the entities with their states and
 relations, the activities that act on them, and their organization in space, in time and
-across levels — completely enough that the description can be run, fitted to observations,
-and shown to be missing an activity. Every activity is an *operator*: it names the entities
+across levels — so that the description can be run, fitted to observations, and shown
+to be missing an activity. Every activity is an *operator*: it names the entities
 it acts on, the state it needs, the relations between those entities, and one or more
 numerical implementations. The research programme has three objectives. First, an algebra of
 activities. Second, to decompose the existing corpus of simulation models into that
