@@ -79,7 +79,11 @@ def _fans(H, tissue_set):
     if eocc is not None:
         live = live & (eocc[: es.shape[0]] > 0)
     es, et, ef = es[live], et[live], ef[live]
-    cnt = torch.bincount(ef, minlength=nF).clamp_min(1).to(pos.dtype)
+    # NOT `torch.bincount`: on CUDA it reads the maximum back to size its output, a device sync
+    # on every call. `ef < nF` is already enforced above, so the size is known and the count is
+    # an integer scatter-add -- the same integers, without the round trip.
+    cnt = (torch.zeros(nF, dtype=torch.long, device=pos.device)
+           .index_add_(0, ef, torch.ones_like(ef)).clamp_min(1).to(pos.dtype))
     z = lambda: torch.zeros(nF, 3, device=pos.device, dtype=pos.dtype)   # noqa: E731
     cen = z().index_add_(0, ef, pos[es]) / cnt[:, None]
     csep = z().index_add_(0, ef, sep[es]) / cnt[:, None]
@@ -227,6 +231,15 @@ def _cell_block(clvl, name, n_species):
     return c0
 
 
+def _count_per_cell(parent, sel, n_cells):
+    """How many selected pieces each of the first `n_cells` cells holds -- `bincount(parent[sel])[:n_cells]`
+    without the two device syncs that carried (the boolean gather and bincount's read of the
+    maximum): the selection is a weight and any parent beyond the table lands in a spare slot."""
+    p = parent.clamp(min=0, max=n_cells)
+    return (torch.zeros(n_cells + 1, dtype=torch.long, device=parent.device)
+            .index_add_(0, p, sel.to(torch.long))[:n_cells])
+
+
 def _write_count(H, lvl, tissue_set, species):
     cs = resolve_cell_set(H, tissue_set, None)
     try:
@@ -239,8 +252,8 @@ def _write_count(H, lvl, tissue_set, species):
     live = lvl.occ > 0
     for sp in species:
         sel = live & (lvl.node_type == sp["id"])
-        n = torch.bincount(lvl.parent[sel], minlength=clvl.state.shape[0]).to(clvl.state.dtype)
-        clvl.state[:, c0 + sp["id"]] = n[: clvl.state.shape[0]]
+        n = _count_per_cell(lvl.parent, sel, clvl.state.shape[0]).to(clvl.state.dtype)
+        clvl.state[:, c0 + sp["id"]] = n
 
 
 def _set_block(lvl, name, idx, value):

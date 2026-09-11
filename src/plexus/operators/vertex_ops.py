@@ -38,6 +38,7 @@ mechanics, cell-cell interactions, and proliferation on epithelial packing. Curr
 17:2095-2104. The mesh representation follows Tyssue.
 """
 from __future__ import annotations
+import math
 import numpy as np
 import torch
 from scipy.spatial import SphericalVoronoi
@@ -4019,23 +4020,52 @@ def _face_ok_3d(ring, getp, normal=None):
     zero for every face and every T1 was refused as "inward-facing" -- the four `sheet_*` runs of
     2026-09-09 flipped nothing while planar and only began to flip once they had buckled. With the
     plane declared (`cell_mechanics.plane_axis`), the orientation to keep is the one the builder
-    fixed, CCW seen from +axis, and that is what `normal` compares against."""
-    P = np.array([np.asarray(getp(i), float) for i in ring])
-    k = len(P)
+    fixed, CCW seen from +axis, and that is what `normal` compares against.
+
+    IN PLAIN PYTHON FLOATS, NOT NUMPY. A ring has six vertices; the numpy version spent 160 us per
+    call in the fixed cost of ~20 small-array operations (np.cross alone was 40 us), and `edge_flip`
+    calls this seven times per candidate, 24 candidates a tick -- 6.4 ms of every frame on
+    `spheroid_organelles_nucleus`. The arithmetic is the same IEEE-754 double sequence (sums in
+    ring order, then the halving, the same 1e-9 and 1e-12 guards); 200,000 random and degenerate
+    rings gave the same verdict as the numpy body on every one."""
+    k = len(ring)
     if k < 3:
         return False
-    c = P.mean(0)
-    N = 0.5 * np.cross(P, np.roll(P, -1, 0)).sum(0)          # Newell area vector (|N| = area)
-    a = np.linalg.norm(N)
-    if a < 1e-9 or float(np.dot(N, c if normal is None else normal)) <= 0.0:   # degenerate, or flipped over
-        return False
-    n = N / a                                                # project to the face plane, test simplicity
-    e1 = P[0] - c; e1 = e1 - np.dot(e1, n) * n
-    if np.linalg.norm(e1) < 1e-9:
-        e1 = P[1] - c; e1 = e1 - np.dot(e1, n) * n
-    e1 = e1 / (np.linalg.norm(e1) + 1e-12)
-    e2 = np.cross(n, e1)
-    Q = np.stack([(P - c) @ e1, (P - c) @ e2], 1)
+    P = []
+    for i in ring:
+        p = getp(i)
+        P.append((float(p[0]), float(p[1]), float(p[2])))
+    cx = cy = cz = 0.0
+    for x, y, z in P:
+        cx += x; cy += y; cz += z
+    cx /= k; cy /= k; cz /= k
+    Nx = Ny = Nz = 0.0                                       # Newell area vector (|N| = area)
+    for i in range(k):
+        x0, y0, z0 = P[i]; x1, y1, z1 = P[(i + 1) % k]
+        Nx += y0 * z1 - z0 * y1; Ny += z0 * x1 - x0 * z1; Nz += x0 * y1 - y0 * x1
+    Nx *= 0.5; Ny *= 0.5; Nz *= 0.5
+    a = math.sqrt(Nx * Nx + Ny * Ny + Nz * Nz)
+    if a < 1e-9:
+        return False                                         # degenerate
+    if normal is None:
+        d = Nx * cx + Ny * cy + Nz * cz
+    else:
+        d = Nx * float(normal[0]) + Ny * float(normal[1]) + Nz * float(normal[2])
+    if d <= 0.0:
+        return False                                         # flipped over
+    nx, ny, nz = Nx / a, Ny / a, Nz / a                      # project to the face plane, test simplicity
+    def _tangent(p):
+        ex, ey, ez = p[0] - cx, p[1] - cy, p[2] - cz
+        t = ex * nx + ey * ny + ez * nz
+        return ex - t * nx, ey - t * ny, ez - t * nz
+    e1 = _tangent(P[0])
+    if math.sqrt(e1[0] * e1[0] + e1[1] * e1[1] + e1[2] * e1[2]) < 1e-9:
+        e1 = _tangent(P[1])
+    L = math.sqrt(e1[0] * e1[0] + e1[1] * e1[1] + e1[2] * e1[2]) + 1e-12
+    e1x, e1y, e1z = e1[0] / L, e1[1] / L, e1[2] / L
+    e2x, e2y, e2z = ny * e1z - nz * e1y, nz * e1x - nx * e1z, nx * e1y - ny * e1x
+    Q = [((x - cx) * e1x + (y - cy) * e1y + (z - cz) * e1z,
+          (x - cx) * e2x + (y - cy) * e2y + (z - cz) * e2z) for x, y, z in P]
     return _polygon_simple_2d(Q)
 
 
@@ -4909,7 +4939,16 @@ class ApicoBasalShapeEnergy3D(Lateral):
         `want_sep` is False at `sep_mu: 0`, where the second gradient would be computed, multiplied
         by zero and thrown away -- and it is not free: it doubles the graph the relaxation walks
         thirty times a frame.
+
+        THE WARP KERNELS FIRST, AUTOGRAD WHERE THEY DO NOT APPLY -- the arrangement the default
+        model has (`try_shape_energy_grad`). `apicobasal_energy_grad_warp` is the hand-derived
+        gradient of the same energy in both degrees of freedom; on CUDA/float32 without
+        PLEXUS_STRICT_DETERMINISM it is the route, and it is why this operator went from 227 ms
+        a frame to a few on `spheroid_organelles_nucleus`.
         """
+        _g = try_apicobasal_grad(self, x, s, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc)
+        if _g is not None:
+            return _g[0], (_g[1] if want_sep else None)
         with torch.enable_grad():
             x = x.detach().requires_grad_(True)
             s = s.detach().requires_grad_(want_sep)
@@ -4994,6 +5033,7 @@ class ApicoBasalShapeEnergy3D(Lateral):
         s0 = lvl.get(self.sep_block)[:Nv].detach().clone()
         eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
         R0t = torch.as_tensor(float(m["R0"]), dtype=dt, device=dev)
+        self._R0 = float(m["R0"])                        # the same number, sync-free for the kernels
         # PUBLISHED FOR THE RENDERER, and it is now a MEASUREMENT rather than a declared constant:
         # the monolayer writes its `h0` here because its thickness is one, and this model's is a
         # per-vertex vector. The cross section wants one number, so it gets the mean cell thickness
@@ -5002,11 +5042,12 @@ class ApicoBasalShapeEnergy3D(Lateral):
         # THE SAME V_eq THE MONOLAYER GETS, and that is what makes AB-C1 a controlled comparison:
         # both arms calibrate the wedge target `V0f` -- the quantity `cell_grow` scales -- against
         # their own rest volume, and on a flat patch those rest volumes are the same number.
-        v_rest, _, _, _ = apicobasal_geometry_3d(x0, s0, es, et, ef, nF, eocc)
         if "mono_k" not in m:
             if self.mono_k is not None:
                 m["mono_k"] = self.mono_k                     # declared: see the monolayer's __init__
             else:
+                # measured ONCE, here: it was computed on every frame and read on this one
+                v_rest, _, _, _ = apicobasal_geometry_3d(x0, s0, es, et, ef, nF, eocc)
                 wedge = face_geometry_3d(x0, es, et, ef, nF, eocc, apex=wedge_apex(m, x0))[3]
                 m["mono_k"] = float((v_rest.median() / wedge.median().clamp(min=1e-9)).item())
         V_eq = (m["mono_k"] * m["V0f"]).clamp(min=1e-9)
@@ -5025,6 +5066,12 @@ class ApicoBasalShapeEnergy3D(Lateral):
                          Gamma=self.gamma, eta=self.eta, cap_frac=self.cap_frac,
                          plane_axis=self.plane_axis)
         move_sep = self.sep_mu != 0.0
+        if apicobasal_warp_unavailable(x0) is None:
+            # THE WHOLE LOOP ON THE WARP PATH: state stays in the kernels' buffers, one gradient
+            # and one `ab_step` per iteration, the same arithmetic as the torch loop below.
+            x, s = relax_apicobasal_warp(self, x0, s0, es, et, ef, nF, V_eq, m["alive"], self._R0,
+                                         eocc, vocc, cap, cap_s, move_sep)
+            return self._emit(H, pos_full, x0, s0, x, s, Nv, move_sep, mask)
         x = x0.clone(); s = s0.clone()
         for _ in range(max(1, self.relax_iters)):
             gx, gs = self._grad(x, s, es, et, ef, nF, V_eq, m["alive"], R0t, eocc, vocc, move_sep)
@@ -5037,6 +5084,11 @@ class ApicoBasalShapeEnergy3D(Lateral):
                 ds = -(self.eta * self.mu * self.sep_mu) * gs
                 ds = ds * torch.clamp(cap_s / (ds.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
                 s = s + ds
+        return self._emit(H, pos_full, x0, s0, x, s, Nv, move_sep, mask)
+
+    def _emit(self, H, pos_full, x0, s0, x, s, Nv, move_sep, mask):
+        """The relaxed state as the velocities the engine integrates -- shared by both loops."""
+        v_full = torch.zeros_like(pos_full)
         # THE DIVISOR IS `general.dt`, NOT A DECLARED ONE -- the same by-construction fix both other
         # implementations of this contract carry: the engine multiplies an emitted velocity by
         # `general.dt`, so the two must cancel or the relaxation rate is silently rescaled.
@@ -5432,3 +5484,548 @@ class ShapeEnergy3DWarp(ShapeEnergy3D):
     Reference: same contract and same energy -- see `cell_mechanics` for the citation.
     """
     MECHANISM_TAGS = ShapeEnergy3D.MECHANISM_TAGS + ["warp"]
+
+
+# ==========================================================================================================
+# NVIDIA Warp gradient for the APICO-BASAL energy: `cell_mechanics[model: apicobasal]`.
+#
+# WHY IT EXISTS. `spheroid_organelles_nucleus` (200 -> 702 cells, at most 1,400 live vertices) ran at
+# 250 ms a frame, and 227 of those were `ApicoBasalShapeEnergy3D._grad`: thirty autograd passes over
+# `_apicobasal_energy_core`, each ~780 CUDA kernels of a few microseconds' work. Profiled, the GPU was
+# busy 24 ms of the 250; the rest was launching. The default model's gradient had already been
+# hand-derived into four kernels (`shape_energy_grad_warp`, above); this is the same treatment for
+# the polyhedron energy, in both of its degrees of freedom.
+#
+# THE DERIVATIVE, TERM BY TERM (`apicobasal_geometry_3d` is the function being differentiated):
+#   apical = pos + sep, basal = pos - sep, so dE/dpos = dE/da + dE/db and dE/dsep = dE/da - dE/db.
+#   Every term is a sum over half-edges (s -> t of face f) of a function of a_s, a_t, b_s, b_t, the
+#   two cap centroids ca_f, cb_f (means of a_s, b_s over the face) and the mid-ring centroid o_f.
+#   Signed volume: v6 = sum of T(p, q, r) = (p-o).((q-o)x(r-o)) over the four triangles per edge;
+#     dT/dp = (q-o)x(r-o), dT/dq = (r-o)x(p-o), dT/dr = (p-o)x(q-o).
+#     THE ROUTE THROUGH `o` IS NOT COMPUTED: the polyhedron is closed (two caps and a wall), and the
+#     sum of a closed surface's triple products is independent of the reference point exactly, so
+#     autograd's o-route sums to float32 rounding noise. The certification test measures the size of
+#     that omission -- it is the reason the tolerance is relative and not zero.
+#   Triangle area A = |u x v| / 2:  dA/du = (v x n)/2, dA/dv = (n x u)/2 with n the unit normal, and
+#     the vertex both edges leave from gets minus their sum.
+#   The cap centroids: ca_f = sum_e w_e a_s / cnt_f, so a gradient landing on ca_f is spread back to
+#     every source vertex of the ring at w_e / cnt_f -- a second per-edge pass, after the first has
+#     finished accumulating it (`ab_centroid_route`).
+#   Perimeter, line tension and the radial spring act on the ring `surface:` names (apical / basal /
+#   mid), routed to (pos, sep) by the same identity. The radial term and its centroid coupling stay
+#   in torch, as they do for the default model: they are one reduction over Nv vectors.
+# ==========================================================================================================
+if HAVE_WARP:
+
+    @wp.func
+    def _dA_du(u: wp.vec3, v: wp.vec3):
+        n = wp.cross(u, v)
+        L = wp.length(n)
+        if L > 1.0e-20:
+            return wp.cross(v, n / L) * 0.5
+        return wp.vec3(0.0, 0.0, 0.0)
+
+    @wp.func
+    def _dA_dv(u: wp.vec3, v: wp.vec3):
+        n = wp.cross(u, v)
+        L = wp.length(n)
+        if L > 1.0e-20:
+            return wp.cross(n / L, u) * 0.5
+        return wp.vec3(0.0, 0.0, 0.0)
+
+    @wp.func
+    def _tri6(o: wp.vec3, p: wp.vec3, q: wp.vec3, r: wp.vec3):
+        return wp.dot(p - o, wp.cross(q - o, r - o))
+
+    @wp.func
+    def _tri_area(u: wp.vec3, v: wp.vec3):
+        return 0.5 * wp.length(wp.cross(u, v))
+
+    @wp.kernel
+    def ab_face_accum(POS: wp.array(dtype=wp.vec3), SEP: wp.array(dtype=wp.vec3),
+                      ES: wp.array(dtype=wp.int32), EF: wp.array(dtype=wp.int32),
+                      EOCC: wp.array(dtype=float),
+                      CNT: wp.array(dtype=float), CSUM: wp.array(dtype=wp.vec3),
+                      CA: wp.array(dtype=wp.vec3), CB: wp.array(dtype=wp.vec3)):
+        """Per-face live-edge count and the three centroid sums (mid ring, apical cap, basal cap)."""
+        e = wp.tid()
+        w = EOCC[e]
+        if w <= 0.0:
+            return
+        f = EF[e]
+        p = POS[ES[e]]
+        s = SEP[ES[e]]
+        wp.atomic_add(CNT, f, w)
+        wp.atomic_add(CSUM, f, p * w)
+        wp.atomic_add(CA, f, (p + s) * w)
+        wp.atomic_add(CB, f, (p - s) * w)
+
+    @wp.kernel
+    def ab_face_measure(POS: wp.array(dtype=wp.vec3), SEP: wp.array(dtype=wp.vec3),
+                        ES: wp.array(dtype=wp.int32), ET: wp.array(dtype=wp.int32),
+                        EF: wp.array(dtype=wp.int32), EOCC: wp.array(dtype=float),
+                        CNT: wp.array(dtype=float), CSUM: wp.array(dtype=wp.vec3),
+                        CA: wp.array(dtype=wp.vec3), CB: wp.array(dtype=wp.vec3), ring: int,
+                        V6: wp.array(dtype=float), S: wp.array(dtype=float),
+                        PER: wp.array(dtype=float)):
+        """Six times the signed polyhedron volume, the total surface and the ring perimeter, per
+        face -- the forward pass of `apicobasal_geometry_3d`, term for term."""
+        e = wp.tid()
+        w = EOCC[e]
+        if w <= 0.0:
+            return
+        f = EF[e]
+        i = ES[e]
+        j = ET[e]
+        cnt = wp.max(CNT[f], 1.0e-9)
+        o = CSUM[f] / cnt
+        ca = CA[f] / cnt
+        cb = CB[f] / cnt
+        ps = POS[i]
+        pt = POS[j]
+        ss = SEP[i]
+        st = SEP[j]
+        a_s = ps + ss
+        a_t = pt + st
+        b_s = ps - ss
+        b_t = pt - st
+        v6 = (_tri6(o, ca, a_s, a_t) + _tri6(o, cb, b_t, b_s)
+              + _tri6(o, a_s, b_s, b_t) + _tri6(o, a_s, b_t, a_t))
+        wp.atomic_add(V6, f, v6 * w)
+        area = (_tri_area(a_s - ca, a_t - ca) + _tri_area(b_s - cb, b_t - cb)
+                + _tri_area(a_t - a_s, b_t - a_s) + _tri_area(b_t - a_s, b_s - a_s))
+        wp.atomic_add(S, f, area * w)
+        rs = ps
+        rt = pt
+        if ring == 0:
+            rs = a_s
+            rt = a_t
+        elif ring == 1:
+            rs = b_s
+            rt = b_t
+        wp.atomic_add(PER, f, wp.length(rt - rs) * w)
+
+    @wp.kernel
+    def ab_face_scalars(V6: wp.array(dtype=float), PER: wp.array(dtype=float),
+                        V_EQ: wp.array(dtype=float), ALIVE: wp.array(dtype=float),
+                        SGN: wp.array(dtype=float), k_v: float, kappa_s: float, gamma: float,
+                        DV6: wp.array(dtype=float), DS: wp.array(dtype=float),
+                        DP: wp.array(dtype=float)):
+        """The per-face covectors: dE/d(v6_f), dE/d(S_f), dE/d(perimeter_f). `SGN` is the tissue's
+        polarity sign, `sign(sum_f v6_f)` with 0 -> 1, exactly as the torch body takes it."""
+        f = wp.tid()
+        a = ALIVE[f]
+        sg = SGN[0]
+        v = V6[f] / 6.0 * sg
+        DV6[f] = k_v * (v - V_EQ[f]) * a * sg / 6.0
+        DS[f] = kappa_s * a
+        DP[f] = gamma * PER[f] * a
+
+    @wp.kernel
+    def ab_edge_grad(POS: wp.array(dtype=wp.vec3), SEP: wp.array(dtype=wp.vec3),
+                     ES: wp.array(dtype=wp.int32), ET: wp.array(dtype=wp.int32),
+                     EF: wp.array(dtype=wp.int32), EOCC: wp.array(dtype=float),
+                     CNT: wp.array(dtype=float), CSUM: wp.array(dtype=wp.vec3),
+                     CA: wp.array(dtype=wp.vec3), CB: wp.array(dtype=wp.vec3),
+                     DV6: wp.array(dtype=float), DS: wp.array(dtype=float),
+                     DP: wp.array(dtype=float), Lam: float, ring: int,
+                     GA: wp.array(dtype=wp.vec3), GB: wp.array(dtype=wp.vec3),
+                     GM: wp.array(dtype=wp.vec3),
+                     GCA: wp.array(dtype=wp.vec3), GCB: wp.array(dtype=wp.vec3)):
+        """Every half-edge's contribution to dE/d(apical), dE/d(basal), dE/d(mid ring) at its two
+        endpoints, and to dE/d(cap centroid) of its face."""
+        e = wp.tid()
+        w = EOCC[e]
+        if w <= 0.0:
+            return
+        f = EF[e]
+        i = ES[e]
+        j = ET[e]
+        cnt = wp.max(CNT[f], 1.0e-9)
+        o = CSUM[f] / cnt
+        ca = CA[f] / cnt
+        cb = CB[f] / cnt
+        ps = POS[i]
+        pt = POS[j]
+        ss = SEP[i]
+        st = SEP[j]
+        a_s = ps + ss
+        a_t = pt + st
+        b_s = ps - ss
+        b_t = pt - st
+        cv = DV6[f] * w
+        cs = DS[f] * w
+        # --- volume: four triangles, three derivatives each ------------------------------- #
+        cao = ca - o
+        cbo = cb - o
+        aso = a_s - o
+        ato = a_t - o
+        bso = b_s - o
+        bto = b_t - o
+        gca = wp.cross(aso, ato) * cv                                 # T(ca, a_s, a_t)
+        gas = wp.cross(ato, cao) * cv
+        gat = wp.cross(cao, aso) * cv
+        gcb = wp.cross(bto, bso) * cv                                 # T(cb, b_t, b_s)
+        gbt = wp.cross(bso, cbo) * cv
+        gbs = wp.cross(cbo, bto) * cv
+        gas = gas + wp.cross(bso, bto) * cv                           # T(a_s, b_s, b_t)
+        gbs = gbs + wp.cross(bto, aso) * cv
+        gbt = gbt + wp.cross(aso, bso) * cv
+        gas = gas + wp.cross(bto, ato) * cv                           # T(a_s, b_t, a_t)
+        gbt = gbt + wp.cross(ato, aso) * cv
+        gat = gat + wp.cross(aso, bto) * cv
+        # --- surface: two cap fans and two wall triangles ---------------------------------- #
+        u = a_s - ca
+        v = a_t - ca
+        du = _dA_du(u, v) * cs
+        dv = _dA_dv(u, v) * cs
+        gas = gas + du
+        gat = gat + dv
+        gca = gca - (du + dv)
+        u = b_s - cb
+        v = b_t - cb
+        du = _dA_du(u, v) * cs
+        dv = _dA_dv(u, v) * cs
+        gbs = gbs + du
+        gbt = gbt + dv
+        gcb = gcb - (du + dv)
+        u = a_t - a_s
+        v = b_t - a_s
+        du = _dA_du(u, v) * cs
+        dv = _dA_dv(u, v) * cs
+        gat = gat + du
+        gbt = gbt + dv
+        gas = gas - (du + dv)
+        u = b_t - a_s
+        v = b_s - a_s
+        du = _dA_du(u, v) * cs
+        dv = _dA_dv(u, v) * cs
+        gbt = gbt + du
+        gbs = gbs + dv
+        gas = gas - (du + dv)
+        # --- perimeter + line tension on the named ring ------------------------------------ #
+        c = (DP[f] + Lam) * w
+        if c != 0.0:
+            rs = ps
+            rt = pt
+            if ring == 0:
+                rs = a_s
+                rt = a_t
+            elif ring == 1:
+                rs = b_s
+                rt = b_t
+            d = rt - rs
+            L = wp.length(d)
+            if L > 1.0e-20:
+                ud = d * (c / L)
+                if ring == 0:
+                    gat = gat + ud
+                    gas = gas - ud
+                elif ring == 1:
+                    gbt = gbt + ud
+                    gbs = gbs - ud
+                else:
+                    wp.atomic_add(GM, j, ud)
+                    wp.atomic_add(GM, i, -ud)
+        wp.atomic_add(GA, i, gas)
+        wp.atomic_add(GA, j, gat)
+        wp.atomic_add(GB, i, gbs)
+        wp.atomic_add(GB, j, gbt)
+        wp.atomic_add(GCA, f, gca)
+        wp.atomic_add(GCB, f, gcb)
+
+    @wp.kernel
+    def ab_centroid_route(ES: wp.array(dtype=wp.int32), EF: wp.array(dtype=wp.int32),
+                          EOCC: wp.array(dtype=float), CNT: wp.array(dtype=float),
+                          GCA: wp.array(dtype=wp.vec3), GCB: wp.array(dtype=wp.vec3),
+                          GA: wp.array(dtype=wp.vec3), GB: wp.array(dtype=wp.vec3)):
+        """The cap centroid is the mean of the ring's SOURCE vertices: spread its gradient back."""
+        e = wp.tid()
+        w = EOCC[e]
+        if w <= 0.0:
+            return
+        f = EF[e]
+        k = w / wp.max(CNT[f], 1.0e-9)
+        wp.atomic_add(GA, ES[e], GCA[f] * k)
+        wp.atomic_add(GB, ES[e], GCB[f] * k)
+
+    @wp.kernel
+    def ab_radial_accum(POS: wp.array(dtype=wp.vec3), SEP: wp.array(dtype=wp.vec3),
+                        VOCC: wp.array(dtype=float), ring: int,
+                        CSUM: wp.array(dtype=wp.vec3), W: wp.array(dtype=float)):
+        """The live occupancy-weighted centroid of the named ring: numerator and weight."""
+        v = wp.tid()
+        w = VOCC[v]
+        if w <= 0.0:
+            return
+        r = POS[v]
+        if ring == 0:
+            r = POS[v] + SEP[v]
+        elif ring == 1:
+            r = POS[v] - SEP[v]
+        wp.atomic_add(CSUM, 0, r * w)
+        wp.atomic_add(W, 0, w)
+
+    @wp.kernel
+    def ab_radial_grad(POS: wp.array(dtype=wp.vec3), SEP: wp.array(dtype=wp.vec3),
+                       VOCC: wp.array(dtype=float), ring: int, K_R: float, R0: float,
+                       CSUM: wp.array(dtype=wp.vec3), W: wp.array(dtype=float),
+                       GR: wp.array(dtype=wp.vec3), GSUM: wp.array(dtype=wp.vec3)):
+        """K_R (|r - c| - R0)^2 per live vertex of the ring, and the sum of those forces, which the
+        route through the centroid `c` hands back to every vertex (see `ab_combine`)."""
+        v = wp.tid()
+        w = VOCC[v]
+        if w <= 0.0:
+            GR[v] = wp.vec3(0.0, 0.0, 0.0)
+            return
+        r = POS[v]
+        if ring == 0:
+            r = POS[v] + SEP[v]
+        elif ring == 1:
+            r = POS[v] - SEP[v]
+        c = CSUM[0] / wp.max(W[0], 1.0)
+        x = r - c
+        n = wp.max(wp.length(x), 1.0e-20)
+        g = x * (2.0 * K_R * (n - R0) * w / n)
+        GR[v] = g
+        wp.atomic_add(GSUM, 0, g)
+
+    @wp.kernel
+    def ab_combine(GA: wp.array(dtype=wp.vec3), GB: wp.array(dtype=wp.vec3),
+                   GM: wp.array(dtype=wp.vec3), VOCC: wp.array(dtype=float), ring: int,
+                   has_radial: int, GR: wp.array(dtype=wp.vec3), GSUM: wp.array(dtype=wp.vec3),
+                   W: wp.array(dtype=float),
+                   GX: wp.array(dtype=wp.vec3), GS: wp.array(dtype=wp.vec3)):
+        """apical = pos + sep, basal = pos - sep: dE/dpos = ga + gb (+ the mid ring's own terms),
+        dE/dsep = ga - gb; then the radial spring on the named ring, with its centroid coupling
+        -(w_i / W) * sum_j g_j -- autograd differentiates through `c` too."""
+        v = wp.tid()
+        gx = GA[v] + GB[v] + GM[v]
+        gs = GA[v] - GB[v]
+        if has_radial == 1:
+            g = GR[v] - GSUM[0] * (VOCC[v] / wp.max(W[0], 1.0))
+            gx = gx + g
+            if ring == 0:
+                gs = gs + g
+            elif ring == 1:
+                gs = gs - g
+        GX[v] = gx
+        GS[v] = gs
+
+    @wp.func
+    def _nan_to_num(v: wp.vec3):
+        """`torch.nan_to_num` on a vec3: NaN -> 0, +-inf -> +-float32 max."""
+        out = wp.vec3(0.0, 0.0, 0.0)
+        for k in range(3):
+            c = v[k]
+            if wp.isnan(c):
+                c = 0.0
+            elif wp.isinf(c):
+                if c > 0.0:
+                    c = 3.4028234663852886e38
+                else:
+                    c = -3.4028234663852886e38
+            out[k] = c
+        return out
+
+    @wp.kernel
+    def ab_step(GX: wp.array(dtype=wp.vec3), GS: wp.array(dtype=wp.vec3),
+                eta_mu: float, eta_mu_sep: float, CAP: wp.array(dtype=float),
+                CAPS: wp.array(dtype=float), plane_axis: int, move_sep: int,
+                X: wp.array(dtype=wp.vec3), S: wp.array(dtype=wp.vec3)):
+        """One bounded overdamped step on both degrees of freedom, the same arithmetic as the
+        torch loop in `ApicoBasalShapeEnergy3D.forward`: step = -(eta mu) g, its length capped at
+        `cap`, the in-plane component zeroed when `plane_axis` is declared."""
+        v = wp.tid()
+        st = _nan_to_num(GX[v]) * (-eta_mu)
+        st = st * wp.min(CAP[0] / (wp.length(st) + 1.0e-12), 1.0)
+        if plane_axis >= 0:
+            st[plane_axis] = 0.0
+        X[v] = X[v] + st
+        if move_sep == 1:
+            ds = _nan_to_num(GS[v]) * (-eta_mu_sep)
+            ds = ds * wp.min(CAPS[0] / (wp.length(ds) + 1.0e-12), 1.0)
+            S[v] = S[v] + ds
+
+
+def _ab_buffers(b, pos, sep, es, et, ef, nF, V_eq, alive, eocc, vocc, R0, k_v, kappa_s, Lam, K_R,
+                gamma, ring):
+    """The scratch, the static inputs and the RECORDED LAUNCHES for one topology.
+
+    Everything the six gradient kernels read is held in buffers this dict owns, so each launch can
+    be recorded once (`wp.launch(..., record_cmd=True)`) and replayed per descent step for a few
+    microseconds -- `wp.launch` itself packs ~20 arguments through Python on every call and cost
+    100 us a kernel, 18 ms a frame, six times the GPU time of the whole relaxation. The launches
+    are re-recorded whenever a topology, a coefficient or an input tensor's identity changes.
+    """
+    dev = pos.device
+    Nv, E = pos.shape[0], es.shape[0]
+    key = (nF, Nv, E, id(es), id(et), id(ef),
+           float(R0), float(k_v), float(kappa_s), float(Lam), float(K_R), float(gamma), int(ring))
+    if b.get("_key") == key:
+        # THE VALUES ARE COPIED IN, THE TABLES ARE NOT: `V_eq` is a fresh tensor every frame
+        # (`mono_k * V0f + mono_delta`), so keying on its identity rebuilt everything -- eight
+        # recordings and a dozen allocations -- 200 times a run for the same topology.
+        b["EOCC"].copy_(eocc); b["VOCC"].copy_(vocc); b["V_EQ"].copy_(V_eq); b["ALIVE"].copy_(alive)
+        return b
+    b.clear()
+    b["_key"] = key
+    b["_pin"] = (es, et, ef)                                # keeps the ids above meaningful
+    b["_nF"], b["_Nv"], b["_E"] = nF, Nv, E
+    f32 = dict(device=dev, dtype=torch.float32)
+    # ONE FLAT SCRATCH TENSOR, so the per-step clear is one kernel and not seventeen.
+    lay = (("CNT", nF, 1), ("V6", nF, 1), ("S", nF, 1), ("PER", nF, 1), ("W", 1, 1),
+           ("CSUM", nF, 3), ("CA", nF, 3), ("CB", nF, 3), ("GCA", nF, 3), ("GCB", nF, 3),
+           ("GA", Nv, 3), ("GB", Nv, 3), ("GM", Nv, 3), ("RC", 1, 3), ("GSUM", 1, 3))
+    acc = torch.zeros(sum(n * d for _, n, d in lay), **f32)
+    b["acc"] = acc
+    k = 0
+    for name, n, d in lay:
+        t = acc[k:k + n * d].view(n, d) if d == 3 else acc[k:k + n]
+        b[name] = t
+        b["w" + name] = wp.from_torch(t, dtype=wp.vec3) if d == 3 else wp.from_torch(t)
+        k += n * d
+    for name, n in (("DV6", nF), ("DS", nF), ("DP", nF)):
+        b[name] = torch.zeros(n, **f32); b["w" + name] = wp.from_torch(b[name])
+    for name in ("GX", "GS", "GR", "POS", "SEP"):
+        b[name] = torch.zeros(Nv, 3, **f32); b["w" + name] = wp.from_torch(b[name], dtype=wp.vec3)
+    b["SGN"] = torch.ones(1, **f32); b["wSGN"] = wp.from_torch(b["SGN"])
+    b["CAP"] = torch.zeros(1, **f32); b["wCAP"] = wp.from_torch(b["CAP"])
+    b["CAPS"] = torch.zeros(1, **f32); b["wCAPS"] = wp.from_torch(b["CAPS"])
+    b["wES"] = wp.from_torch(es.to(torch.int32).contiguous())
+    b["wET"] = wp.from_torch(et.to(torch.int32).contiguous())
+    b["wEF"] = wp.from_torch(ef.to(torch.int32).contiguous())
+    for name, src in (("EOCC", eocc), ("VOCC", vocc), ("V_EQ", V_eq), ("ALIVE", alive)):
+        b[name] = src.detach().clone().contiguous().to(torch.float32)
+        b["w" + name] = wp.from_torch(b[name])
+    wdev = f"cuda:{dev.index or 0}"
+    rec = lambda kern, dim, inputs: wp.launch(kern, dim=dim, device=wdev, inputs=inputs,  # noqa: E731
+                                              record_cmd=True)
+    has_r = 1 if K_R != 0.0 else 0
+    P, Sp = b["wPOS"], b["wSEP"]
+    b["launches"] = [
+        rec(ab_face_accum, E, [P, Sp, b["wES"], b["wEF"], b["wEOCC"],
+                               b["wCNT"], b["wCSUM"], b["wCA"], b["wCB"]]),
+        rec(ab_face_measure, E, [P, Sp, b["wES"], b["wET"], b["wEF"], b["wEOCC"], b["wCNT"],
+                                 b["wCSUM"], b["wCA"], b["wCB"], int(ring), b["wV6"], b["wS"],
+                                 b["wPER"]]),
+        # `ab_face_scalars` needs the polarity sign, taken in torch between these two -- see below
+        rec(ab_face_scalars, nF, [b["wV6"], b["wPER"], b["wV_EQ"], b["wALIVE"], b["wSGN"],
+                                  float(k_v), float(kappa_s), float(gamma),
+                                  b["wDV6"], b["wDS"], b["wDP"]]),
+        rec(ab_edge_grad, E, [P, Sp, b["wES"], b["wET"], b["wEF"], b["wEOCC"], b["wCNT"],
+                              b["wCSUM"], b["wCA"], b["wCB"], b["wDV6"], b["wDS"], b["wDP"],
+                              float(Lam), int(ring), b["wGA"], b["wGB"], b["wGM"],
+                              b["wGCA"], b["wGCB"]]),
+        rec(ab_centroid_route, E, [b["wES"], b["wEF"], b["wEOCC"], b["wCNT"], b["wGCA"],
+                                   b["wGCB"], b["wGA"], b["wGB"]]),
+        rec(ab_radial_accum, Nv, [P, Sp, b["wVOCC"], int(ring), b["wRC"], b["wW"]]),
+        rec(ab_radial_grad, Nv, [P, Sp, b["wVOCC"], int(ring), float(K_R), float(R0),
+                                 b["wRC"], b["wW"], b["wGR"], b["wGSUM"]]),
+        rec(ab_combine, Nv, [b["wGA"], b["wGB"], b["wGM"], b["wVOCC"], int(ring), has_r,
+                             b["wGR"], b["wGSUM"], b["wW"], b["wGX"], b["wGS"]]),
+    ]
+    b["has_radial"] = has_r
+    return b
+
+
+def _ab_stream(b, dev):
+    """Warp's handle on TORCH'S CURRENT STREAM, cached per stream -- the same rule `_wp_launch`
+    enforces (a launch on any other stream is invisible to a CUDA-graph capture)."""
+    ts = torch.cuda.current_stream(dev)
+    if b.get("_ts") != ts.cuda_stream:
+        b["_ts"] = ts.cuda_stream
+        b["_ws"] = wp.stream_from_torch(ts)
+    return b["_ws"]
+
+
+def _ab_grad_into(b, stream):
+    """The gradient of the energy at the state held in `b["POS"]`, `b["SEP"]`, written to
+    `b["GX"]`, `b["GS"]`. Six recorded launches, one clear, and the polarity sign in between."""
+    b["acc"].zero_()
+    L = b["launches"]
+    L[0].launch(stream); L[1].launch(stream)
+    # the tissue's polarity sign, taken once from the sum -- see `apicobasal_geometry_3d`
+    _sg = torch.sign(b["V6"].sum())
+    b["SGN"].copy_(torch.where(_sg == 0, torch.ones_like(_sg), _sg).reshape(1))
+    L[2].launch(stream); L[3].launch(stream); L[4].launch(stream)
+    if b["has_radial"]:
+        L[5].launch(stream); L[6].launch(stream)
+    L[7].launch(stream)
+
+
+def apicobasal_energy_grad_warp(pos, sep, es, et, ef, nF, V_eq, alive, R0, k_v, kappa_s, Lam,
+                                K_R, gamma, eocc, vocc, surface="apical", buffers=None):
+    """(dE/dpos, dE/dsep) for `_apicobasal_energy_core`, in warp kernels instead of an autograd
+    backward. `buffers` is reused across calls: scratch, converted index tables and recorded
+    launches live there, rebuilt only when the topology or a coefficient changes."""
+    ring = {"apical": 0, "basal": 1, "mid": 2}[surface]
+    b = _ab_buffers(buffers if buffers is not None else {}, pos, sep, es, et, ef, nF, V_eq, alive,
+                    eocc, vocc, R0, k_v, kappa_s, Lam, K_R, gamma, ring)
+    b["POS"].copy_(pos); b["SEP"].copy_(sep)
+    _ab_grad_into(b, _ab_stream(b, pos.device))
+    return b["GX"].clone(), b["GS"].clone()
+
+
+def relax_apicobasal_warp(op, x0, s0, es, et, ef, nF, V_eq, alive, R0, eocc, vocc, cap, cap_s,
+                          move_sep):
+    """The whole relaxation of `ApicoBasalShapeEnergy3D.forward` on the warp path: `relax_iters`
+    bounded overdamped steps, each one gradient (`_ab_grad_into`) and one `ab_step`, on state that
+    never leaves the buffers. Returns the relaxed (x, s)."""
+    ring = {"apical": 0, "basal": 1, "mid": 2}[op.surface]
+    if not hasattr(op, "_wbuf"):
+        op._wbuf = {}
+    b = _ab_buffers(op._wbuf, x0, s0, es, et, ef, nF, V_eq, alive, eocc, vocc, R0, op.k_v,
+                    op.kappa_s, op.Lambda, op.K_R, op.gamma, ring)
+    stream = _ab_stream(b, x0.device)
+    b["POS"].copy_(x0); b["SEP"].copy_(s0)
+    b["CAP"].copy_(cap.reshape(1)); b["CAPS"].copy_(cap_s.reshape(1))
+    if b.get("_step") is None:
+        pa = -1 if op.plane_axis is None else int(op.plane_axis)
+        b["_step"] = wp.launch(ab_step, dim=b["_Nv"], device=f"cuda:{x0.device.index or 0}",
+                               record_cmd=True,
+                               inputs=[b["wGX"], b["wGS"], float(op.eta * op.mu),
+                                       float(op.eta * op.mu * op.sep_mu), b["wCAP"], b["wCAPS"],
+                                       pa, 1 if move_sep else 0, b["wPOS"], b["wSEP"]])
+    for _ in range(max(1, op.relax_iters)):
+        _ab_grad_into(b, stream)
+        b["_step"].launch(stream)
+    return b["POS"].clone(), b["SEP"].clone()
+
+
+def apicobasal_warp_unavailable(x):
+    """Why the warp path cannot serve this run, or None -- the same reasons `try_shape_energy_grad`
+    steps aside for, said once."""
+    why = None
+    from plexus.engine import STRICT_DETERMINISM
+    if STRICT_DETERMINISM:
+        why = "PLEXUS_STRICT_DETERMINISM is set, and wp.atomic_add is outside torch's guarantee"
+    elif not HAVE_WARP:
+        why = "warp is not installed"
+    elif x.device.type != "cuda":
+        why = f"the run is on {x.device.type}, and these kernels are CUDA-only"
+    elif x.dtype != torch.float32:
+        why = f"positions are {x.dtype}; the kernels are float32"
+    if why is not None:
+        _warn_once(why, f"[warn] cell_mechanics[apicobasal]: the warp gradient is unavailable "
+                        f"because {why}, so this run uses autograd. The physics is identical; the "
+                        f"speed is not.")
+    return why
+
+
+def try_apicobasal_grad(op, x, s, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc):
+    """(dE/dpos, dE/dsep) in warp, or None if this run is not one the kernels can serve -- the
+    same contract as `try_shape_energy_grad`."""
+    if apicobasal_warp_unavailable(x) is not None:
+        return None
+    if not hasattr(op, "_wbuf"):
+        op._wbuf = {}
+    # `R0t` is a 0-d CUDA tensor; `float()` of it is a device sync per call. The operator
+    # publishes the same number as `_R0` before it starts a frame, so the sync is paid once.
+    R0 = getattr(op, "_R0", None)
+    if R0 is None:
+        R0 = float(R0t)
+    gx, gs = apicobasal_energy_grad_warp(x, s, es, et, ef, nF, V_eq, alive, R0, op.k_v,
+                                         op.kappa_s, op.Lambda, op.K_R, op.gamma, eocc, vocc,
+                                         surface=op.surface, buffers=op._wbuf)
+    return gx, gs

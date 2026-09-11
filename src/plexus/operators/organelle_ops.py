@@ -56,7 +56,8 @@ import torch
 
 from plexus.models.base import Seed, Structural
 from plexus.models.registry import register_operator
-from plexus.operators.protein_ops import PARK, _closest_on_triangles, _fans, _set_block, _tri_of
+from plexus.operators.protein_ops import (PARK, _closest_on_triangles, _count_per_cell, _fans,
+                                          _set_block, _tri_of)
 from plexus.operators.vertex_ops import resolve_cell_set
 
 REGIONS = ("interior", "apical_side", "basal_side")
@@ -200,8 +201,8 @@ def _write_count(H, lvl, tissue_set, species):
     live = lvl.occ > 0
     for sp in species:
         sel = live & (lvl.node_type == sp["id"])
-        n = torch.bincount(lvl.parent[sel], minlength=clvl.state.shape[0]).to(clvl.state.dtype)
-        clvl.state[:, c0 + sp["id"]] = n[: clvl.state.shape[0]]
+        n = _count_per_cell(lvl.parent, sel, clvl.state.shape[0]).to(clvl.state.dtype)
+        clvl.state[:, c0 + sp["id"]] = n
 
 
 # ---------------------------------------------------------------------------------------------
