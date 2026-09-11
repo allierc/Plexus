@@ -563,15 +563,13 @@ PAGE = r"""<!doctype html>
  <div class="row"><input id="task" style="width:100%" placeholder="e.g. build a 120-cell cyst with integrins outside and myosin inside, then show me one cell"></div>
  <div class="row"><button onclick="claudeGo()" id="cbtn">CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
- <h2>Refine with a prompt</h2>
- <div class="row"><input id="prompt" style="width:100%" placeholder="e.g. make the cells twice as thick, or add a species named laminin on the basal cap"></div>
- <div class="row"><button onclick="refine()">APPLY</button> <span id="rstat" style="color:#8c8"></span></div>
+ <div id="rstat" style="color:#9ab;min-height:14px"></div>
  <div id="yaml"><textarea id="yamltext"></textarea><div><button onclick="saveYaml()">SAVE YAML</button></div></div>
  <h2>Visibility</h2><div id="vis">(seed a scene first)</div>
  <h2>Hierarchy</h2><div id="tree">(none)</div>
  <h2>Selected object</h2><div id="info">click a cluster, a cell face or a vertex</div>
 </div>
-<div id="right"><div id="hint">drag to orbit, wheel to zoom, click to select</div></div>
+<div id="right"><div id="hint">drag to orbit, wheel to zoom (8% per notch), click to select</div></div>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
 <script type="module">
 import * as THREE from 'three';
@@ -580,7 +578,7 @@ import {LineSegments2} from 'three/addons/lines/LineSegments2.js';
 import {LineSegmentsGeometry} from 'three/addons/lines/LineSegmentsGeometry.js';
 import {LineMaterial} from 'three/addons/lines/LineMaterial.js';
 // what is shown, Blender-outliner style: caps, edges, vertices, each species, and a per-cell set (null = all)
-const VIS={apical:true,basal:true,edges:true,vertices:true,species:{},cells:null,width:2.5};let LMATS=[];
+const VIS=window.VIS={apical:true,basal:true,edges:true,vertices:true,species:{},cells:null,width:2.5,lmats:[]};
 const $=id=>document.getElementById(id);
 let SCENE=null, renderer, scene, camera, controls, pick=[], raycaster=new THREE.Raycaster(), mouse=new THREE.Vector2(), specName=null;
 const DEFC=[[0.95,0.15,0.15],[0.25,0.6,1.0],[0.45,0.95,0.55],[1,0.85,0.3],[0.85,0.4,0.95],[0.3,0.9,0.95]];
@@ -596,25 +594,27 @@ function fillForm(f){$('name').value=f.name;$('shape').value=f.shape;$('n_cells'
 async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
 window.build=async function(){status('building the spec...');const j=await post('/api/bio/build',form());if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}specName=j.name;$('yamltext').value=j.raw;status(`spec saved: config/studio/${j.name}.yaml -- seeding...`);await reseed();};
 window.reseed=async function(){if(!specName){status('no spec yet',true);return;}status('seeding on the CPU...');const r=await fetch('/api/bio/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){status(j.error,true);return;}SCENE=j;VIS.cells=null;draw(j);visPanel(j);tree(j);status(`seeded in ${j.seconds}s: `+Object.entries(j.sets).map(([k,v])=>`${k} ${v.n_live}`).join(', '));};
-window.refine=async function(){const p=$('prompt').value.trim();if(!p||!specName)return;$('rstat').textContent='Claude is editing the spec...';const j=await post('/api/bio/refine',{name:specName,prompt:p});if(j.error){$('rstat').textContent='';status(j.error+(j.detail?'\n'+j.detail:''),true);return;}$('rstat').textContent=`applied in ${j.seconds}s`;$('yamltext').value=j.raw;if(j.form)fillForm(j.form);await reseed();};
 window.toggleYaml=function(){const y=$('yaml');y.style.display=y.style.display==='none'?'block':'none';};
 window.saveYaml=async function(){const j=await post('/api/bio/save',{name:specName,raw:$('yamltext').value});if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();};
 function init3d(){const R=$('right');renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(R.clientWidth,R.clientHeight);R.appendChild(renderer.domElement);
  scene=new THREE.Scene();scene.background=new THREE.Color(0x0b0b0d);camera=new THREE.PerspectiveCamera(40,R.clientWidth/R.clientHeight,0.01,5000);camera.position.set(0,0,30);
- controls=new OrbitControls(camera,renderer.domElement);controls.zoomSpeed=0.25;controls.enableDamping=true;controls.dampingFactor=0.08;
+ controls=new OrbitControls(camera,renderer.domElement);controls.enableZoom=false;controls.enableDamping=true;controls.dampingFactor=0.08;
+ renderer.domElement.addEventListener('wheel',ev=>{ev.preventDefault();const f=ev.deltaY>0?1.08:1/1.08;const d=camera.position.clone().sub(controls.target);const L=d.length()*f;const fit=fitDist();
+  d.setLength(Math.min(Math.max(L,0.15*fit),6*fit));camera.position.copy(controls.target).add(d);controls.update();},{passive:false});
  scene.add(new THREE.AmbientLight(0xffffff,0.6));const dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(1,1,1);scene.add(dl);
- renderer.domElement.addEventListener('click',onClick);window.addEventListener('resize',()=>{renderer.setSize(R.clientWidth,R.clientHeight);camera.aspect=R.clientWidth/R.clientHeight;camera.updateProjectionMatrix();for(const m of LMATS)m.resolution.set(R.clientWidth,R.clientHeight);});
+ renderer.domElement.addEventListener('click',onClick);window.addEventListener('resize',()=>{renderer.setSize(R.clientWidth,R.clientHeight);camera.aspect=R.clientWidth/R.clientHeight;camera.updateProjectionMatrix();for(const m of VIS.lmats)m.resolution.set(R.clientWidth,R.clientHeight);});
  (function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,camera);})();}
+function fitDist(){return Math.max(12,((SCENE&&SCENE.world&&SCENE.world[0])||50)*0.45);}
 function clear(){for(const o of pick)scene.remove(o);pick=[];}
 function cellOn(f){return VIS.cells===null||VIS.cells.has(f);}
-function draw(j){clear();LMATS=[];const T=j.tissue;let center=new THREE.Vector3();const R=$('right');
+function draw(j){clear();VIS.lmats=[];const T=j.tissue;let center=new THREE.Vector3();const R=$('right');
  if(T){const outer=T.apical==='in'?'basal':'apical';
   for(const [cap,mat] of [[outer,{color:0xcfd8e3,opacity:0.35}],[T.apical==='in'?'apical':'basal',{color:0x8090a0,opacity:0.18}]]){if(!VIS[cap])continue;const c=T.caps[cap];
    const idx=[],face=[];c.tri.forEach((t,k)=>{if(cellOn(c.face[k])){idx.push(...t);face.push(c.face[k]);}});if(!idx.length)continue;
    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(c.verts.flat(),3));g.setIndex(idx);g.computeVertexNormals();
    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:mat.color,transparent:true,opacity:mat.opacity,side:THREE.DoubleSide,flatShading:true}));m.userData={kind:'cap',cap,face};scene.add(m);pick.push(m);
    if(VIS.edges){const lg=new LineSegmentsGeometry().fromWireframeGeometry(new THREE.WireframeGeometry(g));const lm=new LineMaterial({color:cap===outer?0x9fb4cc:0x5a6a80,linewidth:VIS.width,transparent:true,opacity:0.9});
-    lm.resolution.set(R.clientWidth,R.clientHeight);LMATS.push(lm);const w=new LineSegments2(lg,lm);scene.add(w);pick.push(w);}}
+    lm.resolution.set(R.clientWidth,R.clientHeight);VIS.lmats.push(lm);const w=new LineSegments2(lg,lm);scene.add(w);pick.push(w);}}
   const allv=T.caps.mid.verts.slice(0,T.Nv);const keep=[];allv.forEach((v,i)=>{if(T.cells_of_vertex[i].some(cellOn))keep.push(i);});
   if(VIS.vertices&&keep.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(keep.flatMap(i=>allv[i]),3));
    const p=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:0.14}));p.userData={kind:'vertex',map:keep};scene.add(p);pick.push(p);}
@@ -629,7 +629,7 @@ window.redraw=function(){if(SCENE){draw.keepCam=true;draw(SCENE);draw.keepCam=fa
 // the Visibility panel: eye toggles per cap/edges/vertices, per species, and a clickable cell grid
 function visPanel(j){const T=j.tissue;let h='';
  if(T){h+=`<div class="row"><label><input type="checkbox" ${VIS.apical?'checked':''} onchange="VIS.apical=this.checked;redraw()">apical cap</label><label><input type="checkbox" ${VIS.basal?'checked':''} onchange="VIS.basal=this.checked;redraw()">basal cap</label><label><input type="checkbox" ${VIS.edges?'checked':''} onchange="VIS.edges=this.checked;redraw()">edges</label><label><input type="checkbox" ${VIS.vertices?'checked':''} onchange="VIS.vertices=this.checked;redraw()">vertices</label></div>`;
-  h+=`<div class="row"><label style="color:#aab">edge width px</label><input type="range" min="1" max="6" step="0.5" value="${VIS.width}" style="width:120px" oninput="VIS.width=+this.value;for(const m of LMATS)m.linewidth=VIS.width"></div>`;}
+  h+=`<div class="row"><label style="color:#aab">edge width px</label><input type="range" min="1" max="6" step="0.5" value="${VIS.width}" style="width:120px" oninput="VIS.width=+this.value;for(const m of VIS.lmats)m.linewidth=VIS.width"></div>`;}
  const sps=[];for(const s of Object.values(j.sets))for(const n of (s.type_names||[]))if(!sps.includes(n))sps.push(n);
  if(sps.length){h+='<div class="row">'+sps.map(n=>{if(VIS.species[n]===undefined)VIS.species[n]=true;const c=(j.colors[n]||[1,1,1]).map(x=>Math.round(x*255));return `<label><input type="checkbox" ${VIS.species[n]?'checked':''} onchange="VIS.species['${n}']=this.checked;redraw()"><span style="color:rgb(${c})">&#9679;</span> ${n}</label>`;}).join('')+'</div>';}
  if(T){const cells=j.sets[T.cell_set];const ids=cells&&cells.idx?cells.idx:[...new Set(T.caps.apical.face)].sort((a,b)=>a-b);
@@ -658,7 +658,7 @@ init3d();addSpecies({name:'integrin',region:'basal'});addSpecies({name:'myosin',
 // seen here. Spec version -> reload + reseed; camera version -> turn the view; pick -> select.
 let seen={version:-1,cam_version:-1};
 function applyCamera(st){if(!SCENE)return;const c=controls.target.clone();const e=st.elev*Math.PI/180,a=st.azim*Math.PI/180;const d=new THREE.Vector3(Math.cos(e)*Math.cos(a),Math.cos(e)*Math.sin(a),Math.sin(e));
- const dist=Math.max(12,(SCENE.world[0]||50)*0.45)/Math.max(st.zoom,0.05);camera.position.copy(c.clone().add(d.multiplyScalar(dist)));camera.up.set(0,0,1);controls.update();}
+ const dist=fitDist()/Math.min(Math.max(st.zoom,0.15),6);camera.position.copy(c.clone().add(d.multiplyScalar(dist)));camera.up.set(0,0,1);controls.update();}
 window.selectById=function(pk){if(!SCENE||!pk)return;const [set,idx]=pk.split(':');const i=+idx;
  if(set==='cell'){$('info').textContent='cell '+cellInfo(i);highlight(null);return;}
  const s=SCENE.sets[set];if(s&&s.pos&&i<s.pos.length){const sp=(s.type_names||[])[(s.node_type||[])[i]??0]||set;const par=(s.parent||[])[i];$('info').textContent=`${sp} cluster #${s.idx[i]} (set ${set})\n  position: ${s.pos[i].join(', ')}\n  parent: cell #${par}\n\n`+(par!==undefined?cellInfo(par):'');highlight(s.pos[i]);}

@@ -20,7 +20,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="plexus.gui", description="Plexus spec node editor")
     ap.add_argument("spec", nargs="?", help="spec.yaml to open (or a dir to browse)")
     ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--port", type=int, default=None,
+                    help="default 8765; the bio page is always on 8799 so its URL can be bookmarked")
     ap.add_argument("--no-browser", action="store_true")
     ap.add_argument("--studio", action="store_true",
                     help="open the prompt-to-scene studio instead of the node editor")
@@ -28,6 +29,8 @@ def main(argv=None):
                     help="open the bio-objects page: define a tissue and its proteins, seed, click")
     args = ap.parse_args(argv)
 
+    if args.port is None:
+        args.port = 8799 if args.bio else 8765     # http://127.0.0.1:8799/bio is the bookmark
     httpd = serve(args.host, args.port)
     url = f"http://{args.host}:{args.port}/" + ("bio" if args.bio else "studio" if args.studio else "")
     if args.spec and not args.studio:

@@ -3,7 +3,7 @@
 
     python Plexus_gui.py                 # the studio, http://127.0.0.1:8765/studio
     python Plexus_gui.py --editor        # the node editor instead
-    python Plexus_gui.py --bio           # define a tissue and its proteins, seed it, click objects
+    python Plexus_gui.py --bio           # bio objects, always at http://127.0.0.1:8799/bio (bookmark it)
     python Plexus_gui.py --port 8790 --no-browser
 
 Type a scene in English and press PREVIEW: Claude writes a Plexus2 spec grounded in a real
