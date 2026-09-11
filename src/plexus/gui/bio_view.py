@@ -113,12 +113,15 @@ class View:
         with LOCK:
             if azim is not None: self.azim = float(azim)
             if elev is not None: self.elev = max(-89.0, min(89.0, float(elev)))
-            if zoom is not None: self.zoom = max(0.15, min(8.0, float(zoom)))
+            if zoom is not None: self.zoom = max(0.05, min(60.0, float(zoom)))
             a, e = np.radians(self.azim), np.radians(self.elev)
             d = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
             cam = self.p.camera
             cam.focal_point = tuple(self.focal)
-            cam.position = tuple(self.focal + d * (self.dist0 / self.zoom))
+            # under a parallel projection the distance does not change the picture, so the camera
+            # stays far away and only the parallel scale zooms: the near plane never cuts the scene
+            par = bool(cam.parallel_projection)
+            cam.position = tuple(self.focal + d * (self.dist0 if par else self.dist0 / self.zoom))
             cam.up = (0.0, 0.0, 1.0)
             # THE MOVIE'S CAMERA IS ORTHOGRAPHIC (`parallel_projection`, live_movie.py:547), so
             # zoom is the parallel scale (half the view height in world units), not the distance.
@@ -126,6 +129,25 @@ class View:
                 cam.parallel_scale = self.scale0 / self.zoom
             self.p.renderer.ResetCameraClippingRange()
             self._scale_bar(cam, d)
+            self._section_zoom()
+
+    def _section_zoom(self):
+        """The section inset follows the view's zoom: its window is the declared span over the zoom,
+        centred where it was, and the section is redrawn (discs re-sized) when the zoom changed."""
+        lm = self.lm
+        if getattr(lm, "cs", None) is None or getattr(lm, "_cs_rng", None) is None:
+            return
+        if not hasattr(self, "_cs0"):
+            (x0, x1), (y0, y1) = lm._cs_rng
+            self._cs0 = (0.5 * (x0 + x1), 0.5 * (y0 + y1), float(x1 - x0), float(y1 - y0))
+            self._cs_zoom = 1.0
+        if abs(self.zoom - self._cs_zoom) < 1e-9:
+            return
+        cx, cy, sx, sy = self._cs0
+        lm._cs_rng = ([cx - 0.5 * sx / self.zoom, cx + 0.5 * sx / self.zoom],
+                      [cy - 0.5 * sy / self.zoom, cy + 0.5 * sy / self.zoom])
+        self._cs_zoom = self.zoom
+        lm._update_cross_section(self.H)
 
     def _scale_bar(self, cam, view_dir):
         """A bar of a round length, fixed at the bottom-left of the VIEW whatever the camera does.
@@ -152,7 +174,9 @@ class View:
         len_m = max([f * p10 for f in (1.0, 2.0, 2.5, 5.0) if f * p10 <= tgt_m] or [p10])
         L = len_m / m_per_unit
         # bottom-RIGHT: the section inset owns the bottom-left corner
-        b = self.focal + right * (half_w * 0.92) - vup * (half_h * 0.9) + view_dir * (0.5 * half_h)
+        # just in front of the camera, so nothing in the scene can occlude it at any zoom
+        near = 0.5 * (self.dist0 if cam.parallel_projection else self.dist0 / self.zoom)
+        b = self.focal + right * (half_w * 0.92) - vup * (half_h * 0.9) + view_dir * near
         a = b - right * L
         for nm in ("scale_bar", "scale_label"):
             try:
