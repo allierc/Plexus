@@ -47,6 +47,7 @@ def main():
     ap.add_argument("--per-parent", type=int, default=50)
     ap.add_argument("--n-grid", type=int, default=128)
     ap.add_argument("--anchor", type=float, default=1e4)
+    ap.add_argument("--anchor-percell", action="store_true")
     ap.add_argument("--drag", type=float, default=30.0, help="Stokes drag k; 150 critically damps the substrate mode (step_test.py)")
     ap.add_argument("--band", type=float, default=0.03)
     ap.add_argument("--amplify", type=float, default=12.0, help="displacement arrows are drawn this many times longer")
@@ -60,13 +61,13 @@ def main():
     LTIF = os.path.join(HERE, "data_hcm" if rec.get("specimen") == "hcm" else "data", "cells_2560.tif")
     z = np.load(args.params)
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
-    P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["clock"].shape[0]) if mode == "free" else 0)
+    P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["psi"].shape[1]) if "psi" in z.files else (int(z["clock"].shape[0]) if mode == "free" else 0), n_modes=int(z["n_modes"]) if "n_modes" in z.files else 0)
     P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"})
     win = R.beat_window(rec, args.beat); T = len(win["frames"])
     A_ref, u_ref = R.window_affine(rec, win)
     trunc = (win["onset"] - win["span"][0]) - R.PRE
     P.shift = -float(trunc)
-    kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_k=args.anchor, drag_k=args.drag)
+    kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_k=args.anchor, drag_k=args.drag, anchor_percell=args.anchor_percell)
     with torch.no_grad():
         r0 = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="mv_rest", **dict(kw, n_frames=0))),
                        P, dev, C, grad=False)
