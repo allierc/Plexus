@@ -58,23 +58,102 @@ is the rule at a cell division: `duplicate` (each daughter gets one: nucleus, ce
 `s` and `tau` are the same birth-and-turnover law proteins use, for organelles that have a
 biogenesis rate (mitochondria); a species without them keeps its count.
 
-**A piece has a body, and the body is a choice per species.** `body:` says what the piece is
-made of, and only the body changes the cost:
+**A piece has a body, and the body is a choice per species.** The piece level is always the
+same: one row per organelle with a position, an orientation and a radius. `body:` says whether
+that row is ALL there is to the organelle, or whether it owns matter in a child set:
 
-- `point` (default): the piece is a pose (position, orientation, radius). Zero simulation cost;
-  drawn as a sphere or an ellipsoid. This is the twin of a protein cluster and the answer to
-  "add a nucleus to every cell".
-- `mesh`: the piece owns a closed half-edge mesh (an icosphere per nucleus: the nuclear
-  envelope). One extra level, `organelle_vertex`, with `mesh: half_edge` and `parent: organelle`,
-  all pieces' meshes in one level as disconnected components. Faces exist, so proteins can sit on
-  them (nuclear pore complexes, lamins). Cost: the vertex operators over the extra level.
-- `mpm`: the piece owns a cloud of `mpm_particle` rows (`<name>_node`, `parent: organelle`), as
-  in the atlas archive, seeded by the atlas shape table. The organelle deforms and pushes; a
-  nucleus made of MPM particles resists the cell's compression. Cost: the MPM step over the cloud.
+- `point` (default): the row is the organelle. Zero simulation cost; drawn as a sphere or an
+  ellipsoid of its radius. The twin of a protein cluster, and the answer to "add a nucleus".
+- `mesh`: the row owns a closed half-edge mesh in a child level (an icosphere: the nuclear
+  envelope). Faces exist, so proteins can sit on them and a lamina tension can act on them.
+- `mpm`: the row owns a cloud of `mpm_particle` rows in a child set, seeded by the atlas shape
+  table (`cell_ops.py:98-116`). The organelle has mass and a deformation gradient: it resists
+  compression, flows, and pushes on what it touches.
 
-The three bodies share the piece level, so `count:organelle:nucleus` and the hierarchy panel read
-the same way whichever body is chosen, and a spec upgrades a species from `point` to `mpm` by
-changing one word.
+### 2a. How a species picks its body, and what that choice means
+
+The user's question: how can one set be "a mesh or MPM"? It cannot, and it does not have to. The
+`organelle` set is always the piece level. A body is a SECOND set in the spec, declared as a child
+of `organelle` and naming which species it belongs to. Choosing the body is writing that child
+set; `body:` on the species is only the word the operators dispatch on, and the schema refuses a
+species whose `body:` has no matching child set (or the reverse). Three complete specs:
+
+```yaml
+# point: nothing but the piece level
+organelle:
+  parent: cell
+  parent_pos: centroid
+  per_parent: 41
+  types:
+    nucleus:      {body: point, n: 1,  radius: 0.30, region: basal_side, on_divide: duplicate}
+    mitochondria: {body: point, n: 40, radius: 0.05, region: interior,   on_divide: halve}
+```
+
+```yaml
+# mesh: the nucleus owns an icosphere; the mitochondria stay points
+organelle:
+  ...
+  types:
+    nucleus:      {body: mesh,  n: 1,  radius: 0.30, region: basal_side, on_divide: duplicate}
+    mitochondria: {body: point, n: 40, radius: 0.05, region: interior,   on_divide: halve}
+organelle_vertex:
+  parent: organelle
+  body_of: nucleus            # rows belong to pieces of this species only
+  mesh: half_edge
+  per_parent: 42              # icosphere subdivision 1: 42 vertices, 80 faces
+  state: {pos, vel}
+```
+
+```yaml
+# mpm: the nucleus owns a particle cloud; the shape comes from the atlas table
+organelle:
+  ...
+  types:
+    nucleus:      {body: mpm,   n: 1,  radius: 0.30, region: basal_side, on_divide: duplicate,
+                   shape: ball, youngs: 1000, density: 1.0}
+    mitochondria: {body: point, n: 40, radius: 0.05, region: interior,   on_divide: halve}
+nucleus_node:
+  entity: mpm_particle
+  parent: organelle
+  body_of: nucleus
+  per_parent: 2000
+```
+
+What the choice changes is the DIRECTION of information between the piece and its body:
+
+| body  | who moves whom | how it stays inside the cell | what it costs |
+|-------|----------------|------------------------------|---------------|
+| point | the piece is prescribed: `organelle_project` moves the row | projection onto the region (the corral, as for proteins) | nothing |
+| mesh  | the body is simulated: the vertex operators move `organelle_vertex`; the piece's pose is MEASURED back as the centroid of its vertices (`aggregate_centroid`, `cell_ops.py:792`) | contact between the envelope and the cell's caps (`mesh_contact`, `contact_ops.py:87`), a force, not a projection | vertex step on 42 vertices per nucleus |
+| mpm   | the body is simulated: the MPM step moves `nucleus_node`; the pose is the centroid of its particles | the cell's caps are a `mesh_contact` boundary for the cloud, and the cloud's pressure pushes the caps back | MPM step on 2,000 particles per nucleus |
+
+So for `point` the piece drives the body (there is none); for `mesh` and `mpm` the body drives
+the piece. `organelle_project` therefore does two different things by body: for `point` it
+projects; for the other two it only refreshes the pose from the body and applies `on_divide` by
+moving the body's rows with the piece (rigid translate at division, then the physics takes over).
+
+**Which organelle gets which body.** The rule is what the question about the organelle needs:
+
+| organelle | point | mesh | mpm |
+|-----------|-------|------|-----|
+| nucleus | count, position, division plane | envelope with faces: nuclear pores, lamina tension, envelope rupture | resistance to compression, nuclear deformation in a squeezed cell |
+| mitochondria | count, turnover, distribution | no (no closed surface worth having at this scale) | bent capsules with cristae, fission/fusion as cloud split/merge |
+| Golgi, ER | position only | no (fenestrated, not closed) | stacks, cisternae, tubule networks (the atlas shapes) |
+| cytoskeleton | no | no | filaments (atlas `filament`), and only ever mpm |
+| centrosome | count, position, spindle axis | no | no |
+
+A real nucleus is BOTH: a mesh envelope with an mpm chromatin content inside it, coupled by
+`mesh_contact` between the cloud and the envelope. That is two species in the spec (`envelope:
+{body: mesh}`, `chromatin: {body: mpm, parent_region: inner of envelope}`), not a fourth body.
+The plan keeps bodies to three words and composes the rest in the spec.
+
+**Where the body's rows go at seeding.** `organelle_body_seed` runs after `organelle_seed`: it
+reads each piece's pose and radius and fills the child set for that piece. For `mesh` it writes an
+icosphere scaled to the radius, its faces registered in the child level's half-edge mesh as one
+more closed component (the tissue mesh is already one closed component; the level gains N of
+them). For `mpm` it calls the atlas sampler for the species' `shape` with the piece as centre and
+its orientation as `e3`, which is exactly what `seed_cell_atlas` does per cell today, called per
+piece instead.
 
 **Proteins can attach to organelles.** `protein.parent` may be `organelle` (nested containment:
 protein in organelle in cell), and the species `region:` then names a place on the organelle:
@@ -163,6 +242,8 @@ reports per cell per species. Pieces draw as spheres of their radius, not dots.
 | O5 | organelle to cell action: nuclear migration sets the division plane; mitochondria scale growth | division-plane height tracks nucleus height; growth rate versus count is the declared law |
 
 O0 alone answers the request that started this; O2 is where organelles stop being decoration.
+O3 and O4 are independent of each other and can go in either order: a species picks `mesh` or
+`mpm` by declaring its child set (section 2a), and a spec that declares neither runs on O0.
 Each stage adds operators and specs only (no scripts), captions its runs, and registers a
 fingerprint before the next stage starts.
 
