@@ -529,7 +529,8 @@ def _ev_lines(ev: dict) -> list:
     return out
 
 
-def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900, brief: str | None = None) -> dict:
+def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900, brief: str | None = None,
+                 mode: str = "bio") -> dict:
     """Launch the CLI on the task in a thread; the transcript fills `CLAUDE['lines']` as it runs."""
     import subprocess
     import threading
@@ -548,6 +549,15 @@ def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900
     if notes:
         prompt = "Since your last task, the page did this without you:\n- " + "\n- ".join(notes) + \
                  "\nRe-read /api/bio/state before assuming anything about the scene.\n\nTask: " + task
+    if fresh:
+        # PRIMED ONCE PER SESSION: the framework digest, the operator atlas, the entities, the
+        # design notes and two reference specs of this page's domain go in front of the first
+        # task; every later task resumes the session and has them for free.
+        from plexus.gui import corpus as _corpus
+        ref = _corpus.corpus(mode)
+        prompt = ("REFERENCE -- the Plexus framework you are working in. Read it once and keep it "
+                  "for every task of this session.\n\n" + ref + "\n\n=== END OF REFERENCE ===\n\n" + prompt)
+        CLAUDE["lines"].append(f"[session primed with {len(ref):,} chars: framework, operator atlas, entities, references]")
     CLAUDE.update(running=True, task=task, lines=[f"task: {task}" + ("" if fresh else f"  (session turn {CLAUDE['turns'] + 1})")],
                   seconds=0.0, error=None, started=time.time())
 
