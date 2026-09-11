@@ -82,8 +82,16 @@ def main():
     ap.add_argument("--nu", type=float, default=0.3)
     ap.add_argument("--youngs", type=float, default=80.0)
     ap.add_argument("--iters", type=int, default=150)
+    ap.add_argument("--anchor-percell", action="store_true", help="per-cell substrate stiffness (prototype operator)")
+    ap.add_argument("--kappa-shrink", type=float, default=0.1, help="weight on mean(logkappa^2)")
+    ap.add_argument("--n-modes", type=int, default=0, help="K shared temporal activation modes with per-cell weights")
+    ap.add_argument("--mode-shrink", type=float, default=1e-2, help="weight on the modes' smoothness + weights' size")
+    ap.add_argument("--fit-frames", type=int, default=0,
+                    help="fit only the first N frames of the window (0 = all). The autograd tape grows with "
+                         "particles x substeps, so a denser sheet (200/cell, ~60 GB over 57 frames) fits in memory "
+                         "over the 36 frames that hold 97% of the signal; scoring always uses the whole window")
     ap.add_argument("--free", default="g,phi,logE,clock")
-    ap.add_argument("--lr", default="g=2e-3,phi=0.03,logE=0.03,clock=0.05,delay=0.1,g2=2e-3,logtau=0.05,logtr=0.05,logdur=0.05")
+    ap.add_argument("--lr", default="g=2e-3,phi=0.03,logE=0.03,clock=0.05,delay=0.1,g2=2e-3,logtau=0.05,logtr=0.05,logdur=0.05,psi=0.01,amode=0.02,logkappa=0.05")
     ap.add_argument("--cell-clock-shrink", type=float, default=0.0,
                     help="weight on mean(logtau^2 + logtr^2 + logdur^2): keeps per-cell time courses near the shared clock")
     ap.add_argument("--delay-shrink", type=float, default=0.0,
@@ -125,7 +133,9 @@ def main():
     win = R.beat_window(rec, args.beat)
     T = len(win["frames"])
     A_rec, u_rec = R.window_affine(rec, win)
-    kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C,
+    if args.fit_frames > 0:
+        T = min(T, args.fit_frames); A_rec, u_rec = A_rec[:T], u_rec[:T]
+    kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_percell=args.anchor_percell,
               youngs=args.youngs, anchor_k=args.anchor, drag_k=args.drag)
 
     # rest positions + band from one 0-frame rollout (the seed decides where particles sit)
@@ -175,7 +185,12 @@ def main():
 
     P = M.Params(C, dev, g0=float(amp_i.median()), phi0=phi_i, E0=args.youngs, t0=ck_i["t0"],
                  tau_r=ck_i["tau_r"], dur=ck_i["dur"], tau_d=ck_i["tau_d"], nu=args.nu,
-                 clock_mode=args.clock_mode, n_frames=T)
+                 clock_mode=args.clock_mode, n_frames=T, n_modes=args.n_modes)
+    if args.n_modes > 0:
+        with torch.no_grad():
+            gen0 = torch.Generator().manual_seed(args.seed)
+            P.psi.copy_(0.02 * torch.randn(P.psi.shape, generator=gen0).to(dev).cumsum(1)); P.psi[:, 0] = 0
+            P.amode.copy_(0.1 * torch.randn(P.amode.shape, generator=gen0).to(dev))
     if truth is not None and args.init_truth:
         with torch.no_grad():
             for k in args.init_truth.split(","):
@@ -210,6 +225,10 @@ def main():
             loss = loss + args.clock_smooth * P.smoothness()
         if args.E_shrink > 0:
             loss = loss + args.E_shrink * (P.logE - P.logE.mean()).pow(2).mean()
+        if args.n_modes > 0:
+            loss = loss + args.mode_shrink * P.mode_penalty()
+        if args.anchor_percell:
+            loss = loss + args.kappa_shrink * P.logkappa.pow(2).mean()
         if args.cell_clock_shrink > 0:
             loss = loss + args.cell_clock_shrink * P.cell_clock_penalty()
         if args.delay_shrink > 0:
@@ -239,6 +258,7 @@ def main():
             P.logtau.clamp_(min=-1.5, max=1.5)
             P.logtr.clamp_(min=-1.5, max=1.5)
             P.logdur.clamp_(min=-1.0, max=1.0)
+            P.logkappa.clamp_(min=-2.0, max=2.0)
             last_ok = {k: v.detach().clone() for k, v in P.leaves().items()}
         rowd = dict(it=it, loss=float(loss), seconds=time.time() - t0, recovery=recovery(P, truth),
                     lr=[g_["lr"] for g_ in opt.param_groups])

@@ -422,3 +422,29 @@ cell, shrunk to the shared clock; `model.Params.logtr/logdur`) — `s4_live_r10_
 `hcm_r4_cellclock` running. Rank ceiling: 0.94 with two temporal modes, 0.97 with three; the
 discretisation floor is 0.958 at 120/cell, so 0.95 also needs the density raised (200/cell ≈ 60 GB
 a fit: alone on a GPU with a smaller grid, or a two-half rollout).
+
+### Per-cell excitation time course (2026-09-11, evening)
+
+Each cell its own delay, rise, plateau and decay around the shared clock (shrunk, λ = 0.05):
+
+| sheet | fit | held-out R²(A) | R²(u) | shortening r | axis |
+|---|---|---|---|---|---|
+| healthy | r8 (g2, shared clock) | 0.82 | 0.87 | 0.92 | 0.94 |
+| healthy | **r10 per-cell clock** | **0.85** | **0.91** | 0.93 | 0.95 |
+| HCM | hcm_r3 (g2, shared clock) | 0.85 | 0.87–0.89 | 0.95 | 0.94 |
+| HCM | **hcm_r4 per-cell clock** | **0.88** | **0.94–0.96** | 0.96 | 0.95 |
+
+Residual of r10 by rank: the model reaches the recording's rank-1 part at 0.85 (ceiling 0.87) but
+its rank-2 part only at 0.875 (ceiling 0.94): the per-cell clock numbers reach the second temporal
+mode weakly, which is what their poor identifiability predicted (the loss is flat in them). Running:
+(i) `s4_live_r11_p200_f36` — 200 particles per cell over the first 36 frames (97% of the signal;
+the tape does not fit over 57), to lift the discretisation floor; (ii) `s4_live_r12_modes2` — two
+shared temporal activation modes ψ_k(t) with one weight per cell and mode, γ_j(t) = γ_j^clock(t) +
+Σ_k a_jk ψ_k(t), the direct parametrisation of the rank-2/3 temporal structure.
+
+r11 (200/cell, fitted over 36 frames): R²(A) 0.84–0.85, R²(u) 0.75–0.77 — density did not help
+R²(A) (the floor is not the limiter) and leaving the rest tail out of the fit costs R²(u): dropped.
+r12 (two shared temporal modes + per-cell weights, on top of r10): **0.86 / 0.91** (+0.01). The
+temporal side is now close to what the rank ceiling allows for a fixed spatial pattern; the gap to
+0.95 is the SPATIAL pattern of the plateau. Next per-cell physics not yet in the model: substrate
+adhesion κ_j per cell (a prototype-registered operator, `anchor_percell`).

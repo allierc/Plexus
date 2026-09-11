@@ -62,13 +62,14 @@ DOM_LO, DOM_HI = 0.15, 0.85
 def build_spec(n_grid=128, per_parent=100, n_frames=50, dt=0.002, sub=2e-4, n_cells=472,
                youngs=80.0, drag_k=30.0, anchor_k=0.0, differentiable=True, compile=True,
                wall_damp=0.5, wall_contact=0.06, a_max=200.0, label_tif=LABEL_TIF,
-               name="cardio_strain", seed=0, density=1.0):
+               name="cardio_strain", seed=0, density=1.0, anchor_percell=False):
     """A 2D sheet of `n_cells` measured cells, `per_parent` material points each, no forces of
     its own: the contraction comes from `on_frame`. `implementation: differentiable` names the
     operator bodies that rebind instead of writing in place (what autograd needs)."""
     impl = dict(implementation="differentiable") if differentiable else {}
-    anchor = ([dict(op="mpm_anchor", at="mpm_particle", k=float(anchor_k), applies_to="substrate")]
-              if anchor_k > 0 else [])
+    anchor = ([dict(op="anchor_percell", at="mpm_particle", k=float(anchor_k))] if anchor_percell and anchor_k > 0
+              else [dict(op="mpm_anchor", at="mpm_particle", k=float(anchor_k), applies_to="substrate")] if anchor_k > 0
+              else [])
     return dict(
         general=dict(name=name, seed=seed, n_frames=n_frames, dt=dt, record_cap=3,
                      boundary="wall", dim=2),
@@ -92,7 +93,7 @@ def build_spec(n_grid=128, per_parent=100, n_frames=50, dt=0.002, sub=2e-4, n_ce
                  wall_damp=wall_damp, **impl),
             dict(op="mpm_gather", at="mpm_particle", **{"from": "mpm_grid"},
                  wall_contact=wall_contact, wall_damp=wall_damp, **impl)],
-        schedule=["seed_from_segmentation", "drag", *(["mpm_anchor"] if anchor else []),
+        schedule=["seed_from_segmentation", "drag", *([anchor[0]["op"]] if anchor else []),
                   dict(substep_dt=sub, compile=bool(compile),
                        steps=["mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather"])],
         plotting={})
@@ -109,6 +110,7 @@ def sim_label_tif(sim):
 
 def load_sim(raw):
     from plexus import operators  # noqa: F401  -- importing registers every operator
+    import ops_percell  # noqa: F401  -- and this prototype's own
     from plexus.schema import load
     f = os.path.join(tempfile.mkdtemp(prefix="cardio_strain_"), "spec.yaml")
     yaml.safe_dump(raw, open(f, "w"), sort_keys=False)
@@ -119,7 +121,7 @@ class Params:
     """The learnables, as leaves. `E0` in the spec's stress units (the old recipes used 80)."""
 
     def __init__(self, n_cells, device, g0=0.03, phi0=None, E0=80.0,
-                 t0=4.0, tau_r=1.5, dur=8.0, tau_d=3.0, nu=0.3, clock_mode="sigmoid", n_frames=0):
+                 t0=4.0, tau_r=1.5, dur=8.0, tau_d=3.0, nu=0.3, clock_mode="sigmoid", n_frames=0, n_modes=0):
         C = n_cells
         self.nu = float(nu)                 # Poisson ratio of the sheet (plane strain), fixed
         # THE CLOCK'S FORM. `sigmoid` is the 4-number rise x fall; `free` is one number per frame
@@ -149,6 +151,18 @@ class Params:
         # temporal modes 2-3 are per-cell time-course differences; rank ceiling 0.94 / 0.97).
         self.logtr = torch.zeros(C, device=device, requires_grad=True)
         self.logdur = torch.zeros(C, device=device, requires_grad=True)
+        # TEMPORAL MODES. The recording's activation is 88% one time course, 6.7% a second, 3% a third
+        # (rank ceiling 0.87 / 0.94 / 0.97). Per-cell clock numbers reach the second mode only
+        # weakly (they are poorly identifiable, so the loss is flat in them). This is the direct
+        # parametrisation: gamma_j(t) = gamma_j^clock(t) + sum_k a_jk psi_k(t), with K shared
+        # per-frame modes psi_k (psi_k(0) = 0, smooth) and one weight a_jk per cell and mode. Linear
+        # in a, so the optimiser finds it; K = 0 is the model above.
+        # PER-CELL ADHESION: kappa_j = kappa_0 exp(logkappa_j); zero = the shared substrate spring.
+        self.logkappa = torch.zeros(C, device=device, requires_grad=True)
+        self.kappa0 = 1e4
+        self.n_modes = int(n_modes)
+        self.psi = torch.zeros(max(self.n_modes, 1), max(n_frames, 2), device=device, requires_grad=True)
+        self.amode = torch.zeros(C, max(self.n_modes, 1), device=device, requires_grad=True)
         self.g = torch.full((C,), float(g0), device=device, requires_grad=True)
         phi = (torch.zeros(C, device=device) if phi0 is None
                else torch.as_tensor(phi0, device=device, dtype=torch.float32).clone())
@@ -163,8 +177,11 @@ class Params:
 
     def leaves(self):
         clk = self.gfree if self.clock_mode == "free" else self.clock
-        return dict(g=self.g, phi=self.phi, logE=self.logE, clock=clk, delay=self.delay, g2=self.g2,
-                    logtau=self.logtau, logtr=self.logtr, logdur=self.logdur)
+        d = dict(g=self.g, phi=self.phi, logE=self.logE, clock=clk, delay=self.delay, g2=self.g2,
+                 logtau=self.logtau, logtr=self.logtr, logdur=self.logdur, logkappa=self.logkappa)
+        if self.n_modes > 0:
+            d["psi"] = self.psi; d["amode"] = self.amode
+        return d
 
     def _s(self, t, logtau=None, percell=False):
         t0, tr, d, td = self.clock[0], self.clock[1].exp(), self.clock[2].exp(), self.clock[3].exp()
@@ -187,7 +204,18 @@ class Params:
             return self.gamma(t).expand(self.delay.shape[0])
         tt = float(t) - self.shift - self.delay
         s0 = self._s(0.0 - self.delay, self.logtau, percell=True)
-        return ((self._s(tt, self.logtau, percell=True) - s0) / (1.0 - s0)).clamp(min=0.0)
+        gam = ((self._s(tt, self.logtau, percell=True) - s0) / (1.0 - s0)).clamp(min=0.0)
+        if self.n_modes > 0:
+            i = int(round(t - self.shift))
+            if 0 < i < self.psi.shape[1]:
+                gam = (gam + self.amode @ self.psi[:, i]).clamp(min=0.0, max=1.5)
+        return gam
+
+    def mode_penalty(self):
+        """Smoothness of the shared modes (summed squared frame steps) + size of the per-cell weights."""
+        if self.n_modes == 0:
+            return torch.zeros((), device=self.g.device)
+        return (self.psi[:, 1:] - self.psi[:, :-1]).pow(2).sum() + 0.1 * self.amode.pow(2).mean()
 
     def cell_clock_penalty(self):
         """Mean squared log-scales of the per-cell time-course numbers (0 = the shared clock)."""
@@ -213,15 +241,20 @@ class Params:
 
     def state_dict(self):
         d = {k: v.detach().cpu().numpy() for k, v in self.leaves().items()}
-        d["clock_mode"] = np.array(self.clock_mode)
+        d["clock_mode"] = np.array(self.clock_mode); d["n_modes"] = np.array(self.n_modes)
         return d
 
     def load(self, d):
         with torch.no_grad():
             for k, v in d.items():
-                if k == "clock_mode":
+                if k in ("clock_mode", "n_modes"):
                     continue
-                if k in ("delay", "g2", "logtau", "logtr", "logdur") and np.asarray(v).shape != tuple(self.delay.shape):
+                if k in ("delay", "g2", "logtau", "logtr", "logdur", "logkappa") and np.asarray(v).shape != tuple(self.delay.shape):
+                    continue
+                if k in ("psi", "amode"):
+                    if self.n_modes == 0:
+                        continue
+                    setattr(self, k, torch.as_tensor(np.asarray(v), device=self.g.device, dtype=torch.float32).clone().requires_grad_(True))
                     continue
                 if k == "clock" and self.clock_mode == "free":
                     self.gfree = torch.as_tensor(np.asarray(v), device=self.g.device,
@@ -309,6 +342,7 @@ def rollout(sim, params, device, n_cells, grad=True, prescribe=None, keep_pos=Fa
             # the stiffness LEAF, bound after the seed wrote its own per-cell value
             E_p = params.logE.exp()[cid - 1]
             q.mu, q.la = params.lame(E_p)
+            q.kappa = params.kappa0 * params.logkappa.exp()[cid - 1]     # read by anchor_percell, if present
         else:
             cid = box["cid"]
             gam = params.gamma_cells(tick)[cid - 1]

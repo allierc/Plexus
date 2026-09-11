@@ -28,7 +28,7 @@ ap.add_argument("--fps", type=int, default=8)
 args = ap.parse_args(); dev = args.device
 rec = R.load(device=dev, specimen=args.specimen); C = rec["n_cells"]
 z = np.load(args.params); mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
-P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["clock"].shape[0]) if mode == "free" else 0)
+P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["psi"].shape[1]) if "psi" in z.files else (int(z["clock"].shape[0]) if mode == "free" else 0), n_modes=int(z["n_modes"]) if "n_modes" in z.files else 0)
 P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"})
 win = R.beat_window(rec, args.beat); T = len(win["frames"])
 _, ref_nodes, pos, X0, cid = model_node_displacement(args, rec, P, win)          # pos [T,N,2] particles
