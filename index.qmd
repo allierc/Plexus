@@ -13,7 +13,7 @@ next. This is the account a cell biologist uses tacitly every time a paper ends 
 summary cartoon: named parts, arrows between them, boxes drawn inside boxes. The cartoon
 cannot be run, cannot be fitted to data, and cannot be shown to be missing an arrow.
 
-**Plexus** is a language for writing that cartoon down completely enough to run it. A
+**Plexus** is a language in which that cartoon becomes an executable model. A
 model is a mechanistic hypothesis stated in two halves. *What exists*: the **sets** of
 entities — receptors, cells, the vertices of a sheet, the material points of a gel — the
 **state** each entity carries, the **relations** between entities, and the **fields** that
