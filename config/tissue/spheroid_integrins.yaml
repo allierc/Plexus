@@ -237,3 +237,4 @@ plotting:
     - 0.15
     - 0.15
   mesh_opacity: 0.45
+  mesh_surface: basal
