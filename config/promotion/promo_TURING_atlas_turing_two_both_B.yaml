@@ -14,9 +14,6 @@ general:
     length_um: 10.0
     time_s: 600.0
 sets:
-  vertex:
-    n: 24000
-    mesh: half_edge
   cell:
     n: 12000
     state:
@@ -44,6 +41,9 @@ sets:
         record: false
       age:
         width: 1
+  vertex:
+    n: 24000
+    mesh: half_edge
   half_edge:
     n: 96000
     maps:

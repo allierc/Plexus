@@ -15,8 +15,6 @@ _run:
   target_cells: 50000
   seed_cells: 2000
 sets:
-  vertex:
-    n: 15999
   cell:
     n: 8000
     state:
@@ -27,6 +25,8 @@ sets:
         width: 3
       area:
         width: 1
+  vertex:
+    n: 15999
 fields: {}
 operators:
   - op: mesh_seed

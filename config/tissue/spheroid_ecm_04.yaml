@@ -171,6 +171,12 @@ sets:
   vertex:
     n: 41616
     mesh: half_edge
+  half_edge:
+    n: 166400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
   mpm_particle:
     n: 200000
     types:
@@ -262,12 +268,6 @@ sets:
         - 1.0
         - 1.0
         - 1.0
-  half_edge:
-    n: 166400
-    maps:
-      srce: vertex
-      trgt: vertex
-      face: cell
 seed:
 - at: vertex
   cell_set: cell

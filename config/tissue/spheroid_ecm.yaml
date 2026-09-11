@@ -18,6 +18,12 @@ sets:
   vertex:
     n: 4096
     mesh: half_edge
+  half_edge:
+    n: 4096
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: sphere_face
   sphere_face:
     n: 512
     state:
@@ -38,12 +44,6 @@ sets:
         record: false
       age:
         width: 1
-  half_edge:
-    n: 4096
-    maps:
-      srce: vertex
-      trgt: vertex
-      face: sphere_face
   mpm_particle:
     n: 200000
     types:

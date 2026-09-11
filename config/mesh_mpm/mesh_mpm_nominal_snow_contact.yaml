@@ -42,9 +42,6 @@ general:
     force_nN: 9162.430188008488
   record_every: 4
 sets:
-  vertex:
-    n: 524288
-    mesh: half_edge
   cell:
     n: 262144
     state:
@@ -88,6 +85,15 @@ sets:
         record: false
       inhib_frac:
         width: 1
+  vertex:
+    n: 524288
+    mesh: half_edge
+  half_edge:
+    n: 2097152
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
   mpm_particle:
     n: 500000
     types:
@@ -103,12 +109,6 @@ sets:
         - 0.95
         - 0.95
         - 0.472
-  half_edge:
-    n: 2097152
-    maps:
-      srce: vertex
-      trgt: vertex
-      face: cell
 fields:
   mpm_grid:
     frame: mpm_grid

@@ -29,6 +29,29 @@ sets:
     - - 0.4480384757729337
       - 0.5
       - 0.59
+  vertex:
+    n: 256
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  half_edge:
+    n: 256
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: membrane_face
   plasma_membrane:
     parent: cell
     per_parent: 421
@@ -289,23 +312,6 @@ sets:
     radius: 0.042
     density: 0.6
     entity: mpm_particle
-  vertex:
-    n: 256
-    mesh: half_edge
-    state:
-      pos:
-        width: 3
-        role: coordinate
-        integration: second_order_coordinate
-        boundary: world
-      vel:
-        width: 3
-        role: rate
-        integration: second_order_rate
-        record: false
-      sep:
-        width: 3
-        integration: first_order
   membrane_face:
     n: 64
     state:
@@ -330,12 +336,6 @@ sets:
       divjit:
         width: 1
         record: false
-  half_edge:
-    n: 256
-    maps:
-      srce: vertex
-      trgt: vertex
-      face: membrane_face
 fields:
   mpm_grid:
     frame: mpm_grid

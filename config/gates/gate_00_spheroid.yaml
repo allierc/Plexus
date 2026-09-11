@@ -48,9 +48,6 @@ general:
 # TOP LEVEL, not under `general:`. `schema.load` reads `raw.get("plotting", {})` directly, so a
 # `plotting:` nested under `general:` is parsed, ignored and silently lost.
 sets:
-  vertex:
-    n: 25584
-    mesh: half_edge
   cell:
     n: 12800
     state:
@@ -94,6 +91,9 @@ sets:
         record: false
       inhib_frac:
         width: 1
+  vertex:
+    n: 25584
+    mesh: half_edge
   half_edge:
     n: 102400
     maps:

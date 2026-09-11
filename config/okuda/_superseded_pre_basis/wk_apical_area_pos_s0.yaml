@@ -11,8 +11,6 @@ general:
     - 50.0
     - 50.0
 sets:
-  vertex:
-    n: 4996
   cell:
     n: 2500
     state:
@@ -23,6 +21,8 @@ sets:
         width: 3
       area:
         width: 1
+  vertex:
+    n: 4996
 fields: {}
 operators:
   - op: mesh_seed

@@ -53,6 +53,12 @@ sets:
   vertex:
     n: 4096
     mesh: half_edge
+  half_edge:
+    n: 4096
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: sphere_face
   sphere_face:
     n: 512
     state:
@@ -87,12 +93,6 @@ sets:
         - 0.85
         - 0.45
         - 0.85
-  half_edge:
-    n: 4096
-    maps:
-      srce: vertex
-      trgt: vertex
-      face: sphere_face
 fields:
   mpm_grid:
     frame: mpm_grid

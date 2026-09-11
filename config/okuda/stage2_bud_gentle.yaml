@@ -16,9 +16,6 @@ _run:
   seed_cells: 2000
   cell_ceiling: 50000
 sets:
-  vertex:
-    n: 130004
-    mesh: half_edge
   cell:
     n: 65004
     state:
@@ -65,6 +62,9 @@ sets:
       elong:
         width: 1
         record: false
+  vertex:
+    n: 130004
+    mesh: half_edge
   half_edge:
     n: 520032
     maps:

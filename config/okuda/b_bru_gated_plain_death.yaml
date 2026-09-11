@@ -15,9 +15,6 @@ _run:
   target_cells: 60000
   seed_cells: 2000
 sets:
-  vertex:
-    n: 120000
-    mesh: half_edge
   cell:
     n: 60000
     state:
@@ -63,6 +60,9 @@ sets:
         width: 1
       inhib_frac:
         width: 1
+  vertex:
+    n: 120000
+    mesh: half_edge
   half_edge:
     n: 480000
     maps:

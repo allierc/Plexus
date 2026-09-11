@@ -15,9 +15,6 @@ _run:
   target_cells: 4000
   seed_cells: 400
 sets:
-  vertex:
-    n: 8000
-    mesh: half_edge
   cell:
     n: 4000
     state:
@@ -47,6 +44,9 @@ sets:
         width: 1
       apop_flag:
         width: 1
+  vertex:
+    n: 8000
+    mesh: half_edge
   half_edge:
     n: 32000
     maps:
