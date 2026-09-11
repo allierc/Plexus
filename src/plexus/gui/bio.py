@@ -63,6 +63,9 @@ def set_view(azim=None, elev=None, zoom=None, pick=None, message=None) -> dict:
     STATE["cam_version"] += 1
     return dict(STATE)
 REGIONS = ("basal", "apical", "mid", "interior")
+ORG_REGIONS = ("interior", "apical_side", "basal_side")
+ORG_COLORS = {"nucleus": [0.55, 0.75, 1.0], "mitochondria": [0.95, 0.35, 0.2], "golgi": [1.0, 0.8, 0.25],
+              "centrosome": [0.8, 0.95, 0.3], "lysosome": [0.85, 0.4, 0.95]}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -88,8 +91,9 @@ def build_spec(form: dict) -> dict:
     world = float(form.get("world", 50.0))
     frames = int(form.get("n_frames", 801))
     species = form.get("species") or []
-    if not species:
-        raise ValueError("declare at least one protein species")
+    organelles = form.get("organelles") or []
+    if not species and not organelles:
+        raise ValueError("declare at least one protein species or one organelle")
 
     s["general"].update(name=name, n_frames=frames, record_cap=frames + 2, world=[world] * 3)
     cell_n = max(512, 8 * n_cells)
@@ -98,10 +102,19 @@ def build_spec(form: dict) -> dict:
     s["sets"]["vertex"]["n"] = vert_n
     s["sets"]["half_edge"]["n"] = max(8192, 8 * cell_n)
     ns = len(species)
-    for k in ("protein_s", "protein_tau", "n_protein"):
-        s["sets"]["cell"]["state"][k] = {"width": ns}
     types = {}
     colors = {}
+    dot_radius = {}
+    if not species:                                          # a tissue with organelles only: no protein set
+        s["sets"].pop("protein", None)
+        for k in ("protein_s", "protein_tau", "n_protein"):
+            s["sets"]["cell"]["state"].pop(k, None)
+        s["operators"] = [o for o in s["operators"] if o.get("at") != "protein"]
+        s["schedule"] = [x for x in s["schedule"] if x not in ("radius_graph", "attraction_repulsion", "protein_project", "protein_express")]
+        s["seed"] = [o for o in s["seed"] if o.get("op") != "protein_seed"]
+    else:
+        for k in ("protein_s", "protein_tau", "n_protein"):
+            s["sets"]["cell"]["state"][k] = {"width": ns}
     for i, sp in enumerate(species):
         nm = str(sp.get("name") or f"species_{i}").strip()
         region = str(sp.get("region", "basal")).lower()
@@ -113,10 +126,40 @@ def build_spec(form: dict) -> dict:
                      "density": float(sp.get("density", 3.0)), "s": float(sp.get("s", 0.02)),
                      "tau": float(sp.get("tau", 300.0)), "p": [0.0, 1.0, 0.6, 0.35]}
         colors[nm] = [float(v) for v in (sp.get("color") or DEFAULT_COLORS[i % len(DEFAULT_COLORS)])]
-    dens = max(float(t_["density"]) for t_ in types.values())
-    s["sets"]["protein"]["types"] = types
-    s["sets"]["protein"]["per_parent"] = int(max(6, round(2.0 * dens * ns)))
-    s["sets"]["protein"].pop("grow_reserve", None)
+        dot_radius[nm] = float(sp.get("radius", 0.05))
+    if species:
+        dens = max(float(t_["density"]) for t_ in types.values())
+        s["sets"]["protein"]["types"] = types
+        s["sets"]["protein"]["per_parent"] = int(max(6, round(2.0 * dens * ns)))
+        s["sets"]["protein"].pop("grow_reserve", None)
+    # organelles: one contained set of pieces with a radius, species as types with a count per cell
+    otypes = {}
+    for i, og in enumerate(organelles):
+        nm = str(og.get("name") or f"organelle_{i}").strip()
+        region = str(og.get("region", "interior")).lower()
+        if region not in ORG_REGIONS:
+            raise ValueError(f"organelle {nm!r}: region must be one of {ORG_REGIONS}")
+        rule = str(og.get("on_divide", "duplicate")).lower()
+        if rule not in ("duplicate", "halve", "none"):
+            raise ValueError(f"organelle {nm!r}: on_divide must be duplicate|halve|none")
+        t_ = {"count": int(og.get("count", 1)), "radius": float(og.get("radius", 0.3)), "region": region, "on_divide": rule}
+        if og.get("tau") not in (None, "", 0):
+            t_["tau"] = float(og["tau"])
+        otypes[nm] = t_
+        colors[nm] = [float(v) for v in (og.get("color") or ORG_COLORS.get(nm) or DEFAULT_COLORS[(ns + i) % len(DEFAULT_COLORS)])]
+        dot_radius[nm] = t_["radius"]
+    if otypes:
+        s["sets"]["organelle"] = {"entity": "organelle", "parent": "cell", "parent_pos": "centroid",
+                                  "per_parent": sum(t_["count"] for t_ in otypes.values()),
+                                  "state": {"pos": {"width": 3}, "vel": {"width": 3}, "age": {"width": 1}},
+                                  "types": otypes}
+        s["sets"]["cell"]["state"]["n_organelle"] = {"width": len(otypes)}
+        s["operators"].append({"op": "organelle_project", "at": "organelle", "tissue": "vertex", "seed": 0})
+        s["schedule"].append("organelle_project")
+        if any("tau" in t_ for t_ in otypes.values()):
+            s["operators"].append({"op": "organelle_express", "at": "organelle", "tissue": "vertex", "seed": 0})
+            s["schedule"].append("organelle_express")
+        s["seed"].append({"op": "organelle_seed", "at": "organelle", "tissue": "vertex", "seed": 0})
     for o in s["seed"]:
         if o["op"] in ("seed_mesh", "mesh_seed"):
             o.update(n_cells=n_cells, radius=radius, h0=h0, apical=apical, shape=shape, cell_set="cell")
@@ -127,11 +170,19 @@ def build_spec(form: dict) -> dict:
             o["surface"] = "basal" if apical == "in" else "apical"
     p = s["plotting"]
     p["colors"] = colors
+    p["dot_radius"] = dot_radius
     p["mesh_surface"] = "basal" if apical == "in" else "apical"
+    p["mesh_opacity"] = 0.3
+    cs = p.get("cross_section") or {}
+    cs.update(points=False, spheres=True, span=max(6.0, 3.6 * radius)); p["cross_section"] = cs
+    p["cross_section_height"] = 0.34
     p["curve"] = [{"quantity": "cells", "xlabel": "frame", "ylabel": "cells", "ticks": 4, "ymin": 0, "ymax": max(1000, 5 * n_cells)}]
     for nm in types:
         p["curve"].append({"quantity": f"count:protein:{nm}", "xlabel": "frame", "ylabel": nm, "ticks": 4,
                            "ymin": 0, "ymax": 10000})
+    for nm, t_ in otypes.items():
+        p["curve"].append({"quantity": f"count:organelle:{nm}", "xlabel": "frame", "ylabel": nm, "ticks": 4,
+                           "ymin": 0, "ymax": max(1000, 5 * n_cells * t_["count"])})
     p["curve"] = p["curve"][:3]
     return s
 
@@ -158,6 +209,33 @@ def normalise(spec: dict) -> dict:
         colors = (spec.setdefault("plotting", {}) or {}).setdefault("colors", {})
         for i, nm in enumerate(types):
             colors.setdefault(nm, DEFAULT_COLORS[i % len(DEFAULT_COLORS)])
+    org = sets.get("organelle") or {}
+    otypes = org.get("types") or {}
+    if otypes:
+        org["per_parent"] = sum(int((t_ or {}).get("count", 1)) for t_ in otypes.values())
+        org.setdefault("entity", "organelle"); org.setdefault("parent", "cell"); org.setdefault("parent_pos", "centroid")
+        org.setdefault("state", {"pos": {"width": 3}, "vel": {"width": 3}, "age": {"width": 1}})
+        (sets.get("cell") or {}).setdefault("state", {})["n_organelle"] = {"width": len(otypes)}
+        pl = spec.setdefault("plotting", {}) or {}
+        colors = pl.setdefault("colors", {}); rad = pl.setdefault("dot_radius", {})
+        for i, (nm, t_) in enumerate(otypes.items()):
+            t_ = t_ or {}
+            t_.setdefault("count", 1); t_.setdefault("radius", 0.3); t_.setdefault("region", "interior"); t_.setdefault("on_divide", "duplicate")
+            otypes[nm] = t_
+            colors.setdefault(nm, ORG_COLORS.get(nm, DEFAULT_COLORS[(ns + i) % len(DEFAULT_COLORS)]))
+            rad[nm] = float(t_["radius"])
+        ops = [o.get("op") for o in spec.get("operators") or []]
+        sched = spec.setdefault("schedule", [])
+        if "organelle_project" not in ops:
+            spec.setdefault("operators", []).append({"op": "organelle_project", "at": "organelle", "tissue": "vertex", "seed": 0})
+        if "organelle_project" not in sched:
+            sched.append("organelle_project")
+        if any("tau" in t_ for t_ in otypes.values()) and "organelle_express" not in ops:
+            spec["operators"].append({"op": "organelle_express", "at": "organelle", "tissue": "vertex", "seed": 0})
+            if "organelle_express" not in sched:
+                sched.append("organelle_express")
+        if not any(o.get("op") == "organelle_seed" for o in spec.get("seed") or []):
+            spec.setdefault("seed", []).append({"op": "organelle_seed", "at": "organelle", "tissue": "vertex", "seed": 0})
     return spec
 
 
@@ -175,6 +253,10 @@ def form_from_spec(spec: dict) -> dict:
         "species": [{"name": n, "region": t_.get("region", "basal"), "density": t_.get("density", 3.0),
                      "s": t_.get("s", 0.02), "tau": t_.get("tau", 300.0), "color": colors.get(n)}
                     for n, t_ in types.items()],
+        "organelles": [{"name": n, "count": t_.get("count", 1), "radius": t_.get("radius", 0.3),
+                        "region": t_.get("region", "interior"), "on_divide": t_.get("on_divide", "duplicate"),
+                        "tau": t_.get("tau"), "color": colors.get(n)}
+                       for n, t_ in ((spec.get("sets", {}).get("organelle", {}) or {}).get("types", {}) or {}).items()],
     }
 
 
@@ -186,11 +268,15 @@ def seed_scene(spec_path: str, device: str = "cpu") -> dict:
     set, species and parent per cluster, the tissue's caps as triangles with their cell ids, the
     cell set's scalar blocks, and the hierarchy (containment and relations) read off the spec."""
     from plexus import schema, engine
-    import torch
-    t0 = time.time()
     sim = schema.load(spec_path)
     H = engine.build(sim, device)
     engine.seed(H, sim, device)
+    return scene_from(H, sim, spec_path)
+
+
+def scene_from(H, sim, spec_path: str) -> dict:
+    """The scene dict off an already built and seeded hierarchy (the view keeps H for rendering)."""
+    t0 = time.time()
     spec = yaml.safe_load(open(spec_path))
     out = {"name": sim.name, "world": [float(v) for v in sim.world_size], "sets": {}, "tissue": None,
            "hierarchy": hierarchy(spec), "colors": (spec.get("plotting") or {}).get("colors") or {}}
@@ -285,60 +371,8 @@ def hierarchy(spec: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------
-# a server-side eye: the same scene, rendered offscreen, and a pick resolved by id
+# a pick resolved by id (the picture itself is the movie renderer's: gui/bio_view.py)
 # ---------------------------------------------------------------------------------------------
-def snapshot(scene: dict, azim: float = 30.0, elev: float = 20.0, zoom: float = 1.0,
-             pick: str | None = None, size: tuple[int, int] = (900, 700)) -> bytes:
-    """PNG of the seeded scene: the tissue's caps (the cap the proteins face in light grey, the
-    other faint), every cluster as a dot in its species' colour, and the picked object, if any,
-    ringed in yellow. Offscreen pyvista, so it works with no browser and no network."""
-    import io
-    import pyvista as pv
-    pv.OFF_SCREEN = True
-    pl = pv.Plotter(off_screen=True, window_size=list(size))
-    pl.set_background("black")
-    T = scene.get("tissue")
-    centre = np.zeros(3); radius = float(scene["world"][0]) * 0.25
-    if T:
-        front = "basal" if T["apical"] == "in" else "apical"
-        back = "apical" if front == "basal" else "basal"
-        for cap, col, op in ((front, "#cfd8e3", 0.45), (back, "#8090a0", 0.18)):
-            c = T["caps"][cap]
-            V = np.asarray(c["verts"], float); tri = np.asarray(c["tri"], int)
-            faces = np.concatenate([np.full((tri.shape[0], 1), 3), tri], 1).ravel()
-            pl.add_mesh(pv.PolyData(V, faces), color=col, opacity=op, show_edges=True, edge_color="#2b2b2b", smooth_shading=False)
-        mid = np.asarray(T["caps"]["mid"]["verts"][: T["Nv"]], float)
-        centre = mid.mean(0); radius = float(np.linalg.norm(mid - centre, axis=1).max()) * 1.6
-    for name, st in scene["sets"].items():
-        if not st.get("pos") or (T and name == T["set"]):
-            continue
-        P = np.asarray(st["pos"], float)
-        names = st.get("type_names") or []
-        nt = np.asarray(st.get("node_type") or [0] * len(P), int)
-        for i, sp in enumerate(names or [name]):
-            sel = nt == i if names else np.ones(len(P), bool)
-            if not sel.any():
-                continue
-            col = scene["colors"].get(sp) or DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
-            pl.add_points(P[sel], color=[float(v) for v in col], point_size=5, render_points_as_spheres=True)
-    if pick:
-        p = resolve_pick(scene, pick)
-        if p and p.get("position") is not None:
-            pl.add_points(np.asarray([p["position"]], float), color="yellow", point_size=18, render_points_as_spheres=True)
-    e, a = np.radians(elev), np.radians(azim)
-    d = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
-    pl.camera.position = tuple(centre + d * radius * 4.0 / max(zoom, 1e-3))
-    pl.camera.focal_point = tuple(centre)
-    pl.camera.up = (0.0, 0.0, 1.0)
-    pl.camera.parallel_projection = True
-    pl.camera.parallel_scale = radius / max(zoom, 1e-3)
-    img = pl.screenshot(return_img=True)
-    pl.close()
-    import imageio.v3 as iio
-    buf = io.BytesIO(); iio.imwrite(buf, img, extension=".png")
-    return buf.getvalue()
-
-
 def resolve_pick(scene: dict, pick: str) -> dict | None:
     """`<set>:<live index>` (a cluster or a vertex), `cell:<face id>` -- the same facts the page's
     info panel shows, as a dict."""
@@ -406,6 +440,7 @@ Your ONLY tool is `curl` against the local server at http://127.0.0.1:{port} . T
                           n_cells, radius, h0 (cell thickness), apical (in|out; `in` puts the basal
                           cap outside, where a matrix would be), world (box), n_frames,
                           species: [{name, region (basal|apical|mid|interior), density, s, tau}]
+                          (may be empty), organelles: [...] (see below; may be empty)
   POST /api/bio/refine    {name, prompt} -> an English edit of the current spec (another Claude
                           applies it; 20-40 s); use it for anything the form cannot say
   GET  /api/bio/counts?name= -> live count per set, per species, and per cell per species
@@ -414,10 +449,14 @@ Your ONLY tool is `curl` against the local server at http://127.0.0.1:{port} . T
   GET  /api/bio/info?name=&pick=<set>:<index>   -> what one object is (protein:12, cell:7, vertex:5):
                           species, parent cell, what the cell contains, blocks, shared cells
   GET  /api/bio/view?azim=&elev=&zoom=&pick=&message=   -> turns the viewer's camera (degrees,
-                          zoom 0.5-4), highlights a pick, and shows `message` on the page. Move in
+                          zoom 0.15-8), highlights a pick, and shows `message` on the page. Move in
                           steps of 30 degrees or less with `sleep 1` between them so the viewer can
                           follow; zoom no faster than x1.5 per step.
+  POST /api/bio/visible   {species, on} -> hide or show one species in the picture
   GET  /api/bio/state     -> the session state
+The build form also takes organelles: [{name, count (per cell), radius, region
+(interior|apical_side|basal_side), on_divide (duplicate|halve|none), tau (optional, frames to
+recover the count after a division)}]; the picture is the movie renderer's, spheres at their radius.
 
 Rules: use only these routes (curl -s, JSON bodies with -H 'Content-Type: application/json'), with
 jq and sleep as the only other commands;
@@ -527,15 +566,15 @@ PAGE = r"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Plexus bio objects</title>
 <style>
  html,body{margin:0;height:100%;background:#0b0b0d;color:#ddd;font:13px -apple-system,Segoe UI,Helvetica,Arial,sans-serif}
- #left{position:absolute;left:0;top:0;bottom:0;width:380px;overflow:auto;background:#141418;border-right:1px solid #2a2a30;padding:10px 12px;box-sizing:border-box}
- #right{position:absolute;left:380px;top:0;right:0;bottom:0}
- canvas{display:block}
+ #left{position:absolute;left:0;top:0;bottom:0;width:400px;overflow:auto;background:#141418;border-right:1px solid #2a2a30;padding:10px 12px;box-sizing:border-box}
+ #right{position:absolute;left:400px;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden}
+ #view{max-width:100%;max-height:100%;cursor:grab;user-select:none;-webkit-user-drag:none}
  h1{font-size:15px;margin:2px 0 8px;color:#fff} h2{font-size:12px;margin:14px 0 4px;color:#9ab;letter-spacing:.06em;text-transform:uppercase}
  label{display:inline-block;width:92px;color:#aab} input,select{background:#0e0e12;color:#eee;border:1px solid #333;border-radius:3px;padding:2px 5px;width:110px;margin:1px 0}
  input.short{width:56px} select{width:118px}
  button{background:#2b5f9e;color:#fff;border:0;border-radius:3px;padding:5px 10px;margin:3px 3px 3px 0;cursor:pointer} button.dim{background:#3a3a44}
  button:disabled{opacity:.5;cursor:default}
- table.sp{border-collapse:collapse;width:100%} table.sp td{padding:1px 2px} table.sp input,table.sp select{width:100%;box-sizing:border-box}
+ table.sp{border-collapse:collapse;width:100%} table.sp td{padding:1px 2px} table.sp th{font-weight:normal;color:#889;font-size:11px} table.sp input,table.sp select{width:100%;box-sizing:border-box}
  #status{color:#8c8;min-height:16px;margin:4px 0;white-space:pre-wrap;font-size:12px} #status.err{color:#f88}
  #tree div{padding:1px 0 1px 8px;cursor:pointer} #tree div:hover{color:#fff} #tree .n{color:#7fb3ff} #tree .rel{color:#9ac} #tree .cont{color:#c9a}
  #info{background:#0e0e12;border:1px solid #2a2a30;padding:6px;font-size:12px;white-space:pre-wrap;min-height:60px;max-height:260px;overflow:auto}
@@ -543,8 +582,6 @@ PAGE = r"""<!doctype html>
  #yaml{display:none} .row{margin:2px 0}
  #hint{position:absolute;right:12px;top:8px;color:#778;font-size:12px}
  #vis label{width:auto;color:#ccd;margin-right:10px;cursor:pointer} #vis input[type=checkbox]{width:auto;margin:0 3px 0 0}
- #cellgrid{display:flex;flex-wrap:wrap;gap:1px;max-height:110px;overflow:auto;background:#0e0e12;border:1px solid #2a2a30;padding:3px}
- #cellgrid span{width:26px;font-size:10px;text-align:center;cursor:pointer;color:#8ab;border:1px solid #223;border-radius:2px} #cellgrid span.on{background:#2b5f9e;color:#fff}
  button.claude{background:#000;border:1px solid #555;display:inline-flex;align-items:center;gap:6px} button.claude.on{background:#1f8f3f;border-color:#2fbf5f}
  button.claude svg{width:14px;height:14px;fill:#d97757} button.claude.on svg{fill:#fff}
  #claude{background:#0e0e12;border:1px solid #2a2a30;padding:6px;font-size:11px;white-space:pre-wrap;height:190px;overflow:auto;margin:4px 0}
@@ -555,127 +592,81 @@ PAGE = r"""<!doctype html>
  <div class="row"><label>name</label><input id="name" value="bio_scene"></div>
  <div class="row"><label>shape</label><select id="shape"><option>sphere</option><option>disc</option><option>plane</option></select></div>
  <div class="row"><label>cells</label><input id="n_cells" class="short" value="200"> <label style="width:60px">radius</label><input id="radius" class="short" value="5.0"></div>
- <div class="row"><label>thickness h0</label><input id="h0" class="short" value="0.88"> <label style="width:60px">apical</label><select id="apical" style="width:64px"><option value="in">in</option><option value="out">out</option></select></div>
+ <div class="row"><label>thickness h0</label><input id="h0" class="short" value="1.2"> <label style="width:60px">apical</label><select id="apical" style="width:64px"><option value="in">in</option><option value="out">out</option></select></div>
  <div class="row"><label>box</label><input id="world" class="short" value="50"> <label style="width:60px">frames</label><input id="n_frames" class="short" value="801"></div>
+ <h2>Organelles <button class="dim" onclick="addOrganelle()">+ organelle</button></h2>
+ <table class="sp" id="organelles"><tr><th>name</th><th>per cell</th><th>radius</th><th>region</th><th>on divide</th><th>tau</th><th></th></tr></table>
  <h2>Proteins <button class="dim" onclick="addSpecies()">+ species</button></h2>
  <table class="sp" id="species"><tr><th>name</th><th>region</th><th>density</th><th>s</th><th>tau</th><th></th></tr></table>
  <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button><button class="dim" onclick="reseed()">RE-SEED</button></div>
  <div id="status">form a scene, then BUILD</div>
  <h2>Claude takes over <span style="color:#778;font-weight:normal;text-transform:none">drives this page through its own routes</span></h2>
- <div class="row"><input id="task" style="width:100%" placeholder="e.g. build a 120-cell cyst with integrins outside and myosin inside, then show me one cell" onkeydown="if(event.key==='Enter')claudeGo()"></div>
+ <div class="row"><input id="task" style="width:100%" placeholder="e.g. build a 120-cell cyst with one nucleus per cell and integrins outside, then show me one cell" onkeydown="if(event.key==='Enter')claudeGo()"></div>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
  <div id="rstat" style="color:#9ab;min-height:14px"></div>
  <div id="yaml"><textarea id="yamltext"></textarea><div><button onclick="saveYaml()">SAVE YAML</button></div></div>
  <h2>Visibility</h2><div id="vis">(seed a scene first)</div>
  <h2>Hierarchy</h2><div id="tree">(none)</div>
- <h2>Selected object</h2><div id="info">click a cluster, a cell face or a vertex</div>
+ <h2>Selected object</h2><div id="info">click a piece, a cluster, a cell or a vertex</div>
 </div>
-<div id="right"><div id="hint">drag to orbit, wheel to zoom (8% per notch), click to select</div></div>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
-<script type="module">
-import * as THREE from 'three';
-import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {LineSegments2} from 'three/addons/lines/LineSegments2.js';
-import {LineSegmentsGeometry} from 'three/addons/lines/LineSegmentsGeometry.js';
-import {LineMaterial} from 'three/addons/lines/LineMaterial.js';
-// what is shown, Blender-outliner style: caps, edges, vertices, each species, and a per-cell set (null = all)
-const VIS=window.VIS={apical:true,basal:true,edges:true,lateral:true,vertices:true,species:{},cells:null,width:2.5,dot:0.2,lmats:[],pmats:[]};
+<div id="right"><img id="view" draggable="false"><div id="hint">drag to orbit, wheel to zoom, click to select -- rendered by the movie renderer</div></div>
+<script>
 const $=id=>document.getElementById(id);
-let SCENE=null, renderer, scene, camera, controls, pick=[], raycaster=new THREE.Raycaster(), mouse=new THREE.Vector2(), specName=null;
-const DEFC=[[0.95,0.15,0.15],[0.25,0.6,1.0],[0.45,0.95,0.55],[1,0.85,0.3],[0.85,0.4,0.95],[0.3,0.9,0.95]];
+let SCENE=null, specName=null;
+const CAM={azim:30,elev:20,zoom:1};
 function status(t,err){const s=$('status');s.textContent=t;s.className=err?'err':'';}
 window.addSpecies=function(sp){sp=sp||{};const tb=$('species');const tr=tb.insertRow(-1);
  tr.innerHTML=`<td><input value="${sp.name||''}"></td><td><select><option>basal</option><option>apical</option><option>mid</option><option>interior</option></select></td><td><input value="${sp.density??3}"></td><td><input value="${sp.s??0.02}"></td><td><input value="${sp.tau??300}"></td><td><button class="dim" onclick="this.closest('tr').remove()">x</button></td>`;
  tr.cells[1].firstChild.value=sp.region||'basal';};
+window.addOrganelle=function(og){og=og||{};const tb=$('organelles');const tr=tb.insertRow(-1);
+ tr.innerHTML=`<td><input value="${og.name||''}"></td><td><input value="${og.count??1}"></td><td><input value="${og.radius??0.3}"></td><td><select><option>interior</option><option>apical_side</option><option>basal_side</option></select></td><td><select><option>duplicate</option><option>halve</option><option>none</option></select></td><td><input value="${og.tau??''}" placeholder="-"></td><td><button class="dim" onclick="this.closest('tr').remove()">x</button></td>`;
+ tr.cells[3].firstChild.value=og.region||'interior';tr.cells[4].firstChild.value=og.on_divide||'duplicate';};
 function species(){const out=[];for(const tr of $('species').rows){if(!tr.cells[0].querySelector('input'))continue;const c=tr.cells;const name=c[0].firstChild.value.trim();if(!name)continue;
  out.push({name,region:c[1].firstChild.value,density:+c[2].firstChild.value,s:+c[3].firstChild.value,tau:+c[4].firstChild.value});}return out;}
-function form(){return {name:$('name').value,shape:$('shape').value,n_cells:+$('n_cells').value,radius:+$('radius').value,h0:+$('h0').value,apical:$('apical').value,world:+$('world').value,n_frames:+$('n_frames').value,species:species()};}
+function organelles(){const out=[];for(const tr of $('organelles').rows){if(!tr.cells[0].querySelector('input'))continue;const c=tr.cells;const name=c[0].firstChild.value.trim();if(!name)continue;
+ const tau=c[5].firstChild.value.trim();out.push({name,count:+c[1].firstChild.value,radius:+c[2].firstChild.value,region:c[3].firstChild.value,on_divide:c[4].firstChild.value,tau:tau?+tau:null});}return out;}
+function form(){return {name:$('name').value,shape:$('shape').value,n_cells:+$('n_cells').value,radius:+$('radius').value,h0:+$('h0').value,apical:$('apical').value,world:+$('world').value,n_frames:+$('n_frames').value,species:species(),organelles:organelles()};}
 function fillForm(f){$('name').value=f.name;$('shape').value=f.shape;$('n_cells').value=f.n_cells;$('radius').value=f.radius;$('h0').value=f.h0;$('apical').value=f.apical;$('world').value=f.world;$('n_frames').value=f.n_frames;
- const tb=$('species');while(tb.rows.length>1)tb.deleteRow(-1);(f.species||[]).forEach(addSpecies);}
+ let tb=$('species');while(tb.rows.length>1)tb.deleteRow(-1);(f.species||[]).forEach(addSpecies);
+ tb=$('organelles');while(tb.rows.length>1)tb.deleteRow(-1);(f.organelles||[]).forEach(addOrganelle);}
 async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
-window.build=async function(){status('building the spec...');const j=await post('/api/bio/build',form());if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}specName=j.name;$('yamltext').value=j.raw;status(`spec saved: config/studio/${j.name}.yaml -- seeding...`);await reseed();};
-window.reseed=async function(){if(!specName){status('no spec yet',true);return;}status('seeding on the CPU...');const r=await fetch('/api/bio/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){status(j.error,true);return;}SCENE=j;VIS.cells=null;draw(j);visPanel(j);tree(j);status(`seeded in ${j.seconds}s: `+Object.entries(j.sets).map(([k,v])=>`${k} ${v.n_live}`).join(', '));};
+window.build=async function(){status('building the spec...');const j=await post('/api/bio/build',form());if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}specName=j.name;$('yamltext').value=j.raw;status(`spec saved: config/studio/${j.name}.yaml -- seeding and rendering...`);await reseed();};
+window.reseed=async function(){if(!specName){status('no spec yet',true);return;}status('seeding and building the renderer...');const r=await fetch('/api/bio/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){status(j.error,true);return;}SCENE=j;visPanel(j);tree(j);status(`seeded in ${j.seconds}s: `+Object.entries(j.sets).map(([k,v])=>`${k} ${v.n_live}`).join(', '));render(true);};
 window.toggleYaml=function(){const y=$('yaml');y.style.display=y.style.display==='none'?'block':'none';};
 window.saveYaml=async function(){const j=await post('/api/bio/save',{name:specName,raw:$('yamltext').value});if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();};
-function init3d(){const R=$('right');renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(R.clientWidth,R.clientHeight);R.appendChild(renderer.domElement);
- scene=new THREE.Scene();scene.background=new THREE.Color(0x0b0b0d);camera=new THREE.PerspectiveCamera(40,R.clientWidth/R.clientHeight,0.01,5000);camera.position.set(0,0,30);
- controls=new OrbitControls(camera,renderer.domElement);controls.enableZoom=false;controls.enableDamping=true;controls.dampingFactor=0.08;
- renderer.domElement.addEventListener('wheel',ev=>{ev.preventDefault();const f=ev.deltaY>0?1.08:1/1.08;const d=camera.position.clone().sub(controls.target);const L=d.length()*f;const fit=fitDist();
-  d.setLength(Math.min(Math.max(L,0.15*fit),6*fit));camera.position.copy(controls.target).add(d);controls.update();},{passive:false});
- scene.add(new THREE.AmbientLight(0xffffff,0.6));const dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(1,1,1);scene.add(dl);
- renderer.domElement.addEventListener('click',onClick);window.addEventListener('resize',()=>{renderer.setSize(R.clientWidth,R.clientHeight);camera.aspect=R.clientWidth/R.clientHeight;camera.updateProjectionMatrix();for(const m of VIS.lmats)m.resolution.set(R.clientWidth,R.clientHeight);});
- (function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,camera);})();}
-function fitDist(){return Math.max(12,((SCENE&&SCENE.world&&SCENE.world[0])||50)*0.45);}
-function clear(){for(const o of pick)scene.remove(o);pick=[];if(hlc){scene.remove(hlc);hlc=null;}}
-function cellOn(f){return VIS.cells===null||VIS.cells.has(f);}
-function draw(j){clear();VIS.lmats=[];VIS.pmats=[];const T=j.tissue;let center=new THREE.Vector3();const R=$('right');
- if(T){const outer=T.apical==='in'?'basal':'apical';
-  for(const [cap,mat] of [[outer,{color:0xcfd8e3,opacity:0.35}],[T.apical==='in'?'apical':'basal',{color:0x8090a0,opacity:0.18}]]){if(!VIS[cap])continue;const c=T.caps[cap];
-   const idx=[],face=[];c.tri.forEach((t,k)=>{if(cellOn(c.face[k])){idx.push(...t);face.push(c.face[k]);}});if(!idx.length)continue;
-   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(c.verts.flat(),3));g.setIndex(idx);g.computeVertexNormals();
-   const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:mat.color,transparent:true,opacity:mat.opacity,side:THREE.DoubleSide,flatShading:true}));m.userData={kind:'cap',cap,face};scene.add(m);pick.push(m);
-   if(VIS.edges){const lg=new LineSegmentsGeometry().fromWireframeGeometry(new THREE.WireframeGeometry(g));const lm=new LineMaterial({color:cap===outer?0x9fb4cc:0x5a6a80,linewidth:VIS.width,transparent:true,opacity:0.9});
-    lm.resolution.set(R.clientWidth,R.clientHeight);VIS.lmats.push(lm);const w=new LineSegments2(lg,lm);scene.add(w);pick.push(w);}}
-  const allv=T.caps.mid.verts.slice(0,T.Nv);const keep=[];allv.forEach((v,i)=>{if(T.cells_of_vertex[i].some(cellOn))keep.push(i);});
-  if(VIS.lateral&&keep.length){const A=T.caps.apical.verts,B=T.caps.basal.verts;const lg=new LineSegmentsGeometry();lg.setPositions(keep.flatMap(i=>[...A[i],...B[i]]));
-   const lm=new LineMaterial({color:0x7f93ad,linewidth:VIS.width,transparent:true,opacity:0.9});lm.resolution.set(R.clientWidth,R.clientHeight);VIS.lmats.push(lm);const w=new LineSegments2(lg,lm);scene.add(w);pick.push(w);}
-  if(VIS.vertices&&keep.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(keep.flatMap(i=>allv[i]),3));
-   const p=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:0.14}));p.userData={kind:'vertex',map:keep};scene.add(p);pick.push(p);}
-  center=new THREE.Box3().setFromPoints(allv.map(a=>new THREE.Vector3(...a))).getCenter(new THREE.Vector3());}
- for(const [name,s] of Object.entries(j.sets)){if(!s.pos||(T&&name===T.set))continue;const names=s.type_names||[];const map=[],cols=[],pos=[];
-  for(let i=0;i<s.pos.length;i++){const t=(s.node_type||[])[i]??0;const sp=names[t]||name;if(VIS.species[sp]===false)continue;if(s.parent&&!cellOn(s.parent[i]))continue;
-   map.push(i);pos.push(...s.pos[i]);cols.push(...(j.colors[sp]||DEFC[t%DEFC.length]));}
-  if(!map.length)continue;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
-  const pm=new THREE.PointsMaterial({size:VIS.dot,vertexColors:true});VIS.pmats.push(pm);const p=new THREE.Points(g,pm);p.userData={kind:'cluster',set:name,map};scene.add(p);pick.push(p);}
- if(!draw.keepCam){controls.target.copy(center);camera.position.copy(center.clone().add(new THREE.Vector3(0,0,Math.max(12,(j.world[0]||50)*0.45))));controls.update();}}
-window.redraw=function(){if(SCENE){draw.keepCam=true;draw(SCENE);draw.keepCam=false;}};
-// the Visibility panel: eye toggles per cap/edges/vertices, per species, and a clickable cell grid
-function visPanel(j){const T=j.tissue;let h='';
- if(T){h+=`<div class="row"><label><input type="checkbox" ${VIS.apical?'checked':''} onchange="VIS.apical=this.checked;redraw()">apical cap</label><label><input type="checkbox" ${VIS.basal?'checked':''} onchange="VIS.basal=this.checked;redraw()">basal cap</label><label><input type="checkbox" ${VIS.edges?'checked':''} onchange="VIS.edges=this.checked;redraw()">cap edges</label><label><input type="checkbox" ${VIS.lateral?'checked':''} onchange="VIS.lateral=this.checked;redraw()">lateral edges</label><label><input type="checkbox" ${VIS.vertices?'checked':''} onchange="VIS.vertices=this.checked;redraw()">vertices</label></div>`;
-  h+=`<div class="row"><label style="color:#aab">edge width px</label><input type="range" min="1" max="6" step="0.5" value="${VIS.width}" style="width:120px" oninput="VIS.width=+this.value;for(const m of VIS.lmats)m.linewidth=VIS.width"></div>`;}
- h+=`<div class="row"><label style="color:#aab">protein dot size</label><input type="range" min="0.05" max="1.0" step="0.05" value="${VIS.dot}" style="width:120px" oninput="VIS.dot=+this.value;for(const m of VIS.pmats)m.size=VIS.dot"></div>`;
- const sps=[];for(const s of Object.values(j.sets))for(const n of (s.type_names||[]))if(!sps.includes(n))sps.push(n);
- if(sps.length){h+='<div class="row">'+sps.map(n=>{if(VIS.species[n]===undefined)VIS.species[n]=true;const c=(j.colors[n]||[1,1,1]).map(x=>Math.round(x*255));return `<label><input type="checkbox" ${VIS.species[n]?'checked':''} onchange="VIS.species['${n}']=this.checked;redraw()"><span style="color:rgb(${c})">&#9679;</span> ${n}</label>`;}).join('')+'</div>';}
- if(T){const cells=j.sets[T.cell_set];const ids=cells&&cells.idx?cells.idx:[...new Set(T.caps.apical.face)].sort((a,b)=>a-b);
-  h+=`<div class="row"><span style="color:#aab">cells</span> <button class="dim" onclick="VIS.cells=null;visPanel(SCENE);redraw()">all</button><button class="dim" onclick="VIS.cells=new Set();visPanel(SCENE);redraw()">none</button> <span style="color:#778">click a cell to toggle it; shift-click to solo</span></div>`;
-  h+='<div id="cellgrid">'+ids.map(f=>`<span class="${cellOn(f)?'on':''}" onclick="toggleCell(${f},event.shiftKey)">${f}</span>`).join('')+'</div>';}
- $('vis').innerHTML=h||'(nothing to show)';}
-window.visPanel=visPanel;
-window.toggleCell=function(f,solo){const ids=SCENE.sets[SCENE.tissue.cell_set].idx;if(solo){VIS.cells=new Set([f]);}else{if(VIS.cells===null)VIS.cells=new Set(ids);if(VIS.cells.has(f))VIS.cells.delete(f);else VIS.cells.add(f);if(VIS.cells.size===ids.length)VIS.cells=null;}visPanel(SCENE);redraw();};
+// THE PICTURE IS THE MOVIE RENDERER'S. Every camera change asks the server for a fresh screenshot;
+// at most one request is in flight and the newest camera wins, so dragging never queues up.
+let inflight=false, dirty=false;
+async function render(force){if(inflight){dirty=true;return;}inflight=true;try{const r=await fetch(`/api/bio/render?azim=${CAM.azim}&elev=${CAM.elev}&zoom=${CAM.zoom}&t=${Date.now()}`);if(r.ok){const b=await r.blob();const u=URL.createObjectURL(b);const im=$('view');const old=im.src;im.src=u;if(old.startsWith('blob:'))URL.revokeObjectURL(old);}else if(force){status((await r.json()).error||'render failed',true);}}catch(e){}finally{inflight=false;if(dirty){dirty=false;render();}}}
+const im=$('view');let drag=null;
+im.addEventListener('mousedown',e=>{drag={x:e.clientX,y:e.clientY,moved:false};im.style.cursor='grabbing';});
+window.addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>2)drag.moved=true;CAM.azim-=dx*0.4;CAM.elev=Math.max(-89,Math.min(89,CAM.elev+dy*0.4));drag.x=e.clientX;drag.y=e.clientY;render();});
+window.addEventListener('mouseup',async e=>{if(!drag)return;const moved=drag.moved;drag=null;im.style.cursor='grab';if(moved)return;
+ const r=im.getBoundingClientRect();const fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;if(fx<0||fx>1||fy<0||fy>1)return;
+ const j=await (await fetch(`/api/bio/pick?x=${fx.toFixed(4)}&y=${fy.toFixed(4)}`)).json();if(j.pick){showInfo(j.info);render();}else{$('info').textContent='nothing under the click';}});
+im.addEventListener('wheel',e=>{e.preventDefault();CAM.zoom=Math.max(0.15,Math.min(8,CAM.zoom*(e.deltaY>0?1/1.08:1.08)));render();},{passive:false});
+function showInfo(i){if(!i){$('info').textContent='(no object)';return;}let t='';
+ if(i.kind==='cell'){t+=`cell #${i.cell}\n`;for(const [b,v] of Object.entries(i.blocks||{}))t+=`  ${b}: ${JSON.stringify(v)}\n`;for(const [s,per] of Object.entries(i.contains||{}))t+=`  contains ${s}: ${Object.entries(per).map(([a,b])=>b+' '+a).join(', ')}\n`;if(i.vertices)t+=`  vertices: ${i.vertices.length}`;}
+ else if(i.kind==='vertex'){t+=`vertex #${i.vertex}\n  position: ${i.position.join(', ')}\n  shared by cells: ${(i.shared_by_cells||[]).join(', ')}`;}
+ else{t+=`${i.species} #${i.index} (set ${i.set})\n  position: ${i.position.join(', ')}\n  parent: cell #${i.parent_cell}\n`;if(i.cell){const c=i.cell;for(const [s,per] of Object.entries(c.contains||{}))t+=`  the cell contains ${s}: ${Object.entries(per).map(([a,b])=>b+' '+a).join(', ')}\n`;}}
+ $('info').textContent=t;}
+function visPanel(j){const sps=[];for(const s of Object.values(j.sets))for(const n of (s.type_names||[]))if(!sps.includes(n))sps.push(n);
+ if(!sps.length){$('vis').textContent='(no typed set)';return;}
+ $('vis').innerHTML='<div class="row">'+sps.map(n=>{const c=(j.colors[n]||[1,1,1]).map(x=>Math.round(x*255));return `<label><input type="checkbox" checked onchange="setVisible('${n}',this.checked)"><span style="color:rgb(${c})">&#9679;</span> ${n}</label>`;}).join('')+'</div><div style="color:#778;font-size:11px">a species is one glyph actor of the renderer; unticking hides it</div>';}
+window.setVisible=async function(n,on){await post('/api/bio/visible',{species:n,on});render();};
 function tree(j){const h=j.hierarchy;let out='';for(const n of h.sets){const cnt=j.sets[n.name]?`${j.sets[n.name].n_live} live / ${j.sets[n.name].n_buffer}`:'';
  let rel='';if(n.parent)rel+=` <span class="cont">contained in ${n.parent}</span>`;if(n.maps)rel+=` <span class="rel">relation: ${Object.entries(n.maps).map(([k,v])=>k+'->'+v).join(', ')}</span>`;if(n.mesh)rel+=` <span class="rel">mesh: ${n.mesh}</span>`;
  out+=`<div onclick="window.setInfo('${n.name}')"><span class="n">${n.name}</span> ${cnt}${rel}${n.types.length?' <span class="cont">species: '+n.types.join(', ')+'</span>':''}</div>`;}
  out+=`<div style="color:#778;margin-top:4px">schedule: ${h.schedule.map(x=>typeof x==='string'?x:'{substeps}').join(' > ')}</div>`;$('tree').innerHTML=out;}
 window.setInfo=function(name){const s=SCENE.sets[name];const n=SCENE.hierarchy.sets.find(x=>x.name===name);
  $('info').textContent=`set ${name}\n  entity: ${n.entity||'(by name)'}\n  buffer ${s.n_buffer}, live ${s.n_live}\n  blocks: ${s.blocks.join(', ')}\n`+(n.parent?`  contained in: ${n.parent} (${n.per_parent??'?'} per parent)\n`:'')+(n.maps?`  relation maps: ${JSON.stringify(n.maps)}\n`:'')+(n.types.length?`  species: ${n.types.join(', ')}\n`:'')+`  operators on it: ${SCENE.hierarchy.operators.filter(o=>o.at===name).map(o=>o.op).join(', ')||'-'}`;};
-function cellInfo(f){const cs=SCENE.tissue.cell_set;const c=SCENE.sets[cs];let t=`cell #${f} (set ${cs})\n`;if(c&&c.rows){const k=c.idx.indexOf(f);if(k>=0)for(const [b,v] of Object.entries(c.rows))t+=`  ${b}: ${JSON.stringify(v[k])}\n`;}
- for(const [name,s] of Object.entries(SCENE.sets)){if(!s.parent)continue;const per={};s.parent.forEach((p,i)=>{if(p===f){const sp=(s.type_names||[])[(s.node_type||[])[i]??0]||name;per[sp]=(per[sp]||0)+1;}});if(Object.keys(per).length)t+=`  contains ${name}: ${Object.entries(per).map(([a,b])=>b+' '+a).join(', ')}\n`;}
- const vs=[];SCENE.tissue.cells_of_vertex.forEach((cl,i)=>{if(cl.includes(f))vs.push(i);});t+=`  vertices: ${vs.length} (${vs.slice(0,12).join(', ')}${vs.length>12?'...':''})`;return t;}
-function onClick(ev){const r=renderer.domElement.getBoundingClientRect();mouse.x=((ev.clientX-r.left)/r.width)*2-1;mouse.y=-((ev.clientY-r.top)/r.height)*2+1;raycaster.setFromCamera(mouse,camera);raycaster.params.Points.threshold=0.25;
- const hits=raycaster.intersectObjects(pick.filter(o=>o.userData.kind),false);if(!hits.length)return;const h=hits[0];const u=h.object.userData;
- if(u.kind==='cluster'){const s=SCENE.sets[u.set];const i=u.map[h.index];const sp=(s.type_names||[])[(s.node_type||[])[i]??0]||u.set;const par=(s.parent||[])[i];
-  $('info').textContent=`${sp} cluster #${s.idx[i]} (set ${u.set})\n  position: ${s.pos[i].join(', ')}\n  parent: cell #${par}\n\n`+(par!==undefined?cellInfo(par):'');highlight(s.pos[i]);highlightCell(par);}
- else if(u.kind==='cap'){const f=u.face[h.faceIndex];$('info').textContent=`${u.cap} face of `+cellInfo(f);highlight(null);highlightCell(f);}
- else if(u.kind==='vertex'){const i=u.map[h.index];const cl=SCENE.tissue.cells_of_vertex[i];$('info').textContent=`vertex #${i} (set ${SCENE.tissue.set})\n  position: ${SCENE.tissue.caps.mid.verts[i].join(', ')}\n  shared by cells: ${cl.join(', ')}\n  (a vertex belongs to ${cl.length} cells; the half_edge relation records each side)`;}}
-init3d();addSpecies({name:'integrin',region:'basal'});addSpecies({name:'myosin',region:'apical'});
-// FOLLOW THE SERVER'S SESSION: whoever drives the API (a person, or Claude from the terminal) is
-// seen here. Spec version -> reload + reseed; camera version -> turn the view; pick -> select.
+addOrganelle({name:'nucleus',count:1,radius:0.3,region:'basal_side',on_divide:'duplicate'});addSpecies({name:'integrin',region:'basal'});
+// FOLLOW THE SERVER'S SESSION: whoever drives the API (a person, or Claude) is seen here.
 let seen={version:-1,cam_version:-1};
-function applyCamera(st){if(!SCENE)return;const c=controls.target.clone();const e=st.elev*Math.PI/180,a=st.azim*Math.PI/180;const d=new THREE.Vector3(Math.cos(e)*Math.cos(a),Math.cos(e)*Math.sin(a),Math.sin(e));
- const dist=fitDist()/Math.min(Math.max(st.zoom,0.15),6);camera.position.copy(c.clone().add(d.multiplyScalar(dist)));camera.up.set(0,0,1);controls.update();}
-window.selectById=function(pk){if(!SCENE||!pk)return;const [set,idx]=pk.split(':');const i=+idx;
- if(set==='cell'){$('info').textContent='cell '+cellInfo(i);highlight(null);highlightCell(i);return;}
- const s=SCENE.sets[set];if(s&&s.pos&&i<s.pos.length){const sp=(s.type_names||[])[(s.node_type||[])[i]??0]||set;const par=(s.parent||[])[i];$('info').textContent=`${sp} cluster #${s.idx[i]} (set ${set})\n  position: ${s.pos[i].join(', ')}\n  parent: cell #${par}\n\n`+(par!==undefined?cellInfo(par):'');highlight(s.pos[i]);highlightCell(par);}
- else if(SCENE.tissue&&set===SCENE.tissue.set){const cl=SCENE.tissue.cells_of_vertex[i];$('info').textContent=`vertex #${i}\n  shared by cells: ${cl.join(', ')}`;highlight(SCENE.tissue.caps.mid.verts[i]);}};
-let hlc=null;window.highlightCell=function(f){if(hlc){scene.remove(hlc);hlc=null;}if(f===null||f===undefined||!SCENE||!SCENE.tissue)return;const T=SCENE.tissue;const seg=[];const ring=new Set();
- for(const cap of ['apical','basal']){const c=T.caps[cap];c.tri.forEach((t,k)=>{if(c.face[k]===f){seg.push(...c.verts[t[1]],...c.verts[t[2]]);ring.add(t[1]);}});}
- for(const i of ring)seg.push(...T.caps.apical.verts[i],...T.caps.basal.verts[i]);if(!seg.length)return;const lg=new LineSegmentsGeometry();lg.setPositions(seg);
- const lm=new LineMaterial({color:0xffee33,linewidth:VIS.width+1.5});lm.resolution.set($('right').clientWidth,$('right').clientHeight);VIS.lmats.push(lm);hlc=new LineSegments2(lg,lm);scene.add(hlc);};
-let hl=null;function highlight(p){if(hl){scene.remove(hl);hl=null;}if(!p)return;const g=new THREE.SphereGeometry(0.22,12,12);hl=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0xffee33}));hl.position.set(...p);scene.add(hl);}
 async function poll(){try{const st=await (await fetch('/api/bio/state')).json();
  if(st.name&&st.version!==seen.version){seen.version=st.version;specName=st.name;$('name').value=st.name;const j=await (await fetch('/api/studio/spec?name='+encodeURIComponent(st.name))).json();if(j.raw)$('yamltext').value=j.raw;if(j.form)fillForm(j.form);await reseed();}
- if(st.cam_version!==seen.cam_version){seen.cam_version=st.cam_version;applyCamera(st);if(st.pick)selectById(st.pick);}
+ if(st.cam_version!==seen.cam_version){seen.cam_version=st.cam_version;CAM.azim=st.azim;CAM.elev=st.elev;CAM.zoom=st.zoom;if(st.pick){const j=await (await fetch('/api/bio/info?pick='+encodeURIComponent(st.pick))).json();if(!j.error)showInfo(j);}render();}
  if(st.message)$('rstat').textContent=st.message;}catch(e){}finally{setTimeout(poll,1500);}}
 poll();
 let cseen=0;
@@ -684,7 +675,7 @@ window.claudeStop=async function(){await post('/api/bio/claude',{stop:true});};
 async function cpoll(){try{const j=await (await fetch('/api/bio/claude?since='+cseen)).json();if(j.lines&&j.lines.length){const el=$('claude');el.textContent+=j.lines.join('\n')+'\n';el.scrollTop=el.scrollHeight;cseen=j.n;}
  $('cstat').textContent=j.running?'running... '+j.seconds+'s':(j.error?'error: '+j.error.slice(0,200):(j.n?'done in '+j.seconds+'s':''));$('cbtn').disabled=!!j.running;$('cbtn').classList.toggle('on',!!j.running);}catch(e){}finally{setTimeout(cpoll,1200);}}
 cpoll();
-const q=new URLSearchParams(location.search);if(q.get('name')){specName=q.get('name');fetch('/api/studio/spec?name='+encodeURIComponent(specName)).then(r=>r.json()).then(j=>{if(j.raw){$('yamltext').value=j.raw;}reseed();});}
+const q=new URLSearchParams(location.search);if(q.get('name')){specName=q.get('name');fetch('/api/studio/spec?name='+encodeURIComponent(specName)).then(r=>r.json()).then(j=>{if(j.raw){$('yamltext').value=j.raw;}if(j.form)fillForm(j.form);reseed();});}
 </script></body></html>
 """
 
