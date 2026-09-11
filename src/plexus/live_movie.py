@@ -2356,7 +2356,24 @@ class LiveMovie:
         return 1.0, None
 
     def _mesh_xyz(self, lvl, nv, sc, ct):
-        P = lvl.get("pos")[:nv].detach().cpu().numpy().astype(np.float32)
+        P = lvl.get("pos")[:nv].detach()
+        # `plotting.mesh_surface: apical | basal | mid` -- WHICH SURFACE OF AN APICO-BASAL TISSUE
+        # THE MESH IS DRAWN AT. The mesh table lives on the mid-surface, which is a coordinate and
+        # not a membrane; integrins ride the basal cap at `pos - sep`, and drawn against the
+        # mid-surface they floated half a cell thickness off the tissue. Default `mid`, so nothing
+        # archived moves. A tissue without a `sep` block ignores the key.
+        _surf = str((self.style or {}).get("mesh_surface", "mid")).lower()
+        if _surf in ("apical", "basal"):
+            try:
+                _sep = lvl.get("sep")
+            except Exception:                                # noqa: BLE001
+                _sep = None
+            if _sep is not None and int(_sep.shape[0]) >= nv:
+                _sep = _sep[:nv]                             # a tensor live, a numpy array on replay
+                _sep = (_sep.detach().to(P.device, P.dtype) if hasattr(_sep, "detach")
+                        else torch.as_tensor(np.asarray(_sep), device=P.device, dtype=P.dtype))
+                P = P + _sep if _surf == "apical" else P - _sep
+        P = P.cpu().numpy().astype(np.float32)
         return P if (sc == 1.0 or ct is None) else (P - P.mean(0)) * sc + ct
 
     def _mesh_levels(self, H):
