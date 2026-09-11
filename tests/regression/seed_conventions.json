@@ -899,544 +899,64 @@
    "v_ref": 0.26141637563705444
   }
  },
- "tissue/cv_kv_double": {
+ "tissue/cycle_dilution": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
   }
  },
- "tissue/cv_kv_half": {
+ "tissue/cycle_hazard": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
   }
  },
- "tissue/cv_kv_oct": {
+ "tissue/cycle_sizer": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
   }
  },
- "tissue/cv_kv_quad": {
+ "tissue/cycle_timer": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cv_relax_long": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cv_shape_low": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cv_target_percell": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cv_target_uniform": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.5462114810943604,
-   "V0f_sum": 509.2423095703125,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cv_tension_high": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cv_tension_low": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_adder": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_adder_quiet": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_adder_tension": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_all": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.5462114810943604,
-   "V0f_sum": 509.2423095703125,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_doubler": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_every1": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_mincycle": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_quiet_relax": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_quiet_uniform": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.5462114810943604,
-   "V0f_sum": 509.2423095703125,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_rerun": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd2_slow_quiet": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_baseline": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_cyclecv_off": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_factor_low": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_g1ramp": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_noise_off": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_quiet": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_quiet_tension": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_slow": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_tension_low": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.546844482421875,
-   "V0f_sum": 509.71240234375,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cvd_uniform_seed": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.5462114810943604,
-   "V0f_sum": 509.2423095703125,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5462114810943604
-  }
- },
- "tissue/cyc4_dilution": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.544588565826416,
-   "V0f_sum": 509.8047790527344,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5433268547058105
-  }
- },
- "tissue/cyc4_hazard": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.544588565826416,
-   "V0f_sum": 509.8047790527344,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5433268547058105
-  }
- },
- "tissue/cyc4_sizer": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.544588565826416,
-   "V0f_sum": 509.8047790527344,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5433268547058105
-  }
- },
- "tissue/cyc4_timer": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.544588565826416,
-   "V0f_sum": 509.8047790527344,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5433268547058105
-  }
- },
- "tissue/cycle_phases": {
-  "vertex": {
-   "Nv": 396,
-   "V0f_median": 2.544588565826416,
-   "V0f_sum": 509.8047790527344,
-   "centre": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "nF": 200,
-   "v0_from": "wedge",
-   "v_ref": 2.5433268547058105
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
   }
  },
  "tissue/divide_growing_ball": {
@@ -1542,6 +1062,21 @@
    "nF": 320,
    "v0_from": "wedge",
    "v_ref": 1.616619348526001
+  }
+ },
+ "tissue/mech_target_percell": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/mech_uniform_target": {
@@ -1709,6 +1244,96 @@
    "v_ref": 0.0
   }
  },
+ "tissue/size_adder": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
+  }
+ },
+ "tissue/size_doubler": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
+  }
+ },
+ "tissue/size_grow_sizer": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
+  }
+ },
+ "tissue/size_sizer": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
+  }
+ },
+ "tissue/size_timer": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
+  }
+ },
+ "tissue/size_two_channel": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 1.3516297340393066,
+   "V0f_sum": 270.2889099121094,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "polyhedron",
+   "v_ref": 1.3515371084213257
+  }
+ },
  "tissue/spheroid_ecm": {
   "vertex": {
    "Nv": 796,
@@ -1785,6 +1410,51 @@
   }
  },
  "tissue/spheroid_myosin": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/spheroid_organelles_mito": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/spheroid_organelles_nucleus": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/spheroid_organelles_polar": {
   "vertex": {
    "Nv": 396,
    "V0f_median": 2.546844482421875,
