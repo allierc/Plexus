@@ -448,3 +448,17 @@ r12 (two shared temporal modes + per-cell weights, on top of r10): **0.86 / 0.91
 temporal side is now close to what the rank ceiling allows for a fixed spatial pattern; the gap to
 0.95 is the SPATIAL pattern of the plateau. Next per-cell physics not yet in the model: substrate
 adhesion κ_j per cell (a prototype-registered operator, `anchor_percell`).
+
+## Stopped 2026-09-11 night — running in the background, and where to pick up
+
+Left running (finish + self-score within ~30 min): `s4_live_r13_modes2_kappa` (healthy, per-cell
+adhesion on top of r12; score with `--anchor-percell --per-parent 120 --drag 150`) and
+`hcm_r5_modes2` (HCM with the two temporal modes). Read `out/s4_live_r13.score.log`,
+`out/hcm_r5.score.log`, then `python rounds_table.py`.
+
+Best held-out so far: healthy **0.86 / 0.91** (`s4_live_r12_modes2`), HCM **0.88 / 0.95**
+(`hcm_r4_cellclock`). Ceilings: 0.94 with two temporal modes, 0.97 with three; discretisation
+floor 0.958. The remaining gap is the spatial pattern of the plateau. If r13 does not move it, the
+next candidates are fibre-aligned passive anisotropy (needs an operator, like `anchor_percell`) and
+a per-cell noise-weighted loss; the per-cell claims stay g, g2, φ, δ (seeds agree at r 0.9+), E and
+the time-course numbers are prediction machinery only.
