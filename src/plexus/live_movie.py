@@ -162,6 +162,9 @@ def _round1(v, up):
     f = np.ceil(abs(v) / e) if (v > 0) == up else np.floor(abs(v) / e)
     return float(np.sign(v) * max(f, 1.0) * e)
 
+GLYPH_MAX = 60_000                 # spheres per type before a type falls back to point sprites
+
+
 class LiveMovie:
     """An `on_frame(H, tick)` hook that writes one mp4 for the whole run.
 
@@ -3494,7 +3497,18 @@ class LiveMovie:
             if actor is not None:
                 self.p.remove_actor(actor, render=False)
                 actor = None
-            if len(pts):
+            if len(pts) > GLYPH_MAX:
+                # A SPHERE PER POINT HAS A CEILING. 140 triangles a sphere, 300k spheres is 42 M
+                # triangles and VTK dies allocating them (`std::bad_array_new_length`, seen when a
+                # prompt asked for "a lot of integrins"). Past the ceiling a type is drawn as lit
+                # point sprites at the pixel size its radius has on screen -- the same picture at
+                # a distance, and it costs nothing.
+                r = float(self._glyph_geom[key].bounds[1] - self._glyph_geom[key].bounds[0]) / 2.0
+                ps = float(self.p.camera.parallel_scale) if self.p.camera.parallel_projection else None
+                px = max(1.0, r / ps * self.p.window_size[1] / 2.0) if ps else 3.0
+                actor = self.p.add_mesh(self.pv.PolyData(pts), color=col, render_points_as_spheres=True,
+                                        point_size=px, name=f"glyph_{key}")
+            elif len(pts):
                 pd = self.pv.PolyData(pts).glyph(geom=self._glyph_geom[key], scale=False, orient=False)
                 actor = self.p.add_mesh(pd, color=col, smooth_shading=True, lighting=True, ambient=0.35,
                                         diffuse=0.7, specular=0.2, name=f"glyph_{key}")
