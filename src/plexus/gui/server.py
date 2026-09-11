@@ -445,6 +445,9 @@ class Handler(BaseHTTPRequestHandler):
             os.makedirs(studio.CONFIG_DIR, exist_ok=True)
             shutil.copyfile(path, dst)
             bio.bump(name, f"opened {path}")
+            _sets = ", ".join(f"{k}" + (f" (types: {', '.join((v or {}).get('types') or {})})" if (v or {}).get("types") else "")
+                              for k, v in (spec.get("sets") or {}).items())
+            bio.claude_note(f"spec '{name}' opened from {path}; sets: {_sets}")
             return self._send_json({"name": name, "spec": dst, "form": bio.form_from_spec(spec)})
 
         if route == "/api/bio/view":                     # GET ?azim&elev&zoom&pick&message -- drive the page's view
@@ -505,6 +508,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 v = bio_view.open_view(sp)                # seeded once: the scene and the picture share it
                 bio.STATE["name"] = name
+                bio.claude_note(f"spec '{name}' seeded: " + ", ".join(f"{k} {s_.get('n_live')}" for k, s_ in v.scene["sets"].items()))
                 out = dict(v.scene); out["seconds"] = v.seconds
                 return self._send_json(out)
             except Exception as e:                       # noqa: BLE001 -- the page shows the cause
@@ -593,6 +597,8 @@ class Handler(BaseHTTPRequestHandler):
             from plexus.gui import bio
             if data.get("stop"):
                 return self._send_json(bio.claude_stop())
+            if data.get("new_session"):
+                return self._send_json(bio.claude_new_session())
             task = str(data.get("task") or "").strip()
             if not task:
                 return self._send_json({"error": "empty task"}, 400)
@@ -635,6 +641,7 @@ class Handler(BaseHTTPRequestHandler):
             raw = _dump_yaml(spec)
             open(sp, "w").write(raw)
             bio.bump(name, f"built {name}")
+            bio.claude_note(f"material spec '{name}' built from the form: bodies {', '.join((spec['sets'].get('cell') or {}).get('types') or {})}")
             return self._send_json({"name": name, "raw": raw, "valid": True})
 
         if route == "/api/bio/build":
@@ -652,6 +659,7 @@ class Handler(BaseHTTPRequestHandler):
             raw = _dump_yaml(spec)
             open(sp, "w").write(raw)
             bio.bump(name, f"built {name}")
+            bio.claude_note(f"tissue spec '{name}' built from the form: species {', '.join(((spec['sets'].get('protein') or {}).get('types') or {}))}; organelles {', '.join(((spec['sets'].get('organelle') or {}).get('types') or {}))}")
             return self._send_json({"name": name, "raw": raw, "valid": True})
 
         if route == "/api/bio/save":
@@ -709,6 +717,7 @@ class Handler(BaseHTTPRequestHandler):
             raw = _dump_yaml(spec)
             open(sp, "w").write(raw)
             bio.bump(name, f"applied: {prompt[:80]} ({res['seconds']:.0f}s)")
+            bio.claude_note(f"spec '{name}' refined by a prompt: {prompt[:160]}")
             return self._send_json({"name": name, "raw": raw, "seconds": res["seconds"], "valid": True,
                                     "form": bio.form_from_spec(spec)})
 

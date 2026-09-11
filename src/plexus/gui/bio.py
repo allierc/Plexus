@@ -433,7 +433,21 @@ def resolve_pick(scene: dict, pick: str) -> dict | None:
 # ---------------------------------------------------------------------------------------------
 # CLAUDE TAKES OVER THE PAGE: the CLI, with the page's own routes as its only tool
 # ---------------------------------------------------------------------------------------------
-CLAUDE: dict = {"running": False, "task": "", "lines": [], "seconds": 0.0, "error": None, "started": 0.0}
+CLAUDE: dict = {"running": False, "task": "", "lines": [], "seconds": 0.0, "error": None, "started": 0.0,
+                "session": None, "turns": 0, "notes": []}
+
+
+def claude_note(text: str) -> None:
+    """Something the page did without Claude (a spec opened, built, refined or seeded): queued and
+    handed to the session at its next task, so it never works from a stale picture of the scene."""
+    CLAUDE["notes"].append(f"{time.strftime('%H:%M:%S')} {text}")
+    CLAUDE["notes"] = CLAUDE["notes"][-20:]
+
+
+def claude_new_session() -> dict:
+    CLAUDE.update(session=None, turns=0, notes=[])
+    CLAUDE["lines"].append("[new session]")
+    return {"session": None}
 
 BIO_BRIEF = """You are driving the Plexus bio-objects page, a UI for DEFINING biological objects
 (an epithelial tissue and the protein clusters on it) before any simulation. A person is watching
@@ -521,10 +535,25 @@ def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900
     import threading
     if CLAUDE["running"]:
         return {"error": "Claude is already driving; STOP it first"}
-    CLAUDE.update(running=True, task=task, lines=[f"task: {task}"], seconds=0.0, error=None, started=time.time())
+    # ONE SESSION ACROSS PRESSES. The first task opens a session under a fresh id; every later
+    # task resumes it, so Claude keeps what it learned about the scene and skips re-reading it
+    # (faster, and it can refer to "the nucleus you added"). Anything the page did meanwhile is
+    # prepended as notes. "New session" on the page starts over.
+    import uuid
+    fresh = CLAUDE["session"] is None
+    if fresh:
+        CLAUDE["session"] = str(uuid.uuid4())
+    notes = CLAUDE["notes"]; CLAUDE["notes"] = []
+    prompt = task
+    if notes:
+        prompt = "Since your last task, the page did this without you:\n- " + "\n- ".join(notes) + \
+                 "\nRe-read /api/bio/state before assuming anything about the scene.\n\nTask: " + task
+    CLAUDE.update(running=True, task=task, lines=[f"task: {task}" + ("" if fresh else f"  (session turn {CLAUDE['turns'] + 1})")],
+                  seconds=0.0, error=None, started=time.time())
 
     def _go():
-        cmd = [studio._claude_bin(), "-p", task,
+        sess = ["--session-id", CLAUDE["session"]] if fresh else ["--resume", CLAUDE["session"]]
+        cmd = [studio._claude_bin(), "-p", prompt, *sess,
                "--append-system-prompt", (brief or BIO_BRIEF).replace("{port}", str(port)),
                "--allowedTools", "Bash(curl:*)", "Bash(sleep:*)", "Bash(jq:*)",
                "--disallowedTools", "Write", "Edit", "NotebookEdit", "Read", "Glob", "Grep", "WebFetch", "WebSearch", "Task",
@@ -554,6 +583,9 @@ def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900
         finally:
             CLAUDE["seconds"] = round(time.time() - t0, 1)
             CLAUDE["running"] = False
+            CLAUDE["turns"] += 1
+            if CLAUDE["error"] and "resume" in (CLAUDE["error"] or "").lower():
+                CLAUDE["session"] = None                    # a session the CLI cannot find: start over next time
             CLAUDE.pop("proc", None)
     threading.Thread(target=_go, daemon=True).start()
     return {"started": True}
@@ -626,7 +658,7 @@ PAGE = r"""<!doctype html>
  <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:170px" oninput="showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
  <h2>Claude takes over <span style="color:#778;font-weight:normal;text-transform:none">drives this page through its own routes</span></h2>
  <div class="row"><input id="task" style="width:100%" placeholder="e.g. build a 120-cell cyst with one nucleus per cell and integrins outside, then show me one cell" onkeydown="if(event.key==='Enter')claudeGo()"></div>
- <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button> <span id="cstat" style="color:#8c8"></span></div>
+ <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button><button class="dim" onclick="claudeNew()" title="forget the conversation so far">NEW SESSION</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
  <div id="rstat" style="color:#9ab;min-height:14px"></div>
  <div id="yaml"><textarea id="yamltext"></textarea><div><button onclick="saveYaml()">SAVE YAML</button></div></div>
@@ -721,6 +753,7 @@ async function rpoll(){try{const j=await (await fetch('/api/bio/run')).json();if
 let cseen=0;
 window.claudeGo=async function(){const t=$('task').value.trim();if(!t)return;$('claude').textContent='';cseen=0;const j=await post('/api/bio/claude',{task:t});if(j.error){$('cstat').textContent=j.error;return;}$('cstat').textContent='running...';$('cbtn').disabled=true;};
 window.claudeStop=async function(){await post('/api/bio/claude',{stop:true});};
+window.claudeNew=async function(){await post('/api/bio/claude',{new_session:true});$('claude').textContent+='[new session]\n';};
 async function cpoll(){try{const j=await (await fetch('/api/bio/claude?since='+cseen)).json();if(j.lines&&j.lines.length){const el=$('claude');el.textContent+=j.lines.join('\n')+'\n';el.scrollTop=el.scrollHeight;cseen=j.n;}
  $('cstat').textContent=j.running?'running... '+j.seconds+'s':(j.error?'error: '+j.error.slice(0,200):(j.n?'done in '+j.seconds+'s':''));$('cbtn').disabled=!!j.running;$('cbtn').classList.toggle('on',!!j.running);}catch(e){}finally{setTimeout(cpoll,1200);}}
 cpoll();
