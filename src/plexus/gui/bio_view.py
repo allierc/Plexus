@@ -263,8 +263,18 @@ class View:
             T = self.scene.get("tissue")
             f = info.get("cell") if info.get("kind") == "cell" else (info.get("parent_cell"))
             if info.get("kind") != "cell" and info.get("position") is not None:
-                r = 0.25
-                self.p.add_mesh(pv.Sphere(radius=r, center=info["position"]), color="#ffee33", name="pick_dot")
+                # A HALO AT THE OBJECT'S OWN SIZE, not a fixed 0.25-unit ball: on a 0.12-thick sheet
+                # that ball was twice the cell and hid what was picked. A cluster or piece gets a
+                # wireframe sphere 1.4x its declared radius; a vertex a ball of a fifth of the local
+                # cell thickness.
+                rad = (self.sim.plotting or {}).get("dot_radius") or {}
+                if info.get("kind") == "vertex":
+                    r = 0.2 * float(self._thickness())
+                    self.p.add_mesh(pv.Sphere(radius=r, center=info["position"]), color="#ffee33", name="pick_dot")
+                else:
+                    r = 1.4 * float(rad.get(info.get("species"), 0.05))
+                    self.p.add_mesh(pv.Sphere(radius=r, center=info["position"], theta_resolution=16, phi_resolution=12),
+                                    color="#ffee33", style="wireframe", line_width=2, name="pick_dot")
             if T and f is not None:
                 seg = []
                 ring = set()
@@ -280,6 +290,16 @@ class View:
                     lines = np.concatenate([[2, 2 * i, 2 * i + 1] for i in range(len(seg))])
                     pd = pv.PolyData(pts); pd.lines = lines
                     self.p.add_mesh(pd, color="#ffee33", line_width=4, name="pick_cell")
+
+    def _thickness(self) -> float:
+        """The tissue's cell thickness (2|sep| averaged), or 1 without a tissue."""
+        T = self.scene.get("tissue")
+        if not T:
+            return 1.0
+        A = np.asarray(T["caps"]["apical"]["verts"][: T["Nv"]], float)
+        B = np.asarray(T["caps"]["basal"]["verts"][: T["Nv"]], float)
+        h = float(np.linalg.norm(A - B, axis=1).mean())
+        return h if h > 0 else 1.0
 
     # ------------------------------------------------------------------ visibility by species
     def set_visible(self, species: str, on: bool):
