@@ -449,7 +449,7 @@ Your ONLY tool is `curl` against the local server at http://127.0.0.1:{port} . T
   GET  /api/bio/info?name=&pick=<set>:<index>   -> what one object is (protein:12, cell:7, vertex:5):
                           species, parent cell, what the cell contains, blocks, shared cells
   GET  /api/bio/view?azim=&elev=&zoom=&pick=&message=   -> turns the viewer's camera (degrees,
-                          zoom 0.15-8), highlights a pick, and shows `message` on the page. Move in
+                          zoom 0.05-60), highlights a pick, and shows `message` on the page. Move in
                           steps of 30 degrees or less with `sleep 1` between them so the viewer can
                           follow; zoom no faster than x1.5 per step.
   POST /api/bio/visible   {species, on} -> hide or show one species in the picture
@@ -653,7 +653,7 @@ window.addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.
 window.addEventListener('mouseup',async e=>{if(!drag)return;const moved=drag.moved;drag=null;im.style.cursor='grab';if(moved)return;
  const r=im.getBoundingClientRect();const fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;if(fx<0||fx>1||fy<0||fy>1)return;
  const j=await (await fetch(`/api/bio/pick?x=${fx.toFixed(4)}&y=${fy.toFixed(4)}`)).json();if(j.pick){showInfo(j.info);render();}else{$('info').textContent='nothing under the click';}});
-im.addEventListener('wheel',e=>{e.preventDefault();CAM.zoom=Math.max(0.15,Math.min(8,CAM.zoom*(e.deltaY>0?1/1.08:1.08)));render();},{passive:false});
+im.addEventListener('wheel',e=>{e.preventDefault();CAM.zoom=Math.max(0.05,Math.min(60,CAM.zoom*(e.deltaY>0?1/1.08:1.08)));render();},{passive:false});
 function showInfo(i){if(!i){$('info').textContent='(no object)';return;}let t='';
  if(i.kind==='cell'){t+=`cell #${i.cell}\n`;for(const [b,v] of Object.entries(i.blocks||{}))t+=`  ${b}: ${JSON.stringify(v)}\n`;for(const [s,per] of Object.entries(i.contains||{}))t+=`  contains ${s}: ${Object.entries(per).map(([a,b])=>b+' '+a).join(', ')}\n`;if(i.vertices)t+=`  vertices: ${i.vertices.length}`;}
  else if(i.kind==='vertex'){t+=`vertex #${i.vertex}\n  position: ${i.position.join(', ')}\n  shared by cells: ${(i.shared_by_cells||[]).join(', ')}`;}
