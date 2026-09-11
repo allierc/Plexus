@@ -1742,16 +1742,76 @@
  "tissue/spheroid_ecm_ab": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 2.546844005584717,
+   "V0f_median": 2.546844244003296,
    "V0f_sum": 509.71240234375,
    "centre": [
-    25.0,
-    25.0,
-    25.0
+    20.0,
+    20.0,
+    20.0
    ],
    "nF": 200,
    "v0_from": "wedge",
-   "v_ref": 2.5462100505828857
+   "v_ref": 2.546210289001465
+  }
+ },
+ "tissue/spheroid_integrins": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/spheroid_integrins_10x": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/spheroid_myosin": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/spheroid_proteins": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  }
 }
