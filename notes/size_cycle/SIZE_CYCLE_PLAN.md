@@ -368,6 +368,18 @@ the 0.04 band from frame ~250 without the pin), so R3b is a layer-0 rung with no
 **R3d (archives `log/size_cycle/R3d`).** `kappa_h 0.2` on the eleven specs, `K_R 0`. Gauged on
 both band sets and scored inside the shell window when landed.
 
+**The milestones, rendered (`config/tissue/ms*`, archives in `graphs_data/tissue`).** The sizer
+arm under each rung's mechanics, 1601 frames, so the story can be watched side by side:
+
+| spec | mechanics | gauge |
+|---|---|---|
+| `ms1_pinned_shell` | K_R 0.4, as shipped (R2b) | prisms bend from frame 100; by the end trapezoids 0.80, thickness CV 0.24, thinnest cell 9 % of the median |
+| `ms2_unpinned_shell` | K_R 0 (R3b) | prisms bend from frame 200 (0.54 at the end); the shell breathes to asphericity 0.13 |
+| `ms3_prism_shell` | K_R 0, kappa_h 0.2 (R3d) | a spheroid of prisms to frame 1500; trapezoids 0.04-0.08 at the end, thickness CV 0.09, thinnest 0.79 |
+| `ms4_round_prism_shell` | K_R 0.1, kappa_h 0.2 | round early (asphericity 0.008) but the light pin squeezes the grown shell: trapezoids 0.76 and thickness CV 0.23 by the end |
+
+`ms3` is the working point: no pin, the thickness field stiff.
+
 ## 4. The ladder, v2
 
 | rung | layer | change | gate |
