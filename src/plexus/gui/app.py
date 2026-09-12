@@ -167,11 +167,15 @@ async function showFrame(i){{
 window.playGo=async function(){{let j=await (await fetch('/api/scene/frames')).json();nframes=j.n||0;STORED=j.stored||0;
  if(!nframes&&STORED){{  // nothing in memory, but the run is on disk: read it
   $('framelab').textContent=`loading ${{STORED}} recorded frames...`;
-  const l=await post('/api/scene/loadrun',{{}});if(l.error){{$('framelab').textContent=l.error;return;}}nframes=l.n||0;}}
+  const l=await post('/api/scene/loadrun',{{}});if(l.error){{$('framelab').textContent=l.error;return;}}
+  // THE SLIDER SPANS WHAT IS IN MEMORY, not what the run recorded: the trajectory is read back
+  // STRIDED (267 of 1,602 here), and a slider that still ran to 1,601 clamped 83% of its travel
+  // onto the last frame -- which reads as a slider with two positions.
+  nframes=l.n||0;STORED=0;$('frame').max=Math.max(nframes-1,0);}}
  if(!nframes){{$('framelab').textContent='no frames yet: RUN first';return;}}$('frame').max=nframes-1;playing=true;let i=0;
  while(playing){{await showFrame(i);i=(i+1)%nframes;await new Promise(r=>setTimeout(r,30));}}}};
 window.playStop=function(){{playing=null;}};
-async function playStopAndLoad(){{const l=await post('/api/scene/loadrun',{{}});if(!l.error){{nframes=l.n||0;$('frame').max=Math.max(nframes-1,0);}}}}
+async function playStopAndLoad(){{const l=await post('/api/scene/loadrun',{{}});if(!l.error){{nframes=l.n||0;STORED=0;$('frame').max=Math.max(nframes-1,0);}}}}
 
 let cseen=0;
 window.claudeGo=async function(){{const t=$('task').value.trim();if(!t)return;$('claude').textContent='';cseen=0;const j=await post('/api/scene/claude',{{task:t,mode:TAB,form:form(),name:specName}});if(j.error){{$('cstat').textContent=j.error;return;}}$('cstat').textContent='running...';$('cbtn').disabled=true;}};
