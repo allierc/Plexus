@@ -390,7 +390,7 @@ Scored on polyhedron volumes inside the shell window (`size_report --gauge`, cb9
 | cycle_timer (<1550) | 200->3259 | 2859 | 0.76 | 0.04 | 0.24 | 372 | 0.87 | -0.10 | 0.35 |
 | cycle_hazard (<1050) | 200->1480 | 1080 | 0.68 | 0.08 | 0.36 | 318 | 0.72 | -0.23 | 0.60 |
 | cycle_dilution | 200->2375 | 1975 | -0.76 | -0.69 | 0.19 | 419 | 1.21 | 0.02 | 0.27 |
-| mech_target_percell | 200->200 | - | - | - | - | - | - | - | 0.052 |
+| mech_target_percell | 200->200 | - | - | - | - | 0.99 | - | 0.019 |
 
 The layer-2 gate (R4's line in the ladder) is met on the working point without touching the
 rules again: sizers -1.00 / -1.14, adder -0.13, timers +0.68 / +0.76, hazard +0.68, dilution
@@ -464,7 +464,27 @@ rig) and a single inverting cell appears from frame 950 -- an extrusion in progr
 doubler added as G1 rules), the five divide-family specs rewritten as degenerate cycles
 (`t_s = t_g2 = t_m = 0`, `cell_divide[model: cycle]`), the divide-family models deprecated and
 kept for the okuda archive. A daughter's cycle now starts when its birth volume has been read
-(finding 21). Gate: the R3d table within bands. Scored when landed.
+(finding 21). ACCEPTED: the rules keep their identity and every arm's division volumes tighten.
+
+| spec | slope R3d -> R4c | CV(V_d) R3d -> R4c | cells at 1601 |
+|---|---|---|---|
+| size_sizer | -1.00 -> -1.08 | 0.17 -> 0.05 | 2667 |
+| size_adder | -0.13 -> -0.20 | 0.14 -> 0.08 | 2392 |
+| size_doubler | +0.44 -> +0.85 | 0.50 -> 0.29 | 1579 (<1400) |
+| size_timer | +0.68 -> +0.63 | 0.22 -> 0.16 | 2038 |
+| size_grow_sizer | -0.09 -> -0.24 | 0.12 -> 0.09 | 2038 |
+| size_two_channel | -1.23 -> -1.07 | 0.10 -> 0.07 | 1146 |
+| cycle_sizer | -1.14 -> -1.03 | 0.14 -> 0.13 | 2151 |
+| cycle_timer | +0.76 -> +0.64 | 0.24 -> 0.23 | 2546 |
+| cycle_hazard | +0.68 -> +0.49 | 0.36 -> 0.36 | 958 (<1000) |
+| cycle_dilution | -0.76 -> -0.97 | 0.19 -> 0.15 | 2128 |
+| mech_target_percell | CV(V) 0.019, unchanged | | 200 |
+
+Eight of the ten move by <= 0.16; the two that move further are the stochastic hazard and
+`cycle_dilution`, which becomes the sizer-with-a-molecule it is supposed to be (-0.97 against
+the sizer's -1.03). The tightening of CV(V_d) is the consolidation's own effect: the cycle form
+waits for the re-read `Vbirth` before it starts integrating, so no rule spends its first frames
+chasing the septum's geometric piece.
 
 21. **A daughter's cycle must start after the mechanics has answered the septum.** The cycle
     integrated added volume from the cut; the piece the septum makes is restored to its target
@@ -490,7 +510,7 @@ kept for the okuda archive. A daughter's cycle now starts when its birth volume 
 | R3c | 0 | the septum and `local_relax` on prisms; per-event prism damage | trapezoid fraction flat across a division wave |
 | R3d | 0 | `kappa_h`, a stiffness on the thickness field (finding 18) | prism bands green on every arm for >= 3 doublings; shell bands too |
 | R3e | 0 | the seed at rest (findings 7, 22): calibrate the rest offset with the thickness free; `ref_frame` retired | frame-0 volumes within 5 % of frame-60 -- parked behind R5 |
-| R4 | 2 | one "when"; `cell_grow[timer]` withdrawn; `cell_id` (the rig needs identity) | the R3d table reproduced within bands after the consolidation |
+| R4a-c | 2 | `cell_id`; the apoptosis rig; one "when" | DONE: R3d reproduced (8/10 within 0.16), CV(V_d) tighter everywhere |
 | R4b | 3 | the apoptosis rig | `death_report` rows for every arm; deaths never off a bent mesh |
 | R5 | eng | representation and engine, as before | tick-0 invariant; flags 29 -> <= 20 |
 | R6 | -- | register the working points; `library/` regenerated; `QUICK` re-pointed | `pytest tests/regression -m regression --quick` green |
