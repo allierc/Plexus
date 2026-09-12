@@ -93,7 +93,7 @@ The material page is delivered first (G1, G2) for testing on its own at `/materi
 unification (G3) waits for that test. G3 gets FOUR tabs: bio, material, neurons, **metabolism**
 (G4b below).
 
-### G3 -- one page, four tabs.
+### G3 -- one page, four tabs.  DONE 2026-09-12
 `gui/app.py` is the shell: tab bar (bio | material | neurons | metabolism), the shared panel, the shared JS (run/play/yaml/claude/tree,
 today copied three times across `studio.py`, `bio.py`, `material.py`). A tab is a module in
 `gui/tabs/` with three things: `form_html()`, `build_spec(form) -> dict`, `default_form() -> dict`.
@@ -102,19 +102,19 @@ Routes: `/api/tab/<name>/build`, and the shared `/api/run`, `/api/seed`, `/api/r
 `bio.STATE`, build + seed the tab's default. The 1017-line `server.py` route ladder becomes a dict
 of handlers. `--bio / --material / --studio` flags and the three ports go; one port, `/`.
 
-### G4 -- the neurons tab.
+### G4 -- the neurons tab.  DONE 2026-09-12
 Default scene from `config/neural/ctrnn_assemblies.yaml` (the smallest of the four neural specs);
 the form exposes what that spec parameterises (n neurons, assemblies, coupling, noise, frames).
 Renderer: the spec's own `plotting.renderer`; no new drawing code.
 
-### G4b -- the metabolism tab.
+### G4b -- the metabolism tab.  DONE 2026-09-12 (operators written, reference spec runs)
 Default scene from a metabolism spec in the language: none exists under `config/` today, and
 `/workspace/MetabolismGraph` is a separate repo. First step of this rung is therefore a reference
 spec (`config/metabolism/<name>.yaml`) built from that repo's smallest model as Plexus operators
 (the paper->Plexus prototype recipe), THEN the form over it. If the operators are not there, the
 rung stops at the reference spec and says so.
 
-### G5 -- retire.
+### G5 -- retire.  DONE 2026-09-12
 `studio.py`, `bio.py`'s page, `material.py`'s page, `Plexus_gui.py` flags, README rewritten.
 Claude's "takes over" routes stay, one copy, on the shared panel.
 
@@ -128,3 +128,27 @@ Claude's "takes over" routes stay, one copy, on the shared panel.
 - The node editor (`/editor`, catalog.py, corpus.py) is untouched.
 - `_assign_types` random permutation for `fraction:` specs stays the default; only `type_layout:
   ordered` is added.
+
+## What landed (2026-09-12, second half)
+
+- `gui/app.py` is the shell; `gui/tabs/{bio,material,neurons,metabolism}.py` are the forms
+  (FORM_HTML, FORM_JS with `tabForm/tabFill/tabInit`, `build_spec`, `form_from_spec`, BRIEF).
+  `gui/server.py` dispatches through `GET_ROUTES` / `POST_ROUTES`; `/api/bio/*` stays as aliases.
+  `/api/scene/reset` stops the run, drops the view, clears the state, remembers the tab.
+- `operators/metabolism.py`: `metabolite_seed`, `reaction_seed`, `reaction_rate` (Aggregate along
+  `post`: log v = log k + SUM |S| log c, with the reference's flux limiter), `metabolite_flux`
+  (Aggregate along `pre`: dc/dt = S v), `metabolite_homeostasis` (Lateral). The stoichiometry is a
+  `synapse`-entity edge-set `stoich` (pre metabolite, post reaction, `w` = S_ij). Reference
+  `config/metabolism/massaction_toy.yaml` (40 x 80, 40% autocatalytic cycles): concentrations stay
+  in [0.37, 8.4] over 1440 frames. `paths.py` knows the `metabolism` folder.
+- `config/neural/ctrnn_gui.yaml`: the neurons form's default; assemblies on a ring (`start:`) so
+  every neuron is in the picture.
+- Renderer (`live_movie.py`): `plotting.color_field` may name any scalar block of the subject set
+  (`voltage`, `conc`); `plotting.subject` names the drawn set; `graph_overlay` draws an edge-set
+  (pre -> post positions) and `always: true` keeps it on every frame, from frame 0.
+  `bio_view.View` looks at a 2-D world from +z.
+- Retired: `gui/studio.py`'s page, knobs, previews, dev routes and the warm worker
+  (`gui/worker.py`); `gui/material.py` (moved to `tabs/material.py`); `gui/bio.py`'s page.
+  `Plexus_gui.py` keeps `--bio/--material` as spellings of `--tab`.
+- Gates: `tests/test_gui_parity.py` -- per-tab reference equality, round trip, one pipeline, one
+  shell, the route table, and a two-species mass-action check of the metabolism operators.

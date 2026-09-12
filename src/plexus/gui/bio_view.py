@@ -120,6 +120,8 @@ class View:
             if any(st.get("pos") for st in self.scene["sets"].values()) else None
         if P is not None and len(P):
             P = P[np.abs(P).max(1) < 1e5]                        # parked slots sit at -1e6
+            if P.shape[1] == 2:                                  # a 2-D world sits in the z = 0 plane
+                P = np.concatenate([P, np.zeros((len(P), 1))], 1)
             lo, hi = P.min(0), P.max(0)
             self.focal = 0.5 * (lo + hi) + np.asarray(getattr(self.lm, "_shift", 0.0) or 0.0, float)
             R = 0.5 * float(np.linalg.norm(hi - lo))
@@ -129,6 +131,11 @@ class View:
             self.scale0 = float(cam.parallel_scale)
         self.azim, self.elev, self.zoom = 30.0, 20.0, 1.0
         self.up_axis = int(style.get("up_axis", 2))              # a material box is y-up, a tissue z-up
+        if int(getattr(sim, "dim", 3)) == 2:
+            # A 2-D WORLD IS LOOKED AT FROM +z WITH y UP: the orbit's up axis is y and the camera
+            # starts on the +z side (azim 90 around y at elevation 0), so the plane fills the view.
+            self.up_axis = 1
+            self.azim, self.elev = 90.0, 0.0
         self.pick = None
         self.hidden: set = set()
         self.RUN = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}, "frames_kept": 0}
