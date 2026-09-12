@@ -675,7 +675,7 @@ def p_style(h, data):
     spec = yaml.safe_load(open(sp)) or {}
     try:
         spec["plotting"] = M.apply_render(spec.get("plotting") or {}, str(data.get("render", "small_dots")),
-                                          str(data.get("light", "default")))
+                                          str(data.get("light", "default")), str(data.get("color", "particles")))
     except ValueError as e:
         return h._send_json({"error": str(e)}, 400)
     ok, err = _validate(spec)
