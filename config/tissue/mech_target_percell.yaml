@@ -83,7 +83,6 @@ seed:
   p0: 3.5
   seed: 0
   h0: 0.88
-  ref_frame: 60
   v0_uniform: false
 operators:
 - op: cell_geometry

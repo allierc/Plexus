@@ -1,9 +1,9 @@
 general:
   name: size_doubler
   seed: 0
-  n_frames: 801
+  n_frames: 1601
   dt: 1.0
-  record_cap: 803
+  record_cap: 1603
   boundary: free
   dim: 3
   world:
@@ -83,7 +83,7 @@ operators:
   at: cell
 - op: cell_grow
   at: vertex
-  rate: 0.00096
+  rate: 0.000578
   rho: 1.0
   a_sw: 50.0
   hill: 4.0
@@ -139,7 +139,6 @@ seed:
   model: apicobasal
   h0: 0.88
   ref_frame: 60
-  v0_from: polyhedron
 plotting:
   renderer: vtk_points
   background: black

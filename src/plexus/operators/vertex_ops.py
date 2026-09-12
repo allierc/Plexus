@@ -1744,21 +1744,12 @@ class Divide3D(Structural):
         return v_now >= self.factor * jit * v_ref
 
     def _realised_volumes(self, lvl, m, nF):
-        """Every cell's volume on the mesh as it stands, in the convention the trigger reads:
-        the polyhedron where the run carries a separation, the wedge otherwise. None on a mesh
-        with no live vertices."""
-        Nv = int(m["Nv"])
-        if Nv <= 0:
+        """Every cell's volume on the mesh as it stands, in `cell_size`'s convention. None on a
+        mesh with no live vertices."""
+        if int(m["Nv"]) <= 0:
             return None
-        P = lvl.get("pos")[:Nv].detach().to(torch.float32).cpu()
-        es, et, ef = m["E_srce"].cpu(), m["E_trgt"].cpu(), m["E_face"].cpu()
-        s = lvl.get("sep") if "sep" in getattr(lvl, "state_schema", {}) else None
-        if s is not None and int(s.shape[0]) >= Nv:
-            v, _, _, _ = apicobasal_geometry_3d(P, s[:Nv].detach().to(torch.float32).cpu(),
-                                                es, et, ef, nF)
-        else:
-            _, _, _, v = face_geometry_3d(P, es, et, ef, nF, apex=wedge_apex(m, P))
-        return v.numpy().astype(np.float64)
+        v, _ = cell_size(lvl, m, nF)
+        return np.asarray(v, np.float64)
 
     def _fresh_djit(self, rng, n=1):
         """Fresh per-cell division-threshold multiplier. Gaussian CV (cycle_cv) when set -> desynchronised
@@ -1790,66 +1781,14 @@ class Divide3D(Structural):
         pos_np = lvl.get("pos")[:Nv].detach().cpu().numpy().astype(np.float64)
         es = m["E_srce"].detach().cpu().numpy(); et = m["E_trgt"].detach().cpu().numpy()
         ef = m["E_face"].detach().cpu().numpy(); nF = int(m["nF"])
-        _, _, _, vf = face_geometry_3d(torch.as_tensor(pos_np), torch.as_tensor(es),
-                                       torch.as_tensor(et), torch.as_tensor(ef), nF,
-                                       apex=wedge_apex(m, torch.as_tensor(pos_np)))
-        vf = vf.numpy()                                          # per-cell CURRENT wedge volume
-        # THE TRIGGER HAS TO READ THE VOLUME THE MODEL DEFENDS. `vf` above is the origin-referenced
-        # WEDGE volume -- the cone from the world origin out to the cell's mid-surface ring -- and
-        # on a mid-surface model that IS the cell, which is why every rule on this contract was
-        # written against it. Under `cell_mechanics[model: apicobasal]` it is not: the cell is a
-        # polyhedron and its volume carries the THICKNESS, which the wedge cannot see.
-        #
-        # MEASURED ON gate_ab_population, 401 frames, and it is the whole failure of that rung. With
-        # `sep` free the tissue answered `cell_grow` by getting THICKER rather than wider: median
-        # thickness 0.544 -> 1.253 and median polyhedron volume 0.786 -> 1.694, so every cell more
-        # than doubled -- while the wedge volume the trigger reads FELL, 2.32 -> 2.07, because the
-        # mid-surface did not expand. Not one cell divided in 401 frames. A sizer that cannot see
-        # the axis the tissue grew along is not a sizer.
-        #
-        # `v_ref` MOVES WITH IT OR THE COMPARISON IS MEANINGLESS. It is a seed-time median in wedge
-        # units, and `factor * v_ref` against a polyhedron volume would be two different quantities
-        # either side of an inequality. So the polyhedron reference is taken once, at the first call
-        # that sees a separation, and cached beside it.
-        # `sep` LIVES ON THE LEVEL, NOT ON THE MESH TABLE, and that is deliberate -- the apico-basal
-        # design put it there so it never touches FACE_RECORD or `snapshot()` and cannot trip the
-        # recorded-arrays rule. So it is read through `lvl.state_schema`, not through `m`.
-        _s = lvl.get("sep") if "sep" in getattr(lvl, "state_schema", {}) else None
-        if _s is not None:
-            _s = _s.detach() if hasattr(_s, "detach") else torch.as_tensor(_s)
-            _Nv = int(m["Nv"])
-            if int(_s.shape[0]) >= _Nv:
-                _vp, _, _, _ = apicobasal_geometry_3d(
-                    torch.as_tensor(pos_np, dtype=torch.float32)[:_Nv],
-                    _s[:_Nv].to(torch.float32).cpu(), m["E_srce"].cpu(), m["E_trgt"].cpu(),
-                    m["E_face"].cpu(), nF)
-                vf = _vp.numpy().astype(np.float64)
-                # THE REFERENCE IS THE SEED-TIME MEDIAN, THE WAY THE WEDGE ONE ALWAYS WAS -- and
-                # that is only honest because `seed_mesh` now seeds `h0` at the thickness the energy
-                # wants, and it is not free. Left as an arbitrary number, `h0` would be 0.4 on this spec
-                # against an equilibrium of 0.8796, 1.8 on `mech_shell_free` against 0.8001. The
-                # seeded shell then spent the opening of every run RELAXING toward a thickness
-                # nobody had asked for -- on `mech_shell_free` about 300 frames, with the mean
-                # radius drifting 5.03 -> 7.47 on the way -- and the polyhedron volume moved with
-                # it, 0.613 -> 1.229 here.
-                #
-                # Every attempt to time a measurement on that ramp produced a different population
-                # from the same spec: cache at the first call, 12,543 cells; wait for the shell to
-                # settle, 236; freeze when the median stops moving by 1% a call, 200 and flat,
-                # because once growth is uncapped it moves MORE than 1% a call and the reference
-                # simply tracked the cells -- median 17.339 against a reference of 17.339, a trigger
-                # comparing a quantity with itself. None of those numbers was wrong about what it
-                # measured. They were all measuring a shell that had not finished moving.
-                #
-                # `tools/equilibrium_h.py` measures the thickness a spec's energy settles to, and
-                # the specs now seed it. With the shell starting where it ends, the first call is a
-                # rest state and needs no window, no tolerance and no freeze.
-                if "v_ref_poly" not in m:
-                    m["v_ref_poly"] = float(np.median(vf))
-                    reset_vbirth_at_reference(H, m, self.at, vf, nF)
-                    print(f"[cell_divide] this run carries a separation, so the trigger reads the "
-                          f"POLYHEDRON volume; reference {m['v_ref_poly']:.4f} "
-                          f"(the wedge reference is {float(m.get('v_ref', 1.0)):.4f})", flush=True)
+        # ONE READER (R2 of notes/size_cycle/SIZE_CYCLE_PLAN.md). This operator used to compute the
+        # wedge volume here and then, whenever the run carried a separation, replace it with the
+        # polyhedron volume and cache its own reference -- while `cell_cycle`, `cell_die` and
+        # `cell_grow` read `cell_size`. Two conventions in one tissue: the daughters' `Vbirth`
+        # was written in this operator's and read in the cycle's. `cell_size` decides for all
+        # four now, so `vf`, `v_ref` and `Vbirth` are one currency.
+        vf, v_ref = cell_size(lvl, m, nF, pos_np, H=H, at=self.at)
+        vf = np.asarray(vf, np.float64)
         rings = rings_from_flat_3d(es, et, ef, nF)
         pos = [p for p in pos_np]
         A0 = m["A0"].detach().cpu().numpy().tolist()
@@ -1885,7 +1824,7 @@ class Divide3D(Structural):
         # volume-primary + bounded duration: divide if (2x volume AND old enough) OR (past max cycle length)
         # THE REFERENCE IN THE SAME UNITS AS `vf` ABOVE -- polyhedron where the run has a
         # separation, wedge where it does not. Mixing them is the defect the block above exists for.
-        v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))  # SEED-TIME MEDIAN cell volume
+        # `v_ref` came from `cell_size` above, in the same convention as `vf`.
         # A MODEL MAY ANSWER FROM THE TABLE INSTEAD OF FROM THE FOUR SCALARS. `_trigger` sees
         # (v_now, v_birth, jit, age, v_ref) and that is the right interface for every rule that
         # reads size or time -- but `model: cycle` reads a PHASE another operator owns, which is not
