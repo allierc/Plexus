@@ -108,9 +108,12 @@ window.reseed=async function(){{playStop();showMovie(null);FRAME=null;if(!specNa
  try{{const f=await (await fetch('/api/scene/frames')).json();nframes=f.n||0;$('frame').max=Math.max(nframes-1,0);
   // THE RUN THIS SPEC ALREADY HAS: if `graphs_data/.../<name>/movie.mp4` is there, PLAY plays it
   // straight away -- no run needed, and no 2 GB trajectory read to scrub at a camera.
-  const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();MOVIE=a.mp4||null;
-  $('framelab').textContent=nframes?`${{nframes}} frames in memory: PLAY replays them with this render`
-                                  :(MOVIE?'a movie of this spec exists: PLAY':'');}}catch(e){{}}}};
+  const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();
+  MOVIE=a.mp4||null;MOVIE_N=a.mp4_frames||0;MOVIE_FPS=a.mp4_fps||0;
+  // THE SLIDER SPANS WHATEVER PLAY WILL PLAY: the frames in memory, else the movie's own frames
+  // (its count and rate come from the file, probed once), so scrubbing works either way.
+  if(!nframes&&MOVIE_N){{$('frame').max=MOVIE_N-1;}}
+  $('framelab').textContent=nframes?`${{nframes}} frames in memory`:'';}}catch(e){{}}}};
 window.toggleYaml=function(){{const y=$('yaml');const on=getComputedStyle(y).display==='none';y.style.display=on?'block':'none';}};
 window.saveYaml=async function(){{const j=await post('/api/scene/save',{{name:specName,raw:$('yamltext').value,tab:TAB}});if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();}};
 // THE PICTURE IS THE MOVIE RENDERER'S. Every camera change asks the server for a fresh screenshot;
@@ -159,15 +162,22 @@ async function rpoll(){{try{{const j=await (await fetch('/api/scene/run')).json(
  render();if(j.running){{setTimeout(rpoll,700);}}else{{running=false;$('runbtn').disabled=false;for(const id of ['render','light','color'])if($(id))$(id).disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);
   const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();
   $('framelab').textContent=(nframes?`${{nframes}} frames: PLAY replays at any camera`:'')+(a.mp4?`  |  movie.mp4 in ${{a.dir}}`:'');}}}}catch(e){{setTimeout(rpoll,1500);}}}}
-let MOVIE=null, playing=null, nframes=0, FRAME=null;
-async function showFrame(i){{FRAME=i;$('frame').value=i;$('framelab').textContent=`frame ${{i}}/${{Math.max(nframes-1,0)}}`;await render();}}
+let MOVIE=null, MOVIE_N=0, MOVIE_FPS=0, playing=null, nframes=0, FRAME=null;
+async function showFrame(i){{
+ if(!nframes&&MOVIE){{  // scrubbing the movie file: the slider is its time line
+  showMovie(MOVIE);const v=$('movie');playing=null;v.pause();if(MOVIE_FPS)v.currentTime=i/MOVIE_FPS;
+  $('frame').value=i;$('framelab').textContent=`frame ${{i}}/${{Math.max(MOVIE_N-1,0)}}`;return;}}
+ FRAME=i;$('frame').value=i;$('framelab').textContent=`frame ${{i}}/${{Math.max(nframes-1,0)}}`;await render();}}
 window.playGo=async function(){{const j=await (await fetch('/api/scene/frames')).json();nframes=j.n||0;
  if(!nframes){{  // nothing in memory: play the movie the run wrote, if there is one
   if(!MOVIE){{$('framelab').textContent='no frames and no movie yet: RUN first';return;}}
-  playing=null;showMovie(MOVIE);const v=$('movie');v.loop=true;v.play();$('framelab').textContent='playing movie.mp4';return;}}
+  playing=null;showMovie(MOVIE);const v=$('movie');v.loop=true;
+  // the slider follows the film while it runs
+  v.ontimeupdate=()=>{{if(!MOVIE_FPS)return;const k=Math.round(v.currentTime*MOVIE_FPS);$('frame').value=k;$('framelab').textContent=`frame ${{k}}/${{Math.max(MOVIE_N-1,0)}}`;}};
+  v.play();return;}}
  showMovie(null);$('frame').max=nframes-1;playing=true;let i=0;
  while(playing){{await showFrame(i);i=(i+1)%nframes;await new Promise(r=>setTimeout(r,30));}}}};
-window.playStop=function(){{playing=null;const v=$('movie');if(v.style.display!=='none'){{v.pause();showMovie(null);render(true);}}}};
+window.playStop=function(){{playing=null;const v=$('movie');if(v.style.display!=='none')v.pause();}};
 
 let cseen=0;
 window.claudeGo=async function(){{const t=$('task').value.trim();if(!t)return;$('claude').textContent='';cseen=0;const j=await post('/api/scene/claude',{{task:t,mode:TAB,form:form(),name:specName}});if(j.error){{$('cstat').textContent=j.error;return;}}$('cstat').textContent='running...';$('cbtn').disabled=true;}};
