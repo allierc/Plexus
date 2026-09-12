@@ -1317,7 +1317,15 @@ class SeedMeshApicoBasal(SeedMesh3D):
             # its own first call and `cell_grow`, `cell_die` and `cell_cycle` each read the wedge
             # one; they all read this now (`cell_size`), so there is a single seed-time median in
             # the convention the energy defends and the four cannot drift apart.
-            m["v_ref_poly"] = float(vp.median())
+            # THE POLYHEDRON REFERENCE IS NOT WRITTEN HERE WHEN THE SEED DECLARES A SETTLE WINDOW.
+            # Pre-filled with the seed-time median (1.35 on the reference spheroid), it was found
+            # cached by `cell_divide` and `cell_size`, which then never took theirs at `ref_frame`
+            # -- every size threshold was stated against a volume the cells had already inflated
+            # past (settled median 2.59): the R1b sizer divided at 1.05 x the settled median, i.e.
+            # at 2 x the seed's. With `ref_frame > 0` the first reader after the window caches the
+            # reference and resets `Vbirth`.
+            if self.ref_frame <= 0:
+                m["v_ref_poly"] = float(vp.median())
             vb = cell_block(H, resolve_cell_set(H, self.at), "Vbirth", nF)
             if vb is not None:
                 set_cell_block(H, resolve_cell_set(H, self.at), "Vbirth",
