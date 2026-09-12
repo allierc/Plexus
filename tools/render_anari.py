@@ -27,19 +27,55 @@ sys.path.insert(0, os.path.join(REPO, "src"))
 
 
 def read_frame(run_dir: str, frame: int = -1):
-    """(positions [N, 3] of the live particles, the world box) of one recorded frame."""
-    import zarr
-    z = zarr.open(os.path.join(run_dir, "simulation.zarr"), "r")
-    sets = [k for k in z.group_keys() if "pos" in z[k].array_keys()]
-    best = max(sets, key=lambda k: z[k]["pos"].shape[1])
-    a = z[best]["pos"]
-    t = a.shape[0] + frame if frame < 0 else frame
-    pos = np.asarray(a[t], np.float32)
-    if "occ" in z[best].array_keys():
-        pos = pos[np.asarray(z[best]["occ"][t]) > 0]
+    """(positions [N, 3] of the live particles, the world box) of one recorded frame.
+
+    The zarr when it has one, else `trajectory.npz` -- a run whose zarr writer failed (or whose
+    zarr version disagreed with the reader) still leaves the npz, and the two hold the same rows."""
+    zpath = os.path.join(run_dir, "simulation.zarr")
+    pos = occ = None
+    try:
+        import zarr
+        z = zarr.open(zpath, "r")
+        sets = [k for k in z.group_keys() if "pos" in z[k].array_keys()]
+        best = max(sets, key=lambda k: z[k]["pos"].shape[1])
+        a = z[best]["pos"]
+        t = a.shape[0] + frame if frame < 0 else frame
+        pos = np.asarray(a[t], np.float32)
+        occ = np.asarray(z[best]["occ"][t]) if "occ" in z[best].array_keys() else None
+    except Exception:                                          # noqa: BLE001 -- fall back to the npz
+        with np.load(os.path.join(run_dir, "trajectory.npz")) as z:
+            keys = [k for k in z.files if k.endswith("__pos")]
+            best = max(keys, key=lambda k: z[k].shape[1])
+            a = z[best]
+            t = a.shape[0] + frame if frame < 0 else frame
+            pos = np.asarray(a[t], np.float32)
+            ok = best[:-len("__pos")] + "__occ"
+            occ = np.asarray(z[ok][t]) if ok in z.files else None
+    if occ is not None:
+        pos = pos[occ > 0]
     pos = pos[np.abs(pos).max(1) < 1e5]                       # parked slots sit at -1e6
     lo, hi = pos.min(0), pos.max(0)
     return pos, (lo, hi)
+
+
+def body_colours(run_dir: str, n: int):
+    """One colour per body from the run's own spec, mapped through `mpm_particle`'s parent -- the
+    picture the page draws, not a height ramp."""
+    import yaml
+    sp = os.path.join(run_dir, "spec.yaml")
+    if not os.path.exists(sp):
+        return None
+    spec = yaml.safe_load(open(sp))
+    cols = ((spec.get("plotting") or {}).get("colors") or {})
+    types = ((spec.get("sets") or {}).get("cell") or {}).get("types") or {}
+    if not cols or not types:
+        return None
+    per = ((spec.get("sets") or {}).get("mpm_particle") or {}).get("per_parent")
+    if not isinstance(per, int):
+        return None
+    tab = np.asarray([cols.get(t, [0.8, 0.8, 0.8]) for t in types], np.float32)
+    body = (np.arange(n) // per) % len(tab)
+    return tab[body]
 
 
 def colours(pos, lo, hi, up=1):
@@ -52,14 +88,18 @@ def colours(pos, lo, hi, up=1):
 class AnariScene:
     """The particles as ANARI spheres, once; every frame only moves the camera."""
 
-    def __init__(self, pos, col, box, px=(1000, 1000), radius=None, ao=True, spp=1):
+    def __init__(self, pos, col, box, px=(1000, 1000), radius=None, ao=0.5, spp=1,
+                 metallic=0.0, roughness=0.35):
         import pynari as anari
         self.an = anari
         self.px = px
         lo, hi = box
         self.centre = 0.5 * (lo + hi)
         self.span = float(np.max(hi - lo))
-        self.radius = float(radius or 0.0018 * self.span)
+        # A SURFACE NEEDS THE SPHERES TO TOUCH. The default is half the median nearest-neighbour
+        # spacing of the points, so neighbouring spheres just meet and a body reads as a solid;
+        # smaller and it is a cloud of dots, larger and thin sheets close up.
+        self.radius = float(radius or self._spacing(pos) * 0.62)
         d = anari.newDevice("default")
         self.dev = d
         g = d.newGeometry("sphere")
@@ -69,8 +109,8 @@ class AnariScene:
         g.commitParameters()
         m = d.newMaterial("physicallyBased")
         m.setParameter("baseColor", anari.STRING, "color")     # per-sphere colour
-        m.setParameter("metallic", anari.FLOAT, 0.0)
-        m.setParameter("roughness", anari.FLOAT, 0.35)
+        m.setParameter("metallic", anari.FLOAT, float(metallic))
+        m.setParameter("roughness", anari.FLOAT, float(roughness))
         m.commitParameters()
         s = d.newSurface()
         s.setParameter("geometry", anari.GEOMETRY, g)
@@ -79,7 +119,7 @@ class AnariScene:
         w = d.newWorld()
         w.setParameterArray1D("surface", anari.SURFACE, [s])
         lights = []
-        for direction, irr in (((-0.4, -1.0, -0.5), 2.2), ((0.7, -0.3, 0.6), 0.8)):
+        for direction, irr in (((-0.4, -1.0, -0.5), 3.0), ((0.7, -0.3, 0.6), 1.2), ((0.2, 0.6, -0.9), 0.6)):
             li = d.newLight("directional")
             li.setParameter("direction", anari.FLOAT32_VEC3, direction)
             li.setParameter("irradiance", anari.FLOAT, irr)
@@ -95,7 +135,7 @@ class AnariScene:
         # ONE SAMPLE PER PIXEL. The backend path-traces, so its cost is pixels x samples and hardly
         # depends on the particle count at all (36k and 5M measured within 2x of each other).
         r.setParameter("pixelSamples", anari.INT32, int(spp))
-        r.setParameter("ambientRadiance", anari.FLOAT, 0.35 if ao else 1.0)
+        r.setParameter("ambientRadiance", anari.FLOAT, float(ao))
         r.setParameter("background", anari.FLOAT32_VEC4, (0.0, 0.0, 0.0, 1.0))
         r.commitParameters()
         self.frame = d.newFrame()
@@ -105,6 +145,13 @@ class AnariScene:
         self.frame.setParameter("camera", anari.OBJECT, self.cam)
         self.frame.setParameter("renderer", anari.OBJECT, r)
         self.frame.commitParameters()
+
+    @staticmethod
+    def _spacing(pos, k=20000):
+        from scipy.spatial import cKDTree
+        q = np.asarray(pos, np.float64)[:: max(1, len(pos) // k)]
+        nn = cKDTree(q).query(q, k=2)[0][:, 1]
+        return float(np.median(nn[np.isfinite(nn)]))
 
     def look(self, azim_deg, elev_deg=18.0, dist=2.1):
         a, e = np.radians(azim_deg), np.radians(elev_deg)
@@ -154,6 +201,10 @@ def main():
     ap.add_argument("--spp", type=int, default=1, help="samples per pixel")
     ap.add_argument("--cpu", action="store_true", help="hide the GPUs from the backend, to see which it was using")
     ap.add_argument("--turntable", type=int, default=0, help="frames of a camera orbit -> mp4")
+    ap.add_argument("--stills", action="store_true", help="one still per material, for comparing renders")
+    ap.add_argument("--azim", type=float, default=35.0)
+    ap.add_argument("--elev", type=float, default=18.0)
+    ap.add_argument("--dist", type=float, default=2.1)
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--out", default="movie_anari.mp4")
     a = ap.parse_args()
@@ -164,7 +215,9 @@ def main():
     pos, box = read_frame(a.run_dir, a.frame)
     if a.n and a.n < len(pos):
         pos = pos[:: max(1, len(pos) // a.n)][:a.n]
-    col = colours(pos, *box)
+    col = body_colours(a.run_dir, len(pos))
+    if col is None or len(col) != len(pos):
+        col = colours(pos, *box)
     print(f"[data] {len(pos):,} live particles from {a.run_dir} in {time.time() - t0:.1f}s; "
           f"box {np.round(box[0], 3).tolist()}..{np.round(box[1], 3).tolist()}", flush=True)
     px = (a.px, a.px)
@@ -188,6 +241,24 @@ def main():
         print(f"[bench] ANARI spheres : scene build {build:.1f}s, first frame (BVH) {first:.1f}s, "
               f"then {an_dt * 1000:.0f} ms/frame  ({1 / an_dt:.1f} fps)")
         print(f"[bench] VTK points    : {vt_dt * 1000:.0f} ms/frame  ({1 / vt_dt:.1f} fps)")
+
+    if a.stills:
+        import imageio.v3 as iio
+        for nm, kw in (("matte", dict(metallic=0.0, roughness=1.0, spp=a.spp)),
+                       ("glossy", dict(metallic=0.0, roughness=0.12, spp=a.spp)),
+                       ("metal", dict(metallic=1.0, roughness=0.2, spp=a.spp)),
+                       ("path16", dict(metallic=0.0, roughness=0.35, spp=16)),
+                       ("fat", dict(metallic=0.0, roughness=0.5, spp=a.spp, radius_mul=1.6)),
+                       ("dots", dict(metallic=0.0, roughness=0.6, spp=a.spp, radius_mul=0.45))):
+            mul = kw.pop("radius_mul", 1.0)
+            sc = AnariScene(pos, col, box, px, radius=(a.radius * mul if a.radius else None), **kw)
+            if a.radius is None and mul != 1.0:                 # scale the measured default too
+                sc = AnariScene(pos, col, box, px, radius=sc.radius * mul, **kw)
+            sc.look(a.azim, a.elev, a.dist)
+            t0 = time.time(); img = sc.render(); dt = time.time() - t0
+            out = os.path.join(a.run_dir, f"anari_{nm}.png")
+            iio.imwrite(out, img)
+            print(f"[still] {nm:7s} {dt * 1000:6.0f} ms -> {out}", flush=True)
 
     if a.turntable:
         import imageio.v2 as iio
