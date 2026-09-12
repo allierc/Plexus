@@ -349,7 +349,7 @@ window.Quarto = {
   <li><a href="#the-algebra-of-activities" id="toc-the-algebra-of-activities" class="nav-link" data-scroll-target="#the-algebra-of-activities">The algebra of activities</a></li>
   <li><a href="#organization-in-time" id="toc-organization-in-time" class="nav-link" data-scroll-target="#organization-in-time">Organization in time</a></li>
   <li><a href="#organization-across-levels" id="toc-organization-across-levels" class="nav-link" data-scroll-target="#organization-across-levels">Organization across levels</a></li>
-  <li><a href="#bottoming-out-numerical-implementations" id="toc-bottoming-out-numerical-implementations" class="nav-link" data-scroll-target="#bottoming-out-numerical-implementations">Bottoming out: numerical implementations</a></li>
+  <li><a href="#numerical-implementations" id="toc-numerical-implementations" class="nav-link" data-scroll-target="#numerical-implementations">Numerical implementations</a></li>
   <li><a href="#mechanistic-inverse-modelling" id="toc-mechanistic-inverse-modelling" class="nav-link" data-scroll-target="#mechanistic-inverse-modelling">Mechanistic inverse modelling</a></li>
   <li><a href="#agentic-mechanistic-discovery" id="toc-agentic-mechanistic-discovery" class="nav-link" data-scroll-target="#agentic-mechanistic-discovery">Agentic mechanistic discovery</a></li>
   <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
@@ -476,8 +476,8 @@ window.Quarto = {
 <p>Fields belong to levels too. <strong>Exchange</strong> couples entities to the field at their own level, so that a protein concentration inside the cell, a morphogen among cells and a mechanical grid under the tissue coexist as distinct objects.</p>
 <p>Proteins → cells → tissues is therefore not a pipeline of separate simulators. It is one compositional graph: parts of several kinds inside each whole, activities joining them locally, aggregate and broadcast joining the levels. The same eight kinds serve throughout, and another level of organization needs no new machinery.</p>
 </section>
-<section id="bottoming-out-numerical-implementations" class="level2">
-<h2 class="anchored" data-anchor-id="bottoming-out-numerical-implementations">Bottoming out: numerical implementations</h2>
+<section id="numerical-implementations" class="level2">
+<h2 class="anchored" data-anchor-id="numerical-implementations">Numerical implementations</h2>
 <p>Every mechanistic description stops somewhere. It bottoms out in activities the field is content to take as given. In Plexus that floor is the numerical implementation. The algebra of activities states the biological meaning of a model; every activity may admit several implementations satisfying the same typed signature, which differ in how they compute and not in what they mean. Choosing an implementation is a numerical decision, never a biological one.</p>
 <p>This accommodates a broad range of methods. A mechanical activity may be implemented with the material point method, finite elements, a vertex model, a phase field, a Cellular Potts model or an optimal-transport formulation. A signalling activity may use Hodgkin–Huxley equations, a graph neural network or a neural ordinary differential equation. A field activity may use finite differences, finite elements, a neural implicit representation or a spectral method. These coexist in one language because they satisfy the same contracts.</p>
 <p>Implementations may also integrate differently. Depending on the activity, an implementation may advance first-order states such as concentrations or membrane voltages, second-order states such as mechanical accelerations, and rely on explicit, implicit or adaptive solvers. These choices affect cost and accuracy, not the biological reading of the model.</p>
