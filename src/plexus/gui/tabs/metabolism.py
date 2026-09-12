@@ -162,6 +162,9 @@ what you are about to do and why; say what you found after it. No headers, no ma
 
 Your ONLY tool is `curl` against the local server at http://127.0.0.1:{port} . The routes:
 
+You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body inline in `curl -d '...'`
+(one line, however long); a body you cannot write inline you cannot send.
+
   POST /api/tab/metabolism/build  JSON form -> writes and seeds a spec. Fields: name,
                           n_metabolites, n_reactions, max_per_reaction, cycle_fraction (0-1, share of
                           autocatalytic reactions), k_min, k_max (rate constants), c_min, c_max

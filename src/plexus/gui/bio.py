@@ -457,6 +457,9 @@ are about to do and why; say what you found after it. No headers, no markdown.
 
 Your ONLY tool is `curl` against the local server at http://127.0.0.1:{port} . The routes:
 
+You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body inline in `curl -d '...'`
+(one line, however long); a body you cannot write inline you cannot send.
+
   POST /api/bio/build     JSON form -> writes and seeds a spec. Fields: name, shape (sphere|disc|plane),
                           n_cells, radius, h0 (cell thickness), apical (in|out; `in` puts the basal
                           cap outside, where a matrix would be), world (box), n_frames,

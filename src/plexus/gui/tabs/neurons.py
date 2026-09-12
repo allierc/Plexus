@@ -196,6 +196,9 @@ about to do and why; say what you found after it. No headers, no markdown.
 
 Your ONLY tool is `curl` against the local server at http://127.0.0.1:{port} . The routes:
 
+You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body inline in `curl -d '...'`
+(one line, however long); a body you cannot write inline you cannot send.
+
   POST /api/tab/neurons/build  JSON form -> writes and seeds a spec. Fields: name, n_assemblies,
                           per_assembly, p_within, p_cross, boost, frac_exc (share excitatory), dale (0|1),
                           afferent (0|1), drive, gain, noise, seed, pulse_period, pulse_duration,

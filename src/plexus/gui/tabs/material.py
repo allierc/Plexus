@@ -194,6 +194,9 @@ each call, what you are about to do and why; say what you found after it. No hea
 
 Your ONLY tool is `curl` against the local server at http://127.0.0.1:{port} . The routes:
 
+You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body inline in `curl -d '...'`
+(one line, however long); a body you cannot write inline you cannot send.
+
   POST /api/tab/material/build  JSON form -> writes and seeds a spec. Fields: name, world (box side,
                           metres), n_grid, n_frames, dt, gravity, particles (per body), radius
                           (every ball's radius, metres), wall_damp (0-1, wall-normal velocity kept
