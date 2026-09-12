@@ -413,9 +413,13 @@ arm under each rung's mechanics, 1601 frames, so the story can be watched side b
 | `ms6_apoptosis` | ms3 + `cell_die[small]` | SPHEROID to 1600; 29 deaths, each shrinking to three neighbours and extruding |
 | `ms6b_apoptosis_noT1` | the same with T1 flips off | trapezoids 0.29 and asphericity 0.10 by the end, and NOT ONE cell removed: finding 19 in one movie |
 | `ms7_cycle_adder` | ms3 + the adder stated on the cycle (R4c) | SPHEROID; the "one when" form of the same rule |
+| `ms8_cycle_dilution` | ms3 + G1 ended by an inhibitor diluted to threshold | clean to 1600; slope -0.97 against the sizer's -1.03 -- a sizer with a molecule under it (Schmoller 2015, Zatulovskiy 2020) |
+| `ms9_cycle_hazard` | ms3 + G1 as a constant hazard | clean to 800, then the spread tells: slope +0.49, CV(V_d) 0.36, the widest of the family (Smith & Martin 1973) |
 
 `ms3` is the working point: no pin, the thickness field stiff. `ms1` -> `ms3` is the mechanics
-story, `ms3` -> `ms7` the rules story, `ms6`/`ms6b` the topology one.
+story, `ms5`/`ms7`/`ms8`/`ms9` the rules story, `ms6`/`ms6b` the topology one. Four of them are
+registered working points (`ms3`, `ms5`, `ms6`, `ms7`); every milestone's numbers reproduce its
+rung's table, which is what makes it a milestone rather than a picture.
 
 **R4a (3a7db6f5).** `cell_id` / `parent_id` on the cell set; `size_report` reads lineage off them
 (identical numbers to the age-based reading on a 700-frame cut: 83 cycles, slope -0.93).
@@ -513,6 +517,13 @@ chasing the septum's geometric piece.
     runner sets it now. The two references refreshed earlier today under the old runner
     (`divide_growing_ball`, `mesh_mpm_spheroid_nominal`) were refreshed again under the new one.
 
+**R5a (899c5d2d).** `kappa_h` ported to the warp kernels (`ab_sep_dirichlet`), so the working
+point no longer forces the autograd path. Checked on the warp-vs-autograd test, which gains
+`kappa_h` and asserts what is peculiar to it: a stiffness on the thickness field has NO position
+gradient, and a kernel that gave it one would be the defect. Relative error 1.7e-07 to 4.2e-06
+over 200 to 8,000 cells; 29-38x faster than the backward at every size. At 200 cells the frame is
+not gradient-bound and the two paths take the same wall clock, giving the same run.
+
 ## 4. The ladder, v2
 
 | rung | layer | change | gate |
@@ -523,7 +534,8 @@ chasing the septum's geometric piece.
 | R3e | 0 | the seed at rest (findings 7, 22): calibrate the rest offset with the thickness free; `ref_frame` retired | frame-0 volumes within 5 % of frame-60 -- parked behind R5 |
 | R4a-c | 2 | `cell_id`; the apoptosis rig; one "when" | DONE: R3d reproduced (8/10 within 0.16), CV(V_d) tighter everywhere |
 | R4b | 3 | the apoptosis rig | `death_report` rows for every arm; deaths never off a bent mesh |
-| R5 | eng | representation and engine, as before | tick-0 invariant; flags 29 -> <= 20 |
+| R5a | eng | DONE: `kappa_h` in the warp kernels | warp = autograd to float32 round-off, 30x on the gradient |
+| R5b | eng | seed-time writes into seed ops; flags off; tick shims out; `p0` off the apico-basal contract | tick-0 invariant; flags 29 -> <= 20 |
 | R6 | -- | DONE: ms3/ms5/ms6/ms7 registered, `QUICK` re-pointed, the runner made deterministic (finding 23) | the registry green |
 
 Out of scope: MPM, ECM -- touched only through the shared reader, and gated there.
