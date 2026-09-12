@@ -466,6 +466,16 @@ kept for the okuda archive. A daughter's cycle now starts when its birth volume 
     `piece + delta` and scored as a sizer (-0.96). Held at p = 0 until `cell_divide` has re-read
     `Vbirth` (age 0 -> 1): -0.12, the divide-family adder's number.
 
+22. **The seed is not at rest in thickness, and the rest offset is why (R3e, measured, parked).**
+    `tools/equilibrium_h.py` on the working-point energy: seeded at 0.88 the shell settles at
+    1.163; seeded at 1.163 it settles at 1.243. There is no fixed point to seed at because the
+    rest offset `mono_delta` is solved with `sep` frozen at the seeded thickness -- the
+    calibration answers "which target puts THIS shell's mid-surface at rest" and the thickness
+    then moves under it. A seed at rest in every degree of freedom means calibrating with the
+    thickness free, which is a mechanics change with its own gate; the `ref_frame` window
+    (60 frames; the ramp settles in 56-78) covers it for the ladder, so R3e stays parked behind
+    R5 rather than opened now.
+
 ## 4. The ladder, v2
 
 | rung | layer | change | gate |
@@ -473,7 +483,7 @@ kept for the okuda archive. A daughter's cycle now starts when its birth volume 
 | R3b | 0 | `K_R 0` on the dividing specs; flip re-aims `sep` | gauge SPHEROID (shell + prism) for >= 3 doublings on `size_sizer`; the prism bands are the ones to watch |
 | R3c | 0 | the septum and `local_relax` on prisms; per-event prism damage | trapezoid fraction flat across a division wave |
 | R3d | 0 | `kappa_h`, a stiffness on the thickness field (finding 18) | prism bands green on every arm for >= 3 doublings; shell bands too |
-| R3e | 0 | the seed at rest (finding 7); `ref_frame` and `mono_delta` retired | frame-0 volumes within 5 % of frame-60 |
+| R3e | 0 | the seed at rest (findings 7, 22): calibrate the rest offset with the thickness free; `ref_frame` retired | frame-0 volumes within 5 % of frame-60 -- parked behind R5 |
 | R4 | 2 | one "when"; `cell_grow[timer]` withdrawn; `cell_id` (the rig needs identity) | the R3d table reproduced within bands after the consolidation |
 | R4b | 3 | the apoptosis rig | `death_report` rows for every arm; deaths never off a bent mesh |
 | R5 | eng | representation and engine, as before | tick-0 invariant; flags 29 -> <= 20 |
