@@ -33,17 +33,44 @@ LOCK = threading.RLock()
 CURRENT: dict = {"view": None}
 _EXEC = ThreadPoolExecutor(max_workers=1, thread_name_prefix="plexus-vtk")
 _VTK_THREAD: dict = {"ident": None}
+# REQUESTS FOR THE VTK THREAD WAIT HERE, NOT ONLY IN THE EXECUTOR. While a run occupies the VTK
+# thread (the pipeline is called ON it, see `View.run`, because a second off-screen plotter on a
+# second thread dies inside VTK), the executor's own queue is stuck behind the run; the run's
+# per-frame hook drains THIS queue instead, so a camera move from the page is answered between two
+# frames rather than after the last one. Outside a run the executor drains it as before.
+import queue as _queue
+_PENDING: "_queue.Queue" = _queue.Queue()
+
+
+def _drain() -> int:
+    """Answer every waiting request, on the VTK thread. Returns how many were served."""
+    n = 0
+    while True:
+        try:
+            fn, args, kwargs, fut = _PENDING.get_nowait()
+        except _queue.Empty:
+            return n
+        if fut.set_running_or_notify_cancel():
+            try:
+                fut.set_result(fn(*args, **kwargs))
+            except BaseException as e:                               # noqa: BLE001
+                fut.set_exception(e)
+        n += 1
 
 
 def _vtk(fn, *args, **kwargs):
     """Run `fn` on the one VTK thread and return its result (a call from that thread runs inline)."""
     if _VTK_THREAD["ident"] == threading.get_ident():
         return fn(*args, **kwargs)
+    from concurrent.futures import Future
+    fut: Future = Future()
+    _PENDING.put((fn, args, kwargs, fut))
 
-    def _wrapped():
+    def _serve():
         _VTK_THREAD["ident"] = threading.get_ident()
-        return fn(*args, **kwargs)
-    return _EXEC.submit(_wrapped).result()
+        _drain()
+    _EXEC.submit(_serve)
+    return fut.result()
 
 
 class View:
@@ -70,6 +97,27 @@ class View:
         dec = bool(getattr(u, "declared", False))                # the scale bar needs declared units, as the movie does
         self._tmp = tempfile.mkdtemp(prefix="plexus_bio_")
         free = str(getattr(sim, "boundary", "") or "").lower() == "free"
+        # THE CIRCUIT PANEL IS NOT A CAMERA PICTURE. `plotting.renderer: neural_panel` draws the
+        # message on the connectivity matrix, the vectors and the kinograph (plexus/neural_panel.py);
+        # the page shows that figure, orbit and pick do nothing, PLAY redraws any captured frame.
+        self.panel = None
+        if str(style.get("renderer", "") or "").lower() == "neural_panel":
+            from plexus.neural_panel import NeuralPanel
+            self.panel = NeuralPanel(out=os.path.join(self._tmp, "view.mp4"), n_frames=max(1, int(sim.n_frames)),
+                                     sim=sim, style=style, name=sim.name, stills=0, keep_stills=False,
+                                     dt=getattr(sim, "dt", None), time_s=(float(u.time_s) if dec else None))
+            self.panel.capture(H, 0)
+            self.lm = None; self.p = None
+            self.focal = np.zeros(3); self.dist0 = 1.0; self.scale0 = 1.0
+            self.azim, self.elev, self.zoom = 0.0, 0.0, 1.0
+            self.up_axis = 2
+            self.pick = None
+            self.hidden: set = set()
+            self.RUN = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}, "frames_kept": 0}
+            self.snaps: list = []
+            self.frame_shown = None
+            self.seconds = round(time.time() - t0, 2)
+            return
         self.lm = LiveMovie(out=os.path.join(self._tmp, "view.mp4"), world=list(sim.world_size), n_frames=1,
                             up=int(style.get("up_axis", 2)), name=sim.name, sim=sim, style=style,
                             centred=free and not any(k in (sim.sets or {}) for k in ("mpm_particle", "cytosol", "nucleus")),
@@ -93,6 +141,8 @@ class View:
             if any(st.get("pos") for st in self.scene["sets"].values()) else None
         if P is not None and len(P):
             P = P[np.abs(P).max(1) < 1e5]                        # parked slots sit at -1e6
+            if P.shape[1] == 2:                                  # a 2-D world sits in the z = 0 plane
+                P = np.concatenate([P, np.zeros((len(P), 1))], 1)
             lo, hi = P.min(0), P.max(0)
             self.focal = 0.5 * (lo + hi) + np.asarray(getattr(self.lm, "_shift", 0.0) or 0.0, float)
             R = 0.5 * float(np.linalg.norm(hi - lo))
@@ -102,6 +152,11 @@ class View:
             self.scale0 = float(cam.parallel_scale)
         self.azim, self.elev, self.zoom = 30.0, 20.0, 1.0
         self.up_axis = int(style.get("up_axis", 2))              # a material box is y-up, a tissue z-up
+        if int(getattr(sim, "dim", 3)) == 2:
+            # A 2-D WORLD IS LOOKED AT FROM +z WITH y UP: the orbit's up axis is y and the camera
+            # starts on the +z side (azim 90 around y at elevation 0), so the plane fills the view.
+            self.up_axis = 1
+            self.azim, self.elev = 90.0, 0.0
         self.pick = None
         self.hidden: set = set()
         self.RUN = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}, "frames_kept": 0}
@@ -114,6 +169,8 @@ class View:
         return _vtk(self._set_camera, azim, elev, zoom)
 
     def _set_camera(self, azim=None, elev=None, zoom=None):
+        if self.panel is not None:
+            return
         with LOCK:
             if azim is not None: self.azim = float(azim)
             if elev is not None: self.elev = max(-89.0, min(89.0, float(elev)))
@@ -195,6 +252,16 @@ class View:
         self.p.add_text(_si_length(len_m), position=(0.80, 0.065), viewport=True, font_size=11, color="white", name="scale_label")
 
     def png(self) -> bytes:
+        if self.panel is not None:
+            def _panel_png():
+                with LOCK:
+                    i = self.frame_shown if self.frame_shown is not None else len(self.panel.hist) - 1
+                    return self.panel.frame_at(i)
+            img = _vtk(_panel_png)
+            import imageio.v3 as iio
+            buf = io.BytesIO()
+            iio.imwrite(buf, np.asarray(img), extension=".png")
+            return buf.getvalue()
         img = _vtk(self._grab)
         import imageio.v3 as iio
         buf = io.BytesIO()
@@ -242,6 +309,9 @@ class View:
         return _vtk(self._show_frame, i)
 
     def _show_frame(self, i: int):
+        if self.panel is not None:
+            self.frame_shown = max(0, min(int(i), len(self.panel.hist) - 1)) if self.panel.hist else None
+            return
         if not self.snaps:
             return
         i = max(0, min(int(i), len(self.snaps) - 1))
@@ -298,6 +368,8 @@ class View:
 
     def pick_at(self, fx: float, fy: float, tol: float = 0.012) -> str | None:
         """The object under the click at screen fractions (fx from the left, fy from the top)."""
+        if self.panel is not None:
+            return None
         def _proj():
             W, Hh = self.p.window_size
             M = self.p.camera.GetCompositeProjectionTransformMatrix(float(W) / float(Hh), -1.0, 1.0)
@@ -322,6 +394,9 @@ class View:
 
     def _highlight(self, pick: str | None):
         """A yellow dot on a cluster or vertex; the cell's rings and lateral edges for a cell."""
+        if self.panel is not None:
+            self.pick = pick
+            return
         import pyvista as pv
         from plexus.gui import bio
         with LOCK:
@@ -371,6 +446,8 @@ class View:
         return _vtk(self._set_visible, species, on)
 
     def _set_visible(self, species: str, on: bool):
+        if self.panel is not None:
+            return False
         with LOCK:
             acts = [a for n, a in self.p.renderer.actors.items() if n.startswith("glyph_") and n.endswith("_" + species)]
             if not acts:
@@ -389,28 +466,42 @@ class View:
         return names
 
     # ------------------------------------------------------------------ running the engine
-    def run(self, frames: int | None = None, device: str | None = None, keep: int | None = None,
-            live: int | None = None) -> dict:
-        """Simulate the spec forward in a thread, the picture following every frame.
+    def run(self, device: str | None = None, **_ignored) -> dict:
+        """Generate the spec THROUGH THE PIPELINE -- `plexus.pipeline.generate`, the body of
+        `Plexus_Main.py -o generate` -- on the VTK thread, with its per-frame hook feeding this
+        view.
 
-        `engine.run` builds and seeds its own hierarchy and loops internally, so a run always
-        starts from the seed (frame 0) and there is no "continue from here" yet; `frames` caps the
-        number of frames, `stop()` aborts. Each frame the movie renderer is fed the run's
-        hierarchy exactly as a generate does (`lm(H, tick)`), so what the page shows during the run
-        is the movie's frame; the scene dict used for picking is refreshed every 10 frames."""
+        WHY ON THE VTK THREAD. The pipeline builds its own `LiveMovie` (the movie.mp4 and the stills
+        in graphs_data/studio/<name>/); VTK gives one off-screen context per thread, and a second
+        plotter on a second thread died with `std::bad_array_new_length`. So the run is submitted to
+        the one VTK thread, both plotters live there, and the hook drains `_PENDING` -- the page's
+        camera moves, picks and screenshots -- between frames. That is what makes orbit and zoom
+        work DURING generation: every request is answered on the thread that owns the context, at
+        most one frame late.
+
+        What the hook does per tick: counts (cheap), a snapshot every movie stride (so PLAY can
+        replay the run at any camera, the movie's own frames), and a redraw of this view's plotter
+        whenever a request is waiting or a still is due, so the picture the page asks for is the
+        frame being computed."""
         import torch
         if self.RUN.get("running"):
             return {"error": "already running; STOP it first"}
         dev = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
-        n = int(frames or self.sim.n_frames)
-        self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev, started=time.time(), frames_kept=0)
+        n = int(self.sim.n_frames)
+        self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev,
+                        started=time.time(), frames_kept=0, out_dir=None, stopped=False, ms_per_frame=None)
         self.snaps = []
-        # THE RUN IS NOT THE MOVIE. Drawing every frame of a 570k-particle waterfall cost 650 ms a
-        # frame on top of the engine's 55 ms; a generate renders every 8th. Here the picture is
-        # refreshed on a clock (DRAW_INTERVAL seconds), so the engine sets the pace and the page
-        # sees the latest frame; the pick scene is rebuilt at most every SCENE_INTERVAL seconds.
-        # Kept frames for PLAY are strided to SNAPS_MAX and to a memory budget (SNAP_BUDGET bytes,
-        # from the seeded hierarchy's own position columns).
+        if self.panel is not None:
+            self.panel.hist = []; self.panel.n_frames = n; self.frame_shown = None
+        else:
+            # THE OVERLAY'S DENOMINATOR IS THIS RUN'S LENGTH, not the 1 the renderer was built with to draw the seed.
+            self.lm.n_frames = n
+            self.lm.t0 = time.perf_counter()
+        # THE MOVIE'S OWN STRIDES. Kept frames for PLAY are the frames the pipeline's movie keeps
+        # (`plotting.max_frames`, live_movie.py:256), widened only by a memory budget on the kept
+        # positions; the picture is refreshed at the pipeline's stills (`plotting.stills`) and
+        # whenever the page asks.
+        pl = self.sim.plotting or {}
         per_frame = 0
         for lv in self.H.levels.values():
             sch = getattr(lv, "state_schema", None)
@@ -419,64 +510,61 @@ class View:
                     if key in sch:
                         a, b = sch[key]
                         per_frame += int(lv.state.shape[0]) * (b - a) * 4
-        # TWO STRIDES. `live`: how many times the page's picture is refreshed DURING the run (20 by
-        # default: drawing is the cost, and a run is watched, not filmed). `keep`: how many frames
-        # the run keeps for PLAY -- the movie's own rule, every frame up to 300 (live_movie's
-        # max_frames), so a 400-frame run keeps every 2nd, a 2400-frame one every 8th; a memory
-        # budget on the kept positions can widen that stride.
-        keep_n = max(2, int(keep or self.SNAPS_MAX))
-        by_count = max(1, -(-(n + 1) // keep_n))
+        by_count = max(1, -(-n // max(1, int(pl.get("max_frames", 300)))))
         by_mem = max(1, -(-((n + 1) * max(per_frame, 1)) // self.SNAP_BUDGET))
         self._keep_every = max(by_count, by_mem)
-        self._draw_every = max(1, -(-(n + 1) // max(1, int(live or self.LIVE_PICS))))
+        self._draw_every = max(1, -(-n // max(1, int(pl.get("stills", 10)))))
         self.RUN["keep_every"] = self._keep_every
         self.RUN["draw_every"] = self._draw_every
-        self._last_draw = 0.0
         self._last_scene = 0.0
+        from plexus.pipeline import StopRun
 
-        class _Stop(Exception):
-            pass
-
-        def _draw(H, tick, draw, scene):
+        def _on_frame(H, tick):
+            if self.RUN.get("stop"):
+                raise StopRun()
+            now = time.time()
             with LOCK:
                 self.H = H
-                if draw:
-                    self.lm(H, tick)
-                    if getattr(self.lm, "cs", None) is not None and tick == 0:
-                        self.lm._update_cross_section(H)
-                    self._last_draw = time.time()
-                if tick % self._keep_every == 0 or tick == n:
-                    self._snapshot(H)
-                if scene:
+                if self.panel is not None:
+                    if tick % self._keep_every == 0 or tick == n:
+                        self.panel.capture(H, tick)
+                        self.RUN["frames_kept"] = len(self.panel.hist)
+                else:
+                    due = tick == n or tick % self._draw_every == 0
+                    if due or not _PENDING.empty():
+                        self.lm(H, tick)
+                        if getattr(self.lm, "cs", None) is not None and tick == 0:
+                            self.lm._update_cross_section(H)
+                    if tick % self._keep_every == 0 or tick == n:
+                        self._snapshot(H)
+                if tick == n or (now - self._last_scene) >= self.SCENE_INTERVAL:
                     from plexus.gui import bio
                     self.scene = bio.scene_from(H, self.sim, self.spec_path)
                     if self.pick:
                         self._highlight(self.pick)
                     self._last_scene = time.time()
-
-        def _on_frame(H, tick):
-            if self.RUN.get("stop") or tick > n:
-                raise _Stop()
-            now = time.time()
-            draw = tick == n or tick % self._draw_every == 0
-            scene = tick == n or (now - self._last_scene) >= self.SCENE_INTERVAL
-            _vtk(_draw, H, tick, draw, scene)
             self.RUN["frame"] = int(tick)
             self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
             self.RUN["counts"] = self.counts_live(H)
+            _drain()                                                 # the page's camera, between frames
 
         def _go():
-            from plexus import engine
+            _VTK_THREAD["ident"] = threading.get_ident()
+            from plexus import pipeline
             try:
-                engine.run(self.sim, out_path=None, device=dev, on_frame=_on_frame)
-            except _Stop:
-                pass
+                r = pipeline.generate(self.spec_path, device=dev, force=True, describe=False, on_frame=_on_frame)
+                self.RUN["out_dir"] = r.get("data_dir")
+                self.RUN["stopped"] = bool(r.get("stopped"))
+                fm = r.get("frame_ms")
+                if fm is not None and len(fm) > 1:
+                    self.RUN["ms_per_frame"] = float(np.mean(np.asarray(fm)[1:]))
             except Exception as e:                                   # noqa: BLE001
                 self.RUN["error"] = f"{type(e).__name__}: {e}"[:600]
             finally:
                 self.RUN["running"] = False
                 self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
-        threading.Thread(target=_go, daemon=True).start()
+                _drain()
+        _EXEC.submit(_go)
         return {"started": True, "frames": n, "device": dev}
 
     def stop(self) -> dict:
@@ -511,7 +599,7 @@ class View:
         def _c():
             with LOCK:
                 try:
-                    self.lm.close()
+                    (self.panel.close() if self.panel is not None else self.lm.close())
                 except Exception:                                # noqa: BLE001
                     pass
         _vtk(_c)

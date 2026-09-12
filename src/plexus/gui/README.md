@@ -1,44 +1,49 @@
-# plexus.gui — interactive node editor for `spec.yaml`
-
-A Plexus spec *is* a node graph: operators are boxes (typed ports = the state they
-read/write + the set/field they act on), sets and fields are the other node kinds,
-and the `schedule` is the execution rail. This package renders that graph in the
-browser and round-trips edits back to a **validated** `spec.yaml`.
+# plexus.gui -- the one page, and the spec node editor
 
 ```bash
-# from the repo root, with the plexus env
-PYTHONPATH=src python -m plexus.gui                       # browse + pick a spec
-PYTHONPATH=src python -m plexus.gui path/to/spec.yaml     # open a spec directly
-PYTHONPATH=src python -m plexus.gui --port 8765 --no-browser
+PYTHONPATH=src python Plexus_gui.py                  # http://127.0.0.1:8799/?tab=material
+PYTHONPATH=src python Plexus_gui.py --tab neurons    # bio | material | neurons | metabolism
+PYTHONPATH=src python Plexus_gui.py --editor         # the node editor, http://127.0.0.1:8799/editor
 ```
 
-Then open the printed `http://localhost:PORT/` (VS Code forwards the port).
+## The page (`app.py`, `tabs/`)
 
-## What it does
+One page, four tabs. A tab is a FORM that writes a spec the way a person would write it
+(`config/studio/<name>.yaml`, validated by `plexus.schema.load`); everything under the form is
+shared and lives once, in `app.py`:
 
-- **Registry-driven palette** — introspects the codebase operator registry
-  (`plexus.operators`, the 41 canonical operators / 42 implementation classes) and
-  builds one draggable node per operator, with its kind, family, typed signature and
-  per-implementation parameter schema (roles + defaults). No operator list is
-  hard-coded; add an operator to the registry and it appears here.
-- **Full graph editing** — drag operators onto the canvas, rewire `at` / `to` /
-  `from` by dragging ports, reorder the schedule rail, edit sets and their state
-  blocks, tune params in the inspector.
-- **Validated save** — `SAVE` runs the real `plexus.schema.load` validator (the same
-  gatekeeper the engine trusts) and writes ordered YAML. A spec that saves clean is
-  runnable.
-- **mp4 viewer** — if a rendered `movie.mp4` sits next to the spec, it plays in a
-  bottom-right panel (with the `strip.png`/`fig_final.png` poster).
-- Canvas node positions persist to a per-spec `*.gui.json` sidecar (gitignored).
+- **BUILD + SEED** -- the tab's `build_spec(form)`, the validator, the tab's writer (the CFL
+  guard on an MPM spec), then the seeded scene through the movie renderer (`bio_view.py`):
+  orbit, zoom, click to select, visibility per type, the hierarchy.
+- **RUN** -- `plexus.pipeline.generate`, the body of `Plexus_Main.py -o generate`, on the server's
+  VTK thread. Its per-frame hook feeds the page's renderer and answers camera requests between
+  frames, so orbit and zoom work while `movie.mp4` and the stills are written to
+  `graphs_data/studio/<name>/`. The ms/frame shown is the engine's own clock.
+- **PLAY / MOVIE / LIVE** -- the run's kept frames replayed at any camera; the mp4 the run wrote;
+  back to the live view.
+- **YAML** -- the spec text, saved through the same validator. **Claude** -- drives the page
+  through its own routes, primed with the tab's corpus (`corpus.py`).
+- Switching tabs re-initialises (`/api/scene/reset`): run stopped, view dropped, the new tab's
+  default scene built and seeded on load.
 
-## Layout
+Each tab's default form written out IS a reference spec under `config/`, held equal by
+`tests/test_gui_parity.py`:
 
-```
-gui/
-  __main__.py   # `python -m plexus.gui` — starts the server, opens the browser
-  server.py     # stdlib http.server: catalog + spec load/validate/save + media (Range)
-  catalog.py    # registry -> JSON node-palette (signatures, param roles/defaults)
-  static/       # vanilla JS/SVG frontend (index.html / style.css / app.js)
-```
+| tab | reference | dynamics |
+|---|---|---|
+| bio | `config/tissue/spheroid_proteins.yaml` (template) | vertex model, proteins, organelles |
+| material | `config/si_material/si_three_balls.yaml` | MPM bodies in a box (`mpm_ops.py`) |
+| neurons | `config/neural/ctrnn_gui.yaml` | CTRNN assemblies over a synapse edge-set (`neural.py`), Dale-signed E/I; drawn by the circuit panel (`neural_panel.py`: the message on the post x pre matrix, input and rate vectors, output per population, kinograph). OPEN `config/neural/zebrafish_om_285.yaml` (from `tools/zebrafish_to_plexus.py`) for the 285-cell oculomotor pool |
+| metabolism | `config/metabolism/massaction_toy.yaml` | mass action over a stoichiometric edge-set (`metabolism.py`) |
 
-Backend is stdlib-only; the frontend has no build step and no dependencies.
+Routes (`server.py`, a table): `/api/tab/<tab>/build`; `/api/scene/{state, spec, seed, render,
+pick, info, view, run, frames, artefacts, ls, open, counts, save, refine, visible, claude, reset}`;
+`/api/bio/*` are the same handlers under the older name.
+
+## The node editor (`static/`, `catalog.py`)
+
+A spec *is* a node graph: operators are boxes (typed ports = the state they read/write + the
+set/field they act on), sets and fields are the other node kinds, and the `schedule` is the
+execution rail. The editor renders that graph from the operator registry (no operator list is
+hard-coded) and round-trips edits back to a validated `spec.yaml`; node positions persist to a
+per-spec `*.gui.json` sidecar. Unchanged by the page.

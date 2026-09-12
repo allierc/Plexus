@@ -746,6 +746,15 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
         perm = torch.nonzero(lvl.occ > 0, as_tuple=False).flatten()
         perm = perm[torch.argsort(lvl.state[perm, 1])]
         total = int(perm.numel())
+    elif layout == "ordered":
+        # THE i-TH TYPE GOES TO THE i-TH ELEMENT, in declared order, and the reserve stays type 0.
+        # For a set whose elements are individually placed (`start:` lists a centre per body) a
+        # random permutation decouples the material from the position: three balls with `count: 1`
+        # each put the liquid at whichever centre the generator drew. `ordered` is the layout a form
+        # or a hand-written list of bodies means -- "the first body is the red elastic one, at the
+        # first centre" -- and it is opt-in so every existing `fraction:` spec keeps its draw.
+        perm = torch.nonzero(lvl.occ > 0, as_tuple=False).flatten()
+        total = int(perm.numel())
     else:
         perm = torch.randperm(lvl.n, generator=H.rng, device=device)
         total = lvl.n
@@ -784,8 +793,14 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
         # mixed the tail's type-0 padding into the live rows, so a cell declared with one nucleus
         # and thirty mitochondria woke up with sixteen nuclei.
         live_n = min(int(pat.numel()), per)
-        order = torch.argsort(torch.rand(nblk, live_n, generator=H.rng, device=device), dim=1)
-        head = pat[:live_n][order]                                        # [nblk, live_n]
+        if layout == "ordered":
+            # THE DECLARED ORDER INSIDE EVERY BLOCK: type i's `count` rows first, then type i+1's.
+            # A Dale-signed circuit reads its sign vector off this layout, so it must be the one the
+            # spec wrote and not a draw.
+            head = pat[:live_n][None, :].expand(nblk, live_n)
+        else:
+            order = torch.argsort(torch.rand(nblk, live_n, generator=H.rng, device=device), dim=1)
+            head = pat[:live_n][order]                                    # [nblk, live_n]
         tail = torch.zeros(nblk, per - live_n, dtype=torch.long, device=device)
         node_type = torch.cat([head, tail], 1).reshape(-1)
     else:
