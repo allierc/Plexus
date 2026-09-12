@@ -141,7 +141,7 @@ def size_ref(m):
     declared `v0_from: polyhedron` and one has been cached, the seed-time wedge median otherwise.
     Before c671fb31 every reader but `cell_divide` read the wedge one; the September 7 working
     points (cyc4_sizer, apop2_ks*) were made that way and are reproduced only that way."""
-    if str(m.get("v0_from", "wedge")).lower() == "polyhedron" and "v_ref_poly" in m:
+    if "v_ref_poly" in m:
         return float(m["v_ref_poly"])
     return float(m.get("v_ref", 1.0))
 
@@ -194,11 +194,18 @@ def cell_size(lvl, m, nF, pos_np=None, H=None, at="vertex"):
     _Nv = int(m["Nv"])
     P = (torch.as_tensor(pos_np, dtype=torch.float32)[:_Nv] if pos_np is not None
          else lvl.get("pos")[:_Nv].detach().to(torch.float32).cpu())
-    # THE SEED'S DECLARED CONVENTION DECIDES, not the presence of `sep`. c671fb31 made every reader
-    # take the polyhedron whenever the set carried a separation, which re-timed the size-triggered
-    # rules of every apico-basal working point (cyc4_sizer: 620 cells at frame 150 against the
-    # archive's 318; apop2_ks0p1: death 50 frames late). Polyhedron only when the spec says so.
-    if _s is not None and str(m.get("v0_from", "wedge")).lower() == "polyhedron":
+    # THE GEOMETRY DECIDES: a set that carries a separation is a set of polyhedra, and every size
+    # reader takes the polyhedron volume -- the volume `cell_mechanics[apicobasal]` defends. This
+    # was the c671fb31 rule, withdrawn because it re-timed the size-triggered working points, and
+    # it is back for a reason measured on `divide_growing_ball` (R2 of
+    # notes/size_cycle/SIZE_CYCLE_PLAN.md, finding 13): with `cell_divide` reading the WEDGE the
+    # shell crumples from frame 600 (thickness CV 0.67 at 801, `tools/spheroid_gauge.py`), with
+    # the polyhedron it is a spheroid for the whole run. A cell whose thickness runs away divides
+    # when its polyhedron doubles, and its daughters relax; the wedge cannot see thickness, so
+    # under it the thick cells persist and the spread compounds. The seed's TARGETS are untouched
+    # by this -- `v0_from` is a target convention, and the polyhedron target was what crumpled the
+    # mechanics (finding 8); this is about what the rules READ.
+    if _s is not None:
         _s = _s.detach() if hasattr(_s, "detach") else torch.as_tensor(_s)
         if int(_s.shape[0]) >= _Nv:
             vp, _, _, _ = apicobasal_geometry_3d(P.cpu(), _s[:_Nv].to(torch.float32).cpu(),
@@ -2035,17 +2042,16 @@ class Divide3D(Structural):
         # cvd2_adder_tension, slope -1.05 of added volume on birth volume where an adder is 0,
         # while the daughters the septum actually made varied by CV 0.27.
         #
-        # TWO WRITES, IN TWO CURRENCIES. The mother's TARGETS (`V0f`, `A0`) are split between the
-        # daughters in proportion to the volumes the septum actually gave them, so their sum is
-        # conserved and the asymmetry the cut produced is the asymmetry the mechanics holds. The
-        # targets are NOT set to the realised volumes themselves: under `cell_mechanics[apicobasal]`
-        # a cell rests at `mono_k * V0f + mono_delta`, an affine map with an additive rest offset,
-        # and writing an actual volume into a target inflated every daughter by that offset --
-        # measured, the tissue's total volume x2.25 in 60 frames with no growth to speak of.
-        # `Vbirth` is the ACTUAL volume, in the trigger's convention: provisionally the piece the
+        # `Vbirth` IS THE ACTUAL VOLUME, in `cell_size`'s convention: provisionally the piece the
         # septum made, re-read at this operator's next call (see the top of forward) once the
-        # mechanics has answered the cut. A flat sheet whose wedge volumes are zero keeps the even
-        # split: there is no volume to measure.
+        # mechanics has answered the cut. THE TARGETS STAY THE MOTHER'S HALVES. Splitting them in
+        # proportion to the septum's pieces was tried (R1-R2) and hands a small piece a small
+        # target with the same footprint: its thickness collapses, the spread grows with every
+        # division, and `divide_growing_ball` -- a spheroid for 801 frames on the branch base --
+        # crumpled from frame 500 (thickness CV 0.67, `tools/spheroid_gauge.py`). The even split
+        # is what keeps the shell a shell; the size rules read the measured `Vbirth`, not the
+        # target, so nothing they need is lost. A flat sheet whose wedge volumes are zero has no
+        # volume to measure and keeps the provisional halves.
         if daughter_mothers:
             vm = self._realised_volumes(lvl, m, nF2)
             if vm is not None and float(np.median(vm)) > 1e-12:
@@ -2054,16 +2060,7 @@ class Divide3D(Structural):
                     ja, jb = pos_of.get(int(mo)), pos_of.get(nF + i)
                     if ja is None or jb is None:
                         continue
-                    va, vb_ = max(float(vm[ja]), 1e-9), max(float(vm[jb]), 1e-9)
-                    pa = va / (va + vb_)
-                    v0m, a0m = V0fa[ja] + V0fa[jb], A0a[ja] + A0a[jb]     # the mother's, re-summed
-                    V0fa[ja], V0fa[jb] = v0m * pa, v0m * (1.0 - pa)
-                    A0a[ja], A0a[jb] = a0m * pa, a0m * (1.0 - pa)
-                    Vba[ja], Vba[jb] = va, vb_
-                P0a = self.p0 * np.sqrt(np.maximum(A0a, 1e-9))
-                m["A0"] = torch.as_tensor(A0a, dtype=dt, device=dev)
-                m["P0"] = torch.as_tensor(P0a, dtype=dt, device=dev)
-                m["V0f"] = torch.as_tensor(V0fa, dtype=dt, device=dev)
+                    Vba[ja], Vba[jb] = max(float(vm[ja]), 1e-9), max(float(vm[jb]), 1e-9)
         if self.local_relax > 0 and "mech" in m and Nv2 > Nv:    # heal the fresh caps in place at birth
             esT = m["E_srce"]; etT = m["E_trgt"]; efT = m["E_face"]
             newv = torch.zeros(Nv2, dtype=torch.bool, device=dev); newv[Nv:Nv2] = True   # appended septum verts

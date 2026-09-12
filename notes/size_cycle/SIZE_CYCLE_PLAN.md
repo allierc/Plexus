@@ -77,6 +77,38 @@ on any replacement run):
    rung runs at the working point's rate -- one doubling per 400 frames -- with the cycle clock
    scaled to it (183/133/67/17) and 1601 frames per run.
 
+10. **R1's proportional target split is what crumples the shell after division.** Bisected with
+    `tools/spheroid_gauge.py` on `divide_growing_ball`, 801 frames, deterministic
+    (`PLEXUS_STRICT_DETERMINISM=1`): the archive's own commit (0dc401f1), Sep 8, Sep 9, Sep 10,
+    the warp-gradient commit (51b8d9f1) and the branch base (7659a887) are all spheroids with
+    the same numbers (thickness CV 0.093, thinnest/median 0.67); HEAD after R1 crumples from
+    frame 500 (CV 0.67). Giving each daughter a target in proportion to its septum piece hands
+    a small piece a small target with the same footprint, its thickness collapses, and the
+    spread compounds with every division. Fixed: the targets are the mother's halves again;
+    `Vbirth` alone is measured (the piece at the cut, re-read at the next call). R2's
+    "restart" findings 8-9 stand, but the rate was not the driver of the creep: this was.
+11. **The non-deterministic warp path crumples the same commit in one run and not another.**
+    7983f784 and 7659a887 crumpled from frame 400-600 without `PLEXUS_STRICT_DETERMINISM`
+    (through `regression_lib.run_cut`) and were clean with it; 51b8d9f1 without it was clean
+    once. The apico-basal mechanics sits close enough to an instability that atomics order
+    decides. The rung runs deterministic (the job scripts set the flag); the fixed-order
+    `wp.atomic_add` path is a finding for R5, not this ladder.
+12. **A G1 exit parked exactly on the boundary froze the cycle.** Float32 rounding put `p` back
+    under `cut[G1]` next frame; all four R2 cycle arms sat at 304 cells with every cell "in S".
+    Fixed (f364c6ea): the exit lands `1e-5` past the boundary.
+
+13. **The rules must read the polyhedron, and it was R2's wedge trigger that crumpled the shell,
+    not R1's split.** Bisected commit by commit (deterministic, 801 frames): R1 and R1c are
+    spheroids (thickness CV 0.12); R2 -- `cell_divide` routed through `cell_size`, which read
+    the WEDGE for a spec without `v0_from` -- crumples from frame 600; restoring the even target
+    split alone did not help. With every reader on the polyhedron whenever a separation exists,
+    `divide_growing_ball` is a spheroid again (CV 0.090, the archive's number) and so is
+    `size_sizer` over 1001 frames (0.102). Finding 10 is corrected: the proportional split was
+    withdrawn anyway (targets are the mother's halves; `Vbirth` alone is measured), but the
+    driver was the trigger's volume. Physically: a cell whose thickness runs away doubles its
+    polyhedron and divides; the wedge cannot see thickness, so thick cells persist and the
+    spread compounds.
+
 ## 1. What this branch has already done
 
 - Withdrawn: 36 specs (`cv_*`, `cvd_*`, `cvd2_*`, `cyc4_*`, `cycle_phases`), their 35 archives,
@@ -240,7 +272,14 @@ the G1 cap, the settle window), all convention-independent.
 **R2 (archives `log/size_cycle/R2`).** Restart on `divide_growing_ball`'s conventions: no
 `v0_from`, `h0 0.88`, rate 0.000578, `ref_frame 60`, 1601 frames; one reader (`cell_size` in
 `cell_divide` and `cell_grow[sizer]`, the private polyhedron branch gone); `tools/spheroid_gauge.py`
-must say SPHEROID on every arm before its `size_report` row counts. Scored below when landed.
+must say SPHEROID on every arm before its `size_report` row counts. Landed and gauged: every
+dividing arm CRUMPLED (thickness CV past 0.15 between frames 350 and 1200; `size_sizer` 12 %
+inverted cells by 1601), the four cycle arms frozen at 304 cells (finding 12). Findings 10-12
+came out of it; not scored.
+
+**R2b (archives `log/size_cycle/R2b`).** R2 with every size reader on the polyhedron when a
+separation exists (finding 13), the even target split (finding 10) and the G1 boundary fix
+(finding 12). Gauge first, then score.
 
 ## 4. The ladder
 
