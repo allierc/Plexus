@@ -1,0 +1,601 @@
+general:
+  name: si_multimaterial_27
+  seed: 1
+  n_frames: 800
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 27
+    start:
+    - - 0.16670000000000001
+      - 0.23
+      - 0.16670000000000001
+    - - 0.25
+      - 0.23
+      - 0.16670000000000001
+    - - 0.33330000000000004
+      - 0.23
+      - 0.16670000000000001
+    - - 0.16670000000000001
+      - 0.23
+      - 0.25
+    - - 0.25
+      - 0.23
+      - 0.25
+    - - 0.33330000000000004
+      - 0.23
+      - 0.25
+    - - 0.16670000000000001
+      - 0.23
+      - 0.33330000000000004
+    - - 0.25
+      - 0.23
+      - 0.33330000000000004
+    - - 0.33330000000000004
+      - 0.23
+      - 0.33330000000000004
+    - - 0.16670000000000001
+      - 0.3133
+      - 0.16670000000000001
+    - - 0.25
+      - 0.3133
+      - 0.16670000000000001
+    - - 0.33330000000000004
+      - 0.3133
+      - 0.16670000000000001
+    - - 0.16670000000000001
+      - 0.3133
+      - 0.25
+    - - 0.25
+      - 0.3133
+      - 0.25
+    - - 0.33330000000000004
+      - 0.3133
+      - 0.25
+    - - 0.16670000000000001
+      - 0.3133
+      - 0.33330000000000004
+    - - 0.25
+      - 0.3133
+      - 0.33330000000000004
+    - - 0.33330000000000004
+      - 0.3133
+      - 0.33330000000000004
+    - - 0.16670000000000001
+      - 0.39670000000000005
+      - 0.16670000000000001
+    - - 0.25
+      - 0.39670000000000005
+      - 0.16670000000000001
+    - - 0.33330000000000004
+      - 0.39670000000000005
+      - 0.16670000000000001
+    - - 0.16670000000000001
+      - 0.39670000000000005
+      - 0.25
+    - - 0.25
+      - 0.39670000000000005
+      - 0.25
+    - - 0.33330000000000004
+      - 0.39670000000000005
+      - 0.25
+    - - 0.16670000000000001
+      - 0.39670000000000005
+      - 0.33330000000000004
+    - - 0.25
+      - 0.39670000000000005
+      - 0.33330000000000004
+    - - 0.33330000000000004
+      - 0.39670000000000005
+      - 0.33330000000000004
+    type_layout: ordered
+    types:
+      c00:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        block:
+        - 0.1367
+        - 0.2
+        - 0.1367
+        - 0.1967
+        - 0.26
+        - 0.1967
+      c01:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        block:
+        - 0.22
+        - 0.2
+        - 0.1367
+        - 0.28
+        - 0.26
+        - 0.1967
+      c02:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        block:
+        - 0.3033
+        - 0.2
+        - 0.1367
+        - 0.3633
+        - 0.26
+        - 0.1967
+      c03:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        block:
+        - 0.1367
+        - 0.2
+        - 0.22
+        - 0.1967
+        - 0.26
+        - 0.28
+      c04:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        block:
+        - 0.22
+        - 0.2
+        - 0.22
+        - 0.28
+        - 0.26
+        - 0.28
+      c05:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        block:
+        - 0.3033
+        - 0.2
+        - 0.22
+        - 0.3633
+        - 0.26
+        - 0.28
+      c06:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        block:
+        - 0.1367
+        - 0.2
+        - 0.3033
+        - 0.1967
+        - 0.26
+        - 0.3633
+      c07:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        block:
+        - 0.22
+        - 0.2
+        - 0.3033
+        - 0.28
+        - 0.26
+        - 0.3633
+      c08:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        block:
+        - 0.3033
+        - 0.2
+        - 0.3033
+        - 0.3633
+        - 0.26
+        - 0.3633
+      c09:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        block:
+        - 0.1367
+        - 0.2833
+        - 0.1367
+        - 0.1967
+        - 0.3433
+        - 0.1967
+      c10:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        block:
+        - 0.22
+        - 0.2833
+        - 0.1367
+        - 0.28
+        - 0.3433
+        - 0.1967
+      c11:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        block:
+        - 0.3033
+        - 0.2833
+        - 0.1367
+        - 0.3633
+        - 0.3433
+        - 0.1967
+      c12:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        block:
+        - 0.1367
+        - 0.2833
+        - 0.22
+        - 0.1967
+        - 0.3433
+        - 0.28
+      c13:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        block:
+        - 0.22
+        - 0.2833
+        - 0.22
+        - 0.28
+        - 0.3433
+        - 0.28
+      c14:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        block:
+        - 0.3033
+        - 0.2833
+        - 0.22
+        - 0.3633
+        - 0.3433
+        - 0.28
+      c15:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        block:
+        - 0.1367
+        - 0.2833
+        - 0.3033
+        - 0.1967
+        - 0.3433
+        - 0.3633
+      c16:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        block:
+        - 0.22
+        - 0.2833
+        - 0.3033
+        - 0.28
+        - 0.3433
+        - 0.3633
+      c17:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        block:
+        - 0.3033
+        - 0.2833
+        - 0.3033
+        - 0.3633
+        - 0.3433
+        - 0.3633
+      c18:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        block:
+        - 0.1367
+        - 0.3667
+        - 0.1367
+        - 0.1967
+        - 0.4267
+        - 0.1967
+      c19:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        block:
+        - 0.22
+        - 0.3667
+        - 0.1367
+        - 0.28
+        - 0.4267
+        - 0.1967
+      c20:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        block:
+        - 0.3033
+        - 0.3667
+        - 0.1367
+        - 0.3633
+        - 0.4267
+        - 0.1967
+      c21:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        block:
+        - 0.1367
+        - 0.3667
+        - 0.22
+        - 0.1967
+        - 0.4267
+        - 0.28
+      c22:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        block:
+        - 0.22
+        - 0.3667
+        - 0.22
+        - 0.28
+        - 0.4267
+        - 0.28
+      c23:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        block:
+        - 0.3033
+        - 0.3667
+        - 0.22
+        - 0.3633
+        - 0.4267
+        - 0.28
+      c24:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        block:
+        - 0.1367
+        - 0.3667
+        - 0.3033
+        - 0.1967
+        - 0.4267
+        - 0.3633
+      c25:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        block:
+        - 0.22
+        - 0.3667
+        - 0.3033
+        - 0.28
+        - 0.4267
+        - 0.3633
+      c26:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        block:
+        - 0.3033
+        - 0.3667
+        - 0.3033
+        - 0.3633
+        - 0.4267
+        - 0.3633
+  mpm_particle:
+    parent: cell
+    per_parent: 1331
+    density: 1000.0
+    radius: 0.03
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  implementation: warp
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.5
+  wall_friction: 0.4
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  implementation: warp
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+schedule:
+- gravity
+- substep_dt: 4.385965e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  max_frames: 400
+  stills: 10
+  keep_stills: true
+  splat_res: 600
+  box_frame: true
+  hide_sets:
+  - cell
+  colors:
+    c00:
+    - 0.3
+    - 0.55
+    - 1.0
+    c01:
+    - 0.95
+    - 0.25
+    - 0.2
+    c02:
+    - 0.95
+    - 0.95
+    - 0.95
+    c03:
+    - 0.3
+    - 0.55
+    - 1.0
+    c04:
+    - 0.95
+    - 0.25
+    - 0.2
+    c05:
+    - 0.95
+    - 0.95
+    - 0.95
+    c06:
+    - 0.3
+    - 0.55
+    - 1.0
+    c07:
+    - 0.95
+    - 0.25
+    - 0.2
+    c08:
+    - 0.95
+    - 0.95
+    - 0.95
+    c09:
+    - 0.3
+    - 0.55
+    - 1.0
+    c10:
+    - 0.95
+    - 0.25
+    - 0.2
+    c11:
+    - 0.95
+    - 0.95
+    - 0.95
+    c12:
+    - 0.3
+    - 0.55
+    - 1.0
+    c13:
+    - 0.95
+    - 0.25
+    - 0.2
+    c14:
+    - 0.95
+    - 0.95
+    - 0.95
+    c15:
+    - 0.3
+    - 0.55
+    - 1.0
+    c16:
+    - 0.95
+    - 0.25
+    - 0.2
+    c17:
+    - 0.95
+    - 0.95
+    - 0.95
+    c18:
+    - 0.3
+    - 0.55
+    - 1.0
+    c19:
+    - 0.95
+    - 0.25
+    - 0.2
+    c20:
+    - 0.95
+    - 0.95
+    - 0.95
+    c21:
+    - 0.3
+    - 0.55
+    - 1.0
+    c22:
+    - 0.95
+    - 0.25
+    - 0.2
+    c23:
+    - 0.95
+    - 0.95
+    - 0.95
+    c24:
+    - 0.3
+    - 0.55
+    - 1.0
+    c25:
+    - 0.95
+    - 0.25
+    - 0.2
+    c26:
+    - 0.95
+    - 0.95
+    - 0.95
+  slow_motion: 4
+  render_3d: dots
+  dot_size: 1.0

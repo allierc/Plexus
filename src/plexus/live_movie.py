@@ -3429,8 +3429,13 @@ class LiveMovie:
         rng = self.style.get("color_range")
         if rng and len(rng) == 2:
             lo, hi = float(rng[0]), float(rng[1])
-        else:                                                # settled ONCE, on the first frame
-            if getattr(self, "_frng", None) is None:
+        else:                                                # settled ONCE, on the first frame THAT HAS A FIELD
+            # Frame 0 of a run at rest has no strain, no pressure and no speed anywhere, and a range
+            # settled there is [0, 0] -- every later frame then clamps to the top colour. The range
+            # is taken from the first frame whose 2nd and 98th percentiles differ, and kept from
+            # then on (a seeded view coloured by a field is that case exactly).
+            _fr = getattr(self, "_frng", None)
+            if _fr is None or not (_fr[1] > _fr[0]):
                 q = torch.quantile(val.float()[:: max(1, val.numel() // 200_000)],
                                    torch.tensor([0.02, 0.98], device=val.device))
                 self._frng = (float(q[0]), float(q[1]))

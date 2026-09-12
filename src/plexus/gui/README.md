@@ -32,7 +32,7 @@ Each tab's default form written out IS a reference spec under `config/`, held eq
 | tab | reference | dynamics |
 |---|---|---|
 | bio | `config/tissue/spheroid_proteins.yaml` (template) | vertex model, proteins, organelles |
-| material | `config/si_material/si_three_balls.yaml` | MPM bodies in a box (`mpm_ops.py`) |
+| material | `config/si_material/si_multimaterial_27.yaml` (the twin of MPM_pytorch's multimaterial_1_3D: 27 cubes, liquid / elastic / snow) | MPM bodies in a box (`mpm_ops.py`); render (dots x3, surface, surface specular, glassy), light and colour (particles, deformation, stress, velocities) menus rewrite the spec's plotting and re-seed, keeping the last run's frames for PLAY |
 | neurons | `config/neural/ctrnn_gui.yaml` | CTRNN assemblies over a synapse edge-set (`neural.py`), Dale-signed E/I; drawn by the circuit panel (`neural_panel.py`: the message on the post x pre matrix, input and rate vectors, output per population, kinograph). OPEN `config/neural/zebrafish_om_285.yaml` (from `tools/zebrafish_to_plexus.py`) for the 285-cell oculomotor pool |
 | metabolism | `config/metabolism/massaction_toy.yaml` | mass action over a stoichiometric edge-set (`metabolism.py`) |
 

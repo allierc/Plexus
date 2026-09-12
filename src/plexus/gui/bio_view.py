@@ -287,11 +287,13 @@ class View:
             if "pos" not in sch:
                 continue
             e = {}
-            for key in ("pos", "sep"):
+            # `vel` AND THE SOLVER BUFFERS TOO (F, C, Jp), so a frame replayed under a field colour
+            # (`speed`, `deformation`, `pressure`) is that frame's field and not the last one's.
+            for key in ("pos", "sep", "vel"):
                 if key in sch:
                     a, b = sch[key]
                     e[key] = lv.state[:, a:b].detach().cpu().clone()
-            for key in ("occ", "node_type", "parent"):
+            for key in ("occ", "node_type", "parent", "F", "C", "Jp"):
                 v = getattr(lv, key, None)
                 if v is not None and torch.is_tensor(v):
                     e[key] = v.detach().cpu().clone()
@@ -323,11 +325,11 @@ class View:
                     continue
                 lv = H.level(name)
                 dev = lv.state.device
-                for key in ("pos", "sep"):
+                for key in ("pos", "sep", "vel"):
                     if key in e and key in lv.state_schema:
                         a, b = lv.state_schema[key]
                         lv.state[:, a:b] = e[key].to(dev)
-                for key in ("occ", "node_type", "parent"):
+                for key in ("occ", "node_type", "parent", "F", "C", "Jp"):
                     v = getattr(lv, key, None)
                     if key in e and v is not None and v.shape == e[key].shape:
                         v.copy_(e[key].to(dev))
@@ -512,10 +514,14 @@ class View:
         for lv in self.H.levels.values():
             sch = getattr(lv, "state_schema", None)
             if sch is not None and "pos" in sch:
-                for key in ("pos", "sep"):
+                for key in ("pos", "sep", "vel"):
                     if key in sch:
                         a, b = sch[key]
                         per_frame += int(lv.state.shape[0]) * (b - a) * 4
+                for key in ("F", "C", "Jp"):                    # the solver buffers ride along
+                    v = getattr(lv, key, None)
+                    if v is not None and torch.is_tensor(v):
+                        per_frame += int(v.numel()) * 4
         by_count = max(1, -(-n // max(1, int(pl.get("max_frames", 300)))))
         by_mem = max(1, -(-((n + 1) * max(per_frame, 1)) // self.SNAP_BUDGET))
         self._keep_every = max(by_count, by_mem)
