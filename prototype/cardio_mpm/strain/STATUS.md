@@ -532,3 +532,23 @@ happens in the first fifth of the run; the last half is worth 0.01.
 Timing: each three-beat clip is 8 s (21 fps), against the reference `cardio.mp4` which plays the
 whole recording in 4.8 s. `--seconds` on the three movie scripts sets the frame rate from the frame
 count; `render_progress.sh` uses it for the per-beat clips and then re-times the concatenation.
+
+### The relaxation difference (2026-09-11), measured without the model
+
+Cedric read panel f of fig5 correctly: the two activation curves are NOT the same, and the
+difference is in the FALL. Straight off the recordings, averaged over each sheet's beats, no model
+involved:
+
+| | healthy | HCM |
+|---|---|---|
+| contraction, 10% → peak | 0.29 s | 0.30 s |
+| time above half-peak | 0.60 s | 0.70 s |
+| relaxation, peak → 50% | 0.42 s | 0.49 s |
+| relaxation, peak → 10% | 0.67 s | **0.81 s** |
+| beat period | 2.11 s | 2.34 s |
+
+The rise is identical; relaxation is 17–21% slower and the sheet stays contracted longer. So the
+healthy/HCM difference has two parts: **per cell**, a 1.7× larger active shortening with the same
+transverse thickening (so the HCM cell loses area where the healthy one conserves it); **for the
+sheet**, a slower relaxation at an unchanged rate of contraction. The earlier summary line "the
+same excitation, different mechanics" was wrong on the first half and is withdrawn.

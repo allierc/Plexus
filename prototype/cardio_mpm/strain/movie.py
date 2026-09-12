@@ -112,10 +112,10 @@ def main():
     ax = ax.ravel()
     imA = ax[0].imshow(cell_map(sr[0]), cmap="Greens", vmin=0, vmax=vmax, origin="lower", interpolation="nearest")
     imB = ax[1].imshow(cell_map(sm[0]), cmap="Greens", vmin=0, vmax=vmax, origin="lower", interpolation="nearest")
-    for a, s, name in ((ax[0], "A", "recording"), (ax[1], "B", "model, fitted on beat 3")):
+    for a, s, name in ((ax[0], "a", "recording"), (ax[1], "b", "model, fitted on beat 3")):
         a.set_xticks([]); a.set_yticks([])
         a.set_xlabel(f"{name}: shortening strain per cell")
-        a.text(-0.02, 1.01, s, transform=a.transAxes, fontsize=13, fontweight="bold", va="bottom", ha="right")
+        a.text(-0.02, 1.01, s, transform=a.transAxes, fontsize=13, va="bottom", ha="right")
     cb = fig.colorbar(imB, ax=ax[1], fraction=0.04, pad=0.02); cb.set_label("shortening strain (dimensionless)")
     a = ax[2]
     qr = a.quiver(ref_nodes[sel, 0], ref_nodes[sel, 1], disp_rec[0, sel, 0], disp_rec[0, sel, 1], color=GREEN,
@@ -126,7 +126,7 @@ def main():
     a.set_xticks([]); a.set_yticks([])
     a.set_xlabel(f"displacement from rest of one tracking node in {args.stride} per axis, sheet mean removed, "
                  f"drawn x{args.amplify:g}\n(green = recording, white = model; the outer band is prescribed from the recording)")
-    a.text(-0.02, 1.01, "C", transform=a.transAxes, fontsize=13, fontweight="bold", va="bottom", ha="right")
+    a.text(-0.02, 1.01, "c", transform=a.transAxes, fontsize=13, va="bottom", ha="right")
     a = ax[3]
     a.plot(t_s, sr.mean(1), color=GREEN, lw=2, label="recording")
     a.plot(t_s, sm.mean(1), color=WHITE, lw=2, label="model")
@@ -136,7 +136,7 @@ def main():
                  f"{' -- held out' if args.beat != 3 else ' -- the fit beat'}")
     a.set_ylabel("shortening strain, mean over 472 cells\n(band = recording's 25-75% across cells)")
     a.legend(loc="upper right", fontsize=9)
-    a.text(-0.02, 1.01, "D", transform=a.transAxes, fontsize=13, fontweight="bold", va="bottom", ha="right")
+    a.text(-0.02, 1.01, "d", transform=a.transAxes, fontsize=13, va="bottom", ha="right")
     a.text(0.99, 0.02, f"per-cell strain maps, whole window, {int(inter.sum())} interior cells: R$^2$ = {r2A:.2f}", transform=a.transAxes,
            ha="right", va="bottom", fontsize=9)
     frame_txt = fig.text(0.5, 0.965, "", ha="center", fontsize=11)

@@ -43,24 +43,23 @@ for a, S, col, name in ((ax[0, 0], H, BLUE, "healthy"), (ax[0, 1], D, RED, "HCM"
     a.add_collection(LineCollection(np.stack([c - d, c + d], 1), colors=col, linewidths=1.6))
     a.scatter(S["cen"][~m, 0], S["cen"][~m, 1], s=4, c=GREY, lw=0)
     a.set_xlim(0.14, 0.87); a.set_ylim(0.14, 0.87); a.set_aspect("equal"); a.set_xticks([]); a.set_yticks([])
-    a.set_xlabel(f"{name}: fitted fibre axis per cell, length ~ g\n(grey dots = band cells, not fitted)\n"
-                 f"global axis order {S['order']:.2f}  (0 = random, 1 = all parallel)")
+    a.set_xlabel(f"{name}: fibre axis, length ~ g\naxis order {S['order']:.2f}")
 a = ax[1, 0]
 bins = np.linspace(0, 180, 25)
 for S, col, name in ((H, BLUE, "healthy"), (D, RED, "HCM")):
     a.hist(np.degrees(S["phi"][S["inter"]] % np.pi), bins, histtype="step", lw=2, color=col, density=True,
            label=f"{name} ({int(S['inter'].sum())} cells)")
-a.set_xlabel("fitted fibre axis angle (degrees, mod 180; 0 = image x axis)"); a.set_ylabel("density over interior cells")
+a.set_xlabel("axis angle (deg, mod 180)"); a.set_ylabel("density")
 a.legend(loc="upper right", fontsize=9)
 a = ax[1, 1]
 bins = np.linspace(0, 1, 21)
 for S, col, name in ((H, BLUE, "healthy"), (D, RED, "HCM")):
     v = S["local"][S["inter"]]; v = v[np.isfinite(v)]
     a.hist(v, bins, histtype="step", lw=2, color=col, density=True, label=f"{name}, median {np.median(v):.2f}")
-a.set_xlabel("local alignment of a cell's axis with its neighbours'\n(within ~3 cell radii; 0 = they point anywhere, 1 = all parallel)")
-a.set_ylabel("density over interior cells"); a.legend(loc="upper left", fontsize=9)
-for a, s in zip(ax.ravel(), "ABCD"):
-    a.text(-0.02, 1.01, s, transform=a.transAxes, fontsize=13, fontweight="bold", va="bottom", ha="right")
+a.set_xlabel("local alignment with neighbours\n(0 = random, 1 = parallel)")
+a.set_ylabel("density"); a.legend(loc="upper left", fontsize=9)
+for a, s in zip(ax.ravel(), "abcd"):
+    a.text(-0.02, 1.01, s, transform=a.transAxes, fontsize=13, va="bottom", ha="right")
 fig.savefig(os.path.join(HERE, "out", "figures", "fig6_alignment.png"), dpi=130, bbox_inches="tight")
 print("global order healthy %.2f HCM %.2f; local median healthy %.2f HCM %.2f" % (
     H["order"], D["order"], np.nanmedian(H["local"][H["inter"]]), np.nanmedian(D["local"][D["inter"]])))
