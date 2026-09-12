@@ -409,7 +409,13 @@ arm under each rung's mechanics, 1601 frames, so the story can be watched side b
 | `ms3_prism_shell` | K_R 0, kappa_h 0.2 (R3d) | a spheroid of prisms to frame 1500; trapezoids 0.04-0.08 at the end, thickness CV 0.09, thinnest 0.79 |
 | `ms4_round_prism_shell` | K_R 0.1, kappa_h 0.2 | round early (asphericity 0.008) but the light pin squeezes the grown shell: trapezoids 0.76 and thickness CV 0.23 by the end |
 
-`ms3` is the working point: no pin, the thickness field stiff.
+| `ms5_two_channel` | ms3 + growth-rate control and a G1 checkpoint together | SPHEROID for the whole run; trapezoids 0.003, thickness CV 0.074 -- the tightest arm of the ladder (Kafri 2013, Cadart 2018) |
+| `ms6_apoptosis` | ms3 + `cell_die[small]` | SPHEROID to 1600; 29 deaths, each shrinking to three neighbours and extruding |
+| `ms6b_apoptosis_noT1` | the same with T1 flips off | trapezoids 0.29 and asphericity 0.10 by the end, and NOT ONE cell removed: finding 19 in one movie |
+| `ms7_cycle_adder` | ms3 + the adder stated on the cycle (R4c) | SPHEROID; the "one when" form of the same rule |
+
+`ms3` is the working point: no pin, the thickness field stiff. `ms1` -> `ms3` is the mechanics
+story, `ms3` -> `ms7` the rules story, `ms6`/`ms6b` the topology one.
 
 **R4a (3a7db6f5).** `cell_id` / `parent_id` on the cell set; `size_report` reads lineage off them
 (identical numbers to the age-based reading on a 700-frame cut: 83 cycles, slope -0.93).
