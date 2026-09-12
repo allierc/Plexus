@@ -54,6 +54,10 @@ sets:
         record: false
       inhib_frac:
         width: 1
+      cell_id:
+        width: 1
+      parent_id:
+        width: 1
   vertex:
     n: 25584
     mesh: half_edge
@@ -179,8 +183,6 @@ plotting:
     ticks: 4
   scale_bar_corner: right_face
   scale_bar_lift: -0.07
-
-# --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
     description: A spherical cluster of cells grows and expands within a large cubic domain over time.

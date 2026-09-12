@@ -70,6 +70,10 @@ sets:
       cyc_vprev:
         width: 1
         record: false
+      cell_id:
+        width: 1
+      parent_id:
+        width: 1
   vertex:
     n: 25584
     mesh: half_edge
@@ -219,8 +223,6 @@ plotting:
   - '#e8b024'
   - '#e03b2f'
   mesh_mark_division: false
-
-# --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
     description: A spherical cluster of particles grows in size and complexity as the simulation progresses.
@@ -228,7 +230,7 @@ descriptions:
       internal volume of the cluster remains relatively stable despite the increase in cell count. The
       percentage of different phases within the cluster fluctuates slightly but maintains a consistent
       overall distribution.
-    objects: The primary object is a large spherical cluster composed of numerous smaller, interconnected
-      cells. These cells are colored in shades of blue, yellow, and green, representing different phases.
-      The cluster is situated in the center of a large, transparent 500 µm cube. A small circular inset
-      in the bottom left corner shows a cross-sectional view of the cluster's internal structure.
+    objects: "The primary object is a large spherical cluster composed of numerous smaller, interconnected\
+      \ cells. These cells are colored in shades of blue, yellow, and green, representing different phases.\
+      \ The cluster is situated in the center of a large, transparent 500 \xB5m cube. A small circular\
+      \ inset in the bottom left corner shows a cross-sectional view of the cluster's internal structure."

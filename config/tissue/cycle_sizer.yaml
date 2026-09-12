@@ -70,6 +70,10 @@ sets:
       cyc_vprev:
         width: 1
         record: false
+      cell_id:
+        width: 1
+      parent_id:
+        width: 1
   vertex:
     n: 25584
     mesh: half_edge
@@ -216,8 +220,6 @@ plotting:
   - '#e8b024'
   - '#e03b2f'
   mesh_mark_division: false
-
-# --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
     description: A spherical cluster of particles grows and becomes increasingly dense within a large
