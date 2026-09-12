@@ -63,7 +63,10 @@ def test_cli_and_page_share_one_pipeline():
     calls = {n.func.id for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
     assert "generate" in calls and "data_generate" not in calls
     assert "from plexus.pipeline import generate" in src
-    # the page's RUN is the CLI's main(), in the worker
+    # the page's RUN is the same function, on the VTK thread, with the hook that feeds the view
+    view = open(os.path.join(REPO, "src", "plexus", "gui", "bio_view.py")).read()
+    assert "pipeline.generate(self.spec_path" in view and "engine.run(" not in view
+    # and the studio's worker path, when used, is the CLI's own main()
     job = open(os.path.join(REPO, "src", "plexus", "gui", "studio.py")).read()
     assert '["-o", "generate", f"studio/{name}"' in job
     worker = open(os.path.join(REPO, "src", "plexus", "gui", "worker.py")).read()
