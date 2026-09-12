@@ -669,8 +669,7 @@ def p_style(h, data):
         return h._send_json({"error": "no spec is open"}, 400)
     spec = yaml.safe_load(open(sp)) or {}
     try:
-        spec["plotting"] = M.apply_render(spec.get("plotting") or {}, str(data.get("render", "dots")),
-                                          bool(int(data.get("specular", 0) or 0)))
+        spec["plotting"] = M.apply_render(spec.get("plotting") or {}, str(data.get("render", "small_dots")))
     except ValueError as e:
         return h._send_json({"error": str(e)}, 400)
     ok, err = _validate(spec)
@@ -678,7 +677,7 @@ def p_style(h, data):
         return h._send_json({"error": "schema rejected the spec", "detail": err}, 400)
     raw = _dump_yaml(spec)
     open(sp, "w").write(raw)
-    bio.bump(name, f"render {data.get('render', 'dots')}")
+    bio.bump(name, f"render {data.get('render', 'small_dots')}")
     return h._send_json({"name": name, "raw": raw, "version": bio.STATE["version"]})
 
 
