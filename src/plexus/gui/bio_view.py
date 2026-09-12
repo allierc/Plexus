@@ -393,11 +393,12 @@ class View:
         return _vtk(self._highlight, pick)
 
     def _highlight(self, pick: str | None):
-        """A yellow dot on a cluster or vertex; the cell's rings and lateral edges for a cell."""
-        if self.panel is not None:
-            self.pick = pick
-            return
-        import pyvista as pv
+        """Remember the pick. NOTHING IS DRAWN: the selected object is read in the page's text panel,
+        and a marker on the picture hid the thing that was picked (and a yellow ring on a 300,000-dot
+        cloud drew the eye to one dot)."""
+        self.pick = pick
+        return
+        import pyvista as pv                                     # noqa: E402 -- the old marker, kept below unreached
         from plexus.gui import bio
         with LOCK:
             for nm in ("pick_dot", "pick_cell"):

@@ -57,8 +57,8 @@ SHELL = r"""<!doctype html>
 {form}
  <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button><button class="dim" onclick="reseed()">RE-SEED</button></div>
  <div id="status">building the default scene...</div>
- <h2>Run <span style="color:#778;font-weight:normal;text-transform:none">the same -o generate as Plexus_Main.py: movie and stills land in graphs_data/studio/&lt;name&gt;</span></h2>
- <div class="row"><label>device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> <span style="color:#778;font-size:11px">frames, movie frames and stills are the spec's (BUILD writes them)</span></div>
+ <h2>Run</h2>
+ <div class="row"><label>device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
  <div class="row"><button onclick="runGo()" id="runbtn">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
  <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button><button class="dim" onclick="movieGo()" title="the movie.mp4 the run wrote, as a file">MOVIE</button><button class="dim" onclick="playStop();showMovie(null);FRAME=null;render(true)" title="back to the live view">LIVE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:150px" oninput="playing=null;showMovie(null);showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
@@ -68,11 +68,10 @@ SHELL = r"""<!doctype html>
  <pre id="claude"></pre>
  <div id="rstat" style="color:#9ab;min-height:14px"></div>
  <div id="yaml"><textarea id="yamltext"></textarea><div><button onclick="saveYaml()">SAVE YAML</button></div></div>
- <h2>Visibility</h2><div id="vis">(seed a scene first)</div>
  <h2>Hierarchy</h2><div id="tree">(none)</div>
  <h2>Selected object</h2><div id="info">click an object</div>
 </div>
-<div id="right"><img id="view" draggable="false"><video id="movie" style="display:none;max-width:100%;max-height:100%" controls muted></video><div id="hint">drag to orbit, wheel to zoom, click to select -- rendered by the movie renderer, also while a run is going</div></div>
+<div id="right"><img id="view" draggable="false"><video id="movie" style="display:none;max-width:100%;max-height:100%" controls muted></video><div id="hint">drag to orbit, wheel to zoom, click an object to read it below</div></div>
 <script>
 const TAB={tab_json};
 const DEFAULT_BODIES={default_bodies};
@@ -96,8 +95,8 @@ window.pickOpen=async function(path){{$('picker').style.display='block';const j=
  $('picklist').innerHTML=h||'(empty)';}};
 window.openSpec=async function(pth){{$('picker').style.display='none';status('opening '+pth+' ...');const j=await (await fetch('/api/scene/open?path='+encodeURIComponent(pth))).json();if(j.error){{status(j.error,true);return;}}$('openlab').textContent=pth;status('opened '+j.name+' -- seeding...');}};
 async function post(url,body){{const r=await fetch(url,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}});return r.json();}}
-window.build=async function(){{status('building the spec...');const j=await post('/api/tab/'+TAB+'/build',form());if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}specName=j.name;if(j.version!==undefined)seen.version=j.version;$('yamltext').value=j.raw;status(`spec saved: config/studio/${{j.name}}.yaml -- seeding and rendering...`);await reseed();}};
-window.reseed=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{status('no spec yet',true);return;}}status('seeding and building the renderer...');const r=await fetch('/api/scene/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){{status(j.error,true);return;}}SCENE=j;visPanel(j);tree(j);status(`seeded in ${{j.seconds}}s: `+Object.entries(j.sets).map(([k,v])=>`${{k}} ${{v.n_live}}`).join(', '));render(true);}};
+window.build=async function(){{status('building the spec...');const j=await post('/api/tab/'+TAB+'/build',form());if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}specName=j.name;if(j.version!==undefined)seen.version=j.version;$('yamltext').value=j.raw;status(`spec saved: config/studio/${{j.name}}.yaml -- seeding...`);await reseed();}};
+window.reseed=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{status('no spec yet',true);return;}}status('seeding and building the renderer...');const r=await fetch('/api/scene/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){{status(j.error,true);return;}}SCENE=j;tree(j);status(`seeded in ${{j.seconds}}s: `+Object.entries(j.sets).map(([k,v])=>`${{k}} ${{v.n_live}}`).join(', '));render(true);}};
 window.toggleYaml=function(){{const y=$('yaml');y.style.display=y.style.display==='none'?'block':'none';}};
 window.saveYaml=async function(){{const j=await post('/api/scene/save',{{name:specName,raw:$('yamltext').value,tab:TAB}});if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();}};
 // THE PICTURE IS THE MOVIE RENDERER'S. Every camera change asks the server for a fresh screenshot;
@@ -116,9 +115,6 @@ function showInfo(i){{if(!i){{$('info').textContent='(no object)';return;}}let t
  else if(i.kind==='vertex'){{t+=`vertex #${{i.vertex}}\n  position: ${{i.position.join(', ')}}\n  shared by cells: ${{(i.shared_by_cells||[]).join(', ')}}`;}}
  else{{t+=`${{i.species||i.set}} #${{i.index}} (set ${{i.set}})\n  position: ${{(i.position||[]).map(v=>v.toFixed?v.toFixed(4):v).join(', ')}}\n`+(i.parent_cell!==undefined?`  parent: #${{i.parent_cell}}\n`:'');if(i.cell){{const c=i.cell;for(const [s,per] of Object.entries(c.contains||{{}}))t+=`  the parent contains ${{s}}: ${{Object.entries(per).map(([a,b])=>b+' '+a).join(', ')}}\n`;}}}}
  $('info').textContent=t;}}
-function visPanel(j){{const sps=[];for(const s of Object.values(j.sets))for(const n of (s.type_names||[]))if(!sps.includes(n))sps.push(n);
- if(!sps.length){{$('vis').textContent='(no typed set)';return;}}
- $('vis').innerHTML='<div class="row">'+sps.map(n=>{{const c=((j.colors||{{}})[n]||[1,1,1]).map(x=>Math.round(x*255));return `<label><input type="checkbox" checked onchange="setVisible('${{n}}',this.checked)"><span style="color:rgb(${{c}})">&#9679;</span> ${{n}}</label>`;}}).join('')+'</div><div style="color:#778;font-size:11px">a type drawn as glyphs is one actor of the renderer; unticking hides it</div>';}}
 window.setVisible=async function(n,on){{await post('/api/scene/visible',{{species:n,on}});render();}};
 function tree(j){{const h=j.hierarchy;let out='';for(const n of h.sets){{const cnt=j.sets[n.name]?`${{j.sets[n.name].n_live}} live / ${{j.sets[n.name].n_buffer}}`:'';
  let rel='';if(n.parent)rel+=` <span class="cont">contained in ${{n.parent}}</span>`;if(n.maps)rel+=` <span class="rel">relation: ${{Object.entries(n.maps).map(([k,v])=>k+'->'+v).join(', ')}}</span>`;if(n.mesh)rel+=` <span class="rel">mesh: ${{n.mesh}}</span>`;
