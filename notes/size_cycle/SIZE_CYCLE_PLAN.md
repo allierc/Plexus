@@ -454,6 +454,18 @@ rig) and a single inverting cell appears from frame 950 -- an extrusion in progr
     Rates are low (0.001-0.003 per 100 cell-frames) at `max_mark_frac 0.005` and these thresholds;
     the rig's next arms turn that dial.
 
+**R4c (archives `log/size_cycle/R4c`).** One "when": the size rules on `cell_cycle` (adder and
+doubler added as G1 rules), the five divide-family specs rewritten as degenerate cycles
+(`t_s = t_g2 = t_m = 0`, `cell_divide[model: cycle]`), the divide-family models deprecated and
+kept for the okuda archive. A daughter's cycle now starts when its birth volume has been read
+(finding 21). Gate: the R3d table within bands. Scored when landed.
+
+21. **A daughter's cycle must start after the mechanics has answered the septum.** The cycle
+    integrated added volume from the cut; the piece the septum makes is restored to its target
+    within a frame, and that jump counted as growth, so the cycle adder left G1 at a fixed
+    `piece + delta` and scored as a sizer (-0.96). Held at p = 0 until `cell_divide` has re-read
+    `Vbirth` (age 0 -> 1): -0.12, the divide-family adder's number.
+
 ## 4. The ladder, v2
 
 | rung | layer | change | gate |
