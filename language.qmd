@@ -73,10 +73,12 @@ is what running it establishes.
 
 ## The language
 
-Plexus is built around four kinds of object. Three describe what exists: the **entities**,
-their **states**, and the **fields** that make up the microenvironment. One describes what
-happens: the **activities**. A model is a composition of activities acting on discrete and
-continuous biological objects, not a simulator-specific algorithm.
+The description of a mechanism is built from five things, in this order: **entities**, the
+**state** each carries, the **relations** between them, the **activities** that act on
+them, and the **organization** that arranges all of these in space, in time and across
+levels. Fields are the environmental quantities among which the entities act, and an
+operator is how an activity is written in a specification. A model is a composition of
+activities over organized entities, not a simulator-specific algorithm.
 
 ### Entities
 
@@ -106,6 +108,15 @@ concentration, a pressure, an extracellular signal, an electric potential, a mat
 density. Fields complement entities. Entities are the discrete parts, fields the
 continuous environment those parts live in, and activities couple the two through explicit
 maps from entities to positions in space.
+
+### Relations
+
+Relations say which entities stand together: which protein belongs to which cell, which
+synapses connect which neurons, which vertices bound which cell, which cells are
+neighbours. Each is an explicit map. A part-to-whole map organizes levels; a
+many-to-many relation, such as a synapse or a half-edge, is carried as entities of its own
+kind with two such maps. Activities declare the relations they traverse, so the spatial
+organization of a mechanism is written with the activity rather than assumed by the code.
 
 ### Activities
 
@@ -143,198 +154,212 @@ are **eight** kinds, and here each is named first in a biologist's words:
 - **structural**: turnover. **divide** and **die**.
 - **seed**: the set-up conditions, written once and never again.
 
-The first five kinds change state and leave the organization intact. Rewire changes the
-relations, structural changes the entities themselves, and seed writes what the others go
-on to evolve. Together they are the elementary vocabulary of Plexus, and the
-implementation recognizes exactly these eight.
+The first five primarily change state while preserving the underlying organization.
+Rewire changes the relations through which subsequent activities act. Structural changes
+the entities themselves. Seed establishes the initial conditions from which the other
+activities operate.
+
+Together these kinds form the elementary vocabulary of Plexus.
 
 ![](figures/fig_ops.png){width=100% fig-align="center"}
 
-**Lateral.** What entities of one kind do to one another: mechanical forces between
-proteins, adhesion and tension between neighbouring cells, juxtacrine signalling, contact
-inhibition, gap-junction coupling, synaptic transmission, the reactions of a metabolic
-network.
+**Lateral.** Entities of one kind act on one another through their relations: mechanical
+interaction between particles, adhesion between cells, electrical coupling between
+neurons, contact signalling or biochemical interaction.
 
-**Aggregate.** Integration. A whole reads its parts: a cell's shape from its vertices, a
-cell's properties from its proteins, a neuron's input as the sum of its synaptic currents,
-a tissue's shape as the collective consequence of its cells. This is the upward direction
-of causation, the one usually called emergence.
+**Aggregate.** A whole reads or integrates its parts: a cell's geometry from its
+vertices, a neuron's input from its synapses, or a tissue property from its constituent
+cells. It provides the upward direction of organization.
 
-**Broadcast.** Top-down control. A whole imposes on its parts: a cell's polarity on its
-cytoskeleton, a material property on every point the cell owns, a fate decision on
-everything the cell contains, a constraint the tissue places on its cells. Aggregate and
-broadcast together are the upward and downward flow across levels of organization.
+**Broadcast.** A whole influences its parts: a cell's polarity acts on its cytoskeleton,
+a tissue constrains its cells, or a material property is assigned to the points belonging
+to a cell. Aggregate and broadcast together express bidirectional organization across
+levels.
 
-**Exchange.** A cell's traffic with its microenvironment: secretion, uptake, sensing,
-transport, and mechanical load carried to and from the matrix. In numerical terms, the
-transfer between entities and a grid.
+**Exchange.** Entities interact with their environment: secretion, uptake, sensing,
+transport or mechanical loading. Numerically this may be represented as transfer between
+entities and a spatial field.
 
-**Field.** The microenvironment's own dynamics, diffusion, decay and extracellular
-reaction, mapping a field to itself without touching any entity.
+**Field.** A continuous environment undergoes its own dynamics: diffusion, decay,
+reaction or other field evolution.
 
-**Rewire.** Remodelling. Neighbour exchange in an epithelium, junction turnover, synaptic
-plasticity, matrix remodelling: the relations between entities change, the entities do not,
-and which entities take part in the next activity changes with them.
+**Rewire.** Relations are remodelled while the entities persist: neighbour exchange,
+junction turnover, synaptic remodelling or changes in a contact network. Because the
+relations determine which entities participate in later activities, rewire changes the
+organization of subsequent dynamics.
 
-**Structural.** Turnover. A living tissue continuously changes its own composition:
-**divide** creates entities and **die** removes them, as in proliferation, apoptosis and
-extrusion. These activities change the organization itself, not only its state, and they
-are what makes a tissue different from any inert material.
+**Structural.** The composition of the system changes. Divide creates entities and die
+removes them. Proliferation, apoptosis and extrusion therefore change the organization
+itself rather than merely changing an entity's state.
 
-**Seed.** The set-up conditions: the egg, the pre-pattern, the segmentation a model starts
-from. A seed writes the initial state of entities of one kind, once. It is confined to the
-first frame, so that a starting condition cannot silently become a boundary condition
-applied at every step.
+**Seed.** The mechanism is given its set-up condition: initial positions, concentrations,
+pre-patterns or populations. A seed acts only at initialization, so an initial condition
+cannot silently become a persistent boundary condition.
+
+The distinction between these kinds is therefore biological as much as computational:
+Plexus separates change of state, change of relation, and change of entity composition.
 
 ## Organization in time
 
-A model is written as an ordered list of activities, the *schedule*, which says both in
-what order and how often each runs. Formally, one step is the composition
+A mechanism is also temporally organized. Plexus represents this organization with a
+*schedule*, an ordered collection of activities specifying both when they occur and how
+often they are evaluated.
+
+Formally, one simulation step is the composition
 
 $$\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1,$$
 
-of the activities, whose repeated application generates the dynamics
+whose repeated application generates the dynamics
 
 $$x_{t+1} = \Phi(x_t),$$
 
-where $x$ is the whole state, every entity and every field at once. The schedule is the
-temporal organization of the mechanism: its order, rate and duration. Activities run at
-their own tempo, mechanics every step, diffusion, growth or division less often, so a
-model is a multi-rate composition of mechanisms rather than one monolithic solver.
+where $x$ contains the state of every entity and field.
 
-Activities are pure. None modifies state directly; each returns its contribution to the
-change. If activity $\mathcal{O}_i$ produces the increment $\Delta_i$, the complete update
-is
+The schedule therefore expresses the temporal organization of the mechanism: its order,
+rate and duration. Different activities can operate at different tempos. Mechanical
+interactions may run every step, while diffusion, growth or division occur less
+frequently. A biological model is consequently a multi-rate organization of activities,
+rather than a monolithic numerical solver.
+
+Activities are pure transformations. They do not directly modify the state; each produces
+its contribution to the change. If activity $\mathcal{O}_i$ produces $\Delta_i$, the
+complete update is
 
 $$\Delta = \sum_i \Delta_i,$$
 
-before it is passed to the numerical implementation. Two things follow. Activities stay
-independent and composable: adding a mechanism is adding an activity to the schedule.
-And the language stays independent of its numerical realization: the schedule states the
-hypothesis, the implementation states how it is evaluated.
+before being passed to the numerical implementation.
+
+This keeps activities independent and composable: adding a mechanism means adding an
+activity to the schedule. It also preserves the separation between biological semantics
+and numerical realization: the schedule describes the hypothesis, while the implementation
+describes how it is evaluated.
 
 ## Organization across levels
 
-A cell is a compartment, and a compartment holds parts of different kinds. Entities of one
-kind may be contained in entities of another, proteins in a cell, cells in a tissue,
-tissues in an organism, through an explicit part-to-whole map, and one whole may contain
-parts of several kinds: the same cell can hold receptors, signalling proteins,
-cytoskeletal elements and material points. These kinds remain distinct, with their own
-state and their own activities, while sharing the same parent. A vertex model that treats a
-cell as a polygon and a reaction–diffusion model that treats it as a well-mixed bag are
-each a caricature. Here the same cell is both at once, because both kinds of parts belong to
-one parent. Each level also runs at its own tempo, and no level is reduced to a parameter
-of the one above it.
+Biological mechanisms are hierarchical. A cell contains parts; a tissue contains cells; an
+organism contains tissues. But a whole can contain several kinds of parts simultaneously.
+
+Plexus represents this through explicit part-to-whole maps. A cell can contain receptors,
+signalling proteins, cytoskeletal elements and material points, each retaining its own
+state and activities. Different descriptions of the same biological object can therefore
+coexist rather than being forced into one representation.
 
 ![](figures/fig_hier.png){width=70% fig-align="center"}
 
-Activities run within a level or across it. Within a cell, activities couple receptors →
-signalling proteins → cytoskeleton. Across the part-to-whole map, **aggregate ↑** builds
-the whole's state from its parts, a cell's position from its material points, a neuron's
-input from its synapses. **Broadcast ↓** carries the whole's state to its parts, a material
-property to every point a cell owns, a constraint imposed by the tissue. Causation runs
-both ways, and both directions are activities like any other.
+Activities can operate within a level or connect levels. Within a cell, activities may
+connect receptors, signalling proteins and cytoskeletal elements. Across levels,
+**aggregate ↑** constructs properties of a whole from its parts, while **broadcast ↓**
+carries properties or constraints from the whole to its parts.
 
-Fields belong to levels too. **Exchange** couples entities to the field at their own level,
-so that a protein concentration inside the cell, a morphogen among cells and a mechanical
-grid under the tissue coexist as distinct objects.
+The two directions are complementary. Parts can determine the state of a whole, while the
+whole can constrain the behaviour of its parts. Both are explicit activities rather than
+implicit consequences of the software architecture.
+
+Fields belong to levels as well. A protein concentration inside a cell, a morphogen field
+among cells and a mechanical field under a tissue can coexist as distinct objects.
+Exchange activities connect entities to the field at the appropriate level.
 
 Proteins → cells → tissues is therefore not a pipeline of separate simulators. It is one
-compositional graph: parts of several kinds inside each whole, activities joining them
-locally, aggregate and broadcast joining the levels. The same eight kinds serve
-throughout, and another level of organization needs no new machinery.
+compositional organization: entities of several kinds, connected by activities within and
+across levels.
+
+The same eight activity kinds apply throughout. Adding another level of organization does
+not require another kind of computational machinery.
 
 ## Numerical implementations
 
-Every mechanistic description stops somewhere. It bottoms out in activities the field is
-content to take as given. In Plexus that floor is the numerical implementation. The
-algebra of activities states the biological meaning of a model; every activity may admit
-several implementations satisfying the same typed signature, which differ in how they
-compute and not in what they mean. Choosing an implementation is a numerical decision,
-never a biological one.
+A mechanistic description eventually reaches activities that are taken as given. In
+Plexus, this is where the numerical implementation enters.
 
-This accommodates a broad range of methods. A mechanical activity may be implemented with
-the material point method, finite elements, a vertex model, a phase field, a Cellular Potts
-model or an optimal-transport formulation. A signalling activity may use Hodgkin–Huxley
-equations, a graph neural network or a neural ordinary differential equation. A field
-activity may use finite differences, finite elements, a neural implicit representation or a
-spectral method. These coexist in one language because they satisfy the same contracts.
+The activity specifies its biological meaning; an implementation provides one way of
+computing it. A single activity may therefore have several implementations satisfying the
+same typed signature. They may differ in numerical method, spatial discretization, solver
+or hardware while preserving the same biological interpretation.
 
-Implementations may also integrate differently. Depending on the activity, an
-implementation may advance first-order states such as concentrations or membrane voltages,
-second-order states such as mechanical accelerations, and rely on explicit, implicit or
-adaptive solvers. These choices affect cost and accuracy, not the biological reading of the
-model.
+This accommodates a broad range of methods. A mechanical activity may be implemented using
+a material point method, finite elements, a vertex model, a phase field, a Cellular Potts
+model or optimal transport. A signalling activity may use Hodgkin–Huxley equations, a
+graph neural network or a neural ordinary differential equation. A field activity may use
+finite differences, finite elements, a neural implicit representation or a spectral
+method.
 
-The distinction changes how models are compared. Traditional frameworks compare complete
-simulators, which entangle the mechanism with the numerics. Plexus separates the two
-questions: hypotheses are compared through the activities they compose, numerical methods
-through the implementations that realize those activities. There are then two independent
-axes of progress. Biological innovation is discovering a new activity or a new
-composition; numerical innovation is a faster or more accurate implementation of an
-activity that already exists. Existing simulation frameworks become complementary backends
-of one intermediate representation rather than competing paradigms.
+The numerical implementation may also determine how the activity is integrated:
+first-order states such as concentrations or membrane voltages, second-order states such
+as mechanical accelerations, or explicit, implicit or adaptive solvers. These choices
+affect computational cost and accuracy, not the biological meaning of the activity.
+
+This separation changes how models can be compared. Traditional frameworks compare
+complete simulators, often entangling biological assumptions with numerical algorithms.
+Plexus separates the two questions.
+
+- *Which mechanism is being proposed?* Compare the activities and their organization.
+- *How is that mechanism computed?* Compare the implementations.
+
+Biological progress therefore corresponds to new activities or new compositions of
+activities, while numerical progress corresponds to better implementations of activities
+already expressed by the language. Existing simulation frameworks can consequently become
+complementary numerical backends rather than competing modelling paradigms.
 
 ## Mechanistic inverse modelling
 
-A formal language of mechanisms exists first of all so that mechanisms can be identified
-from observations. Rather than calibrating simulations by hand, the aim is to infer the
-parameters, the spatial organization and the constitutive laws of a biological system from
-imaging data.
+A formal language of mechanisms is useful not only for running models but for asking
+whether a proposed mechanism explains observations.
 
-Plexus makes this possible by giving every activity at least one differentiable
-implementation satisfying its signature. Differentiability is then a property of the
-language rather than of a particular simulator: whatever the backend, gradients propagate
-through a composition of explicit activities rather than through monolithic code.
+Rather than assuming a simulator and manually calibrating it, the objective is to infer
+parameters, spatial organization and constitutive laws from biological observations.
 
-This changes what inverse modelling means. The traditional approach assumes the mechanism
-is already right and searches for the parameter values that best reproduce the
-observations. That works when the forward model is complete and misleads when an activity
-is missing: tuning the parameters that exist improves the fit while merely compensating
-for the activity that does not.
+Plexus makes this possible by associating activities with differentiable implementations
+satisfying their typed signatures. Differentiability therefore becomes a property of the
+mechanistic representation rather than of one particular simulator. Gradients can
+propagate through a composition of explicit biological activities.
 
-In Plexus, parameters stay attached to explicit activities rather than to an opaque model.
-Mechanical properties belong to mechanical activities, reaction rates to biochemical ones,
-conductances to signalling ones, and spatial fields to the activities that generate them,
-so that estimation keeps the mechanistic reading of the model.
+This changes the role of inverse modelling. A conventional approach assumes that the
+mechanism is already correct and searches for parameters that reproduce the observations.
+That works when the mechanism is complete, but can be misleading when an important
+activity is absent: parameter optimization may compensate for the missing mechanism.
 
-Residuals acquire the same reading. A persistent mismatch between simulation and
-experiment no longer means only that the parameters are wrong; it may mean that the
-present composition of activities cannot produce the observed change. In the paper's
-terms, a residual that will not go away is the mark of a sketch: a black box where an
-activity belongs. Differentiability therefore does more than make optimization efficient.
-It lets competing mechanistic hypotheses be compared quantitatively while each keeps its
-explicit structure.
+In Plexus, parameters remain attached to explicit activities. Mechanical properties belong
+to mechanical activities, reaction rates to biochemical activities, conductances to
+signalling activities, and spatial fields to the activities that generate or modify them.
+Parameter estimation therefore preserves the mechanistic interpretation of the model.
+
+Residuals acquire the same interpretation. A persistent mismatch does not necessarily mean
+that the parameters are wrong. It may mean that the current composition of activities
+cannot produce the observed change.
+
+In the language of mechanism sketches, the residual may point to a missing activity: a
+black box in the explanatory structure that has not yet been filled. Differentiability
+therefore does more than make optimization efficient. It allows competing mechanistic
+hypotheses to be compared quantitatively while preserving their explicit organization.
 
 ## Agentic mechanistic discovery
 
 Writing mechanisms as explicit activities turns discovery from a parameter-optimization
-problem into a language-exploration problem. Because activities are declared rather than
-buried in a simulator's code, they are directly accessible to an agent.
+problem into a language-exploration problem. Because the activities, entities and
+relations are explicit rather than buried in simulator-specific code, they can be
+inspected and manipulated by an agent.
 
-Plexus proposes a three-loop strategy, each loop at a different level of abstraction,
-moving from existing models toward new biological knowledge.
+Plexus proposes a three-loop strategy, moving from existing models toward new biological
+knowledge.
 
-**Loop I: Understanding.** The first loop reads an existing simulation model. Rather than
-treating the simulator as opaque code, the agent decomposes it into Plexus activities,
-names the entities they act on, and reconstructs an explicit mechanistic description.
-Existing frameworks become repositories of reusable entities and activities.
+**Loop I: Understanding.** An existing simulation model is decomposed into Plexus
+entities, activities and organization. The agent identifies what exists, what changes,
+which relations are required, and how the existing code realizes each activity. Simulation
+frameworks therefore become repositories of reusable mechanisms.
 
-**Loop II: Fitting.** The second loop estimates the parameters, spatial fields and set-up
-conditions of the resulting mechanism by fitting it directly to experimental observations.
-Because every activity has a differentiable implementation, optimization keeps an explicit
-correspondence between parameters and activities.
+**Loop II: Fitting.** The resulting mechanistic model is fitted to experimental
+observations. Parameters, fields and set-up conditions are estimated while remaining
+attached to explicit activities and organizational structure.
 
-**Loop III: Discovery.** The third loop reads the residual that remains after fitting.
-A persistent discrepancy is taken as evidence that the composition is incomplete rather
-than poorly parameterized. The agent proposes alternative activities, compares competing
-mechanistic hypotheses, and extends the algebra whenever the activities it has cannot
-produce the change observed. It turns a sketch into a schema, one filled box at a time.
+**Loop III: Discovery.** The remaining residual is analysed after fitting. A persistent
+discrepancy suggests that the present mechanism cannot produce the observed change. The
+agent proposes alternative activities or organizations, compares competing mechanistic
+hypotheses, and extends the algebra when the existing vocabulary is insufficient.
 
-Together the three loops make simulation, inverse modelling and hypothesis generation
-successive stages of one workflow. The language itself becomes the object of discovery:
-new biological knowledge is a new activity, or a new composition of activities, and not
-merely a new parameter value.
+The three loops make simulation, inverse modelling and hypothesis generation successive
+stages of one scientific workflow. The language itself becomes an object of discovery: new
+biological knowledge can appear as a new activity, a new relation, a new organization, or a
+new composition of mechanisms, not merely as another parameter value.
 
 ## References
 
