@@ -136,52 +136,47 @@ on any replacement run):
   | `cycle_dilution` | Whi5 / Rb dilution | slope -1 once c_birth = v_ref / V_b |
   | `mech_target_percell` | twin of `mech_uniform_target`, per-cell targets | CV(V) = CV(V0f) + 0.006 |
 
-## 2. The target design
+## 2. The plan, v2 (2026-09-12): layers, each gated before the next is read
 
-**One volume.** `cell_size()` is the only reader of a cell's size. `cell_grow`, `cell_divide`,
-`cell_cycle`, `cell_die` all call it; `cell_divide`'s private polyhedron branch and the
-`v0_from` switch go. The convention is decided by geometry -- a set with `sep` is a set of
-polyhedra, a sheet's size is its area, else the wedge -- and nothing in a spec chooses it.
+What R0-R3 taught: the size and cycle rules are READERS on top of a mechanics-and-topology layer
+that was never gauged, and every table produced before `tools/spheroid_gauge.py` existed was a
+table about a bent mesh. So the plan is re-ordered into layers. A layer has its own archives
+under `log/size_cycle/<rung>`, its own gate, and nothing above it is read until it is green.
 
-**Birth volume is measured, not bookkept.** `Vbirth` is written from `cell_size()` on the first
-tick after the septum. `split_cv` moves the septum or is withdrawn; it does not perturb targets.
+**Layer 0 -- mechanics and topology.** The apico-basal shell under growth, T1 and division must
+stay a spheroid of prisms for four doublings: `spheroid_gauge` SPHEROID on the shell bands
+(asphericity, inversions, inward vectors, thickness spread) AND on the prism bands (trapezoid,
+shear, tilt, in-cell thickness). Instruments: the gauge; `tools/equilibrium_h.py` (settling time,
+38 frames at 30 steps, 20 at 90); per-flip and per-division prism damage measured directly.
+Levers, in the order the evidence ranks them: the radial pin (finding 17, off), the T1 flip on
+prisms (finding 16; what a flip does to the four cells' caps), the septum (what the cut does to
+two cells' caps and how `local_relax` should heal them without the mid-surface energy -- the
+shipped `local_relax` uses the wrong energy on an apico-basal mesh, `sweep_r578_i30_heal20`), the
+seed at rest (finding 7), and the energy itself: it has no term that prefers a prism over a
+frustum, so every kick random-walks the caps apart (finding 15). A prism term -- apical and basal
+tensions as separate parameters, which is what the 3D vertex models of Okuda and Misra carry --
+is the candidate, gated by the prism bands on `mech_target_percell` under growth alone.
 
-**One "when".** The size rules live in `cell_cycle` and nowhere else: G1 rules `sizer`, `adder`,
-`timer`, `hazard`, `dilution`; S, G2, M one clock. `cell_divide` keeps the septum and the trigger
-`phase >= M` only -- its `sizer / adder / doubler / timer / concerted` models, `factor`, `delta`,
-`cycle`, `min_cycle`, `max_cycle`, `cycle_cv`, `reset_noise`, `divjit` are withdrawn; the
-"divide when big" runs are a cycle with `t_s = t_g2 = t_m = 0`. Then grow says how fast, cycle
-says when, divide does the topology, and each model exists once.
+**Layer 1 -- readers.** One volume convention (the polyhedron whenever a separation exists,
+finding 13), one reference (`ref_frame`), `Vbirth` measured. Done in R2b; kept under the gate.
 
-**Correct G1 rules.** Sizer `dp/dt = f_G1 (dV/dt) / (v* - V_b)`; adder
-`f_G1 (dV/dt) / (delta v_ref)`; dilution reset `c_birth = v_ref / V_b` (fixed amount), exit at
-`c <= thresh`, which is the sizer with a molecule under it and should reproduce its slope; timer
-and hazard unchanged.
+**Layer 2 -- rate laws.** `cell_grow`, `cell_cycle`, `cell_divide`, `cell_die` as rate laws,
+each with its own test: Kirschner slopes and stationarity for size (`size_report`), phase
+fractions and cycle-length distributions for the cycle, death onset and the shrink-shed-extrude
+sequence for apoptosis. The "one when" consolidation (size rules live in `cell_cycle`;
+`cell_divide` keeps the septum) and the dilution rule's defect (scores like a timer, R2b) are
+here.
 
-**Growth.** Exponential default, `sizer` and `balance` variants kept; `cell_grow[timer]` (a
-proportional controller on a target, which is what `cell_mechanics` already is) withdrawn. At
-build, the engine prints the implied volume growth per cycle, `exp(3 rate T)`, whenever a
-`cell_cycle` is scheduled, and refuses above x4: that is the number finding 3 was missing.
+**Layer 3 -- rigs.** Interaction experiments on the accepted working point, each a spec family
+plus one report. The first is the apoptosis rig: `cell_die` models (`smaller`, `crowded`,
+`stalled`, `competition`, `prescribed`) x size rules (sizer / adder / timer) x cycle models x
+topology (T1 on / off; shell / sheet), with `tools/death_report.py` joining every death to the
+cell's volume, birth volume, phase, age and neighbour count at death, and the gauge run
+alongside so a death is never read off a bent mesh. Later rigs: morphogen x size, ECM x size.
 
-**Time, not calls.** `every`, `min_cycle`, `cycle`, `age` in simulation time. A rule stated in
-division-calls changes meaning with `every`.
-
-**Representation.** Every per-cell quantity is a block on the cell set: `V0f`, `A0`, `P0`, `age`,
-`ndiv`, `alive`, `mg_scale`, the `*_init` triplet leave the mesh table, which keeps topology only
-(finishes the S2b move). `Vbirth`, `phase`, `cycle_progress` recorded by default. A `cell_id`
-block, assigned at seed and at birth, so lineage is read and not reconstructed from index
-stability.
-
-**Engine.** Seed-time writes go to seed operators -- `cell_cycle.seed_async` becomes
-`seed_mesh cycle_async`, the `V0f (1+u)/1.5` rescale with it -- so `cell_cycle` and `cell_grow`
-drop `MAY_MUTATE_INTEGRATED_STATE` (29 operators carry it today; division stays structural). The
-`_k` tick counters and `_engine_owns_clock` shim go once every rate is a rate. `p0` leaves the
-apico-basal contract. The apico-basal step prints its stability number `eta k_v A_med^2` and
-refuses above 1.
-
-**Measurement.** `tools/size_report.py` is the report; the eleven specs are registered as working
-points when the R1 gate passes; `QUICK` becomes `size_adder 60 + mech_uniform_target 60 +
-apop2_ks0p1 60`.
+**Representation and engine (cross-cutting, R5 as before).** Per-cell state on the cell set,
+`cell_id`, time units, default recording of `Vbirth`/`phase`/`cycle_progress`; seed-time writes
+in seed operators; the fixed-order atomics path (finding 11); `p0` off the apico-basal contract.
 
 ## 3. Log
 
@@ -337,23 +332,34 @@ answer a septum. Two instruments and one sweep:
 - The dilution rule and the "one when" consolidation move to R4.
 
 15. **Growth and division bend the prisms.** See R3 above: trapezoid fraction 0 on the control,
-    ~0.5 on every dividing arm, `h_in_cell` 0.06 -> 0.16.
+    ~0.5 on every dividing arm, `h_in_cell` 0.06 -> 0.16. The sweep (`log/size_cycle/R3sweep`,
+    seven arms) bends them the same way at every growth rate and relaxation depth: 0.10 by
+    frame 10 with the first T1 flips, before any division. Time was not the lever.
+16. **A T1 flip moved two vertices and left their thickness vectors behind.** Re-aimed now
+    (`edge_flip`): each moved vertex keeps its thickness and takes its ring neighbours' direction.
+    Correct, and not the driver -- the trapezoid fraction did not move.
+17. **The radial pin is the roughness.** `K_R 0.4` pulls every vertex to `R0 = (3 V0 / 4 pi)^(1/3)`,
+    a solid ball's radius from the summed wedge targets, which grows as N^(1/3) under division at
+    constant cell volume; a shell of cells that keep their footprint grows as N^(1/2). Pinned to
+    it, the growing shell is held too small, footprints shrink, T1 flips come in storms and the
+    prisms bend. `size_sizer`, 800 frames, deterministic: K_R 0.4 -> trapezoids 0.54, 2,952
+    flips; K_R 0 -> 0.21, 276 flips, thickness CV 0.09, asphericity 0.03-0.04, and the shell
+    expands R 4.9 -> 7.9 for 200 -> 593 cells (N^0.44). Giving the pin the shell's area-based
+    radius instead does not help (0.53): the pin itself is the defect. K_R 0 on every dividing
+    spec from R3b on; what still bends after that tracks the flip count and is layer 0's next
+    question.
 
-## 4. The ladder
+## 4. The ladder, v2
 
-Each rung is one commit series with a gate measured by `tools/size_report.py` on the eleven
-specs; a rung that moves a number it did not mean to move is a working-point change and is
-reviewed as one (`tests/REGRESSION_PLAN.md`).
+| rung | layer | change | gate |
+|---|---|---|---|
+| R3b | 0 | `K_R 0` on the dividing specs; flip re-aims `sep` | gauge SPHEROID (shell + prism) for >= 3 doublings on `size_sizer`; the prism bands are the ones to watch |
+| R3c | 0 | the septum and `local_relax` on prisms; per-event prism damage | trapezoid fraction flat across a division wave |
+| R3d | 0 | a prism term in the energy (apical / basal tensions) | `mech_target_percell` under growth alone: prism bands green for 4 doublings' worth of target growth |
+| R3e | 0 | the seed at rest (finding 7); `ref_frame` and `mono_delta` retired | frame-0 volumes within 5 % of frame-60 |
+| R4 | 2 | one "when"; dilution fixed; `cell_grow[timer]` withdrawn | R2b's separation reproduced on the clean shell: sizers -1 +- 0.15, adder 0 +- 0.15, timers > +0.5, dilution = sizer |
+| R4b | 3 | the apoptosis rig | `death_report` rows for every arm; deaths never off a bent mesh |
+| R5 | eng | representation and engine, as before | tick-0 invariant; flags 29 -> <= 20 |
+| R6 | -- | register the working points; `library/` regenerated; `QUICK` re-pointed | `pytest tests/regression -m regression --quick` green |
 
-| rung | change | gate |
-|---|---|---|
-| R0 | run the eleven specs on HEAD; record the table in this note | the defects reproduce: `size_adder` slope -1, `cycle_dilution` slope > 0, `cycle_sizer` slope between |
-| R1 | findings 2, 4, 5 (+ the G1 cap, `mono_k`, `ref_frame` of finding 7): measured `Vbirth`; sizer denominator `v* - V_b`; dilution reset `v_ref / V_b` | `size_sizer` -1 +- 0.15, `size_adder` 0 +- 0.15, `size_timer` > +0.5, `cycle_dilution` = `cycle_sizer` within 0.15; median drift < 10 % over the last two cycles on every checkpoint arm |
-| R2 | findings 6, 8, 9: one reader (`cell_size` in `cell_divide` and `cell_grow[sizer]`); specs on the working point's conventions; the spheroid gauge as a gate; growth-per-cycle print and refusal | byte-identical on `apop2_ks0p1`, `sheet_*`, `mech_uniform_target` (their convention does not change); R1 numbers within bands |
-| R3 | time and topology: prism gauge; rate x relaxation sweep; a working point where the prisms stay prisms | `size_*` rewritten as degenerate cycles reproduce R1 within bands; five operators and eight parameters fewer in `catalog_summary()` |
-| R4 | one "when": divide-family models into `cell_cycle` (dilution fixed there); `cell_divide` keeps septum + trigger; then representation: cell-set blocks, `cell_id`, time units, default recording | trajectory keys renamed once, in their own commit; `size_report` reads lineage from `cell_id` and gives R3's numbers |
-| R5 | engine: seed-time writes to seed ops; flags off; tick shims out; `p0` off the apico-basal contract; stability print; a seed at rest in every degree of freedom so `ref_frame` and `mono_delta` can go (finding 7) | tick-0 invariant passes for `cell_cycle` and `cell_grow`; `MAY_MUTATE_INTEGRATED_STATE` count 29 -> <= 20 |
-| R6 | register the eleven working points; regenerate `library/`; `QUICK` re-pointed | `pytest tests/regression -m regression --quick` green; nightly archive has one row per new point |
-
-Out of scope: MPM, ECM, the apoptosis series -- touched only through the shared reader in R2, and
-gated there.
+Out of scope: MPM, ECM -- touched only through the shared reader, and gated there.
