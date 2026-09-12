@@ -352,6 +352,9 @@ def g_artefacts(h, q):
     for k, mk in (("mp4", "mp4_mtime"), ("png", "png_mtime")):
         out[k] = ("/media?path=" + quote(a[k]) + f"&t={int(a.get(mk) or 0)}") if a.get(k) else None
     out["still"] = ("/media?path=" + quote(a["still"]) + f"&t={int(os.path.getmtime(a['still']))}") if a.get("still") else None
+    # the movie's own frame count and rate, probed from the file: the page's slider spans them
+    out["mp4_frames"] = int(a.get("mp4_frames") or 0)
+    out["mp4_fps"] = float(a.get("mp4_fps") or 0.0)
     return h._send_json(out)
 
 
