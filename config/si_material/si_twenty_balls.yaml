@@ -1,0 +1,369 @@
+general:
+  name: si_twenty_balls
+  seed: 1
+  n_frames: 800
+  dt: 0.0008333333333333334
+  boundary: wall
+  dim: 3
+  world:
+  - 0.5
+  - 0.5
+  - 0.5
+  save_data: false
+  units:
+    length_um: 1000000.0
+    time_s: 1.0
+    force_nN: 1000000000.0
+sets:
+  cell:
+    n: 20
+    start:
+    - - 0.09
+      - 0.4
+      - 0.25
+    - - 0.17
+      - 0.4
+      - 0.25
+    - - 0.25
+      - 0.4
+      - 0.25
+    - - 0.33
+      - 0.4
+      - 0.25
+    - - 0.41
+      - 0.4
+      - 0.25
+    - - 0.09
+      - 0.32
+      - 0.25
+    - - 0.17
+      - 0.32
+      - 0.25
+    - - 0.25
+      - 0.32
+      - 0.25
+    - - 0.33
+      - 0.32
+      - 0.25
+    - - 0.41
+      - 0.32
+      - 0.25
+    - - 0.09
+      - 0.24
+      - 0.25
+    - - 0.17
+      - 0.24
+      - 0.25
+    - - 0.25
+      - 0.24
+      - 0.25
+    - - 0.33
+      - 0.24
+      - 0.25
+    - - 0.41
+      - 0.24
+      - 0.25
+    - - 0.09
+      - 0.16
+      - 0.25
+    - - 0.17
+      - 0.16
+      - 0.25
+    - - 0.25
+      - 0.16
+      - 0.25
+    - - 0.33
+      - 0.16
+      - 0.25
+    - - 0.41
+      - 0.16
+      - 0.25
+    type_layout: ordered
+    types:
+      b00:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        eta: 0.001
+        shape: ball
+      b01:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        eta: 0.00127
+        shape: ball
+      b02:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        eta: 0.00162
+        shape: ball
+      b03:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        eta: 0.00207
+        shape: ball
+      b04:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        eta: 0.00264
+        shape: ball
+      b05:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        eta: 0.00336
+        shape: ball
+      b06:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        eta: 0.00428
+        shape: ball
+      b07:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        eta: 0.00546
+        shape: ball
+      b08:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        eta: 0.00695
+        shape: ball
+      b09:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        eta: 0.00886
+        shape: ball
+      b10:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        eta: 0.01129
+        shape: ball
+      b11:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        eta: 0.01438
+        shape: ball
+      b12:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        eta: 0.01833
+        shape: ball
+      b13:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        eta: 0.02336
+        shape: ball
+      b14:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        eta: 0.02976
+        shape: ball
+      b15:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        eta: 0.03793
+        shape: ball
+      b16:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        eta: 0.04833
+        shape: ball
+      b17:
+        count: 1
+        material: snow
+        youngs: 500000.0
+        density: 350.0
+        eta: 0.06158
+        shape: ball
+      b18:
+        count: 1
+        material: elastic
+        youngs: 2000000.0
+        density: 1000.0
+        eta: 0.07848
+        shape: ball
+      b19:
+        count: 1
+        material: liquid
+        bulk_modulus: 981000.0
+        density: 1000.0
+        eta: 0.1
+        shape: ball
+  mpm_particle:
+    parent: cell
+    per_parent: 500
+    density: 1000.0
+    radius: 0.03
+    vel_init: 0.4
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 96
+operators:
+- op: gravity
+  at: cell
+  g: 9.81
+- op: mpm_strain
+  at: mpm_particle
+  implementation: warp
+- op: mpm_viscosity
+  at: mpm_particle
+  eta: 0.001
+- op: mpm_scatter
+  at: mpm_particle
+  implementation: warp
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200.0
+  polar: higham
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.5
+  wall_friction: 0.4
+  surface_tension: 0.072
+  csf_rho: 1000.0
+  csf_band: 0.2
+- op: mpm_gather
+  at: mpm_particle
+  implementation: warp
+  from: mpm_grid
+  wall_damp: 1.0
+  vmax: 1000000000.0
+schedule:
+- gravity
+- substep_dt: 4.385965e-05
+  steps:
+  - mpm_strain
+  - mpm_viscosity
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  max_frames: 400
+  stills: 10
+  keep_stills: true
+  splat_res: 600
+  box_frame: true
+  hide_sets:
+  - cell
+  colors:
+    b00:
+    - 0.122
+    - 0.467
+    - 0.706
+    b01:
+    - 0.682
+    - 0.78
+    - 0.91
+    b02:
+    - 1.0
+    - 0.498
+    - 0.055
+    b03:
+    - 1.0
+    - 0.733
+    - 0.471
+    b04:
+    - 0.173
+    - 0.627
+    - 0.173
+    b05:
+    - 0.596
+    - 0.875
+    - 0.541
+    b06:
+    - 0.839
+    - 0.153
+    - 0.157
+    b07:
+    - 1.0
+    - 0.596
+    - 0.588
+    b08:
+    - 0.58
+    - 0.404
+    - 0.741
+    b09:
+    - 0.773
+    - 0.69
+    - 0.835
+    b10:
+    - 0.549
+    - 0.337
+    - 0.294
+    b11:
+    - 0.769
+    - 0.612
+    - 0.58
+    b12:
+    - 0.89
+    - 0.467
+    - 0.761
+    b13:
+    - 0.969
+    - 0.714
+    - 0.824
+    b14:
+    - 0.498
+    - 0.498
+    - 0.498
+    b15:
+    - 0.78
+    - 0.78
+    - 0.78
+    b16:
+    - 0.737
+    - 0.741
+    - 0.133
+    b17:
+    - 0.859
+    - 0.859
+    - 0.553
+    b18:
+    - 0.09
+    - 0.745
+    - 0.812
+    b19:
+    - 0.62
+    - 0.855
+    - 0.898
+  slow_motion: 4
+  render_3d: dots

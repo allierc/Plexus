@@ -103,11 +103,7 @@ plotting:
   camera_elev: 1.18
   camera_turns: 0.0
   camera_zoom: 0.0
-  render_3d: dots
   dot_size: 1.6
-  dot_shading: body
-  dot_specular: 0.4
-  dot_specular_power: 12
   max_frames: 400
   stills: 10
   keep_stills: true
@@ -129,3 +125,4 @@ plotting:
     - 0.95
     - 0.95
   slow_motion: 4
+  render_3d: dots
