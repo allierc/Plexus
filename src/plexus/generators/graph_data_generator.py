@@ -121,6 +121,16 @@ def data_generate(
               "movie.mp4 -- a point cloud of a mesh set's vertices is not this run's picture",
               flush=True)
         live_movie = None
+    if live_movie is not None and _want == "neural_panel":
+        # THE CIRCUIT PANEL instead of the point cloud: the message on the connectivity matrix,
+        # the input and output vectors, the kinograph (plexus/neural_panel.py). Same contract as
+        # LiveMovie -- an `on_frame` hook that writes movie.mp4, the stills and 3d.png.
+        from plexus.neural_panel import NeuralPanel
+        _cfg = {k: v for k, v in dict(live_movie).items() if k != "render_n"}
+        movs.append(NeuralPanel(out=os.path.join(data_dir, "movie.mp4"), n_frames=sim.n_frames,
+                                sim=sim, style=(sim.plotting or {}), name=sim.name, **_cfg))
+        hooks.extend(movs)
+        live_movie = None
     if live_movie is not None:
         from plexus.live_movie import LiveMovie
         # SEVERAL MOVIES FROM ONE SIMULATION. At 200 M particles the trajectory is not stored --

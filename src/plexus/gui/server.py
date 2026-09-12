@@ -327,8 +327,8 @@ def g_claude(h, q):
 def g_frames(h, q):
     from plexus.gui import bio_view
     v = bio_view.current()
-    return h._send_json({"n": len(v.snaps) if v is not None else 0,
-                         "every": getattr(v, "_keep_every", 1) if v is not None else 1})
+    n = 0 if v is None else (len(v.panel.hist) if getattr(v, "panel", None) is not None else len(v.snaps))
+    return h._send_json({"n": n, "every": getattr(v, "_keep_every", 1) if v is not None else 1})
 
 
 def g_run(h, q):

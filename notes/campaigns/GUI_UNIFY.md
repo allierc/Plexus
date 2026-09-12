@@ -152,3 +152,23 @@ Claude's "takes over" routes stay, one copy, on the shared panel.
   `Plexus_gui.py` keeps `--bio/--material` as spellings of `--tab`.
 - Gates: `tests/test_gui_parity.py` -- per-tab reference equality, round trip, one pipeline, one
   shell, the route table, and a two-species mass-action check of the metabolism operators.
+
+## The circuit panel (2026-09-12, evening)
+
+The neurons tab draws what connectome-gnn's `prototype/dot_tracking/test_zebra_eyeG.py` draws
+(Figure 1c of the oculomotor note, live), not a point cloud: `plotting.renderer: neural_panel`
+(`src/plexus/neural_panel.py`) -- the message |W_ij r_j| on the post x pre matrix, coloured by
+the presynaptic column's Dale sign (blue E, red I), the input vector (the drive field sampled at
+the neurons), the rate vector r = tanh v, the output per population, the kinograph of every
+neuron below. Same hook contract as LiveMovie (movie.mp4, stills, 3d.png) and the page's View
+draws it (no camera; PLAY redraws captured frames).
+- The form: `frac_exc`, `dale` (every synapse takes its presynaptic sign; I weights carry the
+  n_E/n_I balance), `afferent` (an E sub-population the `drive` lands on through the new
+  `neuron_drive` operator, `at: neuron[type=E_aff]`). `type_layout: ordered` now also orders
+  types inside per-parent blocks.
+- `tools/zebrafish_to_plexus.py`: the 285-cell oculomotor pool (same selection, sort and sign
+  convention as zebrafish_circuit.py; 5,013 synapses, spectral radius 0.9) as
+  `config/neural/zebrafish_om_285.yaml` + `graphs_data/neural/zebrafish_om_285_edges.npz`.
+- Found on the way: the reference `ctrnn_assemblies.yaml` schedules `activation_pulse` with no
+  `pacemaker`, so its Omega field was always zero and the neurons ran on noise alone. The tab
+  and the tool schedule the pacemaker.
