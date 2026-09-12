@@ -902,61 +902,61 @@
  "tissue/cycle_dilution": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/cycle_hazard": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/cycle_sizer": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/cycle_timer": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/divide_growing_ball": {
@@ -1247,91 +1247,91 @@
  "tissue/size_adder": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/size_doubler": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/size_grow_sizer": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/size_sizer": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/size_timer": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/size_two_channel": {
   "vertex": {
    "Nv": 396,
-   "V0f_median": 1.3516297340393066,
-   "V0f_sum": 270.2889099121094,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
    "centre": [
     0.0,
     0.0,
     0.0
    ],
    "nF": 200,
-   "v0_from": "polyhedron",
-   "v_ref": 1.3515371084213257
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
   }
  },
  "tissue/spheroid_ecm": {
