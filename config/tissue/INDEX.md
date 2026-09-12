@@ -85,6 +85,14 @@ Prose and reasons are in `AB_TISSUE_README.md`.
 | `ms4_round_prism_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
 | `r010_00_ctrl` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_shape_probe, cell_grow, cell_mechanics, interface_tension, edge_flip, cell_divide |
 | `r020_00_ctrl` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_shape_probe, cell_grow, cell_mechanics, interface_tension, edge_flip, cell_divide |
+| `rig_apop_competition_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_crowded_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_crowded_sizer_noT1` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, cell_divide, cell_die |
+| `rig_apop_crowded_timer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_small_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_small_sizer_noT1` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, cell_divide, cell_die |
+| `rig_apop_small_timer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_smaller_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
 | `sheet_die` | 400 | 400 | disc | default | -- | cell_mechanics, cell_die, edge_flip |
 | `sheet_divide` | 400 | 400 | disc | default | -- | cell_grow, cell_mechanics, cell_divide, edge_flip |
 | `sheet_moebius` | 200 | 400 | moebius | default | -- | cell_mechanics, edge_flip |

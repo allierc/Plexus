@@ -2346,15 +2346,21 @@ class Apoptosis3D(Structural):
 
     def _q(self, m, H, nF, what):
         """The per-cell quantity a local mode compares."""
-        if what == "growth":                                  # fractional growth SINCE BIRTH
-            v = m.get("V0f"); vb = cell_block(H, self.cat, "Vbirth", nF)
-            if v is None or vb is None:
+        # A CELL IS SMALL BECAUSE IT IS SMALL, NOT BECAUSE IT ASKS TO BE (R4 of
+        # notes/size_cycle/SIZE_CYCLE_PLAN.md). `volume` and `growth` read the TARGET `V0f` until
+        # now, and since R1 every daughter's target is the mother's half exactly, so `small` and
+        # `smaller` could not see the asymmetry the septum actually produces (birth volumes CV
+        # 0.27) and `competition` compared a target with a measured `Vbirth`. All three read the
+        # measured volume through `cell_size` now -- one reader, the one the rules use.
+        if what in ("growth", "volume"):
+            lvl = H.level(self.at)
+            v_now, _ = cell_size(lvl, m, nF)
+            if what == "volume":
+                return np.asarray(v_now, np.float64)
+            vb = cell_block(H, self.cat, "Vbirth", nF)
+            if vb is None:
                 return None
-            return np.maximum(v.detach().cpu().numpy()[:nF]
-                              / np.maximum(vb, 1e-12) - 1.0, 0.0)
-        if what == "volume":
-            v = m.get("V0f")
-            return None if v is None else v.detach().cpu().numpy()[:nF]
+            return np.maximum(np.asarray(v_now, np.float64) / np.maximum(vb, 1e-12) - 1.0, 0.0)
         if what == "age":
             a = m.get("age")
             return None if a is None else a.detach().cpu().numpy()[:nF]
@@ -2480,11 +2486,10 @@ class Apoptosis3D(Structural):
             # v_ref -- the seed-time median -- is squeezed out, which is what an epithelium does
             # with a cell it can no longer accommodate. It re-evaluates for the same reason
             # `chem_low` does: a cell arrives in this set by shrinking, not by being pushed.
-            v = m.get("V0f")
-            if v is None:
+            vv = self._q(m, H, nF, "volume")                           # measured, see `_q`
+            if vv is None:
                 return set()
-            vv = v.detach().cpu().numpy()[:nF]
-            v_ref = size_ref(m)                                        # see `cell_size`
+            v_ref = size_ref(m)                                        # the same convention: see `cell_size`
             return set(np.where(vv < self.small_frac * v_ref)[0].tolist())
         if self.mode == "stalled":
             # CELL COMPETITION: a cell that is not growing while its neighbours are gets removed.
