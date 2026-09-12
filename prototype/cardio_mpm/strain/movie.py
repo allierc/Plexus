@@ -52,6 +52,7 @@ def main():
     ap.add_argument("--band", type=float, default=0.03)
     ap.add_argument("--amplify", type=float, default=12.0, help="displacement arrows are drawn this many times longer")
     ap.add_argument("--fps", type=int, default=8)
+    ap.add_argument("--tag", default="", help="name the file progress_cells_<tag>.mp4 instead of by fit folder")
     ap.add_argument("--stride", type=int, default=5, help="arrows on every stride-th row and column of the node lattice")
     args = ap.parse_args()
     dev = args.device
@@ -142,7 +143,8 @@ def main():
     import imageio_ffmpeg
     od = os.path.join(HERE, "out", "movies"); os.makedirs(od, exist_ok=True)
     tag = os.path.basename(os.path.dirname(args.params))
-    path = os.path.join(od, f"{tag}_beat{args.beat}.mp4")
+    path = (os.path.join(od, f"progress_cells_{args.tag}.mp4") if args.tag
+            else os.path.join(od, f"{tag}_beat{args.beat}.mp4"))
     fig.canvas.draw()
     w, h = fig.canvas.get_width_height()
     w, h = w - w % 2, h - h % 2

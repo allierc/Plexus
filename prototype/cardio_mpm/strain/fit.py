@@ -120,6 +120,9 @@ def main():
                     "(diagnostic: isolates the identifiability of the free ones)")
     ap.add_argument("--tag", default="")
     ap.add_argument("--save-every", type=int, default=25)
+    ap.add_argument("--checkpoints", default="",
+                    help="fractions of the run at which to ALSO write params_p<NN>.npz, e.g. 0.2,0.5 -- "
+                         "so the same fit can be rendered part-trained; params.npz is always the end")
     args = ap.parse_args()
     dev = args.device
     torch.manual_seed(args.seed)
@@ -272,6 +275,11 @@ def main():
                      f"{rc['phi']['weighted_median_deg']:.1f} deg | t0 {rc['clock']['t0']:.2f}/"
                      f"{rc['clock']['truth_t0']:.2f}") if truth is not None else ""
             print(f"  it {it:4d} loss {float(loss):.5f}  {rowd['seconds']:.1f} s{extra}", flush=True)
+        for _fr in [float(v) for v in args.checkpoints.split(",") if v]:
+            if it + 1 == max(1, int(round(_fr * args.iters))):
+                np.savez(os.path.join(od, f"params_p{int(round(_fr * 100)):02d}.npz"), **P.state_dict(),
+                         interior=(interior.cpu().numpy() if interior is not None else np.ones(C, bool)))
+                print(f"  checkpoint at {_fr:.0%} of the run -> params_p{int(round(_fr * 100)):02d}.npz", flush=True)
         if (it + 1) % args.save_every == 0 or it == args.iters - 1:
             np.savez(os.path.join(od, "params.npz"), **P.state_dict(),
                      interior=(interior.cpu().numpy() if interior is not None else np.ones(C, bool)),

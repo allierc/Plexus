@@ -1,0 +1,11 @@
+{
+ "params": "out/fits/s4_live_r16_ckpt/params_p50.npz",
+ "beat": 1,
+ "window": [
+  43,
+  97
+ ],
+ "r2_A": 0.8547468185424805,
+ "frames": 55,
+ "fps": 8
+}

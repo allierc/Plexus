@@ -504,3 +504,23 @@ delay 0.88, axis 10.0°; HCM g 0.92, g2 0.93, delay 0.85, axis 7.1°; median cel
 0.18–0.23 of each map's spread. Slightly looser than the simpler r8 / hcm_r3 pair (g 0.94–0.96,
 axis 5–7°): the richer time-course model buys prediction with a little per-cell reproducibility.
 These are the error bars on every map of the reporting models.
+
+## The training-progress movie set (2026-09-11)
+
+`render_progress.sh` renders, from ONE fit (`s4_live_r16_ckpt`, the reporting model re-run with
+`--checkpoints 0.2,0.5`; it reproduces r13 to 0.002 in held-out R²), **27 movies**: three beats
+(1 and 2 held out, 3 the fit beat) x three stages of the run (20%, 50%, 100% of 250 iterations) x
+three views, named `out/movies/progress_<view>_p<stage>_beat<n>.mp4`:
+
+| view | what |
+|---|---|
+| `overlay` | the raw microscope frames in green and the rest frame warped by the model in magenta, superposed (motion drawn x4); grey where they agree |
+| `particles` | the 18,769 tracking nodes (green) and the 56,640 MPM particles (blue), displacement from rest x10, superposed |
+| `cells` | the four-panel view: per-cell strain map recorded and modelled, the deformation arrows, and the mean curve |
+
+Held-out R²(A) by stage, read off the `cells` movies' json: **20%: 0.815 / 0.820** (beats 1, 2);
+**50%: 0.855 / 0.858**; **100%: 0.864 / 0.867** (fit beat 0.828 / 0.865 / 0.874). Most of the fit
+happens in the first fifth of the run; the last half is worth 0.01.
+
+`out/figures` and `out/movies` were emptied first, and every figure regenerated from this model
+(healthy) and `hcm_r5_modes2` (HCM).

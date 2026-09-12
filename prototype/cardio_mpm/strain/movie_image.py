@@ -85,6 +85,7 @@ def main():
     ap.add_argument("--amplify", type=float, default=1.0)
     ap.add_argument("--down", type=int, default=2, help="downsampling of the 2048 px frames")
     ap.add_argument("--fps", type=int, default=8)
+    ap.add_argument("--tag", default="", help="name the file progress_<kind>_<tag>.mp4 instead of by fit folder")
     ap.add_argument("--overlay", action="store_true",
                     help="ONE panel: the recording in green and the model-warped rest frame in magenta, "
                          "superposed. Where they agree the picture is grey; a mismatch shows as a green/"
@@ -138,7 +139,9 @@ def main():
     import imageio_ffmpeg
     od = os.path.join(HERE, "out", "movies"); os.makedirs(od, exist_ok=True)
     tag = os.path.basename(os.path.dirname(args.params))
-    path = os.path.join(od, f"{'overlay' if args.overlay else 'image'}_{tag}_beat{args.beat}{'' if args.amplify == 1 else f'_x{args.amplify:g}'}.mp4")
+    kind = "overlay" if args.overlay else "image"
+    path = (os.path.join(od, f"progress_{kind}_{args.tag}.mp4") if args.tag else
+            os.path.join(od, f"{kind}_{tag}_beat{args.beat}{'' if args.amplify == 1 else f'_x{args.amplify:g}'}.mp4"))
     fig.canvas.draw(); w, h = fig.canvas.get_width_height(); w, h = w - w % 2, h - h % 2
     writer = imageio_ffmpeg.write_frames(path, (w, h), fps=args.fps, quality=7); writer.send(None)
     for t in range(T):
