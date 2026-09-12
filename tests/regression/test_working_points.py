@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 import regression_lib as R  # noqa: E402
 
 DEVICE = os.environ.get("PLEXUS_REGRESSION_DEVICE", "cuda:0")
-QUICK = {"mech_uniform_target": 60, "apop2_ks0p1": 60}   # size_adder joins once registered (SIZE_CYCLE_PLAN R6)
+QUICK = {"mech_uniform_target": 60, "apop2_ks0p1": 60, "ms3_prism_shell": 60}
 
 pytestmark = pytest.mark.regression
 

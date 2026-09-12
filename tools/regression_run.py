@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 import regression_lib as R  # noqa: E402
 
 ARCHIVE = os.path.join(ROOT, "log", "regression", "archive.jsonl")
-QUICK = {"mech_uniform_target": 60, "apop2_ks0p1": 60}   # size_adder joins once registered (SIZE_CYCLE_PLAN R6)
+QUICK = {"mech_uniform_target": 60, "apop2_ks0p1": 60, "ms3_prism_shell": 60}
 
 
 def _git(*args):

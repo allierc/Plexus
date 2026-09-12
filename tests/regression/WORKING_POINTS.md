@@ -23,6 +23,10 @@ about the working point and goes in its own commit with no source change.
 | mech_uniform_target | tissue | 2026-09-06 | 150 | mid-surface mechanics control, uniform targets |
 | divide_growing_ball | tissue | 2026-09-06 | 150 | growth + division on the base model |
 | mesh_mpm_spheroid_nominal | mesh_mpm | 2026-09 | 150 | the ladder's tissue alone, at the reference scale |
+| ms3_prism_shell | tissue | 2026-09-12 | 150 | the size/cycle working point: no radial pin, the thickness field stiff (`kappa_h 0.2`), the sizer on the cycle |
+| ms5_two_channel | tissue | 2026-09-12 | 150 | growth-rate control and a G1 checkpoint together -- the tightest population of the ladder |
+| ms6_apoptosis | tissue | 2026-09-12 | 150 | death by shrink-shed-extrude on the working point; `ms6b_apoptosis_noT1` is its control and removes nothing |
+| ms7_cycle_adder | tissue | 2026-09-12 | 150 | the adder stated on the cycle -- the "one when" form |
 
 Withdrawn 2026-09-11 (branch size-cycle-align, after the size/cycle audits in
 `notes/size_cycle/SIZE_CYCLE_PLAN.md`): `cvd2_adder_tension`, `cvd_baseline`, `cyc4_sizer`,

@@ -1,0 +1,122 @@
+{
+ "archive": "/workspace/Plexus/graphs_data/tissue/ms5_two_channel",
+ "archived_on": "2026-09-12 16:29",
+ "because": "size-cycle-align: the working-point mechanics (K_R 0, kappa_h 0.2) with the size rules on the cycle; notes/size_cycle/SIZE_CYCLE_PLAN.md",
+ "checkpoints": {
+  "0": {
+   "area_mean": 1.5510858297348022,
+   "cells": 200,
+   "centroid": [
+    0.000894184981007129,
+    -0.0005861315876245499,
+    0.00011713336425600573
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1188,
+   "ndiv_sum": 0,
+   "r_med": 4.918473720550537,
+   "r_p10": 4.909534454345703,
+   "r_p90": 4.925388336181641,
+   "roughness": 0.0012883507879450917,
+   "vertices": 396,
+   "z_sd": 2.8397276401519775
+  },
+  "112": {
+   "area_mean": 1.3648195266723633,
+   "cells": 200,
+   "centroid": [
+    0.009282836690545082,
+    0.0008688532980158925,
+    0.0284127127379179
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1188,
+   "ndiv_sum": 0,
+   "r_med": 4.6677656173706055,
+   "r_p10": 4.525146484375,
+   "r_p90": 4.885401725769043,
+   "roughness": 0.027598123997449875,
+   "vertices": 396,
+   "z_sd": 2.8230462074279785
+  },
+  "150": {
+   "area_mean": 1.421271800994873,
+   "cells": 200,
+   "centroid": [
+    0.010626742616295815,
+    0.0029246800113469362,
+    0.033700019121170044
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1188,
+   "ndiv_sum": 0,
+   "r_med": 4.76374626159668,
+   "r_p10": 4.614353179931641,
+   "r_p90": 4.978131294250488,
+   "roughness": 0.027205033227801323,
+   "vertices": 396,
+   "z_sd": 2.8797857761383057
+  },
+  "37": {
+   "area_mean": 1.2403074502944946,
+   "cells": 200,
+   "centroid": [
+    0.0008531823987141252,
+    -0.0006754446658305824,
+    0.000594387121964246
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1188,
+   "ndiv_sum": 0,
+   "r_med": 4.454277515411377,
+   "r_p10": 4.388566017150879,
+   "r_p90": 4.570542812347412,
+   "roughness": 0.014618354849517345,
+   "vertices": 396,
+   "z_sd": 2.6499640941619873
+  },
+  "75": {
+   "area_mean": 1.305148959159851,
+   "cells": 200,
+   "centroid": [
+    0.005286199972033501,
+    0.0019414081471040845,
+    0.008738052099943161
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1188,
+   "ndiv_sum": 0,
+   "r_med": 4.564033508300781,
+   "r_p10": 4.434363842010498,
+   "r_p90": 4.768009662628174,
+   "roughness": 0.026288732886314392,
+   "vertices": 396,
+   "z_sd": 2.754612684249878
+  }
+ },
+ "cut": {
+  "checkpoints": [
+   0,
+   37,
+   75,
+   112,
+   150
+  ],
+  "engine_frames": 150,
+  "n_frames": 150,
+  "record_stride": 1
+ },
+ "device": "archive",
+ "family": "tissue",
+ "generated_at_commit": "054536f9",
+ "name": "ms5_two_channel",
+ "spec_sha256": "97755612f504730a",
+ "timing": {
+  "device": "archive",
+  "frames": [
+   20,
+   150
+  ],
+  "ms_per_frame": 549.047607421875
+ }
+}
