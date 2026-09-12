@@ -85,6 +85,8 @@ def main():
     ap.add_argument("--amplify", type=float, default=1.0)
     ap.add_argument("--down", type=int, default=2, help="downsampling of the 2048 px frames")
     ap.add_argument("--fps", type=int, default=8)
+    ap.add_argument("--seconds", type=float, default=0.0,
+                    help="play the whole window in this many seconds (sets the frame rate from the frame count); 0 keeps --fps. The reference cardio.mp4 plays the recording in 4.8 s")
     ap.add_argument("--tag", default="", help="name the file progress_<kind>_<tag>.mp4 instead of by fit folder")
     ap.add_argument("--overlay", action="store_true",
                     help="ONE panel: the recording in green and the model-warped rest frame in magenta, "
@@ -143,7 +145,7 @@ def main():
     path = (os.path.join(od, f"progress_{kind}_{args.tag}.mp4") if args.tag else
             os.path.join(od, f"{kind}_{tag}_beat{args.beat}{'' if args.amplify == 1 else f'_x{args.amplify:g}'}.mp4"))
     fig.canvas.draw(); w, h = fig.canvas.get_width_height(); w, h = w - w % 2, h - h % 2
-    writer = imageio_ffmpeg.write_frames(path, (w, h), fps=args.fps, quality=7); writer.send(None)
+    writer = imageio_ffmpeg.write_frames(path, (w, h), fps=(max(1, round(T / args.seconds)) if args.seconds > 0 else args.fps), quality=7); writer.send(None)
     for t in range(T):
         f = LinearNDInterpolator(tri, disp_px[t], fill_value=0.0)
         u = f(pts).reshape(n, n, 2)

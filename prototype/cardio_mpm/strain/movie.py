@@ -52,6 +52,8 @@ def main():
     ap.add_argument("--band", type=float, default=0.03)
     ap.add_argument("--amplify", type=float, default=12.0, help="displacement arrows are drawn this many times longer")
     ap.add_argument("--fps", type=int, default=8)
+    ap.add_argument("--seconds", type=float, default=0.0,
+                    help="play the whole window in this many seconds (sets the frame rate from the frame count); 0 keeps --fps. The reference cardio.mp4 plays the recording in 4.8 s")
     ap.add_argument("--tag", default="", help="name the file progress_cells_<tag>.mp4 instead of by fit folder")
     ap.add_argument("--stride", type=int, default=5, help="arrows on every stride-th row and column of the node lattice")
     args = ap.parse_args()
@@ -148,7 +150,7 @@ def main():
     fig.canvas.draw()
     w, h = fig.canvas.get_width_height()
     w, h = w - w % 2, h - h % 2
-    writer = imageio_ffmpeg.write_frames(path, (w, h), fps=args.fps, quality=7)
+    writer = imageio_ffmpeg.write_frames(path, (w, h), fps=(max(1, round(T / args.seconds)) if args.seconds > 0 else args.fps), quality=7)
     writer.send(None)
     for t in range(T):
         imA.set_data(cell_map(sr[t])); imB.set_data(cell_map(sm[t]))

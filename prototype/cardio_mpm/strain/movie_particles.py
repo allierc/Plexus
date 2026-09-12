@@ -26,6 +26,8 @@ ap.add_argument("--n-grid", type=int, default=128); ap.add_argument("--anchor", 
 ap.add_argument("--drag", type=float, default=30.0); ap.add_argument("--anchor-percell", action="store_true")
 ap.add_argument("--band", type=float, default=0.03); ap.add_argument("--amplify", type=float, default=10.0)
 ap.add_argument("--fps", type=int, default=8)
+ap.add_argument("--seconds", type=float, default=0.0,
+                help="play the whole window in this many seconds (sets the frame rate from the frame count); 0 keeps --fps. The reference cardio.mp4 plays the recording in 4.8 s")
 ap.add_argument("--tag", default="")
 ap.add_argument("--overlay", action="store_true", help="one panel: tracking nodes (green) and MPM particles (blue) superposed")
 args = ap.parse_args(); dev = args.device
@@ -62,7 +64,7 @@ od = os.path.join(HERE, "out", "movies"); os.makedirs(od, exist_ok=True)
 path = (os.path.join(od, f"progress_particles_{args.tag}.mp4") if args.tag else
         os.path.join(od, f"particles{'_overlay' if args.overlay else ''}_{os.path.basename(os.path.dirname(args.params))}_beat{args.beat}.mp4"))
 fig.canvas.draw(); w, h = fig.canvas.get_width_height(); w, h = w - w % 2, h - h % 2
-writer = imageio_ffmpeg.write_frames(path, (w, h), fps=args.fps, quality=7); writer.send(None)
+writer = imageio_ffmpeg.write_frames(path, (w, h), fps=(max(1, round(T / args.seconds)) if args.seconds > 0 else args.fps), quality=7); writer.send(None)
 for t in range(T):
     s_nodes.set_offsets(ref_nodes + A * (nodes_t[t] - ref_nodes))
     dp = pos[t] - X0
