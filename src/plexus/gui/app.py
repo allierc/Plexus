@@ -4,7 +4,7 @@
 FORM_JS); everything below it is here, once: OPEN, BUILD + SEED, the run (which is
 `plexus.pipeline.generate` on the server's VTK thread -- the body of `Plexus_Main.py -o generate`,
 with its per-frame hook feeding this page's renderer so orbit and zoom work while the movie is
-written), PLAY (the run's kept frames at any camera), MOVIE (the mp4 it wrote), YAML, Claude, the
+written), PLAY (the run's frames at any camera, read back from the trajectory if need be), YAML, Claude, the
 hierarchy and the selected object. Switching tabs re-initialises: the run is stopped, the view
 dropped, the server's state cleared, and the new tab's default scene built and seeded on load.
 
@@ -64,7 +64,7 @@ SHELL = r"""<!doctype html>
  <div class="row"><button onclick="runGo()" id="runbtn" title="the form is applied first, then the run starts">RUN</button><button class="dim" onclick="runStop()">STOP</button></div>
  <div id="runstat" style="color:#8c8;font-size:12px;min-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
- <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:190px" oninput="playing=null;showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
+ <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">STOP</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:190px" oninput="playing=null;showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
  <div class="row"><input id="task" style="width:100%" placeholder="{placeholder}" onkeydown="if(event.key==='Enter')claudeGo()"></div>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button><button class="dim" onclick="claudeNew()" title="forget the conversation so far">NEW SESSION</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
@@ -73,7 +73,7 @@ SHELL = r"""<!doctype html>
  <div id="tree" style="margin-top:10px">(none)</div>
  <div id="info" style="margin-top:6px">click an object</div>
 </div>
-<div id="right"><img id="view" draggable="false"><video id="movie" style="display:none;max-width:100%;max-height:100%" controls muted></video><div id="hint">drag to orbit, wheel to zoom, click an object to read it below</div><div id="theme" onclick="toggleTheme()">white / black</div></div>
+<div id="right"><img id="view" draggable="false"><div id="hint">drag to orbit, wheel to zoom, click an object to read it below</div><div id="theme" onclick="toggleTheme()">white / black</div></div>
 <script>
 const TAB={tab_json};
 const DEFAULT_BODIES={default_bodies};
@@ -104,16 +104,15 @@ window.saveAs=async function(){{if(!specName){{status('no spec yet',true);return
 window.openSpec=async function(pth){{$('picker').style.display='none';FORM_SPEC=null;status('opening '+pth+' ...');const j=await (await fetch('/api/scene/open?path='+encodeURIComponent(pth))).json();if(j.error){{status(j.error,true);return;}}$('openlab').textContent=pth;status('opened '+j.name+' -- seeding...');}};
 async function post(url,body){{const r=await fetch(url,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}});return r.json();}}
 window.build=async function(){{status('building the spec...');const j=await post('/api/tab/'+TAB+'/build',form());if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}specName=j.name;FORM_SPEC=j.name;if(j.version!==undefined)seen.version=j.version;$('yamltext').value=j.raw;status(`spec saved: config/studio/${{j.name}}.yaml -- seeding...`);await reseed();}};
-window.reseed=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{status('no spec yet',true);return;}}status('seeding and building the renderer...');const r=await fetch('/api/scene/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){{status(j.error,true);return;}}SCENE=j;tree(j);status(`seeded in ${{j.seconds}}s: `+Object.entries(j.sets).map(([k,v])=>`${{k}} ${{v.n_live}}`).join(', '));render(true);
+window.reseed=async function(){{playStop();FRAME=null;if(!specName){{status('no spec yet',true);return;}}status('seeding and building the renderer...');const r=await fetch('/api/scene/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){{status(j.error,true);return;}}SCENE=j;tree(j);status(`seeded in ${{j.seconds}}s: `+Object.entries(j.sets).map(([k,v])=>`${{k}} ${{v.n_live}}`).join(', '));render(true);
  try{{const f=await (await fetch('/api/scene/frames')).json();nframes=f.n||0;$('frame').max=Math.max(nframes-1,0);
   // THE RUN THIS SPEC ALREADY HAS: if `graphs_data/.../<name>/movie.mp4` is there, PLAY plays it
   // straight away -- no run needed, and no 2 GB trajectory read to scrub at a camera.
-  const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();
-  MOVIE=a.mp4||null;MOVIE_N=a.mp4_frames||0;MOVIE_FPS=a.mp4_fps||0;
-  // THE SLIDER SPANS WHATEVER PLAY WILL PLAY: the frames in memory, else the movie's own frames
-  // (its count and rate come from the file, probed once), so scrubbing works either way.
-  if(!nframes&&MOVIE_N){{$('frame').max=MOVIE_N-1;}}
-  $('framelab').textContent=nframes?`${{nframes}} frames in memory`:'';}}catch(e){{}}}};
+  STORED=f.stored||0;
+  // THE RUN'S OWN DATA, not its movie: a spec whose trajectory is on disk says so, and PLAY reads
+  // it into memory -- real frames, replayable at any camera and through any render.
+  if(!nframes&&STORED){{$('frame').max=STORED-1;}}
+  $('framelab').textContent=nframes?`${{nframes}} frames in memory`:(STORED?`${{STORED}} recorded frames on disk: PLAY loads them`:'');}}catch(e){{}}}};
 window.toggleYaml=function(){{const y=$('yaml');const on=getComputedStyle(y).display==='none';y.style.display=on?'block':'none';}};
 window.saveYaml=async function(){{const j=await post('/api/scene/save',{{name:specName,raw:$('yamltext').value,tab:TAB}});if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();}};
 // THE PICTURE IS THE MOVIE RENDERER'S. Every camera change asks the server for a fresh screenshot;
@@ -149,35 +148,30 @@ async function poll(){{try{{const st=await (await fetch('/api/scene/state')).jso
 poll();
 let running=false;
 let FORM_SPEC=null;   // the spec the form wrote; RUN rebuilds it from the form first, so an edited field counts
-window.runGo=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{$('runstat').textContent='build a scene first';return;}}if(FORM_SPEC===specName){{await build();}}const j=await post('/api/scene/run',{{device:$('run_device').value}});if(j.error){{$('runstat').textContent=j.error;return;}}running=true;$('runbtn').disabled=true;for(const id of ['render','light','color'])if($(id))$(id).disabled=true;$('runstat').textContent=`${{specName}} on ${{j.device}}...`;MOVIE=null;rpoll();}};
+window.runGo=async function(){{playStop();FRAME=null;if(!specName){{$('runstat').textContent='build a scene first';return;}}if(FORM_SPEC===specName){{await build();}}const j=await post('/api/scene/run',{{device:$('run_device').value}});if(j.error){{$('runstat').textContent=j.error;return;}}running=true;$('runbtn').disabled=true;for(const id of ['render','light','color'])if($(id))$(id).disabled=true;$('runstat').textContent=`${{specName}} on ${{j.device}}...`;MOVIE=null;rpoll();}};
 window.runStop=async function(){{await post('/api/scene/run',{{stop:true}});}};
 // THE RUN IS plexus.pipeline.generate -- the body of Plexus_Main.py -o generate -- on the server's
 // VTK thread; its per-frame hook feeds this page's renderer and answers camera moves between
 // frames, so orbit and zoom work WHILE the movie is written to graphs_data/studio/<name>/.
 // Every movie frame is also kept as a level state, so PLAY replays the run at any camera.
-function showMovie(url){{const v=$('movie');if(url){{v.src=url;v.style.display='block';$('view').style.display='none';}}else{{v.pause();v.style.display='none';$('view').style.display='';}}}}
 async function rpoll(){{try{{const j=await (await fetch('/api/scene/run')).json();if(j.error&&!j.running){{$('runstat').textContent='error: '+j.error;}}
  else $('runstat').textContent=(j.running?'running':(j.stopped?'stopped':'done'))+`  frame ${{j.frame}}/${{j.n_frames}}  ${{j.seconds}} s`+(j.ms_per_frame?`  ${{j.ms_per_frame.toFixed(0)}} ms/frame`:(j.frame&&j.seconds?`  ${{(j.seconds/j.frame*1000).toFixed(0)}} ms/frame`:''));
  if(j.counts&&j.counts.sets)$('runcounts').textContent=Object.entries(j.counts.sets).filter(([k])=>k!=='half_edge').map(([k,v])=>`${{k}} ${{v}}`).join('  ');
  render();if(j.running){{setTimeout(rpoll,700);}}else{{running=false;$('runbtn').disabled=false;for(const id of ['render','light','color'])if($(id))$(id).disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);
   const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();
-  $('framelab').textContent=(nframes?`${{nframes}} frames: PLAY replays at any camera`:'')+(a.mp4?`  |  movie.mp4 in ${{a.dir}}`:'');}}}}catch(e){{setTimeout(rpoll,1500);}}}}
-let MOVIE=null, MOVIE_N=0, MOVIE_FPS=0, playing=null, nframes=0, FRAME=null;
+  $('framelab').textContent=(nframes?`${{nframes}} frames: PLAY replays at any camera`:'')+(a.dir?`  |  written to ${{a.dir}}`:'');}}}}catch(e){{setTimeout(rpoll,1500);}}}}
+let STORED=0, playing=null, nframes=0, FRAME=null;
 async function showFrame(i){{
- if(!nframes&&MOVIE){{  // scrubbing the movie file: the slider is its time line
-  showMovie(MOVIE);const v=$('movie');playing=null;v.pause();if(MOVIE_FPS)v.currentTime=i/MOVIE_FPS;
-  $('frame').value=i;$('framelab').textContent=`frame ${{i}}/${{Math.max(MOVIE_N-1,0)}}`;return;}}
+ if(!nframes&&STORED){{await playStopAndLoad();}}
  FRAME=i;$('frame').value=i;$('framelab').textContent=`frame ${{i}}/${{Math.max(nframes-1,0)}}`;await render();}}
-window.playGo=async function(){{const j=await (await fetch('/api/scene/frames')).json();nframes=j.n||0;
- if(!nframes){{  // nothing in memory: play the movie the run wrote, if there is one
-  if(!MOVIE){{$('framelab').textContent='no frames and no movie yet: RUN first';return;}}
-  playing=null;showMovie(MOVIE);const v=$('movie');v.loop=true;
-  // the slider follows the film while it runs
-  v.ontimeupdate=()=>{{if(!MOVIE_FPS)return;const k=Math.round(v.currentTime*MOVIE_FPS);$('frame').value=k;$('framelab').textContent=`frame ${{k}}/${{Math.max(MOVIE_N-1,0)}}`;}};
-  v.play();return;}}
- showMovie(null);$('frame').max=nframes-1;playing=true;let i=0;
+window.playGo=async function(){{let j=await (await fetch('/api/scene/frames')).json();nframes=j.n||0;STORED=j.stored||0;
+ if(!nframes&&STORED){{  // nothing in memory, but the run is on disk: read it
+  $('framelab').textContent=`loading ${{STORED}} recorded frames...`;
+  const l=await post('/api/scene/loadrun',{{}});if(l.error){{$('framelab').textContent=l.error;return;}}nframes=l.n||0;}}
+ if(!nframes){{$('framelab').textContent='no frames yet: RUN first';return;}}$('frame').max=nframes-1;playing=true;let i=0;
  while(playing){{await showFrame(i);i=(i+1)%nframes;await new Promise(r=>setTimeout(r,30));}}}};
-window.playStop=function(){{playing=null;const v=$('movie');if(v.style.display!=='none')v.pause();}};
+window.playStop=function(){{playing=null;}};
+async function playStopAndLoad(){{const l=await post('/api/scene/loadrun',{{}});if(!l.error){{nframes=l.n||0;$('frame').max=Math.max(nframes-1,0);}}}}
 
 let cseen=0;
 window.claudeGo=async function(){{const t=$('task').value.trim();if(!t)return;$('claude').textContent='';cseen=0;const j=await post('/api/scene/claude',{{task:t,mode:TAB,form:form(),name:specName}});if(j.error){{$('cstat').textContent=j.error;return;}}$('cstat').textContent='running...';$('cbtn').disabled=true;}};
