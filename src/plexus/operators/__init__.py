@@ -67,6 +67,8 @@ from . import cell_ops             # noqa: F401  compartment (entity), seed_cell
 #                                                 aggregate_centroid, state_diffuse, and the
 #                                                 motility pair: substrate_traction, protrusion
 from . import neural                # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
+from . import metabolism            # noqa: F401  metabolite_seed, reaction_rate, metabolite_flux,
+                                    #             metabolite_homeostasis -- mass action over a stoichiometric edge-set
 #                                                 (psi: shared | type_pre | type_pairwise),
 #                                                 neuron_field_input (Omega)
 # The continuous-flow operators live with their engine but must still register here. `mpm_emit`

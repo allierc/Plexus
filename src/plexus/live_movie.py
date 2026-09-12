@@ -1001,7 +1001,13 @@ class LiveMovie:
 
     def _frame(self, H, tick):
         import torch
-        sname = _biggest_particle_set(H)
+        # `plotting.subject: <set>` NAMES THE SET THE MOVIE IS ABOUT; otherwise the largest set
+        # carrying positions is it. A metabolic network has more reactions than metabolites and
+        # both sit somewhere, and the concentrations are the picture.
+        sname = (self.style or {}).get("subject") or _biggest_particle_set(H)
+        if sname is not None and sname not in H.levels:
+            self.failed = f"plotting.subject: no set {sname!r}"
+            return
         if sname is None:
             self.failed = "no set carries positions"
             return
@@ -1159,6 +1165,7 @@ class LiveMovie:
                 break
             self._curves_setup(H, lvl)
             self._graph_setup(H)
+            self._graph_update(H, tick)                   # drawn from frame 0 when `always`, else hidden
             self.t0 = time.perf_counter()
             return
         if tick % self.stride:
@@ -2293,6 +2300,10 @@ class LiveMovie:
         if not gs:
             return
         show = getattr(self, "_graph_ticks", {}).get(tick)
+        # `graph_overlay.always: true` draws the relation on EVERY frame -- a circuit's synapses or
+        # a metabolic network's stoichiometry are the picture, not its closing statement.
+        if (getattr(self, "_graph_cfg", None) or {}).get("always"):
+            show = [g["name"] for g in gs]
         if show is None:
             for g in gs:
                 g["actor"].SetVisibility(False)
@@ -2306,6 +2317,37 @@ class LiveMovie:
                 continue
             lvl = H.level(g["name"])
             ei = getattr(lvl, "edge_index", None)
+            # AN EDGE-SET IS A RELATION TOO, drawn between the sets it joins: a synapse set has
+            # `pre`/`post` into the neuron set and no positions of its own, so the segments run
+            # from the pre endpoint's `pos` to the post endpoint's. Directed, so every edge is
+            # drawn (the symmetric filter below is for a proximity graph, which stores each pair
+            # twice). A bipartite relation (stoichiometry: metabolite -> reaction) draws only
+            # when both endpoint sets carry a `pos`.
+            _pre = getattr(lvl, "pre", None)
+            if (ei is None or ei.numel() == 0) and _pre is not None and getattr(lvl, "post", None) is not None:
+                try:
+                    Pa = H.level(lvl.pre_name).get("pos")
+                    Pb = H.level(lvl.post_name).get("pos")
+                except Exception:                    # noqa: BLE001 -- an endpoint with no position
+                    g["actor"].SetVisibility(False)
+                    continue
+                a = _pre.detach().cpu().numpy(); b = lvl.post.detach().cpu().numpy()
+                if a.shape[0] > cap:
+                    a = a[:: a.shape[0] // cap + 1]; b = b[:: b.shape[0] // cap + 1]
+                Pa = np.asarray(Pa.detach().cpu().numpy(), np.float32)
+                Pb = np.asarray(Pb.detach().cpu().numpy(), np.float32)
+                if Pa.shape[1] == 2:
+                    Pa = np.concatenate([Pa, np.zeros((len(Pa), 1), np.float32)], 1)
+                    Pb = np.concatenate([Pb, np.zeros((len(Pb), 1), np.float32)], 1)
+                pts = np.concatenate([Pa[a], Pb[b]], axis=0)
+                m = a.shape[0]
+                lines = np.column_stack([np.full(m, 2, np.int64),
+                                         np.arange(m, dtype=np.int64),
+                                         np.arange(m, 2 * m, dtype=np.int64)]).ravel()
+                g["pd"].points = pts
+                g["pd"].lines = lines
+                g["pd"].Modified()
+                continue
             if ei is None or ei.numel() == 0:
                 g["actor"].SetVisibility(False)
                 continue
@@ -3257,11 +3299,21 @@ class LiveMovie:
         # looked exactly like a field, on a run whose whole subject is a deformation. A colour that
         # looks like data and is not is worse than no colour, and this is the one line that decides
         # which of the two a typo produces.
-        if want not in _FIELDS:
-            raise ValueError(f"plotting.color_field: {want!r} is not one of "
-                             f"{', '.join(sorted(_FIELDS))}")
         import torch
         idx = self.idx
+        # A DECLARED SCALAR BLOCK IS A FIELD TOO. A neuron's `voltage`, a metabolite's `conc`: the
+        # quantity the run is about is a column of the set's own state, declared in its schema,
+        # and colouring by it needs no solver buffer -- so it is available on replay as well.
+        # Looked up on the schema BEFORE the derived names below, and only for width-1 blocks,
+        # because a vector block has no single colour.
+        _sch = getattr(lvl, "state_schema", None)
+        if _sch is not None and want in _sch and want not in _FIELDS:
+            a, b = _sch[want]
+            if b - a == 1:
+                return lvl.state[idx, a], want
+        if want not in _FIELDS:
+            raise ValueError(f"plotting.color_field: {want!r} is not one of "
+                             f"{', '.join(sorted(_FIELDS))} nor a scalar block of {lvl.name!r}")
         # A REPLAY HAS NO DEFORMATION GRADIENT. `trajectory.npz` stores positions, occupancy and the
         # mesh; `F` and `C` are solver state and are not recorded (9 floats per particle per frame
         # would be 1.8 GB on this run alone). Returning None here reads to the caller as "no colour
@@ -3899,7 +3951,7 @@ def replay(data_dir, sim, out=None, *, max_frames=300, render_n=500_000_000, sti
     H = _ReplayState(z, dev, cell_sets=_cs)
     if not H.levels:
         raise ValueError(f"{data_dir}: no set carries positions, nothing to render")
-    sname = _biggest_particle_set(H)
+    sname = ((sim.plotting or {}).get("subject") if sim is not None else None) or _biggest_particle_set(H)
     lvl = H.levels[sname]
     P = lvl._pos                                       # [T, N, D]
     T, D = int(P.shape[0]), int(P.shape[2])

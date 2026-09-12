@@ -169,6 +169,7 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     # substrings are given because these specs are named for what they model -- `ctrnn_*`,
     # `assemblies_*` -- rather than for the folder, unlike the three above.
     ("neural",      ("neural", "ctrnn", "assemblies", "connectome")),
+    ("metabolism",  ("metabol", "massaction", "stoich")),
 ]
 _VALID_PRE_FOLDERS = {f for f, _ in _PRE_FOLDER_RULES}
 
