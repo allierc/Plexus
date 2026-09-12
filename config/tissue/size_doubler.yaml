@@ -95,7 +95,7 @@ operators:
   kappa_s: 0.2
   gamma: 0.0
   Lambda: 0.0
-  K_R: 0.4
+  K_R: 0.0
   mu: 1.0
   relax_iters: 30
   eta: 0.08
@@ -178,3 +178,17 @@ plotting:
     ticks: 4
   scale_bar_corner: right_face
   scale_bar_lift: -0.07
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of cells grows significantly in size as the simulation progresses
+      from frame 6 to frame 1366. The number of individual cells within the cluster increases steadily
+      over time, as shown in the top-right graph. The total volume of the cell cluster expands from approximately
+      1719 $\mu\text{m}^3$ to over 2540 $\mu\text{m}^3$. Red and blue markers appear and multiply within
+      the cluster, indicating specific internal features or states.
+    objects: The primary object is a spherical cluster composed of many small, interconnected polygonal
+      cells. These cells are primarily white with grey outlines, forming a dense, packed structure. Small
+      red and blue markers are distributed throughout the interior of the sphere, increasing in number
+      as the cluster grows. The entire cluster is contained within a large, transparent 3D bounding box
+      representing a 600 $\mu\text{m}$ cube.

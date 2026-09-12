@@ -95,7 +95,7 @@ operators:
   kappa_s: 0.2
   gamma: 0.0
   Lambda: 0.0
-  K_R: 0.4
+  K_R: 0.0
   mu: 1.0
   relax_iters: 30
   eta: 0.08
@@ -177,3 +177,15 @@ plotting:
     ticks: 4
   scale_bar_corner: right_face
   scale_bar_lift: -0.07
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of particles grows in size and complexity as the simulation progresses.
+      The number of individual cells within the cluster increases steadily over the observed frames. The
+      total volume of the cluster remains relatively stable, fluctuating slightly around 1800 cubic micrometers.
+      Small red and blue internal structures appear and multiply within the expanding white mesh.
+    objects: The primary object is a large, spherical cluster composed of a white wireframe mesh. Numerous
+      small red and blue internal components are distributed throughout the interior of this sphere. A
+      large black bounding box defines the simulation space, with a 100 micrometer scale bar in the corner.
+      Two line graphs on the right track the total cell count and the average cell volume over time.

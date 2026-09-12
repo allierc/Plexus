@@ -111,7 +111,7 @@ operators:
   kappa_s: 0.2
   gamma: 0.0
   Lambda: 0.0
-  K_R: 0.4
+  K_R: 0.0
   mu: 1.0
   relax_iters: 30
   eta: 0.08
@@ -215,3 +215,17 @@ plotting:
   - '#e8b024'
   - '#e03b2f'
   mesh_mark_division: false
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of particles grows and becomes increasingly dense within a large
+      cubic simulation box. The internal structure of the sphere evolves from a uniform blue mass to a
+      complex, multi-colored mosaic of distinct shapes. Over time, the number of cells within the cluster
+      increases significantly as shown in the top-right graph. The volume of the cluster remains relatively
+      stable while its internal composition becomes more heterogeneous.
+    objects: The primary object is a spherical cluster of particles located in the center of a large,
+      transparent 500 $\mu$m cube. The particles within the sphere transition from a uniform blue color
+      to a mixture of blue, yellow, green, and red. The cluster maintains a consistent diameter while
+      its internal density and variety of shapes increase. A small circular inset in the bottom-left corner
+      shows a cross-sectional view of the sphere's internal arrangement.

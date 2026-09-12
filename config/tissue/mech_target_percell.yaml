@@ -144,3 +144,16 @@ plotting:
     xlabel: frame
     ylabel: shell radius
     ticks: 4
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: The simulation shows a spherical cell-like structure maintaining a stable shape within
+      a 3D bounding box. A horizontal bar in the "cell-volume" graph remains constant at a value of 1.4
+      throughout the sequence. Similarly, the "sphericity" graph shows a steady value of approximately
+      4.3 across all frames. The visual representation of the sphere and its cross-section remains static,
+      indicating a steady-state equilibrium.
+    objects: A large, light-blue sphere with a Voronoi-like polygonal mesh pattern is centered in a wireframe
+      cube. The sphere is surrounded by a black background, emphasizing its geometric structure. A small
+      inset in the bottom-left corner shows a circular cross-section with red and blue segments. The graphs
+      on the right display horizontal white lines representing constant physical parameters over time.

@@ -98,7 +98,7 @@ operators:
   kappa_s: 0.2
   gamma: 0.0
   Lambda: 0.0
-  K_R: 0.4
+  K_R: 0.0
   mu: 1.0
   relax_iters: 30
   eta: 0.08
@@ -181,3 +181,16 @@ plotting:
     ticks: 4
   scale_bar_corner: right_face
   scale_bar_lift: -0.07
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of cells grows and expands within a large cubic simulation box. As
+      the simulation progresses, the number of cells increases while the average cell volume fluctuates
+      and eventually stabilizes. The internal structure of the sphere becomes more complex, showing a
+      denser network of interconnected cells. By the final frames, the cluster has significantly increased
+      in size and internal complexity compared to the initial state.
+    objects: The primary object is a spherical cluster of cells composed of many small, interconnected
+      polygonal units. These cells are primarily white with grey outlines, and some internal components
+      appear in red and blue. The cluster is centered within a large, transparent 500 $\mu$m cubic bounding
+      box. A small inset in the bottom left corner shows a cross-sectional view of the cluster's boundary.
