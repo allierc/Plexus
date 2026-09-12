@@ -190,7 +190,7 @@ PAGE = r"""<!doctype html>
  <h2>Box</h2>
  <div class="row"><label>name</label><input id="name" value="bouncing_balls"></div>
  <div class="row"><label>box side (m)</label><input id="world" class="short" value="0.1"> <label style="width:60px">grid</label><input id="n_grid" class="short" value="96"></div>
- <div class="row"><label>frames</label><input id="n_frames" class="short" value="400"> <label style="width:60px">dt (s)</label><input id="dt" class="short" value="0.00083"></div>
+ <div class="row"><label>frames</label><input id="n_frames" class="short" value="800"> <label style="width:60px">dt (s)</label><input id="dt" class="short" value="0.00083"></div>
  <div class="row"><label>gravity</label><input id="gravity" class="short" value="9.81"> <label style="width:60px">particles</label><input id="particles" class="short" value="10000" title="material points per body"></div>
  <div class="row"><label>bounce</label><input id="bounce" class="short" value="0.9" title="wall restitution: 1 = elastic wall, 0 = dead"> <span style="color:#778;font-size:11px">wall restitution, per impact</span></div>
  <h2>Bodies <button class="dim" onclick="addBody()">+ body</button></h2>
@@ -199,8 +199,8 @@ PAGE = r"""<!doctype html>
  <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button><button class="dim" onclick="reseed()">RE-SEED</button></div>
  <div id="status">form a scene, then BUILD</div>
  <h2>Run the engine</h2>
- <div class="row"><label>frames</label><input id="run_frames" class="short" value="400"> <label style="width:60px">device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
- <div class="row"><label title="how many times the picture is refreshed while the run goes">live pics</label><input id="run_live" class="short" value="20"> <label style="width:70px" title="frames kept for PLAY: every frame up to this many, then every 2nd, 4th... (the movie's rule)">movie frames</label><input id="run_keep" class="short" value="300"></div>
+ <div class="row"><label>frames</label><input id="run_frames" class="short" value="800"> <label style="width:60px">device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
+ <div class="row"><label title="how many times the picture is refreshed while the run goes">live pics</label><input id="run_live" class="short" value="10"> <label style="width:70px" title="frames kept for PLAY: every frame up to this many, then every 2nd, 4th... (the movie's rule)">movie frames</label><input id="run_keep" class="short" value="400"></div>
  <div class="row"><button onclick="runGo()" id="runbtn">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
  <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:170px" oninput="showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
