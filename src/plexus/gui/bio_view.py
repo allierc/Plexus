@@ -341,6 +341,41 @@ class View:
                 self.lm._update_cross_section(H)
             self.frame_shown = i
 
+    def _range_from_frames(self, n_sample: int = 24):
+        """THE COLOUR RANGE OF A FIELD, FROM THE RUN: with the run's frames in memory and a field
+        colour asked for (`plotting.color_field` without a `color_range`), the range is the 2nd to
+        98th percentile over a sample of the kept frames -- the whole run's deformation, stress or
+        speed -- rather than whatever the first frame with a field happened to hold."""
+        lm = self.lm
+        st = lm.style or {}
+        if lm is None or not st.get("color_field") or st.get("color_range") or not self.snaps:
+            return
+        import torch
+        try:
+            lvl = self.H.level(lm._sname)
+        except Exception:                                        # noqa: BLE001
+            return
+        vals = []
+        idxs = np.unique(np.linspace(1, len(self.snaps) - 1, min(n_sample, len(self.snaps) - 1)).astype(int))
+        for i in idxs:
+            self._show_frame(int(i))
+            try:
+                val, _ = lm._field(self.H, lvl)
+            except Exception:                                    # noqa: BLE001
+                return
+            if val is not None:
+                vals.append(val.detach().float().flatten()[:: max(1, val.numel() // 50_000)].cpu())
+        if not vals:
+            return
+        allv = torch.cat(vals)
+        q = torch.quantile(allv, torch.tensor([0.02, 0.98]))
+        lo, hi = float(q[0]), float(q[1])
+        if hi > lo:
+            lm.style["color_range"] = [lo, hi]
+            lm._frng = (lo, hi)
+            print(f"[view] {st.get('color_field')} range from {len(idxs)} kept frames: [{lo:.4g}, {hi:.4g}]", flush=True)
+        self._show_frame(0)
+
     def _grab(self):
         with LOCK:
             self.p.render()                                      # screenshot() alone returns the stale frame
@@ -667,6 +702,7 @@ def open_view(spec_path: str, device: str = "cpu", carry: bool = False) -> View:
                     v.RUN = dict(keep.RUN); v.RUN["running"] = False
                     v.lm.n_frames = int(v.RUN.get("n_frames") or 1)   # the overlay's denominator is the run's
                     print(f"[view] {len(v.snaps)} frames of the last run carried to the new render", flush=True)
+                    v._range_from_frames()
             elif keep is not None and getattr(v, "panel", None) is not None and getattr(keep, "panel", None) is not None:
                 v.panel.hist = keep.panel.hist
                 v.RUN = dict(keep.RUN); v.RUN["running"] = False
