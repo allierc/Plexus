@@ -4781,7 +4781,9 @@ def _apicobasal_energy_core(pos, sep, es, et, ef, nF, V_eq, alive, k_v, kappa_s,
         _w = vocc.to(ring.dtype).reshape(-1, 1)
         _c = (ring * _w).sum(dim=0, keepdim=True) / _w.sum().clamp(min=1.0)
         E = E + K_R * ((((ring - _c).norm(dim=1) - R0) ** 2) * vocc).sum()
-    # `kappa_h` -- A STIFFNESS ON THE THICKNESS FIELD (R3d of notes/size_cycle/SIZE_CYCLE_PLAN.md).
+    # `kappa_h` -- A STIFFNESS ON THE THICKNESS FIELD (R3d of notes/size_cycle/SIZE_CYCLE_PLAN.md;
+    # `ab_sep_dirichlet` is its warp kernel, checked against this expression by
+    # `tests/test_vertex_warp_apicobasal.py`).
     # Nothing above prefers a prism to a frustum: a cell that flares its apical cap and pinches its
     # basal one keeps its volume and nearly its surface, so every T1 kick and every septum walked
     # the caps apart and the mechanics never walked them back (half the cells trapezoids by frame
@@ -6003,6 +6005,27 @@ if HAVE_WARP:
         GX[v] = gx
         GS[v] = gs
 
+    @wp.kernel
+    def ab_sep_dirichlet(SEP: wp.array(dtype=wp.vec3), ES: wp.array(dtype=wp.int32),
+                         ET: wp.array(dtype=wp.int32), EOCC: wp.array(dtype=float),
+                         kappa_h: float, GS: wp.array(dtype=wp.vec3)):
+        """The thickness field's stiffness, 1/2 kappa_h sum_e |sep_s - sep_t|^2, added to dE/dsep.
+
+        One half-edge, one difference: d/d(sep_s) = +kappa_h w (sep_s - sep_t) and the opposite at
+        the other end. Accumulated ATOMICALLY into `GS` after `ab_combine` has written it, which is
+        why this launch is last -- `ab_combine` assigns, everything after it adds. The term touches
+        `sep` only; `pos` is untouched, so `GX` is not read here.
+        """
+        e = wp.tid()
+        w = EOCC[e]
+        if w <= 0.0:
+            return
+        i = ES[e]
+        j = ET[e]
+        g = (SEP[i] - SEP[j]) * (kappa_h * w)
+        wp.atomic_add(GS, i, g)
+        wp.atomic_add(GS, j, -g)
+
     @wp.func
     def _nan_to_num(v: wp.vec3):
         """`torch.nan_to_num` on a vec3: NaN -> 0, +-inf -> +-float32 max."""
@@ -6040,7 +6063,7 @@ if HAVE_WARP:
 
 
 def _ab_buffers(b, pos, sep, es, et, ef, nF, V_eq, alive, eocc, vocc, R0, k_v, kappa_s, Lam, K_R,
-                gamma, ring):
+                gamma, ring, kappa_h=0.0):
     """The scratch, the static inputs and the RECORDED LAUNCHES for one topology.
 
     Everything the six gradient kernels read is held in buffers this dict owns, so each launch can
@@ -6052,7 +6075,8 @@ def _ab_buffers(b, pos, sep, es, et, ef, nF, V_eq, alive, eocc, vocc, R0, k_v, k
     dev = pos.device
     Nv, E = pos.shape[0], es.shape[0]
     key = (nF, Nv, E, id(es), id(et), id(ef),
-           float(R0), float(k_v), float(kappa_s), float(Lam), float(K_R), float(gamma), int(ring))
+           float(R0), float(k_v), float(kappa_s), float(Lam), float(K_R), float(gamma), int(ring),
+           float(kappa_h))
     if b.get("_key") == key:
         # THE VALUES ARE COPIED IN, THE TABLES ARE NOT: `V_eq` is a fresh tensor every frame
         # (`mono_k * V0f + mono_delta`), so keying on its identity rebuilt everything -- eight
@@ -6115,8 +6139,10 @@ def _ab_buffers(b, pos, sep, es, et, ef, nF, V_eq, alive, eocc, vocc, R0, k_v, k
                                  b["wRC"], b["wW"], b["wGR"], b["wGSUM"]]),
         rec(ab_combine, Nv, [b["wGA"], b["wGB"], b["wGM"], b["wVOCC"], int(ring), has_r,
                              b["wGR"], b["wGSUM"], b["wW"], b["wGX"], b["wGS"]]),
+        rec(ab_sep_dirichlet, E, [Sp, b["wES"], b["wET"], b["wEOCC"], float(kappa_h), b["wGS"]]),
     ]
     b["has_radial"] = has_r
+    b["has_kappa_h"] = 1 if kappa_h != 0.0 else 0
     return b
 
 
@@ -6143,16 +6169,19 @@ def _ab_grad_into(b, stream):
     if b["has_radial"]:
         L[5].launch(stream); L[6].launch(stream)
     L[7].launch(stream)
+    if b["has_kappa_h"]:
+        L[8].launch(stream)                      # adds into GS, so it goes after ab_combine writes it
 
 
 def apicobasal_energy_grad_warp(pos, sep, es, et, ef, nF, V_eq, alive, R0, k_v, kappa_s, Lam,
-                                K_R, gamma, eocc, vocc, surface="apical", buffers=None):
+                                K_R, gamma, eocc, vocc, surface="apical", buffers=None,
+                                kappa_h=0.0):
     """(dE/dpos, dE/dsep) for `_apicobasal_energy_core`, in warp kernels instead of an autograd
     backward. `buffers` is reused across calls: scratch, converted index tables and recorded
     launches live there, rebuilt only when the topology or a coefficient changes."""
     ring = {"apical": 0, "basal": 1, "mid": 2}[surface]
     b = _ab_buffers(buffers if buffers is not None else {}, pos, sep, es, et, ef, nF, V_eq, alive,
-                    eocc, vocc, R0, k_v, kappa_s, Lam, K_R, gamma, ring)
+                    eocc, vocc, R0, k_v, kappa_s, Lam, K_R, gamma, ring, kappa_h)
     b["POS"].copy_(pos); b["SEP"].copy_(sep)
     _ab_grad_into(b, _ab_stream(b, pos.device))
     return b["GX"].clone(), b["GS"].clone()
@@ -6167,7 +6196,7 @@ def relax_apicobasal_warp(op, x0, s0, es, et, ef, nF, V_eq, alive, R0, eocc, voc
     if not hasattr(op, "_wbuf"):
         op._wbuf = {}
     b = _ab_buffers(op._wbuf, x0, s0, es, et, ef, nF, V_eq, alive, eocc, vocc, R0, op.k_v,
-                    op.kappa_s, op.Lambda, op.K_R, op.gamma, ring)
+                    op.kappa_s, op.Lambda, op.K_R, op.gamma, ring, float(getattr(op, "kappa_h", 0.0)))
     stream = _ab_stream(b, x0.device)
     b["POS"].copy_(x0); b["SEP"].copy_(s0)
     b["CAP"].copy_(cap.reshape(1)); b["CAPS"].copy_(cap_s.reshape(1))
@@ -6209,11 +6238,6 @@ def try_apicobasal_grad(op, x, s, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc):
     same contract as `try_shape_energy_grad`."""
     if apicobasal_warp_unavailable(x) is not None:
         return None
-    if float(getattr(op, "kappa_h", 0.0)) != 0.0:
-        _warn_once("kappa_h", "[warn] cell_mechanics[apicobasal]: `kappa_h` is not ported to the "
-                              "warp kernels; this run uses autograd. A term dropped from a gradient "
-                              "is a different model, not a faster one.")
-        return None
     if not hasattr(op, "_wbuf"):
         op._wbuf = {}
     # `R0t` is a 0-d CUDA tensor; `float()` of it is a device sync per call. The operator
@@ -6223,5 +6247,6 @@ def try_apicobasal_grad(op, x, s, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc):
         R0 = float(R0t)
     gx, gs = apicobasal_energy_grad_warp(x, s, es, et, ef, nF, V_eq, alive, R0, op.k_v,
                                          op.kappa_s, op.Lambda, op.K_R, op.gamma, eocc, vocc,
-                                         surface=op.surface, buffers=op._wbuf)
+                                         surface=op.surface, buffers=op._wbuf,
+                                         kappa_h=float(getattr(op, "kappa_h", 0.0)))
     return gx, gs
