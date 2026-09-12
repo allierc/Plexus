@@ -134,7 +134,7 @@ tabInit();
 // FOLLOW THE SERVER'S SESSION: whoever drives the API (a person, or Claude) is seen here.
 let seen={{version:-1,cam_version:-1}};
 async function poll(){{try{{const st=await (await fetch('/api/scene/state')).json();
- if(st.name&&st.version!==seen.version){{seen.version=st.version;specName=st.name;$('name').value=st.name;const j=await (await fetch('/api/scene/spec?name='+encodeURIComponent(st.name)+'&tab='+TAB)).json();if(j.raw)$('yamltext').value=j.raw;if(j.form)fillForm(j.form);await reseed();}}
+ if(st.name&&st.version!==seen.version){{seen.version=st.version;specName=st.name;$('name').value=st.name;const j=await (await fetch('/api/scene/spec?name='+encodeURIComponent(st.name)+'&tab='+TAB)).json();if(j.raw)$('yamltext').value=j.raw;if(j.form){{fillForm(j.form);FORM_SPEC=st.name;}}else{{FORM_SPEC=null;}}await reseed();}}
  if(st.cam_version!==seen.cam_version){{seen.cam_version=st.cam_version;CAM.azim=st.azim;CAM.elev=st.elev;CAM.zoom=st.zoom;if(st.pick){{const j=await (await fetch('/api/scene/info?pick='+encodeURIComponent(st.pick))).json();if(!j.error)showInfo(j);}}render();}}
  if(st.message)$('rstat').textContent=st.message;}}catch(e){{}}finally{{setTimeout(poll,1500);}}}}
 poll();
