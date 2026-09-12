@@ -524,3 +524,7 @@ happens in the first fifth of the run; the last half is worth 0.01.
 
 `out/figures` and `out/movies` were emptied first, and every figure regenerated from this model
 (healthy) and `hcm_r5_modes2` (HCM).
+
+All 27 progress movies play their beat window in **4 s** (14 fps), matching the reference
+`cardio.mp4` (4.8 s for the whole recording). `--seconds` on the three movie scripts sets the frame
+rate from the frame count; `render_progress.sh` passes it.
