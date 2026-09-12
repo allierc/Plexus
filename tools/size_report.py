@@ -37,6 +37,7 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
+sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 
 def _traj(name, group):
@@ -85,12 +86,16 @@ def _age(z, t):
     return z["vertex__mesh_age"][int(foff[t]):int(foff[t]) + n]
 
 
-def row(name, group="tissue", birth_lag=12):
+def row(name, group="tissue", birth_lag=12, until=None):
+    """`until`: score only the frames before it -- the first frame `tools/spheroid_gauge.py`
+    refuses, so a table never reads a crumpled mesh."""
     p = _traj(name, group)
     if p is None:
         return None
     z = np.load(p)
     nFs = z["vertex__mesh_nF"]; T = len(nFs)
+    if until is not None:
+        T = max(2, min(T, int(until)))
     # AGES FIRST, VOLUMES ONLY WHERE THEY ARE READ. Lineage comes from the recorded `age`, which is
     # cheap; the polyhedron geometry is not, and a run of 800 frames and 2,000 cells took minutes
     # per spec when every frame was rebuilt. The volumes are needed at each birth's read frame,
@@ -120,7 +125,7 @@ def row(name, group="tissue", birth_lag=12):
     V = {t: _volumes(z, t, conv) for t in sorted(need)}
     v_ref = float(np.median(V[min(ref_frame, T - 1)]))
     cyc = [(V[tr][i] / v_ref, V[td - 1][i] / v_ref, td - tb) for i, tb, tr, td in pairs]
-    out = dict(name=name, T=T, n0=int(nFs[0]), nT=int(nFs[-1]), cycles=len(cyc))
+    out = dict(name=name, T=T, n0=int(nFs[0]), nT=int(nFs[T - 1]), cycles=len(cyc))
     med_t = sorted(t for t in V if t % stride == 0 or t == T - 1)
     med = np.array([np.median(V[t]) for t in med_t]) / v_ref
     out["med_end"] = float(med[-1])
@@ -148,6 +153,10 @@ def main():
                     help="spec-name glob under the group's data dir; repeatable")
     ap.add_argument("--birth-lag", type=int, default=12,
                     help="frames after the septum at which the birth volume is read")
+    ap.add_argument("--until", type=int, default=None,
+                    help="score only frames before this one (the gauge's first refused frame)")
+    ap.add_argument("--gauge", action="store_true",
+                    help="run tools/spheroid_gauge.py first and score up to its first refused frame")
     a = ap.parse_args()
     names = list(a.names)
     if a.glob:
@@ -156,14 +165,21 @@ def main():
             names += sorted(os.path.basename(p) for p in
                             glob.glob(os.path.join(graphs_data_path(), a.group, g))
                             if os.path.isdir(p))
-    print(f"{'spec':<20} {'cells':>11} {'cycles':>6} {'slope':>6} {'r(L,Vb)':>8} {'CV(Vd)':>7} "
+    print(f"{'spec':<26} {'cells':>11} {'cycles':>6} {'slope':>6} {'r(L,Vb)':>8} {'CV(Vd)':>7} "
           f"{'L':>6} {'med V/vref':>10} {'drift':>6} {'CV(V)':>6}")
     for n in dict.fromkeys(names):
-        r = row(n, a.group, a.birth_lag)
+        until = a.until
+        if a.gauge:
+            import spheroid_gauge as G
+            fb, _ = G.gauge(_traj(n, a.group), every=50, verbose=False)
+            until = fb[0] if fb is not None else None
+        r = row(n, a.group, a.birth_lag, until)
+        if r is not None:
+            r["name"] = f"{n}<{until}" if until else n
         if r is None:
             print(f"{n:<20} -- no trajectory on disk"); continue
         f = lambda k, w, d=2: (f"{r[k]:{w}.{d}f}" if k in r else " " * (w - 1) + "-")   # noqa: E731
-        print(f"{r['name']:<20} {r['n0']:5d}->{r['nT']:<5d} {r['cycles']:6d} {f('slope', 6)} "
+        print(f"{r['name']:<26} {r['n0']:5d}->{r['nT']:<5d} {r['cycles']:6d} {f('slope', 6)} "
               f"{f('r_L_Vb', 8)} {f('cv_Vd', 7)} {f('mean_L', 6, 0)} {r['med_end']:10.2f} "
               f"{f('drift', 6)} {r['cv_end']:6.3f}")
     return 0
