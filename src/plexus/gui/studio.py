@@ -403,8 +403,21 @@ def _mp4_info(path: str) -> tuple:
 
 
 def artefacts(name: str) -> dict:
-    """What this spec's run wrote: the folder, the poster (`3d.png`), the movie, the newest still."""
+    """What this spec's run wrote: the folder, the poster (`3d.png`), the movie, the newest still.
+
+    TWO PLACES, NEWEST WINS. A run started from the page lands in `graphs_data/studio/<name>`; a
+    spec OPENED from a finished run has its own folder (`graphs_data/<type>/<name>`, found by
+    `resolve_run`), and that one already holds a movie -- which is what makes PLAY work the moment
+    a spec is opened, with no run and no trajectory read."""
     full = out_dir(name)
+    if not os.path.exists(os.path.join(full, "movie.mp4")):
+        try:
+            from plexus.paths import resolve_run
+            alt = resolve_run(name)
+            if os.path.exists(os.path.join(alt, "movie.mp4")):
+                full = alt
+        except Exception:                                            # noqa: BLE001 -- no such run
+            pass
     png = os.path.join(full, "3d.png")
     mp4 = os.path.join(full, "movie.mp4")
     stills = sorted(glob.glob(os.path.join(full, "still_*.png")))

@@ -42,6 +42,8 @@ FORM_HTML = r'''
  <div class="row"><button class="dim" onclick="addOrganelle()">+ organelle</button> <span style="color:#9ab">organelles</span></div>
  <table class="sp" id="organelles"><tr><th>name</th><th>per cell</th><th>radius</th><th>region</th><th>on divide</th><th>tau</th><th></th></tr></table>
  <div class="row"><button class="dim" onclick="addSpecies()">+ species</button> <span style="color:#9ab">protein species</span></div>
+ <div class="row" id="curves" style="color:#ccd">plots: <label style="width:auto;margin-right:8px"><input type="checkbox" value="cells" style="width:auto" onchange="setCurves()"> cells</label><label style="width:auto;margin-right:8px"><input type="checkbox" value="area" style="width:auto" onchange="setCurves()"> area</label><label style="width:auto;margin-right:8px"><input type="checkbox" value="volume" style="width:auto" onchange="setCurves()"> volume</label><label style="width:auto;margin-right:8px"><input type="checkbox" value="radius" style="width:auto" onchange="setCurves()"> radius</label><label style="width:auto;margin-right:8px"><input type="checkbox" value="phase" style="width:auto" onchange="setCurves()"> phase</label><label style="width:auto"><input type="checkbox" value="cycle_progress" style="width:auto" onchange="setCurves()"> cycle</label></div>
+ <div style="color:#778;font-size:11px">up to three plots are drawn beside the tissue, live, and in the movie</div>
  <table class="sp" id="species"><tr><th>name</th><th>region</th><th>density</th><th>s</th><th>tau</th><th></th></tr></table>
 '''
 
@@ -60,5 +62,10 @@ window.tabForm=function(){return {name:$('name').value,shape:$('shape').value,n_
 window.tabFill=function(f){$('name').value=f.name;$('shape').value=f.shape;$('n_cells').value=f.n_cells;$('radius').value=f.radius;$('h0').value=f.h0;$('apical').value=f.apical;$('world').value=f.world;$('n_frames').value=f.n_frames;
  let tb=$('species');while(tb.rows.length>1)tb.deleteRow(-1);(f.species||[]).forEach(addSpecies);
  tb=$('organelles');while(tb.rows.length>1)tb.deleteRow(-1);(f.organelles||[]).forEach(addOrganelle);}
+// THE PLOT LIST: the quantities `plotting.curve` draws beside the picture; at most three fit.
+window.setCurves=async function(){const boxes=[...document.querySelectorAll('#curves input')];const want=boxes.filter(b=>b.checked).map(b=>b.value);
+ if(want.length>3){boxes.filter(b=>b.checked).slice(3).forEach(b=>b.checked=false);status('at most three plots fit beside the picture',true);return setCurves();}
+ if(!specName){status('build or open a scene first',true);return;}status('drawing '+(want.join(', ')||'no plots')+'...');
+ const j=await post('/api/scene/curves',{name:specName,curves:want});if(j.error){status(j.error,true);return;}if(j.version!==undefined)seen.version=j.version;if(j.raw)$('yamltext').value=j.raw;await reseed();};
 window.tabInit=function(){addOrganelle({name:'nucleus',count:1,radius:0.3,region:'basal_side',on_divide:'duplicate'});addSpecies({name:'integrin',region:'basal'});};
 '''
