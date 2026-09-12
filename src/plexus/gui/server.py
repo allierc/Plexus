@@ -328,7 +328,16 @@ def g_frames(h, q):
     from plexus.gui import bio_view
     v = bio_view.current()
     n = 0 if v is None else (len(v.panel.hist) if getattr(v, "panel", None) is not None else len(v.snaps))
-    return h._send_json({"n": n, "every": getattr(v, "_keep_every", 1) if v is not None else 1})
+    # WHAT IS ON DISK, when nothing is in memory: the recorded trajectory of this spec's run, as a
+    # frame count read from the file's header. PLAY loads it (`/api/scene/loadrun`).
+    stored = 0
+    if v is not None and not n and getattr(v, "panel", None) is None:
+        try:
+            stored = int(v.stored_frames())
+        except Exception:                                        # noqa: BLE001
+            stored = 0
+    return h._send_json({"n": n, "stored": stored,
+                         "every": getattr(v, "_keep_every", 1) if v is not None else 1})
 
 
 def g_run(h, q):
@@ -741,6 +750,22 @@ def p_curves(h, data):
     return h._send_json({"name": name, "raw": raw, "curves": want, "version": bio.STATE["version"]})
 
 
+def p_loadrun(h, data):
+    """Read this spec's recorded trajectory into the view, so PLAY replays the REAL frames through
+    the current render at any camera (the movie file is a picture; this is the data)."""
+    from plexus.gui import bio_view
+    v = bio_view.current()
+    if v is None:
+        return h._send_json({"error": "no scene is open"}, 400)
+    try:
+        n = bio_view._vtk(v.load_run_frames)
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": f"{type(e).__name__}: {e}"[:400]}, 400)
+    if not n:
+        return h._send_json({"error": "this spec has no recorded trajectory"}, 404)
+    return h._send_json({"n": n, "every": v._keep_every, "n_frames": v.RUN.get("n_frames")})
+
+
 def p_quit(h, data):
     """SHUT THE SOCKET, NOT JUST THE PROCESS. A server killed with the port still bound -- or
     suspended with Ctrl-Z -- leaves the port held and the next launch dies on "Address already in
@@ -822,6 +847,7 @@ POST_ROUTES = {
     "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
     "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
     "/api/scene/style": p_style, "/api/scene/saveas": p_saveas, "/api/scene/curves": p_curves,
+    "/api/scene/loadrun": p_loadrun,
     "/api/quit": p_quit, "/api/studio/quit": p_quit,
     "/api/validate": p_validate, "/api/save": p_editor_save, "/api/layout": p_layout,
 }

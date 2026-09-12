@@ -347,6 +347,134 @@ class View:
         self.snaps.append(snap)
         self.RUN["frames_kept"] = len(self.snaps)
 
+    # ------------------------------------------------------------------ a finished run's frames
+    def run_dir(self):
+        """Where this spec's run landed: the page's own output folder, else the run it was opened
+        from (`resolve_run`), or None."""
+        name = os.path.splitext(os.path.basename(self.spec_path))[0]
+        cands = []
+        try:
+            from plexus.gui import studio
+            cands.append(studio.out_dir(name))
+        except Exception:                                        # noqa: BLE001
+            pass
+        try:
+            from plexus.paths import resolve_run
+            cands.append(resolve_run(name))
+        except Exception:                                        # noqa: BLE001
+            pass
+        for d in cands:
+            if d and os.path.exists(os.path.join(d, "trajectory.npz")):
+                return d
+        return None
+
+    def stored_frames(self):
+        """How many frames the run on disk holds -- read from the npz HEADER, not by loading it: a
+        tissue run's positions are 500 MB and the page only wants the number until PLAY is pressed."""
+        d = self.run_dir()
+        if d is None:
+            return 0
+        try:
+            import zipfile
+            with np.load(os.path.join(d, "trajectory.npz")) as z:
+                for k in z.files:
+                    if not k.endswith("__pos"):
+                        continue
+                    with z.zip.open(k + ".npy") as f:
+                        ver = np.lib.format.read_magic(f)
+                        shape = np.lib.format._read_array_header(f, ver)[0]
+                    return int(shape[0])
+        except Exception as e:                                   # noqa: BLE001
+            print(f"[view] {d}: cannot read the trajectory header ({type(e).__name__}: {e})", flush=True)
+        return 0
+
+    def load_run_frames(self, max_frames: int = 300):
+        """THE RUN'S OWN DATA, not its movie: the recorded trajectory read back into the same
+        per-frame level states a live run keeps, so PLAY replays the real frames through the
+        CURRENT render at ANY camera. Strided to `max_frames` and to `SNAP_BUDGET` bytes.
+
+        Read one array at a time and strided immediately: a 1,600-frame tissue holds 500 MB of
+        vertex positions, and the point of the stride is not to keep them."""
+        d = self.run_dir()
+        if d is None:
+            return 0
+        import torch
+        t0 = time.time()
+        path = os.path.join(d, "trajectory.npz")
+        with np.load(path) as z:
+            names = [n for n in self.H.levels if f"{n}__pos" in z.files]
+            if not names:
+                return 0
+            T = None
+            per_frame = 0
+            for n in names:
+                sch = self.H.level(n).state_schema
+                for key in ("pos", "sep"):
+                    if f"{n}__{key}" in z.files and key in sch:
+                        with z.zip.open(f"{n}__{key}.npy") as f:
+                            ver = np.lib.format.read_magic(f)
+                            shp = np.lib.format._read_array_header(f, ver)[0]
+                        T = shp[0] if T is None else min(T, int(shp[0]))
+                        per_frame += int(np.prod(shp[1:])) * 4
+            if not T:
+                return 0
+            by_count = max(1, -(-T // max_frames))
+            by_mem = max(1, -(-(T * max(per_frame, 1)) // self.SNAP_BUDGET))
+            step = max(by_count, by_mem)
+            rows = list(range(0, T, step))
+            snaps = [{} for _ in rows]
+            for n in names:
+                sch = self.H.level(n).state_schema
+                for key in ("pos", "sep"):
+                    k = f"{n}__{key}"
+                    if k not in z.files or key not in sch:
+                        continue
+                    a = z[k][rows]                               # one read, then only the kept rows
+                    for j in range(len(rows)):
+                        snaps[j].setdefault(n, {})[key] = torch.as_tensor(np.ascontiguousarray(a[j]), dtype=torch.float32)
+                    del a
+                k = f"{n}__occ"
+                if k in z.files:
+                    a = z[k][rows]
+                    for j in range(len(rows)):
+                        snaps[j].setdefault(n, {})["occ"] = torch.as_tensor(np.ascontiguousarray(a[j]), dtype=torch.float32)
+                    del a
+                # THE MESH TABLE PER FRAME, ragged: row t is `E_srce[off[t]:off[t+1]]`, and the
+                # per-face columns ride their own offsets (a face is not a half-edge).
+                if f"{n}__mesh_offsets" in z.files:
+                    off = z[f"{n}__mesh_offsets"]; foff = z[f"{n}__mesh_face_offsets"]
+                    nF = z[f"{n}__mesh_nF"]; Nv = z[f"{n}__mesh_Nv"]
+                    cols = {c[len(f"{n}__mesh_"):]: z[c] for c in z.files
+                            if c.startswith(f"{n}__mesh_") and not c.endswith("_offsets")
+                            and c[len(f"{n}__mesh_"):] not in ("nF", "Nv")}
+                    ownoff = {c[len(f"{n}__mesh_"):-len("_offsets")]: z[c] for c in z.files
+                              if c.startswith(f"{n}__mesh_") and c.endswith("_offsets")
+                              and c not in (f"{n}__mesh_offsets", f"{n}__mesh_face_offsets")}
+                    for j, t in enumerate(rows):
+                        if t + 1 >= len(off):
+                            continue
+                        m = {"nF": int(nF[t]), "Nv": int(Nv[t])}
+                        for cname, arr in cols.items():
+                            if arr.ndim == 1 and arr.shape[0] == len(nF):      # one value per row
+                                m[cname] = float(arr[t]); continue
+                            o = ownoff.get(cname)
+                            if o is not None:
+                                sl = slice(int(o[t]), int(o[t + 1]))
+                            elif cname in ("E_srce", "E_trgt", "E_face"):
+                                sl = slice(int(off[t]), int(off[t + 1]))
+                            else:
+                                sl = slice(int(foff[t]), int(foff[t + 1]))
+                            m[cname] = torch.as_tensor(np.ascontiguousarray(arr[sl]))
+                        snaps[j].setdefault(n, {})["mesh"] = m
+        self.snaps = snaps
+        self._keep_every = step
+        self.RUN.update(n_frames=T - 1, frames_kept=len(snaps), keep_every=step, frame=T - 1, running=False)
+        self.lm.n_frames = int(T - 1)                            # the overlay's denominator is the run's
+        self.lm.t0 = time.perf_counter()
+        print(f"[view] {len(snaps)} of {T} recorded frames from {path} in {time.time() - t0:.1f}s "
+              f"(every {step})", flush=True)
+        return len(snaps)
+
     def show_frame(self, i: int):
         """Put the picture at kept frame `i` (on the VTK thread): the levels of the view's own
         hierarchy take the snapshot's columns, then the movie renderer redraws them as it would
