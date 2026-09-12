@@ -47,16 +47,11 @@ def _traj(name, group):
 
 
 def _convention(traj):
-    """The convention the run's size rules read (`vertex_ops.cell_size`): the polyhedron only when
-    the seed declared `v0_from: polyhedron`, the wedge otherwise. Read from the spec archived beside
-    the trajectory, so the report regresses the quantity the rule compared and not another one."""
-    import yaml
-    sp = os.path.join(os.path.dirname(traj), "spec.yaml")
-    if os.path.exists(sp):
-        for op in (yaml.safe_load(open(sp)).get("seed") or []):
-            if op.get("op") in ("seed_mesh", "mesh_seed") and str(op.get("v0_from", "wedge")).lower() == "polyhedron":
-                return "polyhedron"
-    return "wedge"
+    """The convention the run's size rules read (`vertex_ops.cell_size`, R2b): the polyhedron
+    whenever the set carries a separation, the area on a flat sheet, the wedge otherwise. Decided
+    from the trajectory's own blocks, so the report regresses the quantity the rule compared."""
+    z = np.load(traj)
+    return "polyhedron" if "vertex__sep" in z.files else "wedge"
 
 
 def _volumes(z, t, convention="wedge"):
