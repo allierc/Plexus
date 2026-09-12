@@ -1202,33 +1202,56 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             # `vel_init` on a CONTAINED set = one coherent random launch velocity per parent
             # CELL (the ball/cube body), shared by all its particles, so the whole object
             # translates (not per-particle jitter). `vel_init_cell` / `vel_init_cube`: aliases.
-            vcell = float(s.get("vel_init", s.get("vel_init_cell", s.get("vel_init_cube", 0.0))))
-            if vcell > 0 and "vel" in schema:
+            _vi = s.get("vel_init", s.get("vel_init_cell", s.get("vel_init_cube", 0.0)))
+            # A CONE OF LAUNCHES, not only a random box. `vel_init: {mode: cone, speed: 3, axis: 1,
+            # spread_deg: 30}` gives each parent a velocity of `speed` along `axis`, tilted by an
+            # angle drawn uniformly in [0, spread_deg] about a random azimuth -- a spray of jets
+            # leaving a surface, which the scalar form (a uniform box in every axis) cannot say.
+            # `speed_jitter` (a fraction of `speed`) varies the magnitude between parents.
+            _cone = isinstance(_vi, dict) and str(_vi.get("mode", "")).lower() == "cone"
+            vcell = 0.0 if isinstance(_vi, dict) else float(_vi)
+            if (_cone or vcell > 0) and "vel" in schema:
                 vx0, vx1 = schema["vel"]
-                # DRAWN ONCE PER PARENT, SHARED BY EVERY CHILD SET. The launch velocity is a
-                # property of the CELL, not of each of its substrates: a composed cell whose
-                # nucleus, cytosol and membrane each drew their own random vector would not
-                # translate, it would come apart in the first frame. Cached on the parent Level so
-                # the second and third child set reuse the first one's draw. (Any spec with a
-                # single child set is unaffected -- it makes the first draw and nothing reuses it.)
                 vc = getattr(parent, "_launch_v", None)
                 if vc is None or vc.shape != (parent.n, D):
-                    vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcell)
-                    # `vel_init_axes: [0, 1]` -- launch in the PLANE only.
-                    #
-                    # An isotropic draw does not average to zero over a handful of cells: with 20
-                    # the sample mean of one component is ~v/sqrt(3n), and with no gravity and no
-                    # drag there is nothing to cancel it. In a run confined between plates that
-                    # small bias decides everything -- the ensemble sank 0.015 before the plates
-                    # engaged, met the lower plate first, and came out with 56% of each cell's
-                    # particles flat against its underside and 3% against its top. It reads as an
-                    # asymmetric boundary condition and is actually an asymmetric initial condition.
-                    _axes = s.get("vel_init_axes")
-                    if _axes is not None:
-                        keep = torch.zeros(D, device=device)
-                        for _a in _axes:
-                            keep[int(_a)] = 1.0
-                        vc = vc * keep
+                    if _cone:
+                        ax = int(_vi.get("axis", 1))
+                        sp = float(_vi.get("speed", 1.0))
+                        half = math.radians(float(_vi.get("spread_deg", 30.0)))
+                        jit = float(_vi.get("speed_jitter", 0.0))
+                        lat = [i for i in range(D) if i != ax]
+                        th = torch.rand(parent.n, generator=H.rng, device=device) * half
+                        vc = torch.zeros(parent.n, D, device=device)
+                        vc[:, ax] = torch.cos(th)
+                        if len(lat) == 1:                               # 2-D: one side or the other
+                            sgn = torch.where(torch.rand(parent.n, generator=H.rng, device=device) < 0.5, -1.0, 1.0)
+                            vc[:, lat[0]] = torch.sin(th) * sgn
+                        else:                                           # 3-D: a random azimuth
+                            phi = torch.rand(parent.n, generator=H.rng, device=device) * (2 * math.pi)
+                            vc[:, lat[0]] = torch.sin(th) * torch.cos(phi)
+                            vc[:, lat[1]] = torch.sin(th) * torch.sin(phi)
+                        mag = sp * (1.0 + jit * (torch.rand(parent.n, generator=H.rng, device=device) - 0.5) * 2.0)
+                        vc = vc * mag[:, None]
+                    else:
+                        vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcell)
+                        _axes = s.get("vel_init_axes")
+                        if _axes is not None:
+                            keep = torch.zeros(D, device=device)
+                            for _a in _axes:
+                                keep[int(_a)] = 1.0
+                            vc = vc * keep
+                    # `types: [jet]` -- ONLY THOSE BODIES ARE LAUNCHED, the rest start at rest.
+                    # A pool and the jets leaving it are one set (they are one material); without
+                    # this the pool takes the launch too and the whole tank moves.
+                    _only = (_vi.get("types") if isinstance(_vi, dict) else None) or s.get("vel_init_types")
+                    if _only:
+                        tn = list(getattr(parent, "type_names", []) or [])
+                        want = torch.zeros(parent.n, dtype=torch.bool, device=device)
+                        pnt = getattr(parent, "node_type", None)
+                        for t in _only:
+                            if t in tn and pnt is not None:
+                                want |= (pnt == tn.index(t))
+                        vc = vc * want[:, None].to(vc.dtype)
                     parent._launch_v = vc
                 state[:, vx0:vx1] = vc[parent_idx]
         occ = parent.occ[parent_idx].clone()                      # a child is live iff its parent is

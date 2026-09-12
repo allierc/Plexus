@@ -1,6 +1,6 @@
 general:
   name: si_water_blast
-  seed: 1
+  seed: 3
   n_frames: 900
   dt: 0.0005
   boundary: wall
@@ -11,10 +11,24 @@ general:
 
 sets:
   cell:
-    n: 2
+    n: 15
     start:
-    - [0.25, 0.10, 0.25]
-    - [0.25, 0.08, 0.25]
+    - [0.25, 0.09, 0.25]
+    - [0.13, 0.15, 0.16]
+    - [0.22, 0.15, 0.13]
+    - [0.35, 0.15, 0.17]
+    - [0.41, 0.15, 0.28]
+    - [0.33, 0.15, 0.38]
+    - [0.20, 0.15, 0.39]
+    - [0.11, 0.15, 0.30]
+    - [0.26, 0.15, 0.26]
+    - [0.17, 0.15, 0.23]
+    - [0.31, 0.15, 0.22]
+    - [0.36, 0.15, 0.32]
+    - [0.19, 0.15, 0.33]
+    - [0.28, 0.15, 0.18]
+    - [0.24, 0.15, 0.34]
+    type_layout: ordered
     types:
       pool:
         count: 1
@@ -22,39 +36,33 @@ sets:
         bulk_modulus: 2200000.0
         density: 1000.0
         eta: 0.001
-        block: [0.03, 0.02, 0.03, 0.47, 0.18, 0.47]
-      charge:
-        count: 1
+        block: [0.03, 0.02, 0.03, 0.47, 0.16, 0.47]
+      jet:
+        count: 14
         material: liquid
         bulk_modulus: 2200000.0
         density: 1000.0
         eta: 0.001
         shape: ball
-    type_layout: ordered
   mpm_particle:
     parent: cell
-    per_parent: {pool: 470000, charge: 30000}
-    radius: 0.035
+    per_parent: {pool: 360000, jet: 10000}
+    radius: 0.028
     density: 1000.0
+    vel_init: {mode: cone, speed: 3.2, axis: 1, spread_deg: 32, speed_jitter: 0.35, types: [jet]}
 
 fields:
   mpm_grid: {frame: mpm_grid, n_grid: 128}
 
 operators:
 - {op: gravity, at: cell, g: 9.81}
-- op: mpm_turgor
-  at: mpm_particle[parent=1]
-  pressure: 6000000.0
-  after_frame: 30
-  before_frame: 90
 - {op: mpm_strain, at: mpm_particle, implementation: warp}
 - {op: mpm_viscosity, at: mpm_particle, eta: 0.001}
 - {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 4000.0, implementation: warp, polar: higham}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.4, wall_friction: 0.2, surface_tension: 0.072, csf_rho: 1000.0, csf_band: 0.2}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.4, wall_friction: 0.2, surface_tension: 2.0, csf_rho: 1000.0, csf_band: 0.25}
 - {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, vmax: 1000000000.0, implementation: warp}
 
 schedule:
-- mpm_turgor
 - gravity
 - substep_dt: 2.5e-05
   steps: [mpm_strain, mpm_viscosity, mpm_scatter, mpm_grid_update, mpm_gather]
@@ -66,14 +74,16 @@ plotting:
   render_3d: dots
   dot_size: 2.0
   dot_shading: true
-  color_field: speed
-  field_cmap: turbo
+  dot_specular: 0.35
+  dot_specular_power: 14
   max_frames: 450
   stills: 12
   keep_stills: true
   box_frame: true
-  floor: '#0b1a3a'
-  floor_opacity: 0.3
+  floor: '#06102a'
+  floor_opacity: 0.35
   hide_sets: [cell]
-  colors: {pool: [0.30, 0.55, 1.00], charge: [1.00, 0.75, 0.25]}
+  colors:
+    pool: [0.10, 0.35, 0.95]
+    jet: [0.45, 0.75, 1.00]
   slow_motion: 4

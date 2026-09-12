@@ -475,6 +475,11 @@ class View:
         self.RUN.update(n_frames=T - 1, frames_kept=len(snaps), keep_every=step, frame=T - 1, running=False)
         self.lm.n_frames = int(T - 1)                            # the overlay's denominator is the run's
         self.lm.t0 = time.perf_counter()
+        # THE FIELD'S COLOUR RANGE FROM THE WHOLE RUN, now that its frames are here: deformation,
+        # stress or speed measured over a sample of them rather than settled on one frame. A field
+        # the trajectory cannot rebuild (it stores no F, C or velocity) simply leaves the range as
+        # it was -- `_range_from_frames` asks the renderer and gives up quietly.
+        self._range_from_frames()
         print(f"[view] {len(snaps)} of {T} recorded frames from {path} in {time.time() - t0:.1f}s "
               f"(every {step})", flush=True)
         return len(snaps)
