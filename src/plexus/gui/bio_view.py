@@ -449,13 +449,21 @@ class View:
                 except Exception:                                # noqa: BLE001
                     pass
                 self._paint = None
-            for nm, act in list(getattr(lm.p, "renderer", None).actors.items() if lm.p is not None else []):
-                if nm.startswith("contour_") and getattr(self, "_paint_actor", None) == nm:
+            _pa = getattr(self, "_paint_actor", None)
+            if _pa == "pick_cell":
+                try:
+                    lm.p.remove_actor("pick_cell", render=False)
+                except Exception:                                # noqa: BLE001
+                    pass
+                self._paint_actor = None
+            elif _pa:
+                act = lm.p.renderer.actors.get(_pa) if lm.p is not None else None
+                if act is not None:
                     try:
                         act.GetProperty().SetColor(*self._paint_color)
                     except Exception:                            # noqa: BLE001
                         pass
-                    self._paint_actor = None
+                self._paint_actor = None
             if not pick or not pick.startswith("cell:"):
                 return
             try:
@@ -480,6 +488,27 @@ class View:
                     act.GetProperty().SetColor(1.0, 0.93, 0.2)
                     self._paint_actor = f"contour_{tname}"
                     return
+            # A TISSUE'S CELL IS A RING OF EDGES, not a set of contained points: its own apical and
+            # basal cap edges plus the lateral edges joining them, drawn in yellow. That IS the
+            # object -- the cell has no particles of its own to paint.
+            T = self.scene.get("tissue")
+            if T is not None:
+                import pyvista as pv
+                seg, ring = [], set()
+                for cap in ("apical", "basal"):
+                    c = T["caps"][cap]
+                    for j, t in enumerate(c["tri"]):
+                        if c["face"][j] == k:
+                            seg.append((c["verts"][t[1]], c["verts"][t[2]])); ring.add(t[1])
+                for i in ring:
+                    seg.append((T["caps"]["apical"]["verts"][i], T["caps"]["basal"]["verts"][i]))
+                if seg:
+                    pts = np.asarray([p for sg in seg for p in sg], float)
+                    lines = np.concatenate([[2, 2 * j, 2 * j + 1] for j in range(len(seg))])
+                    pd = pv.PolyData(pts); pd.lines = lines
+                    lm.p.add_mesh(pd, color="#ffee33", line_width=4, lighting=False, name="pick_cell")
+                    self._paint_actor = "pick_cell"
+                return
             par = getattr(H_lvl, "parent", None)
             idx = getattr(lm, "idx", None)
             if par is None or idx is None or getattr(lm, "cloud", None) is None:

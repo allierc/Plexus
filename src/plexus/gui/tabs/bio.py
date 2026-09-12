@@ -12,6 +12,11 @@ NAME, TITLE = "bio", "Plexus bio objects"
 PICK_DIR = os.path.join(studio.REPO, "config", "tissue")
 CORPUS_MODE = "bio"
 BRIEF = bio.BIO_BRIEF.replace("/api/bio/build", "/api/tab/bio/build").replace("/api/bio/", "/api/scene/")
+# THE TAB OPENS A FILE, NOT THE FORM. `ms4_round_prism_shell` is a run's own spec (copied from
+# graphs_data/tissue/ms4_round_prism_shell/spec.yaml): a 200-cell apico-basal shell with the
+# growth, mechanics, division and edge-flip a tissue run actually uses, which the form -- whose
+# template is `spheroid_proteins` -- cannot write. BUILD + SEED still writes the form's spec.
+DEFAULT_SPEC = os.path.join(studio.REPO, "config", "tissue", "ms4_round_prism_shell.yaml")
 DEFAULT_FORM = {"name": "bio_scene", "shape": "sphere", "n_cells": 200, "radius": 5.0, "h0": 1.2, "apical": "in",
                 "world": 50.0, "n_frames": 801,
                 "species": [{"name": "integrin", "region": "basal", "density": 3.0, "s": 0.02, "tau": 300.0}],

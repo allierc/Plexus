@@ -73,8 +73,8 @@ def _multimaterial_27(world: float = 0.5, side: float = 0.06):
     box is 0.5 m, g = 9.81 and the form's `particles` sets the points per cube."""
     import matplotlib
     # BOUNCING CUBES, as the reference shows them: every cube elastic (the reference's jelly),
-    # E = 0.2 MPa, one colour each; the material menu of the form can still change any of them.
-    mats = ({"material": "elastic", "youngs": 200000.0, "density": 1000.0},)   # 0.2 MPa: a jelly that deforms on landing
+    # E = 50 kPa, one colour each; the material menu of the form can still change any of them.
+    mats = ({"material": "elastic", "youngs": 50000.0, "density": 1000.0},)   # 50 kPa: a soft jelly, visibly squashed by its own landing
     # ONE COLOUR PER CUBE, as the reference draws them (tab10 per object): 27 distinct hues from
     # tab20 and tab20b, so neighbouring cubes of one material are still telling apart.
     cm_a, cm_b = matplotlib.colormaps["tab20"], matplotlib.colormaps["tab20b"]
@@ -100,7 +100,7 @@ DEFAULT_FORM = {
     # a random initial velocity per cube.
     "name": "si_multimaterial_27", "world": 0.5, "n_grid": 96, "n_frames": 800, "dt": 0.002,
     "gravity": 9.81, "particles": 1331, "radius": 0.03, "wall_damp": 0.9, "friction": 0.2,
-    "launch": 1.0, "movie_frames": 400, "stills": 10, "seed": 1, "render": "middle_splats", "light": "default",
+    "launch": 1.0, "movie_frames": 400, "stills": 10, "seed": 1, "render": "large_splats", "light": "default",
     "color": "particles", "bodies": _multimaterial_27(),
 }
 REFERENCE = os.path.join(REPO, "config", "si_material", "si_multimaterial_27.yaml")
@@ -113,9 +113,12 @@ REFERENCE = os.path.join(REPO, "config", "si_material", "si_multimaterial_27.yam
 RENDER_KEYS = ("render_3d", "dot_size", "dot_shading", "dot_specular", "dot_specular_power", "contour_by_type",
                "surface_env", "surface_env_color", "surface_opacity", "surface_roughness", "surface_metallic",
                "surface_pbr", "shadows", "light", "edl", "contour_ngrid", "contour_smooth")
-RENDER_MODES = ("small_dots", "middle_dots", "large_dots", "small_splats", "middle_splats", "large_splats",
-                "surface", "surface_specular", "glassy")
+RENDER_MODES = ("small_splats", "middle_splats", "large_splats", "surface", "surface_specular", "glassy")
 LIGHT_MODES = ("default", "headlight", "sun", "studio", "flat")
+# FLAT PIXELS ARE STILL A RENDER, just not a menu entry: `render_3d: dots` with a `dot_size` is
+# what a hand-written spec uses and what `render_of` reads back when one is opened. The menu lists
+# splats only -- a lit sphere imposter at the same cost, which the three dot sizes were the poor
+# version of.
 DOT_PX = {"small_dots": 1.0, "middle_dots": 2.0, "large_dots": 4.0}
 # THE SPLAT SIZES, in pixels: a lit sphere imposter per point, so the size is the ball's diameter
 # on screen and the three sizes are the three densities a body is worth drawing at.
@@ -129,15 +132,15 @@ def render_style(mode: str = "small_dots", light: str = "default") -> dict:
         raise ValueError(f"render must be one of {RENDER_MODES}")
     if light not in LIGHT_MODES:
         raise ValueError(f"light must be one of {LIGHT_MODES}")
-    if mode in DOT_PX:
-        st = {"render_3d": "dots", "dot_size": DOT_PX[mode]}
-    elif mode in SPLAT_PX:
+    if mode in SPLAT_PX:
         # THE ONE IN BETWEEN: big dots drawn as lit sphere imposters (VTK's point sprites,
         # `render_points_as_spheres` + `dot_shading: true`) -- each point a shaded ball at the cost
         # of a point, so a body reads as a solid without a contour's density grid. (The gaussian
         # splat mapper and eye-dome lighting were tried first: the mapper drew nothing through
         # pyvista's rgb path and EDL darkened the whole off-screen frame.)
         st = {"render_3d": "dots", "dot_size": SPLAT_PX[mode], "dot_shading": True}
+    elif mode in DOT_PX:
+        st = {"render_3d": "dots", "dot_size": DOT_PX[mode]}
     else:
         # THE SURFACE, AT PAGE SPEED: a 96^3 density grid and 8 smoothing passes where the movie's
         # default is 176^3 and 35 -- a coarser skin, a few times faster to rebuild per frame.
@@ -300,7 +303,7 @@ def build_spec(form: dict) -> dict:
                                   "camera_turns": 0.0, "camera_zoom": 0.0,
                                   "max_frames": int(form.get("movie_frames", 400)), "stills": int(form.get("stills", 10)),
                                   "keep_stills": True, "splat_res": 600, "box_frame": True, "hide_sets": ["cell"],
-                                  "floor": "#0b1a3a", "colors": colors, "slow_motion": 4},
+                                  "floor": "#0b1a3a", "floor_opacity": 0.25, "colors": colors, "slow_motion": 4},
                                  str(form.get("render", "small_dots")), str(form.get("light", "default")),
                                  str(form.get("color", "particles"))),
     }
@@ -373,8 +376,7 @@ You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body 
                           block [x0,y0,z0,x1,y1,z1] for a slab, material (elastic|liquid|snow),
                           youngs (elastic/snow) or bulk_modulus (liquid), density}].
                           Bodies keep their order: the first body is at the first centre.
-                          render (small_dots|middle_dots|large_dots|small_splats|middle_splats|large_splats|
-                          surface|surface_specular|glassy),
+                          render (small_splats|middle_splats|large_splats|surface|surface_specular|glassy),
                           light (default|headlight|sun|studio|flat), color (particles|deformation|stress|velocities).
                           A ball deforms visibly below ~30,000 Pa; 1,000,000 is rigid.
   POST /api/scene/refine    {name, prompt} -> an English edit of the current spec (another Claude
@@ -411,7 +413,7 @@ FORM_HTML = r'''
  <div style="color:#778;font-size:11px">a ball is placed at its centre with the shared radius above; a block spans its six numbers (metres). Bodies keep their order: the first body is at the first centre. stiffness = Young's modulus (elastic, snow) or bulk modulus (liquid), Pa; eta the viscosity, Pa s; colour r g b in 0-1 (blank = automatic).</div>
  </div>
 
- <div class="row"><label>render</label><select id="render" style="width:130px" onchange="setStyle()"><option value="small_dots">small dots</option><option value="middle_dots">middle dots</option><option value="large_dots">large dots</option><option value="small_splats">small splats</option><option value="middle_splats">middle splats</option><option value="large_splats">large splats</option><option value="surface">surface</option><option value="surface_specular">surface specular</option><option value="glassy">glassy</option></select> <label style="width:40px">light</label><select id="light" style="width:100px" onchange="setStyle()"><option value="default">default</option><option value="headlight">headlight</option><option value="sun">sun</option><option value="studio">studio</option><option value="flat">flat</option></select></div>
+ <div class="row"><label>render</label><select id="render" style="width:130px" onchange="setStyle()"><option value="small_splats">small splats</option><option value="middle_splats">middle splats</option><option value="large_splats">large splats</option><option value="surface">surface</option><option value="surface_specular">surface specular</option><option value="glassy">glassy</option></select> <label style="width:40px">light</label><select id="light" style="width:100px" onchange="setStyle()"><option value="default">default</option><option value="headlight">headlight</option><option value="sun">sun</option><option value="studio">studio</option><option value="flat">flat</option></select></div>
  <div class="row"><label>colour</label><select id="color" style="width:130px" onchange="setStyle()"><option value="particles">particles</option><option value="deformation">deformation</option><option value="stress">stress</option><option value="velocities">velocities</option></select> <span style="color:#778;font-size:11px">render, light and colour apply now and to the movie</span></div>
 '''
 
