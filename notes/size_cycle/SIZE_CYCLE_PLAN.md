@@ -277,9 +277,45 @@ dividing arm CRUMPLED (thickness CV past 0.15 between frames 350 and 1200; `size
 inverted cells by 1601), the four cycle arms frozen at 304 cells (finding 12). Findings 10-12
 came out of it; not scored.
 
-**R2b (archives `log/size_cycle/R2b`).** R2 with every size reader on the polyhedron when a
-separation exists (finding 13), the even target split (finding 10) and the G1 boundary fix
-(finding 12). Gauge first, then score.
+**R2b (b3ef2ca6, archives `log/size_cycle/R2b`, run locally on two A6000s, deterministic).** R2
+with every size reader on the polyhedron when a separation exists (finding 13), the even target
+split (finding 10) and the G1 boundary fix (finding 12).
+
+Gauge (`tools/spheroid_gauge.py`, every 50 frames): every arm is a spheroid until the
+thinnest-cell band trips -- asphericity <= 0.05 and inverted wedges <= 0.8 % at the point of
+refusal on all of them, so the shell is a shell; what drifts is a slowly widening thickness
+spread (finding 14). Scored inside each arm's clean window (`size_report --gauge`):
+
+| spec | clean to | cells | cycles | slope | r(L,V_b) | CV(V_d) | L | med V/v_ref | drift | CV(V) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| size_sizer | 1150 | 200->1299 | 899 | -0.93 | -0.56 | 0.21 | 357 | 1.05 | 0.02 | 0.32 |
+| size_adder | 1400 | 200->1640 | 1240 | -0.22 | -0.11 | 0.22 | 375 | 1.41 | 0.04 | 0.31 |
+| size_doubler | 700 | 200->420 | 50 | -0.43 | -0.32 | 0.21 | 241 | 1.52 | 0.18 | 0.28 |
+| size_timer | 1350 | 200->1457 | 1057 | -0.34 | -0.05 | 0.22 | 392 | 1.37 | 0.09 | 0.32 |
+| size_grow_sizer | 1300 | 200->1322 | 922 | -0.63 | 0.06 | 0.18 | 389 | 0.82 | -0.09 | 0.30 |
+| size_two_channel | 1250 | 200->1214 | 814 | -1.05 | -0.32 | 0.19 | 474 | 0.95 | 0.20 | 0.29 |
+| cycle_sizer | 1150 | 200->1416 | 1016 | -0.88 | -0.37 | 0.22 | 392 | 1.03 | 0.15 | 0.30 |
+| cycle_timer | 1100 | 200->1421 | 1021 | -0.27 | 0.03 | 0.21 | 370 | 0.93 | -0.01 | 0.32 |
+| cycle_hazard | 950 | 200->1226 | 826 | -0.08 | 0.04 | 0.28 | 315 | 0.78 | -0.11 | 0.40 |
+| cycle_dilution | 950 | 200->1155 | 755 | -0.32 | -0.07 | 0.24 | 336 | 0.84 | -0.03 | 0.36 |
+| mech_target_percell | 1601 | 200->200 | - | - | - | - | - | - | - | 0.018 (polyhedron) |
+
+Accepted as the baseline of the ladder. The rules separate the way the review predicts and the
+checkpoint arms are stationary; sizers at -0.9, the adder at -0.2, timers at -0.3, the hazard at
+-0.1. Every slope sits about 0.3 below its textbook value because the even target split pulls
+both daughters toward the same half-target over the cycle, so a large piece shrinks and a small
+one grows whatever the rule (the R0 effect, now bounded rather than total). Two open items go to
+R3: `cycle_dilution` scores like a timer (slope -0.32, r(L,V_b) -0.07: the checkpoint is not
+binding), and `size_grow_sizer` reads -0.63 with no cycle-length coupling, which is the growth
+channel doing what Ginzberg et al. say it does.
+
+14. **Thickness spread widens slowly with cell count on every dividing arm.** With everything
+    else fixed, the thinnest cell falls under half the median between frames 700 and 1400
+    (1,200-1,600 cells), and thickness CV passes 0.15 around the same time, on a shell whose
+    asphericity is still 0.03. The 2026-09-06 archive shows the same slope (0.03 -> 0.09 over 801
+    frames). A single-cell minimum is a harsh statistic and T1 flips leave thin cells behind; the
+    band and the cause are R5's (engine) business. Until then a rung is scored inside its clean
+    window, which is >= 2.5 doublings on every arm.
 
 ## 4. The ladder
 
