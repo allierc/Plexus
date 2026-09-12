@@ -77,6 +77,7 @@ SHELL = r"""<!doctype html>
 <script>
 const TAB={tab_json};
 const DEFAULT_BODIES={default_bodies};
+const DEFAULT_SPEC={default_spec};   // a tab whose default scene is a FILE, not a form
 const $=id=>document.getElementById(id);
 // THE PAGE'S THEME, black or white, remembered by the browser; the picture keeps the spec's own background.
 window.toggleTheme=function(){{const on=!document.body.classList.contains('light');document.body.classList.toggle('light',on);localStorage.setItem('plexus_theme',on?'light':'dark');}};
@@ -171,7 +172,7 @@ cpoll();
 // picked up by poll() instead.
 const q=new URLSearchParams(location.search);
 if(q.get('name')){{specName=q.get('name');fetch('/api/scene/spec?name='+encodeURIComponent(specName)+'&tab='+TAB).then(r=>r.json()).then(j=>{{if(j.raw){{$('yamltext').value=j.raw;}}if(j.form)fillForm(j.form);reseed();}});}}
-else{{fetch('/api/scene/state').then(r=>r.json()).then(st=>{{if(!st.name)build();}}).catch(()=>{{}});}}
+else{{fetch('/api/scene/state').then(r=>r.json()).then(st=>{{if(st.name)return;if(DEFAULT_SPEC)openSpec(DEFAULT_SPEC);else build();}}).catch(()=>{{}});}}
 </script></body></html>
 """
 
@@ -190,4 +191,5 @@ def page(tab_name: str = "material") -> str:
     return SHELL.format(title=tab.TITLE, css=CSS, tabbar=bar, form=tab.FORM_HTML, form_js=tab.FORM_JS,
                         tab_json=json.dumps(tab_name), pick_dir=tab.PICK_DIR,
                         default_bodies=json.dumps(getattr(tab, "DEFAULT_FORM", {}).get("bodies", [])),
+                        default_spec=json.dumps(getattr(tab, "DEFAULT_SPEC", None)),
                         placeholder=PLACEHOLDERS.get(tab_name, ""))

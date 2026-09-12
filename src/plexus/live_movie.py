@@ -580,6 +580,7 @@ class LiveMovie:
                 self.p.add_mesh(pv.Plane(center=tuple(_c), direction=tuple(_dir),
                                          i_size=float(_hi[_ax[0]] - _lo[_ax[0]]), j_size=float(_hi[_ax[1]] - _lo[_ax[1]])),
                                 color=str(_fl), lighting=True, ambient=0.35, diffuse=0.65, specular=0.0,
+                                opacity=float((self.style or {}).get("floor_opacity", 1.0)),
                                 show_scalar_bar=False, name="floor")
             # A SCALE BAR, AND ONLY WHERE THERE IS A SCALE. Without `general.units` the box is
             # a number of nothing and a bar labelled "20" would be a lie. The length is the largest

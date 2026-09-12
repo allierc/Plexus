@@ -243,7 +243,16 @@ class NeuralPanel:
         tick, r, om = self.hist[idx]
         rs = r[self.order]
         knee = np.log1p(9.0)
-        mag = np.log1p(9.0 * np.abs(self.W) * np.abs(rs)[None, :] / max(self.msg_lim or 1.0, 1e-12)) / knee
+        # THE WIRING WHEN THERE IS NO TRAFFIC. |W r| is zero everywhere at the seed (v = 0, so
+        # r = 0), which would draw the panel black and say nothing; with no message to show, the
+        # brightness is the SYNAPSE WEIGHT |W| itself -- Figure 1c as it is normally printed. The
+        # colour is the presynaptic column's Dale sign either way.
+        _traffic = bool(self.msg_lim) and float(np.abs(rs).max()) > 1e-12
+        if _traffic:
+            mag = np.log1p(9.0 * np.abs(self.W) * np.abs(rs)[None, :] / max(self.msg_lim or 1.0, 1e-12)) / knee
+        else:
+            _wl = float(np.percentile(np.abs(self.W)[np.abs(self.W) > 0], 99.5)) if (self.W != 0).any() else 1.0
+            mag = np.log1p(9.0 * np.abs(self.W) / max(_wl, 1e-12)) / knee
         try:
             from scipy.ndimage import grey_dilation
             if self.N > 120:
@@ -273,7 +282,9 @@ class NeuralPanel:
         clk = f"   t = {tick * float(self.dt) * float(self.time_s):.4g} s" if (self.dt and self.time_s) else ""
         self.txt.set_text(f"{self.name}   {self.N} neurons, {self.pre.size:,} synapses"
                           f"{' (Dale: blue E, red I)' if self.dale else ' (colour = sign of W)'}   "
-                          f"frame {tick}/{self.n_frames}{clk}   brightness = |W r| up to {self.msg_lim or 0:.3g}")
+                          f"frame {tick}/{self.n_frames}{clk}   "
+                          + (f"brightness = |W r| up to {self.msg_lim or 0:.3g}" if _traffic
+                             else "brightness = |W|, the synapse weight (no traffic yet)"))
         self.fig.canvas.draw()
         return np.asarray(self.fig.canvas.buffer_rgba())[..., :3].copy()
 
