@@ -11,6 +11,7 @@ is agnostic to what the sets are.
 from __future__ import annotations
 
 import copy
+import math
 import os
 
 import yaml
@@ -72,6 +73,19 @@ def build_spec(form: dict) -> dict:
         types[nm] = t
         colors[nm] = [float(v) for v in (b.get("color") or DEFAULT_COLORS[i % len(DEFAULT_COLORS)])]
     s["sets"]["cell"] = {"n": len(bodies), "start": start, "types": types}
+    # THE SUBSTEP IS THE SCENE'S, NOT THE TEMPLATE'S. The template's 6.6e-6 s was its own CFL number
+    # (2.25 MPa in a 0.1 m box) and copying it into a 0.5 m box ran 127 substeps a frame where 19
+    # would do -- the whole "the page is 2.4x slower than the CLI" discrepancy. Explicit MPM is
+    # stable for a substep below dx / c with c = sqrt(stiffness / density) the sound speed of the
+    # stiffest body (Young's modulus for elastic and snow, bulk modulus for liquid); 0.4 of that,
+    # rounded to a whole number of substeps per frame, is what si_three_balls runs at.
+    dx = world / n_grid
+    c_max = max(math.sqrt(float(t.get("youngs", t.get("bulk_modulus", 1.0e5))) / float(t["density"]))
+                for t in types.values())
+    n_sub = max(1, math.ceil(dt / (0.4 * dx / c_max)))
+    for blk in s["schedule"]:
+        if isinstance(blk, dict) and "substep_dt" in blk:
+            blk["substep_dt"] = float(f"{dt / n_sub:.6e}")
     mp = s["sets"]["mpm_particle"]
     mp["per_parent"] = per
     mp["radius"] = float(radius if radius is not None else 0.1 * world)
