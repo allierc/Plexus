@@ -349,13 +349,32 @@ answer a septum. Two instruments and one sweep:
     spec from R3b on; what still bends after that tracks the flip count and is layer 0's next
     question.
 
+**R3b (62bcd98f, archives `log/size_cycle/R3b`).** `K_R 0` on the ten dividing specs. Gauge on
+`size_sizer`: the shell bands hold to ~1200 frames (asphericity 0.03-0.04, thickness CV <= 0.11,
+thinnest cell >= 0.65 of the median) -- longer and thicker than R2b -- but the prism band trips
+at frame 200 and the trapezoid fraction climbs to 0.54 by 1601 with the flip count (2,564). Per
+division: a daughter is 7 % trapezoidal as a mother, 16 % at the cut, 20 % eight frames later,
+never straightened. Scored windows cut at the shell bands hold no cycles (asphericity sits on
+the 0.04 band from frame ~250 without the pin), so R3b is a layer-0 rung with no layer-2 table.
+
+18. **A stiffness on the thickness field makes the prisms prisms.** `kappa_h`, the Dirichlet energy
+    of `sep` along the ring edges (R3d): on `size_sizer`, 800 frames, trapezoids 0.000 at every
+    sampled frame (0.21 with `K_R 0` alone, 0.54 as shipped), in-cell thickness range 0.09,
+    thickness CV 0.06, T1 flips 216, asphericity <= 0.03; with `K_R 0.1` as well, asphericity
+    0.008 but the cells thicken 1.03 -> 1.67 as the pin still squeezes footprints, so the rung
+    runs `K_R 0`. Finding 15's mechanism -- the energy's indifference between a prism and a
+    frustum -- is closed by it.
+
+**R3d (archives `log/size_cycle/R3d`).** `kappa_h 0.2` on the eleven specs, `K_R 0`. Gauged on
+both band sets and scored inside the shell window when landed.
+
 ## 4. The ladder, v2
 
 | rung | layer | change | gate |
 |---|---|---|---|
 | R3b | 0 | `K_R 0` on the dividing specs; flip re-aims `sep` | gauge SPHEROID (shell + prism) for >= 3 doublings on `size_sizer`; the prism bands are the ones to watch |
 | R3c | 0 | the septum and `local_relax` on prisms; per-event prism damage | trapezoid fraction flat across a division wave |
-| R3d | 0 | a prism term in the energy (apical / basal tensions) | `mech_target_percell` under growth alone: prism bands green for 4 doublings' worth of target growth |
+| R3d | 0 | `kappa_h`, a stiffness on the thickness field (finding 18) | prism bands green on every arm for >= 3 doublings; shell bands too |
 | R3e | 0 | the seed at rest (finding 7); `ref_frame` and `mono_delta` retired | frame-0 volumes within 5 % of frame-60 |
 | R4 | 2 | one "when"; dilution fixed; `cell_grow[timer]` withdrawn | R2b's separation reproduced on the clean shell: sizers -1 +- 0.15, adder 0 +- 0.15, timers > +0.5, dilution = sizer |
 | R4b | 3 | the apoptosis rig | `death_report` rows for every arm; deaths never off a bent mesh |
