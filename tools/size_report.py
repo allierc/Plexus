@@ -171,7 +171,10 @@ def main():
         until = a.until
         if a.gauge:
             import spheroid_gauge as G
-            fb, _ = G.gauge(_traj(n, a.group), every=50, verbose=False)
+            # THE SHELL BANDS CUT THE WINDOW. The prism bands (trapezoid, shear, tilt, in-cell
+            # thickness) are layer 0's objective and trip on the first divisions of every arm
+            # while that layer is open; a window cut there would hold no cycles at all.
+            fb, _ = G.gauge(_traj(n, a.group), every=50, verbose=False, which="shell")
             until = fb[0] if fb is not None else None
         r = row(n, a.group, a.birth_lag, until)
         if r is not None:

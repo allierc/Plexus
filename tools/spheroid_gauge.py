@@ -135,9 +135,19 @@ def prism_metrics(P, S, es, et, ef, nF):
     return dict(trapezoid=trapezoid, shear=shear, tilt=tilt, h_in_cell=h_in_cell)
 
 
-def judge(m):
+SHELL = ("asph", "inv_wedge", "sep_in", "h_cv", "h_min_rel")
+PRISM = ("trapezoid", "shear", "tilt", "h_in_cell")
+
+
+def judge(m, which="all"):
+    """`which`: "all", "shell" or "prism" -- the bands to hold the frame to. The shell bands are
+    the gate a scoring window is cut at (a bent shell yields no volumes worth reading); the
+    prism bands are layer 0's objective (notes/size_cycle/SIZE_CYCLE_PLAN.md v2) and, until that
+    layer is green, trip on the first divisions of every arm."""
+    keys = SHELL if which == "shell" else PRISM if which == "prism" else tuple(BANDS)
     bad = []
-    for k, (lo, hi) in BANDS.items():
+    for k in keys:
+        lo, hi = BANDS[k]
         v = m.get(k)
         if v is None:
             continue
@@ -148,7 +158,7 @@ def judge(m):
     return bad
 
 
-def gauge(traj, every=20, verbose=True):
+def gauge(traj, every=20, verbose=True, which="all"):
     z = np.load(traj)
     T = len(z["vertex__mesh_nF"])
     frames = sorted(set(range(0, T, max(1, every))) | {T - 1})
@@ -157,7 +167,7 @@ def gauge(traj, every=20, verbose=True):
         m = frame_metrics(z, t)
         for k in BANDS:
             worst[k] = max(worst.get(k, -np.inf), m[k]) if BANDS[k][1] is not None else min(worst.get(k, np.inf), m[k])
-        bad = judge(m)
+        bad = judge(m, which)
         if verbose:
             print(f"   t{t:4d} cells={m['cells']:5d} asph={m['asph']:.3f} inv_wedge={m['inv_wedge']:.3f} "
                   f"sep_in={m['sep_in']:.3f} h_cv={m['h_cv']:.2f} h_min_rel={m['h_min_rel']:.2f} "
@@ -176,6 +186,8 @@ def main():
     ap.add_argument("--traj", action="append", default=[], help="trajectory.npz paths, in addition to names")
     ap.add_argument("--every", type=int, default=20)
     ap.add_argument("--quiet", action="store_true", help="verdict lines only")
+    ap.add_argument("--bands", default="all", choices=["all", "shell", "prism"],
+                    help="which bands to hold the run to (see `judge`)")
     a = ap.parse_args()
     from plexus.paths import graphs_data_path
     names = list(a.names)
@@ -189,7 +201,7 @@ def main():
             print(f"{n:<22} -- no trajectory on disk"); continue
         if not a.quiet:
             print(n)
-        first_bad, worst = gauge(p, a.every, verbose=not a.quiet)
+        first_bad, worst = gauge(p, a.every, verbose=not a.quiet, which=a.bands)
         w = " ".join(f"{k}={v:.3f}" for k, v in worst.items())
         if first_bad is None:
             print(f"{n:<22} SPHEROID   worst: {w}")
