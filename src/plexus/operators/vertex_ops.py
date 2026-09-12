@@ -3545,7 +3545,11 @@ class CellCycle3D(Lateral):
         # on cycle_dilution: 200 -> 2,927 cells in 300 frames with a mean cycle of 28 frames
         # against an S+G2+M clock of 130, and the median volume at zero. S and G2 are clocks and
         # take their own time from the boundary on.
-        p_next = np.where(g1, np.minimum(p_next, cut[self.G1]), p_next)
+        # ... AND A HAIR PAST IT. `cycle_progress` is float32 state, and a cell parked EXACTLY on
+        # `cut[G1]` reads as G1 again next frame once the stored value rounds below the boundary
+        # (183.3/400 does; 110/240 happened not to), so the cap put it back on the boundary every
+        # frame for ever: R2's four cycle arms froze at 304 cells with 100 % of cells "in S".
+        p_next = np.where(g1, np.minimum(p_next, cut[self.G1] + 1e-5), p_next)
         p_next = np.clip(p_next, 0.0, cut[self.G2])
         ph_next = np.searchsorted(cut, p_next, side="right").astype(np.float64).clip(0, self.M)
         # `phase_t` IS A READOUT NOW, NOT A DRIVER. Nothing above consults it -- the models spend
