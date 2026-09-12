@@ -7,8 +7,10 @@
 #                        overlay of the points (green tracking nodes / blue MPM particles),
 #                        the four-panel cell view (per-cell strain maps, arrows, mean curve)
 #
-# 27 files named progress_<kind>_p<stage>_beat<n>.mp4, so they sort by kind then stage then beat.
-# `--seconds 4` plays each beat window in four seconds, like the reference cardio.mp4 (4.8 s).
+# NINE files named progress_<kind>_p<stage>.mp4: the three beats run one after another inside each
+# clip, the whole sequence in 4 s (like the reference cardio.mp4, which plays the recording in 4.8 s).
+# The per-beat clips are rendered first and concatenated, because each beat is its own rollout from
+# its own rest configuration -- the model is never run across a beat boundary.
 PY=/workspace/.conda_envs/neural-graph-linux/bin/python
 export PYTHONPATH=/workspace/Plexus/src
 cd "$(dirname "$0")"
@@ -22,4 +24,18 @@ render() {   # $1 device, $2 params file, $3 stage label, $4 beat
 ( for b in 1 2 3; do render cuda:0 params_p20.npz 020 $b; render cuda:0 params.npz 100 $b; done ) > out/render_gpu0.log 2>&1 &
 ( for b in 1 2 3; do render cuda:1 params_p50.npz 050 $b; done ) > out/render_gpu1.log 2>&1 &
 wait
-ls out/movies/progress_*.mp4 | wc -l
+
+# ---- the three beats, end to end, 4 s per clip ------------------------------------------------
+FF=$($PY -c "import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())")
+cd out/movies
+for view in overlay particles cells; do for st in 020 050 100; do
+  list=$(mktemp); for b in 1 2 3; do echo "file '$PWD/progress_${view}_p${st}_beat${b}.mp4'" >> "$list"; done
+  n=$(for b in 1 2 3; do $FF -i progress_${view}_p${st}_beat${b}.mp4 2>&1 | grep -oP 'Duration: \K[0-9:.]+' \
+        | awk -F: '{print ($3)*14}'; done | awk '{s+=$1} END {printf "%d", s}')
+  r=$(python3 -c "print(max(1,round($n/4)))")
+  $FF -loglevel error -y -f concat -safe 0 -i "$list" -vf "setpts=PTS*14/$r" -r $r -c:v libx264 \
+      -crf 20 -pix_fmt yuv420p "progress_${view}_p${st}.mp4"
+  rm -f "$list"
+done; done
+rm -f progress_*_beat[123].mp4 progress_*_beat[123].json      # the per-beat clips were scaffolding
+ls progress_*.mp4 | wc -l
