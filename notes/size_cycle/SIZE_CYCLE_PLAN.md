@@ -365,8 +365,39 @@ the 0.04 band from frame ~250 without the pin), so R3b is a layer-0 rung with no
     runs `K_R 0`. Finding 15's mechanism -- the energy's indifference between a prism and a
     frustum -- is closed by it.
 
-**R3d (archives `log/size_cycle/R3d`).** `kappa_h 0.2` on the eleven specs, `K_R 0`. Gauged on
-both band sets and scored inside the shell window when landed.
+**R3d (8fb4f80d, archives `log/size_cycle/R3d`) -- ACCEPTED, the ladder's working point.**
+`kappa_h 0.2`, `K_R 0` on the eleven specs, 1601 frames, deterministic, on gpu_l4.
+
+Gauge, both band sets: `size_adder`, `size_grow_sizer`, `size_two_channel`, `cycle_dilution`,
+`mech_target_percell` SPHEROID for the whole run; `size_sizer`, `size_timer`, `cycle_sizer`,
+`cycle_timer` to frames 1450-1600 (the prism band at 0.02-0.04); `cycle_hazard` to 1050;
+`size_doubler` destroys its mesh from frame 600 (the null: a relative rule under asymmetric
+division drives cells to zero volume, asphericity 2.5, half the cells inverted -- the review's
+own argument, with a mesh to show for it). Thickness CV 0.05-0.09, thinnest cell >= 0.78 of the
+median, in-cell thickness range 0.09-0.12 on every accepted arm.
+
+Scored on polyhedron volumes inside the shell window (`size_report --gauge`, cb936177):
+
+| spec | cells | cycles | slope | r(L,V_b) | CV(V_d) | L | med V/v_ref | drift | CV(V) |
+|---|---|---|---|---|---|---|---|---|---|
+| size_sizer | 200->2160 | 1760 | -1.00 | -0.70 | 0.17 | 365 | 0.96 | -0.07 | 0.33 |
+| size_adder | 200->2318 | 1918 | -0.13 | -0.43 | 0.14 | 376 | 1.03 | -0.05 | 0.33 |
+| size_doubler (<600) | 200->405 | 37 | 0.44 | 0.43 | 0.50 | 196 | 1.41 | -0.01 | 0.33 |
+| size_timer | 200->2144 | 1744 | 0.68 | 0.01 | 0.22 | 391 | 1.06 | -0.02 | 0.35 |
+| size_grow_sizer | 200->2144 | 1744 | -0.09 | 0.08 | 0.12 | 391 | 0.99 | 0.11 | 0.26 |
+| size_two_channel | 200->1439 | 1039 | -1.23 | -0.71 | 0.10 | 556 | 1.25 | 0.06 | 0.19 |
+| cycle_sizer | 200->2314 | 1914 | -1.14 | -0.78 | 0.14 | 409 | 1.26 | -0.04 | 0.25 |
+| cycle_timer (<1550) | 200->3259 | 2859 | 0.76 | 0.04 | 0.24 | 372 | 0.87 | -0.10 | 0.35 |
+| cycle_hazard (<1050) | 200->1480 | 1080 | 0.68 | 0.08 | 0.36 | 318 | 0.72 | -0.23 | 0.60 |
+| cycle_dilution | 200->2375 | 1975 | -0.76 | -0.69 | 0.19 | 419 | 1.21 | 0.02 | 0.27 |
+| mech_target_percell | 200->200 | - | - | - | - | - | - | - | 0.052 |
+
+The layer-2 gate (R4's line in the ladder) is met on the working point without touching the
+rules again: sizers -1.00 / -1.14, adder -0.13, timers +0.68 / +0.76, hazard +0.68, dilution
+-0.76 (a sizer with a molecule under it, as it should be), the two-channel arm the tightest
+population (CV 0.19, CV(V_d) 0.10), the growth channel alone adder-like (-0.09, CV(V_d) 0.12),
+and every checkpoint arm stationary (|drift| <= 0.11). The doubler is the null and behaves as
+one. What R4 still owes is consolidation, not correctness.
 
 **The milestones, rendered (`config/tissue/ms*`, archives in `graphs_data/tissue`).** The sizer
 arm under each rung's mechanics, 1601 frames, so the story can be watched side by side:
@@ -388,7 +419,7 @@ arm under each rung's mechanics, 1601 frames, so the story can be watched side b
 | R3c | 0 | the septum and `local_relax` on prisms; per-event prism damage | trapezoid fraction flat across a division wave |
 | R3d | 0 | `kappa_h`, a stiffness on the thickness field (finding 18) | prism bands green on every arm for >= 3 doublings; shell bands too |
 | R3e | 0 | the seed at rest (finding 7); `ref_frame` and `mono_delta` retired | frame-0 volumes within 5 % of frame-60 |
-| R4 | 2 | one "when"; dilution fixed; `cell_grow[timer]` withdrawn | R2b's separation reproduced on the clean shell: sizers -1 +- 0.15, adder 0 +- 0.15, timers > +0.5, dilution = sizer |
+| R4 | 2 | one "when"; `cell_grow[timer]` withdrawn; `cell_id` (the rig needs identity) | the R3d table reproduced within bands after the consolidation |
 | R4b | 3 | the apoptosis rig | `death_report` rows for every arm; deaths never off a bent mesh |
 | R5 | eng | representation and engine, as before | tick-0 invariant; flags 29 -> <= 20 |
 | R6 | -- | register the working points; `library/` regenerated; `QUICK` re-pointed | `pytest tests/regression -m regression --quick` green |
