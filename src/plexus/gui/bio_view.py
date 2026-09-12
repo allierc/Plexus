@@ -368,25 +368,42 @@ class View:
                 return d
         return None
 
-    def stored_frames(self):
-        """How many frames the run on disk holds -- read from the npz HEADER, not by loading it: a
-        tissue run's positions are 500 MB and the page only wants the number until PLAY is pressed."""
+    def _traj_shape(self, z, max_frames: int):
+        """(recorded frames, frames a read would KEEP, stride) from the npz HEADERS alone -- no
+        array is read. The kept count is what the page's slider must span: a 1,602-frame tissue is
+        read back as 267 frames, and a slider that ran to 1,601 would clamp 83% of its travel."""
+        T, per_frame = None, 0
+        for n in self.H.levels:
+            sch = getattr(self.H.level(n), "state_schema", None)
+            if sch is None or "pos" not in sch:
+                continue
+            for key in ("pos", "sep"):
+                k = f"{n}__{key}"
+                if k not in z.files or key not in sch:
+                    continue
+                with z.zip.open(k + ".npy") as f:
+                    ver = np.lib.format.read_magic(f)
+                    shp = np.lib.format._read_array_header(f, ver)[0]
+                T = int(shp[0]) if T is None else min(T, int(shp[0]))
+                per_frame += int(np.prod(shp[1:])) * 4
+        if not T:
+            return 0, 0, 1
+        step = max(max(1, -(-T // max_frames)), max(1, -(-(T * max(per_frame, 1)) // self.SNAP_BUDGET)))
+        return T, len(range(0, T, step)), step
+
+    def stored_frames(self, max_frames: int = 300):
+        """(recorded, kept) of this spec's run on disk, from the file's headers -- the page only
+        wants the numbers until PLAY is pressed, and the positions are 500 MB."""
         d = self.run_dir()
         if d is None:
-            return 0
+            return 0, 0
         try:
-            import zipfile
             with np.load(os.path.join(d, "trajectory.npz")) as z:
-                for k in z.files:
-                    if not k.endswith("__pos"):
-                        continue
-                    with z.zip.open(k + ".npy") as f:
-                        ver = np.lib.format.read_magic(f)
-                        shape = np.lib.format._read_array_header(f, ver)[0]
-                    return int(shape[0])
+                T, kept, _ = self._traj_shape(z, max_frames)
+                return T, kept
         except Exception as e:                                   # noqa: BLE001
             print(f"[view] {d}: cannot read the trajectory header ({type(e).__name__}: {e})", flush=True)
-        return 0
+        return 0, 0
 
     def load_run_frames(self, max_frames: int = 300):
         """THE RUN'S OWN DATA, not its movie: the recorded trajectory read back into the same
@@ -405,22 +422,9 @@ class View:
             names = [n for n in self.H.levels if f"{n}__pos" in z.files]
             if not names:
                 return 0
-            T = None
-            per_frame = 0
-            for n in names:
-                sch = self.H.level(n).state_schema
-                for key in ("pos", "sep"):
-                    if f"{n}__{key}" in z.files and key in sch:
-                        with z.zip.open(f"{n}__{key}.npy") as f:
-                            ver = np.lib.format.read_magic(f)
-                            shp = np.lib.format._read_array_header(f, ver)[0]
-                        T = shp[0] if T is None else min(T, int(shp[0]))
-                        per_frame += int(np.prod(shp[1:])) * 4
+            T, _kept, step = self._traj_shape(z, max_frames)
             if not T:
                 return 0
-            by_count = max(1, -(-T // max_frames))
-            by_mem = max(1, -(-(T * max(per_frame, 1)) // self.SNAP_BUDGET))
-            step = max(by_count, by_mem)
             rows = list(range(0, T, step))
             snaps = [{} for _ in rows]
             for n in names:

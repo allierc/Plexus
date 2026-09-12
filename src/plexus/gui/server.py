@@ -330,13 +330,13 @@ def g_frames(h, q):
     n = 0 if v is None else (len(v.panel.hist) if getattr(v, "panel", None) is not None else len(v.snaps))
     # WHAT IS ON DISK, when nothing is in memory: the recorded trajectory of this spec's run, as a
     # frame count read from the file's header. PLAY loads it (`/api/scene/loadrun`).
-    stored = 0
+    stored, recorded = 0, 0
     if v is not None and not n and getattr(v, "panel", None) is None:
         try:
-            stored = int(v.stored_frames())
+            recorded, stored = (int(x) for x in v.stored_frames())
         except Exception:                                        # noqa: BLE001
-            stored = 0
-    return h._send_json({"n": n, "stored": stored,
+            stored, recorded = 0, 0
+    return h._send_json({"n": n, "stored": stored, "recorded": recorded,
                          "every": getattr(v, "_keep_every", 1) if v is not None else 1})
 
 
