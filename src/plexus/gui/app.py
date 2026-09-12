@@ -17,14 +17,18 @@ from __future__ import annotations
 from plexus.gui import tabs
 
 CSS = r"""
- html,body{margin:0;height:100%;background:#0b0b0d;color:#ddd;font:13px -apple-system,Segoe UI,Helvetica,Arial,sans-serif}
- #left{position:absolute;left:0;top:0;bottom:0;width:430px;overflow:auto;background:#141418;border-right:1px solid #2a2a30;padding:10px 12px;box-sizing:border-box}
+ :root{--bg:#0b0b0d;--panel:#141418;--ink:#ddd;--line:#2a2a30;--field:#0e0e12;--fieldink:#eee;--muted:#aab}
+ body.light{--bg:#f4f4f6;--panel:#ffffff;--ink:#222;--line:#d0d0d6;--field:#ffffff;--fieldink:#111;--muted:#556}
+ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px -apple-system,Segoe UI,Helvetica,Arial,sans-serif}
+ #left{position:absolute;left:0;top:0;bottom:0;width:430px;overflow:auto;background:var(--panel);border-right:1px solid var(--line);padding:10px 12px;box-sizing:border-box}
  #right{position:absolute;left:430px;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden}
  #view{max-width:100%;max-height:100%;cursor:grab;user-select:none;-webkit-user-drag:none}
  #tabs{display:flex;gap:2px;margin:0 0 10px} #tabs a{flex:1;text-align:center;padding:6px 0;background:#1c1c22;color:#9ab;text-decoration:none;letter-spacing:.08em;text-transform:uppercase;font-size:11px;border:1px solid #2a2a30;cursor:pointer}
  #tabs a.on{background:#2b5f9e;color:#fff;border-color:#2b5f9e}
  h1{font-size:15px;margin:2px 0 8px;color:#fff} h2{font-size:12px;margin:14px 0 4px;color:#9ab;letter-spacing:.06em;text-transform:uppercase}
- label{display:inline-block;width:92px;color:#aab} input,select{background:#0e0e12;color:#eee;border:1px solid #333;border-radius:3px;padding:2px 5px;width:110px;margin:1px 0}
+ label{display:inline-block;width:92px;color:var(--muted)} input,select{background:var(--field);color:var(--fieldink);border:1px solid var(--line);border-radius:3px;padding:2px 5px;width:110px;margin:1px 0}
+ h1{color:var(--ink)} #info,#claude,textarea{background:var(--field);color:var(--ink);border-color:var(--line)}
+ #theme{position:absolute;right:12px;bottom:8px;color:var(--muted);cursor:pointer;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
  input.short{width:56px} select{width:118px}
  button{background:#2b5f9e;color:#fff;border:0;border-radius:3px;padding:5px 10px;margin:3px 3px 3px 0;cursor:pointer} button.dim{background:#3a3a44}
  button:disabled{opacity:.5;cursor:default}
@@ -46,8 +50,7 @@ SHELL = r"""<!doctype html>
 <style>{css}</style></head><body>
 <div id="left">
  <div id="tabs">{tabbar}</div>
- <h2>Open a spec</h2>
- <div class="row"><button class="dim" onclick="pickOpen()">OPEN...</button> <span id="openlab" style="color:#778;font-size:11px">a spec.yaml or a run folder; copied into config/studio and seeded as is</span></div>
+ <div class="row"><button class="dim" onclick="pickOpen()">OPEN...</button><button class="dim" onclick="saveAs()" title="write the spec on screen to a file under config/">SAVE...</button> <span id="openlab" style="color:#778;font-size:11px"></span></div>
  <div id="picker" style="display:none;position:fixed;left:60px;top:40px;width:560px;max-height:80vh;background:#1a1a20;border:1px solid #556;border-radius:6px;padding:10px;z-index:10;box-shadow:0 0 30px #000">
   <div class="row"><b>Open a spec</b> <span style="float:right;cursor:pointer" onclick="$('picker').style.display='none'">&#10005;</span></div>
   <div class="row" id="pickroots"></div>
@@ -57,25 +60,27 @@ SHELL = r"""<!doctype html>
 {form}
  <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button><button class="dim" onclick="reseed()">RE-SEED</button></div>
  <div id="status">building the default scene...</div>
- <h2>Run</h2>
  <div class="row"><label>device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
- <div class="row"><button onclick="runGo()" id="runbtn" title="the form is applied first, then the run starts">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
+ <div class="row"><button onclick="runGo()" id="runbtn" title="the form is applied first, then the run starts">RUN</button><button class="dim" onclick="runStop()">STOP</button></div>
+ <div id="runstat" style="color:#8c8;font-size:12px;min-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
  <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button><button class="dim" onclick="movieGo()" title="the movie.mp4 the run wrote, as a file">MOVIE</button><button class="dim" onclick="playStop();showMovie(null);FRAME=null;render(true)" title="back to the live view">LIVE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:150px" oninput="playing=null;showMovie(null);showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
- <h2>Claude</h2>
  <div class="row"><input id="task" style="width:100%" placeholder="{placeholder}" onkeydown="if(event.key==='Enter')claudeGo()"></div>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button><button class="dim" onclick="claudeNew()" title="forget the conversation so far">NEW SESSION</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
  <div id="rstat" style="color:#9ab;min-height:14px"></div>
  <div id="yaml"><textarea id="yamltext"></textarea><div><button onclick="saveYaml()">SAVE YAML</button></div></div>
- <h2>Hierarchy</h2><div id="tree">(none)</div>
- <h2>Selected object</h2><div id="info">click an object</div>
+ <div id="tree" style="margin-top:10px">(none)</div>
+ <div id="info" style="margin-top:6px">click an object</div>
 </div>
-<div id="right"><img id="view" draggable="false"><video id="movie" style="display:none;max-width:100%;max-height:100%" controls muted></video><div id="hint">drag to orbit, wheel to zoom, click an object to read it below</div></div>
+<div id="right"><img id="view" draggable="false"><video id="movie" style="display:none;max-width:100%;max-height:100%" controls muted></video><div id="hint">drag to orbit, wheel to zoom, click an object to read it below</div><div id="theme" onclick="toggleTheme()">white / black</div></div>
 <script>
 const TAB={tab_json};
 const DEFAULT_BODIES={default_bodies};
 const $=id=>document.getElementById(id);
+// THE PAGE'S THEME, black or white, remembered by the browser; the picture keeps the spec's own background.
+window.toggleTheme=function(){{const on=!document.body.classList.contains('light');document.body.classList.toggle('light',on);localStorage.setItem('plexus_theme',on?'light':'dark');}};
+if(localStorage.getItem('plexus_theme')==='light')document.body.classList.add('light');
 let SCENE=null, specName=null;
 const CAM={{azim:30,elev:20,zoom:1}};
 function status(t,err){{const s=$('status');s.textContent=t;s.className=err?'err':'';}}
@@ -93,6 +98,8 @@ window.pickOpen=async function(path){{$('picker').style.display='block';const j=
  for(const d of j.dirs)h+=`<div style="cursor:pointer;padding:1px 0"><span style="color:#7fb3ff" onclick="pickOpen('${{j.path}}/${{d.name}}')">&#128193; ${{d.name}}/</span>${{d.spec?` <button class="dim" style="padding:1px 6px;font-size:11px" onclick="openSpec('${{j.path}}/${{d.name}}')">open run</button>`:''}}</div>`;
  for(const f of j.files)h+=`<div style="cursor:pointer;padding:1px 0;color:#dde" onclick="openSpec('${{j.path}}/${{f}}')">&#128196; ${{f}}</div>`;
  $('picklist').innerHTML=h||'(empty)';}};
+// SAVE...: the spec on screen (config/studio/<name>.yaml) written to a path of your choosing under config/.
+window.saveAs=async function(){{if(!specName){{status('no spec yet',true);return;}}const pth=prompt('save the spec as', '{pick_dir}/'+specName+'.yaml');if(!pth)return;const j=await post('/api/scene/saveas',{{name:specName,path:pth}});if(j.error){{status(j.error,true);return;}}status('saved '+j.path);$('openlab').textContent=j.path;}};
 window.openSpec=async function(pth){{$('picker').style.display='none';FORM_SPEC=null;status('opening '+pth+' ...');const j=await (await fetch('/api/scene/open?path='+encodeURIComponent(pth))).json();if(j.error){{status(j.error,true);return;}}$('openlab').textContent=pth;status('opened '+j.name+' -- seeding...');}};
 async function post(url,body){{const r=await fetch(url,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}});return r.json();}}
 window.build=async function(){{status('building the spec...');const j=await post('/api/tab/'+TAB+'/build',form());if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}specName=j.name;FORM_SPEC=j.name;if(j.version!==undefined)seen.version=j.version;$('yamltext').value=j.raw;status(`spec saved: config/studio/${{j.name}}.yaml -- seeding...`);await reseed();}};
@@ -133,7 +140,7 @@ async function poll(){{try{{const st=await (await fetch('/api/scene/state')).jso
 poll();
 let running=false;
 let FORM_SPEC=null;   // the spec the form wrote; RUN rebuilds it from the form first, so an edited field counts
-window.runGo=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{$('runstat').textContent='build a scene first';return;}}if(FORM_SPEC===specName){{await build();}}const j=await post('/api/scene/run',{{device:$('run_device').value}});if(j.error){{$('runstat').textContent=j.error;return;}}running=true;$('runbtn').disabled=true;for(const id of ['render','light','color'])if($(id))$(id).disabled=true;$('runstat').textContent=`generate ${{specName}} on ${{j.device}}...`;MOVIE=null;rpoll();}};
+window.runGo=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{$('runstat').textContent='build a scene first';return;}}if(FORM_SPEC===specName){{await build();}}const j=await post('/api/scene/run',{{device:$('run_device').value}});if(j.error){{$('runstat').textContent=j.error;return;}}running=true;$('runbtn').disabled=true;for(const id of ['render','light','color'])if($(id))$(id).disabled=true;$('runstat').textContent=`${{specName}} on ${{j.device}}...`;MOVIE=null;rpoll();}};
 window.runStop=async function(){{await post('/api/scene/run',{{stop:true}});}};
 // THE RUN IS plexus.pipeline.generate -- the body of Plexus_Main.py -o generate -- on the server's
 // VTK thread; its per-frame hook feeds this page's renderer and answers camera moves between
@@ -141,7 +148,7 @@ window.runStop=async function(){{await post('/api/scene/run',{{stop:true}});}};
 // Every movie frame is also kept as a level state, so PLAY replays the run at any camera.
 function showMovie(url){{const v=$('movie');if(url){{v.src=url;v.style.display='block';$('view').style.display='none';}}else{{v.pause();v.style.display='none';$('view').style.display='';}}}}
 async function rpoll(){{try{{const j=await (await fetch('/api/scene/run')).json();if(j.error&&!j.running){{$('runstat').textContent='error: '+j.error;}}
- else $('runstat').textContent=(j.running?'running: ':(j.stopped?'stopped: ':'done: '))+`frame ${{j.frame}}/${{j.n_frames}}, ${{j.seconds}}s`+(j.ms_per_frame?` (${{j.ms_per_frame.toFixed(0)}} ms/frame, the engine's own clock)`:(j.frame&&j.seconds?` (${{(j.seconds/j.frame*1000).toFixed(0)}} ms/frame incl. the movie)`:''));
+ else $('runstat').textContent=(j.running?'running':(j.stopped?'stopped':'done'))+`  frame ${{j.frame}}/${{j.n_frames}}  ${{j.seconds}} s`+(j.ms_per_frame?`  ${{j.ms_per_frame.toFixed(0)}} ms/frame`:(j.frame&&j.seconds?`  ${{(j.seconds/j.frame*1000).toFixed(0)}} ms/frame`:''));
  if(j.counts&&j.counts.sets)$('runcounts').textContent=Object.entries(j.counts.sets).filter(([k])=>k!=='half_edge').map(([k,v])=>`${{k}} ${{v}}`).join('  ');
  render();if(j.running){{setTimeout(rpoll,700);}}else{{running=false;$('runbtn').disabled=false;for(const id of ['render','light','color'])if($(id))$(id).disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);
   const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();MOVIE=a.mp4||null;

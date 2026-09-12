@@ -28,15 +28,15 @@ form_from_spec = bio.form_from_spec
 
 
 FORM_HTML = r'''
- <h2>Tissue</h2>
+
  <div class="row"><label>name</label><input id="name" value="bio_scene"></div>
  <div class="row"><label>shape</label><select id="shape"><option>sphere</option><option>disc</option><option>plane</option></select></div>
  <div class="row"><label>cells</label><input id="n_cells" class="short" value="200"> <label style="width:60px">radius</label><input id="radius" class="short" value="5.0"></div>
  <div class="row"><label>thickness h0</label><input id="h0" class="short" value="1.2"> <label style="width:60px">apical</label><select id="apical" style="width:64px"><option value="in">in</option><option value="out">out</option></select></div>
  <div class="row"><label>box</label><input id="world" class="short" value="50"> <label style="width:60px">frames</label><input id="n_frames" class="short" value="801"></div>
- <h2>Organelles <button class="dim" onclick="addOrganelle()">+ organelle</button></h2>
+ <div class="row"><button class="dim" onclick="addOrganelle()">+ organelle</button> <span style="color:#9ab">organelles</span></div>
  <table class="sp" id="organelles"><tr><th>name</th><th>per cell</th><th>radius</th><th>region</th><th>on divide</th><th>tau</th><th></th></tr></table>
- <h2>Proteins <button class="dim" onclick="addSpecies()">+ species</button></h2>
+ <div class="row"><button class="dim" onclick="addSpecies()">+ species</button> <span style="color:#9ab">protein species</span></div>
  <table class="sp" id="species"><tr><th>name</th><th>region</th><th>density</th><th>s</th><th>tau</th><th></th></tr></table>
 '''
 

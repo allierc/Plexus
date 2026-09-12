@@ -569,6 +569,18 @@ class LiveMovie:
                 self.p.add_mesh(pv.Box((_b[0][0], _b[1][0], _b[0][1], _b[1][1],
                                         _b[0][2], _b[1][2])).extract_all_edges(),
                                 color="#4a4a4a", line_width=1.0, lighting=False)
+            # A FLOOR, `plotting.floor: <colour>`: the bottom face of the box as a lit plane, so the
+            # bodies have something to land on in the picture as they do in the model.
+            _fl = (self.style or {}).get("floor")
+            if _fl:
+                _lo, _hi = _b[0].astype(float), _b[1].astype(float)
+                _c = 0.5 * (_lo + _hi); _c[self.up] = _lo[self.up]
+                _ax = [i for i in range(3) if i != self.up]
+                _dir = np.zeros(3); _dir[self.up] = 1.0
+                self.p.add_mesh(pv.Plane(center=tuple(_c), direction=tuple(_dir),
+                                         i_size=float(_hi[_ax[0]] - _lo[_ax[0]]), j_size=float(_hi[_ax[1]] - _lo[_ax[1]])),
+                                color=str(_fl), lighting=True, ambient=0.35, diffuse=0.65, specular=0.0,
+                                show_scalar_bar=False, name="floor")
             # A SCALE BAR, AND ONLY WHERE THERE IS A SCALE. Without `general.units` the box is
             # a number of nothing and a bar labelled "20" would be a lie. The length is the largest
             # round number (1, 2 or 5 times a power of ten) fitting in a third of the box, so it
@@ -1160,6 +1172,14 @@ class LiveMovie:
             elif _r3d != "surface" or not self._skin_build(H, lvl, pos):
                 self.p.add_mesh(self.cloud, scalars="rgb", rgb=True, **_flat,
                                 point_size=self._dot_px(pos))
+            # EYE-DOME LIGHTING, `plotting.edl: true`: a screen-space depth cue (Boucheny & Ribes
+            # 2011) that darkens a pixel where its neighbours' depth jumps, so a flat cloud of dots
+            # reads as bodies with an outline -- one render pass, no normals, no geometry.
+            if bool((self.style or {}).get("edl", False)):
+                try:
+                    self.p.enable_eye_dome_lighting()
+                except Exception as e:                        # noqa: BLE001
+                    print(f"[live-movie] edl unavailable: {e}", flush=True)
             self._add_meshes(H)
             for _n, _l, _m in self._mesh_levels(H):
                 self._edge_actor(H, _l, _m, first=True)

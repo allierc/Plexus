@@ -168,7 +168,7 @@ def form_from_spec(spec: dict) -> dict:
 
 
 FORM_HTML = r'''
- <h2>Circuit</h2>
+
  <div class="row"><label>name</label><input id="name" value="ctrnn_gui"></div>
  <div class="row"><label>assemblies</label><input id="n_assemblies" class="short" value="3"> <label style="width:70px">neurons each</label><input id="per_assembly" class="short" value="16"></div>
  <div class="row"><label title="share of excitatory neurons; the rest are inhibitory">excitatory</label><input id="frac_exc" class="short" value="0.8"> <label style="width:70px" title="Dale's law: every synapse takes the sign of its presynaptic neuron"><input type="checkbox" id="dale" checked style="width:auto"> Dale</label> <label style="width:80px" title="an afferent E sub-population receives the drive"><input type="checkbox" id="afferent" checked style="width:auto"> afferent</label></div>

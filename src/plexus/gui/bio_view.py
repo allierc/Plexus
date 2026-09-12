@@ -395,49 +395,72 @@ class View:
         return _vtk(self._highlight, pick)
 
     def _highlight(self, pick: str | None):
-        """A yellow wire outline around the picked BODY -- the sphere that bounds its members'
-        positions (its particles, its pieces), which is what the click meant. Nothing on the
-        member itself: a marker on one dot of a 300,000-dot cloud draws the eye to the dot."""
+        """PAINT THE PICKED BODY YELLOW -- the body itself, not a marker around it: its particles in
+        the point cloud (their colours are put back when the pick moves on), or its surface actor
+        when the scene is contoured per body."""
         self.pick = pick
-        if self.panel is not None:
+        if self.panel is not None or self.lm is None:
             return
-        import pyvista as pv
         with LOCK:
-            try:
-                self.p.remove_actor("pick_body", render=False)
-            except Exception:                                    # noqa: BLE001
-                pass
+            lm = self.lm
+            # put back what the last pick painted
+            _prev = getattr(self, "_paint", None)
+            if _prev is not None:
+                sel, rgb = _prev
+                try:
+                    cur = np.asarray(lm.cloud["rgb"]).copy(); cur[sel] = rgb; lm.cloud["rgb"] = cur
+                    if getattr(lm, "_base_rgb", None) is not None:
+                        lm._base_rgb[sel] = rgb
+                except Exception:                                # noqa: BLE001
+                    pass
+                self._paint = None
+            for nm, act in list(getattr(lm.p, "renderer", None).actors.items() if lm.p is not None else []):
+                if nm.startswith("contour_") and getattr(self, "_paint_actor", None) == nm:
+                    try:
+                        act.GetProperty().SetColor(*self._paint_color)
+                    except Exception:                            # noqa: BLE001
+                        pass
+                    self._paint_actor = None
             if not pick or not pick.startswith("cell:"):
                 return
             try:
                 k = int(pick.split(":", 1)[1])
             except ValueError:
                 return
-            P = []
-            for name, st in self.scene["sets"].items():
-                par = st.get("parent")
-                if par is None or not st.get("pos"):
-                    continue
-                pos = np.asarray(st["pos"], float)
-                sel = np.asarray(par) == k
-                if sel.any():
-                    P.append(pos[sel[:len(pos)]])
-            T = self.scene.get("tissue")
-            if not P and T:
-                V = np.asarray(T["caps"]["mid"]["verts"], float)
-                ring = {t[1] for c in ("apical", "basal") for kk, t in enumerate(T["caps"][c]["tri"]) if T["caps"][c]["face"][kk] == k}
-                if ring:
-                    P.append(V[sorted(ring)])
-            if not P:
+            lvl = H_lvl = None
+            try:
+                H_lvl = self.H.level(getattr(lm, "_sname", None))
+            except Exception:                                    # noqa: BLE001
+                H_lvl = None
+            if H_lvl is None:
                 return
-            P = np.concatenate(P, 0)
-            if P.shape[1] == 2:
-                P = np.concatenate([P, np.zeros((len(P), 1))], 1)
-            c = P.mean(0) + np.asarray(getattr(self.lm, "_shift", 0.0) or 0.0, float)
-            r = float(np.linalg.norm(P - P.mean(0), axis=1).max()) * 1.08 + 1e-6
-            self.p.add_mesh(pv.Sphere(radius=r, center=tuple(c), theta_resolution=24, phi_resolution=16),
-                            name="pick_body", style="wireframe", color="#ffee33", line_width=1.5,
-                            lighting=False, opacity=0.8)
+            # the contour per body: the actor is named by the body's type
+            names = list(getattr(self.H.level("cell"), "type_names", []) or []) if "cell" in self.H.levels else []
+            nt = getattr(self.H.level("cell"), "node_type", None) if "cell" in self.H.levels else None
+            if names and nt is not None and k < int(nt.numel()):
+                tname = names[int(nt[k])]
+                act = lm.p.renderer.actors.get(f"contour_{tname}") if lm.p is not None else None
+                if act is not None:
+                    self._paint_color = act.GetProperty().GetColor()
+                    act.GetProperty().SetColor(1.0, 0.93, 0.2)
+                    self._paint_actor = f"contour_{tname}"
+                    return
+            par = getattr(H_lvl, "parent", None)
+            idx = getattr(lm, "idx", None)
+            if par is None or idx is None or getattr(lm, "cloud", None) is None:
+                return
+            sel = (par.detach().cpu().numpy()[np.asarray(idx)] == k)
+            if not sel.any():
+                return
+            try:
+                cur = np.asarray(lm.cloud["rgb"]).copy()
+                self._paint = (sel, cur[sel].copy())
+                cur[sel] = np.array([255, 238, 51], np.uint8)
+                lm.cloud["rgb"] = cur
+                if getattr(lm, "_base_rgb", None) is not None:
+                    lm._base_rgb[sel] = np.array([255, 238, 51], np.uint8)
+            except Exception:                                    # noqa: BLE001
+                self._paint = None
 
     def _thickness(self) -> float:
         """The tissue's cell thickness (2|sep| averaged), or 1 without a tissue."""

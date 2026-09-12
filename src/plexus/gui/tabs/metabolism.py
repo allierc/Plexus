@@ -137,7 +137,7 @@ def form_from_spec(spec: dict) -> dict:
 
 
 FORM_HTML = r'''
- <h2>Network</h2>
+
  <div class="row"><label>name</label><input id="name" value="massaction_toy"></div>
  <div class="row"><label>metabolites</label><input id="n_metabolites" class="short" value="40"> <label style="width:70px">reactions</label><input id="n_reactions" class="short" value="80"></div>
  <div class="row"><label title="substrates and products a reaction may have, each">per reaction</label><input id="max_per_reaction" class="short" value="3"> <label style="width:70px" title="share of the reactions that form autocatalytic cycles A+B -> 2B (oscillations)">cycles</label><input id="cycle_fraction" class="short" value="0.4"></div>

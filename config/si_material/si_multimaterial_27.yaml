@@ -103,9 +103,10 @@ sets:
     types:
       c00:
         count: 1
-        material: liquid
-        bulk_modulus: 981000.0
+        material: elastic
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.1367
         - 0.2
@@ -116,8 +117,9 @@ sets:
       c01:
         count: 1
         material: elastic
-        youngs: 2000000.0
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.22
         - 0.2
@@ -127,9 +129,10 @@ sets:
         - 0.1967
       c02:
         count: 1
-        material: snow
-        youngs: 500000.0
-        density: 350.0
+        material: elastic
+        youngs: 1000000.0
+        density: 1000.0
+        fill: lattice
         block:
         - 0.3033
         - 0.2
@@ -139,9 +142,10 @@ sets:
         - 0.1967
       c03:
         count: 1
-        material: liquid
-        bulk_modulus: 981000.0
+        material: elastic
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.1367
         - 0.2
@@ -152,8 +156,9 @@ sets:
       c04:
         count: 1
         material: elastic
-        youngs: 2000000.0
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.22
         - 0.2
@@ -163,9 +168,10 @@ sets:
         - 0.28
       c05:
         count: 1
-        material: snow
-        youngs: 500000.0
-        density: 350.0
+        material: elastic
+        youngs: 1000000.0
+        density: 1000.0
+        fill: lattice
         block:
         - 0.3033
         - 0.2
@@ -175,9 +181,10 @@ sets:
         - 0.28
       c06:
         count: 1
-        material: liquid
-        bulk_modulus: 981000.0
+        material: elastic
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.1367
         - 0.2
@@ -188,8 +195,9 @@ sets:
       c07:
         count: 1
         material: elastic
-        youngs: 2000000.0
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.22
         - 0.2
@@ -199,9 +207,10 @@ sets:
         - 0.3633
       c08:
         count: 1
-        material: snow
-        youngs: 500000.0
-        density: 350.0
+        material: elastic
+        youngs: 1000000.0
+        density: 1000.0
+        fill: lattice
         block:
         - 0.3033
         - 0.2
@@ -211,9 +220,10 @@ sets:
         - 0.3633
       c09:
         count: 1
-        material: liquid
-        bulk_modulus: 981000.0
+        material: elastic
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.1367
         - 0.2833
@@ -224,8 +234,9 @@ sets:
       c10:
         count: 1
         material: elastic
-        youngs: 2000000.0
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.22
         - 0.2833
@@ -235,9 +246,10 @@ sets:
         - 0.1967
       c11:
         count: 1
-        material: snow
-        youngs: 500000.0
-        density: 350.0
+        material: elastic
+        youngs: 1000000.0
+        density: 1000.0
+        fill: lattice
         block:
         - 0.3033
         - 0.2833
@@ -247,9 +259,10 @@ sets:
         - 0.1967
       c12:
         count: 1
-        material: liquid
-        bulk_modulus: 981000.0
+        material: elastic
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.1367
         - 0.2833
@@ -260,8 +273,9 @@ sets:
       c13:
         count: 1
         material: elastic
-        youngs: 2000000.0
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.22
         - 0.2833
@@ -271,9 +285,10 @@ sets:
         - 0.28
       c14:
         count: 1
-        material: snow
-        youngs: 500000.0
-        density: 350.0
+        material: elastic
+        youngs: 1000000.0
+        density: 1000.0
+        fill: lattice
         block:
         - 0.3033
         - 0.2833
@@ -283,9 +298,10 @@ sets:
         - 0.28
       c15:
         count: 1
-        material: liquid
-        bulk_modulus: 981000.0
+        material: elastic
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.1367
         - 0.2833
@@ -296,8 +312,9 @@ sets:
       c16:
         count: 1
         material: elastic
-        youngs: 2000000.0
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.22
         - 0.2833
@@ -307,9 +324,10 @@ sets:
         - 0.3633
       c17:
         count: 1
-        material: snow
-        youngs: 500000.0
-        density: 350.0
+        material: elastic
+        youngs: 1000000.0
+        density: 1000.0
+        fill: lattice
         block:
         - 0.3033
         - 0.2833
@@ -319,9 +337,10 @@ sets:
         - 0.3633
       c18:
         count: 1
-        material: liquid
-        bulk_modulus: 981000.0
+        material: elastic
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.1367
         - 0.3667
@@ -332,8 +351,9 @@ sets:
       c19:
         count: 1
         material: elastic
-        youngs: 2000000.0
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.22
         - 0.3667
@@ -343,9 +363,10 @@ sets:
         - 0.1967
       c20:
         count: 1
-        material: snow
-        youngs: 500000.0
-        density: 350.0
+        material: elastic
+        youngs: 1000000.0
+        density: 1000.0
+        fill: lattice
         block:
         - 0.3033
         - 0.3667
@@ -355,9 +376,10 @@ sets:
         - 0.1967
       c21:
         count: 1
-        material: liquid
-        bulk_modulus: 981000.0
+        material: elastic
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.1367
         - 0.3667
@@ -368,8 +390,9 @@ sets:
       c22:
         count: 1
         material: elastic
-        youngs: 2000000.0
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.22
         - 0.3667
@@ -379,9 +402,10 @@ sets:
         - 0.28
       c23:
         count: 1
-        material: snow
-        youngs: 500000.0
-        density: 350.0
+        material: elastic
+        youngs: 1000000.0
+        density: 1000.0
+        fill: lattice
         block:
         - 0.3033
         - 0.3667
@@ -391,9 +415,10 @@ sets:
         - 0.28
       c24:
         count: 1
-        material: liquid
-        bulk_modulus: 981000.0
+        material: elastic
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.1367
         - 0.3667
@@ -404,8 +429,9 @@ sets:
       c25:
         count: 1
         material: elastic
-        youngs: 2000000.0
+        youngs: 1000000.0
         density: 1000.0
+        fill: lattice
         block:
         - 0.22
         - 0.3667
@@ -415,9 +441,10 @@ sets:
         - 0.3633
       c26:
         count: 1
-        material: snow
-        youngs: 500000.0
-        density: 350.0
+        material: elastic
+        youngs: 1000000.0
+        density: 1000.0
+        fill: lattice
         block:
         - 0.3033
         - 0.3667
@@ -454,8 +481,8 @@ operators:
   polar: higham
 - op: mpm_grid_update
   at: mpm_grid
-  wall_damp: 0.5
-  wall_friction: 0.4
+  wall_damp: 0.9
+  wall_friction: 0.2
   surface_tension: 0.072
   csf_rho: 1000.0
   csf_band: 0.2
@@ -467,7 +494,7 @@ operators:
   vmax: 1000000000.0
 schedule:
 - gravity
-- substep_dt: 4.347826e-05
+- substep_dt: 6.250000e-05
   steps:
   - mpm_strain
   - mpm_viscosity
@@ -488,6 +515,7 @@ plotting:
   box_frame: true
   hide_sets:
   - cell
+  floor: '#0b1a3a'
   colors:
     c00:
     - 0.122
@@ -599,4 +627,4 @@ plotting:
     - 0.42
   slow_motion: 4
   render_3d: dots
-  dot_size: 2.0
+  dot_size: 4.0
