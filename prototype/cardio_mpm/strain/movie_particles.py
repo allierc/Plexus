@@ -26,6 +26,7 @@ ap.add_argument("--n-grid", type=int, default=128); ap.add_argument("--anchor", 
 ap.add_argument("--drag", type=float, default=30.0); ap.add_argument("--anchor-percell", action="store_true")
 ap.add_argument("--band", type=float, default=0.03); ap.add_argument("--amplify", type=float, default=10.0)
 ap.add_argument("--fps", type=int, default=8)
+ap.add_argument("--tag", default="")
 ap.add_argument("--overlay", action="store_true", help="one panel: tracking nodes (green) and MPM particles (blue) superposed")
 args = ap.parse_args(); dev = args.device
 rec = R.load(device=dev, specimen=args.specimen); C = rec["n_cells"]
@@ -58,7 +59,8 @@ for a, name in zip(ax, names):
 txt = fig.text(0.5, 0.965, "", ha="center"); fig.subplots_adjust(left=0.02, right=0.98, top=0.93, bottom=0.07, wspace=0.04)
 import imageio_ffmpeg
 od = os.path.join(HERE, "out", "movies"); os.makedirs(od, exist_ok=True)
-path = os.path.join(od, f"particles{'_overlay' if args.overlay else ''}_{os.path.basename(os.path.dirname(args.params))}_beat{args.beat}.mp4")
+path = (os.path.join(od, f"progress_particles_{args.tag}.mp4") if args.tag else
+        os.path.join(od, f"particles{'_overlay' if args.overlay else ''}_{os.path.basename(os.path.dirname(args.params))}_beat{args.beat}.mp4"))
 fig.canvas.draw(); w, h = fig.canvas.get_width_height(); w, h = w - w % 2, h - h % 2
 writer = imageio_ffmpeg.write_frames(path, (w, h), fps=args.fps, quality=7); writer.send(None)
 for t in range(T):
