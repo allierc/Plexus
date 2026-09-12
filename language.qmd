@@ -244,7 +244,7 @@ compositional graph: parts of several kinds inside each whole, activities joinin
 locally, aggregate and broadcast joining the levels. The same eight kinds serve
 throughout, and another level of organization needs no new machinery.
 
-## Bottoming out: numerical implementations
+## Numerical implementations
 
 Every mechanistic description stops somewhere. It bottoms out in activities the field is
 content to take as given. In Plexus that floor is the numerical implementation. The
