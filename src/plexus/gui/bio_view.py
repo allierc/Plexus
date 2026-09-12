@@ -404,6 +404,9 @@ class View:
         dev = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
         n = int(frames or self.sim.n_frames)
         self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev, started=time.time(), frames_kept=0)
+        # THE OVERLAY'S DENOMINATOR IS THIS RUN'S LENGTH, not the 1 the renderer was built with to draw the seed.
+        self.lm.n_frames = n
+        self.lm.t0 = time.perf_counter()
         self.snaps = []
         # THE RUN IS NOT THE MOVIE. Drawing every frame of a 570k-particle waterfall cost 650 ms a
         # frame on top of the engine's 55 ms; a generate renders every 8th. Here the picture is
