@@ -135,3 +135,39 @@ def test_metabolism_operators_conserve_what_the_stoichiometry_says():
     finally:
         if os.path.exists(path):
             os.remove(path)
+
+
+# ----------------------------------------------------------------- the circuit panel
+def test_dale_weights_take_the_presynaptic_sign():
+    """Under `dale: 1` every synapse's sign is its presynaptic neuron's, E first then I inside
+    every assembly block (`type_layout: ordered`), and the I weights carry the n_E/n_I balance."""
+    from plexus.gui.tabs import neurons as N
+    spec = N.build_spec(N.DEFAULT_FORM)
+    types = spec["sets"]["neuron"]["types"]
+    per = spec["sets"]["neuron"]["per_parent"]
+    n_e = sum(t["count"] for nm, t in types.items() if t["sign"] == "E")
+    for (pre, post), w in zip(spec["sets"]["synapse"]["edges"], spec["sets"]["synapse"]["weights"]):
+        assert (w > 0) == ((pre % per) < n_e), (pre, w)
+
+
+def test_the_panel_draws_a_tiny_circuit(tmp_path):
+    """A 2-assembly Dale circuit on the CPU: the panel captures ticks and renders an RGB frame;
+    the movie and a still are written by the pipeline's own hook contract."""
+    import numpy as np
+    from plexus import engine, schema
+    from plexus.gui.tabs import neurons as N, write_spec
+    from plexus.neural_panel import NeuralPanel
+    form = dict(N.DEFAULT_FORM, n_assemblies=2, per_assembly=6, n_frames=12, movie_frames=6, stills=1, name="tiny")
+    path = str(tmp_path / "tiny.yaml")
+    write_spec(N, N.build_spec(form), path)
+    sim = schema.load(path)
+    H = engine.build(sim, "cpu"); engine.seed(H, sim, "cpu")
+    panel = NeuralPanel(out=str(tmp_path / "movie.mp4"), n_frames=12, sim=sim, style=sim.plotting,
+                        max_frames=6, stills=1, keep_stills=True, name="tiny")
+    engine.run(sim, out_path=None, device="cpu", on_frame=panel)
+    panel.close()
+    assert panel.failed is None and panel.rendered == 6
+    img = panel.frame_at(len(panel.hist) - 1)
+    assert isinstance(img, np.ndarray) and img.ndim == 3 and img.shape[2] == 3
+    assert (tmp_path / "movie.mp4").exists() and (tmp_path / "3d.png").exists()
+    assert panel.N == 12 and panel.dale and [b[0] for b in panel.blocks] == ["E_aff", "E", "I"]

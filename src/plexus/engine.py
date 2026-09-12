@@ -793,8 +793,14 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
         # mixed the tail's type-0 padding into the live rows, so a cell declared with one nucleus
         # and thirty mitochondria woke up with sixteen nuclei.
         live_n = min(int(pat.numel()), per)
-        order = torch.argsort(torch.rand(nblk, live_n, generator=H.rng, device=device), dim=1)
-        head = pat[:live_n][order]                                        # [nblk, live_n]
+        if layout == "ordered":
+            # THE DECLARED ORDER INSIDE EVERY BLOCK: type i's `count` rows first, then type i+1's.
+            # A Dale-signed circuit reads its sign vector off this layout, so it must be the one the
+            # spec wrote and not a draw.
+            head = pat[:live_n][None, :].expand(nblk, live_n)
+        else:
+            order = torch.argsort(torch.rand(nblk, live_n, generator=H.rng, device=device), dim=1)
+            head = pat[:live_n][order]                                    # [nblk, live_n]
         tail = torch.zeros(nblk, per - live_n, dtype=torch.long, device=device)
         node_type = torch.cat([head, tail], 1).reshape(-1)
     else:

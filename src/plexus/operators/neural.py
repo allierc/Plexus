@@ -402,6 +402,48 @@ class NeuronFieldInput(Exchange):
 # --------------------------------------------------------------------------- #
 #  the seed -- x_0 from a frozen connectome region
 # --------------------------------------------------------------------------- #
+@register_operator("neuron_drive", family="signalling", set="neuron", kind="exchange")
+class NeuronDrive(Exchange):
+    """An external CURRENT into the neurons it is applied to, read off a field at their positions.
+
+    field -> neuron: samples the field, emits dx/dt += gain * Omega(x_i) + offset. The afferent
+    input of a circuit -- eq:input-map of the oculomotor note, I = W_in p_dot on the AF5 rows --
+    where `neuron_field_input` is the multiplicative modulation Omega of the reference CTRNN. Which
+    neurons receive it is the `at:` selector's business (`at: neuron[type=AF5]`), as for every
+    operator; the masked neurons get nothing, not a zero written over their state.
+    """
+
+    EMIT = "velocity"
+    INPUTS = ["neuron"]
+    OUTPUTS = ["neuron"]
+    READS = ["pos"]
+    WRITES = ["voltage"]
+    MAPS = []
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["afferent_drive", "external_input", "rate_model"]
+    PARAM_ROLES = {"gain": "input_gain", "offset": "constant_drive", "channel": "field_channel"}
+    REFERENCE = "oculomotor note eq:input-map; connectome-gnn prototype/dot_tracking/train_zebra_eyeG.py"
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "neuron")
+        self.field = params.get("_from") or params.get("from") or params.get("field", "omega")
+        self.gain = float(params.get("gain", 1.0))
+        self.offset = float(params.get("offset", 0.0))
+        self.channel = int(params.get("channel", 0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        fld = H.field(self.field)
+        val = fld.sample(lvl.get("pos"), channel=self.channel)      # [N]
+        dx = (self.gain * val + self.offset)[:, None] * lvl.occ[:, None]
+        if mask is not None:
+            dx = dx * mask[:, None].to(dx.dtype)
+        return {self.at: dx}
+
+
 @register_operator("neural_seed", family="seed", set="neuron", kind="seed")
 class NeuralSeed(Seed):
     """Establish x_0 for a neuron set from a frozen connectome region manifest: real somata at

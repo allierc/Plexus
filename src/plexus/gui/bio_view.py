@@ -97,6 +97,27 @@ class View:
         dec = bool(getattr(u, "declared", False))                # the scale bar needs declared units, as the movie does
         self._tmp = tempfile.mkdtemp(prefix="plexus_bio_")
         free = str(getattr(sim, "boundary", "") or "").lower() == "free"
+        # THE CIRCUIT PANEL IS NOT A CAMERA PICTURE. `plotting.renderer: neural_panel` draws the
+        # message on the connectivity matrix, the vectors and the kinograph (plexus/neural_panel.py);
+        # the page shows that figure, orbit and pick do nothing, PLAY redraws any captured frame.
+        self.panel = None
+        if str(style.get("renderer", "") or "").lower() == "neural_panel":
+            from plexus.neural_panel import NeuralPanel
+            self.panel = NeuralPanel(out=os.path.join(self._tmp, "view.mp4"), n_frames=max(1, int(sim.n_frames)),
+                                     sim=sim, style=style, name=sim.name, stills=0, keep_stills=False,
+                                     dt=getattr(sim, "dt", None), time_s=(float(u.time_s) if dec else None))
+            self.panel.capture(H, 0)
+            self.lm = None; self.p = None
+            self.focal = np.zeros(3); self.dist0 = 1.0; self.scale0 = 1.0
+            self.azim, self.elev, self.zoom = 0.0, 0.0, 1.0
+            self.up_axis = 2
+            self.pick = None
+            self.hidden: set = set()
+            self.RUN = {"running": False, "frame": 0, "n_frames": 0, "seconds": 0.0, "error": None, "stop": False, "counts": {}, "frames_kept": 0}
+            self.snaps: list = []
+            self.frame_shown = None
+            self.seconds = round(time.time() - t0, 2)
+            return
         self.lm = LiveMovie(out=os.path.join(self._tmp, "view.mp4"), world=list(sim.world_size), n_frames=1,
                             up=int(style.get("up_axis", 2)), name=sim.name, sim=sim, style=style,
                             centred=free and not any(k in (sim.sets or {}) for k in ("mpm_particle", "cytosol", "nucleus")),
@@ -148,6 +169,8 @@ class View:
         return _vtk(self._set_camera, azim, elev, zoom)
 
     def _set_camera(self, azim=None, elev=None, zoom=None):
+        if self.panel is not None:
+            return
         with LOCK:
             if azim is not None: self.azim = float(azim)
             if elev is not None: self.elev = max(-89.0, min(89.0, float(elev)))
@@ -229,6 +252,16 @@ class View:
         self.p.add_text(_si_length(len_m), position=(0.80, 0.065), viewport=True, font_size=11, color="white", name="scale_label")
 
     def png(self) -> bytes:
+        if self.panel is not None:
+            def _panel_png():
+                with LOCK:
+                    i = self.frame_shown if self.frame_shown is not None else len(self.panel.hist) - 1
+                    return self.panel.frame_at(i)
+            img = _vtk(_panel_png)
+            import imageio.v3 as iio
+            buf = io.BytesIO()
+            iio.imwrite(buf, np.asarray(img), extension=".png")
+            return buf.getvalue()
         img = _vtk(self._grab)
         import imageio.v3 as iio
         buf = io.BytesIO()
@@ -276,6 +309,9 @@ class View:
         return _vtk(self._show_frame, i)
 
     def _show_frame(self, i: int):
+        if self.panel is not None:
+            self.frame_shown = max(0, min(int(i), len(self.panel.hist) - 1)) if self.panel.hist else None
+            return
         if not self.snaps:
             return
         i = max(0, min(int(i), len(self.snaps) - 1))
@@ -332,6 +368,8 @@ class View:
 
     def pick_at(self, fx: float, fy: float, tol: float = 0.012) -> str | None:
         """The object under the click at screen fractions (fx from the left, fy from the top)."""
+        if self.panel is not None:
+            return None
         def _proj():
             W, Hh = self.p.window_size
             M = self.p.camera.GetCompositeProjectionTransformMatrix(float(W) / float(Hh), -1.0, 1.0)
@@ -356,6 +394,9 @@ class View:
 
     def _highlight(self, pick: str | None):
         """A yellow dot on a cluster or vertex; the cell's rings and lateral edges for a cell."""
+        if self.panel is not None:
+            self.pick = pick
+            return
         import pyvista as pv
         from plexus.gui import bio
         with LOCK:
@@ -405,6 +446,8 @@ class View:
         return _vtk(self._set_visible, species, on)
 
     def _set_visible(self, species: str, on: bool):
+        if self.panel is not None:
+            return False
         with LOCK:
             acts = [a for n, a in self.p.renderer.actors.items() if n.startswith("glyph_") and n.endswith("_" + species)]
             if not acts:
@@ -448,9 +491,12 @@ class View:
         self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev,
                         started=time.time(), frames_kept=0, out_dir=None, stopped=False, ms_per_frame=None)
         self.snaps = []
-        # THE OVERLAY'S DENOMINATOR IS THIS RUN'S LENGTH, not the 1 the renderer was built with to draw the seed.
-        self.lm.n_frames = n
-        self.lm.t0 = time.perf_counter()
+        if self.panel is not None:
+            self.panel.hist = []; self.panel.n_frames = n; self.frame_shown = None
+        else:
+            # THE OVERLAY'S DENOMINATOR IS THIS RUN'S LENGTH, not the 1 the renderer was built with to draw the seed.
+            self.lm.n_frames = n
+            self.lm.t0 = time.perf_counter()
         # THE MOVIE'S OWN STRIDES. Kept frames for PLAY are the frames the pipeline's movie keeps
         # (`plotting.max_frames`, live_movie.py:256), widened only by a memory budget on the kept
         # positions; the picture is refreshed at the pipeline's stills (`plotting.stills`) and
@@ -479,13 +525,18 @@ class View:
             now = time.time()
             with LOCK:
                 self.H = H
-                due = tick == n or tick % self._draw_every == 0
-                if due or not _PENDING.empty():
-                    self.lm(H, tick)
-                    if getattr(self.lm, "cs", None) is not None and tick == 0:
-                        self.lm._update_cross_section(H)
-                if tick % self._keep_every == 0 or tick == n:
-                    self._snapshot(H)
+                if self.panel is not None:
+                    if tick % self._keep_every == 0 or tick == n:
+                        self.panel.capture(H, tick)
+                        self.RUN["frames_kept"] = len(self.panel.hist)
+                else:
+                    due = tick == n or tick % self._draw_every == 0
+                    if due or not _PENDING.empty():
+                        self.lm(H, tick)
+                        if getattr(self.lm, "cs", None) is not None and tick == 0:
+                            self.lm._update_cross_section(H)
+                    if tick % self._keep_every == 0 or tick == n:
+                        self._snapshot(H)
                 if tick == n or (now - self._last_scene) >= self.SCENE_INTERVAL:
                     from plexus.gui import bio
                     self.scene = bio.scene_from(H, self.sim, self.spec_path)
@@ -548,7 +599,7 @@ class View:
         def _c():
             with LOCK:
                 try:
-                    self.lm.close()
+                    (self.panel.close() if self.panel is not None else self.lm.close())
                 except Exception:                                # noqa: BLE001
                     pass
         _vtk(_c)
