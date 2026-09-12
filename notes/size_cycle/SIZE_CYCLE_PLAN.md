@@ -317,6 +317,28 @@ channel doing what Ginzberg et al. say it does.
     band and the cause are R5's (engine) business. Until then a rung is scored inside its clean
     window, which is >= 2.5 doublings on every arm.
 
+**R3 -- time and topology (opened 2026-09-12).** The user's diagnosis after the R2b movies:
+the shell is a sphere but a rough one, and the division rate has to be set against the
+mechanics' own relaxation time -- daughters must not arrive faster than energy minimisation can
+answer a septum. Two instruments and one sweep:
+
+- `tools/spheroid_gauge.py` now judges the PRISM as well as the shell (finding 15): apical/basal
+  cap area over the ratio the curvature imposes (`trapezoid`), cap-centroid offset per thickness
+  (`shear`), `sep` against the local cap normal (`tilt`), thickness range around the ring
+  (`h_in_cell`). The mechanics-only control: 0 / 0 / 0 / 0.07. Every dividing run, the accepted
+  archive included: 45-54 % trapezoids from frame 400, 16 % in-cell thickness range. This is the
+  roughness the eye sees, and it is there long before the shell-level bands trip.
+- `sweep_r{578,289,145}_i{30,90}` and `sweep_r578_i30_heal20` (archives `log/size_cycle/R3sweep`):
+  `size_sizer` at growth rates 0.000578 / 0.000289 / 0.000145 (doubling in 400 / 800 / 1600
+  frames), `relax_iters` 30 / 90, and the daughter-healing relax `local_relax 20`. Gauged for
+  the working point where the prisms stay prisms over the run; the ratio doubling-time /
+  relaxation-time is the number to report, with the relaxation time measured on
+  `mech_target_percell` as the frames to settle after a target step.
+- The dilution rule and the "one when" consolidation move to R4.
+
+15. **Growth and division bend the prisms.** See R3 above: trapezoid fraction 0 on the control,
+    ~0.5 on every dividing arm, `h_in_cell` 0.06 -> 0.16.
+
 ## 4. The ladder
 
 Each rung is one commit series with a gate measured by `tools/size_report.py` on the eleven
@@ -328,8 +350,8 @@ reviewed as one (`tests/REGRESSION_PLAN.md`).
 | R0 | run the eleven specs on HEAD; record the table in this note | the defects reproduce: `size_adder` slope -1, `cycle_dilution` slope > 0, `cycle_sizer` slope between |
 | R1 | findings 2, 4, 5 (+ the G1 cap, `mono_k`, `ref_frame` of finding 7): measured `Vbirth`; sizer denominator `v* - V_b`; dilution reset `v_ref / V_b` | `size_sizer` -1 +- 0.15, `size_adder` 0 +- 0.15, `size_timer` > +0.5, `cycle_dilution` = `cycle_sizer` within 0.15; median drift < 10 % over the last two cycles on every checkpoint arm |
 | R2 | findings 6, 8, 9: one reader (`cell_size` in `cell_divide` and `cell_grow[sizer]`); specs on the working point's conventions; the spheroid gauge as a gate; growth-per-cycle print and refusal | byte-identical on `apop2_ks0p1`, `sheet_*`, `mech_uniform_target` (their convention does not change); R1 numbers within bands |
-| R3 | one "when": divide-family models into `cell_cycle`; `cell_divide` keeps septum + trigger; `cell_grow[timer]` withdrawn | `size_*` rewritten as degenerate cycles reproduce R1 within bands; five operators and eight parameters fewer in `catalog_summary()` |
-| R4 | representation: cell-set blocks, `cell_id`, time units, default recording | trajectory keys renamed once, in their own commit; `size_report` reads lineage from `cell_id` and gives R3's numbers |
+| R3 | time and topology: prism gauge; rate x relaxation sweep; a working point where the prisms stay prisms | `size_*` rewritten as degenerate cycles reproduce R1 within bands; five operators and eight parameters fewer in `catalog_summary()` |
+| R4 | one "when": divide-family models into `cell_cycle` (dilution fixed there); `cell_divide` keeps septum + trigger; then representation: cell-set blocks, `cell_id`, time units, default recording | trajectory keys renamed once, in their own commit; `size_report` reads lineage from `cell_id` and gives R3's numbers |
 | R5 | engine: seed-time writes to seed ops; flags off; tick shims out; `p0` off the apico-basal contract; stability print; a seed at rest in every degree of freedom so `ref_frame` and `mono_delta` can go (finding 7) | tick-0 invariant passes for `cell_cycle` and `cell_grow`; `MAY_MUTATE_INTEGRATED_STATE` count 29 -> <= 20 |
 | R6 | register the eleven working points; regenerate `library/`; `QUICK` re-pointed | `pytest tests/regression -m regression --quick` green; nightly archive has one row per new point |
 
