@@ -285,7 +285,11 @@ def build_spec(form: dict) -> dict:
         mp["vel_init"] = launch
     return {
         "general": {"name": name, "seed": seed, "n_frames": frames, "dt": dt, "boundary": "wall",
-                    "dim": 3, "world": [world, world, world], "save_data": False,
+                    "dim": 3, "world": [world, world, world],
+                    # THE RUN RECORDS ITS TRAJECTORY. Without it a finished run leaves a movie and
+                    # nothing to replay: the page's own frames die with the view, and PLAY on a
+                    # re-opened spec has no data. 800 frames of 36k points is 350 MB.
+                    "save_data": True,
                     "units": {"length_um": 1000000.0, "time_s": 1.0, "force_nN": 1000000000.0}},
         "sets": {"cell": {"n": len(bodies), "start": start, "type_layout": "ordered", "types": types},
                  "mpm_particle": mp},

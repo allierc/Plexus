@@ -9,7 +9,7 @@ general:
   - 0.5
   - 0.5
   - 0.5
-  save_data: false
+  save_data: true
   units:
     length_um: 1000000.0
     time_s: 1.0

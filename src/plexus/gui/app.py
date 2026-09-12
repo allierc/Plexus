@@ -108,11 +108,13 @@ window.reseed=async function(){{playStop();FRAME=null;if(!specName){{status('no 
  try{{const f=await (await fetch('/api/scene/frames')).json();nframes=f.n||0;$('frame').max=Math.max(nframes-1,0);
   // THE RUN THIS SPEC ALREADY HAS: if `graphs_data/.../<name>/movie.mp4` is there, PLAY plays it
   // straight away -- no run needed, and no 2 GB trajectory read to scrub at a camera.
-  STORED=f.stored||0;
-  // THE RUN'S OWN DATA, not its movie: a spec whose trajectory is on disk says so, and PLAY reads
-  // it into memory -- real frames, replayable at any camera and through any render.
+  STORED=f.stored||0;RECORDED=f.recorded||0;
+  // THE RUN'S OWN DATA, not its movie: a spec whose trajectory is on disk says so, and PLAY (or a
+  // drag of the slider) reads it into memory -- real frames, replayable at any camera and through
+  // any render. The slider spans the frames a read will KEEP, which is what it will hold after.
   if(!nframes&&STORED){{$('frame').max=STORED-1;}}
-  $('framelab').textContent=nframes?`${{nframes}} frames in memory`:(STORED?`${{STORED}} recorded frames on disk: PLAY loads them`:'');}}catch(e){{}}}};
+  $('framelab').textContent=nframes?`${{nframes}} frames in memory`
+    :(STORED?`${{STORED}} of ${{RECORDED}} recorded frames -- drag or PLAY to load them`:'');}}catch(e){{}}}};
 window.toggleYaml=function(){{const y=$('yaml');const on=getComputedStyle(y).display==='none';y.style.display=on?'block':'none';}};
 window.saveYaml=async function(){{const j=await post('/api/scene/save',{{name:specName,raw:$('yamltext').value,tab:TAB}});if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();}};
 // THE PICTURE IS THE MOVIE RENDERER'S. Every camera change asks the server for a fresh screenshot;
@@ -160,11 +162,11 @@ async function rpoll(){{try{{const j=await (await fetch('/api/scene/run')).json(
  render();if(j.running){{setTimeout(rpoll,700);}}else{{running=false;$('runbtn').disabled=false;for(const id of ['render','light','color'])if($(id))$(id).disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);
   const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();
   $('framelab').textContent=(nframes?`${{nframes}} frames: PLAY replays at any camera`:'')+(a.dir?`  |  written to ${{a.dir}}`:'');}}}}catch(e){{setTimeout(rpoll,1500);}}}}
-let STORED=0, playing=null, nframes=0, FRAME=null;
+let STORED=0, RECORDED=0, playing=null, nframes=0, FRAME=null;
 async function showFrame(i){{
- if(!nframes&&STORED){{await playStopAndLoad();}}
+ if(!nframes&&STORED){{$('framelab').textContent=`loading ${{STORED}} frames...`;await playStopAndLoad();}}
  FRAME=i;$('frame').value=i;$('framelab').textContent=`frame ${{i}}/${{Math.max(nframes-1,0)}}`;await render();}}
-window.playGo=async function(){{let j=await (await fetch('/api/scene/frames')).json();nframes=j.n||0;STORED=j.stored||0;
+window.playGo=async function(){{let j=await (await fetch('/api/scene/frames')).json();nframes=j.n||0;STORED=j.stored||0;RECORDED=j.recorded||0;
  if(!nframes&&STORED){{  // nothing in memory, but the run is on disk: read it
   $('framelab').textContent=`loading ${{STORED}} recorded frames...`;
   const l=await post('/api/scene/loadrun',{{}});if(l.error){{$('framelab').textContent=l.error;return;}}
