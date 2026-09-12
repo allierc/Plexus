@@ -202,44 +202,156 @@ def route_gauss_splat(pos, col, cam, radius, sigma_mul=0.6):
     return np.where((wsum.view(H, W, 1) > 1e-6).cpu().numpy(), lit, 0)
 
 
-def route_levelset(pos, col, cam, radius, ngrid=192, iso=0.32, smooth=2):
-    """Density grid -> marching cubes -> a shaded mesh. Returns (image, seconds to build the mesh,
-    seconds to render it, triangle count)."""
+_WP_READY = {"ok": False}
+
+
+def _zhu_warp(pos_np, lo, dims, dx, h):
+    """Zhu-Bridson's two grid fields (sum of weights, weighted position sum) with a warp hash grid.
+
+    ONE THREAD PER GRID CELL, asking the hash grid which particles are within `h` -- instead of the
+    torch route's (2k+1)^3 passes over every particle, which is where its half second went. The
+    grid is built once per frame and the query is what an SPH neighbour search costs anyway.
+    """
+    import warp as wp
+    if not _WP_READY["ok"]:
+        wp.init(); _WP_READY["ok"] = True
+
+    @wp.kernel
+    def _acc(grid: wp.uint64, pts: wp.array(dtype=wp.vec3), lo: wp.vec3, dx: float, h: float,
+             nx: int, ny: int, nz: int,
+             wsum: wp.array(dtype=float), xbar: wp.array(dtype=wp.vec3)):
+        c = wp.tid()
+        k = c % nz
+        j = (c // nz) % ny
+        i = c // (ny * nz)
+        x = lo + wp.vec3(float(i) * dx, float(j) * dx, float(k) * dx)
+        query = wp.hash_grid_query(grid, x, h)
+        index = int(0)
+        w_tot = float(0.0)
+        xb = wp.vec3(0.0, 0.0, 0.0)
+        while wp.hash_grid_query_next(query, index):
+            d = wp.length(x - pts[index]) / h
+            if d < 1.0:
+                w = (1.0 - d * d) * (1.0 - d * d) * (1.0 - d * d)
+                w_tot += w
+                xb += pts[index] * w
+        wsum[c] = w_tot
+        xbar[c] = xb
+
+    nx, ny, nz = (int(v) for v in dims)
+    dev = "cuda:0" if wp.get_cuda_device_count() else "cpu"
+    pts = wp.array(np.ascontiguousarray(pos_np, np.float32), dtype=wp.vec3, device=dev)
+    grid = wp.HashGrid(dim_x=64, dim_y=64, dim_z=64, device=dev)
+    grid.build(points=pts, radius=float(h))
+    n = nx * ny * nz
+    wsum = wp.zeros(n, dtype=float, device=dev)
+    xbar = wp.zeros(n, dtype=wp.vec3, device=dev)
+    wp.launch(_acc, dim=n, inputs=[grid.id, pts, wp.vec3(*[float(v) for v in lo]), float(dx), float(h),
+                                   nx, ny, nz, wsum, xbar], device=dev)
+    wp.synchronize()
+    return wsum.numpy().reshape(nx, ny, nz), xbar.numpy().reshape(nx, ny, nz, 3)
+
+
+def route_levelset(pos, col, cam, radius, ngrid=0, iso=0.32, smooth=2, method="zhu",
+                   cell_mul=1.0, kernel_mul=3.0, taubin=0, backend="warp"):
+    """Points -> an implicit surface -> marching cubes -> a shaded mesh.
+
+    TWO IMPLICIT SURFACES, and the difference is the whole quality question.
+
+      `blobby`  phi(x) = sum_i W(|x - x_i|), thresholded. The classic metaball sum: it bulges
+                where particles pile up and dips between them, so a FLAT face comes out lumpy and
+                the only cure is to blur -- which rounds the corners off with it. That is what the
+                first version of this route did, and why it read as blurry.
+
+      `zhu`     ZHU & BRIDSON (SIGGRAPH 2005), the film default: phi(x) = |x - xbar(x)| - rbar(x)
+                where xbar is the WEIGHTED AVERAGE PARTICLE POSITION near x and rbar the weighted
+                average radius. It is a distance field to a smoothed point set rather than a sum of
+                bumps, so a flat wall of particles gives a flat surface and an edge stays an edge:
+                no blur is needed to hide the sampling, so none is applied to the corners.
+
+    The grid is sized from the PARTICLE SPACING (`cell_mul` x spacing), not from a fixed count: a
+    grid finer than the spacing costs cubically and resolves nothing that is there. `kernel_mul` is
+    the support radius in spacings -- 2 is the usual choice, under 1.5 the surface breaks up.
+
+    Returns (image, seconds to build the mesh, seconds to render it, triangle count).
+    """
     import torch
-    import pyvista as pv
-    lo = pos.min(0).values - 3 * radius
-    hi = pos.max(0).values + 3 * radius
-    dx = float((hi - lo).max()) / ngrid
-    dims = ((hi - lo) / dx).long() + 2
-    t0 = time.time()
-    g = torch.zeros(int(dims[0]) * int(dims[1]) * int(dims[2]), device=pos.device)
-    q = ((pos - lo) / dx)
-    base = q.floor().long()
-    frac = q - base.float()
-    W_, H_, D_ = int(dims[0]), int(dims[1]), int(dims[2])
-    for ox in (0, 1):
-        for oy in (0, 1):
-            for oz in (0, 1):
-                w = ((frac[:, 0] if ox else 1 - frac[:, 0])
-                     * (frac[:, 1] if oy else 1 - frac[:, 1])
-                     * (frac[:, 2] if oz else 1 - frac[:, 2]))
-                i = ((base[:, 0] + ox).clamp(0, W_ - 1) * H_ * D_
-                     + (base[:, 1] + oy).clamp(0, H_ - 1) * D_
-                     + (base[:, 2] + oz).clamp(0, D_ - 1))
-                g.index_add_(0, i, w)
-    vol = g.view(W_, H_, D_)
     import torch.nn.functional as F
-    kx = torch.tensor([1.0, 4.0, 6.0, 4.0, 1.0], device=vol.device); kx = kx / kx.sum()
-    for _ in range(smooth):                                     # separable binomial blur, 3-D
-        for ax in range(3):
-            shape = [1, 1, 1, 1, 1]; shape[2 + ax] = 5
-            vol = F.conv3d(F.pad(vol[None, None], (2, 2, 2, 2, 2, 2), mode="replicate"),
-                           kx.view(*shape))[0, 0]
+    import pyvista as pv
+    spacing = radius / 0.62                                     # the caller derives radius from it
+    dx = float(cell_mul * spacing) if not ngrid else float((pos.max(0).values - pos.min(0).values).max()) / ngrid
+    h = float(kernel_mul * spacing)                             # kernel support
+    lo = pos.min(0).values - 2 * h
+    hi = pos.max(0).values + 2 * h
+    dims = ((hi - lo) / dx).long() + 3
+    W_, H_, D_ = (int(x) for x in dims)
+    t0 = time.time()
+    n = W_ * H_ * D_
+    if method == "zhu" and backend == "warp":
+        ws, xb = _zhu_warp(pos.detach().cpu().numpy(), lo.cpu().numpy(), (W_, H_, D_), dx, h)
+        wsum = torch.as_tensor(ws.reshape(-1), device=pos.device)
+        xbar = torch.as_tensor(xb.reshape(-1, 3), device=pos.device)
+        q = None
+    else:
+        wsum = torch.zeros(n, device=pos.device)
+        xbar = torch.zeros(n, 3, device=pos.device)
+        q = (pos - lo) / dx
+    base = q.floor().long() if q is not None else None
+    k = int(np.ceil(h / dx))
+    off = torch.arange(-k, k + 1, device=pos.device) if q is not None else []
+    for ox in (off.tolist() if q is not None else []):
+        for oy in off.tolist():
+            for oz in off.tolist():
+                gi = base + torch.tensor([ox, oy, oz], device=pos.device)
+                gi = gi.clamp(torch.zeros(3, dtype=torch.long, device=pos.device),
+                              torch.tensor([W_ - 1, H_ - 1, D_ - 1], device=pos.device))
+                gx = lo + gi.float() * dx                       # that cell's world position
+                r = (gx - pos).norm(dim=1) / h
+                w = (1.0 - r * r).clamp(min=0.0) ** 3           # smooth, compact, cheap
+                m = w > 0
+                if not bool(m.any()):
+                    continue
+                idx = gi[:, 0] * H_ * D_ + gi[:, 1] * D_ + gi[:, 2]
+                wsum.index_add_(0, idx[m], w[m])
+                xbar.index_add_(0, idx[m], pos[m] * w[m][:, None])
+    if method == "zhu":
+        gxi = torch.stack(torch.meshgrid(torch.arange(W_, device=pos.device),
+                                         torch.arange(H_, device=pos.device),
+                                         torch.arange(D_, device=pos.device), indexing="ij"), -1)
+        gx = lo + gxi.float() * dx
+        xb = (xbar / wsum.clamp(min=1e-12)[:, None]).view(W_, H_, D_, 3)
+        phi = (gx - xb).norm(dim=-1) - float(radius * 1.35)
+        phi = torch.where(wsum.view(W_, H_, D_) > 1e-9, phi, torch.full_like(phi, 3 * dx))
+        vol, level = phi, 0.0
+        # ONE light pass, on the DISTANCE field, not on a density: it moves the surface by a
+        # fraction of a cell instead of eating the corners.
+        if smooth:
+            kx = torch.tensor([1.0, 2.0, 1.0], device=vol.device); kx = kx / kx.sum()
+            for _ in range(max(1, smooth // 2)):
+                for ax in range(3):
+                    shape = [1, 1, 1, 1, 1]; shape[2 + ax] = 3
+                    vol = F.conv3d(F.pad(vol[None, None], (1, 1, 1, 1, 1, 1), mode="replicate"),
+                                   kx.view(*shape))[0, 0]
+    else:
+        vol = wsum.view(W_, H_, D_)
+        if smooth:
+            kx = torch.tensor([1.0, 4.0, 6.0, 4.0, 1.0], device=vol.device); kx = kx / kx.sum()
+            for _ in range(smooth):
+                for ax in range(3):
+                    shape = [1, 1, 1, 1, 1]; shape[2 + ax] = 5
+                    vol = F.conv3d(F.pad(vol[None, None], (2, 2, 2, 2, 2, 2), mode="replicate"),
+                                   kx.view(*shape))[0, 0]
+        level = iso * float(vol.max())
+    t_field = time.time() - t0
     v = vol.detach().cpu().numpy()
     grid = pv.ImageData(dimensions=v.shape, spacing=(dx, dx, dx), origin=tuple(lo.cpu().numpy()))
     grid.point_data["d"] = v.flatten(order="F")
-    surf = grid.contour([iso * float(v.max())], scalars="d")
+    surf = grid.contour([level], scalars="d")
+    if taubin and surf.n_points:
+        surf = surf.smooth_taubin(n_iter=int(taubin), pass_band=0.1)
+    surf = surf.compute_normals(consistent_normals=False, auto_orient_normals=False)
     t_build = time.time() - t0
+    route_levelset.last = dict(field=t_field, mc=t_build - t_field, cells=(W_, H_, D_), dx=dx)
     t0 = time.time()
     p = pv.Plotter(off_screen=True, window_size=cam.px, border=False)
     p.add_mesh(surf, color=(0.55, 0.72, 0.95), smooth_shading=True, specular=0.6,
@@ -289,7 +401,11 @@ def main():
     ap.add_argument("--azim", type=float, default=35.0)
     ap.add_argument("--elev", type=float, default=14.0)
     ap.add_argument("--dist", type=float, default=1.5)
-    ap.add_argument("--ngrid", type=int, default=192)
+    ap.add_argument("--ngrid", type=int, default=192, help="grid for the blobby reference only")
+    ap.add_argument("--cell", type=float, default=1.0, help="Zhu-Bridson cell size, in particle spacings")
+    ap.add_argument("--kernel", type=float, default=2.5, help="kernel support, in particle spacings")
+    ap.add_argument("--smooth", type=int, default=2)
+    ap.add_argument("--taubin", type=int, default=0, help="Taubin mesh smoothing iterations (shape-preserving)")
     ap.add_argument("--device", default="cuda:0" if os.environ.get("CUDA_VISIBLE_DEVICES", "0") else "cpu")
     ap.add_argument("--repeat", type=int, default=4)
     a = ap.parse_args()
@@ -322,9 +438,19 @@ def main():
         if dev.startswith("cuda"):
             torch.cuda.synchronize()
         out[name], times[name] = img, (time.time() - t0) / a.repeat
-    img, tb, tr, ntri = route_levelset(pos, col, cam, radius, ngrid=a.ngrid)
-    out["levelset_mc"], times["levelset_mc"] = img, tb + tr
-    times["levelset_mc_build"], times["levelset_mc_render"], times["levelset_triangles"] = tb, tr, ntri
+    for nm, kw in (("levelset_blobby", dict(method="blobby", ngrid=a.ngrid, smooth=2)),
+                   ("levelset_torch", dict(method="zhu", cell_mul=a.cell, kernel_mul=a.kernel,
+                                           smooth=a.smooth, taubin=a.taubin, backend="torch")),
+                   ("levelset_mc", dict(method="zhu", cell_mul=a.cell, kernel_mul=a.kernel,
+                                        smooth=a.smooth, taubin=a.taubin, backend="warp"))):
+        if kw.get("backend") == "warp":
+            route_levelset(pos, col, cam, radius, **kw)         # warp compiles its kernel once
+        img, tb, tr, ntri = route_levelset(pos, col, cam, radius, **kw)
+        out[nm], times[nm] = img, tb + tr
+        times[nm + "_build"], times[nm + "_render"], times[nm + "_triangles"] = tb, tr, ntri
+        _last = getattr(route_levelset, "last", {})
+        times[nm + "_field"], times[nm + "_mc"] = _last.get("field"), _last.get("mc")
+        times[nm + "_grid"] = _last.get("cells")
     try:                                                        # the ray tracer, for reference
         sc = RA.AnariScene(pos_np, np.asarray(col_np, np.float32), box, (a.px, a.px), radius=radius, spp=1)
         sc.look(a.azim, a.elev, a.dist); sc.render()
@@ -339,13 +465,17 @@ def main():
     times["pixels"] = a.px * a.px
     json.dump(times, open(os.path.join(a.run_dir, "surface_bench.json"), "w"), indent=1)
     print(f"[bench] {len(pos_np):,} particles at {a.px}x{a.px} on {dev}")
-    for k in ("points", "screen_space", "gauss_splat", "levelset_mc", "anari_spheres"):
+    for k in ("points", "screen_space", "gauss_splat", "levelset_blobby", "levelset_torch",
+              "levelset_mc", "anari_spheres"):
         if k in times:
             extra = ""
-            if k == "levelset_mc":
-                extra = (f"  (grid+MC {times['levelset_mc_build'] * 1000:.0f} ms, "
-                         f"render {times['levelset_mc_render'] * 1000:.0f} ms, "
-                         f"{times['levelset_triangles']:,} triangles)")
+            if k.startswith("levelset"):
+                extra = (f"  (build {times[k + '_build'] * 1000:.0f} ms, "
+                         f"render {times[k + '_render'] * 1000:.0f} ms, "
+                         f"{times[k + '_triangles']:,} triangles"
+                         + (f"; field {times[k + '_field'] * 1000:.0f} ms + marching cubes "
+                            f"{times[k + '_mc'] * 1000:.0f} ms on a {'x'.join(str(c) for c in times[k + '_grid'])} grid"
+                            if times.get(k + "_field") else "") + ")")
             print(f"[bench] {k:14s} {times[k] * 1000:7.0f} ms/frame  ({1 / times[k]:6.1f} fps){extra}")
 
 
