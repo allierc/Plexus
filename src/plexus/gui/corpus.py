@@ -136,11 +136,15 @@ def _spec(rel: str) -> str:
 
 REFERENCES = {
     "bio": ["config/tissue/spheroid_organelles_polar.yaml", "config/tissue/spheroid_proteins.yaml"],
-    "material": ["config/si_material/si_ball_splash.yaml", "config/si_material/si_waterfall.yaml"],
+    "material": ["config/si_material/si_three_balls.yaml", "config/si_material/si_waterfall.yaml"],
+    "neurons": ["config/neural/ctrnn_gui.yaml"],
+    "metabolism": ["config/metabolism/massaction_toy.yaml"],
 }
 DESIGN_NOTES = {
     "bio": ["src/plexus/operators/protein_ops.py", "src/plexus/operators/organelle_ops.py"],
     "material": ["src/plexus/operators/mpm_ops.py"],
+    "neurons": ["src/plexus/operators/neural.py"],
+    "metabolism": ["src/plexus/operators/metabolism.py"],
 }
 
 

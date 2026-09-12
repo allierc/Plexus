@@ -1,7 +1,7 @@
-"""`python -m plexus.gui [spec.yaml | dir] [--port N] [--host H] [--no-browser]`.
+"""`python -m plexus.gui [--tab bio|material|neurons|metabolism] [--port N] [--no-browser]`.
 
-Starts the local editor server and (unless --no-browser) opens the page, deep-
-linking to the spec if one was given.
+Starts the server and (unless --no-browser) opens the one page on the tab asked for.
+`--editor` opens the spec node editor instead (`/editor`).
 """
 
 from __future__ import annotations
@@ -17,30 +17,24 @@ from plexus.gui.server import serve
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="plexus.gui", description="Plexus spec node editor")
-    ap.add_argument("spec", nargs="?", help="spec.yaml to open (or a dir to browse)")
+    ap = argparse.ArgumentParser(prog="plexus.gui", description="the Plexus page")
+    ap.add_argument("spec", nargs="?", help="spec.yaml to open in the editor (with --editor)")
     ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=None,
-                    help="default 8765; the bio page is always on 8799 so its URL can be bookmarked")
+    ap.add_argument("--port", type=int, default=8799, help="default 8799, so the URL can be bookmarked")
     ap.add_argument("--no-browser", action="store_true")
-    ap.add_argument("--studio", action="store_true",
-                    help="open the prompt-to-scene studio instead of the node editor")
-    ap.add_argument("--bio", action="store_true",
-                    help="open the bio-objects page: define a tissue and its proteins, seed, click")
-    ap.add_argument("--material", action="store_true",
-                    help="open the material page: MPM bodies in a box, seed, run (always on 8798)")
+    ap.add_argument("--tab", default="material", choices=("bio", "material", "neurons", "metabolism"),
+                    help="the tab the page opens on")
+    ap.add_argument("--editor", action="store_true", help="open the spec node editor instead of the page")
     args = ap.parse_args(argv)
 
-    if args.port is None:
-        args.port = 8799 if args.bio else 8798 if args.material else 8765   # /bio on 8799, /material on 8798: bookmarks
     httpd = serve(args.host, args.port)
-    url = f"http://{args.host}:{args.port}/" + ("bio" if args.bio else "material" if args.material else "studio" if args.studio else "")
-    if args.spec and not args.studio:
+    url = f"http://{args.host}:{args.port}/" + ("editor" if args.editor else f"?tab={args.tab}")
+    if args.spec and args.editor:
         sp = os.path.abspath(os.path.expanduser(args.spec))
         if os.path.isfile(sp):
             url += f"?spec={quote(sp)}"
 
-    print(f"  {'Plexus bio objects' if args.bio else 'Plexus material' if args.material else 'Plexus Studio' if args.studio else 'Plexus spec editor'}  ->  {url}")
+    print(f"  {'Plexus spec editor' if args.editor else 'Plexus'}  ->  {url}")
     print("  (Ctrl-C to stop)")
 
     if not args.no_browser:

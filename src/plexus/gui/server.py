@@ -1,14 +1,17 @@
-"""A zero-dependency backend for the Plexus spec node-editor.
+"""A zero-dependency backend for the Plexus page and the spec node-editor.
 
-Stdlib `http.server` only. Three jobs:
+Stdlib `http.server` only. The routes are a TABLE (`GET_ROUTES`, `POST_ROUTES`: path -> handler),
+not a ladder of ifs, so a route is one entry and one function:
 
-  * serve the static frontend (`static/`),
-  * expose the registry-driven operator catalog (`/api/catalog`),
-  * load / validate / save `spec.yaml` files, plus a node-layout sidecar so the
-    canvas remembers where you placed things.
+  * `/`                the one page (`gui/app.py`), `?tab=` bio | material | neurons | metabolism
+  * `/api/tab/<t>/build`  the tab's form -> a validated spec in config/studio/, seeded
+  * `/api/scene/*`     the shared panel: state, spec, seed, render, pick, info, view, run, frames,
+                       artefacts, ls, open, counts, save, refine, visible, claude, reset
+  * `/editor`, `/static/*`, `/api/catalog`, `/api/specs`, `/api/spec`, `/api/validate`,
+    `/api/save`, `/api/layout`, `/media`   the node editor, unchanged
 
-Validation reuses `plexus.schema.load` verbatim -- the same gatekeeper the engine
-trusts -- so "valid in the editor" == "runnable". Binds to localhost.
+Validation reuses `plexus.schema.load` verbatim -- the same gatekeeper the engine trusts -- so
+"valid in the page" == "runnable". Binds to localhost.
 """
 
 from __future__ import annotations
@@ -172,17 +175,6 @@ def _dump_yaml(spec: dict) -> str:
                           default_flow_style=False, allow_unicode=True)
 
 
-def _studio_name(prompt: str) -> str:
-    """A filesystem name from the prompt's first few words, uniquified against what is there."""
-    import re as _re
-    base = "_".join(_re.findall(r"[a-z0-9]+", prompt.lower())[:4]) or "scene"
-    from plexus.gui import studio
-    n, i = base, 2
-    while os.path.exists(os.path.join(studio.CONFIG_DIR, n + ".yaml")):
-        n, i = f"{base}_{i}", i + 1
-    return n
-
-
 def _validate(spec: dict):
     """Run the real schema validator on a temp copy. Returns (ok, error)."""
     tmp = None
@@ -242,8 +234,519 @@ def _list_specs():
 # --------------------------------------------------------------------------- #
 #  HTTP
 # --------------------------------------------------------------------------- #
+
+# --------------------------------------------------------------------------- #
+#  the scene routes: one function each, registered in the tables at the bottom
+# --------------------------------------------------------------------------- #
+def _q1(q, k, default=""):
+    return (q.get(k) or [default])[0]
+
+
+def _spec_path(name: str) -> str:
+    from plexus.gui import studio
+    return os.path.join(studio.CONFIG_DIR, name + ".yaml")
+
+
+def _tab_for(name: str, tab_hint: str | None = None):
+    """The tab whose form a spec refills: the one named by the page, else the one recorded when
+    the spec was built, else the current tab in STATE."""
+    from plexus.gui import bio, tabs
+    for t in (tab_hint, bio.STATE.get("specs", {}).get(name), bio.STATE.get("tab")):
+        if t in tabs.ORDER:
+            return tabs.get(t)
+    return None
+
+
+def _form_of(name: str, spec: dict, tab_hint: str | None = None):
+    t = _tab_for(name, tab_hint)
+    if t is None:
+        return None
+    try:
+        return t.form_from_spec(spec)
+    except Exception as e:                                       # noqa: BLE001
+        print(f"[{t.NAME}] form_from_spec: {e}", flush=True)
+        return None
+
+
+def g_page(h, q):
+    from plexus.gui import app, bio, tabs
+    tab = _q1(q, "tab") or bio.STATE.get("tab") or "material"
+    if tab not in tabs.ORDER:
+        return h._send_json({"error": f"no tab {tab!r}; tabs are {', '.join(tabs.ORDER)}"}, 404)
+    if bio.STATE.get("tab") != tab:
+        # A PAGE OPENED ON ANOTHER TAB THAN THE SERVER HOLDS IS A SWITCH: same re-initialisation.
+        _reset_scene(tab)
+    return h._send_html(app.page(tab))
+
+
+def g_editor(h, q):
+    return h._send_file(os.path.join(STATIC, "index.html"), "text/html; charset=utf-8")
+
+
+def g_state(h, q):
+    from plexus.gui import bio
+    return h._send_json(dict(bio.STATE))
+
+
+def g_spec(h, q):
+    name = _q1(q, "name")
+    sp = _spec_path(name)
+    if not name or not os.path.exists(sp):
+        return h._send_json({"error": "no such spec"}, 404)
+    raw = open(sp).read()
+    try:
+        ok, err = _validate(yaml.safe_load(raw) or {})
+    except Exception as e:                                       # noqa: BLE001
+        ok, err = False, str(e)
+    form = None
+    try:
+        form = _form_of(name, yaml.safe_load(raw), _q1(q, "tab") or None)
+    except Exception:                                            # noqa: BLE001
+        pass
+    return h._send_json({"name": name, "path": sp, "raw": raw, "form": form, "valid": ok, "error": err})
+
+
+def g_counts(h, q):
+    from plexus.gui import bio
+    name = _q1(q, "name")
+    sp = _spec_path(name)
+    if not name or not os.path.exists(sp):
+        return h._send_json({"error": f"no spec {name!r}"}, 404)
+    return h._send_json(bio.counts(bio.seed_scene(sp)))
+
+
+def g_claude(h, q):
+    from plexus.gui import bio
+    since = int(_q1(q, "since", "0"))
+    C = bio.CLAUDE
+    secs = round(time.time() - C["started"], 1) if C["running"] else C["seconds"]
+    return h._send_json({"running": C["running"], "task": C["task"], "n": len(C["lines"]),
+                         "lines": C["lines"][since:], "seconds": secs, "error": C["error"]})
+
+
+def g_frames(h, q):
+    from plexus.gui import bio_view
+    v = bio_view.current()
+    return h._send_json({"n": len(v.snaps) if v is not None else 0,
+                         "every": getattr(v, "_keep_every", 1) if v is not None else 1})
+
+
+def g_run(h, q):
+    from plexus.gui import bio_view
+    v = bio_view.current()
+    if v is None:
+        return h._send_json({"running": False, "error": "no scene is open"})
+    r = dict(v.RUN); r.pop("stop", None); r.pop("started", None)
+    return h._send_json(r)
+
+
+def g_artefacts(h, q):
+    """What the run wrote for this spec: the movie (a `/media` URL with a cache buster), the
+    newest still, the folder."""
+    from plexus.gui import studio
+    name = _q1(q, "name")
+    if not name:
+        return h._send_json({"error": "name?"}, 400)
+    a = studio.artefacts(name)
+    out = {"dir": a.get("dir")}
+    for k, mk in (("mp4", "mp4_mtime"), ("png", "png_mtime")):
+        out[k] = ("/media?path=" + quote(a[k]) + f"&t={int(a.get(mk) or 0)}") if a.get(k) else None
+    out["still"] = ("/media?path=" + quote(a["still"]) + f"&t={int(os.path.getmtime(a['still']))}") if a.get("still") else None
+    return h._send_json(out)
+
+
+def g_ls(h, q):
+    from plexus.gui import studio
+    from plexus.paths import graphs_data_path
+    roots = {"config": os.path.join(studio.REPO, "config"), "studio": studio.CONFIG_DIR,
+             "graphs_data": graphs_data_path()}
+    path = os.path.abspath(_q1(q, "path") or roots["config"])
+    if not os.path.isdir(path):
+        return h._send_json({"error": f"not a folder: {path}"}, 404)
+    dirs, files = [], []
+    try:
+        for e in sorted(os.listdir(path)):
+            if e.startswith("."):
+                continue
+            fp = os.path.join(path, e)
+            if os.path.isdir(fp):
+                dirs.append({"name": e, "spec": os.path.exists(os.path.join(fp, "spec.yaml"))})
+            elif e.endswith((".yaml", ".yml")):
+                files.append(e)
+    except PermissionError:
+        return h._send_json({"error": f"no access to {path}"}, 403)
+    return h._send_json({"path": path, "parent": os.path.dirname(path), "dirs": dirs, "files": files, "roots": roots})
+
+
+def g_open(h, q):
+    """Import a spec (or a run folder's spec.yaml) into config/studio and open it as is."""
+    import shutil
+    from plexus.gui import bio, studio
+    path = _q1(q, "path")
+    if os.path.isdir(path):
+        path = os.path.join(path, "spec.yaml")
+    if not path or not os.path.exists(path):
+        return h._send_json({"error": f"no spec at {path!r}"}, 404)
+    spec = yaml.safe_load(open(path))
+    name = str(((spec.get("general") or {}).get("name")) or os.path.basename(os.path.dirname(path)) or "opened").strip()
+    dst = _spec_path(name)
+    os.makedirs(studio.CONFIG_DIR, exist_ok=True)
+    shutil.copyfile(path, dst)
+    bio.bump(name, f"opened {path}")
+    _sets = ", ".join(f"{k}" + (f" (types: {', '.join((v or {}).get('types') or {})})" if (v or {}).get("types") else "")
+                      for k, v in (spec.get("sets") or {}).items())
+    bio.claude_note(f"spec '{name}' opened from {path}; sets: {_sets}")
+    return h._send_json({"name": name, "spec": dst, "form": _form_of(name, spec)})
+
+
+def g_view(h, q):
+    """Drive the page's view from outside (Claude): camera, pick, message."""
+    from plexus.gui import bio, bio_view
+    g = lambda k: (q.get(k) or [None])[0]                        # noqa: E731
+    st = bio.set_view(azim=g("azim"), elev=g("elev"), zoom=g("zoom"), pick=g("pick"), message=g("message"))
+    v = bio_view.current()
+    if v is not None:
+        v.set_camera(st["azim"], st["elev"], st["zoom"])
+        if g("pick") is not None:
+            v.highlight(st["pick"])
+    return h._send_json(st)
+
+
+def g_picture(h, q, route):
+    """render / pick / info / snapshot: all read the session's view. `?name=` opens it when none is
+    open (or a different spec is named)."""
+    from plexus.gui import bio, bio_view
+    name = _q1(q, "name")
+    v = bio_view.current()
+    try:
+        if name and (v is None or os.path.basename(v.spec_path) != name + ".yaml"):
+            sp = _spec_path(name)
+            if not os.path.exists(sp):
+                return h._send_json({"error": "no such spec"}, 404)
+            v = bio_view.open_view(sp)
+            bio.STATE["name"] = name
+        if v is None:
+            return h._send_json({"error": "no scene is open; seed one first (BUILD + SEED, or ?name=)"}, 400)
+        if route.endswith("/info"):
+            return h._send_json(bio.resolve_pick(v.scene, _q1(q, "pick")) or {"error": "no such object"})
+        if route.endswith("/pick"):
+            pk = v.pick_at(float(_q1(q, "x", "0.5")), float(_q1(q, "y", "0.5")))
+            v.highlight(pk)
+            bio.STATE["pick"] = pk
+            return h._send_json({"pick": pk, "info": bio.resolve_pick(v.scene, pk) if pk else None})
+        if q.get("azim") or q.get("elev") or q.get("zoom"):
+            v.set_camera(*(float((q.get(k) or [str(getattr(v, k))])[0]) for k in ("azim", "elev", "zoom")))
+        if q.get("frame"):                                       # a kept frame of the last run, at this camera
+            v.show_frame(int(q["frame"][0]))
+        if q.get("pick"):
+            v.highlight(_q1(q, "pick") or None)
+        png = v.png()
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": f"{type(e).__name__}: {e}"[:800]}, 400)
+    h.send_response(200)
+    h.send_header("Content-Type", "image/png")
+    h.send_header("Content-Length", str(len(png)))
+    h.send_header("Cache-Control", "no-store")
+    h.end_headers()
+    return h.wfile.write(png)
+
+
+def g_seed(h, q):
+    from plexus.gui import bio, bio_view
+    name = _q1(q, "name")
+    sp = _spec_path(name)
+    if not name or not os.path.exists(sp):
+        return h._send_json({"error": "no such spec"}, 404)
+    try:
+        v = bio_view.open_view(sp)                               # seeded once: the scene and the picture share it
+        bio.STATE["name"] = name
+        bio.claude_note(f"spec '{name}' seeded: " + ", ".join(f"{k} {s_.get('n_live')}" for k, s_ in v.scene["sets"].items()))
+        out = dict(v.scene); out["seconds"] = v.seconds
+        return h._send_json(out)
+    except Exception as e:                                       # noqa: BLE001 -- the page shows the cause
+        return h._send_json({"error": f"seed failed: {type(e).__name__}: {e}"[:800]}, 400)
+
+
+def g_catalog(h, q):
+    return h._send_json(catalog())
+
+
+def g_specs(h, q):
+    return h._send_json({"specs": _list_specs(), "repo_root": REPO_ROOT})
+
+
+def g_media(h, q):
+    return h._serve_media(_q1(q, "path") or None)
+
+
+def g_editor_spec(h, q):
+    path = _q1(q, "path") or None
+    if not path:
+        return h._send_json({"error": "missing ?path"}, 400)
+    try:
+        sp = _safe_spec_path(path)
+        with open(sp) as f:
+            raw = f.read()
+        parsed = yaml.safe_load(raw) or {}
+        ok, err = _validate(parsed)
+        layout = None
+        lp = _layout_path(sp)
+        if os.path.exists(lp):
+            with open(lp) as f:
+                layout = json.load(f)
+        return h._send_json({"path": sp, "rel": os.path.relpath(sp, REPO_ROOT), "raw": raw, "spec": parsed,
+                             "layout": layout, "valid": ok, "error": err, "media": _media_for(sp)})
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": str(e)}, 400)
+
+
+# ---- POST ------------------------------------------------------------------ #
+def _reset_scene(tab: str) -> None:
+    """Stop the run, drop the view, forget the spec, remember the tab -- a tab switch."""
+    from plexus.gui import bio, bio_view
+    v = bio_view.current()
+    if v is not None:
+        v.stop()
+        for _ in range(100):                                     # the hook raises StopRun at its next frame
+            if not v.RUN.get("running"):
+                break
+            time.sleep(0.1)
+        try:
+            v.close()
+        except Exception:                                        # noqa: BLE001
+            pass
+        bio_view.CURRENT["view"] = None
+    bio.STATE.update(name=None, pick=None, message="", tab=tab)
+    bio.STATE["version"] += 1
+    bio.claude_note(f"the page switched to the {tab} tab; the scene was reset")
+
+
+def p_reset(h, data):
+    from plexus.gui import bio, tabs
+    tab = str(data.get("tab") or bio.STATE.get("tab") or "material")
+    if tab not in tabs.ORDER:
+        return h._send_json({"error": f"no tab {tab!r}"}, 400)
+    _reset_scene(tab)
+    return h._send_json(dict(bio.STATE))
+
+
+def p_tab_build(h, data, tab_name: str):
+    from plexus.gui import bio, tabs
+    try:
+        tab = tabs.get(tab_name)
+    except KeyError as e:
+        return h._send_json({"error": str(e)}, 404)
+    try:
+        spec = tab.build_spec(data)
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": f"form: {e}"}, 400)
+    ok, err = _validate(spec)
+    if not ok:
+        return h._send_json({"error": "schema rejected the spec", "detail": err}, 400)
+    name = spec["general"]["name"]
+    sp = _spec_path(name)
+    # WRITTEN THE WAY THE PIPELINE WILL READ IT: the tab's writer runs the guards the pipeline runs
+    # (the CFL on an MPM spec) on the file now, so the YAML panel shows the YAML that runs.
+    raw = tabs.write_spec(tab, spec, sp)
+    bio.STATE.setdefault("specs", {})[name] = tab_name
+    bio.STATE["tab"] = tab_name
+    bio.bump(name, f"built {name}")
+    bio.claude_note(f"{tab_name} spec '{name}' built from the form: sets {', '.join((spec.get('sets') or {}).keys())}")
+    return h._send_json({"name": name, "raw": raw, "valid": True, "version": bio.STATE["version"]})
+
+
+def p_claude(h, data):
+    from plexus.gui import bio, tabs
+    if data.get("stop"):
+        return h._send_json(bio.claude_stop())
+    if data.get("new_session"):
+        return h._send_json(bio.claude_new_session())
+    task = str(data.get("task") or "").strip()
+    if not task:
+        return h._send_json({"error": "empty task"}, 400)
+    mode = str(data.get("mode") or bio.STATE.get("tab") or "bio")
+    brief = None
+    try:
+        brief = tabs.get(mode).BRIEF
+    except Exception:                                            # noqa: BLE001
+        mode = "bio"
+    return h._send_json(bio.claude_start(task, int(h.server.server_address[1]),
+                                         model=str(data.get("model") or "sonnet"), brief=brief, mode=mode))
+
+
+def p_run(h, data):
+    from plexus.gui import bio_view
+    v = bio_view.current()
+    if v is None:
+        return h._send_json({"error": "no scene is open; seed one first"}, 400)
+    if data.get("stop"):
+        return h._send_json(v.stop())
+    return h._send_json(v.run(device=data.get("device")))
+
+
+def p_visible(h, data):
+    from plexus.gui import bio_view
+    v = bio_view.current()
+    if v is None:
+        return h._send_json({"error": "no scene is open"}, 400)
+    ok = v.set_visible(str(data.get("species") or ""), bool(data.get("on", True)))
+    return h._send_json({"ok": ok, "hidden": sorted(v.hidden)})
+
+
+def p_save(h, data):
+    """The YAML panel's SAVE: the text goes through the tab's `normalise` (when it has one) and
+    the validator, then to disk, then the page re-seeds."""
+    from plexus.gui import bio
+    name = str(data.get("name") or "")
+    try:
+        spec = yaml.safe_load(data.get("raw") or "")
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": f"not YAML: {e}"}, 400)
+    if not isinstance(spec, dict) or not name:
+        return h._send_json({"error": "no spec or no name"}, 400)
+    tab = _tab_for(name, data.get("tab"))
+    if tab is not None and getattr(tab, "normalise", None):
+        spec = tab.normalise(spec)
+    ok, err = _validate(spec)
+    if not ok:
+        return h._send_json({"error": "schema rejected the spec", "detail": err}, 400)
+    open(_spec_path(name), "w").write(_dump_yaml(spec))
+    bio.bump(name, f"saved {name}")
+    return h._send_json({"name": name, "valid": True, "form": _form_of(name, spec, data.get("tab"))})
+
+
+def p_refine(h, data):
+    """An English edit of the current spec, applied by Claude and accepted only if it loads AND
+    seeds; a failure goes back to Claude once with the error."""
+    from plexus.gui import bio, studio
+    name = str(data.get("name") or ""); prompt = str(data.get("prompt") or "").strip()
+    sp = _spec_path(name)
+    if not prompt or not os.path.exists(sp):
+        return h._send_json({"error": "no prompt or no spec"}, 400)
+    tab = _tab_for(name, data.get("tab"))
+    norm = (getattr(tab, "normalise", None) if tab is not None else None) or (lambda s: s)
+    current = open(sp).read()
+    model = str(data.get("model") or "sonnet")
+    res = studio.author_spec(prompt, name, current=current, model=model)
+    if not res["yaml"]:
+        return h._send_json({"error": f"Claude returned no YAML (rc={res['rc']})", "detail": res["log"][-1200:]})
+    try:
+        spec = norm(yaml.safe_load(res["yaml"]))
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": f"the reply is not YAML: {e}", "seconds": res["seconds"]})
+    ok, err = _validate(spec)
+    if ok:
+        ok, err = _seed_check(spec, name)
+    if not ok:
+        res2 = studio.author_spec(prompt, name, current=_dump_yaml(spec), error=str(err), model=model)
+        try:
+            spec2 = norm(yaml.safe_load(res2["yaml"])) if res2["yaml"] else None
+        except Exception:                                        # noqa: BLE001
+            spec2 = None
+        ok2, err2 = (_validate(spec2) if spec2 else (False, "no YAML on the fix pass"))
+        if ok2:
+            ok2, err2 = _seed_check(spec2, name)
+        if not ok2:
+            return h._send_json({"error": "the edited spec does not load or seed", "detail": f"{err}\n-- fix pass: {err2}",
+                                 "seconds": res["seconds"] + res2.get("seconds", 0)})
+        spec = spec2; res["seconds"] += res2.get("seconds", 0)
+    raw = _dump_yaml(spec)
+    open(sp, "w").write(raw)
+    bio.bump(name, f"applied: {prompt[:80]} ({res['seconds']:.0f}s)")
+    bio.claude_note(f"spec '{name}' refined by a prompt: {prompt[:160]}")
+    return h._send_json({"name": name, "raw": raw, "seconds": res["seconds"], "valid": True,
+                         "form": _form_of(name, spec, data.get("tab"))})
+
+
+def p_quit(h, data):
+    """SHUT THE SOCKET, NOT JUST THE PROCESS. A server killed with the port still bound -- or
+    suspended with Ctrl-Z -- leaves the port held and the next launch dies on "Address already in
+    use". `shutdown()` must be called from ANOTHER thread than serve_forever, hence the timer;
+    `server_close()` is what releases the listening socket."""
+    import threading as _th
+
+    def _bye():
+        try:
+            h.server.shutdown()
+            h.server.server_close()
+        finally:
+            os._exit(0)
+    h._send_json({"bye": True})
+    _th.Timer(0.25, _bye).start()
+
+
+def p_validate(h, data):
+    ok, err = _validate(data.get("spec", {}))
+    yamltext = None
+    try:
+        yamltext = _dump_yaml(data.get("spec", {}))
+    except Exception as e:                                       # noqa: BLE001
+        ok, err = False, f"yaml dump failed: {e}"
+    return h._send_json({"valid": ok, "error": err, "yaml": yamltext})
+
+
+def p_editor_save(h, data):
+    path = data.get("path"); spec = data.get("spec", {}); layout = data.get("layout")
+    if not path:
+        return h._send_json({"error": "missing path"}, 400)
+    try:
+        sp = _safe_spec_path(path)
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": str(e)}, 400)
+    ok, err = _validate(spec)
+    if not ok and not data.get("force"):
+        return h._send_json({"saved": False, "valid": False, "error": err})
+    try:
+        with open(sp, "w") as f:
+            f.write(_dump_yaml(spec))
+        if layout is not None:
+            with open(_layout_path(sp), "w") as f:
+                json.dump(layout, f, indent=1)
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"saved": False, "error": str(e)}, 500)
+    return h._send_json({"saved": True, "valid": ok, "error": err, "path": sp, "rel": os.path.relpath(sp, REPO_ROOT)})
+
+
+def p_layout(h, data):
+    path = data.get("path"); layout = data.get("layout")
+    if not path:
+        return h._send_json({"error": "missing path"}, 400)
+    try:
+        sp = _safe_spec_path(path)
+        with open(_layout_path(sp), "w") as f:
+            json.dump(layout, f, indent=1)
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": str(e)}, 400)
+    return h._send_json({"saved": True})
+
+
+# THE TABLES. `/api/scene/<x>` is canonical; `/api/bio/<x>` is the same handler under the name the
+# older Claude sessions were primed with.
+GET_ROUTES = {
+    "/": g_page, "/index.html": g_page, "/editor": g_editor,
+    "/api/scene/state": g_state, "/api/scene/spec": g_spec, "/api/scene/counts": g_counts,
+    "/api/scene/claude": g_claude, "/api/scene/frames": g_frames, "/api/scene/run": g_run,
+    "/api/scene/artefacts": g_artefacts, "/api/scene/ls": g_ls, "/api/scene/open": g_open,
+    "/api/scene/view": g_view, "/api/scene/seed": g_seed,
+    "/api/catalog": g_catalog, "/api/specs": g_specs, "/media": g_media, "/api/spec": g_editor_spec,
+}
+for _x in ("state", "spec", "counts", "claude", "frames", "run", "artefacts", "ls", "open", "view", "seed"):
+    GET_ROUTES[f"/api/bio/{_x}"] = GET_ROUTES[f"/api/scene/{_x}"]
+GET_ROUTES["/api/studio/spec"] = g_spec
+GET_ROUTES["/api/material/run"] = g_artefacts
+PICTURE_ROUTES = {f"/api/{p}/{x}" for p in ("scene", "bio") for x in ("render", "pick", "info", "snapshot")}
+POST_ROUTES = {
+    "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
+    "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
+    "/api/quit": p_quit, "/api/studio/quit": p_quit,
+    "/api/validate": p_validate, "/api/save": p_editor_save, "/api/layout": p_layout,
+}
+for _x in ("reset", "claude", "run", "visible", "save", "refine"):
+    POST_ROUTES[f"/api/bio/{_x}"] = POST_ROUTES[f"/api/scene/{_x}"]
+
+
 class Handler(BaseHTTPRequestHandler):
-    server_version = "PlexusGUI/0.1"
+    server_version = "PlexusGUI/0.2"
     protocol_version = "HTTP/1.1"   # keep-alive -> smoother <video> range seeking
 
     def log_message(self, fmt, *args):  # quieter console
@@ -258,6 +761,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_html(self, text: str):
+        body = text.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        return self.wfile.write(body)
 
     def _send_file(self, path, ctype):
         try:
@@ -319,652 +830,53 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
                     remaining -= len(chunk)
         except (BrokenPipeError, ConnectionResetError):
-            pass   # client seeked/closed the stream — normal for <video>
+            pass   # client seeked/closed the stream -- normal for <video>
 
     def _read_json(self):
         n = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(n) if n else b"{}"
         return json.loads(raw.decode("utf-8"))
 
-    # -- GET -------------------------------------------------------------- #
+    # -- dispatch --------------------------------------------------------- #
     def do_GET(self):
         u = urlparse(self.path)
-        route = u.path
-        q = parse_qs(u.query)
-
-        if route == "/" or route == "/index.html":
-            return self._send_file(os.path.join(STATIC, "index.html"), "text/html; charset=utf-8")
-
+        route, q = u.path, parse_qs(u.query)
         if route.startswith("/static/"):
             rel = posixpath.normpath(unquote(route[len("/static/"):]))
             if rel.startswith(".."):
                 return self.send_error(403)
             full = os.path.join(STATIC, rel)
             return self._send_file(full, _ctype(full))
+        if route in ("/bio", "/material", "/neurons", "/metabolism", "/studio"):
+            tab = "material" if route == "/studio" else route[1:]
+            self.send_response(302)
+            self.send_header("Location", f"/?tab={tab}")
+            self.send_header("Content-Length", "0")
+            return self.end_headers()
+        if route in PICTURE_ROUTES:
+            return g_picture(self, q, route)
+        fn = GET_ROUTES.get(route)
+        if fn is None:
+            return self.send_error(404)
+        return fn(self, q)
 
-        if route == "/studio":
-            from plexus.gui import studio
-            body = studio.page().encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            return self.wfile.write(body)
-
-        if route == "/bio":
-            from plexus.gui import bio
-            body = bio.page().encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            return self.wfile.write(body)
-
-        if route == "/material":
-            from plexus.gui import material
-            body = material.page().encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            return self.wfile.write(body)
-
-        if route == "/api/material/spec":
-            from plexus.gui import material, studio
-            name = (q.get("name") or [""])[0]
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            if not name or not os.path.exists(sp):
-                return self._send_json({"error": "no such spec"}, 404)
-            raw = open(sp).read()
-            try:
-                form = material.form_from_spec(yaml.safe_load(raw))
-            except Exception as e:                       # noqa: BLE001
-                form = None
-                print(f"[material] form_from_spec: {e}", flush=True)
-            return self._send_json({"name": name, "raw": raw, "form": form})
-
-        if route == "/api/material/run":                 # GET ?name= -> the pipeline run's progress and what it wrote
-            # THE RUN IS `Plexus_Main.py -o generate studio/<name>`, in the warm worker (studio.Job),
-            # and this is its bar and its files: the newest still for the live picture, the movie
-            # for PLAY. Nothing here is computed by the page.
-            from plexus.gui import studio
-            name = (q.get("name") or [""])[0]
-            j = studio.JOBS.get(name)
-            st = j.status() if j else {"done": True, "rc": None, "frame": 0, "total": 0, "pct": 0,
-                                       "elapsed": 0, "error": None, "ms_per_frame": None, "tail": []}
-            st["running"] = bool(j) and not j.done
-            a = studio.artefacts(name) if name else {}
-            st["still"] = ("/media?path=" + quote(a["still"]) + f"&t={int(os.path.getmtime(a['still']))}") if a.get("still") else None
-            st["png"] = ("/media?path=" + quote(a["png"]) + f"&t={int(a.get('png_mtime') or 0)}") if a.get("png") else None
-            st["mp4"] = ("/media?path=" + quote(a["mp4"]) + f"&t={int(a.get('mp4_mtime') or 0)}") if a.get("mp4") else None
-            st["dir"] = a.get("dir")
-            return self._send_json(st)
-
-        if route == "/api/bio/counts":
-            from plexus.gui import bio, studio
-            name = (q.get("name") or [""])[0]
-            path = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            if not name or not os.path.exists(path):
-                return self._send_json({"error": f"no spec {name!r}"}, 404)
-            return self._send_json(bio.counts(bio.seed_scene(path)))
-
-        if route == "/api/bio/claude":
-            from plexus.gui import bio
-            since = int((q.get("since") or ["0"])[0])
-            C = bio.CLAUDE
-            secs = round(time.time() - C["started"], 1) if C["running"] else C["seconds"]
-            return self._send_json({"running": C["running"], "task": C["task"], "n": len(C["lines"]),
-                                    "lines": C["lines"][since:], "seconds": secs, "error": C["error"]})
-
-        if route == "/api/bio/state":
-            from plexus.gui import bio
-            return self._send_json(dict(bio.STATE))
-
-        if route == "/api/bio/frames":                   # GET -> how many frames the last run kept
-            from plexus.gui import bio_view
-            v = bio_view.current()
-            return self._send_json({"n": len(v.snaps) if v is not None else 0,
-                                    "every": getattr(v, "_keep_every", 1) if v is not None else 1})
-
-        if route == "/api/bio/run":                      # GET -> progress of the engine run
-            from plexus.gui import bio_view
-            v = bio_view.current()
-            if v is None:
-                return self._send_json({"running": False, "error": "no scene is open"})
-            r = dict(v.RUN); r.pop("stop", None); r.pop("started", None)
-            return self._send_json(r)
-
-        if route == "/api/bio/ls":                       # GET ?path= -> folders and spec files there (a picker)
-            from plexus.gui import studio
-            from plexus.paths import graphs_data_path
-            roots = {"config": os.path.join(studio.REPO, "config"), "studio": studio.CONFIG_DIR,
-                     "graphs_data": graphs_data_path()}
-            path = (q.get("path") or [""])[0] or roots["config"]
-            path = os.path.abspath(path)
-            if not os.path.isdir(path):
-                return self._send_json({"error": f"not a folder: {path}"}, 404)
-            dirs, files = [], []
-            try:
-                for e in sorted(os.listdir(path)):
-                    if e.startswith("."):
-                        continue
-                    fp = os.path.join(path, e)
-                    if os.path.isdir(fp):
-                        dirs.append({"name": e, "spec": os.path.exists(os.path.join(fp, "spec.yaml"))})
-                    elif e.endswith((".yaml", ".yml")):
-                        files.append(e)
-            except PermissionError:
-                return self._send_json({"error": f"no access to {path}"}, 403)
-            return self._send_json({"path": path, "parent": os.path.dirname(path), "dirs": dirs, "files": files, "roots": roots})
-
-        if route == "/api/bio/open":                     # GET ?path=<spec.yaml or run folder> -> import into config/studio, open it
-            from plexus.gui import bio, studio
-            import shutil
-            path = (q.get("path") or [""])[0]
-            if os.path.isdir(path):
-                path = os.path.join(path, "spec.yaml")
-            if not path or not os.path.exists(path):
-                return self._send_json({"error": f"no spec at {path!r}"}, 404)
-            spec = yaml.safe_load(open(path))
-            name = str(((spec.get("general") or {}).get("name")) or os.path.basename(os.path.dirname(path)) or "opened").strip()
-            dst = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            os.makedirs(studio.CONFIG_DIR, exist_ok=True)
-            shutil.copyfile(path, dst)
-            bio.bump(name, f"opened {path}")
-            _sets = ", ".join(f"{k}" + (f" (types: {', '.join((v or {}).get('types') or {})})" if (v or {}).get("types") else "")
-                              for k, v in (spec.get("sets") or {}).items())
-            bio.claude_note(f"spec '{name}' opened from {path}; sets: {_sets}")
-            return self._send_json({"name": name, "spec": dst, "form": bio.form_from_spec(spec)})
-
-        if route == "/api/bio/view":                     # GET ?azim&elev&zoom&pick&message -- drive the page's view
-            from plexus.gui import bio, bio_view
-            g = lambda k: (q.get(k) or [None])[0]        # noqa: E731
-            st = bio.set_view(azim=g("azim"), elev=g("elev"), zoom=g("zoom"), pick=g("pick"), message=g("message"))
-            v = bio_view.current()
-            if v is not None:
-                v.set_camera(st["azim"], st["elev"], st["zoom"])
-                if g("pick") is not None:
-                    v.highlight(st["pick"])
-            return self._send_json(st)
-
-        if route in ("/api/bio/snapshot", "/api/bio/render", "/api/bio/info", "/api/bio/pick"):
-            # ALL FOUR READ THE SESSION'S VIEW, the movie renderer on the seeded spec. `?name=`
-            # opens it when none is open (or a different spec is named).
-            from plexus.gui import bio, bio_view, studio
-            name = (q.get("name") or [""])[0]
-            v = bio_view.current()
-            try:
-                if name and (v is None or os.path.basename(v.spec_path) != name + ".yaml"):
-                    sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-                    if not os.path.exists(sp):
-                        return self._send_json({"error": "no such spec"}, 404)
-                    v = bio_view.open_view(sp)
-                    bio.STATE["name"] = name
-                if v is None:
-                    return self._send_json({"error": "no scene is open; seed one first (BUILD + SEED, or ?name=)"}, 400)
-                if route == "/api/bio/info":
-                    return self._send_json(bio.resolve_pick(v.scene, (q.get("pick") or [""])[0]) or {"error": "no such object"})
-                if route == "/api/bio/pick":
-                    pk = v.pick_at(float((q.get("x") or ["0.5"])[0]), float((q.get("y") or ["0.5"])[0]))
-                    v.highlight(pk)
-                    bio.STATE["pick"] = pk
-                    return self._send_json({"pick": pk, "info": bio.resolve_pick(v.scene, pk) if pk else None})
-                if q.get("azim") or q.get("elev") or q.get("zoom"):
-                    v.set_camera(*(float((q.get(k) or [str(getattr(v, k))])[0]) for k in ("azim", "elev", "zoom")))
-                if q.get("frame"):                       # a kept frame of the last run, at this camera
-                    v.show_frame(int(q["frame"][0]))
-                if q.get("pick"):
-                    v.highlight((q.get("pick") or [None])[0])
-                png = v.png()
-            except Exception as e:                       # noqa: BLE001
-                return self._send_json({"error": f"{type(e).__name__}: {e}"[:800]}, 400)
-            self.send_response(200)
-            self.send_header("Content-Type", "image/png")
-            self.send_header("Content-Length", str(len(png)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            return self.wfile.write(png)
-
-        if route == "/api/bio/seed":
-            from plexus.gui import bio, bio_view, studio
-            name = (q.get("name") or [""])[0]
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            if not name or not os.path.exists(sp):
-                return self._send_json({"error": "no such spec"}, 404)
-            try:
-                v = bio_view.open_view(sp)                # seeded once: the scene and the picture share it
-                bio.STATE["name"] = name
-                bio.claude_note(f"spec '{name}' seeded: " + ", ".join(f"{k} {s_.get('n_live')}" for k, s_ in v.scene["sets"].items()))
-                out = dict(v.scene); out["seconds"] = v.seconds
-                return self._send_json(out)
-            except Exception as e:                       # noqa: BLE001 -- the page shows the cause
-                return self._send_json({"error": f"seed failed: {type(e).__name__}: {e}"[:800]}, 400)
-
-            from plexus.gui import studio
-            S = studio.SESSION
-            return self._send_json({"state": S.get("state"), "chars": S.get("chars"),
-                                    "seconds": S.get("seconds"), "error": S.get("error"),
-                                    "specs": len(studio.REFERENCES)})
-
-        if route == "/api/studio/list":
-            from plexus.gui import studio
-            return self._send_json({"specs": studio.list_specs()})
-
-        if route == "/api/studio/spec":
-            from plexus.gui import studio
-            name = (q.get("name") or [""])[0]
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            if not name or not os.path.exists(sp):
-                return self._send_json({"error": "no such spec"}, 404)
-            raw = open(sp).read()
-            try:
-                ok, err = _validate(yaml.safe_load(raw) or {})
-            except Exception as e:                                       # noqa: BLE001
-                ok, err = False, str(e)
-            _form = None
-            try:
-                from plexus.gui import bio
-                _form = bio.form_from_spec(yaml.safe_load(raw))
-            except Exception:                            # noqa: BLE001
-                _form = None
-            return self._send_json({"name": name, "path": sp, "raw": raw, "form": _form,
-                                    "valid": ok, "error": err, **studio.artefacts(name)})
-
-        if route == "/api/studio/progress":
-            from plexus.gui import studio
-            j = studio.JOBS.get((q.get("name") or [""])[0])
-            return self._send_json(j.status() if j else {"done": True, "rc": 0,
-                                                         "frame": 0, "total": 0, "pct": 0})
-
-        if route == "/api/catalog":
-            return self._send_json(catalog())
-
-        if route == "/api/specs":
-            return self._send_json({"specs": _list_specs(), "repo_root": REPO_ROOT})
-
-        if route == "/media":
-            return self._serve_media((q.get("path") or [None])[0])
-
-        if route == "/api/spec":
-            path = (q.get("path") or [None])[0]
-            if not path:
-                return self._send_json({"error": "missing ?path"}, 400)
-            try:
-                sp = _safe_spec_path(path)
-                with open(sp) as f:
-                    raw = f.read()
-                parsed = yaml.safe_load(raw) or {}
-                ok, err = _validate(parsed)
-                layout = None
-                lp = _layout_path(sp)
-                if os.path.exists(lp):
-                    with open(lp) as f:
-                        layout = json.load(f)
-                return self._send_json({
-                    "path": sp, "rel": os.path.relpath(sp, REPO_ROOT),
-                    "raw": raw, "spec": parsed, "layout": layout,
-                    "valid": ok, "error": err, "media": _media_for(sp),
-                })
-            except Exception as e:  # noqa: BLE001
-                return self._send_json({"error": str(e)}, 400)
-
-        return self.send_error(404)
-
-    # -- POST ------------------------------------------------------------- #
     def do_POST(self):
-        u = urlparse(self.path)
-        route = u.path
+        route = urlparse(self.path).path
         try:
             data = self._read_json()
         except Exception as e:  # noqa: BLE001
             return self._send_json({"error": f"bad json: {e}"}, 400)
-
-        if route == "/api/bio/claude":
-            from plexus.gui import bio
-            if data.get("stop"):
-                return self._send_json(bio.claude_stop())
-            if data.get("new_session"):
-                return self._send_json(bio.claude_new_session())
-            task = str(data.get("task") or "").strip()
-            if not task:
-                return self._send_json({"error": "empty task"}, 400)
-            brief = None
-            if str(data.get("mode") or "") == "material":
-                from plexus.gui import material
-                brief = material.MATERIAL_BRIEF
-            return self._send_json(bio.claude_start(task, int(self.server.server_address[1]),
-                                                    model=str(data.get("model") or "sonnet"), brief=brief,
-                                                    mode=str(data.get("mode") or "bio")))
-
-        if route == "/api/bio/run":                      # POST {frames, device} | {stop: true}
-            from plexus.gui import bio_view
-            v = bio_view.current()
-            if v is None:
-                return self._send_json({"error": "no scene is open; seed one first"}, 400)
-            if data.get("stop"):
-                return self._send_json(v.stop())
-            return self._send_json(v.run(frames=data.get("frames"), device=data.get("device"), keep=data.get("keep"), live=data.get("live")))
-
-        if route == "/api/bio/visible":
-            from plexus.gui import bio_view
-            v = bio_view.current()
-            if v is None:
-                return self._send_json({"error": "no scene is open"}, 400)
-            ok = v.set_visible(str(data.get("species") or ""), bool(data.get("on", True)))
-            return self._send_json({"ok": ok, "hidden": sorted(v.hidden)})
-
+        m = re.match(r"^/api/tab/([a-z_]+)/build$", route)
+        if m:
+            return p_tab_build(self, data, m.group(1))
         if route == "/api/material/build":
-            from plexus.gui import bio, material, studio
-            try:
-                spec = material.build_spec(data)
-            except Exception as e:                       # noqa: BLE001
-                return self._send_json({"error": f"form: {e}"}, 400)
-            ok, err = _validate(spec)
-            if not ok:
-                return self._send_json({"error": "schema rejected the spec", "detail": err}, 400)
-            name = spec["general"]["name"]
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            # WRITTEN THE WAY THE PIPELINE WILL READ IT: the CFL guard runs on the file now, so the
-            # substep in the YAML panel is the one the run uses (idempotent when the form's is fine).
-            raw = material.write_spec(spec, sp)
-            bio.bump(name, f"built {name}")
-            bio.claude_note(f"material spec '{name}' built from the form: bodies {', '.join((spec['sets'].get('cell') or {}).get('types') or {})}")
-            return self._send_json({"name": name, "raw": raw, "valid": True, "version": bio.STATE["version"]})
-
+            return p_tab_build(self, data, "material")
         if route == "/api/bio/build":
-            from plexus.gui import bio, studio
-            try:
-                spec = bio.normalise(bio.build_spec(data))
-            except Exception as e:                       # noqa: BLE001
-                return self._send_json({"error": f"form: {e}"}, 400)
-            ok, err = _validate(spec)
-            if not ok:
-                return self._send_json({"error": "schema rejected the spec", "detail": err}, 400)
-            os.makedirs(studio.CONFIG_DIR, exist_ok=True)
-            name = spec["general"]["name"]
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            raw = _dump_yaml(spec)
-            open(sp, "w").write(raw)
-            bio.bump(name, f"built {name}")
-            bio.claude_note(f"tissue spec '{name}' built from the form: species {', '.join(((spec['sets'].get('protein') or {}).get('types') or {}))}; organelles {', '.join(((spec['sets'].get('organelle') or {}).get('types') or {}))}")
-            return self._send_json({"name": name, "raw": raw, "valid": True})
-
-        if route == "/api/bio/save":
-            from plexus.gui import bio, studio
-            name = str(data.get("name") or "")
-            try:
-                spec = yaml.safe_load(data.get("raw") or "")
-            except Exception as e:                       # noqa: BLE001
-                return self._send_json({"error": f"not YAML: {e}"}, 400)
-            if not isinstance(spec, dict) or not name:
-                return self._send_json({"error": "no spec or no name"}, 400)
-            spec = bio.normalise(spec)
-            ok, err = _validate(spec)
-            if not ok:
-                return self._send_json({"error": "schema rejected the spec", "detail": err}, 400)
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            open(sp, "w").write(_dump_yaml(spec))
-            bio.bump(name, f"saved {name}")
-            return self._send_json({"name": name, "valid": True, "form": bio.form_from_spec(spec)})
-
-        if route == "/api/bio/refine":
-            from plexus.gui import bio, studio
-            name = str(data.get("name") or ""); prompt = str(data.get("prompt") or "").strip()
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            if not prompt or not os.path.exists(sp):
-                return self._send_json({"error": "no prompt or no spec"}, 400)
-            current = open(sp).read()
-            res = studio.author_spec(prompt, name, current=current, model=str(data.get("model") or "sonnet"))
-            if not res["yaml"]:
-                return self._send_json({"error": f"Claude returned no YAML (rc={res['rc']})", "detail": res["log"][-1200:]})
-            try:
-                spec = bio.normalise(yaml.safe_load(res["yaml"]))
-            except Exception as e:                       # noqa: BLE001
-                return self._send_json({"error": f"the reply is not YAML: {e}", "seconds": res["seconds"]})
-            # ACCEPTED ONLY IF IT LOADS AND SEEDS. The schema cannot see a seed-time failure (a
-            # region the operators refuse, a block the seed needs); seeding is cheap, so it is
-            # part of the check, and a failure goes back to Claude once with the error.
-            ok, err = _validate(spec)
-            if ok:
-                ok, err = _seed_check(spec, name)
-            if not ok:
-                res2 = studio.author_spec(prompt, name, current=_dump_yaml(spec), error=str(err),
-                                          model=str(data.get("model") or "sonnet"))
-                try:
-                    spec2 = bio.normalise(yaml.safe_load(res2["yaml"])) if res2["yaml"] else None
-                except Exception:                        # noqa: BLE001
-                    spec2 = None
-                ok2, err2 = (_validate(spec2) if spec2 else (False, "no YAML on the fix pass"))
-                if ok2:
-                    ok2, err2 = _seed_check(spec2, name)
-                if not ok2:
-                    return self._send_json({"error": "the edited spec does not load or seed", "detail": f"{err}\n-- fix pass: {err2}",
-                                            "seconds": res["seconds"] + res2.get("seconds", 0)})
-                spec = spec2; res["seconds"] += res2.get("seconds", 0)
-            raw = _dump_yaml(spec)
-            open(sp, "w").write(raw)
-            bio.bump(name, f"applied: {prompt[:80]} ({res['seconds']:.0f}s)")
-            bio.claude_note(f"spec '{name}' refined by a prompt: {prompt[:160]}")
-            return self._send_json({"name": name, "raw": raw, "seconds": res["seconds"], "valid": True,
-                                    "form": bio.form_from_spec(spec)})
-
-            # THE SERVER OWNS THE FILE. Claude runs read-only and hands back text; nothing reaches
-            # config/studio/ until `plexus.schema.load` -- the same validator the engine trusts --
-            # has accepted it. An invalid spec is returned as an error with the schema's own
-            # message, so what you see is what the engine would have said.
-            from plexus.gui import studio
-            prompt = (data.get("prompt") or "").strip()
-            if not prompt:
-                return self._send_json({"error": "empty prompt"}, 400)
-            os.makedirs(studio.CONFIG_DIR, exist_ok=True)
-            # AN EXISTING NAME MEANS EDIT, NOT REPLACE. "make the ball bigger" is only meaningful
-            # against the spec on screen, so the current YAML goes with the request and the reply
-            # is written back over the same file. A missing name starts a new one.
-            name = data.get("name") or _studio_name(prompt)
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            current = open(sp).read() if os.path.exists(sp) else ""
-            err_ctx = (data.get("error") or "").strip()
-            if err_ctx:
-                _last = err_ctx.strip().splitlines()[-1][:160] if err_ctx else ""
-                print(f"\n[studio] SECOND PASS on {name!r} -- feeding the failure back to Claude\n"
-                      f"         {_last}", flush=True)
-            res = studio.author_spec(prompt, name, current=current,
-                                     model=data.get("model") or "sonnet",
-                                     deep=bool(data.get("deep")),
-                                     effort=data.get("effort") or "low",
-                                     error=err_ctx)
-            if not res["yaml"]:
-                studio.fail(f"Claude returned no YAML for {prompt!r} "
-                            f"(rc={res['rc']}, {res['seconds']}s)", res["log"] or res["raw"])
-                return self._send_json({"error": f"Claude returned no YAML (rc={res['rc']}, "
-                                                 f"{res['seconds']}s)",
-                                        "detail": (res["log"] or res["raw"])[-600:],
-                                        "seconds": res["seconds"]})
-            try:
-                spec = yaml.safe_load(res["yaml"]) or {}
-            except Exception as e:                                       # noqa: BLE001
-                studio.fail(f"the reply is not YAML: {e}", res["yaml"])
-                return self._send_json({"error": f"not YAML: {e}", "seconds": res["seconds"],
-                                        "detail": res["yaml"][:600]})
-            # A COUNT NAMED IN THE PROMPT BEATS THE FIELD, and then updates it. The knobs own this
-            # number so the model cannot decouple it from n_grid -- but "5m particles" in the prompt
-            # is the person asking, not the model guessing, and running 100k instead would be the
-            # interface overruling its user in silence.
-            _kn = dict(data.get("knobs") or {})
-            _pp = studio.particles_from_prompt(prompt or "")
-            if _pp:
-                _kn["particles"] = _pp
-            try:
-                spec = studio.apply_knobs(spec, _kn)
-            except Exception as e:                                       # noqa: BLE001
-                studio.fail(str(e), res["yaml"])
-                return self._send_json({"error": str(e), "seconds": res["seconds"]})
-            spec.setdefault("general", {})["name"] = name
-            ok, err = _validate(spec)
-            if not ok:
-                # THE SCHEMA'S OWN WORDS, IN FULL, IN THE TERMINAL. The browser gets a truncated
-                # copy; the reason a scene could not be built belongs where the pipeline speaks.
-                studio.fail(f"the schema rejected the spec for {prompt!r}",
-                            f"{err}\n\n--- the spec it rejected ---\n{res['yaml'][:3000]}")
-                return self._send_json({"error": "schema rejected the spec", "detail": err,
-                                        "seconds": res["seconds"]})
-            with open(sp, "w") as f:
-                f.write(_dump_yaml(spec))
-            return self._send_json({"name": name, "seconds": res["seconds"], "valid": True,
-                                    "particles": _kn.get("particles"),
-                                    "report": studio.knob_report(spec, _kn)})
-
-        if route == "/api/studio/quit":
-            # SHUT THE SOCKET, NOT JUST THE PROCESS. A studio killed with the port still bound --
-            # or suspended with Ctrl-Z, which is how this bit us -- leaves 8765 held and the next
-            # launch dies on "Address already in use" with a traceback that looks like a bug in the
-            # server. `shutdown()` must be called from ANOTHER thread than serve_forever, hence the
-            # timer; `server_close()` is what actually releases the listening socket.
-            from plexus.gui import studio
-            import threading as _th
-
-            def _bye():
-                try:
-                    studio.worker_stop()
-                finally:
-                    try:
-                        self.server.shutdown()
-                        self.server.server_close()
-                    finally:
-                        os._exit(0)
-            self._send_json({"bye": True})
-            _th.Timer(0.25, _bye).start()
-            return
-
-        if route == "/api/studio/save":
-            from plexus.gui import studio
-            name = data.get("name") or ""
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            if not name or not os.path.exists(sp):
-                return self._send_json({"saved": False, "error": "no such spec"}, 404)
-            try:
-                spec = yaml.safe_load(data.get("raw") or "") or {}
-            except Exception as e:                                       # noqa: BLE001
-                return self._send_json({"saved": False, "error": f"not YAML: {e}"})
-            ok, err = _validate(spec)
-            if not ok:
-                return self._send_json({"saved": False, "error": err})
-            # THE TEXT YOU TYPED IS WHAT IS WRITTEN, not a re-dump of the parse. A round-trip
-            # through yaml.safe_dump silently reorders keys and drops the layout you were reading,
-            # which makes SAVE feel like it edited your file behind you.
-            with open(sp, "w") as f:
-                f.write(data.get("raw") or "")
-            return self._send_json({"saved": True, "valid": True})
-
-        if route == "/api/studio/dev":
-            from plexus.gui import studio
-            p = (data.get("prompt") or "").strip()
-            if not p:
-                return self._send_json({"error": "empty prompt"}, 400)
-            return self._send_json(studio.start_dev(p, model=data.get("model") or "sonnet"))
-
-        if route == "/api/studio/devstatus":
-            from plexus.gui import studio
-            d = dict(studio.DEV.get("dev") or {"running": False})
-            d["text"] = (d.get("text") or "")[:400]      # the full text went to the terminal
-            return self._send_json(d)
-
-        if route == "/api/studio/apply":
-            # RE-SIZE WITHOUT ASKING CLAUDE. A particle count is not a question about the scene;
-            # round-tripping it through the model would cost 20 s to be handed back the spec it
-            # already wrote, and would risk it changing something else on the way.
-            from plexus.gui import studio
-            name = data.get("name") or ""
-            sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            if not os.path.exists(sp):
-                return self._send_json({"error": "no such spec"}, 404)
-            try:
-                spec = studio.apply_knobs(yaml.safe_load(open(sp)) or {}, data.get("knobs") or {})
-            except Exception as e:                                       # noqa: BLE001
-                studio.fail(str(e))
-                return self._send_json({"error": str(e)}, 400)
-            spec.setdefault("general", {})["name"] = name
-            ok, err = _validate(spec)
-            if not ok:
-                studio.fail(f"re-sizing {name!r} produced an invalid spec", err)
-                return self._send_json({"error": err})
-            with open(sp, "w") as f:
-                f.write(_dump_yaml(spec))
-            return self._send_json({"name": name, "valid": True,
-                                    "report": studio.knob_report(spec, data.get("knobs") or {})})
-
-        if route == "/api/studio/metrics":
-            from plexus.gui import studio
-            sp = os.path.join(studio.CONFIG_DIR, (data.get("name") or "") + ".yaml")
-            if not os.path.exists(sp):
-                return self._send_json({"error": "no such spec"}, 404)
-            try:
-                return self._send_json(studio.metrics(yaml.safe_load(open(sp)) or {},
-                                                      data.get("knobs") or {}))
-            except Exception as e:                                       # noqa: BLE001
-                return self._send_json({"error": str(e)}, 400)
-
-        if route == "/api/studio/run":
-            from plexus.gui import studio
-            return self._send_json(studio.start_run(data.get("name") or "",
-                                                    data.get("device") or "cuda:1",
-                                                    bool(data.get("preview"))))
-
-        if route == "/api/studio/stop":
-            from plexus.gui import studio
-            j = studio.JOBS.get(data.get("name") or "")
-            if j:
-                j.kill()
-            return self._send_json({"stopped": bool(j)})
-
-        if route == "/api/validate":
-            ok, err = _validate(data.get("spec", {}))
-            yamltext = None
-            try:
-                yamltext = _dump_yaml(data.get("spec", {}))
-            except Exception as e:  # noqa: BLE001
-                ok, err = False, f"yaml dump failed: {e}"
-            return self._send_json({"valid": ok, "error": err, "yaml": yamltext})
-
-        if route == "/api/save":
-            path = data.get("path")
-            spec = data.get("spec", {})
-            layout = data.get("layout")
-            if not path:
-                return self._send_json({"error": "missing path"}, 400)
-            try:
-                sp = _safe_spec_path(path)
-            except Exception as e:  # noqa: BLE001
-                return self._send_json({"error": str(e)}, 400)
-            ok, err = _validate(spec)
-            if not ok and not data.get("force"):
-                return self._send_json({"saved": False, "valid": False, "error": err})
-            try:
-                with open(sp, "w") as f:
-                    f.write(_dump_yaml(spec))
-                if layout is not None:
-                    with open(_layout_path(sp), "w") as f:
-                        json.dump(layout, f, indent=1)
-            except Exception as e:  # noqa: BLE001
-                return self._send_json({"saved": False, "error": str(e)}, 500)
-            return self._send_json({"saved": True, "valid": ok, "error": err,
-                                    "path": sp, "rel": os.path.relpath(sp, REPO_ROOT)})
-
-        if route == "/api/layout":
-            # persist just the node layout without touching the spec
-            path = data.get("path")
-            layout = data.get("layout")
-            if not path:
-                return self._send_json({"error": "missing path"}, 400)
-            try:
-                sp = _safe_spec_path(path)
-                with open(_layout_path(sp), "w") as f:
-                    json.dump(layout, f, indent=1)
-            except Exception as e:  # noqa: BLE001
-                return self._send_json({"error": str(e)}, 400)
-            return self._send_json({"saved": True})
-
-        return self.send_error(404)
+            return p_tab_build(self, data, "bio")
+        fn = POST_ROUTES.get(route)
+        if fn is None:
+            return self.send_error(404)
+        return fn(self, data)
 
 
 def _ctype(path):
@@ -1024,20 +936,20 @@ def serve(host="127.0.0.1", port=8765, prime=True):
         if e.errno != errno.EADDRINUSE:
             raise
         who = _port_holder(port)
-        print(f"\n[studio] port {port} is already in use"
+        print(f"\n[gui] port {port} is already in use"
               f"{' by ' + who if who else ''}.\n"
-              f"  open it      http://{host}:{port}/studio\n"
-              f"  stop it      the 'Quit studio' button in that page (releases the port cleanly)\n"
+              f"  open it      http://{host}:{port}/\n"
+              f"  stop it      curl -X POST http://{host}:{port}/api/quit (releases the port cleanly)\n"
               f"  or elsewhere python Plexus_gui.py --port {port + 25}\n", flush=True)
         raise SystemExit(1)
     if prime:
         # PRIME WHILE THE BROWSER IS STILL OPENING. Loading the corpus into a session takes a few
         # seconds and happens once; doing it lazily would make the FIRST prompt -- the one someone
-        # is watching -- the one that pays for it.
+        # is watching -- the one that pays for it. The engine's imports (torch, warp, pyvista)
+        # are paid once too, by the first seed, in this process: the run is in-process now.
         try:
             from plexus.gui import studio
             studio.prime_async()
-            studio.worker_ready_async()      # imports torch/warp/pyvista once, off the hot path
         except Exception as e:                                       # noqa: BLE001
             print(f"[studio] could not start priming: {e}", flush=True)
     return httpd
