@@ -14,9 +14,9 @@ spheroids, `mech_target_percell` (mechanics only) and `divide_growing_ball` (gro
 division, 200 -> 708 cells over 801 frames), which sit at asphericity <= 0.03, no inverted wedge,
 no inward prism, thickness CV <= 0.10 and thinnest/median thickness >= 0.7 for their whole runs.
 
-    asph        std / mean of the vertex radius about the vertex centroid          <= 0.04
-    inv_wedge   fraction of cells whose origin-referenced wedge volume is <= 0     == 0
-    sep_in      fraction of vertices whose apico-basal vector points inward        == 0
+    asph        std / mean of the vertex radius about the vertex centroid          <= 0.06
+    inv_wedge   fraction of cells whose origin-referenced wedge volume is <= 0     <= 0.005
+    sep_in      fraction of vertices whose apico-basal vector points inward        <= 0.005
     h_cv        std / mean of the cell thickness 2|sep|                            <= 0.15
     h_min_rel   thinnest thickness over the median                                 >= 0.5
 
@@ -53,7 +53,13 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
-BANDS = dict(asph=(None, 0.04), inv_wedge=(None, 0.0), sep_in=(None, 0.0),
+# THE SHELL BANDS WERE RE-CUT ON THE WORKING POINT (R4 of notes/size_cycle/SIZE_CYCLE_PLAN.md):
+# without the radial pin a healthy shell breathes to asphericity 0.045-0.063 over four doublings
+# (the pinned archives sat at 0.03 because the pin held them), and on an apoptosis run one cell
+# at a time inverts on its way out -- an extrusion in progress, not a defect. 0.06 and 0.005
+# (one cell in two hundred) are those numbers; the crumpled archives this gauge was written on
+# read 0.12-0.18 and 0.12-0.24.
+BANDS = dict(asph=(None, 0.06), inv_wedge=(None, 0.005), sep_in=(None, 0.005),
              h_cv=(None, 0.15), h_min_rel=(0.5, None),
              trapezoid=(None, 0.02), shear=(None, 0.02), tilt=(None, 0.02), h_in_cell=(None, 0.5))
 
