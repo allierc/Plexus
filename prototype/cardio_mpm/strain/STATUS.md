@@ -508,11 +508,13 @@ These are the error bars on every map of the reporting models.
 ## The training-progress movie set (2026-09-11)
 
 `render_progress.sh` renders, from ONE fit (`s4_live_r16_ckpt`, the reporting model re-run with
-`--checkpoints 0.2,0.5`; it reproduces r13 to 0.002 in held-out R²), **nine movies**, one per view
-and stage, named `out/movies/progress_<view>_p<stage>.mp4`. Each clip runs the three beats end to
-end (1 and 2 held out, 3 the fit beat) in **4 s** total, at three stages of the run (20%, 50%, 100%
-of 250 iterations). Each beat is its own rollout from its own rest configuration; the clips are
-concatenated, the model never runs across a beat boundary. The three views:
+`--checkpoints 0.2,0.5`; it reproduces r13 to 0.002 in held-out R²), the movies kept in
+`out/movies/`. Each clip runs the three beats end to end: 1 and 2 held out, then the fitted 3. Each
+beat is its own rollout from its own rest configuration; the clips are concatenated, so the joins
+are cuts and the model never runs across a beat boundary. Kept, all of the finished fit:
+`progress_overlay_p100.mp4` and `progress_particles_p100.mp4` (4 s each), and
+**`progress_cells_particles_p100.mp4`**, the four-panel cell view beside the particle overlay, 8 s.
+`STAGES="020 050 100" ./render_progress.sh` regenerates the part-trained ones. The three views:
 
 | view | what |
 |---|---|
