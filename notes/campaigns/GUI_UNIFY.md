@@ -37,8 +37,8 @@ A hand-written spec has the same property and nobody noticed because nobody name
 
 ## Intent
 
-`Plexus_gui.py` is the UI of `Plexus_Main.py`: one page at `/`, three tabs -- **bio**,
-**material**, **neurons** -- and below the tab one shared panel (RUN / STOP, PLAY, YAML, hierarchy,
+`Plexus_gui.py` is the UI of `Plexus_Main.py`: one page at `/`, four tabs -- **bio**,
+**material**, **neurons**, **metabolism** -- and below the tab one shared panel (RUN / STOP, PLAY, YAML, hierarchy,
 selected object, Claude). A tab is only a FORM that writes a spec file; everything after the form
 is the ordinary pipeline, byte-for-byte the one `-o generate` runs, on the file it wrote. Switching
 tabs re-initialises: the run is stopped, the view dropped, the tab's default scene built and seeded.
@@ -50,32 +50,49 @@ Carried over from the shared tree: the substep-from-CFL fix in `material.build_s
 (`n_sub = ceil(dt / (0.4 dx / c))`, `c = sqrt(stiffness/density)` of the stiffest body) and the
 overlay denominator (`lm.n_frames = n` in `View.run`).
 
-### G1 -- the form writes the spec a person would write.  `gate: same yaml`
-`material.build_spec` stops patching a template. It writes `general / sets / fields / operators /
-schedule / plotting` from the form alone, with the same rules `si_three_balls.yaml` follows:
-per-body `types` in FORM ORDER, the CFL substep, the spec's wall model (`wall_damp`,
-`wall_friction` on `mpm_grid_update`), `plotting.max_frames / stills / keep_stills` from the
-run controls. The engine gets `type_layout: ordered` (one line in `_assign_types`: type i to
-element i, in declared order) so a body's material sits at its centre; the form sets it.
-Gate: `tests/test_gui_parity.py::test_form_writes_the_reference_spec` -- the default form
-dumped equals `config/si_material/si_three_balls.yaml` up to `general.name`.
+### G1 -- the form writes the spec a person would write.  DONE 2026-09-12  `gate: same yaml`
+`material.build_spec` writes `general / sets / fields / operators / schedule / plotting` from the
+form alone, no template: per-body `types` in FORM ORDER with `type_layout: ordered` (engine
+`_assign_types`: type i to element i, so a body's material sits at its centre), the CFL substep
+(then the pipeline's own guard, `mpm_cfl.Courant_Friedrichs_Lewy_condition`, run on the written
+file by `material.write_spec` so the YAML on disk is the YAML that runs), the spec's wall model
+(`wall_damp`, `wall_friction` on `mpm_grid_update`), `plotting.max_frames / stills / keep_stills`
+from the form. Every ball shares one radius (`sets.mpm_particle.radius`) because the engine sizes a
+body's points from radius and density and refuses a per-body count next to `particle_mass`.
+`config/si_material/si_three_balls.yaml` is now this form's default written out.
+Gate: `tests/test_gui_parity.py::test_form_writes_the_reference_spec` -- the default form dumped
+equals the reference up to `general.name`. Plus round-trip (`form_from_spec`) and order tests.
 
-### G2 -- one run path.  `gate: same engine`
-Extract the body of `Plexus_Main.main` for `-o generate` into `plexus/pipeline.py::generate(spec_path,
-device, *, output_root, on_frame=None, progress=None) -> out_dir` (schema.load, engine.build/seed,
-`engine.run`, the LiveMovie with the spec's `plotting`, stills, 3d.png, movie.mp4, the caption).
-`Plexus_Main.py` calls it; nothing else in it changes. The page's RUN calls the same function in a
-thread with `on_frame` for the frame counter and the live re-render at the page camera. The
-page's picture during a run is the pipeline's own current frame; PLAY steps the pipeline's kept
-frames (`plotting.max_frames`), so `movie frames` on the page IS `plotting.max_frames`.
-`bio_view.View.run`, `_snapshot`, `SNAPS_MAX`, `LIVE_PICS`, `SNAP_BUDGET` go.
-Gate: `tests/test_gui_parity.py::test_page_run_is_the_pipeline` -- 20 frames of `si_three_balls`
-through `/api/run` and through `Plexus_Main.py -o generate`, positions identical
-(`tools/promotion_identical._arrays`), and `graphs_data/si_material/si_three_balls/` holds the same
-files either way. The ms/frame on the page is the pipeline's progress bar, nothing else.
+### G2 -- one run path.  DONE 2026-09-12  `gate: same engine`
+`plexus/pipeline.py::generate(config_name, device=..., on_frame=None, ...)` is the body of
+`Plexus_Main.main` for `-o generate` (resolve, CFL and particles-per-cell guards, schema.load, the
+log copy, the VRAM warning, `data_generate` with the spec-shaped live movie, the markers, the
+caption); `Plexus_Main.py` calls it and keeps only argument parsing and the `-o plot` branch.
+`data_generate` takes an `on_frame` hook composed after the movie's; `pipeline.StopRun` ends a
+run early from inside it.
+THE PAGE'S RUN IS THE CLI IN THE WORKER PROCESS, not a thread. `studio.Job` already runs
+`Plexus_Main.main()` on `-o generate studio/<name> --device ... --force --no-describe` in the warm
+worker (`gui/worker.py`) and scrapes tqdm's bar; the page now uses it (`/api/studio/run`), reads
+the bar's own `ms/frame` (`Job.ms_per_frame`, new) and the pipeline's own files through
+`/api/material/run`: the newest `still_NN` as the live picture, `movie.mp4` for PLAY (a <video>).
+Chosen over the in-thread hook because VTK owns one off-screen context per thread and a second
+plotter on a second thread dies (`bio_view.py` docstring); a subprocess is also, literally, the
+command line. The seeded view (orbit, zoom, pick) is the page's own `LiveMovie` on the seed, as
+before; `bio_view.View.run` (the page's own loop) stays only for the bio page until G3.
+Measured: page RUN of `si_three_balls` on the local A6000 = 801 frames in 79 s, the bar's 92
+ms/frame (rendering the 400-frame movie inline, as the CLI does); the CLI's own number on the
+same card was 85. The a100 ran 68.
+Gate: `tests/test_gui_parity.py::test_cli_and_page_share_one_pipeline` -- `Plexus_Main` calls
+`pipeline.generate` and no `data_generate`; the Job's argv is `-o generate studio/<name>`; the
+worker runs `Plexus_Main.main()`.
 
-### G3 -- one page, three tabs.
-`gui/app.py` is the shell: tab bar, the shared panel, the shared JS (run/play/yaml/claude/tree,
+## Order, revised 2026-09-12
+The material page is delivered first (G1, G2) for testing on its own at `/material`; the tab
+unification (G3) waits for that test. G3 gets FOUR tabs: bio, material, neurons, **metabolism**
+(G4b below).
+
+### G3 -- one page, four tabs.
+`gui/app.py` is the shell: tab bar (bio | material | neurons | metabolism), the shared panel, the shared JS (run/play/yaml/claude/tree,
 today copied three times across `studio.py`, `bio.py`, `material.py`). A tab is a module in
 `gui/tabs/` with three things: `form_html()`, `build_spec(form) -> dict`, `default_form() -> dict`.
 Routes: `/api/tab/<name>/build`, and the shared `/api/run`, `/api/seed`, `/api/render`,
@@ -87,6 +104,13 @@ of handlers. `--bio / --material / --studio` flags and the three ports go; one p
 Default scene from `config/neural/ctrnn_assemblies.yaml` (the smallest of the four neural specs);
 the form exposes what that spec parameterises (n neurons, assemblies, coupling, noise, frames).
 Renderer: the spec's own `plotting.renderer`; no new drawing code.
+
+### G4b -- the metabolism tab.
+Default scene from a metabolism spec in the language: none exists under `config/` today, and
+`/workspace/MetabolismGraph` is a separate repo. First step of this rung is therefore a reference
+spec (`config/metabolism/<name>.yaml`) built from that repo's smallest model as Plexus operators
+(the paper->Plexus prototype recipe), THEN the form over it. If the operators are not there, the
+rung stops at the reference spec and says so.
 
 ### G5 -- retire.
 `studio.py`, `bio.py`'s page, `material.py`'s page, `Plexus_gui.py` flags, README rewritten.

@@ -54,6 +54,15 @@ def _allowed_roots():
     gd = os.path.join(REPO_ROOT, "graphs_data")   # symlink -> the dataset/output tree (mp4s live there)
     if os.path.exists(gd):
         roots.append(os.path.realpath(gd))
+    # THE DATA ROOT ITSELF, wherever it is. The runs the page starts land in
+    # `graphs_data_path()` (GraphData on the NFS share, from $GNN_OUTPUT_ROOT or the default), and a
+    # worktree has no `graphs_data` symlink at all -- so the movie the page had just written came
+    # back 403 from `/media`. The data root is the page's own output; it is always servable.
+    try:
+        from plexus.paths import graphs_data_path
+        roots.append(os.path.realpath(graphs_data_path()))
+    except Exception:                                                # noqa: BLE001
+        pass
     extra = os.environ.get("PLEXUS_GUI_ROOTS", "")
     roots += [r for r in extra.split(os.pathsep) if r]
     return [os.path.realpath(r) for r in roots]
@@ -374,6 +383,23 @@ class Handler(BaseHTTPRequestHandler):
                 print(f"[material] form_from_spec: {e}", flush=True)
             return self._send_json({"name": name, "raw": raw, "form": form})
 
+        if route == "/api/material/run":                 # GET ?name= -> the pipeline run's progress and what it wrote
+            # THE RUN IS `Plexus_Main.py -o generate studio/<name>`, in the warm worker (studio.Job),
+            # and this is its bar and its files: the newest still for the live picture, the movie
+            # for PLAY. Nothing here is computed by the page.
+            from plexus.gui import studio
+            name = (q.get("name") or [""])[0]
+            j = studio.JOBS.get(name)
+            st = j.status() if j else {"done": True, "rc": None, "frame": 0, "total": 0, "pct": 0,
+                                       "elapsed": 0, "error": None, "ms_per_frame": None, "tail": []}
+            st["running"] = bool(j) and not j.done
+            a = studio.artefacts(name) if name else {}
+            st["still"] = ("/media?path=" + quote(a["still"]) + f"&t={int(os.path.getmtime(a['still']))}") if a.get("still") else None
+            st["png"] = ("/media?path=" + quote(a["png"]) + f"&t={int(a.get('png_mtime') or 0)}") if a.get("png") else None
+            st["mp4"] = ("/media?path=" + quote(a["mp4"]) + f"&t={int(a.get('mp4_mtime') or 0)}") if a.get("mp4") else None
+            st["dir"] = a.get("dir")
+            return self._send_json(st)
+
         if route == "/api/bio/counts":
             from plexus.gui import bio, studio
             name = (q.get("name") or [""])[0]
@@ -636,11 +662,11 @@ class Handler(BaseHTTPRequestHandler):
             ok, err = _validate(spec)
             if not ok:
                 return self._send_json({"error": "schema rejected the spec", "detail": err}, 400)
-            os.makedirs(studio.CONFIG_DIR, exist_ok=True)
             name = spec["general"]["name"]
             sp = os.path.join(studio.CONFIG_DIR, name + ".yaml")
-            raw = _dump_yaml(spec)
-            open(sp, "w").write(raw)
+            # WRITTEN THE WAY THE PIPELINE WILL READ IT: the CFL guard runs on the file now, so the
+            # substep in the YAML panel is the one the run uses (idempotent when the form's is fine).
+            raw = material.write_spec(spec, sp)
             bio.bump(name, f"built {name}")
             bio.claude_note(f"material spec '{name}' built from the form: bodies {', '.join((spec['sets'].get('cell') or {}).get('types') or {})}")
             return self._send_json({"name": name, "raw": raw, "valid": True, "version": bio.STATE["version"]})

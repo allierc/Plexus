@@ -954,11 +954,15 @@ class Job:
     """
 
     _RE = re.compile(r"(\d+)/(\d+)\s*\[")            # tqdm's "  184/801 [04:43<15:54, ...]"
+    # THE ENGINE'S OWN SPEED, not elapsed/frames: the bar's postfix is the engine's steady per-tick
+    # cost (engine.py ~2115), which excludes the import and build that elapsed time folds in.
+    _MS = re.compile(r"([\d.]+)\s*ms/frame")
 
     def __init__(self, name: str, device: str, frames: int | None = None,
                  render_n: int = 400_000, tag: str = ""):
         self.name, self.device, self.tag = name, device, tag
         self.frame, self.total = 0, frames or 0
+        self.ms_per_frame = None
         self.done, self.rc, self.error = False, None, None
         self.lines: list[str] = []
         self.started = time.time()
@@ -1003,6 +1007,9 @@ class Job:
                     m = self._RE.search(chunk)
                     if m:
                         self.frame, self.total = int(m.group(1)), int(m.group(2))
+                        ms = self._MS.search(chunk)
+                        if ms:
+                            self.ms_per_frame = float(ms.group(1))
                         now = time.time()
                         if now - last > 5.0:
                             last = now
@@ -1055,7 +1062,7 @@ class Job:
 
     def status(self) -> dict:
         return {"name": self.name, "tag": self.tag, "frame": self.frame, "total": self.total,
-                "done": self.done, "rc": self.rc, "error": self.error,
+                "done": self.done, "rc": self.rc, "error": self.error, "ms_per_frame": self.ms_per_frame,
                 "elapsed": round(time.time() - self.started, 1),
                 "pct": (100.0 * self.frame / self.total) if self.total else 0.0,
                 "tail": self.lines[-8:]}

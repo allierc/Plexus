@@ -30,6 +30,7 @@ def data_generate(
     save: bool = True,
     live_every_frac: float | None = 0.05,
     live_movie: dict | None = None,
+    on_frame=None,
 ) -> tuple[str, dict]:
     """forward-simulate `sim` and write its trajectory under
     graphs_data/<pre_folder>/<sim.name>/. Returns (data_dir, out).
@@ -45,7 +46,12 @@ def data_generate(
     extension point `live_every_frac` already uses -- and its pyvista import lives inside
     `plexus.live_movie`, below the branch that decides whether to build one, so this module
     still imports no rendering stack. Pass `None` (what `--no-viz` does) and nothing is
-    built, which is how a throughput measurement is taken."""
+    built, which is how a throughput measurement is taken.
+
+    `on_frame(H, tick)` is a caller's own hook, composed AFTER the movie's: the material page runs
+    this very function and reads the hierarchy off it to draw at its own camera and to count what
+    is alive. Raising from it aborts the run (the movie is still closed and the frames so far
+    kept); `plexus.pipeline.StopRun` is the exception a stop button raises."""
     folder = pre_folder.rstrip("/")
     data_dir = graphs_data_path(folder, sim.name)
     if erase and os.path.isdir(data_dir):
@@ -148,6 +154,8 @@ def data_generate(
     # COMPOSED, not replaced. The live PNG snapshot and the live movie are independent answers to
     # "what is this run doing right now" and a run may want both; `on_frame` is a single slot, so
     # the composition happens here rather than by one hook knowing about the other.
+    if on_frame is not None:
+        hooks.append(on_frame)
     on_frame = None
     if hooks:
         def on_frame(H, tick, _hs=tuple(hooks)):

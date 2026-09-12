@@ -30,7 +30,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src
 import plexus.operators  # noqa: F401  self-register the operator library
 from plexus.schema import load
 from plexus.paths import resolve_config, validate_pre_folder, set_data_root, log_path
-from plexus.generators.graph_data_generator import data_generate
 
 
 def main():
@@ -117,185 +116,48 @@ def main():
     if config_name is None:
         parser.error("a config name is required: -o <task> <config_name>")
 
-    # resolve spec + simulation type, then validate (the gatekeeper)
-    yaml_file, pre_folder, name = resolve_config(config_name)
-    validate_pre_folder(pre_folder)
-    if not os.path.isfile(yaml_file):
-        parser.error(f"config not found: {yaml_file}")
-    print(f"task={task}  type={pre_folder.rstrip('/')}  config={name}  ({yaml_file})")
-    # MPM grid-dt CFL: auto-correct the SPEC (not the engine) so dt_sub respects the
-    # Courant condition before we generate; idempotent for non-MPM / already-stable specs.
-    if "generate" in task:
-        from plexus.generators.mpm_cfl import (Courant_Friedrichs_Lewy_condition,
-                                               particles_per_cell)
-        Courant_Friedrichs_Lewy_condition(yaml_file)
-        # The grid's OTHER discretisation constraint. CFL bounds the time step; this bounds the
-        # space step against the particle count, and it had no check at all until a spec was
-        # raised to n_grid 192 at a fixed particle count and its snow quietly collapsed.
-        particles_per_cell(yaml_file)
-    sim = load(yaml_file)
-
-    # self-describing run dir: snapshot the spec into log/<type>/<name>/
-    run_log_dir = log_path(pre_folder.rstrip("/"), name)
-    os.makedirs(run_log_dir, exist_ok=True)
-    shutil.copy2(yaml_file, os.path.join(run_log_dir, "spec.yaml"))   # same name as the data-dir copy (line ~104)
-
-    describe = not args.no_describe and not args.no_viz
-    data_dir = None
-
-    if "generate" in task:
-        # THE mp4 IS WRITTEN BY THE RUN ITSELF, not by a second script and not by a second pass over
-        # the trajectory. `plot_dataset` below still runs and still renders from the recorded data;
-        # this hook exists for the runs where that is impossible, and at 100 M particles one
-        # recorded frame is 1.2 GB so it is impossible often. `--no-viz` turns off every renderer.
-        _dot = (None if args.render_dot is None
-                else args.render_dot if args.render_dot == "auto" else float(args.render_dot))
-        # A CAPTURED GRAPH AND A RENDERER COMPETE FOR THE SAME CARD, and the failure is silent:
-        # the allocator retries rather than raising, so the run sits at 100% CPU with no output and
-        # no error. That is what a 100 M render did -- the capture pool plus the renderer plus the
-        # recording buffers on a 47.4 GiB card -- and the tell was that `[engine] substep captured
-        # as a CUDA graph` never printed.
-        #
-        # THE TEST IS THE FOOTPRINT AGAINST *THIS* CARD, NOT A PARTICLE COUNT AND NOT A CARD NAME.
-        # 20 M is a stall on a 48 GiB A6000 and unremarkable on an 80 GiB H100, so a fixed
-        # threshold would nag on the big card and stay silent on a 24 GiB one. The coefficients are
-        # measured, on `warp`, over 500 k -> 100 M (paper/mpm_warp.pdf 5.2-5.3): 0.309 GiB per
-        # million particles eager, 0.42 with capture -- capture's private pool stays resident, which
-        # is where the ~39% comes from.
-        if not args.no_viz and args.device.startswith("cuda"):
-            # `per_parent` MAY BE A MAPPING from the parent's type name to a count (a cell atlas
-            # gives a membrane patch 50 points and a nuclear-envelope patch 50,000), so the total
-            # is the sum over types of count x per-type budget rather than one product. Getting
-            # this wrong is not cosmetic: the number feeds the VRAM projection below, which is what
-            # warns before a capture stalls the card.
-            def _child_total(v):
-                pp = v.get("per_parent", 0)
-                par = sim.sets.get(v.get("parent"), {}) or {}
-                ptypes = par.get("types") or {}
-                if isinstance(pp, dict):
-                    npar = int(par.get("n", par.get("per_parent", 1)) or 1)
-                    return sum(int(pp.get(tn, 0)) * int(t.get("count", 0) or
-                                                        round(float(t.get("fraction", 0.0)) * npar))
-                               for tn, t in ptypes.items())
-                return int(pp) * int(par.get("n", 1))
-            _npart = sum(_child_total(v)
-                         for v in sim.sets.values() if isinstance(v, dict) and "per_parent" in v)
-            _cap_on = any(isinstance(x, dict) and x.get("capture") for x in sim.schedule)
-            if _npart and _cap_on:
-                import torch
-                _tot = torch.cuda.get_device_properties(args.device).total_memory / 2 ** 30
-                _proj = 0.42 * _npart / 1e6            # GiB, captured
-                if _proj > 0.80 * _tot:                # the renderer and the recorder want the rest
-                    print(f"[capture] WARNING: {_npart:,} particles with capture ON projects "
-                          f"~{_proj:.0f} GiB on a {_tot:.0f} GiB "
-                          f"{torch.cuda.get_device_properties(args.device).name}, and a live "
-                          f"renderer needs room too. Without capture it is ~{0.309 * _npart / 1e6:.0f} "
-                          f"GiB. If the run stalls at 100% CPU with no output and never prints "
-                          f"'substep captured as a CUDA graph', that is why -- set "
-                          f"`capture: false` on the spec's substep block.", flush=True)
-        _rn = [int(x) for x in str(args.render_n).split(",") if x.strip()]
-        # THE SPEC MAY SET THE MOVIE'S OWN SHAPE. `max_frames` (how many frames the movie keeps,
-        # the run strided to fit), `stills` (how many PNGs are dropped through it) and
-        # `keep_stills` are render decisions a spec is entitled to make about itself -- a
-        # benchmark that wants 400 movie frames and ten pictures should say so once, in the file,
-        # rather than on every command line and in every cluster job script that runs it. The
-        # CLI values remain the defaults for a spec that says nothing.
-        _pl = getattr(sim, "plotting", None) or {}
-        lm = None if args.no_viz else {"render_n": (_rn if len(_rn) > 1 else _rn[0]),
-                                       "max_frames": int(_pl.get("max_frames", args.render_max_frames)),
-                                       "dot": _dot,
-                                       "stills": int(_pl.get("stills", args.render_stills)),
-                                       "keep_stills": bool(_pl.get("keep_stills", args.keep_stills)),
-                                       # the movie can only be timed if the run has a clock
-                                       "dt": getattr(sim, "dt", None),
-                                       "time_s": (sim.units.time_s if getattr(
-                                           getattr(sim, "units", None), "declared", False) else None),
-                                       "real_time": not args.no_real_time,
-                                       "length_um": (sim.units.length_um if getattr(
-                                           getattr(sim, "units", None), "declared", False) else None)}
-        data_dir, _ = data_generate(sim, pre_folder, device=args.device,
-                                    erase=args.force, save=True,
-                                    live_every_frac=(None if args.no_viz else 0.05),
-                                    live_movie=lm)
-        shutil.copy2(yaml_file, os.path.join(data_dir, "spec.yaml"))   # co-locate the spec with its data
-        _mark(run_log_dir, "_completed_generate", data_dir)
-
-    # render movies if plotting was asked OR describing (the captioner needs the mp4s)
-    if not args.no_viz and ("plot" in task or (describe and "generate" in task)):
-        from plexus.plot import plot_dataset
-        data_dir = plot_dataset(sim, pre_folder, movie=(args.movie or describe))
-        if "plot" in task:
-            _mark(run_log_dir, "_completed_plot", data_dir)
-
-    # optional MLS-MPM grid-diagnostic movie (re-runs the sim to capture F/C/Jp/stress/grid)
-    if args.grid and data_dir is None and ("generate" in task or "plot" in task):
-        from plexus.paths import graphs_data_path
-        data_dir = os.path.join(graphs_data_path(), pre_folder.rstrip("/"), name)
-    if args.grid and data_dir and not args.no_viz:
-        from plexus.generators.mpm_grid_diag import generate_grid_movie
-        generate_grid_movie(sim, data_dir, device=args.device)
-
-    # caption the freshly rendered movies (default on for -o generate; --no-describe to skip)
-    if describe and "generate" in task and data_dir:
-        _describe(data_dir, args.describe_out, device=args.device)
-        _mark(run_log_dir, "_completed_describe", args.describe_out or "graphs_data/video_descriptions.txt")
-
     for stage in ("train", "test"):
         if stage in task:
             raise NotImplementedError(
                 f"task stage {stage!r} is not built yet (inverse-problem stage).")
 
-    _mark(run_log_dir, "_complete", " ".join(sys.argv))
-
-
-def _describe(data_dir: str, out_file: str | None, device: str = "cuda:0") -> None:
-    """Caption this run's movies with the local VLM, appending to the aggregate file.
-    Runs describe_video.py as a subprocess so a missing/broken VLM never breaks a run."""
-    import glob
-    import subprocess
-    from plexus.paths import graphs_data_path
-    repo = os.path.dirname(os.path.abspath(__file__))
-    gemma = os.environ.get("GEMMA_DIR", os.path.join(repo, "VLLM", "gemma-4-12B-it"))
-    if not os.path.isdir(gemma):
-        print(f"[describe] skip: no VLM weights at {gemma} (pass --no-describe to silence)", flush=True)
+    # THE PIPELINE IS ONE FUNCTION AND THIS IS ITS COMMAND LINE. `plexus.pipeline.generate` is what
+    # runs here and what the web page's RUN button runs, so a run started from a terminal and one
+    # started from the page are the same run -- same CFL rewrite, same schema gate, same movie,
+    # same folder. Nothing below this line is a second implementation of any of it.
+    from plexus.pipeline import generate
+    if "generate" in task:
+        generate(config_name, device=args.device, force=args.force, viz=not args.no_viz,
+                 render_n=args.render_n, render_max_frames=args.render_max_frames,
+                 real_time=not args.no_real_time, keep_stills=args.keep_stills,
+                 render_stills=args.render_stills, render_dot=args.render_dot,
+                 describe=not args.no_describe, describe_out=args.describe_out,
+                 grid=args.grid, movie=args.movie, plot=("plot" in task),
+                 argv_line=" ".join(sys.argv))
         return
-    # EVERY mp4 THE RUN WROTE, not just the ones named `movie_*`. The two-panel composition view
-    # lands as `movie.mp4` and the VTK products as `vtk_*.mp4`, so a run whose ONLY output is the
-    # panels reported "no movies found to describe" one line after printing the path of the movie
-    # it had just written. The captioner's business is "what did this run produce", and that is a
-    # question about the directory, not about a prefix.
-    movies = sorted(f for f in glob.glob(os.path.join(data_dir, "*.mp4"))
-                    if not os.path.basename(f).startswith("grid_"))   # the MPM grid diagnostic
-    if not movies:
-        print(f"[describe] no .mp4 in {data_dir} to describe", flush=True)
-        return
-    gd = graphs_data_path()
-    out_file = out_file or os.path.join(gd, "video_descriptions.txt")
-    script = os.path.join(repo, "VLLM", "describe_video.py")
-    print(f"[describe] captioning {len(movies)} movie(s) -> {out_file}", flush=True)
-    # a caption that did not happen must SAY SO. check=False keeps a broken VLM from killing a run,
-    # which is right, but on its own it also let an out-of-memory captioner pass for a successful one.
-    before = os.path.getsize(out_file) if os.path.exists(out_file) else 0
-    # NO `Loading weights: 100%|####...| 677/677`. It is a full terminal width of blocks, redrawn,
-    # for a load the line above already announced, and it reports nothing anyone can act on -- the
-    # load either finishes or the caption says UNAVAILABLE. `discovery_okuda/caption_wave.py`
-    # disables it in-process for the same reason; this path runs the captioner as a SUBPROCESS, so
-    # the switch has to travel in its environment instead.
-    # THE PATH THIS CHECKED IS THE PATH THE CHILD LOADS. `gemma` above is resolved against this
-    # checkout and tested with `isdir`; passing it down closes the gap where the parent verifies one
-    # directory and the subprocess then goes looking in another, which is a failure that gets past
-    # the guard and dies inside the captioner instead.
-    _env = {**os.environ, "HF_HUB_DISABLE_PROGRESS_BARS": "1", "TRANSFORMERS_VERBOSITY": "error",
-            "GEMMA_DIR": gemma}
-    r = subprocess.run([sys.executable, script, *movies, "--root", gd,
-                        "--out", out_file, "--append", "--device", device], check=False, env=_env)
-    after = os.path.getsize(out_file) if os.path.exists(out_file) else 0
-    if r.returncode != 0 or after <= before:
-        print(f"[describe] *** NO CAPTIONS WERE WRITTEN *** (exit {r.returncode}, "
-              f"{out_file} unchanged at {after} bytes). The movies exist and are undescribed.",
-              flush=True)
-    else:
-        print(f"[describe] wrote {after - before} bytes of captions", flush=True)
+    if "plot" in task:
+        from plexus.paths import log_path
+        yaml_file, pre_folder, name = resolve_config(config_name)
+        validate_pre_folder(pre_folder)
+        if not os.path.isfile(yaml_file):
+            parser.error(f"config not found: {yaml_file}")
+        print(f"task={task}  type={pre_folder.rstrip('/')}  config={name}  ({yaml_file})")
+        sim = load(yaml_file)
+        run_log_dir = log_path(pre_folder.rstrip("/"), name)
+        os.makedirs(run_log_dir, exist_ok=True)
+        shutil.copy2(yaml_file, os.path.join(run_log_dir, "spec.yaml"))
+        data_dir = None
+        if not args.no_viz:
+            from plexus.plot import plot_dataset
+            data_dir = plot_dataset(sim, pre_folder, movie=args.movie)
+            _mark(run_log_dir, "_completed_plot", data_dir)
+        if args.grid and data_dir is None:
+            from plexus.paths import graphs_data_path
+            data_dir = os.path.join(graphs_data_path(), pre_folder.rstrip("/"), name)
+        if args.grid and data_dir and not args.no_viz:
+            from plexus.generators.mpm_grid_diag import generate_grid_movie
+            generate_grid_movie(sim, data_dir, device=args.device)
+        _mark(run_log_dir, "_complete", " ".join(sys.argv))
 
 
 def _mark(run_log_dir: str, marker: str, info: str) -> None:
