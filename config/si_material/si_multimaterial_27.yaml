@@ -104,7 +104,7 @@ sets:
       c00:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -117,7 +117,7 @@ sets:
       c01:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -130,7 +130,7 @@ sets:
       c02:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -143,7 +143,7 @@ sets:
       c03:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -156,7 +156,7 @@ sets:
       c04:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -169,7 +169,7 @@ sets:
       c05:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -182,7 +182,7 @@ sets:
       c06:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -195,7 +195,7 @@ sets:
       c07:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -208,7 +208,7 @@ sets:
       c08:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -221,7 +221,7 @@ sets:
       c09:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -234,7 +234,7 @@ sets:
       c10:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -247,7 +247,7 @@ sets:
       c11:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -260,7 +260,7 @@ sets:
       c12:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -273,7 +273,7 @@ sets:
       c13:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -286,7 +286,7 @@ sets:
       c14:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -299,7 +299,7 @@ sets:
       c15:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -312,7 +312,7 @@ sets:
       c16:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -325,7 +325,7 @@ sets:
       c17:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -338,7 +338,7 @@ sets:
       c18:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -351,7 +351,7 @@ sets:
       c19:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -364,7 +364,7 @@ sets:
       c20:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -377,7 +377,7 @@ sets:
       c21:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -390,7 +390,7 @@ sets:
       c22:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -403,7 +403,7 @@ sets:
       c23:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -416,7 +416,7 @@ sets:
       c24:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -429,7 +429,7 @@ sets:
       c25:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -442,7 +442,7 @@ sets:
       c26:
         count: 1
         material: elastic
-        youngs: 50000.0
+        youngs: 20000000.0
         density: 1000.0
         fill: lattice
         block:
@@ -494,7 +494,7 @@ operators:
   vmax: 1000000000.0
 schedule:
 - gravity
-- substep_dt: 2.500000e-04
+- substep_dt: 1.388889e-05
   steps:
   - mpm_strain
   - mpm_viscosity
