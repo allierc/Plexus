@@ -85,8 +85,19 @@ class View:
         self.sim, self.H, self.spec_path = sim, H, spec_path
         self.scene = bio.scene_from(H, sim, spec_path)
         style = dict(sim.plotting or {})
-        for k in ("curve", "stills"):                       # the curves need a clip; the section inset stays
-            style.pop(k, None)
+        style.pop("stills", None)                           # the page writes no stills; the section inset stays
+        # THE CURVE PANELS STAY. They were dropped here ("the curves need a clip") when nothing on
+        # the page could ask for one; the plot list does now. A LIVE panel needs its y axis fixed
+        # in advance (the renderer refuses to draw one that would rescale under itself, which would
+        # make a rising curve and a falling axis indistinguishable), so a curve that does not say
+        # `ymin`/`ymax` is given one MEASURED AT THE SEED: 0 to three times the seeded value, and
+        # 0..1 for a fraction. The spec's own numbers, when it has them, are left alone.
+        _curves = style.get("curve")
+        if _curves:
+            style["curve"] = [dict(c) if isinstance(c, dict) else {"quantity": str(c)}
+                              for c in (_curves if isinstance(_curves, (list, tuple)) else [_curves])]
+            for c in style["curve"]:                        # provisional; replaced below from the seed
+                c.setdefault("ymin", 0.0); c.setdefault("ymax", 1.0)
         style["real_time"] = False
         # a walled box IS the scene (the balls bounce on its floor): keep its frame; a free tissue has
         # no wall, and its box was only a camera hint that shrank the cyst to a tenth of the picture
@@ -128,6 +139,12 @@ class View:
         self.lm(H, 0)                                            # builds every actor, writes one frame
         if self.lm.failed:
             raise RuntimeError(f"renderer: {self.lm.failed}")
+        # THE PANELS' Y AXES, FROM THE SEED. A live panel must fix its axis in advance (a curve
+        # that rescaled under itself would be unreadable), and the renderer's own `_curve_row` is
+        # the value the panel will plot -- so ask it once, at frame 0, and give each axis 0 to 3x
+        # that (0..1 for a fraction, the live count x3 for `cells`). The spec's own ymin/ymax win.
+        if _curves:
+            self._seed_curve_axes(H, _curves)
         if getattr(self.lm, "cs", None) is not None:             # the first frame builds the inset but fills it from frame 1
             self.lm._update_cross_section(H)
         self.p = self.lm.p
@@ -163,6 +180,32 @@ class View:
         self.snaps: list = []                                    # the run's frames as level states, for PLAY at any camera
         self.seconds = round(time.time() - t0, 2)
         self.set_camera(self.azim, self.elev, self.zoom)
+
+    def _seed_curve_axes(self, H, declared):
+        lm = self.lm
+        decl = [c if isinstance(c, dict) else {"quantity": str(c)} for c in
+                (declared if isinstance(declared, (list, tuple)) else [declared])]
+        changed = False
+        for cv, d in zip(getattr(lm, "_curves", []) or [], decl):
+            if "ymin" in d and "ymax" in d:
+                continue
+            q = cv["q"]
+            try:
+                if q == "cells":
+                    hi = 3.0 * max(1.0, float(np.nansum(lm._curve_row(H, cv["lvl"], q, cv["ntype"], cv["nt"])[:, 0])))
+                elif q in ("phase", "cycle_progress"):
+                    hi = 1.0
+                else:
+                    r = lm._curve_row(H, cv["lvl"], q, cv["ntype"], cv["nt"])
+                    v = float(np.nanmax(np.asarray(r)[:, 0]))
+                    hi = 3.0 * v if np.isfinite(v) and v > 0 else 1.0
+            except Exception as e:                           # noqa: BLE001 -- a panel is not the run
+                print(f"[view] curve {q}: no seed range ({type(e).__name__}: {e})", flush=True)
+                continue
+            cv["ch"].y_axis.range = [0.0, float(hi)]
+            changed = True
+        if changed:
+            self.lm.p.render()
 
     # ------------------------------------------------------------------ camera and picture
     def set_camera(self, azim=None, elev=None, zoom=None):
@@ -730,6 +773,7 @@ def open_view(spec_path: str, device: str = "cpu", carry: bool = False) -> View:
                     v._keep_every = getattr(keep, "_keep_every", 1)
                     v.RUN = dict(keep.RUN); v.RUN["running"] = False
                     v.lm.n_frames = int(v.RUN.get("n_frames") or 1)   # the overlay's denominator is the run's
+                    v.lm.n = v.lm.n_frames
                     print(f"[view] {len(v.snaps)} frames of the last run carried to the new render", flush=True)
                     v._range_from_frames()
             elif keep is not None and getattr(v, "panel", None) is not None and getattr(keep, "panel", None) is not None:

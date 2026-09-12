@@ -575,6 +575,12 @@ def p_claude(h, data):
         brief = tabs.get(mode).BRIEF
     except Exception:                                            # noqa: BLE001
         mode = "bio"
+    # WHAT IS ON SCREEN, IN THE PROMPT. Without it the agent's first move is always a GET to read
+    # the scene back -- one model round trip before any work, on every task.
+    if data.get("form") is not None:
+        task = (f"The form on screen (spec '{data.get('name')}') is:\n{json.dumps(data['form'])}\n\n"
+                f"Apply this change to it and POST the WHOLE edited form back in ONE build call, "
+                f"then say what you changed. Do not read the scene first.\n\nTask: {task}")
     return h._send_json(bio.claude_start(task, int(h.server.server_address[1]),
                                          model=str(data.get("model") or "sonnet"), brief=brief, mode=mode))
 
@@ -704,6 +710,34 @@ def p_saveas(h, data):
     return h._send_json({"path": dst})
 
 
+# THE CURVE PANELS a spec may carry beside the picture (`plotting.curve`, at most three): a live
+# plot per quantity, drawn by `live_movie._curves_setup` from `plexus.measures`.
+CURVES = ("cells", "area", "volume", "radius", "phase", "cycle_progress")
+
+
+def p_curves(h, data):
+    from plexus.gui import bio
+    name = str(data.get("name") or bio.STATE.get("name") or "")
+    sp = _spec_path(name)
+    if not name or not os.path.exists(sp):
+        return h._send_json({"error": "no spec is open"}, 400)
+    want = [q for q in (data.get("curves") or []) if q in CURVES][:3]
+    spec = yaml.safe_load(open(sp)) or {}
+    pl = spec.setdefault("plotting", {})
+    if want:
+        pl["curve"] = [{"quantity": q, "xlabel": "frame", "ylabel": q.replace("_", " "), "ticks": 4} for q in want]
+    else:
+        pl.pop("curve", None)
+    ok, err = _validate(spec)
+    if not ok:
+        return h._send_json({"error": "schema rejected the spec", "detail": err}, 400)
+    raw = _dump_yaml(spec)
+    open(sp, "w").write(raw)
+    bio.STATE["carry_frames"] = True
+    bio.bump(name, f"curves {', '.join(want) or 'none'}")
+    return h._send_json({"name": name, "raw": raw, "curves": want, "version": bio.STATE["version"]})
+
+
 def p_quit(h, data):
     """SHUT THE SOCKET, NOT JUST THE PROCESS. A server killed with the port still bound -- or
     suspended with Ctrl-Z -- leaves the port held and the next launch dies on "Address already in
@@ -784,7 +818,7 @@ PICTURE_ROUTES = {f"/api/{p}/{x}" for p in ("scene", "bio") for x in ("render", 
 POST_ROUTES = {
     "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
     "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
-    "/api/scene/style": p_style, "/api/scene/saveas": p_saveas,
+    "/api/scene/style": p_style, "/api/scene/saveas": p_saveas, "/api/scene/curves": p_curves,
     "/api/quit": p_quit, "/api/studio/quit": p_quit,
     "/api/validate": p_validate, "/api/save": p_editor_save, "/api/layout": p_layout,
 }

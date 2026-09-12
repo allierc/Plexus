@@ -58,13 +58,13 @@ SHELL = r"""<!doctype html>
   <div id="picklist" style="max-height:55vh;overflow:auto;background:#0e0e12;border:1px solid #2a2a30;padding:4px;font-size:12px"></div>
  </div>
 {form}
- <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button><button class="dim" onclick="reseed()">RE-SEED</button></div>
+ <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button></div>
  <div id="status">building the default scene...</div>
  <div class="row"><label>device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
  <div class="row"><button onclick="runGo()" id="runbtn" title="the form is applied first, then the run starts">RUN</button><button class="dim" onclick="runStop()">STOP</button></div>
  <div id="runstat" style="color:#8c8;font-size:12px;min-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
- <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button><button class="dim" onclick="movieGo()" title="the movie.mp4 the run wrote, as a file">MOVIE</button><button class="dim" onclick="playStop();showMovie(null);FRAME=null;render(true)" title="back to the live view">LIVE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:150px" oninput="playing=null;showMovie(null);showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
+ <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:190px" oninput="playing=null;showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
  <div class="row"><input id="task" style="width:100%" placeholder="{placeholder}" onkeydown="if(event.key==='Enter')claudeGo()"></div>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button><button class="dim" onclick="claudeNew()" title="forget the conversation so far">NEW SESSION</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
@@ -105,8 +105,13 @@ window.openSpec=async function(pth){{$('picker').style.display='none';FORM_SPEC=
 async function post(url,body){{const r=await fetch(url,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}});return r.json();}}
 window.build=async function(){{status('building the spec...');const j=await post('/api/tab/'+TAB+'/build',form());if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}specName=j.name;FORM_SPEC=j.name;if(j.version!==undefined)seen.version=j.version;$('yamltext').value=j.raw;status(`spec saved: config/studio/${{j.name}}.yaml -- seeding...`);await reseed();}};
 window.reseed=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{status('no spec yet',true);return;}}status('seeding and building the renderer...');const r=await fetch('/api/scene/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){{status(j.error,true);return;}}SCENE=j;tree(j);status(`seeded in ${{j.seconds}}s: `+Object.entries(j.sets).map(([k,v])=>`${{k}} ${{v.n_live}}`).join(', '));render(true);
- try{{const f=await (await fetch('/api/scene/frames')).json();nframes=f.n||0;$('frame').max=Math.max(nframes-1,0);if(nframes)$('framelab').textContent=`${{nframes}} frames of the last run kept: PLAY replays them with this render`;}}catch(e){{}}}};
-window.toggleYaml=function(){{const y=$('yaml');y.style.display=y.style.display==='none'?'block':'none';}};
+ try{{const f=await (await fetch('/api/scene/frames')).json();nframes=f.n||0;$('frame').max=Math.max(nframes-1,0);
+  // THE RUN THIS SPEC ALREADY HAS: if `graphs_data/.../<name>/movie.mp4` is there, PLAY plays it
+  // straight away -- no run needed, and no 2 GB trajectory read to scrub at a camera.
+  const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();MOVIE=a.mp4||null;
+  $('framelab').textContent=nframes?`${{nframes}} frames in memory: PLAY replays them with this render`
+                                  :(MOVIE?'a movie of this spec exists: PLAY':'');}}catch(e){{}}}};
+window.toggleYaml=function(){{const y=$('yaml');const on=getComputedStyle(y).display==='none';y.style.display=on?'block':'none';}};
 window.saveYaml=async function(){{const j=await post('/api/scene/save',{{name:specName,raw:$('yamltext').value,tab:TAB}});if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();}};
 // THE PICTURE IS THE MOVIE RENDERER'S. Every camera change asks the server for a fresh screenshot;
 // at most one request is in flight and the newest camera wins, so dragging never queues up.
@@ -152,16 +157,20 @@ async function rpoll(){{try{{const j=await (await fetch('/api/scene/run')).json(
  else $('runstat').textContent=(j.running?'running':(j.stopped?'stopped':'done'))+`  frame ${{j.frame}}/${{j.n_frames}}  ${{j.seconds}} s`+(j.ms_per_frame?`  ${{j.ms_per_frame.toFixed(0)}} ms/frame`:(j.frame&&j.seconds?`  ${{(j.seconds/j.frame*1000).toFixed(0)}} ms/frame`:''));
  if(j.counts&&j.counts.sets)$('runcounts').textContent=Object.entries(j.counts.sets).filter(([k])=>k!=='half_edge').map(([k,v])=>`${{k}} ${{v}}`).join('  ');
  render();if(j.running){{setTimeout(rpoll,700);}}else{{running=false;$('runbtn').disabled=false;for(const id of ['render','light','color'])if($(id))$(id).disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);
-  const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();MOVIE=a.mp4||null;
-  $('framelab').textContent=(nframes?`${{nframes}} frames kept (every ${{j.keep_every||1}}): PLAY replays at any camera`:'')+(MOVIE?`; MOVIE plays ${{a.dir}}/movie.mp4`:'');}}}}catch(e){{setTimeout(rpoll,1500);}}}}
+  const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();
+  $('framelab').textContent=(nframes?`${{nframes}} frames: PLAY replays at any camera`:'')+(a.mp4?`  |  movie.mp4 in ${{a.dir}}`:'');}}}}catch(e){{setTimeout(rpoll,1500);}}}}
 let MOVIE=null, playing=null, nframes=0, FRAME=null;
 async function showFrame(i){{FRAME=i;$('frame').value=i;$('framelab').textContent=`frame ${{i}}/${{Math.max(nframes-1,0)}}`;await render();}}
-window.playGo=async function(){{showMovie(null);const j=await (await fetch('/api/scene/frames')).json();nframes=j.n||0;if(!nframes){{$('framelab').textContent='no frames yet: RUN first';return;}}$('frame').max=nframes-1;playing=true;let i=0;
+window.playGo=async function(){{const j=await (await fetch('/api/scene/frames')).json();nframes=j.n||0;
+ if(!nframes){{  // nothing in memory: play the movie the run wrote, if there is one
+  if(!MOVIE){{$('framelab').textContent='no frames and no movie yet: RUN first';return;}}
+  playing=null;showMovie(MOVIE);const v=$('movie');v.loop=true;v.play();$('framelab').textContent='playing movie.mp4';return;}}
+ showMovie(null);$('frame').max=nframes-1;playing=true;let i=0;
  while(playing){{await showFrame(i);i=(i+1)%nframes;await new Promise(r=>setTimeout(r,30));}}}};
-window.playStop=function(){{playing=null;const v=$('movie');if(v.style.display!=='none')v.pause();}};
-window.movieGo=function(){{if(!MOVIE){{$('framelab').textContent='no movie yet: RUN first';return;}}playing=null;showMovie(MOVIE);const v=$('movie');v.loop=true;v.play();}};
+window.playStop=function(){{playing=null;const v=$('movie');if(v.style.display!=='none'){{v.pause();showMovie(null);render(true);}}}};
+
 let cseen=0;
-window.claudeGo=async function(){{const t=$('task').value.trim();if(!t)return;$('claude').textContent='';cseen=0;const j=await post('/api/scene/claude',{{task:t,mode:TAB}});if(j.error){{$('cstat').textContent=j.error;return;}}$('cstat').textContent='running...';$('cbtn').disabled=true;}};
+window.claudeGo=async function(){{const t=$('task').value.trim();if(!t)return;$('claude').textContent='';cseen=0;const j=await post('/api/scene/claude',{{task:t,mode:TAB,form:form(),name:specName}});if(j.error){{$('cstat').textContent=j.error;return;}}$('cstat').textContent='running...';$('cbtn').disabled=true;}};
 window.claudeStop=async function(){{await post('/api/scene/claude',{{stop:true}});}};
 window.claudeNew=async function(){{await post('/api/scene/claude',{{new_session:true}});$('claude').textContent+='[new session]\n';}};
 async function cpoll(){{try{{const j=await (await fetch('/api/scene/claude?since='+cseen)).json();if(j.lines&&j.lines.length){{const el=$('claude');el.textContent+=j.lines.join('\n')+'\n';el.scrollTop=el.scrollHeight;cseen=j.n;}}

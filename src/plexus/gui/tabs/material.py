@@ -66,7 +66,7 @@ def _twenty_balls(seed: int = 1, radius: float = 0.03, world: float = 0.5):
     return out
 
 
-def _multimaterial_27(world: float = 0.5, side: float = 0.06):
+def _multimaterial_27(world: float = 0.5, side: float = 0.04):
     """The twin of MPM_pytorch's `config/multimaterial/multimaterial_1_3D.yaml`: 27 cubes on a
     3 x 3 x 3 lattice falling and bouncing in a box, one colour per cube, the points of each cube
     on a lattice (`fill: lattice`) so a cube reads as a solid. The reference is 35,937 points over 27 cubes in a unit box under g = 20; here the
@@ -100,7 +100,7 @@ DEFAULT_FORM = {
     # a random initial velocity per cube.
     "name": "si_multimaterial_27", "world": 0.5, "n_grid": 96, "n_frames": 800, "dt": 0.002,
     "gravity": 9.81, "particles": 1331, "radius": 0.03, "wall_damp": 0.9, "friction": 0.2,
-    "launch": 1.0, "movie_frames": 400, "stills": 10, "seed": 1, "render": "large_splats", "light": "default",
+    "launch": 1.0, "movie_frames": 400, "stills": 10, "seed": 1, "render": "middle_splats", "light": "default",
     "color": "particles", "bodies": _multimaterial_27(),
 }
 REFERENCE = os.path.join(REPO, "config", "si_material", "si_multimaterial_27.yaml")
@@ -177,7 +177,11 @@ def apply_color(plotting: dict, color: str = "particles") -> dict:
         raise ValueError(f"color must be one of {tuple(COLOR_MODES)}")
     out = {k: v for k, v in (plotting or {}).items() if k not in COLOR_KEYS}
     if COLOR_MODES[color]:
-        out.update(color_field=COLOR_MODES[color], field_cmap="turbo")
+        # BLUE - WHITE - RED for a mechanical field (`coolwarm`): the eye reads white as the
+        # resting value and the two ends as the two ways to leave it, which is what deformation
+        # and pressure are. Speed has no such middle, so it keeps a sequential map.
+        out.update(color_field=COLOR_MODES[color],
+                   field_cmap=("turbo" if color == "velocities" else "coolwarm"))
     return out
 
 
