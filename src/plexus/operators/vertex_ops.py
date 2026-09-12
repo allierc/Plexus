@@ -4626,7 +4626,7 @@ def apicobasal_geometry_3d(pos, sep, es, et, ef, nF, eocc=None):
 
 
 def _apicobasal_energy_core(pos, sep, es, et, ef, nF, V_eq, alive, k_v, kappa_s, Lam, K_R, R0,
-                            eocc, vocc, gamma=0.0, surface="apical"):
+                            eocc, vocc, gamma=0.0, surface="apical", kappa_h=0.0):
     """The monolayer's energy on the polyhedron: same functional, different geometry.
 
         U = sum_j [ 1/2 k_v (V_j - V_eq_j)^2 + kappa_s S_j + 1/2 gamma P_j^2 ]
@@ -4680,6 +4680,17 @@ def _apicobasal_energy_core(pos, sep, es, et, ef, nF, V_eq, alive, k_v, kappa_s,
         _w = vocc.to(ring.dtype).reshape(-1, 1)
         _c = (ring * _w).sum(dim=0, keepdim=True) / _w.sum().clamp(min=1.0)
         E = E + K_R * ((((ring - _c).norm(dim=1) - R0) ** 2) * vocc).sum()
+    # `kappa_h` -- A STIFFNESS ON THE THICKNESS FIELD (R3d of notes/size_cycle/SIZE_CYCLE_PLAN.md).
+    # Nothing above prefers a prism to a frustum: a cell that flares its apical cap and pinches its
+    # basal one keeps its volume and nearly its surface, so every T1 kick and every septum walked
+    # the caps apart and the mechanics never walked them back (half the cells trapezoids by frame
+    # 400 on every dividing arm, finding 15). This is the Dirichlet energy of `sep` along the
+    # ring edges, 1/2 kappa_h sum_e |sep_s - sep_t|^2: neighbouring thickness vectors want the
+    # same length and the same direction, which is a prism, while a slow variation across the
+    # shell -- its curvature -- costs almost nothing. kappa_h L^2 = F L, so kappa_h is a tension,
+    # like kappa_s. 0 (the default) is byte-identical to every run before it.
+    if kappa_h != 0.0:
+        E = E + 0.5 * kappa_h * (((sep[es] - sep[et]) ** 2).sum(dim=-1) * eocc).sum()
     return E
 
 
@@ -4982,6 +4993,7 @@ class ApicoBasalShapeEnergy3D(Lateral):
         self.at = params.get("_at", "vertex")
         self.sep_block = str(params.get("sep_block", "sep"))
         self.k_v = float(params.get("k_v", 4.0)); self.kappa_s = float(params.get("kappa_s", 0.2))
+        self.kappa_h = float(params.get("kappa_h", 0.0))       # thickness-field stiffness; see the energy core
         self.gamma = float(params.get("gamma", 0.0))
         self.Lambda = float(params.get("Lambda", 0.0)); self.K_R = float(params.get("K_R", 0.0))
         self.mu = float(params.get("mu", 1.0)); self.dt = float(params.get("dt", 1.0))
@@ -5023,7 +5035,7 @@ class ApicoBasalShapeEnergy3D(Lateral):
             s = s.detach().requires_grad_(want_sep)
             E = _apicobasal_energy_core(x, s, es, et, ef, nF, V_eq, alive, self.k_v, self.kappa_s,
                                         self.Lambda, self.K_R, R0t, eocc, vocc, self.gamma,
-                                        self.surface)
+                                        self.surface, kappa_h=self.kappa_h)
             if want_sep:
                 gx, gs = torch.autograd.grad(E, (x, s))
                 return torch.nan_to_num(gx), torch.nan_to_num(gs)
@@ -6095,6 +6107,11 @@ def try_apicobasal_grad(op, x, s, es, et, ef, nF, V_eq, alive, R0t, eocc, vocc):
     """(dE/dpos, dE/dsep) in warp, or None if this run is not one the kernels can serve -- the
     same contract as `try_shape_energy_grad`."""
     if apicobasal_warp_unavailable(x) is not None:
+        return None
+    if float(getattr(op, "kappa_h", 0.0)) != 0.0:
+        _warn_once("kappa_h", "[warn] cell_mechanics[apicobasal]: `kappa_h` is not ported to the "
+                              "warp kernels; this run uses autograd. A term dropped from a gradient "
+                              "is a different model, not a faster one.")
         return None
     if not hasattr(op, "_wbuf"):
         op._wbuf = {}
