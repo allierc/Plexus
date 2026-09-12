@@ -20,7 +20,7 @@ from plexus.gui import studio
 REPO = studio.REPO
 TEMPLATE = os.path.join(REPO, "config", "si_material", "si_ball_splash.yaml")
 MATERIALS = ("elastic", "liquid", "snow")
-DEFAULT_COLORS = [[0.95, 0.35, 0.30], [0.30, 0.62, 1.00], [0.45, 0.95, 0.55], [1.00, 0.85, 0.30],
+DEFAULT_COLORS = [[0.95, 0.25, 0.20], [0.30, 0.55, 1.00], [0.95, 0.95, 0.95], [1.00, 0.85, 0.30],
                   [0.85, 0.40, 0.95], [0.30, 0.90, 0.95]]
 
 
@@ -188,16 +188,16 @@ PAGE = r"""<!doctype html>
   <div id="picklist" style="max-height:55vh;overflow:auto;background:#0e0e12;border:1px solid #2a2a30;padding:4px;font-size:12px"></div>
  </div>
  <h2>Box</h2>
- <div class="row"><label>name</label><input id="name" value="bouncing_balls"></div>
- <div class="row"><label>box side (m)</label><input id="world" class="short" value="0.1"> <label style="width:60px">grid</label><input id="n_grid" class="short" value="96"></div>
+ <div class="row"><label>name</label><input id="name" value="three_balls"></div>
+ <div class="row"><label>box side (m)</label><input id="world" class="short" value="0.5"> <label style="width:60px">grid</label><input id="n_grid" class="short" value="96"></div>
  <div class="row"><label>frames</label><input id="n_frames" class="short" value="800"> <label style="width:60px">dt (s)</label><input id="dt" class="short" value="0.00083"></div>
- <div class="row"><label>gravity</label><input id="gravity" class="short" value="9.81"> <label style="width:60px">particles</label><input id="particles" class="short" value="10000" title="material points per body"></div>
+ <div class="row"><label>gravity</label><input id="gravity" class="short" value="9.81"> <label style="width:60px">particles</label><input id="particles" class="short" value="100000" title="material points per body"></div>
  <div class="row"><label>bounce</label><input id="bounce" class="short" value="0.9" title="wall restitution: 1 = elastic wall, 0 = dead"> <span style="color:#778;font-size:11px">wall restitution, per impact</span></div>
  <h2>Bodies <button class="dim" onclick="addBody()">+ body</button></h2>
  <table class="sp" id="bodies"><tr><th>name</th><th>shape</th><th>centre x y z | block x0 y0 z0 x1 y1 z1</th><th>radius</th><th>material</th><th>stiffness</th><th>density</th><th></th></tr></table>
  <div style="color:#778;font-size:11px">a ball is placed at its centre with the radius; a block spans its six numbers (metres). stiffness = Young's modulus (elastic, snow) or bulk modulus (liquid), Pa.</div>
  <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button><button class="dim" onclick="reseed()">RE-SEED</button></div>
- <div id="status">form a scene, then BUILD</div>
+ <div id="status">building the default scene...</div>
  <h2>Run the engine</h2>
  <div class="row"><label>frames</label><input id="run_frames" class="short" value="800"> <label style="width:60px">device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
  <div class="row"><label title="how many times the picture is refreshed while the run goes">live pics</label><input id="run_live" class="short" value="10"> <label style="width:70px" title="frames kept for PLAY: every frame up to this many, then every 2nd, 4th... (the movie's rule)">movie frames</label><input id="run_keep" class="short" value="400"></div>
@@ -219,8 +219,8 @@ const $=id=>document.getElementById(id);
 let SCENE=null, specName=null;
 const CAM={azim:30,elev:20,zoom:1};
 function status(t,err){const s=$('status');s.textContent=t;s.className=err?'err':'';}
-window.addBody=function(b){b=b||{};const tb=$('bodies');const tr=tb.insertRow(-1);const geo=b.shape==='block'?(b.block||[0,0,0,0.1,0.025,0.1]).join(' '):(b.centre||[0.05,0.075,0.05]).join(' ');
- tr.innerHTML=`<td><input value="${b.name||''}"></td><td><select><option>ball</option><option>block</option></select></td><td><input value="${geo}"></td><td><input value="${b.radius??0.01}"></td><td><select><option>elastic</option><option>liquid</option><option>snow</option></select></td><td><input value="${b.youngs??2250000}"></td><td><input value="${b.density??1000}"></td><td><button class="dim" onclick="this.closest('tr').remove()">x</button></td>`;
+window.addBody=function(b){b=b||{};const tb=$('bodies');const tr=tb.insertRow(-1);const geo=b.shape==='block'?(b.block||[0,0,0,0.5,0.125,0.5]).join(' '):(b.centre||[0.25,0.375,0.25]).join(' ');
+ tr.innerHTML=`<td><input value="${b.name||''}"></td><td><select><option>ball</option><option>block</option></select></td><td><input value="${geo}"></td><td><input value="${b.radius??0.05}"></td><td><select><option>elastic</option><option>liquid</option><option>snow</option></select></td><td><input value="${b.youngs??2250000}"></td><td><input value="${b.density??1000}"></td><td><button class="dim" onclick="this.closest('tr').remove()">x</button></td>`;
  tr.cells[1].firstChild.value=b.shape||'ball';tr.cells[4].firstChild.value=b.material||'elastic';};
 function bodies(){const out=[];for(const tr of $('bodies').rows){if(!tr.cells[0].querySelector('input'))continue;const c=tr.cells;const name=c[0].firstChild.value.trim();if(!name)continue;
  const nums=c[2].firstChild.value.trim().split(/[\s,]+/).map(Number);const shape=c[1].firstChild.value;const mat=c[4].firstChild.value;
@@ -239,7 +239,7 @@ window.pickOpen=async function(path){$('picker').style.display='block';const j=a
  $('picklist').innerHTML=h||'(empty)';};
 window.openSpec=async function(pth){$('picker').style.display='none';status('opening '+pth+' ...');const j=await (await fetch('/api/bio/open?path='+encodeURIComponent(pth))).json();if(j.error){status(j.error,true);return;}$('openlab').textContent=pth;status('opened '+j.name+' -- seeding...');};
 async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
-window.build=async function(){status('building the spec...');const j=await post('/api/material/build',form());if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}specName=j.name;$('yamltext').value=j.raw;status(`spec saved: config/studio/${j.name}.yaml -- seeding and rendering...`);await reseed();};
+window.build=async function(){status('building the spec...');const j=await post('/api/material/build',form());if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}specName=j.name;if(j.version!==undefined)seen.version=j.version;$('yamltext').value=j.raw;status(`spec saved: config/studio/${j.name}.yaml -- seeding and rendering...`);await reseed();};
 window.reseed=async function(){playStop();FRAME=null;if(!specName){status('no spec yet',true);return;}status('seeding and building the renderer...');const r=await fetch('/api/bio/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){status(j.error,true);return;}SCENE=j;tree(j);status(`seeded in ${j.seconds}s: `+Object.entries(j.sets).map(([k,v])=>`${k} ${v.n_live}`).join(', '));render(true);};
 window.toggleYaml=function(){const y=$('yaml');y.style.display=y.style.display==='none'?'block':'none';};
 window.saveYaml=async function(){const j=await post('/api/bio/save',{name:specName,raw:$('yamltext').value});if(j.error){status(j.error+(j.detail?'\n'+j.detail:''),true);return;}status('saved; seeding...');await reseed();};
@@ -260,7 +260,7 @@ function tree(j){const h=j.hierarchy;let out='';for(const n of h.sets){const cnt
  out+=`<div style="color:#778;margin-top:4px">schedule: ${h.schedule.map(x=>typeof x==='string'?x:'{substeps: '+(x.steps||[]).join(' > ')+'}').join(' > ')}</div>`;$('tree').innerHTML=out;}
 window.setInfo=function(name){const s=SCENE.sets[name];const n=SCENE.hierarchy.sets.find(x=>x.name===name);
  $('info').textContent=`set ${name}\n  entity: ${n.entity||'(by name)'}\n  buffer ${s.n_buffer}, live ${s.n_live}\n  blocks: ${s.blocks.join(', ')}\n`+(n.parent?`  contained in: ${n.parent} (${n.per_parent??'?'} per parent)\n`:'')+(n.types.length?`  bodies: ${n.types.join(', ')}\n`:'')+`  operators on it: ${SCENE.hierarchy.operators.filter(o=>o.at===name).map(o=>o.op).join(', ')||'-'}`;};
-addBody({name:'red',shape:'ball',centre:[0.03,0.062,0.05],radius:0.012,material:'elastic',youngs:20000,density:1000});addBody({name:'blue',shape:'ball',centre:[0.05,0.074,0.05],radius:0.012,material:'elastic',youngs:20000,density:1000});addBody({name:'green',shape:'ball',centre:[0.07,0.058,0.05],radius:0.012,material:'elastic',youngs:20000,density:1000});
+addBody({name:'red',shape:'ball',centre:[0.15,0.31,0.25],radius:0.05,material:'elastic',youngs:2000000,density:1000});addBody({name:'blue',shape:'ball',centre:[0.25,0.37,0.25],radius:0.05,material:'liquid',youngs:981000,density:1000});addBody({name:'white',shape:'ball',centre:[0.35,0.29,0.25],radius:0.05,material:'snow',youngs:500000,density:350});
 let running=false, playing=null, nframes=0;
 // REPLAY: every frame the run drew was kept as an image on the server; PLAY steps through them.
 // REPLAY AT ANY CAMERA: a kept frame is the levels' state, re-drawn by the renderer at the
@@ -290,6 +290,9 @@ async function cpoll(){try{const j=await (await fetch('/api/bio/claude?since='+c
  $('cstat').textContent=j.running?'running... '+j.seconds+'s':(j.error?'error: '+j.error.slice(0,200):(j.n?'done in '+j.seconds+'s':''));$('cbtn').disabled=!!j.running;$('cbtn').classList.toggle('on',!!j.running);}catch(e){}finally{setTimeout(cpoll,1200);}}
 cpoll();
 const q=new URLSearchParams(location.search);if(q.get('name')){specName=q.get('name');fetch('/api/material/spec?name='+encodeURIComponent(specName)).then(r=>r.json()).then(j=>{if(j.raw){$('yamltext').value=j.raw;}if(j.form)fillForm(j.form);reseed();});}
+// THE SCENE IS THERE WHEN THE PAGE OPENS: a fresh server has no spec, so the default form is built and
+// seeded at once; a server that already holds one is picked up by poll() instead.
+else{fetch('/api/bio/state').then(r=>r.json()).then(st=>{if(!st.name)build();}).catch(()=>{});}
 </script></body></html>
 """
 
