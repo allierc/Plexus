@@ -552,3 +552,38 @@ healthy/HCM difference has two parts: **per cell**, a 1.7× larger active shorte
 transverse thickening (so the HCM cell loses area where the healthy one conserves it); **for the
 sheet**, a slower relaxation at an unchanged rate of contraction. The earlier summary line "the
 same excitation, different mechanics" was wrong on the first half and is withdrawn.
+
+## Two findings and a change of protocol (2026-09-11, late)
+
+**1. The excitation difference is NOT identifiable.** Cedric's test: freeze the HCM fit's shared
+clock at the HEALTHY sheet's fitted values and refit everything else. Against the control (the same
+fit with HCM's own clock frozen):
+
+| HCM fit, clock frozen at | held-out R²(A) | R²(u) | per-cell plateau scale, median |
+|---|---|---|---|
+| its own clock (plateau 20.4 frames) | 0.881–0.883 | 0.938–0.956 | ×0.78 → 15.9 frames |
+| the **healthy** clock (plateau 13.2) | 0.879–0.882 | 0.921–0.945 | ×1.15 → 15.2 frames |
+
+The two fits are equivalent (ΔR²(A) 0.002), and the per-cell plateau scaling moves to compensate
+almost exactly: the data determines the PRODUCT of the shared plateau and the per-cell scale, not
+either factor. So "the HCM sheet is driven by a longer excitation" is **not a claim this data can
+support**; what is observed, model-free, is that the tissue relaxes 20% more slowly (peak → 10% in
+0.81 s against 0.67 s). Where that slowness lives — in the excitation or in the cells' release — is
+undetermined. `fit.py --init-from <params.npz>` runs this test for any pair.
+
+**2. The movies were three rollouts stitched together.** Each beat started from its own rest, so the
+model was silently re-initialised twice. `recording.continuous_window` + `model.Params.segments`
+give ONE rollout over beats 1–3 with the fitted clock firing once per beat; the model is never
+reset. It holds: R²(A) **0.844** over the three beats continuous, against 0.87 per beat with a
+reset — the drift across two beat boundaries costs 0.03. `out/movies/` now holds exactly two files,
+`cont_cells.mp4` and `cont_overlay_particles.mp4`, both 8 s, both continuous.
+(`shortening` also had to be rewritten in closed form: cuSOLVER's batched eigenvalue path fails
+above ~70k matrices, and a three-beat window is 158 × 472 of them.)
+
+**3. This is a fit, not a learning task (Cedric).** The held-out split was inherited from the
+discovery loop's culture; for parameter estimation every beat is data. `fit.py --beats 1,2,3` now
+fits all beats at once — one rollout per beat from its own rest, gradients accumulated before the
+step, so memory stays at one rollout and cost scales with the number of beats. Running:
+`healthy_allbeats` (beats 1–3, 24 s/iteration) and `hcm_allbeats` (beats 1–4, 32 s/iteration).
+The per-beat R² of such a fit is a consistency check, not a generalisation claim, and the honest
+generalisation statement is the continuous rollout above.

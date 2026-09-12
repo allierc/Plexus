@@ -74,6 +74,11 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--target", default="planted", choices=["planted", "recording"])
     ap.add_argument("--beat", type=int, default=3)
+    ap.add_argument("--beats", default="",
+                    help="fit SEVERAL beats at once, e.g. 1,2,3 -- this is a fit, not a learning task, so "
+                         "every beat of the recording is data. Each beat is its own rollout from its own "
+                         "rest; their gradients are accumulated before the step, so the memory is one "
+                         "rollout's and the cost is one per beat. Overrides --beat")
     ap.add_argument("--per-parent", type=int, default=50)
     ap.add_argument("--n-grid", type=int, default=128)
     ap.add_argument("--anchor", type=float, default=1e4)
@@ -116,6 +121,11 @@ def main():
     ap.add_argument("--mask-band", action="store_true",
                     help="leave cells with any particle in the prescribed band out of the loss")
     ap.add_argument("--specimen", default="healthy", choices=["healthy", "hcm"])
+    ap.add_argument("--init-from", default="",
+                    help="a params.npz whose SHARED excitation clock (the 4 numbers t0, rise, plateau, decay) "
+                         "is copied in. With a --free list that omits `clock` this FREEZES one sheet's "
+                         "excitation on another sheet's data: if the fit is as good, the two cannot be told "
+                         "apart by the motion, and the excitation difference is not a claim")
     ap.add_argument("--init-truth", default="", help="planted only: families started AT the truth "
                     "(diagnostic: isolates the identifiability of the free ones)")
     ap.add_argument("--tag", default="")
@@ -134,11 +144,19 @@ def main():
     rec = R.load(device=dev, specimen=args.specimen)
     C = rec["n_cells"]
     LTIF = os.path.join(HERE, "data_hcm" if rec.get("specimen") == "hcm" else "data", "cells_2560.tif")
-    win = R.beat_window(rec, args.beat)
-    T = len(win["frames"])
-    A_rec, u_rec = R.window_affine(rec, win)
+    beats = [int(b) for b in args.beats.split(",")] if args.beats else [args.beat]
+    wins = [R.beat_window(rec, b) for b in beats]
+    win = wins[0]
+    T = max(len(w["frames"]) for w in wins)
+    refs = []                                        # (A_rec, u_rec) per beat, its own rest
+    for w in wins:
+        A_w, u_w = R.window_affine(rec, w)
+        if args.fit_frames > 0:
+            A_w, u_w = A_w[:args.fit_frames], u_w[:args.fit_frames]
+        refs.append((A_w, u_w))
+    A_rec, u_rec = refs[0]
     if args.fit_frames > 0:
-        T = min(T, args.fit_frames); A_rec, u_rec = A_rec[:T], u_rec[:T]
+        T = min(T, args.fit_frames)
     kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_percell=args.anchor_percell,
               youngs=args.youngs, anchor_k=args.anchor, drag_k=args.drag)
 
@@ -150,7 +168,8 @@ def main():
     X0, cid = r0["X0"], r0["cid"]
     band = ((X0[:, 0] < M.DOM_LO + args.band) | (X0[:, 0] > M.DOM_HI - args.band)
             | (X0[:, 1] < M.DOM_LO + args.band) | (X0[:, 1] > M.DOM_HI - args.band))
-    prescribe = (band, M.band_prescription(A_rec, u_rec, X0, cid, band))
+    prescribes = [(band, M.band_prescription(A_w, u_w, X0, cid, band)) for A_w, u_w in refs]
+    prescribe = prescribes[0]
     interior = M.interior_cells(cid, band, C) if args.mask_band else None
     n_int = int(interior.sum()) if interior is not None else C
 
@@ -195,6 +214,12 @@ def main():
             gen0 = torch.Generator().manual_seed(args.seed)
             P.psi.copy_(0.02 * torch.randn(P.psi.shape, generator=gen0).to(dev).cumsum(1)); P.psi[:, 0] = 0
             P.amode.copy_(0.1 * torch.randn(P.amode.shape, generator=gen0).to(dev))
+    if args.init_from:
+        with torch.no_grad():
+            P.clock.copy_(torch.as_tensor(np.load(args.init_from)["clock"], device=dev))
+        print(f"  excitation clock taken from {args.init_from}: t0 {float(P.clock[0]):.2f} fr, rise "
+              f"{float(P.clock[1].exp()):.2f}, plateau {float(P.clock[2].exp()):.2f}, decay "
+              f"{float(P.clock[3].exp()):.2f} fr" + ("" if "clock" in free else "  [FROZEN]"), flush=True)
     if truth is not None and args.init_truth:
         with torch.no_grad():
             for k in args.init_truth.split(","):
@@ -202,7 +227,11 @@ def main():
     eye = torch.eye(2, device=dev)
     w_A = 1.0 / ((A_t - eye) ** 2).mean()
     w_u = args.u_weight / (u_t ** 2).mean()
-    sim = M.load_sim(M.build_spec(label_tif=LTIF, differentiable=True, name="fit", **kw))
+    # one spec per beat: the windows differ in length (a beat is 49-57 frames), so each rollout
+    # declares its own `n_frames`; they share every other setting and the same seeded layout
+    sims = [M.load_sim(M.build_spec(label_tif=LTIF, differentiable=True, name="fit",
+                                    **dict(kw, n_frames=A_w.shape[0] - 1))) for A_w, _ in refs]
+    sim = sims[0]
     groups = [dict(params=[getattr(P, k)], lr=lrs[k]) for k in free]
     opt = torch.optim.Adam(groups)
     # cosine from 1x to 0.05x of each group's own rate
@@ -223,20 +252,35 @@ def main():
     for it in range(args.iters):
         t0 = time.time()
         opt.zero_grad()
-        out = M.rollout(sim, P, dev, C, grad=True, prescribe=prescribe)
-        loss = M.affine_loss(out["A"], out["u"], A_t, u_t, w_u=w_u, w_A=w_A, cells=interior)
-        if args.clock_mode == "free":
-            loss = loss + args.clock_smooth * P.smoothness()
-        if args.E_shrink > 0:
-            loss = loss + args.E_shrink * (P.logE - P.logE.mean()).pow(2).mean()
-        if args.n_modes > 0:
-            loss = loss + args.mode_shrink * P.mode_penalty()
-        if args.anchor_percell:
-            loss = loss + args.kappa_shrink * P.logkappa.pow(2).mean()
-        if args.cell_clock_shrink > 0:
-            loss = loss + args.cell_clock_shrink * P.cell_clock_penalty()
-        if args.delay_shrink > 0:
-            loss = loss + args.delay_shrink * P.delay.pow(2).mean()
+        # ONE ROLLOUT PER BEAT, gradients accumulated. Every beat of the recording is data -- this is
+        # a fit, not a learning task with a held-out set -- and each beat starts from its own rest,
+        # so they are separate rollouts whose graphs are freed one at a time: the memory is a single
+        # beat's, the cost is one beat's per beat.
+        loss_v = 0.0
+        for bi, (sim_b, pres_b) in enumerate(zip(sims, prescribes)):
+            A_b, u_b = (A_t, u_t) if args.target == "planted" else refs[bi]
+            P.shift = -float((wins[bi]["onset"] - wins[bi]["span"][0]) - R.PRE)
+            out = M.rollout(sim_b, P, dev, C, grad=True, prescribe=pres_b)
+            loss_b = M.affine_loss(out["A"], out["u"], A_b, u_b, w_u=w_u, w_A=w_A,
+                                   cells=interior) / len(sims)
+            if bi == len(sims) - 1:            # the priors once, carried on the last beat's graph
+                if args.clock_mode == "free":
+                    loss_b = loss_b + args.clock_smooth * P.smoothness()
+                if args.E_shrink > 0:
+                    loss_b = loss_b + args.E_shrink * (P.logE - P.logE.mean()).pow(2).mean()
+                if args.n_modes > 0:
+                    loss_b = loss_b + args.mode_shrink * P.mode_penalty()
+                if args.anchor_percell:
+                    loss_b = loss_b + args.kappa_shrink * P.logkappa.pow(2).mean()
+                if args.cell_clock_shrink > 0:
+                    loss_b = loss_b + args.cell_clock_shrink * P.cell_clock_penalty()
+                if args.delay_shrink > 0:
+                    loss_b = loss_b + args.delay_shrink * P.delay.pow(2).mean()
+            if torch.isfinite(loss_b):
+                loss_b.backward()
+            loss_v += float(loss_b)
+        P.shift = 0.0
+        loss = torch.as_tensor(loss_v, device=dev)
         if not torch.isfinite(loss):
             # a diverged rollout (measured once: lambda 0.03, iteration 90, loss 0.67 -> 2.8 -> nan):
             # restore the last finite parameters, halve every learning rate, and go on
@@ -249,7 +293,6 @@ def main():
                   flush=True)
             sched.step()
             continue
-        loss.backward()
         opt.step()
         sched.step()
         with torch.no_grad():
