@@ -79,6 +79,10 @@ Prose and reasons are in `AB_TISSUE_README.md`.
 | spec | frames | cells | shape | mechanics | sep | operators |
 |---|---|---|---|---|---|---|
 | `b_star` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_grow, cell_mechanics, interface_tension, cell_divide, edge_flip |
+| `ms1_pinned_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `ms2_unpinned_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `ms3_prism_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `ms4_round_prism_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
 | `r010_00_ctrl` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_shape_probe, cell_grow, cell_mechanics, interface_tension, edge_flip, cell_divide |
 | `r020_00_ctrl` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_shape_probe, cell_grow, cell_mechanics, interface_tension, edge_flip, cell_divide |
 | `sheet_die` | 400 | 400 | disc | default | -- | cell_mechanics, cell_die, edge_flip |
