@@ -58,6 +58,22 @@ sets:
         width: 1
       parent_id:
         width: 1
+      phase:
+        width: 1
+      cycle_progress:
+        width: 1
+      cyc_rate:
+        width: 1
+        record: false
+      phase_t:
+        width: 1
+        record: false
+      cyc_inhib:
+        width: 1
+        record: false
+      cyc_vprev:
+        width: 1
+        record: false
   vertex:
     n: 25584
     mesh: half_edge
@@ -112,16 +128,25 @@ operators:
   engine_clock: true
   l_th_frac: 0.35
   max_flips: 30
+- op: cell_cycle
+  at: vertex
+  t_g1: 400.0
+  t_s: 0.0
+  t_g2: 0.0
+  t_m: 0.0
+  phase_cv: 0.15
+  seed: 0
+  seed_async: false
+  model: adder
+  g1_delta: 1.0
 - op: cell_divide
   at: vertex
   every: 4
   engine_clock: true
-  cycle_cv: 0.15
   min_cycle: 4
   max_cycle: 1000000000
   p0: 3.5
-  model: adder
-  delta: 1.0
+  model: cycle
 - op: topo_record
   at: vertex
   every: 1
@@ -130,6 +155,7 @@ schedule:
 - cell_grow
 - cell_mechanics
 - edge_flip
+- cell_cycle
 - cell_divide
 - topo_record
 seed:
@@ -183,15 +209,3 @@ plotting:
     ticks: 4
   scale_bar_corner: right_face
   scale_bar_lift: -0.07
-descriptions:
-  movie:
-    description: A spherical cluster of cells grows and expands within a large cubic domain over time.
-      As the simulation progresses, the number of individual cells within the sphere increases significantly.
-      The total volume of the cell cluster fluctuates, reaching a peak and then slightly decreasing as
-      the structure becomes more complex. Small red and blue markers appear and multiply on the surface
-      of the sphere as it matures.
-    objects: The primary object is a spherical cluster composed of many small, interconnected polygonal
-      cells. These cells are primarily white with grey outlines, forming a dense, porous network. Small
-      red and blue markers are distributed across the surface of the sphere, representing specific data
-      points or agents. The entire structure is contained within a large, transparent 500 $\mu$m cube,
-      with a 100 $\mu$m scale bar provided for reference.
