@@ -457,6 +457,7 @@ class LiveMovie:
         pxw = max(16, int(px * _asp) // 16 * 16)
         self.aspect = pxw / float(px)
         self.p = pv.Plotter(off_screen=True, window_size=(pxw, px), border=False)
+        self._set_lights()
         # `surface_env: true` -- IMAGE-BASED LIGHTING, so a reflective surface has something to
         # reflect. A PBR material with `metallic`/`roughness` and no environment map reads as dark
         # plastic with a few white flecks: there is nothing in the scene for it to pick up except
@@ -1711,6 +1712,39 @@ class LiveMovie:
         tex.SetMipmap(True); tex.SetInterpolate(True)
         return tex
 
+    def _set_lights(self):
+        """`plotting.light` -- which lights the scene has, when the spec says (`surface_env` brings
+        its own four-light rig and wins):
+
+            default    VTK's light kit (a key, a fill, a back light, all following the camera)
+            headlight  one light at the camera; every face towards the viewer is lit the same
+            sun        one directional light from `dot_light` (default upper left), hard shadows
+            studio     key + fill + rim from fixed directions, the photographic three-point rig
+            flat       no light at all: ambient only, every colour as declared
+        """
+        mode = str((self.style or {}).get("light", "") or "").lower()
+        if not mode or mode == "default" or bool((self.style or {}).get("surface_env", False)):
+            return
+        import pyvista as pv
+        self.p.remove_all_lights()
+        if mode == "flat":
+            return
+        if mode == "headlight":
+            self.p.add_light(pv.Light(light_type="headlight", intensity=1.0))
+        elif mode == "sun":
+            d = np.asarray((self.style or {}).get("dot_light", [-0.45, 0.8, 0.4]), np.float64)
+            self.p.add_light(pv.Light(position=tuple(d * 10.0), focal_point=(0, 0, 0), light_type="scene light",
+                                      intensity=1.1, positional=False))
+        elif mode == "studio":
+            for pos, inten in (((-1.0, 1.2, 1.0), 1.0), ((1.2, 0.3, 0.8), 0.45), ((0.2, 0.8, -1.2), 0.6)):
+                self.p.add_light(pv.Light(position=tuple(np.asarray(pos) * 10.0), focal_point=(0, 0, 0),
+                                          light_type="scene light", intensity=inten, positional=False))
+        else:
+            print(f"[live-movie] plotting.light: {mode!r} is not one of default, headlight, sun, studio, flat",
+                  flush=True)
+            return
+        print(f"[live-movie] light: {mode}", flush=True)
+
     def _contour_settings(self):
         """morph.py's dielectric, with the spec allowed to override the few knobs that are a look.
 
@@ -1879,6 +1913,16 @@ class LiveMovie:
     def _contour_draw(self, surf, name="contour", color=None):
         """Replace the contour actor -- same name, so pyvista swaps rather than stacks."""
         s = self._contour_s
+        # `surface_pbr: false` -- A MATTE SURFACE: plain Lambert shading, no specular, no coat, no
+        # index of refraction. The dielectric below always keeps a highlight however rough it is
+        # set (the coat is a second, sharp layer), so "flat" needs the plain material.
+        if (self.style or {}).get("surface_pbr", True) is False:
+            # diffuse 0.55 + ambient 0.2 under VTK's three-light kit: at diffuse 1 the pastel
+            # colours of a tab20 palette blew out to white.
+            self.p.add_mesh(surf, name=name, color=(color or s["color"]), pbr=False, specular=0.0,
+                            diffuse=0.55, ambient=0.2, opacity=s["opacity"], smooth_shading=True,
+                            show_scalar_bar=False)
+            return
         act = self.p.add_mesh(surf, name=name, color=(color or s["color"]), pbr=True,
                               metallic=s["metallic"], roughness=s["roughness"],
                               opacity=s["opacity"], diffuse=s["diffuse"], ambient=s["ambient"],

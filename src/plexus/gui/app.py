@@ -96,7 +96,8 @@ window.pickOpen=async function(path){{$('picker').style.display='block';const j=
 window.openSpec=async function(pth){{$('picker').style.display='none';status('opening '+pth+' ...');const j=await (await fetch('/api/scene/open?path='+encodeURIComponent(pth))).json();if(j.error){{status(j.error,true);return;}}$('openlab').textContent=pth;status('opened '+j.name+' -- seeding...');}};
 async function post(url,body){{const r=await fetch(url,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}});return r.json();}}
 window.build=async function(){{status('building the spec...');const j=await post('/api/tab/'+TAB+'/build',form());if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}specName=j.name;if(j.version!==undefined)seen.version=j.version;$('yamltext').value=j.raw;status(`spec saved: config/studio/${{j.name}}.yaml -- seeding...`);await reseed();}};
-window.reseed=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{status('no spec yet',true);return;}}status('seeding and building the renderer...');const r=await fetch('/api/scene/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){{status(j.error,true);return;}}SCENE=j;tree(j);status(`seeded in ${{j.seconds}}s: `+Object.entries(j.sets).map(([k,v])=>`${{k}} ${{v.n_live}}`).join(', '));render(true);}};
+window.reseed=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{status('no spec yet',true);return;}}status('seeding and building the renderer...');const r=await fetch('/api/scene/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){{status(j.error,true);return;}}SCENE=j;tree(j);status(`seeded in ${{j.seconds}}s: `+Object.entries(j.sets).map(([k,v])=>`${{k}} ${{v.n_live}}`).join(', '));render(true);
+ try{{const f=await (await fetch('/api/scene/frames')).json();nframes=f.n||0;$('frame').max=Math.max(nframes-1,0);if(nframes)$('framelab').textContent=`${{nframes}} frames of the last run kept: PLAY replays them with this render`;}}catch(e){{}}}};
 window.toggleYaml=function(){{const y=$('yaml');y.style.display=y.style.display==='none'?'block':'none';}};
 window.saveYaml=async function(){{const j=await post('/api/scene/save',{{name:specName,raw:$('yamltext').value,tab:TAB}});if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();}};
 // THE PICTURE IS THE MOVIE RENDERER'S. Every camera change asks the server for a fresh screenshot;
@@ -111,7 +112,7 @@ window.addEventListener('mouseup',async e=>{{if(!drag)return;const moved=drag.mo
  const j=await (await fetch(`/api/scene/pick?x=${{fx.toFixed(4)}}&y=${{fy.toFixed(4)}}`)).json();if(j.pick){{showInfo(j.info);render();}}else{{$('info').textContent='nothing under the click';}}}});
 im.addEventListener('wheel',e=>{{e.preventDefault();CAM.zoom=Math.max(0.05,Math.min(60,CAM.zoom*(e.deltaY>0?1/1.08:1.08)));render();}},{{passive:false}});
 function showInfo(i){{if(!i){{$('info').textContent='(no object)';return;}}let t='';
- if(i.kind==='cell'){{t+=`cell #${{i.cell}}\n`;for(const [b,v] of Object.entries(i.blocks||{{}}))t+=`  ${{b}}: ${{JSON.stringify(v)}}\n`;for(const [s,per] of Object.entries(i.contains||{{}}))t+=`  contains ${{s}}: ${{Object.entries(per).map(([a,b])=>b+' '+a).join(', ')}}\n`;if(i.vertices)t+=`  vertices: ${{i.vertices.length}}`;}}
+ if(i.kind==='cell'){{t+=`${{i.species?i.species+' ':''}}body #${{i.cell}}\n`+(i.position?`  centre: ${{i.position.map(v=>v.toFixed?v.toFixed(4):v).join(', ')}}\n`:'');for(const [b,v] of Object.entries(i.blocks||{{}}))t+=`  ${{b}}: ${{JSON.stringify(v)}}\n`;for(const [s,per] of Object.entries(i.contains||{{}}))t+=`  contains ${{s}}: ${{Object.entries(per).map(([a,b])=>b+' '+a).join(', ')}}\n`;if(i.vertices)t+=`  vertices: ${{i.vertices.length}}`;}}
  else if(i.kind==='vertex'){{t+=`vertex #${{i.vertex}}\n  position: ${{i.position.join(', ')}}\n  shared by cells: ${{(i.shared_by_cells||[]).join(', ')}}`;}}
  else{{t+=`${{i.species||i.set}} #${{i.index}} (set ${{i.set}})\n  position: ${{(i.position||[]).map(v=>v.toFixed?v.toFixed(4):v).join(', ')}}\n`+(i.parent_cell!==undefined?`  parent: #${{i.parent_cell}}\n`:'');if(i.cell){{const c=i.cell;for(const [s,per] of Object.entries(c.contains||{{}}))t+=`  the parent contains ${{s}}: ${{Object.entries(per).map(([a,b])=>b+' '+a).join(', ')}}\n`;}}}}
  $('info').textContent=t;}}
@@ -131,7 +132,7 @@ async function poll(){{try{{const st=await (await fetch('/api/scene/state')).jso
  if(st.message)$('rstat').textContent=st.message;}}catch(e){{}}finally{{setTimeout(poll,1500);}}}}
 poll();
 let running=false;
-window.runGo=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{$('runstat').textContent='build a scene first';return;}}const j=await post('/api/scene/run',{{device:$('run_device').value}});if(j.error){{$('runstat').textContent=j.error;return;}}running=true;$('runbtn').disabled=true;$('runstat').textContent=`generate ${{specName}} on ${{j.device}}...`;MOVIE=null;rpoll();}};
+window.runGo=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{$('runstat').textContent='build a scene first';return;}}const j=await post('/api/scene/run',{{device:$('run_device').value}});if(j.error){{$('runstat').textContent=j.error;return;}}running=true;$('runbtn').disabled=true;for(const id of ['render','light'])if($(id))$(id).disabled=true;$('runstat').textContent=`generate ${{specName}} on ${{j.device}}...`;MOVIE=null;rpoll();}};
 window.runStop=async function(){{await post('/api/scene/run',{{stop:true}});}};
 // THE RUN IS plexus.pipeline.generate -- the body of Plexus_Main.py -o generate -- on the server's
 // VTK thread; its per-frame hook feeds this page's renderer and answers camera moves between
@@ -141,7 +142,7 @@ function showMovie(url){{const v=$('movie');if(url){{v.src=url;v.style.display='
 async function rpoll(){{try{{const j=await (await fetch('/api/scene/run')).json();if(j.error&&!j.running){{$('runstat').textContent='error: '+j.error;}}
  else $('runstat').textContent=(j.running?'running: ':(j.stopped?'stopped: ':'done: '))+`frame ${{j.frame}}/${{j.n_frames}}, ${{j.seconds}}s`+(j.ms_per_frame?` (${{j.ms_per_frame.toFixed(0)}} ms/frame, the engine's own clock)`:(j.frame&&j.seconds?` (${{(j.seconds/j.frame*1000).toFixed(0)}} ms/frame incl. the movie)`:''));
  if(j.counts&&j.counts.sets)$('runcounts').textContent=Object.entries(j.counts.sets).filter(([k])=>k!=='half_edge').map(([k,v])=>`${{k}} ${{v}}`).join('  ');
- render();if(j.running){{setTimeout(rpoll,700);}}else{{running=false;$('runbtn').disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);
+ render();if(j.running){{setTimeout(rpoll,700);}}else{{running=false;$('runbtn').disabled=false;for(const id of ['render','light'])if($(id))$(id).disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);
   const a=await (await fetch('/api/scene/artefacts?name='+encodeURIComponent(specName))).json();MOVIE=a.mp4||null;
   $('framelab').textContent=(nframes?`${{nframes}} frames kept (every ${{j.keep_every||1}}): PLAY replays at any camera`:'')+(MOVIE?`; MOVIE plays ${{a.dir}}/movie.mp4`:'');}}}}catch(e){{setTimeout(rpoll,1500);}}}}
 let MOVIE=null, playing=null, nframes=0, FRAME=null;

@@ -69,7 +69,7 @@ def _twenty_balls(seed: int = 1, radius: float = 0.03, world: float = 0.5):
 DEFAULT_FORM = {
     "name": "si_twenty_balls", "world": 0.5, "n_grid": 96, "n_frames": 800, "dt": 0.0008333333333333334,
     "gravity": 9.81, "particles": 500, "radius": 0.03, "wall_damp": 0.5, "friction": 0.4,
-    "launch": 0.4, "movie_frames": 400, "stills": 10, "seed": 1, "render": "small_dots",
+    "launch": 0.4, "movie_frames": 400, "stills": 10, "seed": 1, "render": "small_dots", "light": "default",
     "bodies": _twenty_balls(),
 }
 
@@ -80,20 +80,29 @@ DEFAULT_FORM = {
 # the white sky at half opacity.
 RENDER_KEYS = ("render_3d", "dot_size", "dot_shading", "dot_specular", "dot_specular_power", "contour_by_type",
                "surface_env", "surface_env_color", "surface_opacity", "surface_roughness", "surface_metallic",
-               "shadows")
+               "surface_pbr", "shadows", "light")
 RENDER_MODES = ("small_dots", "middle_dots", "large_dots", "surface", "surface_specular", "glassy")
+LIGHT_MODES = ("default", "headlight", "sun", "studio", "flat")
 DOT_PX = {"small_dots": 1.0, "middle_dots": 2.0, "large_dots": 4.0}
 
 
-def render_style(mode: str = "small_dots") -> dict:
+def render_style(mode: str = "small_dots", light: str = "default") -> dict:
     mode = str(mode or "small_dots").lower()
+    light = str(light or "default").lower()
     if mode not in RENDER_MODES:
         raise ValueError(f"render must be one of {RENDER_MODES}")
+    if light not in LIGHT_MODES:
+        raise ValueError(f"light must be one of {LIGHT_MODES}")
     if mode in DOT_PX:
-        return {"render_3d": "dots", "dot_size": DOT_PX[mode]}
-    st = {"render_3d": "contour", "contour_by_type": True, "surface_metallic": 0.0}
+        st = {"render_3d": "dots", "dot_size": DOT_PX[mode]}
+    else:
+        st = {"render_3d": "contour", "contour_by_type": True, "surface_metallic": 0.0}
+    if light != "default":
+        st["light"] = light
+    if mode in DOT_PX:
+        return st
     if mode == "surface":
-        st.update(surface_env=False, surface_opacity=1.0, surface_roughness=1.0, shadows=False)
+        st.update(surface_env=False, surface_pbr=False, surface_opacity=1.0, surface_roughness=1.0, shadows=False)
     elif mode == "surface_specular":
         st.update(surface_env=True, surface_env_color="white", surface_opacity=1.0, surface_roughness=0.1, shadows=True)
     else:
@@ -101,10 +110,10 @@ def render_style(mode: str = "small_dots") -> dict:
     return st
 
 
-def apply_render(plotting: dict, mode: str) -> dict:
+def apply_render(plotting: dict, mode: str, light: str = "default") -> dict:
     """The plotting block with its render keys replaced by `mode`'s -- the other keys untouched."""
     out = {k: v for k, v in (plotting or {}).items() if k not in RENDER_KEYS}
-    out.update(render_style(mode))
+    out.update(render_style(mode, light))
     return out
 
 
@@ -214,7 +223,7 @@ def build_spec(form: dict) -> dict:
                                   "max_frames": int(form.get("movie_frames", 400)), "stills": int(form.get("stills", 10)),
                                   "keep_stills": True, "splat_res": 600, "box_frame": True, "hide_sets": ["cell"],
                                   "colors": colors, "slow_motion": 4},
-                                 str(form.get("render", "small_dots"))),
+                                 str(form.get("render", "small_dots")), str(form.get("light", "default"))),
     }
 
 
@@ -255,7 +264,7 @@ def form_from_spec(spec: dict) -> dict:
     gu = next((o for o in ops if o.get("op") == "mpm_grid_update"), {})
     pl = spec.get("plotting") or {}
     return {"name": gen.get("name", ""), "world": (gen.get("world") or [0.5])[0], "n_frames": gen.get("n_frames", 800),
-            "render": render_of(pl),
+            "render": render_of(pl), "light": str(pl.get("light", "default")),
             "dt": gen.get("dt", 1.0 / 1200.0), "gravity": g, "wall_damp": gu.get("wall_damp", 0.5),
             "friction": gu.get("wall_friction", 0.0), "launch": mp.get("vel_init", 0.0), "seed": gen.get("seed", 1),
             "n_grid": ((spec.get("fields") or {}).get("mpm_grid") or {}).get("n_grid", 96),
@@ -283,7 +292,8 @@ You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body 
                           block [x0,y0,z0,x1,y1,z1] for a slab, material (elastic|liquid|snow),
                           youngs (elastic/snow) or bulk_modulus (liquid), density}].
                           Bodies keep their order: the first body is at the first centre.
-                          render (small_dots|middle_dots|large_dots|surface|surface_specular|glassy).
+                          render (small_dots|middle_dots|large_dots|surface|surface_specular|glassy),
+                          light (default|headlight|sun|studio|flat).
                           A ball deforms visibly below ~30,000 Pa; 1,000,000 is rigid.
   POST /api/scene/refine    {name, prompt} -> an English edit of the current spec (another Claude
                           applies it; 20-40 s)
@@ -319,7 +329,7 @@ FORM_HTML = r'''
  <div style="color:#778;font-size:11px">a ball is placed at its centre with the shared radius above; a block spans its six numbers (metres). Bodies keep their order: the first body is at the first centre. stiffness = Young's modulus (elastic, snow) or bulk modulus (liquid), Pa; eta the viscosity, Pa s; colour r g b in 0-1 (blank = automatic).</div>
  </div>
  <h2>Render</h2>
- <div class="row"><label>render</label><select id="render" style="width:130px" onchange="setStyle()"><option value="small_dots">small dots</option><option value="middle_dots">middle dots</option><option value="large_dots">large dots</option><option value="surface">surface</option><option value="surface_specular">surface specular</option><option value="glassy">glassy</option></select> <span style="color:#778;font-size:11px">applies to the scene now and to the movie</span></div>
+ <div class="row"><label>render</label><select id="render" style="width:130px" onchange="setStyle()"><option value="small_dots">small dots</option><option value="middle_dots">middle dots</option><option value="large_dots">large dots</option><option value="surface">surface</option><option value="surface_specular">surface specular</option><option value="glassy">glassy</option></select> <label style="width:40px">light</label><select id="light" style="width:100px" onchange="setStyle()"><option value="default">default</option><option value="headlight">headlight</option><option value="sun">sun</option><option value="studio">studio</option><option value="flat">flat</option></select> <span style="color:#778;font-size:11px">applies now and to the movie</span></div>
 '''
 
 FORM_JS = r'''
@@ -336,11 +346,11 @@ function bodies(){const out=[];for(const tr of $('bodies').rows){if(!tr.cells[0]
 window.bodyCount=function(){const bs=bodies();const per={};for(const b of bs)per[b.material]=(per[b.material]||0)+1;$('bodycount').textContent=bs.length?`${bs.length} bodies: `+Object.entries(per).map(([k,v])=>`${v} ${k}`).join(', '):'(none)';};
 window.toggleBodies=function(){const w=$('bodieswrap');const on=w.style.display==='none';w.style.display=on?'block':'none';$('bodiesbtn').textContent=on?'hide':'show';};
 const NUM=['world','n_grid','n_frames','dt','gravity','particles','radius','launch','wall_damp','friction','movie_frames','stills','seed'];
-window.tabForm=function(){const f={name:$('name').value,bodies:bodies(),render:$('render').value};for(const k of NUM)f[k]=+$(k).value;return f;};
-window.tabFill=function(f){$('name').value=f.name;for(const k of NUM)if(f[k]!==undefined&&f[k]!==null)$(k).value=f[k];if(f.render)$('render').value=f.render;
+window.tabForm=function(){const f={name:$('name').value,bodies:bodies(),render:$('render').value,light:$('light').value};for(const k of NUM)f[k]=+$(k).value;return f;};
+window.tabFill=function(f){$('name').value=f.name;for(const k of NUM)if(f[k]!==undefined&&f[k]!==null)$(k).value=f[k];if(f.render)$('render').value=f.render;if(f.light)$('light').value=f.light;
  const tb=$('bodies');while(tb.rows.length>1)tb.deleteRow(-1);(f.bodies||[]).forEach(addBody);bodyCount();};
 // THE RENDER SELECTOR WRITES THE SPEC'S plotting AND RE-SEEDS, so what the page shows is what the
 // movie will draw; a BUILD keeps the choice because the form carries it.
-window.setStyle=async function(){if(!specName)return;status('changing the render...');const j=await post('/api/scene/style',{name:specName,render:$('render').value});if(j.error){status(j.error,true);return;}if(j.version!==undefined)seen.version=j.version;if(j.raw)$('yamltext').value=j.raw;await reseed();};
+window.setStyle=async function(){if(!specName)return;status('changing the render...');const j=await post('/api/scene/style',{name:specName,render:$('render').value,light:$('light').value});if(j.error){status(j.error,true);return;}if(j.version!==undefined)seen.version=j.version;if(j.raw)$('yamltext').value=j.raw;await reseed();};
 window.tabInit=function(){for(const b of DEFAULT_BODIES)addBody(b);};
 '''

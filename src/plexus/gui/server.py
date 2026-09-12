@@ -431,6 +431,9 @@ def g_picture(h, q, route):
             return h._send_json(bio.resolve_pick(v.scene, _q1(q, "pick")) or {"error": "no such object"})
         if route.endswith("/pick"):
             pk = v.pick_at(float(_q1(q, "x", "0.5")), float(_q1(q, "y", "0.5")))
+            # THE OBJECT, NOT THE POINT: a click lands on one particle of a body; what was meant is
+            # the body (the parent up the hierarchy), which is what is reported and outlined.
+            pk = bio.climb(v.scene, pk)
             v.highlight(pk)
             bio.STATE["pick"] = pk
             return h._send_json({"pick": pk, "info": bio.resolve_pick(v.scene, pk) if pk else None})
@@ -458,7 +461,9 @@ def g_seed(h, q):
     if not name or not os.path.exists(sp):
         return h._send_json({"error": "no such spec"}, 404)
     try:
-        v = bio_view.open_view(sp)                               # seeded once: the scene and the picture share it
+        # A SEED AFTER A RENDER CHANGE KEEPS THE RUN'S FRAMES (the style route sets the flag, once).
+        carry = bool(bio.STATE.pop("carry_frames", False))
+        v = bio_view.open_view(sp, carry=carry)                  # seeded once: the scene and the picture share it
         bio.STATE["name"] = name
         bio.claude_note(f"spec '{name}' seeded: " + ", ".join(f"{k} {s_.get('n_live')}" for k, s_ in v.scene["sets"].items()))
         out = dict(v.scene); out["seconds"] = v.seconds
@@ -669,7 +674,8 @@ def p_style(h, data):
         return h._send_json({"error": "no spec is open"}, 400)
     spec = yaml.safe_load(open(sp)) or {}
     try:
-        spec["plotting"] = M.apply_render(spec.get("plotting") or {}, str(data.get("render", "small_dots")))
+        spec["plotting"] = M.apply_render(spec.get("plotting") or {}, str(data.get("render", "small_dots")),
+                                          str(data.get("light", "default")))
     except ValueError as e:
         return h._send_json({"error": str(e)}, 400)
     ok, err = _validate(spec)
@@ -677,6 +683,7 @@ def p_style(h, data):
         return h._send_json({"error": "schema rejected the spec", "detail": err}, 400)
     raw = _dump_yaml(spec)
     open(sp, "w").write(raw)
+    bio.STATE["carry_frames"] = True                             # the next seed keeps the run's frames
     bio.bump(name, f"render {data.get('render', 'small_dots')}")
     return h._send_json({"name": name, "raw": raw, "version": bio.STATE["version"]})
 
