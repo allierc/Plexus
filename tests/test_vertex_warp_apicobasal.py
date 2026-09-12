@@ -48,7 +48,7 @@ def _autograd(m, c, surface):
     E = _apicobasal_energy_core(x, s, m["es"], m["et"], m["ef"], m["nF"], m["V_eq"], m["alive"],
                                 c["k_v"], c["kappa_s"], c["Lam"], c["K_R"],
                                 torch.as_tensor(c["R0"], device=x.device), m["eocc"], m["vocc"],
-                                gamma=c["gamma"], surface=surface)
+                                gamma=c["gamma"], surface=surface, kappa_h=c.get("kappa_h", 0.0))
     return torch.autograd.grad(E, (x, s))
 
 
@@ -56,14 +56,15 @@ def _warp(m, c, surface):
     return vo.apicobasal_energy_grad_warp(m["pos"], m["sep"], m["es"], m["et"], m["ef"], m["nF"],
                                           m["V_eq"], m["alive"], c["R0"], c["k_v"], c["kappa_s"],
                                           c["Lam"], c["K_R"], c["gamma"], m["eocc"], m["vocc"],
-                                          surface=surface)
+                                          surface=surface, kappa_h=c.get("kappa_h", 0.0))
 
 
 # R0 = 0.85 on a unit sphere so the radial term is live (see test_vertex_warp.py for the lesson).
-FULL = dict(k_v=4.0, kappa_s=0.05, gamma=0.1, Lam=0.05, K_R=0.4, R0=0.85)
-ZERO = dict(k_v=0.0, kappa_s=0.0, gamma=0.0, Lam=0.0, K_R=0.0, R0=0.85)
+FULL = dict(k_v=4.0, kappa_s=0.05, gamma=0.1, Lam=0.05, K_R=0.4, R0=0.85, kappa_h=0.2)
+ZERO = dict(k_v=0.0, kappa_s=0.0, gamma=0.0, Lam=0.0, K_R=0.0, R0=0.85, kappa_h=0.0)
 # each coefficient alone, sized to make its own gradient order 0.1-1
-ONLY = {k: {**ZERO, k: v} for k, v in dict(k_v=200.0, kappa_s=1.0, gamma=1.0, Lam=1.0, K_R=1.0).items()}
+ONLY = {k: {**ZERO, k: v} for k, v in dict(k_v=200.0, kappa_s=1.0, gamma=1.0, Lam=1.0, K_R=1.0,
+                                           kappa_h=1.0).items()}
 
 
 def _agree(got, ref, what, tol=3e-4):
@@ -85,11 +86,17 @@ def test_full_energy_matches_autograd(surface):
 @pytest.mark.parametrize("surface", ["apical", "basal", "mid"])
 def test_each_term_alone_matches_autograd(term, surface):
     """One coefficient at a time, on each ring. `k_v` and `kappa_s` do not depend on the ring; the
-    other three are exactly what `surface:` moves, and a route sent to the wrong ring shows only here.
-    The mid ring has no `sep` gradient for the ring terms, so that comparison is skipped as inert."""
+    ring terms are exactly what `surface:` moves, and a route sent to the wrong ring shows only here.
+    The mid ring has no `sep` gradient for the ring terms, so that comparison is skipped as inert;
+    `kappa_h` is the mirror case -- it is a stiffness on the thickness field alone, so it has no
+    `pos` gradient on any ring, and a warp kernel that gave it one would be the defect."""
     m = _mesh()
     (gx, gs), (rx, rs) = _warp(m, ONLY[term], surface), _autograd(m, ONLY[term], surface)
-    _agree(gx, rx, f"only {term}/{surface} dE/dpos")
+    if term == "kappa_h":
+        assert rx.abs().max() == 0, "kappa_h must not move `pos` in the reference"
+        assert gx.abs().max() == 0, f"kappa_h moved `pos` in warp by {gx.abs().max():.3e}"
+    else:
+        _agree(gx, rx, f"only {term}/{surface} dE/dpos")
     if not (surface == "mid" and term in ("gamma", "Lam", "K_R")):
         _agree(gs, rs, f"only {term}/{surface} dE/dsep")
 
