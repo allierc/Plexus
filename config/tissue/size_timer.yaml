@@ -95,7 +95,7 @@ operators:
   kappa_s: 0.2
   gamma: 0.0
   Lambda: 0.0
-  K_R: 0.4
+  K_R: 0.0
   mu: 1.0
   relax_iters: 30
   eta: 0.08
@@ -178,3 +178,17 @@ plotting:
     ticks: 4
   scale_bar_corner: right_face
   scale_bar_lift: -0.07
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of particles initially appears small and uniform in a large cubic
+      domain. As the simulation progresses, the cluster expands in size while internal red and blue regions
+      begin to emerge and fluctuate. The cluster reaches a maximum volume and then undergoes a period
+      of contraction and expansion, showing dynamic internal movement. By the final frames, the cluster
+      has grown significantly larger and maintains a complex, heterogeneous internal structure.
+    objects: The primary object is a spherical cluster composed of many small, interconnected white cells.
+      Within this sphere, distinct red and blue regions appear, representing different internal states
+      or properties. The cluster is centered within a large, transparent 500 $\mu$m cubic bounding box.
+      A small circular inset in the bottom left corner provides a cross-sectional view of the sphere's
+      boundary.

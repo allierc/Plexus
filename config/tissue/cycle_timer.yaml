@@ -111,7 +111,7 @@ operators:
   kappa_s: 0.2
   gamma: 0.0
   Lambda: 0.0
-  K_R: 0.4
+  K_R: 0.0
   mu: 1.0
   relax_iters: 30
   eta: 0.08
@@ -216,3 +216,16 @@ plotting:
   - '#e8b024'
   - '#e03b2f'
   mesh_mark_division: false
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie:
+    description: A spherical cluster of particles grows in size and complexity as the simulation progresses.
+      The number of individual cells within the cluster increases steadily over time. The total volume
+      of the cluster remains relatively stable despite the increasing internal complexity. The percentage
+      of different phases within the cluster shifts slightly but remains largely consistent.
+    objects: The primary object is a large spherical cluster composed of many smaller, interconnected
+      cells. These cells are colored in shades of blue, green, and yellow, representing different phases.
+      The cluster is situated in the center of a large, transparent 500 $\mu$m cubic bounding box. A small
+      circular inset in the bottom left corner shows a cross-sectional view of the cluster's internal
+      structure.
