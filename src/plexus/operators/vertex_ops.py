@@ -1746,6 +1746,14 @@ class Divide3D(Structural):
     def _trigger(self, v_now, v_birth, jit, age, v_ref):
         """Has this cell earned a division? THE ONLY THING A `model=` VARIANT OF cell_divide CHANGES.
 
+        ONE "WHEN" (R4 of notes/size_cycle/SIZE_CYCLE_PLAN.md): a NEW spec states its size rule on
+        `cell_cycle` -- G1 rules `sizer`, `adder`, `doubler`, `timer`, `transition_probability`,
+        `inhibitor_dilution`, with `t_s = t_g2 = t_m = 0` for "divide when the rule fires" -- and
+        schedules `cell_divide[model: cycle]`, which does the topology when the cycle says M. The
+        `sizer` / `adder` / `doubler` / `timer` / `concerted` models of THIS operator are the same
+        rules on the other contract, kept for the specs that carry them (the okuda archive) and not
+        to be used by a new one. The eleven size/cycle specs say their rule on the cycle.
+
         THE DEFAULT IS `sizer`: an ABSOLUTE threshold, v >= factor * v_ref, where v_ref is the
         seed-time median cell volume. Ginzberg, Kafri & Kirschner (Science 2015) are explicit that
         this is what size control requires -- "both the cell's target size and its actual size
@@ -3569,7 +3577,18 @@ class CellCycle3D(Lateral):
         # BACKWARD ONLY INSIDE G1. S, G2 and M are clocks in every model and a clock does not run
         # backwards; only the G1 rules read a quantity that can fall.
         rate = np.where((p >= cut[self.G1]) & (rate < 0.0), 0.0, rate)
-        rate = np.where(born, 0.0, rate) if age is not None and len(age) == nF else rate
+        # A DAUGHTER'S CYCLE STARTS WHEN ITS BIRTH VOLUME HAS BEEN READ, not at the septum. At the
+        # cut a daughter is the geometric piece the septum made (about half the mother, CV 0.27)
+        # and within a frame the mechanics has pulled it to its target; `cell_divide` re-reads
+        # `Vbirth` at its next call (`age` 0 -> 1). A rule that started integrating at the cut
+        # counted that mechanical jump as growth: the cycle-based adder left G1 at
+        # piece + delta, a fixed 1.5 v_ref, and scored as a sizer (slope -0.96 where the
+        # divide-family adder on the re-read Vbirth scored -0.13). So the cycle holds at p = 0
+        # until `age` is 1 -- the frames between the cut and the next divide call, four at most.
+        if age is not None and len(age) == nF:
+            unborn = (age <= 0)
+            rate = np.where(unborn, 0.0, rate)
+            p = np.where(unborn, 0.0, p)
         # A CELL STOPS AT M'S DOORSTEP. `rate` is already zero once `p` is inside M, so the only
         # way past is the single step that crosses -- and an unbounded rate can carry it far past
         # (a `transition_probability` cell whose drawn waiting time is a fraction of a frame reached
@@ -3646,6 +3665,56 @@ class CellCycleTimer(CellCycle3D):
         # unit time makes G1 take `f_G1 * T = t_g1`, so this model is the one whose `p` is literally
         # elapsed time -- and that is the null the other three have to beat.
         return np.full(np.shape(ctx["v_now"]), 1.0 / ctx["T"]) / np.maximum(ctx["jit"] * ctx["cvj"], 1e-9)
+
+
+@register_operator("cell_cycle", model="adder", set="vertex", kind="lateral", family="population")
+class CellCycleAdder(CellCycle3D):
+    """G1 ends when the cell has ADDED `g1_delta` x `v_ref` since birth -- the adder, as a G1 rule.
+
+    ONE "WHEN" (R4 of notes/size_cycle/SIZE_CYCLE_PLAN.md). The size rules live here, on the
+    cycle, and `cell_divide` does the topology when the cycle says M. `cell_divide[model: adder]`
+    is the same rule on the other contract and is kept for the specs that carry it; a new spec
+    says it here, where a cycle with `t_s = t_g2 = t_m = 0` is "divide when the rule fires".
+
+        dp/dt = f_G1 (dV/dt) / (g1_delta v_ref)        leaves G1 at V = V_b + g1_delta v_ref
+
+    Reference: Taheri-Araghi et al. (2015) Curr. Biol. 25:385-391; Cadart et al. (2018)
+    Nat. Commun. 9:3275.
+    """
+    MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "adder", "size_control", "incremental_threshold"]
+    PARAM_ROLES = {"g1_delta": "volume added through G1, in units of v_ref"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.g1_delta = float(params.get("g1_delta", 1.0))
+
+    def _g1_rate(self, ctx):
+        need = max(self.g1_delta * ctx["v_ref"], 1e-9)
+        r = ctx["f"][self.G1] * ctx["dv_dt"] / need
+        past = ctx["v_now"] >= ctx["v_birth"] + need
+        return np.where(past, np.maximum(r, ctx["to_boundary"]), r)
+
+
+@register_operator("cell_cycle", model="doubler", set="vertex", kind="lateral", family="population")
+class CellCycleDoubler(CellCycle3D):
+    """G1 ends at `g1_factor` x THIS CELL'S OWN birth volume -- the relative rule, the null that
+    corrects nothing (Ginzberg, Kafri & Kirschner 2015), as a G1 rule. See `CellCycleAdder` for
+    why it lives here.
+
+        dp/dt = f_G1 (dV/dt) / ((g1_factor - 1) V_b)     leaves G1 at V = g1_factor V_b
+    """
+    MECHANISM_TAGS = ["cell_cycle", "G1_S_G2_M", "doubler", "relative_threshold", "no_size_control"]
+    PARAM_ROLES = {"g1_factor": "multiple of the cell's own birth volume at which G1 ends"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.g1_factor = float(params.get("g1_factor", 2.0))
+
+    def _g1_rate(self, ctx):
+        need = np.maximum((self.g1_factor - 1.0) * ctx["v_birth"], 1e-9)
+        r = ctx["f"][self.G1] * ctx["dv_dt"] / need
+        past = ctx["v_now"] >= self.g1_factor * ctx["v_birth"]
+        return np.where(past, np.maximum(r, ctx["to_boundary"]), r)
 
 
 @register_operator("cell_cycle", model="transition_probability", set="vertex", kind="lateral",
