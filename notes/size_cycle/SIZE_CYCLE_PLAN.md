@@ -419,7 +419,40 @@ competition}_sizer`, `rig_apop_{small,crowded}_timer`, `rig_apop_{small,crowded}
 the working-point mechanics, 1601 frames; `tools/death_report.py` joins every death to volume at
 death, birth volume, age, phase, neighbours and mark-to-removal latency. `cell_die`'s size and
 growth readings are the measured volume now (they read the target, which is the mother's half
-for every daughter, so `small` could not see a small daughter). Gauged and reported when landed.
+for every daughter, so `small` could not see a small daughter).
+
+Landed (`log/size_cycle/R4rig`, 1601 frames, gpu_l4). Gauge: every arm's shell holds its
+thickness and prism bands (thickness CV <= 0.13, trapezoids <= 0.06); asphericity drifts to
+0.045-0.063 on the sizer arms (the 0.04 band is marginal without the pin; to be widened for the
+rig) and a single inverting cell appears from frame 950 -- an extrusion in progress, which the
+`inv_wedge == 0` band should tolerate on apoptosis runs. `tools/death_report.py`:
+
+| spec | cells | deaths | per 100 cell-frames | V_birth | age | neighbours at removal | latency | first death |
+|---|---|---|---|---|---|---|---|---|
+| rig_apop_small_sizer | 200->2382 | 29 | 0.002 | 0.77 | 160 | 3 | 64 | 188 |
+| rig_apop_smaller_sizer | 200->2416 | 33 | 0.003 | 0.87 | 220 | 3 | 56 | 208 |
+| rig_apop_crowded_sizer | 200->2452 | 19 | 0.001 | 0.92 | 336 | 3 | 148 | 252 |
+| rig_apop_competition_sizer | 200->2287 | 22 | 0.002 | 0.90 | 274 | 3 | 136 | 256 |
+| rig_apop_small_timer | 200->2088 | 26 | 0.002 | 0.83 | 156 | 3 | 86 | 416 |
+| rig_apop_crowded_timer | 200->1971 | 25 | 0.002 | 0.93 | 168 | 3 | 56 | 524 |
+| rig_apop_small_sizer_noT1 | 200->2443 | 0 | 0 | - | - | - | - | - |
+| rig_apop_crowded_sizer_noT1 | 200->2403 | 0 | 0 | - | - | - | - | - |
+
+(volumes over `v_ref`, ages and latencies in frames; every death leaves at 3 neighbours and
+~zero volume, the shrink-shed-extrude path.)
+
+19. **Death needs topology.** Without T1 flips not one marked cell is removed in 1601 frames on
+    either rule: a marked cell shrinks but cannot shed neighbours, never reaches the triangle
+    the extrusion needs, and the shell deforms around the cells that cannot leave (asphericity
+    0.10-0.15, 3.7 % inverted wedges). The shrink-shed-extrude sequence is a topological
+    operation as much as a mechanical one.
+20. **The death models select what they say they select, and the size rule sets when.** `small`
+    takes cells born at 0.77 of the reference and young (160 frames), `smaller` 0.87, `crowded`
+    and `competition` normal-born cells (0.90-0.93) and old (274-336). Under a timer the first
+    death comes 200-300 frames later than under a sizer at the same threshold: a sizer makes
+    small cells early (asymmetric septa on a cell that divides at a fixed size), a timer does not.
+    Rates are low (0.001-0.003 per 100 cell-frames) at `max_mark_frac 0.005` and these thresholds;
+    the rig's next arms turn that dial.
 
 ## 4. The ladder, v2
 
