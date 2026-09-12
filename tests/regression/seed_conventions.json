@@ -1214,6 +1214,36 @@
    "v_ref": 2.5462114810943604
   }
  },
+ "tissue/ms8_cycle_dilution": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
+ "tissue/ms9_cycle_hazard": {
+  "vertex": {
+   "Nv": 396,
+   "V0f_median": 2.546844482421875,
+   "V0f_sum": 509.71240234375,
+   "centre": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "nF": 200,
+   "v0_from": "wedge",
+   "v_ref": 2.5462114810943604
+  }
+ },
  "tissue/r010_00_ctrl": {
   "vertex": {
    "Nv": 3996,
