@@ -643,7 +643,7 @@ class Handler(BaseHTTPRequestHandler):
             open(sp, "w").write(raw)
             bio.bump(name, f"built {name}")
             bio.claude_note(f"material spec '{name}' built from the form: bodies {', '.join((spec['sets'].get('cell') or {}).get('types') or {})}")
-            return self._send_json({"name": name, "raw": raw, "valid": True})
+            return self._send_json({"name": name, "raw": raw, "valid": True, "version": bio.STATE["version"]})
 
         if route == "/api/bio/build":
             from plexus.gui import bio, studio
