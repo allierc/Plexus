@@ -502,6 +502,17 @@ chasing the septum's geometric piece.
     (60 frames; the ramp settles in 56-78) covers it for the ladder, so R3e stays parked behind
     R5 rather than opened now.
 
+**R6 (2026-09-12).** Four working points registered from their archives in `graphs_data/tissue`:
+`ms3_prism_shell` (the working point), `ms5_two_channel`, `ms6_apoptosis`, `ms7_cycle_adder`;
+`ms3` joins the quick set. One defect found registering them (finding 23).
+
+23. **The regression reruns were not deterministic and the archives are.** Every archive on disk
+    comes from `jobs/*.sh`, which export `PLEXUS_STRICT_DETERMINISM=1`; `regression_lib.run_cut`
+    did not, so a rerun took the TF32 and compiled paths and landed about 1 % away in median
+    radius over 150 frames -- enough to fail the 1 % band on physics that had not changed. The
+    runner sets it now. The two references refreshed earlier today under the old runner
+    (`divide_growing_ball`, `mesh_mpm_spheroid_nominal`) were refreshed again under the new one.
+
 ## 4. The ladder, v2
 
 | rung | layer | change | gate |
@@ -513,6 +524,6 @@ chasing the septum's geometric piece.
 | R4a-c | 2 | `cell_id`; the apoptosis rig; one "when" | DONE: R3d reproduced (8/10 within 0.16), CV(V_d) tighter everywhere |
 | R4b | 3 | the apoptosis rig | `death_report` rows for every arm; deaths never off a bent mesh |
 | R5 | eng | representation and engine, as before | tick-0 invariant; flags 29 -> <= 20 |
-| R6 | -- | register the working points; `library/` regenerated; `QUICK` re-pointed | `pytest tests/regression -m regression --quick` green |
+| R6 | -- | DONE: ms3/ms5/ms6/ms7 registered, `QUICK` re-pointed, the runner made deterministic (finding 23) | the registry green |
 
 Out of scope: MPM, ECM -- touched only through the shared reader, and gated there.
