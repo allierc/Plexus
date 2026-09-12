@@ -688,6 +688,22 @@ def p_style(h, data):
     return h._send_json({"name": name, "raw": raw, "version": bio.STATE["version"]})
 
 
+def p_saveas(h, data):
+    """SAVE...: copy the spec on screen to a path under the repo's config/ (the studio copy stays)."""
+    import shutil
+    name = str(data.get("name") or "")
+    src = _spec_path(name)
+    if not name or not os.path.exists(src):
+        return h._send_json({"error": "no spec is open"}, 400)
+    dst = os.path.abspath(os.path.expanduser(str(data.get("path") or "")))
+    root = os.path.realpath(os.path.join(REPO_ROOT, "config"))
+    if not os.path.realpath(os.path.dirname(dst)).startswith(root) or not dst.endswith(".yaml"):
+        return h._send_json({"error": f"the path must be a .yaml under {root}"}, 400)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copyfile(src, dst)
+    return h._send_json({"path": dst})
+
+
 def p_quit(h, data):
     """SHUT THE SOCKET, NOT JUST THE PROCESS. A server killed with the port still bound -- or
     suspended with Ctrl-Z -- leaves the port held and the next launch dies on "Address already in
@@ -768,7 +784,7 @@ PICTURE_ROUTES = {f"/api/{p}/{x}" for p in ("scene", "bio") for x in ("render", 
 POST_ROUTES = {
     "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
     "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
-    "/api/scene/style": p_style,
+    "/api/scene/style": p_style, "/api/scene/saveas": p_saveas,
     "/api/quit": p_quit, "/api/studio/quit": p_quit,
     "/api/validate": p_validate, "/api/save": p_editor_save, "/api/layout": p_layout,
 }

@@ -68,14 +68,13 @@ def _twenty_balls(seed: int = 1, radius: float = 0.03, world: float = 0.5):
 
 def _multimaterial_27(world: float = 0.5, side: float = 0.06):
     """The twin of MPM_pytorch's `config/multimaterial/multimaterial_1_3D.yaml`: 27 cubes on a
-    3 x 3 x 3 lattice falling in a box, the three materials in turn (liquid, elastic -- the
-    reference's jelly -- and snow, at the reference's density ratios 1 : 1 : 0.35), one colour per
-    material. The reference is 35,937 points over 27 cubes in a unit box under g = 20; here the
+    3 x 3 x 3 lattice falling and bouncing in a box, one colour per cube, the points of each cube
+    on a lattice (`fill: lattice`) so a cube reads as a solid. The reference is 35,937 points over 27 cubes in a unit box under g = 20; here the
     box is 0.5 m, g = 9.81 and the form's `particles` sets the points per cube."""
     import matplotlib
-    mats = ({"material": "liquid", "bulk_modulus": 981000.0, "density": 1000.0},
-            {"material": "elastic", "youngs": 2000000.0, "density": 1000.0},
-            {"material": "snow", "youngs": 500000.0, "density": 350.0})
+    # BOUNCING CUBES, as the reference shows them: every cube elastic (the reference's jelly),
+    # E = 1 MPa, one colour each; the material menu of the form can still change any of them.
+    mats = ({"material": "elastic", "youngs": 1000000.0, "density": 1000.0},)
     # ONE COLOUR PER CUBE, as the reference draws them (tab10 per object): 27 distinct hues from
     # tab20 and tab20b, so neighbouring cubes of one material are still telling apart.
     cm_a, cm_b = matplotlib.colormaps["tab20"], matplotlib.colormaps["tab20b"]
@@ -90,7 +89,7 @@ def _multimaterial_27(world: float = 0.5, side: float = 0.06):
                 col = (cm_a(i) if i < 20 else cm_b(i - 20))[:3]
                 out.append({"name": f"c{i:02d}", "shape": "block", "block": [a[0], a[1], a[2], round(a[0] + side, 4),
                                                                               round(a[1] + side, 4), round(a[2] + side, 4)],
-                            "color": [round(float(v), 3) for v in col], **dict(mats[i % 3])})
+                            "color": [round(float(v), 3) for v in col], "fill": "lattice", **dict(mats[i % len(mats)])})
                 i += 1
     return out
 
@@ -100,8 +99,8 @@ DEFAULT_FORM = {
     # runs 10,000 frames of 0.1 ms in a unit box under g = 20. `launch` 1.0 is its `dpos_init`,
     # a random initial velocity per cube.
     "name": "si_multimaterial_27", "world": 0.5, "n_grid": 96, "n_frames": 800, "dt": 0.002,
-    "gravity": 9.81, "particles": 1331, "radius": 0.03, "wall_damp": 0.5, "friction": 0.4,
-    "launch": 1.0, "movie_frames": 400, "stills": 10, "seed": 1, "render": "middle_dots", "light": "default",
+    "gravity": 9.81, "particles": 1331, "radius": 0.03, "wall_damp": 0.9, "friction": 0.2,
+    "launch": 1.0, "movie_frames": 400, "stills": 10, "seed": 1, "render": "large_dots", "light": "default",
     "color": "particles", "bodies": _multimaterial_27(),
 }
 REFERENCE = os.path.join(REPO, "config", "si_material", "si_multimaterial_27.yaml")
@@ -113,8 +112,8 @@ REFERENCE = os.path.join(REPO, "config", "si_material", "si_multimaterial_27.yam
 # the white sky at half opacity.
 RENDER_KEYS = ("render_3d", "dot_size", "dot_shading", "dot_specular", "dot_specular_power", "contour_by_type",
                "surface_env", "surface_env_color", "surface_opacity", "surface_roughness", "surface_metallic",
-               "surface_pbr", "shadows", "light")
-RENDER_MODES = ("small_dots", "middle_dots", "large_dots", "surface", "surface_specular", "glassy")
+               "surface_pbr", "shadows", "light", "edl", "contour_ngrid", "contour_smooth")
+RENDER_MODES = ("small_dots", "middle_dots", "large_dots", "splats", "surface", "surface_specular", "glassy")
 LIGHT_MODES = ("default", "headlight", "sun", "studio", "flat")
 DOT_PX = {"small_dots": 1.0, "middle_dots": 2.0, "large_dots": 4.0}
 
@@ -128,14 +127,24 @@ def render_style(mode: str = "small_dots", light: str = "default") -> dict:
         raise ValueError(f"light must be one of {LIGHT_MODES}")
     if mode in DOT_PX:
         st = {"render_3d": "dots", "dot_size": DOT_PX[mode]}
+    elif mode == "splats":
+        # THE ONE IN BETWEEN: big dots drawn as lit sphere imposters (VTK's point sprites,
+        # `render_points_as_spheres` + `dot_shading: true`) -- each point a shaded ball at the cost
+        # of a point, so a body reads as a solid without a contour's density grid. (The gaussian
+        # splat mapper and eye-dome lighting were tried first: the mapper drew nothing through
+        # pyvista's rgb path and EDL darkened the whole off-screen frame.)
+        st = {"render_3d": "dots", "dot_size": 7.0, "dot_shading": True}
     else:
-        st = {"render_3d": "contour", "contour_by_type": True, "surface_metallic": 0.0}
+        # THE SURFACE, AT PAGE SPEED: a 96^3 density grid and 8 smoothing passes where the movie's
+        # default is 176^3 and 35 -- a coarser skin, a few times faster to rebuild per frame.
+        st = {"render_3d": "contour", "contour_by_type": True, "surface_metallic": 0.0,
+              "contour_ngrid": 96, "contour_smooth": 8}
     if light != "default":
         st["light"] = light
-    if mode in DOT_PX:
+    if mode in DOT_PX or mode == "splats":
         # A LIGHT ON DOTS: flat pixels take no light, so any light but the default (and `flat`)
         # draws the dots as lit spheres (`dot_shading: true`), which is what a light can act on.
-        if light not in ("default", "flat"):
+        if light not in ("default", "flat") and mode in DOT_PX:
             st["dot_shading"] = True
         return st
     if mode == "surface":
@@ -187,6 +196,8 @@ def render_of(plotting: dict) -> str:
             return "glassy"
         return "surface_specular" if pl.get("surface_env") else "surface"
     px = float(pl.get("dot_size", 1.0) or 1.0)
+    if pl.get("dot_shading") is True and px >= 6.0:
+        return "splats"
     return min(DOT_PX, key=lambda k: abs(DOT_PX[k] - px))
 
 
@@ -224,6 +235,8 @@ def build_spec(form: dict) -> dict:
         t["density"] = float(b.get("density", 1000.0))
         if b.get("eta") is not None:
             t["eta"] = float(b["eta"])                       # per-body viscosity, Pa s (overrides mpm_viscosity's)
+        if shape == "block" and str(b.get("fill", "")).lower() == "lattice":
+            t["fill"] = "lattice"
         if shape == "ball":
             c = [float(v) for v in (b.get("centre") or [world / 2, world * 0.75, world / 2])]
             if len(c) != 3:
@@ -284,7 +297,7 @@ def build_spec(form: dict) -> dict:
                                   "camera_turns": 0.0, "camera_zoom": 0.0,
                                   "max_frames": int(form.get("movie_frames", 400)), "stills": int(form.get("stills", 10)),
                                   "keep_stills": True, "splat_res": 600, "box_frame": True, "hide_sets": ["cell"],
-                                  "colors": colors, "slow_motion": 4},
+                                  "floor": "#0b1a3a", "colors": colors, "slow_motion": 4},
                                  str(form.get("render", "small_dots")), str(form.get("light", "default")),
                                  str(form.get("color", "particles"))),
     }
@@ -318,6 +331,8 @@ def form_from_spec(spec: dict) -> dict:
             b["eta"] = t["eta"]
         if t.get("block"):
             b.update(shape="block", block=t["block"])
+            if t.get("fill"):
+                b["fill"] = t["fill"]
         else:
             b.update(shape="ball", centre=(starts[i] if i < len(starts) else None))
         bodies.append(b)
@@ -355,7 +370,7 @@ You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body 
                           block [x0,y0,z0,x1,y1,z1] for a slab, material (elastic|liquid|snow),
                           youngs (elastic/snow) or bulk_modulus (liquid), density}].
                           Bodies keep their order: the first body is at the first centre.
-                          render (small_dots|middle_dots|large_dots|surface|surface_specular|glassy),
+                          render (small_dots|middle_dots|large_dots|splats|surface|surface_specular|glassy),
                           light (default|headlight|sun|studio|flat), color (particles|deformation|stress|velocities).
                           A ball deforms visibly below ~30,000 Pa; 1,000,000 is rigid.
   POST /api/scene/refine    {name, prompt} -> an English edit of the current spec (another Claude
@@ -378,21 +393,21 @@ unless told otherwise; finish with two or three lines summarising the scene and 
 
 
 FORM_HTML = r'''
- <h2>Box</h2>
+
  <div class="row"><label>name</label><input id="name" value="si_multimaterial_27"></div>
  <div class="row"><label>box side (m)</label><input id="world" class="short" value="0.5"> <label style="width:60px">grid</label><input id="n_grid" class="short" value="96"></div>
  <div class="row"><label>frames</label><input id="n_frames" class="short" value="800"> <label style="width:60px">dt (s)</label><input id="dt" class="short" value="0.002"></div>
  <div class="row"><label>gravity</label><input id="gravity" class="short" value="9.81"> <label style="width:60px">particles</label><input id="particles" class="short" value="1331" title="material points per body"></div>
  <div class="row"><label>ball radius (m)</label><input id="radius" class="short" value="0.03" title="every ball's radius; a block is sized by its own box"> <label style="width:60px">launch</label><input id="launch" class="short" value="1.0" title="initial speed given to each body, m/s (0 = dropped from rest)"></div>
- <div class="row"><label>wall damp</label><input id="wall_damp" class="short" value="0.5" title="share of the wall-normal velocity kept at the grid: 1 = elastic wall, 0 = dead"> <label style="width:60px">friction</label><input id="friction" class="short" value="0.4" title="Coulomb friction on the walls, 0 = slippery"></div>
+ <div class="row"><label>wall damp</label><input id="wall_damp" class="short" value="0.9" title="share of the wall-normal velocity kept at the grid: 1 = elastic wall, 0 = dead"> <label style="width:60px">friction</label><input id="friction" class="short" value="0.2" title="Coulomb friction on the walls, 0 = slippery"></div>
  <div class="row"><label title="frames the movie keeps: every frame up to this many, then every 2nd, 4th...">movie frames</label><input id="movie_frames" class="short" value="400"> <label style="width:60px" title="PNG stills dropped through the run, also the live pictures on this page">stills</label><input id="stills" class="short" value="10"> <label style="width:40px">seed</label><input id="seed" class="short" value="1"></div>
- <h2>Bodies <button class="dim" onclick="toggleBodies()" id="bodiesbtn">show</button> <button class="dim" onclick="addBody()">+ body</button> <span id="bodycount" style="color:#9ab;font-weight:normal;text-transform:none"></span></h2>
+ <div class="row"><button class="dim" onclick="toggleBodies()" id="bodiesbtn">show bodies</button><button class="dim" onclick="addBody()">+ body</button> <span id="bodycount" style="color:#9ab"></span></div>
  <div id="bodieswrap" style="display:none">
  <table class="sp" id="bodies"><tr><th>name</th><th>shape</th><th>centre x y z | block x0 y0 z0 x1 y1 z1</th><th>material</th><th>stiffness</th><th>density</th><th title="viscosity, Pa s">eta</th><th title="r g b in 0-1, blank = automatic">colour</th><th></th></tr></table>
  <div style="color:#778;font-size:11px">a ball is placed at its centre with the shared radius above; a block spans its six numbers (metres). Bodies keep their order: the first body is at the first centre. stiffness = Young's modulus (elastic, snow) or bulk modulus (liquid), Pa; eta the viscosity, Pa s; colour r g b in 0-1 (blank = automatic).</div>
  </div>
- <h2>Render</h2>
- <div class="row"><label>render</label><select id="render" style="width:130px" onchange="setStyle()"><option value="small_dots">small dots</option><option value="middle_dots">middle dots</option><option value="large_dots">large dots</option><option value="surface">surface</option><option value="surface_specular">surface specular</option><option value="glassy">glassy</option></select> <label style="width:40px">light</label><select id="light" style="width:100px" onchange="setStyle()"><option value="default">default</option><option value="headlight">headlight</option><option value="sun">sun</option><option value="studio">studio</option><option value="flat">flat</option></select></div>
+
+ <div class="row"><label>render</label><select id="render" style="width:130px" onchange="setStyle()"><option value="small_dots">small dots</option><option value="middle_dots">middle dots</option><option value="large_dots">large dots</option><option value="splats">splats</option><option value="surface">surface</option><option value="surface_specular">surface specular</option><option value="glassy">glassy</option></select> <label style="width:40px">light</label><select id="light" style="width:100px" onchange="setStyle()"><option value="default">default</option><option value="headlight">headlight</option><option value="sun">sun</option><option value="studio">studio</option><option value="flat">flat</option></select></div>
  <div class="row"><label>colour</label><select id="color" style="width:130px" onchange="setStyle()"><option value="particles">particles</option><option value="deformation">deformation</option><option value="stress">stress</option><option value="velocities">velocities</option></select> <span style="color:#778;font-size:11px">render, light and colour apply now and to the movie</span></div>
 '''
 
@@ -402,13 +417,13 @@ window.addBody=function(b){b=b||{};const tb=$('bodies');const tr=tb.insertRow(-1
  tr.cells[1].firstChild.value=b.shape||'ball';tr.cells[3].firstChild.value=b.material||'elastic';bodyCount();};
 function bodies(){const out=[];for(const tr of $('bodies').rows){if(!tr.cells[0].querySelector('input'))continue;const c=tr.cells;const name=c[0].firstChild.value.trim();if(!name)continue;
  const nums=c[2].firstChild.value.trim().split(/[\s,]+/).map(Number);const shape=c[1].firstChild.value;const mat=c[3].firstChild.value;
- const b={name,shape,material:mat,density:+c[5].firstChild.value};if(shape==='ball'){b.centre=nums.slice(0,3);}else{b.block=nums.slice(0,6);}
+ const b={name,shape,material:mat,density:+c[5].firstChild.value};if(shape==='ball'){b.centre=nums.slice(0,3);}else{b.block=nums.slice(0,6);b.fill='lattice';}
  if(mat==='liquid')b.bulk_modulus=+c[4].firstChild.value;else b.youngs=+c[4].firstChild.value;
  const eta=c[6].firstChild.value.trim();if(eta)b.eta=+eta;const col=c[7].firstChild.value.trim();if(col)b.color=col.split(/[\s,]+/).map(Number);out.push(b);}return out;}
 // THE LIST IS FOLDED: twenty bodies are a page of rows and a hundred are a scroll; the count says
 // what is there and SHOW opens the table when a row needs editing.
 window.bodyCount=function(){const bs=bodies();const per={};for(const b of bs)per[b.material]=(per[b.material]||0)+1;$('bodycount').textContent=bs.length?`${bs.length} bodies: `+Object.entries(per).map(([k,v])=>`${v} ${k}`).join(', '):'(none)';};
-window.toggleBodies=function(){const w=$('bodieswrap');const on=w.style.display==='none';w.style.display=on?'block':'none';$('bodiesbtn').textContent=on?'hide':'show';};
+window.toggleBodies=function(){const w=$('bodieswrap');const on=w.style.display==='none';w.style.display=on?'block':'none';$('bodiesbtn').textContent=on?'hide bodies':'show bodies';};
 const NUM=['world','n_grid','n_frames','dt','gravity','particles','radius','launch','wall_damp','friction','movie_frames','stills','seed'];
 window.tabForm=function(){const f={name:$('name').value,bodies:bodies(),render:$('render').value,light:$('light').value,color:$('color').value};for(const k of NUM)f[k]=+$(k).value;return f;};
 window.tabFill=function(f){$('name').value=f.name;for(const k of NUM)if(f[k]!==undefined&&f[k]!==null)$(k).value=Number(Number(f[k]).toPrecision(4));if(f.render)$('render').value=f.render;if(f.light)$('light').value=f.light;if(f.color)$('color').value=f.color;

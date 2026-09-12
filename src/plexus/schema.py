@@ -509,7 +509,9 @@ def load(path: str) -> Spec:
     # `_assign_types`, not by an operator, so it joins the keys the typo guard already knows.
     _KNOWN_TYPE_KEYS = {"fraction", "count", "core", "layers", "block",
                         "material", "density", "tau", "bulk_modulus", "shape",
-                        "eta"} | used_props          # per-type dynamic viscosity (mpm_viscosity)
+                        "eta",                        # per-type dynamic viscosity (mpm_viscosity)
+                        "fill",                       # a block's point layout (entities: random | lattice)
+                        "sign", "role"} | used_props  # a neuron type's Dale sign and circuit role (neural_panel)
     for sname, s in raw["sets"].items():
         for tname, t in s.get("types", {}).items():
             for k in t:

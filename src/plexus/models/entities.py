@@ -393,6 +393,18 @@ class MPMParticle:
                 continue
             v = [float(x) for x in blk]
             lo = torch.tensor(v[:D], device=device); hi = torch.tensor(v[D:2 * D], device=device)
+            if str(t.get("fill", "random")).lower() == "lattice":
+                # `fill: lattice` -- THE POINTS ON A REGULAR GRID inside the box (the cube root of
+                # the count per axis, a small jitter so no two lie on one grid line of the MPM
+                # grid), which reads as a solid body where a uniform draw reads as a cloud.
+                k = max(1, int(round(nb ** (1.0 / D))))
+                ax = [(torch.arange(k, device=device, dtype=torch.float32) + 0.5) / k for _ in range(D)]
+                g = torch.stack(torch.meshgrid(*ax, indexing="ij"), -1).reshape(-1, D)
+                if g.shape[0] < nb:                      # the count is not a perfect power: pad at random
+                    g = torch.cat([g, torch.rand(nb - g.shape[0], D, generator=H.rng, device=device)], 0)
+                g = g[:nb] + (torch.rand(nb, D, generator=H.rng, device=device) - 0.5) * (0.2 / k)
+                pos[bm] = lo + g.clamp(0.0, 1.0) * (hi - lo)
+                continue
             u = torch.rand(nb, D, generator=H.rng, device=device)
             pos[bm] = lo + u * (hi - lo)
         lvl.state[:, px0:px1] = pos                              # commit block positions
