@@ -458,7 +458,12 @@ def resolve_pick(scene: dict, pick: str) -> dict | None:
 # CLAUDE TAKES OVER THE PAGE: the CLI, with the page's own routes as its only tool
 # ---------------------------------------------------------------------------------------------
 CLAUDE: dict = {"running": False, "task": "", "lines": [], "seconds": 0.0, "error": None, "started": 0.0,
-                "session": None, "turns": 0, "notes": []}
+                "session": None, "turns": 0, "notes": [], "warming": False, "primed_mode": None}
+# WHAT THE ANSWER COSTS. Every sentence written back is tokens generated after the work is done,
+# and the page shows a transcript, not an essay: one line before the call, one after.
+SHORT = ("\n\nANSWER LENGTH: one short line before the call saying what you are about to do, one "
+         "short line after saying what happened. No preamble, no summary, no markdown, no lists. "
+         "Do the smallest number of calls that does the job -- usually exactly one.")
 
 
 def claude_note(text: str) -> None:
@@ -489,6 +494,9 @@ You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body 
                           cap outside, where a matrix would be), world (box), n_frames,
                           species: [{name, region (basal|apical|mid|interior), density, s, tau}]
                           (may be empty), organelles: [...] (see below; may be empty)
+  POST /api/scene/patch   {form: {...}, bodies: {"*"|<name>: {...}}} -> change a FEW fields of the
+                          scene on screen and rebuild. THE FIRST THING TO REACH FOR: one short call,
+                          where re-sending the whole form is thousands of characters.
   POST /api/bio/refine    {name, prompt} -> an English edit of the current spec (another Claude
                           applies it; 20-40 s); use it for anything the form cannot say
   GET  /api/bio/counts?name= -> live count per set, per species, and per cell per species
@@ -556,6 +564,44 @@ def _ev_lines(ev: dict) -> list:
     return out
 
 
+def claude_warm(mode: str = "material", model: str = "sonnet") -> None:
+    """Open the page's session WITH THE CORPUS ALREADY IN IT, in the background, at server start.
+
+    The corpus is 30,000 characters and it was carried by the FIRST task of a session -- so the
+    first thing anyone asked paid for it. This sends it alone, before anyone asks; every later
+    task `--resume`s that session and the reference is already there."""
+    import subprocess
+    import threading
+    import uuid
+    if CLAUDE["session"] is not None or CLAUDE.get("warming"):
+        return
+    CLAUDE["warming"] = True
+
+    def _go():
+        from plexus.gui import corpus as _corpus
+        sid = str(uuid.uuid4())
+        ref = _corpus.corpus(mode)
+        t0 = time.time()
+        try:
+            subprocess.run([studio._claude_bin(), "-p",
+                            "REFERENCE -- the Plexus framework you are working in. Read it once and "
+                            "keep it for every task of this session. Reply with the single word READY.\n\n"
+                            + ref + "\n\n=== END OF REFERENCE ===",
+                            "--session-id", sid, "--model", model, "--effort", "low",
+                            "--disallowedTools", "Write", "Edit", "Read", "Glob", "Grep", "Bash",
+                            "WebFetch", "WebSearch", "Task"],
+                           cwd=studio.REPO, capture_output=True, text=True, timeout=300)
+            CLAUDE["session"] = sid
+            CLAUDE["primed_mode"] = mode
+            print(f"[claude] session primed with {len(ref):,} chars in {time.time() - t0:.1f}s "
+                  f"-- the first task will not pay for it", flush=True)
+        except Exception as e:                                       # noqa: BLE001 -- the page still works cold
+            print(f"[claude] could not prime the session: {type(e).__name__}: {e}", flush=True)
+        finally:
+            CLAUDE["warming"] = False
+    threading.Thread(target=_go, daemon=True).start()
+
+
 def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900, brief: str | None = None,
                  mode: str = "bio") -> dict:
     """Launch the CLI on the task in a thread; the transcript fills `CLAUDE['lines']` as it runs."""
@@ -571,6 +617,8 @@ def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900
     fresh = CLAUDE["session"] is None
     if fresh:
         CLAUDE["session"] = str(uuid.uuid4())
+    # A SESSION PRIMED AT STARTUP ALREADY HOLDS THE CORPUS: resume it and do not send it again.
+    primed = CLAUDE.get("primed_mode") == mode and not fresh
     notes = CLAUDE["notes"]; CLAUDE["notes"] = []
     prompt = task
     if notes:
@@ -585,13 +633,15 @@ def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900
         prompt = ("REFERENCE -- the Plexus framework you are working in. Read it once and keep it "
                   "for every task of this session.\n\n" + ref + "\n\n=== END OF REFERENCE ===\n\n" + prompt)
         primed_line = f"[session primed with {len(ref):,} chars: framework, operator atlas, entities, references]"
-    CLAUDE.update(running=True, task=task, lines=([primed_line] if fresh else []) + [f"task: {task}" + ("" if fresh else f"  (session turn {CLAUDE['turns'] + 1})")],
+    else:
+        primed_line = ""
+    CLAUDE.update(running=True, task=task, lines=([primed_line] if (fresh and not primed) else []) + [f"task: {task}" + ("" if fresh else f"  (session turn {CLAUDE['turns'] + 1})")],
                   seconds=0.0, error=None, started=time.time())
 
     def _go():
         sess = ["--session-id", CLAUDE["session"]] if fresh else ["--resume", CLAUDE["session"]]
         cmd = [studio._claude_bin(), "-p", prompt, *sess,
-               "--append-system-prompt", (brief or BIO_BRIEF).replace("{port}", str(port)),
+               "--append-system-prompt", (brief or BIO_BRIEF).replace("{port}", str(port)) + SHORT,
                "--allowedTools", "Bash(curl:*)", "Bash(sleep:*)", "Bash(jq:*)",
                "--disallowedTools", "Write", "Edit", "NotebookEdit", "Read", "Glob", "Grep", "WebFetch", "WebSearch", "Task",
                "--model", model, "--effort", "low",

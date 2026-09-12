@@ -590,9 +590,18 @@ def p_claude(h, data):
     # WHAT IS ON SCREEN, IN THE PROMPT. Without it the agent's first move is always a GET to read
     # the scene back -- one model round trip before any work, on every task.
     if data.get("form") is not None:
-        task = (f"The form on screen (spec '{data.get('name')}') is:\n{json.dumps(data['form'])}\n\n"
-                f"Apply this change to it and POST the WHOLE edited form back in ONE build call, "
-                f"then say what you changed. Do not read the scene first.\n\nTask: {task}")
+        f = dict(data["form"])
+        bodies = f.pop("bodies", []) or []
+        kinds = {}
+        for b in bodies:
+            kinds[str(b.get("material", "?"))] = kinds.get(str(b.get("material", "?")), 0) + 1
+        task = (f"The scene on screen is spec '{data.get('name')}': {json.dumps(f)}, with "
+                f"{len(bodies)} bodies ({', '.join(f'{v} {k}' for k, v in kinds.items()) or 'none'}).\n"
+                f"Change it with ONE patch call and nothing else:\n"
+                f"  curl -s -X POST http://127.0.0.1:{{port}}/api/scene/patch -H 'Content-Type: application/json' "
+                f"-d '{{\"form\": {{...changed top-level fields...}}, \"bodies\": {{\"*\": {{...changed body fields...}}}}}}'\n"
+                f"Send only the fields that change. Do not read the scene first and do not send the whole form."
+                f"\n\nTask: {task}")
     return h._send_json(bio.claude_start(task, int(h.server.server_address[1]),
                                          model=str(data.get("model") or "sonnet"), brief=brief, mode=mode))
 
@@ -766,6 +775,41 @@ def p_loadrun(h, data):
     return h._send_json({"n": n, "every": v._keep_every, "n_frames": v.RUN.get("n_frames")})
 
 
+def p_patch(h, data):
+    """Change a FEW FIELDS of the scene on screen, and rebuild: `{"form": {...}, "bodies": {"*": {...}}}`.
+
+    WHY A PATCH AND NOT THE WHOLE FORM. The page's driver used to be handed the form and asked to
+    post the edited copy back; on a 27-body scene that is 5,000 characters of JSON it must READ and
+    then WRITE, and generating them is most of a 50-second turn. "Change the material to water" is
+    two fields. `bodies` keys are body names, or `*` for every body.
+    """
+    from plexus.gui import bio, tabs
+    name = str(data.get("name") or bio.STATE.get("name") or "")
+    sp = _spec_path(name)
+    tab_name = str(data.get("tab") or bio.STATE.get("specs", {}).get(name) or bio.STATE.get("tab") or "")
+    if not name or not os.path.exists(sp) or tab_name not in tabs.ORDER:
+        return h._send_json({"error": "no form-built scene is open"}, 400)
+    tab = tabs.get(tab_name)
+    try:
+        form = tab.form_from_spec(yaml.safe_load(open(sp)))
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": f"this spec does not read back into the form: {e}"}, 400)
+    form.update(data.get("form") or {})
+    bp = data.get("bodies") or {}
+    if bp:
+        for b in form.get("bodies") or []:
+            for key in ("*", b.get("name")):
+                if key in bp:
+                    b.update(bp[key])
+        # a material change carries its own stiffness key: drop the one that no longer applies
+        for b in form.get("bodies") or []:
+            if str(b.get("material", "")).lower() == "liquid":
+                b.pop("youngs", None)
+            else:
+                b.pop("bulk_modulus", None)
+    return p_tab_build(h, form, tab_name)
+
+
 def p_quit(h, data):
     """SHUT THE SOCKET, NOT JUST THE PROCESS. A server killed with the port still bound -- or
     suspended with Ctrl-Z -- leaves the port held and the next launch dies on "Address already in
@@ -847,7 +891,7 @@ POST_ROUTES = {
     "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
     "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
     "/api/scene/style": p_style, "/api/scene/saveas": p_saveas, "/api/scene/curves": p_curves,
-    "/api/scene/loadrun": p_loadrun,
+    "/api/scene/loadrun": p_loadrun, "/api/scene/patch": p_patch,
     "/api/quit": p_quit, "/api/studio/quit": p_quit,
     "/api/validate": p_validate, "/api/save": p_editor_save, "/api/layout": p_layout,
 }
@@ -1058,8 +1102,9 @@ def serve(host="127.0.0.1", port=8765, prime=True):
         # is watching -- the one that pays for it. The engine's imports (torch, warp, pyvista)
         # are paid once too, by the first seed, in this process: the run is in-process now.
         try:
-            from plexus.gui import studio
+            from plexus.gui import bio, studio
             studio.prime_async()
+            bio.claude_warm()                    # the page's own session, corpus already in it
         except Exception as e:                                       # noqa: BLE001
             print(f"[studio] could not start priming: {e}", flush=True)
     return httpd

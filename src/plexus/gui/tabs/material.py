@@ -387,6 +387,9 @@ You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body 
                           render (small_splats|middle_splats|large_splats|surface|surface_specular|glassy),
                           light (default|headlight|sun|studio|flat), color (particles|deformation|stress|velocities).
                           A ball deforms visibly below ~30,000 Pa; 1,000,000 is rigid.
+  POST /api/scene/patch   {form: {...}, bodies: {"*"|<name>: {...}}} -> change a FEW fields of the
+                          scene on screen and rebuild. THE FIRST THING TO REACH FOR: it is one short
+                          call, where re-sending the whole form is thousands of characters.
   POST /api/scene/refine    {name, prompt} -> an English edit of the current spec (another Claude
                           applies it; 20-40 s)
   GET  /api/scene/counts?name= -> live count per set and per body type

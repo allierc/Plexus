@@ -203,6 +203,9 @@ You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body 
                           per_assembly, p_within, p_cross, boost, frac_exc (share excitatory), dale (0|1),
                           afferent (0|1), drive, gain, noise, seed, pulse_period, pulse_duration,
                           pulse_radius, n_frames, dt, movie_frames, stills.
+  POST /api/scene/patch   {form: {...}, bodies: {"*"|<name>: {...}}} -> change a FEW fields of the
+                          scene on screen and rebuild. THE FIRST THING TO REACH FOR: one short call,
+                          where re-sending the whole form is thousands of characters.
   POST /api/scene/run     {device} -> generate the spec (the same run as Plexus_Main.py -o generate)
   GET  /api/scene/run     -> progress {running, frame, n_frames, seconds}
   POST /api/scene/run     {stop: true}
