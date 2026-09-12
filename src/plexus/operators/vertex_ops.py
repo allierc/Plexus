@@ -2666,7 +2666,16 @@ class Apoptosis3D(Structural):
         # `critical_frac * v_ref` IN THE CONVENTION `V0f` IS ACTUALLY IN -- see `cell_size`. It was
         # the wedge reference on every run, so an apicobasal cell was extruded at a fraction of a
         # volume it does not have.
-        _vn, v_ref = cell_size(lvl, m, nF, pos_t)
+        # THE CRITERION IS ON A TARGET, SO ITS REFERENCE IS THE TARGET'S. `size_tgt` below is `V0f`
+        # (or `A0` on a sheet), a quantity in the SEED's convention -- wedge on every apico-basal
+        # spec in the tree -- and `crit` is a fraction of it. `cell_size` reads the polyhedron for
+        # a set with a separation (R2b), which is right for what a cell HAS and wrong for what it
+        # ASKS: against the polyhedron median apop2_ks0p1 shed 325 cells by frame 37 where the
+        # working point sheds none. The reference here is the seed-time median in the target's
+        # own units, which is what it was before R2b.
+        _vn, _ = cell_size(lvl, m, nF, pos_t)
+        _by_area = m.get("size_convention") == "area"
+        v_ref = float(m.get("a_ref", 0.0)) if _by_area else float(m.get("v_ref", 1.0))
         crit = self.crit * v_ref
         # THE TARGET THAT IS SHRUNK, IN THE SAME CONVENTION AS `crit`: the volume target on a
         # shell, the area target on a flat sheet (where V0f is identically zero -- see

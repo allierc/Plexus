@@ -20,6 +20,22 @@ no inward prism, thickness CV <= 0.10 and thinnest/median thickness >= 0.7 for t
     h_cv        std / mean of the cell thickness 2|sep|                            <= 0.15
     h_min_rel   thinnest thickness over the median                                 >= 0.5
 
+AND FOUR ON THE PRISM ITSELF, because a cell can sit on a smooth shell and still be the wrong
+solid: an apico-basal cell is a prism whose two caps are alike, parallel, stacked and of one
+thickness. A trapezoid in the cross section is a cell whose apical cap is much larger than its
+basal one; a sheared cell has its apical cap displaced sideways over its basal one; a tilted
+cell's thickness vectors lean away from the cap normal; a cell of uneven thickness has one
+ring vertex much thinner than another. On a shell of radius R and thickness h the caps differ
+by ~2h/R legitimately (0.2 here), so the trapezoid band allows that and refuses the rest.
+
+    trapezoid   fraction of cells whose apical/basal cap area ratio, over the ratio
+                the shell's curvature imposes, lies outside [1/1.4, 1.4]          <= 0.02
+    shear       fraction of cells whose cap-centroid offset, in the cap plane,
+                exceeds half the cell's thickness                                    <= 0.02
+    tilt        fraction of vertices whose `sep` leans more than 45 deg from the
+                mean normal of the cells around them                                 <= 0.02
+    h_in_cell   median over cells of (max - min)/mean thickness around the ring     <= 0.5
+
 A run FAILS at the first frame that leaves a band; the report says which frame and which number,
 because "asph 0.12 at frame 20" and "asph 0.05 at frame 790" are different defects.
 
@@ -38,7 +54,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
 BANDS = dict(asph=(None, 0.04), inv_wedge=(None, 0.0), sep_in=(None, 0.0),
-             h_cv=(None, 0.15), h_min_rel=(0.5, None))
+             h_cv=(None, 0.15), h_min_rel=(0.5, None),
+             trapezoid=(None, 0.02), shear=(None, 0.02), tilt=(None, 0.02), h_in_cell=(None, 0.5))
 
 
 def frame_metrics(z, t):
@@ -64,11 +81,58 @@ def frame_metrics(z, t):
         m.update(sep_in=float((cosang < 0).float().mean()),
                  h_cv=float(h.std() / h.mean().clamp(min=1e-9)),
                  h_min_rel=float(h.min() / h.median().clamp(min=1e-9)))
+        m.update(prism_metrics(P, S, es, et, ef, nF))
     else:                                            # a mid-surface model has no thickness to judge
-        m.update(sep_in=0.0, h_cv=0.0, h_min_rel=1.0)
+        m.update(sep_in=0.0, h_cv=0.0, h_min_rel=1.0, trapezoid=0.0, shear=0.0, tilt=0.0, h_in_cell=0.0)
     if "vertex__mesh_scalar_n_t1" in z.files:
         m["t1"] = int(z["vertex__mesh_scalar_n_t1"][t])
     return m
+
+
+def prism_metrics(P, S, es, et, ef, nF):
+    """The four prism-quality numbers of one frame (see the module docstring)."""
+    import torch
+    a, b = P + S, P - S
+    ones = torch.ones(es.shape[0])
+    cnt = torch.zeros(nF).index_add(0, ef, ones).clamp(min=1)
+    z3 = lambda: torch.zeros(nF, 3)                                          # noqa: E731
+    ca = z3().index_add(0, ef, a[es]) / cnt[:, None]
+    cb = z3().index_add(0, ef, b[es]) / cnt[:, None]
+
+    def cap_area_and_normal(x, cx):
+        cr = torch.cross(x[es] - cx[ef], x[et] - cx[ef], dim=-1)             # 2 x triangle area vectors
+        nv = z3().index_add(0, ef, cr)                                       # Newell vector per cell
+        return 0.5 * nv.norm(dim=1), nv / nv.norm(dim=1, keepdim=True).clamp(min=1e-9)
+    A_ap, n_ap = cap_area_and_normal(a, ca)
+    A_ba, _ = cap_area_and_normal(b, cb)
+    # THE CURVATURE'S OWN TRAPEZOID IS ALLOWED. On a shell of radius R a prism of thickness h has
+    # caps in the ratio ((R + h/2) / (R - h/2))^2 -- 1.6 at R 5, h 1.16 -- and that is a healthy
+    # cell. What is refused is the EXCESS over that: a cell flared or pinched by more than x1.4
+    # beyond what its own radius and thickness demand.
+    c = P.mean(0)
+    R_cell = (z3().index_add(0, ef, P[es]) / cnt[:, None] - c).norm(dim=1).clamp(min=1e-9)
+    h_c = (2.0 * S.norm(dim=1))
+    h_cellm = torch.zeros(nF).index_add(0, ef, h_c[es]) / cnt
+    expected = ((R_cell + 0.5 * h_cellm) / (R_cell - 0.5 * h_cellm).clamp(min=1e-9)) ** 2
+    ratio = A_ap / A_ba.clamp(min=1e-12) / expected
+    trapezoid = float(((ratio < 1 / 1.4) | (ratio > 1.4)).float().mean())
+    # shear: apical centroid displaced over the basal one, measured in the cap plane, per thickness
+    d = ca - cb
+    h_cell = (d * n_ap).sum(1).abs().clamp(min=1e-9)
+    lateral = (d - (d * n_ap).sum(1, keepdim=True) * n_ap).norm(dim=1)
+    shear = float((lateral > 0.5 * h_cell).float().mean())
+    # tilt: each vertex's sep against the mean cap normal of the cells it belongs to
+    vn = torch.zeros(P.shape[0], 3).index_add(0, es, n_ap[ef])
+    vn = vn / vn.norm(dim=1, keepdim=True).clamp(min=1e-9)
+    cosv = ((S / S.norm(dim=1, keepdim=True).clamp(min=1e-9)) * vn).sum(1).abs()
+    tilt = float((cosv < 0.7071).float().mean())
+    # thickness uniformity around each cell's ring
+    hv = 2.0 * S.norm(dim=1)
+    hmax = torch.full((nF,), -1e9).scatter_reduce(0, ef, hv[es], reduce="amax")
+    hmin = torch.full((nF,), 1e9).scatter_reduce(0, ef, hv[es], reduce="amin")
+    hmean = torch.zeros(nF).index_add(0, ef, hv[es]) / cnt
+    h_in_cell = float(((hmax - hmin) / hmean.clamp(min=1e-9)).median())
+    return dict(trapezoid=trapezoid, shear=shear, tilt=tilt, h_in_cell=h_in_cell)
 
 
 def judge(m):
@@ -96,7 +160,8 @@ def gauge(traj, every=20, verbose=True):
         bad = judge(m)
         if verbose:
             print(f"   t{t:4d} cells={m['cells']:5d} asph={m['asph']:.3f} inv_wedge={m['inv_wedge']:.3f} "
-                  f"sep_in={m['sep_in']:.3f} h_cv={m['h_cv']:.2f} h_min_rel={m['h_min_rel']:.2f}"
+                  f"sep_in={m['sep_in']:.3f} h_cv={m['h_cv']:.2f} h_min_rel={m['h_min_rel']:.2f} "
+                  f"trap={m['trapezoid']:.3f} shear={m['shear']:.3f} tilt={m['tilt']:.3f} h_in={m['h_in_cell']:.2f}"
                   + (f" T1={m['t1']}" if "t1" in m else "") + ("   <-- " + "; ".join(bad) if bad else ""))
         if bad and first_bad is None:
             first_bad = (t, bad)
