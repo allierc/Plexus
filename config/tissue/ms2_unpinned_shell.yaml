@@ -54,6 +54,10 @@ sets:
         record: false
       inhib_frac:
         width: 1
+      cell_id:
+        width: 1
+      parent_id:
+        width: 1
   vertex:
     n: 25584
     mesh: half_edge

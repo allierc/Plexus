@@ -95,31 +95,56 @@ def row(name, group="tissue", birth_lag=12, until=None):
     # cheap; the polyhedron geometry is not, and a run of 800 frames and 2,000 cells took minutes
     # per spec when every frame was rebuilt. The volumes are needed at each birth's read frame,
     # at the frame before each division, and on a stride for the population medians.
-    ages = [_age(z, t) for t in range(T)]
-    births = []                                   # (index, frame) of every birth after frame 0
-    for t in range(1, T):
-        n0, a0, a1 = len(ages[t - 1]), ages[t - 1], ages[t]
-        for i in range(len(ages[t])):
-            if i >= n0 or a1[i] < a0[i]:
-                births.append((i, t))
-    resets = {}
-    for i, t in births:
-        resets.setdefault(i, []).append(t)
-    pairs = []
-    for i, tb in births:
-        later = [t for t in resets[i] if t > tb]
-        if later:
-            td = later[0]
-            pairs.append((i, tb, min(tb + birth_lag, td - 1), td))
+    pairs = []                                    # (index at read frame, birth, read frame, division)
+    if "cell__cell_id" in z.files:
+        # LINEAGE FROM IDENTITY (R4). A cell is born the frame its id first appears and divides the
+        # frame after its id last appears while children carry it as `parent_id`; nothing here
+        # depends on where the cell sits in the buffer.
+        ids = [np.rint(np.asarray(z["cell__cell_id"][t])[:int(nFs[t]), 0]).astype(np.int64) for t in range(T)]
+        pids = ([np.rint(np.asarray(z["cell__parent_id"][t])[:int(nFs[t]), 0]).astype(np.int64) for t in range(T)]
+                if "cell__parent_id" in z.files else None)
+        first, last, where = {}, {}, {}
+        for t in range(T):
+            for j, c in enumerate(ids[t]):
+                c = int(c)
+                if c not in first:
+                    first[c] = t
+                last[c] = t; where[(c, t)] = j
+        parents = set(int(p) for t in range(T) for p in pids[t]) if pids is not None else None
+        for c, tb in first.items():
+            tl = last[c]
+            if tl >= T - 1 or tb == 0:
+                continue                          # still alive at the end, or seeded: no full cycle
+            if parents is not None and c not in parents:
+                continue                          # vanished without children: a death, not a division
+            td = tl + 1
+            tr = min(tb + birth_lag, tl)
+            pairs.append((where[(c, tr)], tb, tr, td, where[(c, tl)]))
+    else:
+        ages = [_age(z, t) for t in range(T)]
+        births = []                               # (index, frame) of every birth after frame 0
+        for t in range(1, T):
+            n0, a0, a1 = len(ages[t - 1]), ages[t - 1], ages[t]
+            for i in range(len(ages[t])):
+                if i >= n0 or a1[i] < a0[i]:
+                    births.append((i, t))
+        resets = {}
+        for i, t in births:
+            resets.setdefault(i, []).append(t)
+        for i, tb in births:
+            later = [t for t in resets[i] if t > tb]
+            if later:
+                td = later[0]
+                pairs.append((i, tb, min(tb + birth_lag, td - 1), td, i))
     # the settle window: the reference is the median once the size rules start reading
     ref_frame = int(z["vertex__mesh_scalar_ref_frame"][0]) if "vertex__mesh_scalar_ref_frame" in z.files else 0
     stride = max(1, T // 80)
     need = {0, T - 1, min(ref_frame, T - 1)} | set(range(0, T, stride)) \
-        | {tr for _, _, tr, _ in pairs} | {td - 1 for _, _, _, td in pairs}
+        | {tr for _, _, tr, _, _ in pairs} | {td - 1 for _, _, _, td, _ in pairs}
     conv = _convention(p)
     V = {t: _volumes(z, t, conv) for t in sorted(need)}
     v_ref = float(np.median(V[min(ref_frame, T - 1)]))
-    cyc = [(V[tr][i] / v_ref, V[td - 1][i] / v_ref, td - tb) for i, tb, tr, td in pairs]
+    cyc = [(V[tr][i] / v_ref, V[td - 1][j] / v_ref, td - tb) for i, tb, tr, td, j in pairs]
     out = dict(name=name, T=T, n0=int(nFs[0]), nT=int(nFs[T - 1]), cycles=len(cyc))
     med_t = sorted(t for t in V if t % stride == 0 or t == T - 1)
     med = np.array([np.median(V[t]) for t in med_t]) / v_ref

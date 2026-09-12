@@ -1129,6 +1129,16 @@ class SeedMesh3D(Structural):
         _seed_cell_blocks(H, self.cell_set, nF, dt, dev,
                           Vbirth=vf.detach().cpu().numpy() * self.a0_scale ** 1.5,
                           divjit=np.asarray(dj, np.float64))
+        # IDENTITY (R4 of notes/size_cycle/SIZE_CYCLE_PLAN.md). `cell_id` is a number a cell keeps
+        # for its whole life and no other cell ever has; `parent_id` is its mother's, -1 for a
+        # seeded cell. Optional blocks: a spec that declares them gets lineage that survives every
+        # renumbering, and a report reads births and divisions off the ids instead of arguing
+        # from index stability. A spec that does not declare them is untouched.
+        if cell_block(H, self.cell_set, "cell_id", nF) is not None:
+            set_cell_block(H, self.cell_set, "cell_id", np.arange(nF, dtype=np.float64), nF)
+            m["next_id"] = int(nF)
+        if cell_block(H, self.cell_set, "parent_id", nF) is not None:
+            set_cell_block(H, self.cell_set, "parent_id", np.full(nF, -1.0), nF)
         return {}
 
 
@@ -1809,6 +1819,11 @@ class Divide3D(Structural):
         # and looked entirely normal. A declared block cannot be absent by accident, so the honest
         # answer is the refusal `require_cell_block` gives.
         djit = require_cell_block(H, self.cell_set, "divjit", nF, "cell_divide").tolist()
+        _cid = cell_block(H, self.cell_set, "cell_id", nF)
+        cid = None if _cid is None else _cid.tolist()
+        _pid = cell_block(H, self.cell_set, "parent_id", nF)
+        pid = None if _pid is None else _pid.tolist()
+        next_id = int(m.get("next_id", nF))
         age = m.get("age")                                       # per-cell age in division-calls since birth
         age = ([0] * nF) if (age is None or age.shape[0] != nF) else (age.detach().cpu().numpy() + 1).tolist()
         # THE BIRTH VOLUME, RE-READ ONCE THE MECHANICS HAS ANSWERED THE SEPTUM. A cell at age 1 was
@@ -1959,6 +1974,11 @@ class Divide3D(Structural):
             a0d = a0e = 0.5 * A0[f]; v0d = v0e = 0.5 * V0f[f]
             A0[f] = a0d; V0f[f] = v0d; Vbirth[f] = half           # daughter A (kept at index f)
             djit[f] = self._fresh_djit(rng); age[f] = 0           # fresh (desync'd) thresholds; reset cell-cycle age
+            if cid is not None:                                   # both daughters are new cells; the mother's id ends here
+                mother_id = cid[f]
+                cid[f] = float(next_id); cid.append(float(next_id + 1)); next_id += 2
+                if pid is not None:
+                    pid[f] = mother_id; pid.append(mother_id)
             ndiv[f] = ndiv[f] + 1
             A0.append(a0e); V0f.append(v0e); Vbirth.append(other); alive.append(1.0)  # daughter B
             djit.append(self._fresh_djit(rng)); age.append(0); ndiv.append(ndiv[f])
@@ -1989,6 +2009,9 @@ class Divide3D(Structural):
         V0fa = np.array([V0f[i] for i in keep], np.float64)
         Vba = np.array([Vbirth[i] for i in keep], np.float64)
         dja = np.array([djit[i] for i in keep], np.float64)
+        cida = None if cid is None else np.array([cid[i] for i in keep], np.float64)
+        pida = None if pid is None else np.array([pid[i] for i in keep], np.float64)
+        m["next_id"] = next_id
         agea = np.array([age[i] for i in keep], np.float64)
         ndva = np.array([ndiv[i] for i in keep], np.float64)
         alv = np.array([alive[i] for i in keep], np.float64)
@@ -2110,6 +2133,10 @@ class Divide3D(Structural):
         # because nothing copies a mesh row wholesale.
         set_cell_block(H, self.cell_set, "Vbirth", Vba, nF2)
         set_cell_block(H, self.cell_set, "divjit", dja, nF2)
+        if cida is not None:
+            set_cell_block(H, self.cell_set, "cell_id", cida, nF2)
+        if pida is not None:
+            set_cell_block(H, self.cell_set, "parent_id", pida, nF2)
         return {}
 
 

@@ -49,6 +49,10 @@ sets:
       V0f_init:
         width: 1
         record: false
+      cell_id:
+        width: 1
+      parent_id:
+        width: 1
   vertex:
     n: 16384
     mesh: half_edge
@@ -145,8 +149,6 @@ plotting:
     xlabel: frame
     ylabel: shell radius
     ticks: 4
-
-# --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie:
     description: The simulation shows a spherical cell-like structure maintaining a stable shape within
