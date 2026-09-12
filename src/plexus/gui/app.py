@@ -62,7 +62,7 @@ SHELL = r"""<!doctype html>
  <div class="row"><button onclick="runGo()" id="runbtn">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
  <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button><button class="dim" onclick="movieGo()" title="the movie.mp4 the run wrote, as a file">MOVIE</button><button class="dim" onclick="playStop();showMovie(null);FRAME=null;render(true)" title="back to the live view">LIVE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:150px" oninput="playing=null;showMovie(null);showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
- <h2>Claude takes over <span style="color:#778;font-weight:normal;text-transform:none">drives this page through its own routes</span></h2>
+ <h2>Claude</h2>
  <div class="row"><input id="task" style="width:100%" placeholder="{placeholder}" onkeydown="if(event.key==='Enter')claudeGo()"></div>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button><button class="dim" onclick="claudeNew()" title="forget the conversation so far">NEW SESSION</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
@@ -75,6 +75,7 @@ SHELL = r"""<!doctype html>
 <div id="right"><img id="view" draggable="false"><video id="movie" style="display:none;max-width:100%;max-height:100%" controls muted></video><div id="hint">drag to orbit, wheel to zoom, click to select -- rendered by the movie renderer, also while a run is going</div></div>
 <script>
 const TAB={tab_json};
+const DEFAULT_BODIES={default_bodies};
 const $=id=>document.getElementById(id);
 let SCENE=null, specName=null;
 const CAM={{azim:30,elev:20,zoom:1}};
@@ -183,4 +184,5 @@ def page(tab_name: str = "material") -> str:
     bar = "".join(f'<a class="{"on" if t == tab_name else ""}" onclick="switchTab(\'{t}\')">{t}</a>' for t in tabs.ORDER)
     return SHELL.format(title=tab.TITLE, css=CSS, tabbar=bar, form=tab.FORM_HTML, form_js=tab.FORM_JS,
                         tab_json=json.dumps(tab_name), pick_dir=tab.PICK_DIR,
+                        default_bodies=json.dumps(getattr(tab, "DEFAULT_FORM", {}).get("bodies", [])),
                         placeholder=PLACEHOLDERS.get(tab_name, ""))

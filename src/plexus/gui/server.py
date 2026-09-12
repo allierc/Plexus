@@ -658,6 +658,30 @@ def p_refine(h, data):
                          "form": _form_of(name, spec, data.get("tab"))})
 
 
+def p_style(h, data):
+    """The render selector: replace the spec's render keys, keep everything else, bump so the
+    page re-seeds through the renderer with the new style (which is also the movie's)."""
+    from plexus.gui import bio
+    from plexus.gui.tabs import material as M
+    name = str(data.get("name") or bio.STATE.get("name") or "")
+    sp = _spec_path(name)
+    if not name or not os.path.exists(sp):
+        return h._send_json({"error": "no spec is open"}, 400)
+    spec = yaml.safe_load(open(sp)) or {}
+    try:
+        spec["plotting"] = M.apply_render(spec.get("plotting") or {}, str(data.get("render", "dots")),
+                                          bool(int(data.get("specular", 0) or 0)))
+    except ValueError as e:
+        return h._send_json({"error": str(e)}, 400)
+    ok, err = _validate(spec)
+    if not ok:
+        return h._send_json({"error": "schema rejected the spec", "detail": err}, 400)
+    raw = _dump_yaml(spec)
+    open(sp, "w").write(raw)
+    bio.bump(name, f"render {data.get('render', 'dots')}")
+    return h._send_json({"name": name, "raw": raw, "version": bio.STATE["version"]})
+
+
 def p_quit(h, data):
     """SHUT THE SOCKET, NOT JUST THE PROCESS. A server killed with the port still bound -- or
     suspended with Ctrl-Z -- leaves the port held and the next launch dies on "Address already in
@@ -738,6 +762,7 @@ PICTURE_ROUTES = {f"/api/{p}/{x}" for p in ("scene", "bio") for x in ("render", 
 POST_ROUTES = {
     "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
     "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
+    "/api/scene/style": p_style,
     "/api/quit": p_quit, "/api/studio/quit": p_quit,
     "/api/validate": p_validate, "/api/save": p_editor_save, "/api/layout": p_layout,
 }
