@@ -79,14 +79,16 @@ Prose and reasons are in `AB_TISSUE_README.md`.
 | spec | frames | cells | shape | mechanics | sep | operators |
 |---|---|---|---|---|---|---|
 | `b_star` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_grow, cell_mechanics, interface_tension, cell_divide, edge_flip |
-| `ms1_pinned_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
-| `ms2_unpinned_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
-| `ms3_prism_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
-| `ms4_round_prism_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `ms1_pinned_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms2_unpinned_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms3_prism_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms4_round_prism_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
 | `ms5_two_channel` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
 | `ms6_apoptosis` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
 | `ms6b_apoptosis_noT1` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, cell_divide, cell_die |
 | `ms7_cycle_adder` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms8_cycle_dilution` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms9_cycle_hazard` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
 | `r010_00_ctrl` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_shape_probe, cell_grow, cell_mechanics, interface_tension, edge_flip, cell_divide |
 | `r020_00_ctrl` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_shape_probe, cell_grow, cell_mechanics, interface_tension, edge_flip, cell_divide |
 | `rig_apop_competition_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
