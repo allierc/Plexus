@@ -266,7 +266,7 @@ PAGE = r"""<!doctype html>
  <div class="row"><label>device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> <span style="color:#778;font-size:11px">frames, movie frames and stills are the spec's (BUILD writes them)</span></div>
  <div class="row"><button onclick="runGo()" id="runbtn">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
- <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button><button class="dim" onclick="showMovie(null);render(true)">VIEW</button> <span id="framelab" style="color:#9ab"></span></div>
+ <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button><button class="dim" onclick="movieGo()" title="the movie.mp4 the run wrote, as a file">MOVIE</button><button class="dim" onclick="playStop();showMovie(null);FRAME=null;render(true)" title="back to the live view">LIVE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:150px" oninput="playing=null;showMovie(null);showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
  <h2>Claude takes over <span style="color:#778;font-weight:normal;text-transform:none">drives this page through its own routes</span></h2>
  <div class="row"><input id="task" style="width:100%" placeholder="e.g. drop a snow ball onto a water slab, then run 100 frames" onkeydown="if(event.key==='Enter')claudeGo()"></div>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button><button class="dim" onclick="claudeNew()" title="forget the conversation so far">NEW SESSION</button> <span id="cstat" style="color:#8c8"></span></div>
@@ -276,7 +276,7 @@ PAGE = r"""<!doctype html>
  <h2>Hierarchy</h2><div id="tree">(none)</div>
  <h2>Selected object</h2><div id="info">click a particle</div>
 </div>
-<div id="right"><img id="view" draggable="false"><video id="movie" style="display:none;max-width:100%;max-height:100%" controls muted></video><div id="hint">drag to orbit, wheel to zoom, click to select -- rendered by the movie renderer; during a run: the pipeline's own stills, then its movie</div></div>
+<div id="right"><img id="view" draggable="false"><video id="movie" style="display:none;max-width:100%;max-height:100%" controls muted></video><div id="hint">drag to orbit, wheel to zoom, click to select -- rendered by the movie renderer, also while a run is going</div></div>
 <script>
 const $=id=>document.getElementById(id);
 let SCENE=null, specName=null;
@@ -326,21 +326,25 @@ window.setInfo=function(name){const s=SCENE.sets[name];const n=SCENE.hierarchy.s
  $('info').textContent=`set ${name}\n  entity: ${n.entity||'(by name)'}\n  buffer ${s.n_buffer}, live ${s.n_live}\n  blocks: ${s.blocks.join(', ')}\n`+(n.parent?`  contained in: ${n.parent} (${n.per_parent??'?'} per parent)\n`:'')+(n.types.length?`  bodies: ${n.types.join(', ')}\n`:'')+`  operators on it: ${SCENE.hierarchy.operators.filter(o=>o.at===name).map(o=>o.op).join(', ')||'-'}`;};
 addBody({name:'elastic',shape:'ball',centre:[0.15,0.31,0.25],material:'elastic',youngs:2000000,density:1000});addBody({name:'liquid',shape:'ball',centre:[0.25,0.37,0.25],material:'liquid',youngs:981000,density:1000});addBody({name:'snow',shape:'ball',centre:[0.35,0.29,0.25],material:'snow',youngs:500000,density:350});
 let running=false;
-window.runGo=async function(){playStop();FRAME=null;if(!specName){$('runstat').textContent='build a scene first';return;}const j=await post('/api/studio/run',{name:specName,device:$('run_device').value});if(j.error){$('runstat').textContent=j.error;return;}running=true;$('runbtn').disabled=true;$('runstat').textContent=`generate ${specName} on ${$('run_device').value}...`;lastStill=null;rpoll();};
-window.runStop=async function(){await post('/api/studio/stop',{name:specName});};
-// THE RUN IS Plexus_Main.py -o generate, IN THE WORKER PROCESS; the page shows ITS bar and ITS
-// pictures. While it runs the newest still the pipeline wrote is the picture; when it is done the
-// movie it wrote is what PLAY plays. Orbit, zoom and picking are the seeded view's (RE-SEED).
-let lastStill=null;
+window.runGo=async function(){playStop();showMovie(null);FRAME=null;if(!specName){$('runstat').textContent='build a scene first';return;}const j=await post('/api/bio/run',{device:$('run_device').value});if(j.error){$('runstat').textContent=j.error;return;}running=true;$('runbtn').disabled=true;$('runstat').textContent=`generate ${specName} on ${j.device}...`;MOVIE=null;rpoll();};
+window.runStop=async function(){await post('/api/bio/run',{stop:true});};
+// THE RUN IS plexus.pipeline.generate -- the body of Plexus_Main.py -o generate -- on the server's
+// VTK thread; its per-frame hook feeds this page's renderer and answers camera moves between
+// frames, so orbit and zoom work WHILE the movie is written to graphs_data/studio/<name>/.
+// Every movie frame is also kept as a level state, so PLAY replays the run at any camera.
 function showMovie(url){const v=$('movie');if(url){v.src=url;v.style.display='block';$('view').style.display='none';}else{v.pause();v.style.display='none';$('view').style.display='';}}
-async function rpoll(){try{const j=await (await fetch('/api/material/run?name='+encodeURIComponent(specName))).json();
- if(j.error&&j.done){$('runstat').textContent='error: '+j.error;}
- else $('runstat').textContent=(j.running?'running: ':(j.done&&j.total?'done: ':''))+(j.total?`frame ${j.frame}/${j.total}, ${j.elapsed}s`:'')+(j.ms_per_frame?` (${j.ms_per_frame.toFixed(0)} ms/frame, ${(1000/j.ms_per_frame).toFixed(1)} fps -- the engine's own bar)`:'');
- const pic=j.still||j.png;if(j.running&&pic&&pic!==lastStill){lastStill=pic;showMovie(null);$('view').src=pic;}
- if(j.running){setTimeout(rpoll,700);}else{running=false;$('runbtn').disabled=false;if(j.mp4){MOVIE=j.mp4;$('framelab').textContent=`movie written: ${j.dir}/movie.mp4 -- PLAY`;}else{$('framelab').textContent=j.error?'':'no movie was written';}}}catch(e){setTimeout(rpoll,1500);}}
-let MOVIE=null, playing=null, FRAME=null;
-window.playGo=async function(){if(!MOVIE){$('framelab').textContent='no movie yet: RUN first';return;}showMovie(MOVIE);const v=$('movie');v.loop=true;v.play();playing=true;};
-window.playStop=function(){if(playing){$('movie').pause();}playing=null;};
+async function rpoll(){try{const j=await (await fetch('/api/bio/run')).json();if(j.error&&!j.running){$('runstat').textContent='error: '+j.error;}
+ else $('runstat').textContent=(j.running?'running: ':(j.stopped?'stopped: ':'done: '))+`frame ${j.frame}/${j.n_frames}, ${j.seconds}s`+(j.ms_per_frame?` (${j.ms_per_frame.toFixed(0)} ms/frame, the engine's own clock)`:(j.frame&&j.seconds?` (${(j.seconds/j.frame*1000).toFixed(0)} ms/frame incl. the movie)`:''));
+ if(j.counts&&j.counts.sets)$('runcounts').textContent=Object.entries(j.counts.sets).map(([k,v])=>`${k} ${v}`).join('  ');
+ render();if(j.running){setTimeout(rpoll,700);}else{running=false;$('runbtn').disabled=false;nframes=j.frames_kept||0;$('frame').max=Math.max(nframes-1,0);
+  const a=await (await fetch('/api/material/run?name='+encodeURIComponent(specName))).json();MOVIE=a.mp4||null;
+  $('framelab').textContent=(nframes?`${nframes} frames kept (every ${j.keep_every||1}): PLAY replays at any camera`:'')+(MOVIE?`; MOVIE plays ${a.dir}/movie.mp4`:'');}}catch(e){setTimeout(rpoll,1500);}}
+let MOVIE=null, playing=null, nframes=0, FRAME=null;
+async function showFrame(i){FRAME=i;$('frame').value=i;$('framelab').textContent=`frame ${i}/${Math.max(nframes-1,0)}`;await render();}
+window.playGo=async function(){showMovie(null);const j=await (await fetch('/api/bio/frames')).json();nframes=j.n||0;if(!nframes){$('framelab').textContent='no frames yet: RUN first';return;}$('frame').max=nframes-1;playing=true;let i=0;
+ while(playing){await showFrame(i);i=(i+1)%nframes;await new Promise(r=>setTimeout(r,30));}};
+window.playStop=function(){playing=null;const v=$('movie');if(v.style.display!=='none')v.pause();};
+window.movieGo=function(){if(!MOVIE){$('framelab').textContent='no movie yet: RUN first';return;}playing=null;showMovie(MOVIE);const v=$('movie');v.loop=true;v.play();};
 let seen={version:-1,cam_version:-1};
 async function poll(){try{const st=await (await fetch('/api/bio/state')).json();
  if(st.name&&st.version!==seen.version){seen.version=st.version;specName=st.name;$('name').value=st.name;const j=await (await fetch('/api/material/spec?name='+encodeURIComponent(st.name))).json();if(j.raw)$('yamltext').value=j.raw;if(j.form)fillForm(j.form);await reseed();}

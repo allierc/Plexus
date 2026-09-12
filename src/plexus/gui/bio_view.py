@@ -33,17 +33,44 @@ LOCK = threading.RLock()
 CURRENT: dict = {"view": None}
 _EXEC = ThreadPoolExecutor(max_workers=1, thread_name_prefix="plexus-vtk")
 _VTK_THREAD: dict = {"ident": None}
+# REQUESTS FOR THE VTK THREAD WAIT HERE, NOT ONLY IN THE EXECUTOR. While a run occupies the VTK
+# thread (the pipeline is called ON it, see `View.run`, because a second off-screen plotter on a
+# second thread dies inside VTK), the executor's own queue is stuck behind the run; the run's
+# per-frame hook drains THIS queue instead, so a camera move from the page is answered between two
+# frames rather than after the last one. Outside a run the executor drains it as before.
+import queue as _queue
+_PENDING: "_queue.Queue" = _queue.Queue()
+
+
+def _drain() -> int:
+    """Answer every waiting request, on the VTK thread. Returns how many were served."""
+    n = 0
+    while True:
+        try:
+            fn, args, kwargs, fut = _PENDING.get_nowait()
+        except _queue.Empty:
+            return n
+        if fut.set_running_or_notify_cancel():
+            try:
+                fut.set_result(fn(*args, **kwargs))
+            except BaseException as e:                               # noqa: BLE001
+                fut.set_exception(e)
+        n += 1
 
 
 def _vtk(fn, *args, **kwargs):
     """Run `fn` on the one VTK thread and return its result (a call from that thread runs inline)."""
     if _VTK_THREAD["ident"] == threading.get_ident():
         return fn(*args, **kwargs)
+    from concurrent.futures import Future
+    fut: Future = Future()
+    _PENDING.put((fn, args, kwargs, fut))
 
-    def _wrapped():
+    def _serve():
         _VTK_THREAD["ident"] = threading.get_ident()
-        return fn(*args, **kwargs)
-    return _EXEC.submit(_wrapped).result()
+        _drain()
+    _EXEC.submit(_serve)
+    return fut.result()
 
 
 class View:
@@ -389,31 +416,39 @@ class View:
         return names
 
     # ------------------------------------------------------------------ running the engine
-    def run(self, frames: int | None = None, device: str | None = None, keep: int | None = None,
-            live: int | None = None) -> dict:
-        """Simulate the spec forward in a thread, the picture following every frame.
+    def run(self, device: str | None = None, **_ignored) -> dict:
+        """Generate the spec THROUGH THE PIPELINE -- `plexus.pipeline.generate`, the body of
+        `Plexus_Main.py -o generate` -- on the VTK thread, with its per-frame hook feeding this
+        view.
 
-        `engine.run` builds and seeds its own hierarchy and loops internally, so a run always
-        starts from the seed (frame 0) and there is no "continue from here" yet; `frames` caps the
-        number of frames, `stop()` aborts. Each frame the movie renderer is fed the run's
-        hierarchy exactly as a generate does (`lm(H, tick)`), so what the page shows during the run
-        is the movie's frame; the scene dict used for picking is refreshed every 10 frames."""
+        WHY ON THE VTK THREAD. The pipeline builds its own `LiveMovie` (the movie.mp4 and the stills
+        in graphs_data/studio/<name>/); VTK gives one off-screen context per thread, and a second
+        plotter on a second thread died with `std::bad_array_new_length`. So the run is submitted to
+        the one VTK thread, both plotters live there, and the hook drains `_PENDING` -- the page's
+        camera moves, picks and screenshots -- between frames. That is what makes orbit and zoom
+        work DURING generation: every request is answered on the thread that owns the context, at
+        most one frame late.
+
+        What the hook does per tick: counts (cheap), a snapshot every movie stride (so PLAY can
+        replay the run at any camera, the movie's own frames), and a redraw of this view's plotter
+        whenever a request is waiting or a still is due, so the picture the page asks for is the
+        frame being computed."""
         import torch
         if self.RUN.get("running"):
             return {"error": "already running; STOP it first"}
         dev = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
-        n = int(frames or self.sim.n_frames)
-        self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev, started=time.time(), frames_kept=0)
+        n = int(self.sim.n_frames)
+        self.RUN.update(running=True, frame=0, n_frames=n, seconds=0.0, error=None, stop=False, device=dev,
+                        started=time.time(), frames_kept=0, out_dir=None, stopped=False, ms_per_frame=None)
+        self.snaps = []
         # THE OVERLAY'S DENOMINATOR IS THIS RUN'S LENGTH, not the 1 the renderer was built with to draw the seed.
         self.lm.n_frames = n
         self.lm.t0 = time.perf_counter()
-        self.snaps = []
-        # THE RUN IS NOT THE MOVIE. Drawing every frame of a 570k-particle waterfall cost 650 ms a
-        # frame on top of the engine's 55 ms; a generate renders every 8th. Here the picture is
-        # refreshed on a clock (DRAW_INTERVAL seconds), so the engine sets the pace and the page
-        # sees the latest frame; the pick scene is rebuilt at most every SCENE_INTERVAL seconds.
-        # Kept frames for PLAY are strided to SNAPS_MAX and to a memory budget (SNAP_BUDGET bytes,
-        # from the seeded hierarchy's own position columns).
+        # THE MOVIE'S OWN STRIDES. Kept frames for PLAY are the frames the pipeline's movie keeps
+        # (`plotting.max_frames`, live_movie.py:256), widened only by a memory budget on the kept
+        # positions; the picture is refreshed at the pipeline's stills (`plotting.stills`) and
+        # whenever the page asks.
+        pl = self.sim.plotting or {}
         per_frame = 0
         for lv in self.H.levels.values():
             sch = getattr(lv, "state_schema", None)
@@ -422,64 +457,56 @@ class View:
                     if key in sch:
                         a, b = sch[key]
                         per_frame += int(lv.state.shape[0]) * (b - a) * 4
-        # TWO STRIDES. `live`: how many times the page's picture is refreshed DURING the run (20 by
-        # default: drawing is the cost, and a run is watched, not filmed). `keep`: how many frames
-        # the run keeps for PLAY -- the movie's own rule, every frame up to 300 (live_movie's
-        # max_frames), so a 400-frame run keeps every 2nd, a 2400-frame one every 8th; a memory
-        # budget on the kept positions can widen that stride.
-        keep_n = max(2, int(keep or self.SNAPS_MAX))
-        by_count = max(1, -(-(n + 1) // keep_n))
+        by_count = max(1, -(-n // max(1, int(pl.get("max_frames", 300)))))
         by_mem = max(1, -(-((n + 1) * max(per_frame, 1)) // self.SNAP_BUDGET))
         self._keep_every = max(by_count, by_mem)
-        self._draw_every = max(1, -(-(n + 1) // max(1, int(live or self.LIVE_PICS))))
+        self._draw_every = max(1, -(-n // max(1, int(pl.get("stills", 10)))))
         self.RUN["keep_every"] = self._keep_every
         self.RUN["draw_every"] = self._draw_every
-        self._last_draw = 0.0
         self._last_scene = 0.0
+        from plexus.pipeline import StopRun
 
-        class _Stop(Exception):
-            pass
-
-        def _draw(H, tick, draw, scene):
+        def _on_frame(H, tick):
+            if self.RUN.get("stop"):
+                raise StopRun()
+            now = time.time()
             with LOCK:
                 self.H = H
-                if draw:
+                due = tick == n or tick % self._draw_every == 0
+                if due or not _PENDING.empty():
                     self.lm(H, tick)
                     if getattr(self.lm, "cs", None) is not None and tick == 0:
                         self.lm._update_cross_section(H)
-                    self._last_draw = time.time()
                 if tick % self._keep_every == 0 or tick == n:
                     self._snapshot(H)
-                if scene:
+                if tick == n or (now - self._last_scene) >= self.SCENE_INTERVAL:
                     from plexus.gui import bio
                     self.scene = bio.scene_from(H, self.sim, self.spec_path)
                     if self.pick:
                         self._highlight(self.pick)
                     self._last_scene = time.time()
-
-        def _on_frame(H, tick):
-            if self.RUN.get("stop") or tick > n:
-                raise _Stop()
-            now = time.time()
-            draw = tick == n or tick % self._draw_every == 0
-            scene = tick == n or (now - self._last_scene) >= self.SCENE_INTERVAL
-            _vtk(_draw, H, tick, draw, scene)
             self.RUN["frame"] = int(tick)
             self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
             self.RUN["counts"] = self.counts_live(H)
+            _drain()                                                 # the page's camera, between frames
 
         def _go():
-            from plexus import engine
+            _VTK_THREAD["ident"] = threading.get_ident()
+            from plexus import pipeline
             try:
-                engine.run(self.sim, out_path=None, device=dev, on_frame=_on_frame)
-            except _Stop:
-                pass
+                r = pipeline.generate(self.spec_path, device=dev, force=True, describe=False, on_frame=_on_frame)
+                self.RUN["out_dir"] = r.get("data_dir")
+                self.RUN["stopped"] = bool(r.get("stopped"))
+                fm = r.get("frame_ms")
+                if fm is not None and len(fm) > 1:
+                    self.RUN["ms_per_frame"] = float(np.mean(np.asarray(fm)[1:]))
             except Exception as e:                                   # noqa: BLE001
                 self.RUN["error"] = f"{type(e).__name__}: {e}"[:600]
             finally:
                 self.RUN["running"] = False
                 self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
-        threading.Thread(target=_go, daemon=True).start()
+                _drain()
+        _EXEC.submit(_go)
         return {"started": True, "frames": n, "device": dev}
 
     def stop(self) -> dict:

@@ -70,18 +70,20 @@ log copy, the VRAM warning, `data_generate` with the spec-shaped live movie, the
 caption); `Plexus_Main.py` calls it and keeps only argument parsing and the `-o plot` branch.
 `data_generate` takes an `on_frame` hook composed after the movie's; `pipeline.StopRun` ends a
 run early from inside it.
-THE PAGE'S RUN IS THE CLI IN THE WORKER PROCESS, not a thread. `studio.Job` already runs
-`Plexus_Main.main()` on `-o generate studio/<name> --device ... --force --no-describe` in the warm
-worker (`gui/worker.py`) and scrapes tqdm's bar; the page now uses it (`/api/studio/run`), reads
-the bar's own `ms/frame` (`Job.ms_per_frame`, new) and the pipeline's own files through
-`/api/material/run`: the newest `still_NN` as the live picture, `movie.mp4` for PLAY (a <video>).
-Chosen over the in-thread hook because VTK owns one off-screen context per thread and a second
-plotter on a second thread dies (`bio_view.py` docstring); a subprocess is also, literally, the
-command line. The seeded view (orbit, zoom, pick) is the page's own `LiveMovie` on the seed, as
-before; `bio_view.View.run` (the page's own loop) stays only for the bio page until G3.
-Measured: page RUN of `si_three_balls` on the local A6000 = 801 frames in 79 s, the bar's 92
-ms/frame (rendering the 400-frame movie inline, as the CLI does); the CLI's own number on the
-same card was 85. The a100 ran 68.
+THE PAGE'S RUN IS `pipeline.generate` ON THE SERVER'S VTK THREAD (`bio_view.View.run`). VTK owns
+one off-screen context per thread and a second plotter on a second thread dies, so the run is
+submitted to the one VTK thread, where the pipeline's `LiveMovie` (movie.mp4 + stills in
+graphs_data/studio/<name>/) and the page's own plotter both live; the per-frame hook drains the
+page's request queue (`bio_view._PENDING`: camera moves, picks, screenshots) between frames, which
+is what makes ORBIT AND ZOOM WORK DURING GENERATION -- a request is answered at most one frame
+late. The hook also keeps a level-state snapshot every movie stride, so PLAY replays the run at
+any camera; MOVIE plays the mp4 the run wrote. A first version ran the CLI in the worker process
+(`studio.Job`, kept, and still the CLI's own `main()`); it lost the camera during a run and was
+replaced the same day at the user's request.
+Measured: page RUN of `si_three_balls` on the local A6000 = 800 frames in 83 s, the engine's
+own 99 ms/frame with the 400-frame movie, the page's redraws and a camera request every 3 s
+folded in; the CLI with no rendering on the same card is 29 ms/frame; the a100 with the movie
+ran 68.
 Gate: `tests/test_gui_parity.py::test_cli_and_page_share_one_pipeline` -- `Plexus_Main` calls
 `pipeline.generate` and no `data_generate`; the Job's argv is `-o generate studio/<name>`; the
 worker runs `Plexus_Main.main()`.
