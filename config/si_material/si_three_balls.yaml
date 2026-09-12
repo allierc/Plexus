@@ -27,21 +27,22 @@ sets:
     - - 0.35
       - 0.29
       - 0.25
+    type_layout: ordered
     types:
       elastic:
-        fraction: 0.3334
+        count: 1
         material: elastic
         youngs: 2000000.0
         density: 1000.0
         shape: ball
       liquid:
-        fraction: 0.3333
+        count: 1
         material: liquid
         bulk_modulus: 981000.0
         density: 1000.0
         shape: ball
       snow:
-        fraction: 0.3333
+        count: 1
         material: snow
         youngs: 500000.0
         density: 350.0
@@ -50,8 +51,8 @@ sets:
     parent: cell
     per_parent: 100000
     density: 1000.0
+    radius: 0.05
     vel_init: 0.4
-    particle_mass: 5.23599e-06
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -68,10 +69,10 @@ operators:
   eta: 0.001
 - op: mpm_scatter
   at: mpm_particle
+  implementation: warp
   to: mpm_grid
   drag: 0.0
   a_max: 200.0
-  implementation: warp
   polar: higham
 - op: mpm_grid_update
   at: mpm_grid
@@ -82,10 +83,10 @@ operators:
   csf_band: 0.2
 - op: mpm_gather
   at: mpm_particle
+  implementation: warp
   from: mpm_grid
   wall_damp: 1.0
   vmax: 1000000000.0
-  implementation: warp
 schedule:
 - gravity
 - substep_dt: 4.385965e-05
