@@ -193,7 +193,30 @@ term sets the volume and `k_v` no longer holds per-cell targets. The "equilibriu
 `tools/equilibrium_h.py` is where the rest offset inflates the shell to, not a regime to seed in.
 
 **R1b (687cd2ce, archives `log/size_cycle/R1b`).** R1 with `h0 0.88`; the settle window covers
-the 0.88 -> 1.16 ramp. Scored below when landed.
+the 0.88 -> 1.16 ramp.
+
+| spec | cells | cycles | slope | r(L,V_b) | CV(V_d) | L | med V/v_ref | drift | CV(V) |
+|---|---|---|---|---|---|---|---|---|---|
+| size_sizer | 200->2165 | 1765 | -0.61 | -0.58 | 0.17 | 186 | 0.83 | -0.01 | 0.28 |
+| size_adder | 200->1294 | 894 | -0.04 | -0.45 | 0.26 | 221 | 1.04 | -0.07 | 0.41 |
+| size_doubler | 200->797 | 398 | 0.69 | -0.09 | 0.42 | 280 | 1.49 | 0.07 | 0.57 |
+| size_timer | 200->1269 | 869 | 0.60 | -0.00 | 0.51 | 236 | 0.95 | -0.20 | 0.63 |
+| size_grow_sizer | 200->1277 | 877 | -0.16 | -0.02 | 0.27 | 236 | 0.95 | -0.11 | 0.35 |
+| size_two_channel | 200->4068 | 3668 | -0.49 | -0.55 | 0.19 | 167 | 0.83 | -0.01 | 0.25 |
+| cycle_sizer | 200->2578 | 2178 | -0.15 | -0.48 | 0.26 | 176 | 0.74 | 0.01 | 0.27 |
+| cycle_timer | 200->1980 | 1580 | 0.53 | 0.09 | 0.48 | 224 | 0.73 | -0.28 | 0.54 |
+| cycle_hazard | 200->2353 | 1953 | 0.49 | 0.08 | 0.53 | 197 | 0.66 | -0.26 | 0.58 |
+| cycle_dilution | 200->3553 | 3153 | 0.07 | -0.33 | 0.34 | 163 | 0.64 | -0.05 | 0.29 |
+| mech_target_percell | 200->200 | - | - | - | - | - | 0.99 | - | 0.018 |
+
+The mechanics control is back (0.018), the checkpoint arms are stationary (drift <= 7 %), the
+two-channel arm has the tightest dividing-population CV (0.25). Not accepted: the sizers divide
+at 1.05 x the settled median and are born at 0.75, i.e. at 2 x the SEED's median. The seed had
+pre-filled `v_ref_poly` with the pre-ramp median (1.35 against 2.59 settled), so the settle window
+never cached a reference and no seeded `Vbirth` was ever reset.
+
+**R1c (archives `log/size_cycle/R1c`).** The seed writes no `v_ref_poly` under a settle window;
+the first reader after `ref_frame` caches 2.61 on `size_sizer`. Scored below when landed.
 
 ## 4. The ladder
 
