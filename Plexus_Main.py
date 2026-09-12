@@ -194,10 +194,18 @@ def main():
                           f"'substep captured as a CUDA graph', that is why -- set "
                           f"`capture: false` on the spec's substep block.", flush=True)
         _rn = [int(x) for x in str(args.render_n).split(",") if x.strip()]
+        # THE SPEC MAY SET THE MOVIE'S OWN SHAPE. `max_frames` (how many frames the movie keeps,
+        # the run strided to fit), `stills` (how many PNGs are dropped through it) and
+        # `keep_stills` are render decisions a spec is entitled to make about itself -- a
+        # benchmark that wants 400 movie frames and ten pictures should say so once, in the file,
+        # rather than on every command line and in every cluster job script that runs it. The
+        # CLI values remain the defaults for a spec that says nothing.
+        _pl = getattr(sim, "plotting", None) or {}
         lm = None if args.no_viz else {"render_n": (_rn if len(_rn) > 1 else _rn[0]),
-                                       "max_frames": args.render_max_frames, "dot": _dot,
-                                       "stills": args.render_stills,
-                                       "keep_stills": args.keep_stills,
+                                       "max_frames": int(_pl.get("max_frames", args.render_max_frames)),
+                                       "dot": _dot,
+                                       "stills": int(_pl.get("stills", args.render_stills)),
+                                       "keep_stills": bool(_pl.get("keep_stills", args.keep_stills)),
                                        # the movie can only be timed if the run has a clock
                                        "dt": getattr(sim, "dt", None),
                                        "time_s": (sim.units.time_s if getattr(
