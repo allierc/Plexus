@@ -72,9 +72,13 @@ def _multimaterial_27(world: float = 0.5, side: float = 0.06):
     reference's jelly -- and snow, at the reference's density ratios 1 : 1 : 0.35), one colour per
     material. The reference is 35,937 points over 27 cubes in a unit box under g = 20; here the
     box is 0.5 m, g = 9.81 and the form's `particles` sets the points per cube."""
-    mats = ({"material": "liquid", "bulk_modulus": 981000.0, "density": 1000.0, "color": [0.30, 0.55, 1.00]},
-            {"material": "elastic", "youngs": 2000000.0, "density": 1000.0, "color": [0.95, 0.25, 0.20]},
-            {"material": "snow", "youngs": 500000.0, "density": 350.0, "color": [0.95, 0.95, 0.95]})
+    import matplotlib
+    mats = ({"material": "liquid", "bulk_modulus": 981000.0, "density": 1000.0},
+            {"material": "elastic", "youngs": 2000000.0, "density": 1000.0},
+            {"material": "snow", "youngs": 500000.0, "density": 350.0})
+    # ONE COLOUR PER CUBE, as the reference draws them (tab10 per object): 27 distinct hues from
+    # tab20 and tab20b, so neighbouring cubes of one material are still telling apart.
+    cm_a, cm_b = matplotlib.colormaps["tab20"], matplotlib.colormaps["tab20b"]
     pitch = 0.5 * world / 3.0                         # the lattice spans the middle half of the box
     x0 = 0.5 * world - 1.5 * pitch + 0.5 * (pitch - side)
     out = []
@@ -83,17 +87,21 @@ def _multimaterial_27(world: float = 0.5, side: float = 0.06):
         for iz in range(3):
             for ix in range(3):
                 a = [round(x0 + ix * pitch, 4), round(0.40 * world + iy * pitch, 4), round(x0 + iz * pitch, 4)]
+                col = (cm_a(i) if i < 20 else cm_b(i - 20))[:3]
                 out.append({"name": f"c{i:02d}", "shape": "block", "block": [a[0], a[1], a[2], round(a[0] + side, 4),
                                                                               round(a[1] + side, 4), round(a[2] + side, 4)],
-                            **dict(mats[i % 3])})
+                            "color": [round(float(v), 3) for v in col], **dict(mats[i % 3])})
                 i += 1
     return out
 
 
 DEFAULT_FORM = {
-    "name": "si_multimaterial_27", "world": 0.5, "n_grid": 96, "n_frames": 800, "dt": 0.0008333333333333334,
+    # dt 2 ms: 800 frames are 1.6 s, enough for the cubes to fall, bounce and settle; the reference
+    # runs 10,000 frames of 0.1 ms in a unit box under g = 20. `launch` 1.0 is its `dpos_init`,
+    # a random initial velocity per cube.
+    "name": "si_multimaterial_27", "world": 0.5, "n_grid": 96, "n_frames": 800, "dt": 0.002,
     "gravity": 9.81, "particles": 1331, "radius": 0.03, "wall_damp": 0.5, "friction": 0.4,
-    "launch": 0.0, "movie_frames": 400, "stills": 10, "seed": 1, "render": "small_dots", "light": "default",
+    "launch": 1.0, "movie_frames": 400, "stills": 10, "seed": 1, "render": "middle_dots", "light": "default",
     "color": "particles", "bodies": _multimaterial_27(),
 }
 REFERENCE = os.path.join(REPO, "config", "si_material", "si_multimaterial_27.yaml")
@@ -125,6 +133,10 @@ def render_style(mode: str = "small_dots", light: str = "default") -> dict:
     if light != "default":
         st["light"] = light
     if mode in DOT_PX:
+        # A LIGHT ON DOTS: flat pixels take no light, so any light but the default (and `flat`)
+        # draws the dots as lit spheres (`dot_shading: true`), which is what a light can act on.
+        if light not in ("default", "flat"):
+            st["dot_shading"] = True
         return st
     if mode == "surface":
         st.update(surface_env=False, surface_pbr=False, surface_opacity=1.0, surface_roughness=1.0, shadows=False)
@@ -369,9 +381,9 @@ FORM_HTML = r'''
  <h2>Box</h2>
  <div class="row"><label>name</label><input id="name" value="si_multimaterial_27"></div>
  <div class="row"><label>box side (m)</label><input id="world" class="short" value="0.5"> <label style="width:60px">grid</label><input id="n_grid" class="short" value="96"></div>
- <div class="row"><label>frames</label><input id="n_frames" class="short" value="800"> <label style="width:60px">dt (s)</label><input id="dt" class="short" value="0.00083"></div>
+ <div class="row"><label>frames</label><input id="n_frames" class="short" value="800"> <label style="width:60px">dt (s)</label><input id="dt" class="short" value="0.002"></div>
  <div class="row"><label>gravity</label><input id="gravity" class="short" value="9.81"> <label style="width:60px">particles</label><input id="particles" class="short" value="1331" title="material points per body"></div>
- <div class="row"><label>ball radius (m)</label><input id="radius" class="short" value="0.03" title="every ball's radius; a block is sized by its own box"> <label style="width:60px">launch</label><input id="launch" class="short" value="0" title="initial speed given to each body, m/s (0 = dropped from rest)"></div>
+ <div class="row"><label>ball radius (m)</label><input id="radius" class="short" value="0.03" title="every ball's radius; a block is sized by its own box"> <label style="width:60px">launch</label><input id="launch" class="short" value="1.0" title="initial speed given to each body, m/s (0 = dropped from rest)"></div>
  <div class="row"><label>wall damp</label><input id="wall_damp" class="short" value="0.5" title="share of the wall-normal velocity kept at the grid: 1 = elastic wall, 0 = dead"> <label style="width:60px">friction</label><input id="friction" class="short" value="0.4" title="Coulomb friction on the walls, 0 = slippery"></div>
  <div class="row"><label title="frames the movie keeps: every frame up to this many, then every 2nd, 4th...">movie frames</label><input id="movie_frames" class="short" value="400"> <label style="width:60px" title="PNG stills dropped through the run, also the live pictures on this page">stills</label><input id="stills" class="short" value="10"> <label style="width:40px">seed</label><input id="seed" class="short" value="1"></div>
  <h2>Bodies <button class="dim" onclick="toggleBodies()" id="bodiesbtn">show</button> <button class="dim" onclick="addBody()">+ body</button> <span id="bodycount" style="color:#9ab;font-weight:normal;text-transform:none"></span></h2>
@@ -399,7 +411,7 @@ window.bodyCount=function(){const bs=bodies();const per={};for(const b of bs)per
 window.toggleBodies=function(){const w=$('bodieswrap');const on=w.style.display==='none';w.style.display=on?'block':'none';$('bodiesbtn').textContent=on?'hide':'show';};
 const NUM=['world','n_grid','n_frames','dt','gravity','particles','radius','launch','wall_damp','friction','movie_frames','stills','seed'];
 window.tabForm=function(){const f={name:$('name').value,bodies:bodies(),render:$('render').value,light:$('light').value,color:$('color').value};for(const k of NUM)f[k]=+$(k).value;return f;};
-window.tabFill=function(f){$('name').value=f.name;for(const k of NUM)if(f[k]!==undefined&&f[k]!==null)$(k).value=f[k];if(f.render)$('render').value=f.render;if(f.light)$('light').value=f.light;if(f.color)$('color').value=f.color;
+window.tabFill=function(f){$('name').value=f.name;for(const k of NUM)if(f[k]!==undefined&&f[k]!==null)$(k).value=Number(Number(f[k]).toPrecision(4));if(f.render)$('render').value=f.render;if(f.light)$('light').value=f.light;if(f.color)$('color').value=f.color;
  const tb=$('bodies');while(tb.rows.length>1)tb.deleteRow(-1);(f.bodies||[]).forEach(addBody);bodyCount();};
 // THE RENDER SELECTOR WRITES THE SPEC'S plotting AND RE-SEEDS, so what the page shows is what the
 // movie will draw; a BUILD keeps the choice because the form carries it.

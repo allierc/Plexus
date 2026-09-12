@@ -59,7 +59,7 @@ SHELL = r"""<!doctype html>
  <div id="status">building the default scene...</div>
  <h2>Run</h2>
  <div class="row"><label>device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
- <div class="row"><button onclick="runGo()" id="runbtn">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
+ <div class="row"><button onclick="runGo()" id="runbtn" title="the form is applied first, then the run starts">RUN</button><button class="dim" onclick="runStop()">STOP</button> <span id="runstat" style="color:#8c8"></span></div>
  <div id="runcounts" style="color:#9ab;font-size:12px;min-height:14px"></div>
  <div class="row"><button class="dim" onclick="playGo()" id="playbtn">PLAY</button><button class="dim" onclick="playStop()">PAUSE</button><button class="dim" onclick="movieGo()" title="the movie.mp4 the run wrote, as a file">MOVIE</button><button class="dim" onclick="playStop();showMovie(null);FRAME=null;render(true)" title="back to the live view">LIVE</button> <input type="range" id="frame" min="0" max="0" value="0" style="width:150px" oninput="playing=null;showMovie(null);showFrame(+this.value)"> <span id="framelab" style="color:#9ab"></span></div>
  <h2>Claude</h2>
@@ -93,9 +93,9 @@ window.pickOpen=async function(path){{$('picker').style.display='block';const j=
  for(const d of j.dirs)h+=`<div style="cursor:pointer;padding:1px 0"><span style="color:#7fb3ff" onclick="pickOpen('${{j.path}}/${{d.name}}')">&#128193; ${{d.name}}/</span>${{d.spec?` <button class="dim" style="padding:1px 6px;font-size:11px" onclick="openSpec('${{j.path}}/${{d.name}}')">open run</button>`:''}}</div>`;
  for(const f of j.files)h+=`<div style="cursor:pointer;padding:1px 0;color:#dde" onclick="openSpec('${{j.path}}/${{f}}')">&#128196; ${{f}}</div>`;
  $('picklist').innerHTML=h||'(empty)';}};
-window.openSpec=async function(pth){{$('picker').style.display='none';status('opening '+pth+' ...');const j=await (await fetch('/api/scene/open?path='+encodeURIComponent(pth))).json();if(j.error){{status(j.error,true);return;}}$('openlab').textContent=pth;status('opened '+j.name+' -- seeding...');}};
+window.openSpec=async function(pth){{$('picker').style.display='none';FORM_SPEC=null;status('opening '+pth+' ...');const j=await (await fetch('/api/scene/open?path='+encodeURIComponent(pth))).json();if(j.error){{status(j.error,true);return;}}$('openlab').textContent=pth;status('opened '+j.name+' -- seeding...');}};
 async function post(url,body){{const r=await fetch(url,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}});return r.json();}}
-window.build=async function(){{status('building the spec...');const j=await post('/api/tab/'+TAB+'/build',form());if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}specName=j.name;if(j.version!==undefined)seen.version=j.version;$('yamltext').value=j.raw;status(`spec saved: config/studio/${{j.name}}.yaml -- seeding...`);await reseed();}};
+window.build=async function(){{status('building the spec...');const j=await post('/api/tab/'+TAB+'/build',form());if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}specName=j.name;FORM_SPEC=j.name;if(j.version!==undefined)seen.version=j.version;$('yamltext').value=j.raw;status(`spec saved: config/studio/${{j.name}}.yaml -- seeding...`);await reseed();}};
 window.reseed=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{status('no spec yet',true);return;}}status('seeding and building the renderer...');const r=await fetch('/api/scene/seed?name='+encodeURIComponent(specName));const j=await r.json();if(j.error){{status(j.error,true);return;}}SCENE=j;tree(j);status(`seeded in ${{j.seconds}}s: `+Object.entries(j.sets).map(([k,v])=>`${{k}} ${{v.n_live}}`).join(', '));render(true);
  try{{const f=await (await fetch('/api/scene/frames')).json();nframes=f.n||0;$('frame').max=Math.max(nframes-1,0);if(nframes)$('framelab').textContent=`${{nframes}} frames of the last run kept: PLAY replays them with this render`;}}catch(e){{}}}};
 window.toggleYaml=function(){{const y=$('yaml');y.style.display=y.style.display==='none'?'block':'none';}};
@@ -132,7 +132,8 @@ async function poll(){{try{{const st=await (await fetch('/api/scene/state')).jso
  if(st.message)$('rstat').textContent=st.message;}}catch(e){{}}finally{{setTimeout(poll,1500);}}}}
 poll();
 let running=false;
-window.runGo=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{$('runstat').textContent='build a scene first';return;}}const j=await post('/api/scene/run',{{device:$('run_device').value}});if(j.error){{$('runstat').textContent=j.error;return;}}running=true;$('runbtn').disabled=true;for(const id of ['render','light','color'])if($(id))$(id).disabled=true;$('runstat').textContent=`generate ${{specName}} on ${{j.device}}...`;MOVIE=null;rpoll();}};
+let FORM_SPEC=null;   // the spec the form wrote; RUN rebuilds it from the form first, so an edited field counts
+window.runGo=async function(){{playStop();showMovie(null);FRAME=null;if(!specName){{$('runstat').textContent='build a scene first';return;}}if(FORM_SPEC===specName){{await build();}}const j=await post('/api/scene/run',{{device:$('run_device').value}});if(j.error){{$('runstat').textContent=j.error;return;}}running=true;$('runbtn').disabled=true;for(const id of ['render','light','color'])if($(id))$(id).disabled=true;$('runstat').textContent=`generate ${{specName}} on ${{j.device}}...`;MOVIE=null;rpoll();}};
 window.runStop=async function(){{await post('/api/scene/run',{{stop:true}});}};
 // THE RUN IS plexus.pipeline.generate -- the body of Plexus_Main.py -o generate -- on the server's
 // VTK thread; its per-frame hook feeds this page's renderer and answers camera moves between
