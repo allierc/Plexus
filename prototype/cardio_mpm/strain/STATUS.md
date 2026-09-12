@@ -493,3 +493,14 @@ maps (the loss trades one for the other), route 3 learns κ back to 0.93× its h
 right), route 4 is worth +0.005. **Displacement is at the two-mode ceiling; the balanced model r13
 stays the reporting model.** What remains (0.91 → 0.96) is the third temporal mode of the
 displacement, which the mechanics do not express through any per-cell number tried so far.
+
+### Seeds for the reporting models (2026-09-11)
+
+Second fits (optimiser seed 1, layout 121/cell): healthy `s4_live_r13b_seed1` held-out **0.859 /
+0.911** (seed 0: 0.866 / 0.913); HCM `hcm_r5b_seed1` **0.894–0.897 / 0.944–0.960** (seed 0:
+0.894–0.897 / 0.943–0.961). Predictions are seed-independent to 0.007. Per-cell agreement between
+the two seeds (`fig7_seed_agreement.png`, `out/seed_agreement.json`): healthy g r 0.91, g2 0.88,
+delay 0.88, axis 10.0°; HCM g 0.92, g2 0.93, delay 0.85, axis 7.1°; median cell-to-cell difference
+0.18–0.23 of each map's spread. Slightly looser than the simpler r8 / hcm_r3 pair (g 0.94–0.96,
+axis 5–7°): the richer time-course model buys prediction with a little per-cell reproducibility.
+These are the error bars on every map of the reporting models.
