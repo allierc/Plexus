@@ -508,9 +508,11 @@ These are the error bars on every map of the reporting models.
 ## The training-progress movie set (2026-09-11)
 
 `render_progress.sh` renders, from ONE fit (`s4_live_r16_ckpt`, the reporting model re-run with
-`--checkpoints 0.2,0.5`; it reproduces r13 to 0.002 in held-out R²), **27 movies**: three beats
-(1 and 2 held out, 3 the fit beat) x three stages of the run (20%, 50%, 100% of 250 iterations) x
-three views, named `out/movies/progress_<view>_p<stage>_beat<n>.mp4`:
+`--checkpoints 0.2,0.5`; it reproduces r13 to 0.002 in held-out R²), **nine movies**, one per view
+and stage, named `out/movies/progress_<view>_p<stage>.mp4`. Each clip runs the three beats end to
+end (1 and 2 held out, 3 the fit beat) in **4 s** total, at three stages of the run (20%, 50%, 100%
+of 250 iterations). Each beat is its own rollout from its own rest configuration; the clips are
+concatenated, the model never runs across a beat boundary. The three views:
 
 | view | what |
 |---|---|
@@ -525,6 +527,6 @@ happens in the first fifth of the run; the last half is worth 0.01.
 `out/figures` and `out/movies` were emptied first, and every figure regenerated from this model
 (healthy) and `hcm_r5_modes2` (HCM).
 
-All 27 progress movies play their beat window in **4 s** (14 fps), matching the reference
-`cardio.mp4` (4.8 s for the whole recording). `--seconds` on the three movie scripts sets the frame
-rate from the frame count; `render_progress.sh` passes it.
+Timing: each three-beat clip is 4 s (42 fps), against the reference `cardio.mp4` which plays the
+whole recording in 4.8 s. `--seconds` on the three movie scripts sets the frame rate from the frame
+count; `render_progress.sh` uses it for the per-beat clips and then re-times the concatenation.
