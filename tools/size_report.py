@@ -45,8 +45,21 @@ def _traj(name, group):
     return p if os.path.exists(p) else None
 
 
-def _volumes(z, t):
-    """Polyhedron volumes when the run carries a separation, wedge volumes otherwise."""
+def _convention(traj):
+    """The convention the run's size rules read (`vertex_ops.cell_size`): the polyhedron only when
+    the seed declared `v0_from: polyhedron`, the wedge otherwise. Read from the spec archived beside
+    the trajectory, so the report regresses the quantity the rule compared and not another one."""
+    import yaml
+    sp = os.path.join(os.path.dirname(traj), "spec.yaml")
+    if os.path.exists(sp):
+        for op in (yaml.safe_load(open(sp)).get("seed") or []):
+            if op.get("op") in ("seed_mesh", "mesh_seed") and str(op.get("v0_from", "wedge")).lower() == "polyhedron":
+                return "polyhedron"
+    return "wedge"
+
+
+def _volumes(z, t, convention="wedge"):
+    """Cell volumes in the run's own convention (see `_convention`)."""
     import torch
     from plexus.operators.vertex_ops import apicobasal_geometry_3d, face_geometry_3d
     off = z["vertex__mesh_offsets"]
@@ -56,7 +69,7 @@ def _volumes(z, t):
     et = torch.as_tensor(z["vertex__mesh_E_trgt"][a:b].astype(np.int64))
     ef = torch.as_tensor(z["vertex__mesh_E_face"][a:b].astype(np.int64))
     P = torch.as_tensor(z["vertex__pos"][t][:Nv]).float()
-    if "vertex__sep" in z.files:
+    if convention == "polyhedron" and "vertex__sep" in z.files:
         S = torch.as_tensor(z["vertex__sep"][t][:Nv]).float()
         v, _, _, _ = apicobasal_geometry_3d(P, S, es, et, ef, nF)
     else:
@@ -103,7 +116,8 @@ def row(name, group="tissue", birth_lag=12):
     stride = max(1, T // 80)
     need = {0, T - 1, min(ref_frame, T - 1)} | set(range(0, T, stride)) \
         | {tr for _, _, tr, _ in pairs} | {td - 1 for _, _, _, td in pairs}
-    V = {t: _volumes(z, t) for t in sorted(need)}
+    conv = _convention(p)
+    V = {t: _volumes(z, t, conv) for t in sorted(need)}
     v_ref = float(np.median(V[min(ref_frame, T - 1)]))
     cyc = [(V[tr][i] / v_ref, V[td - 1][i] / v_ref, td - tb) for i, tb, tr, td in pairs]
     out = dict(name=name, T=T, n0=int(nFs[0]), nT=int(nFs[-1]), cycles=len(cyc))

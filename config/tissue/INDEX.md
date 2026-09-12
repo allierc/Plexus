@@ -26,10 +26,10 @@ Prose and reasons are in `AB_TISSUE_README.md`.
 
 | spec | frames | cells | shape | mechanics | sep | operators |
 |---|---|---|---|---|---|---|
-| `cycle_dilution` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
-| `cycle_hazard` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
-| `cycle_sizer` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
-| `cycle_timer` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `cycle_dilution` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `cycle_hazard` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `cycle_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `cycle_timer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
 
 ## `shape_*` -- seed geometry: one hypothesis, several surfaces
 
@@ -86,12 +86,12 @@ Prose and reasons are in `AB_TISSUE_README.md`.
 | `sheet_moebius` | 200 | 400 | moebius | default | -- | cell_mechanics, edge_flip |
 | `sheet_morphogen` | 400 | 400 | disc | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_grow, cell_mechanics, edge_flip |
 | `sheet_morphogen_die` | 400 | 400 | disc | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_grow, cell_die, cell_mechanics, edge_flip |
-| `size_adder` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
-| `size_doubler` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
-| `size_grow_sizer` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
-| `size_sizer` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
-| `size_timer` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
-| `size_two_channel` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `size_adder` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `size_doubler` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `size_grow_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `size_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `size_timer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `size_two_channel` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
 | `spheroid_ecm` | 400 | 400 | sphere | -- | -- | surface_drive, mesh_contact, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather, ecm_stress, mesh_inside |
 | `spheroid_ecm_04` | 401 | 200 | sphere | default | -- | cell_grow, cell_mechanics, edge_flip, cell_divide, mesh_contact, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather, ecm_stress, mesh_inside |
 | `spheroid_ecm_ab` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, mesh_contact, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather, ecm_stress, mesh_inside |

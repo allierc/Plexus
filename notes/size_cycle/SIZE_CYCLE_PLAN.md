@@ -61,6 +61,22 @@ on any replacement run):
    affine (split the mother's target in proportion to the measured pieces; `Vbirth` measured);
    the rest offset itself is R5's business (a seed at rest in every degree of freedom).
 
+8. **`v0_from: polyhedron` crumples the shell, and every R0-R1c archive was crumpled.** Seen in
+   the movies, not the tables: a jagged mass of inverted prisms where the mechanics-only control
+   is a clean sphere. `tools/spheroid_gauge.py` (asphericity, inverted wedges, inward thickness
+   vectors, thickness CV and min/median) puts numbers on it -- `size_sizer` R0: asphericity 0.18,
+   24 % inverted wedges, thickness CV 0.37, thinnest cell 0.8 % of the median; `divide_growing_ball`:
+   0.02 / 0 / 0.09 / 0.71 over 801 frames. Ablated on 200-frame cuts: the one key that matters is
+   `v0_from: polyhedron` (with it, asphericity 0.12 and thickness 0.05 by frame 20 at either growth
+   rate; without it a clean ball at either rate). The polyhedron target convention is not a
+   working mechanics, whatever the readers do with it. Every spec is rebuilt from
+   `divide_growing_ball`'s conventions and the gauge is a gate on every rung from here on.
+9. **Thickness spread grows with division waves, and with the growth rate.** On current code
+   `divide_growing_ball` at its own rate (0.000578) holds thickness CV 0.10 over 400 frames; at
+   0.00096 it passes 0.15 at frame 320 and reaches 0.39 by 400 as divisions come in waves. The
+   rung runs at the working point's rate -- one doubling per 400 frames -- with the cycle clock
+   scaled to it (183/133/67/17) and 1601 frames per run.
+
 ## 1. What this branch has already done
 
 - Withdrawn: 36 specs (`cv_*`, `cvd_*`, `cvd2_*`, `cyc4_*`, `cycle_phases`), their 35 archives,
@@ -215,8 +231,16 @@ at 1.05 x the settled median and are born at 0.75, i.e. at 2 x the SEED's median
 pre-filled `v_ref_poly` with the pre-ramp median (1.35 against 2.59 settled), so the settle window
 never cached a reference and no seeded `Vbirth` was ever reset.
 
-**R1c (archives `log/size_cycle/R1c`).** The seed writes no `v_ref_poly` under a settle window;
-the first reader after `ref_frame` caches 2.61 on `size_sizer`. Scored below when landed.
+**R1c (46efe89f, archives `log/size_cycle/R1c`).** The seed writes no `v_ref_poly` under a settle
+window. Not scored: the movies showed every dividing arm of R0-R1c crumpled (finding 8), so
+R0-R1c are archives of a broken mesh and their tables are withdrawn from evidence. What survives
+of R1: the arithmetic fixes (measured `Vbirth`, the sizer's denominator, the inhibitor at birth,
+the G1 cap, the settle window), all convention-independent.
+
+**R2 (archives `log/size_cycle/R2`).** Restart on `divide_growing_ball`'s conventions: no
+`v0_from`, `h0 0.88`, rate 0.000578, `ref_frame 60`, 1601 frames; one reader (`cell_size` in
+`cell_divide` and `cell_grow[sizer]`, the private polyhedron branch gone); `tools/spheroid_gauge.py`
+must say SPHEROID on every arm before its `size_report` row counts. Scored below when landed.
 
 ## 4. The ladder
 
@@ -228,7 +252,7 @@ reviewed as one (`tests/REGRESSION_PLAN.md`).
 |---|---|---|
 | R0 | run the eleven specs on HEAD; record the table in this note | the defects reproduce: `size_adder` slope -1, `cycle_dilution` slope > 0, `cycle_sizer` slope between |
 | R1 | findings 2, 4, 5 (+ the G1 cap, `mono_k`, `ref_frame` of finding 7): measured `Vbirth`; sizer denominator `v* - V_b`; dilution reset `v_ref / V_b` | `size_sizer` -1 +- 0.15, `size_adder` 0 +- 0.15, `size_timer` > +0.5, `cycle_dilution` = `cycle_sizer` within 0.15; median drift < 10 % over the last two cycles on every checkpoint arm |
-| R2 | finding 6: one reader (`cell_size` in `cell_divide`; `v0_from` withdrawn); growth-per-cycle print and refusal | byte-identical on `apop2_ks0p1`, `sheet_*`, `mech_uniform_target` (their convention does not change); R1 numbers within bands |
+| R2 | findings 6, 8, 9: one reader (`cell_size` in `cell_divide` and `cell_grow[sizer]`); specs on the working point's conventions; the spheroid gauge as a gate; growth-per-cycle print and refusal | byte-identical on `apop2_ks0p1`, `sheet_*`, `mech_uniform_target` (their convention does not change); R1 numbers within bands |
 | R3 | one "when": divide-family models into `cell_cycle`; `cell_divide` keeps septum + trigger; `cell_grow[timer]` withdrawn | `size_*` rewritten as degenerate cycles reproduce R1 within bands; five operators and eight parameters fewer in `catalog_summary()` |
 | R4 | representation: cell-set blocks, `cell_id`, time units, default recording | trajectory keys renamed once, in their own commit; `size_report` reads lineage from `cell_id` and gives R3's numbers |
 | R5 | engine: seed-time writes to seed ops; flags off; tick shims out; `p0` off the apico-basal contract; stability print; a seed at rest in every degree of freedom so `ref_frame` and `mono_delta` can go (finding 7) | tick-0 invariant passes for `cell_cycle` and `cell_grow`; `MAY_MUTATE_INTEGRATED_STATE` count 29 -> <= 20 |

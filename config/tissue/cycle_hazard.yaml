@@ -1,9 +1,9 @@
 general:
   name: cycle_hazard
   seed: 0
-  n_frames: 801
+  n_frames: 1601
   dt: 1.0
-  record_cap: 803
+  record_cap: 1603
   boundary: free
   dim: 3
   world:
@@ -99,7 +99,7 @@ operators:
   at: cell
 - op: cell_grow
   at: vertex
-  rate: 0.00096
+  rate: 0.000578
   rho: 1.0
   a_sw: 50.0
   hill: 4.0
@@ -125,10 +125,10 @@ operators:
   max_flips: 30
 - op: cell_cycle
   at: vertex
-  t_g1: 110.0
-  t_s: 80.0
-  t_g2: 40.0
-  t_m: 10.0
+  t_g1: 183.3
+  t_s: 133.3
+  t_g2: 66.7
+  t_m: 16.7
   g1_size: 1.6
   phase_cv: 0.15
   seed: 0
@@ -166,7 +166,6 @@ seed:
   model: apicobasal
   h0: 0.88
   ref_frame: 60
-  v0_from: polyhedron
 plotting:
   renderer: vtk_points
   background: black
