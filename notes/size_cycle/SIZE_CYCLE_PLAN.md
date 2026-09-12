@@ -411,6 +411,16 @@ arm under each rung's mechanics, 1601 frames, so the story can be watched side b
 
 `ms3` is the working point: no pin, the thickness field stiff.
 
+**R4a (3a7db6f5).** `cell_id` / `parent_id` on the cell set; `size_report` reads lineage off them
+(identical numbers to the age-based reading on a 700-frame cut: 83 cycles, slope -0.93).
+
+**R4b (archives `log/size_cycle/R4rig`).** The apoptosis rig: `rig_apop_{small,smaller,crowded,
+competition}_sizer`, `rig_apop_{small,crowded}_timer`, `rig_apop_{small,crowded}_sizer_noT1` on
+the working-point mechanics, 1601 frames; `tools/death_report.py` joins every death to volume at
+death, birth volume, age, phase, neighbours and mark-to-removal latency. `cell_die`'s size and
+growth readings are the measured volume now (they read the target, which is the mother's half
+for every daughter, so `small` could not see a small daughter). Gauged and reported when landed.
+
 ## 4. The ladder, v2
 
 | rung | layer | change | gate |
