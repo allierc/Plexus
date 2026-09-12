@@ -511,9 +511,9 @@ These are the error bars on every map of the reporting models.
 `--checkpoints 0.2,0.5`; it reproduces r13 to 0.002 in held-out R²), the movies kept in
 `out/movies/`. Each clip runs the three beats end to end: 1 and 2 held out, then the fitted 3. Each
 beat is its own rollout from its own rest configuration; the clips are concatenated, so the joins
-are cuts and the model never runs across a beat boundary. Kept, all of the finished fit:
-`progress_overlay_p100.mp4` and `progress_particles_p100.mp4` (4 s each), and
-**`progress_cells_particles_p100.mp4`**, the four-panel cell view beside the particle overlay, 8 s.
+are cuts and the model never runs across a beat boundary. Kept, all of the finished fit and all **8 s**: `progress_overlay_p100.mp4`,
+`progress_particles_p100.mp4`, `progress_cells_p100.mp4`, and
+**`progress_overlay_particles_p100.mp4`**, the two overlays side by side.
 `STAGES="020 050 100" ./render_progress.sh` regenerates the part-trained ones. The three views:
 
 | view | what |
@@ -529,6 +529,6 @@ happens in the first fifth of the run; the last half is worth 0.01.
 `out/figures` and `out/movies` were emptied first, and every figure regenerated from this model
 (healthy) and `hcm_r5_modes2` (HCM).
 
-Timing: each three-beat clip is 4 s (42 fps), against the reference `cardio.mp4` which plays the
+Timing: each three-beat clip is 8 s (21 fps), against the reference `cardio.mp4` which plays the
 whole recording in 4.8 s. `--seconds` on the three movie scripts sets the frame rate from the frame
 count; `render_progress.sh` uses it for the per-beat clips and then re-times the concatenation.

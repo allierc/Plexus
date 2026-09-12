@@ -10,7 +10,9 @@
 # THREE files, all of the finished fit (STAGES below adds part-trained ones):
 #   progress_overlay_p100.mp4          the raw frames in green, the model-warped rest frame in magenta
 #   progress_particles_p100.mp4        tracking nodes in green, MPM particles in blue
-#   progress_cells_particles_p100.mp4  the four-panel cell view beside the particles, 8 s
+#   progress_cells_p100.mp4            the four-panel cell view
+#   progress_overlay_particles_p100.mp4  the two overlays side by side
+# every clip 8 s
 # Each clip runs the three beats one after another (1 and 2 held out, then the fitted 3). The
 # per-beat clips are rendered first and concatenated, because each beat is its own rollout from its
 # own rest configuration -- the model is never run across a beat boundary.
@@ -47,11 +49,15 @@ for view in overlay particles cells; do for st in $STAGES; do
   rm -f "$list"
 done; done
 
-# ---- the cell view beside the particles, one 8 s clip ------------------------------------------
+# ---- every clip to 8 s, and the two overlays side by side ---------------------------------------
 for st in $STAGES; do
-  $FF -loglevel error -y -i "progress_cells_p${st}.mp4" -i "progress_particles_p${st}.mp4" -filter_complex \
-    "[0:v]scale=-2:1180,setpts=PTS*2[a];[1:v]scale=-2:1180,setpts=PTS*2[b];[a][b]hstack=inputs=2[v]" \
-    -map "[v]" -r 21 -c:v libx264 -crf 20 -pix_fmt yuv420p "progress_cells_particles_p${st}.mp4"
+  $FF -loglevel error -y -i "progress_overlay_p${st}.mp4" -i "progress_particles_p${st}.mp4" -filter_complex \
+    "[0:v]scale=-2:1000,setpts=PTS*2[a];[1:v]scale=-2:1000,setpts=PTS*2[b];[a][b]hstack=inputs=2[v]" \
+    -map "[v]" -r 21 -c:v libx264 -crf 20 -pix_fmt yuv420p "progress_overlay_particles_p${st}.mp4"
+  for v in overlay particles cells; do
+    $FF -loglevel error -y -i "progress_${v}_p${st}.mp4" -vf "setpts=PTS*2" -r 21 -c:v libx264 -crf 20 \
+        -pix_fmt yuv420p "/tmp/p_${v}_${st}.mp4" && mv "/tmp/p_${v}_${st}.mp4" "progress_${v}_p${st}.mp4"
+  done
 done
 rm -f progress_*_beat[123].mp4 progress_*_beat[123].json      # the per-beat clips were scaffolding
 ls progress_*.mp4
