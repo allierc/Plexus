@@ -393,44 +393,49 @@ class View:
         return _vtk(self._highlight, pick)
 
     def _highlight(self, pick: str | None):
-        """Remember the pick. NOTHING IS DRAWN: the selected object is read in the page's text panel,
-        and a marker on the picture hid the thing that was picked (and a yellow ring on a 300,000-dot
-        cloud drew the eye to one dot)."""
+        """A yellow wire outline around the picked BODY -- the sphere that bounds its members'
+        positions (its particles, its pieces), which is what the click meant. Nothing on the
+        member itself: a marker on one dot of a 300,000-dot cloud draws the eye to the dot."""
         self.pick = pick
-        return
-        import pyvista as pv                                     # noqa: E402 -- the old marker, kept below unreached
-        from plexus.gui import bio
+        if self.panel is not None:
+            return
+        import pyvista as pv
         with LOCK:
-            for nm in ("pick_dot", "pick_cell"):
-                try:
-                    self.p.remove_actor(nm, render=False)
-                except Exception:                                # noqa: BLE001
-                    pass
-            self.pick = pick
-            if not pick:
+            try:
+                self.p.remove_actor("pick_body", render=False)
+            except Exception:                                    # noqa: BLE001
+                pass
+            if not pick or not pick.startswith("cell:"):
                 return
-            info = bio.resolve_pick(self.scene, pick)
-            if not info:
+            try:
+                k = int(pick.split(":", 1)[1])
+            except ValueError:
                 return
+            P = []
+            for name, st in self.scene["sets"].items():
+                par = st.get("parent")
+                if par is None or not st.get("pos"):
+                    continue
+                pos = np.asarray(st["pos"], float)
+                sel = np.asarray(par) == k
+                if sel.any():
+                    P.append(pos[sel[:len(pos)]])
             T = self.scene.get("tissue")
-            f = info.get("cell") if info.get("kind") == "cell" else (info.get("parent_cell"))
-            # no marker on the object itself: the cell outline below says which cell, and the
-            # info panel says which object; a ball or halo only hid what was picked
-            if T and f is not None:
-                seg = []
-                ring = set()
-                for cap in ("apical", "basal"):
-                    c = T["caps"][cap]
-                    for k, t in enumerate(c["tri"]):
-                        if c["face"][k] == f:
-                            seg.append((c["verts"][t[1]], c["verts"][t[2]])); ring.add(t[1])
-                for i in ring:
-                    seg.append((T["caps"]["apical"]["verts"][i], T["caps"]["basal"]["verts"][i]))
-                if seg:
-                    pts = np.asarray([p for s in seg for p in s], float)
-                    lines = np.concatenate([[2, 2 * i, 2 * i + 1] for i in range(len(seg))])
-                    pd = pv.PolyData(pts); pd.lines = lines
-                    self.p.add_mesh(pd, color="#ffee33", line_width=4, name="pick_cell")
+            if not P and T:
+                V = np.asarray(T["caps"]["mid"]["verts"], float)
+                ring = {t[1] for c in ("apical", "basal") for kk, t in enumerate(T["caps"][c]["tri"]) if T["caps"][c]["face"][kk] == k}
+                if ring:
+                    P.append(V[sorted(ring)])
+            if not P:
+                return
+            P = np.concatenate(P, 0)
+            if P.shape[1] == 2:
+                P = np.concatenate([P, np.zeros((len(P), 1))], 1)
+            c = P.mean(0) + np.asarray(getattr(self.lm, "_shift", 0.0) or 0.0, float)
+            r = float(np.linalg.norm(P - P.mean(0), axis=1).max()) * 1.08 + 1e-6
+            self.p.add_mesh(pv.Sphere(radius=r, center=tuple(c), theta_resolution=24, phi_resolution=16),
+                            name="pick_body", style="wireframe", color="#ffee33", line_width=1.5,
+                            lighting=False, opacity=0.8)
 
     def _thickness(self) -> float:
         """The tissue's cell thickness (2|sep| averaged), or 1 without a tissue."""
@@ -606,15 +611,36 @@ class View:
         _vtk(_c)
 
 
-def open_view(spec_path: str, device: str = "cpu") -> View:
-    """Replace the session's view with a fresh one for `spec_path`, built on the VTK thread."""
+def open_view(spec_path: str, device: str = "cpu", carry: bool = False) -> View:
+    """Replace the session's view with a fresh one for `spec_path`, built on the VTK thread.
+
+    `carry=True` KEEPS THE LAST RUN'S FRAMES on the new view when it is the same scene -- same
+    spec name, every set the same buffer shape -- so a change of render (dot size, surface,
+    light) re-opens the renderer and PLAY replays the frames already in memory through it,
+    rather than asking for the run again. The frames are level states, not pictures, which is
+    what makes them re-drawable at all."""
     def _open():
         with LOCK:
             old = CURRENT.get("view")
+            keep = None
+            if old is not None and carry and os.path.basename(old.spec_path) == os.path.basename(spec_path):
+                keep = old
             if old is not None:
                 old.close()
             CURRENT["view"] = None
             v = View(spec_path, device)
+            if keep is not None and keep.snaps and getattr(v, "panel", None) is None:
+                same = all(n in v.H.levels and tuple(v.H.level(n).state.shape) == tuple(keep.H.level(n).state.shape)
+                           for n in keep.H.levels)
+                if same:
+                    v.snaps = keep.snaps
+                    v._keep_every = getattr(keep, "_keep_every", 1)
+                    v.RUN = dict(keep.RUN); v.RUN["running"] = False
+                    v.lm.n_frames = int(v.RUN.get("n_frames") or 1)   # the overlay's denominator is the run's
+                    print(f"[view] {len(v.snaps)} frames of the last run carried to the new render", flush=True)
+            elif keep is not None and getattr(v, "panel", None) is not None and getattr(keep, "panel", None) is not None:
+                v.panel.hist = keep.panel.hist
+                v.RUN = dict(keep.RUN); v.RUN["running"] = False
             CURRENT["view"] = v
             return v
     return _vtk(_open)

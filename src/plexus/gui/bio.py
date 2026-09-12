@@ -380,6 +380,24 @@ def hierarchy(spec: dict) -> dict:
 # ---------------------------------------------------------------------------------------------
 # a pick resolved by id (the picture itself is the movie renderer's: gui/bio_view.py)
 # ---------------------------------------------------------------------------------------------
+def climb(scene: dict, pick: str | None) -> str | None:
+    """`<set>:<i>` -> the parent's `cell:<k>` when the set is contained and the parent set is the
+    cell set; a pick on a member of a body names the body."""
+    if not pick or ":" not in pick:
+        return pick
+    sname, idx = pick.split(":", 1)
+    st = scene["sets"].get(sname) or {}
+    T = scene.get("tissue")
+    cs = T["cell_set"] if T else "cell"
+    try:
+        par = st.get("parent")
+        if par is not None and st.get("parent_name", cs) == cs and int(idx) < len(par):
+            return f"cell:{int(par[int(idx)])}"
+    except (TypeError, ValueError):
+        pass
+    return pick
+
+
 def resolve_pick(scene: dict, pick: str) -> dict | None:
     """`<set>:<live index>` (a cluster or a vertex), `cell:<face id>` -- the same facts the page's
     info panel shows, as a dict."""
@@ -393,6 +411,12 @@ def resolve_pick(scene: dict, pick: str) -> dict | None:
         cs = T["cell_set"] if T else "cell"
         c = scene["sets"].get(cs, {})
         out.update(kind="cell", cell=idx, blocks={})
+        _tn = c.get("type_names") or []
+        _nt = c.get("node_type") or []
+        if _tn and idx < len(_nt):
+            out["species"] = _tn[_nt[idx]]
+        if c.get("pos") and idx < len(c["pos"]):
+            out["position"] = c["pos"][idx]
         if c.get("rows") and idx in c.get("idx", []):
             k = c["idx"].index(idx)
             out["blocks"] = {b: v[k] for b, v in c["rows"].items()}
