@@ -477,3 +477,19 @@ Movies rendered between 21:57 and the fix were discarded and re-rendered.
 R²(u) 0.943–0.961, shortening r 0.96, axis 0.95**. `s4_live_r13_modes2_kappa` (per-cell adhesion on
 top of r12): 0.866 / 0.913 — adhesion adds +0.004: not a lever. **Best models: healthy r13
 (0.87 / 0.91), HCM r5 (0.90 / 0.95).** All figures and movies regenerated from these two.
+
+### Displacement-focused round (2026-09-11 afternoon), routes 1–4
+
+| fit | change vs r13 | held-out R²(A) | R²(u) |
+|---|---|---|---|
+| r13 (reporting model) | – | 0.866 | 0.913 |
+| r13, quarter-frame onset re-alignment (route 4) | scorer only | 0.868 | 0.918 |
+| r14 | 3rd temporal mode + displacement weighted ×3 in the loss (routes 1–2) | 0.826 | 0.928 |
+| r15 | r14 + sheet-wide substrate stiffness learnable (route 3) | 0.826 | 0.928 |
+
+Displacement ceiling of the recording (fixed patterns, held-out): 0.86 / 0.935 / 0.959 for 1 / 2 / 3
+temporal modes. Verdict: routes 1–2 buy +0.015 on displacement at the price of −0.04 on the strain
+maps (the loss trades one for the other), route 3 learns κ back to 0.93× its hand-set value (it was
+right), route 4 is worth +0.005. **Displacement is at the two-mode ceiling; the balanced model r13
+stays the reporting model.** What remains (0.91 → 0.96) is the third temporal mode of the
+displacement, which the mechanics do not express through any per-cell number tried so far.

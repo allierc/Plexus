@@ -215,9 +215,14 @@ class Params:
         s0 = self._s(0.0 - self.delay, self.logtau, percell=True)
         gam = ((self._s(tt, self.logtau, percell=True) - s0) / (1.0 - s0)).clamp(min=0.0)
         if self.n_modes > 0:
-            i = int(round(t - self.shift))
-            if 0 < i < self.psi.shape[1]:
-                gam = (gam + self.amode @ self.psi[:, i]).clamp(min=0.0, max=1.5)
+            # the modes are per-frame vectors; a fractional shift (the scorer's sub-frame onset
+            # re-alignment) interpolates linearly between the two neighbouring frames
+            tt = float(t) - self.shift
+            i0 = int(np.floor(tt)); fr = tt - i0
+            if 0 < i0 + 1 < self.psi.shape[1] or 0 < i0 < self.psi.shape[1]:
+                a0 = self.psi[:, min(max(i0, 0), self.psi.shape[1] - 1)] * (1 - fr) * float(i0 > 0)
+                a1 = self.psi[:, min(max(i0 + 1, 0), self.psi.shape[1] - 1)] * fr * float(i0 + 1 > 0)
+                gam = (gam + self.amode @ (a0 + a1)).clamp(min=0.0, max=1.5)
         return gam
 
     def mode_penalty(self):

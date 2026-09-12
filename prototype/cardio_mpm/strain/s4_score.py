@@ -78,6 +78,9 @@ def main():
     ap.add_argument("--fit-beat", type=int, default=3)
     ap.add_argument("--beats", default="0,1,2,3")
     ap.add_argument("--no-realign", action="store_true")
+    ap.add_argument("--fine-shift", type=float, default=0.0,
+                    help="step of the per-beat onset re-alignment in frames (0 = whole frames within +-3); "
+                         "e.g. 0.25 searches +-3 frames in quarter-frame steps")
     ap.add_argument("--specimen", default="healthy", choices=["healthy", "hcm"])
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
@@ -115,8 +118,12 @@ def main():
         # at frame 0, 2 frames before its onset): that known truncation shifts the clock and the
         # replay alike; the +-3 search around it is the only per-beat freedom
         trunc = (win["onset"] - win["span"][0]) - R.PRE                 # <= 0
-        shifts = [float(trunc)] if (args.no_realign or k == args.fit_beat) else \
-            [trunc + d for d in (-3, -2, -1, 0, 1, 2, 3)]
+        if args.no_realign or k == args.fit_beat:
+            shifts = [float(trunc)]
+        elif args.fine_shift > 0:
+            shifts = [trunc + d for d in np.arange(-3, 3 + 1e-9, args.fine_shift)]
+        else:
+            shifts = [trunc + d for d in (-3, -2, -1, 0, 1, 2, 3)]
         best = None
         for sh in shifts:
             with torch.no_grad():
