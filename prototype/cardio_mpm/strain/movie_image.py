@@ -46,8 +46,10 @@ def model_node_displacement(args, rec, P, win):
     """[T,N,2] model displacement at the tracking nodes, world units, from the fitted rollout."""
     dev = args.device; C = rec["n_cells"]; T = len(win["frames"])
     A_ref, u_ref = R.window_affine(rec, win)
-    trunc = (win["onset"] - win["span"][0]) - R.PRE
-    P.shift = -float(trunc)
+    if win.get("segments"):
+        P.segments = win["segments"]          # the clock fires once per beat inside one rollout
+    else:
+        P.shift = -float((win["onset"] - win["span"][0]) - R.PRE)
     LTIF = os.path.join(HERE, "data_hcm" if rec.get("specimen") == "hcm" else "data", "cells_2560.tif")
     kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_k=args.anchor, drag_k=args.drag, anchor_percell=args.anchor_percell,
               label_tif=LTIF)
@@ -87,6 +89,8 @@ def main():
     ap.add_argument("--fps", type=int, default=8)
     ap.add_argument("--seconds", type=float, default=0.0,
                     help="play the whole window in this many seconds (sets the frame rate from the frame count); 0 keeps --fps. The reference cardio.mp4 plays the recording in 4.8 s")
+    ap.add_argument("--continuous", action="store_true",
+                    help="ONE rollout over beats 1-3, never reset: the window spans all three and the\n                         fitted clock fires once per beat (recording.continuous_window). Without it the\n                         movie is one rollout per beat, each from its own rest.")
     ap.add_argument("--tag", default="", help="name the file progress_<kind>_<tag>.mp4 instead of by fit folder")
     ap.add_argument("--overlay", action="store_true",
                     help="ONE panel: the recording in green and the model-warped rest frame in magenta, "
@@ -101,7 +105,8 @@ def main():
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
     P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["psi"].shape[1]) if "psi" in z.files else (int(z["clock"].shape[0]) if mode == "free" else 0), n_modes=int(z["n_modes"]) if "n_modes" in z.files else 0)
     P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"})
-    win = R.beat_window(rec, args.beat); T = len(win["frames"]); lo, hi = win["span"]
+    win = R.continuous_window(rec) if args.continuous else R.beat_window(rec, args.beat)
+    T = len(win["frames"]); lo, hi = win["span"]
     disp, ref_nodes, _, _, _ = model_node_displacement(args, rec, P, win)       # world units
 
     d = args.down; px = 2048.0 / 0.7 / d                                        # world -> downsampled px
@@ -160,7 +165,9 @@ def main():
             ims[0].set_data(np.stack([m_, g_, m_], -1))
         else:
             ims[0].set_data(frames[t]); ims[1].set_data(warped)
-        txt.set_text(f"{args.specimen} sheet, beat {args.beat} ({'held out' if args.beat != 3 else 'fit beat'}), "
+        _lab = ("beats 1-3, one rollout, never reset (1 and 2 held out, 3 fitted)" if args.continuous
+                else f"beat {args.beat} ({'held out' if args.beat != 3 else 'fit beat'})")
+        txt.set_text(f"{args.specimen} sheet, {_lab}, "
                      f"recording frame {win['frames'][t]}, t = {t * R.DT_S:.2f} s; the tissue moves 1-3 px per beat"
                      + (f" (drawn x{args.amplify:g})" if args.amplify != 1 else ""))
         fig.canvas.draw()

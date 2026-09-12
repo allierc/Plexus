@@ -28,6 +28,8 @@ ap.add_argument("--band", type=float, default=0.03); ap.add_argument("--amplify"
 ap.add_argument("--fps", type=int, default=8)
 ap.add_argument("--seconds", type=float, default=0.0,
                 help="play the whole window in this many seconds (sets the frame rate from the frame count); 0 keeps --fps. The reference cardio.mp4 plays the recording in 4.8 s")
+ap.add_argument("--continuous", action="store_true",
+                help="ONE rollout over beats 1-3, never reset: the window spans all three and the\n                     fitted clock fires once per beat (recording.continuous_window). Without it the\n                     movie is one rollout per beat, each from its own rest.")
 ap.add_argument("--tag", default="")
 ap.add_argument("--overlay", action="store_true", help="one panel: tracking nodes (green) and MPM particles (blue) superposed")
 args = ap.parse_args(); dev = args.device
@@ -35,7 +37,8 @@ rec = R.load(device=dev, specimen=args.specimen); C = rec["n_cells"]
 z = np.load(args.params); mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
 P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["psi"].shape[1]) if "psi" in z.files else (int(z["clock"].shape[0]) if mode == "free" else 0), n_modes=int(z["n_modes"]) if "n_modes" in z.files else 0)
 P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"})
-win = R.beat_window(rec, args.beat); T = len(win["frames"])
+win = R.continuous_window(rec) if args.continuous else R.beat_window(rec, args.beat)
+T = len(win["frames"])
 _, ref_nodes, pos, X0, cid = model_node_displacement(args, rec, P, win)          # pos [T,N,2] particles
 nodes_t = rec["pos"][win["frames"]].cpu().numpy()
 band = ((X0[:, 0] < M.DOM_LO + args.band) | (X0[:, 0] > M.DOM_HI - args.band)
@@ -69,7 +72,9 @@ for t in range(T):
     s_nodes.set_offsets(ref_nodes + A * (nodes_t[t] - ref_nodes))
     dp = pos[t] - X0
     s_band.set_offsets(X0[band] + A * dp[band]); s_part.set_offsets(X0[~band] + A * dp[~band])
-    txt.set_text(f"{args.specimen} sheet, beat {args.beat} ({'held out' if args.beat != 3 else 'fit beat'}), "
+    _lab = ("beats 1-3, one rollout, never reset (1 and 2 held out, 3 fitted)" if args.continuous
+            else f"beat {args.beat} ({'held out' if args.beat != 3 else 'fit beat'})")
+    txt.set_text(f"{args.specimen} sheet, {_lab}, "
                  f"recording frame {win['frames'][t]}, t = {t * R.DT_S:.2f} s")
     fig.canvas.draw(); writer.send(np.ascontiguousarray(np.asarray(fig.canvas.buffer_rgba())[:h, :w, :3]))
 writer.close(); print(f"  {T} frames -> {path}")

@@ -136,6 +136,10 @@ class Params:
         # (residual/signal > 1 after frame 24). A free clock is 57 numbers shared by 472 cells.
         self.clock_mode = clock_mode
         self.shift = 0.0                    # whole-frame re-alignment used only by the scorer
+        # SEGMENTS: the frame offsets at which the clock fires again, for a rollout that spans
+        # several beats without being reset (recording.continuous_window). None = one beat, the
+        # clock fires once. The same fitted clock is replayed at each offset; nothing is refitted.
+        self.segments = None
         # PER-CELL TIMING. The recording's beat is 88% one temporal mode and 6.7% a second whose
         # time course is early-negative / late-positive: cells lead or lag. Per-cell peak frames
         # spread p10 7 / p50 13 / p90 21 -- 14 frames (0.6 s) across the sheet, with no spatial
@@ -205,19 +209,26 @@ class Params:
         s0 = self._s(0)
         return (self._s(t) - s0) / (1.0 - s0)
 
+    def _t_local(self, t):
+        """Frame index inside the CURRENT beat: the window's own time, minus the segment it is in."""
+        tl = float(t) - self.shift
+        if self.segments:
+            tl = tl - max([s for s in self.segments if s <= tl], default=self.segments[0])
+        return tl
+
     def gamma_cells(self, t):
         """[C] clock value of every cell at frame t, its own delay applied (sigmoid clock only;
         a free clock has no per-cell timing). gamma_j(0) = 0 is kept exactly by the same
         normalisation, so a delayed cell still starts at rest."""
         if self.clock_mode == "free":
             return self.gamma(t).expand(self.delay.shape[0])
-        tt = float(t) - self.shift - self.delay
+        tt = self._t_local(t) - self.delay
         s0 = self._s(0.0 - self.delay, self.logtau, percell=True)
         gam = ((self._s(tt, self.logtau, percell=True) - s0) / (1.0 - s0)).clamp(min=0.0)
         if self.n_modes > 0:
             # the modes are per-frame vectors; a fractional shift (the scorer's sub-frame onset
             # re-alignment) interpolates linearly between the two neighbouring frames
-            tt = float(t) - self.shift
+            tt = self._t_local(t)
             i0 = int(np.floor(tt)); fr = tt - i0
             if 0 < i0 + 1 < self.psi.shape[1] or 0 < i0 < self.psi.shape[1]:
                 a0 = self.psi[:, min(max(i0, 0), self.psi.shape[1] - 1)] * (1 - fr) * float(i0 > 0)
@@ -237,11 +248,11 @@ class Params:
 
     def gamma(self, t):
         if self.clock_mode == "free":
-            i = int(round(t - self.shift))
+            i = int(round(self._t_local(t)))
             if i <= 0:
                 return self.gfree[0] * 0.0                      # gamma(0) = 0, on the tape
             return self.gfree[min(i, self.gfree.shape[0] - 1)]
-        return self._gamma_sigmoid(t - self.shift)
+        return self._gamma_sigmoid(self._t_local(t))
 
     def smoothness(self):
         """Sum of squared frame-to-frame steps of a free clock (0 for the sigmoid)."""

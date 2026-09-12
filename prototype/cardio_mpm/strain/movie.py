@@ -54,6 +54,8 @@ def main():
     ap.add_argument("--fps", type=int, default=8)
     ap.add_argument("--seconds", type=float, default=0.0,
                     help="play the whole window in this many seconds (sets the frame rate from the frame count); 0 keeps --fps. The reference cardio.mp4 plays the recording in 4.8 s")
+    ap.add_argument("--continuous", action="store_true",
+                    help="ONE rollout over beats 1-3, never reset: the window spans all three and the\n                         fitted clock fires once per beat (recording.continuous_window). Without it the\n                         movie is one rollout per beat, each from its own rest.")
     ap.add_argument("--tag", default="", help="name the file progress_cells_<tag>.mp4 instead of by fit folder")
     ap.add_argument("--stride", type=int, default=5, help="arrows on every stride-th row and column of the node lattice")
     args = ap.parse_args()
@@ -66,10 +68,13 @@ def main():
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
     P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["psi"].shape[1]) if "psi" in z.files else (int(z["clock"].shape[0]) if mode == "free" else 0), n_modes=int(z["n_modes"]) if "n_modes" in z.files else 0)
     P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"})
-    win = R.beat_window(rec, args.beat); T = len(win["frames"])
+    win = R.continuous_window(rec) if args.continuous else R.beat_window(rec, args.beat)
+    T = len(win["frames"])
     A_ref, u_ref = R.window_affine(rec, win)
-    trunc = (win["onset"] - win["span"][0]) - R.PRE
-    P.shift = -float(trunc)
+    if win.get("segments"):
+        P.segments = win["segments"]          # the clock fires once per beat inside one rollout
+    else:
+        P.shift = -float((win["onset"] - win["span"][0]) - R.PRE)
     kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_k=args.anchor, drag_k=args.drag, anchor_percell=args.anchor_percell)
     with torch.no_grad():
         r0 = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="mv_rest", **dict(kw, n_frames=0))),
@@ -132,8 +137,9 @@ def main():
     a.plot(t_s, sm.mean(1), color=WHITE, lw=2, label="model")
     a.fill_between(t_s, np.percentile(sr, 25, 1), np.percentile(sr, 75, 1), color=GREEN, alpha=0.18, lw=0)
     marker = a.axvline(0, color=GREY, lw=1)
-    a.set_xlabel(f"time in the window (s); beat {args.beat}, frames {win['span'][0]}-{win['span'][1]}"
-                 f"{' -- held out' if args.beat != 3 else ' -- the fit beat'}")
+    a.set_xlabel(f"time (s); frames {win['span'][0]}-{win['span'][1]}"
+                 + (", beats 1-3 in one rollout" if args.continuous else
+                    f", beat {args.beat}{' held out' if args.beat != 3 else ' fitted'}"))
     a.set_ylabel("shortening strain, mean over 472 cells\n(band = recording's 25-75% across cells)")
     a.legend(loc="upper right", fontsize=9)
     a.text(-0.02, 1.01, "d", transform=a.transAxes, fontsize=13, va="bottom", ha="right")

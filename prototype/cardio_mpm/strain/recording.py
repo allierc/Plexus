@@ -148,6 +148,26 @@ def beat_window(rec, k):
     return dict(frames=list(range(lo, hi + 1)), ref=ref, onset=o, k=k, span=(lo, hi))
 
 
+def continuous_window(rec, beats=(1, 2, 3), rest_head=8):
+    """ONE window spanning several beats, for a rollout that is never reset.
+
+    `beat_window` gives each beat its own window and its own rest, which is what a fit wants (one
+    contraction, starting and ending at rest). A movie of three beats built from three such windows
+    restarts the model at every beat -- three rollouts stitched together. This window instead opens
+    `PRE` frames before the first onset, closes `POST` before the beat after the last, and takes its
+    rest from the `rest_head` frames at its OWN start, which precede any contraction here.
+    `segments` are the frame offsets at which each beat's clock fires, so the model's single clock
+    can be replayed once per beat inside one continuous rollout (`model.Params.segments`).
+    """
+    on = rec["onsets"]
+    start = max(on[beats[0]] - PRE, 0)
+    nxt = on[beats[-1] + 1] if beats[-1] + 1 < len(on) else rec["pos"].shape[0] - 1
+    hi = nxt - POST
+    ref = rec["pos"][start:start + rest_head].median(0).values
+    return dict(frames=list(range(start, hi + 1)), ref=ref, span=(start, hi), onset=on[beats[0]],
+                k=beats[0], segments=[int(on[k] - PRE - start) for k in beats], beats=list(beats))
+
+
 def window_affine(rec, win):
     """A_rec [T,C,2,2], u_rec [T,C,2] over the window, relative to its REST configuration."""
     pos, lab, C = rec["pos"], rec["labels"], rec["n_cells"]
@@ -159,11 +179,19 @@ def window_affine(rec, win):
 
 
 def shortening(A):
-    """Per-cell shortening strain: minus the smallest eigenvalue of sym(A - I). [T,C] or [C]."""
+    """Per-cell shortening strain: minus the smallest eigenvalue of sym(A - I). [T,C] or [C].
+
+    In CLOSED FORM, not through `eigvalsh`: for a symmetric 2x2 the eigenvalues are
+    (a + c)/2 -+ sqrt(((a - c)/2)^2 + b^2), exact and differentiable, while cuSOLVER's batched
+    path raises CUSOLVER_STATUS_INVALID_VALUE above ~70k matrices (a three-beat window is
+    158 x 472 of them) on perfectly finite input.
+    """
     eye = torch.eye(2, device=A.device, dtype=A.dtype)
     E = A - eye
-    S = 0.5 * (E + E.transpose(-1, -2))
-    return -torch.linalg.eigvalsh(S)[..., 0]
+    a, c = E[..., 0, 0], E[..., 1, 1]
+    b = 0.5 * (E[..., 0, 1] + E[..., 1, 0])
+    half, disc = 0.5 * (a + c), torch.sqrt((0.5 * (a - c)) ** 2 + b ** 2)
+    return -(half - disc)
 
 
 def clock_init(A_rec):
