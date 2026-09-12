@@ -58,6 +58,22 @@ sets:
         width: 1
       parent_id:
         width: 1
+      phase:
+        width: 1
+      cycle_progress:
+        width: 1
+      cyc_rate:
+        width: 1
+        record: false
+      phase_t:
+        width: 1
+        record: false
+      cyc_inhib:
+        width: 1
+        record: false
+      cyc_vprev:
+        width: 1
+        record: false
   vertex:
     n: 25584
     mesh: half_edge
@@ -112,15 +128,24 @@ operators:
   engine_clock: true
   l_th_frac: 0.35
   max_flips: 30
+- op: cell_cycle
+  at: vertex
+  t_g1: 400.0
+  t_s: 0.0
+  t_g2: 0.0
+  t_m: 0.0
+  phase_cv: 0.15
+  seed: 0
+  seed_async: false
+  g1_size: 2.0
 - op: cell_divide
   at: vertex
   every: 4
   engine_clock: true
-  cycle_cv: 0.15
   min_cycle: 4
   max_cycle: 1000000000
   p0: 3.5
-  factor: 2.0
+  model: cycle
 - op: topo_record
   at: vertex
   every: 1
@@ -129,6 +154,7 @@ schedule:
 - cell_grow
 - cell_mechanics
 - edge_flip
+- cell_cycle
 - cell_divide
 - topo_record
 seed:
