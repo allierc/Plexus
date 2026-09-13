@@ -549,7 +549,7 @@ def p_reset(h, data):
     return h._send_json(dict(bio.STATE))
 
 
-def p_tab_build(h, data, tab_name: str):
+def p_tab_build(h, data, tab_name: str, quiet: bool | None = None):
     from plexus.gui import bio, tabs
     try:
         tab = tabs.get(tab_name)
@@ -571,6 +571,13 @@ def p_tab_build(h, data, tab_name: str):
     bio.STATE["tab"] = tab_name
     bio.bump(name, f"built {name}")
     bio.claude_note(f"{tab_name} spec '{name}' built from the form: sets {', '.join((spec.get('sets') or {}).keys())}")
+    if quiet if quiet is not None else bool(data.get("quiet")):
+        # THE YAML IS FOR THE PAGE'S EDITOR, NOT FOR A DRIVER. 32 KB of spec came back to a session
+        # whose tool truncates at 30 KB, so its own change was unreadable to it; `quiet` answers
+        # with what it asked for instead.
+        sets = {k: (len((v or {}).get("types") or {}) or (v or {}).get("n") or (v or {}).get("per_parent"))
+                for k, v in (spec.get("sets") or {}).items()}
+        return h._send_json({"name": name, "valid": True, "version": bio.STATE["version"], "sets": sets})
     return h._send_json({"name": name, "raw": raw, "valid": True, "version": bio.STATE["version"]})
 
 
@@ -599,12 +606,17 @@ def p_claude(h, data):
             kinds[str(b.get("material", "?"))] = kinds.get(str(b.get("material", "?")), 0) + 1
         task = (f"The scene on screen is spec '{data.get('name')}': {json.dumps(f)}, with "
                 f"{len(bodies)} bodies ({', '.join(f'{v} {k}' for k, v in kinds.items()) or 'none'}).\n"
-                f"Change it with ONE patch call and nothing else:\n"
+                f"Change it with ONE patch call when one will do:\n"
                 f"  curl -s -X POST http://127.0.0.1:{{port}}/api/scene/patch -H 'Content-Type: application/json' "
                 f"-d '{{\"form\": {{...changed top-level fields...}}, \"bodies\": {{\"*\": {{...changed body fields...}}}}}}'\n"
-                f"Send only the fields that change. Do not read the scene first and do not send the whole form.\n"
-                f"`form.n_bodies` changes HOW MANY bodies there are (the scene is re-laid on a lattice); a "
-                f"`bodies` key may be `*`, a name, an index, or a range like \"0-9\"."
+                f"Send only the fields that change, and do not read the scene first -- it is quoted above.\n"
+                f"EVERY field of that form is patchable, including `n_bodies` (how many bodies there are; "
+                f"the scene is re-laid on a lattice) and `particles` (material points PER BODY -- millions "
+                f"are fine). A `bodies` key may be `*`, a name, an index, or a range like \"0-9\".\n"
+                f"NOTHING IS OFF LIMITS. If a patch cannot say what the task asks -- a different kind of "
+                f"scene, bodies at hand-picked places, a spec the form has no field for -- then build the "
+                f"whole form with POST /api/tab/<tab>/build, or edit the spec in English with "
+                f"POST /api/scene/refine. Do the task; never stop to ask whether you may."
                 f"\n\nTask: {task}")
     return h._send_json(bio.claude_start(task, int(h.server.server_address[1]),
                                          model=str(data.get("model") or "sonnet"), brief=brief, mode=mode))
@@ -831,13 +843,32 @@ def p_patch(h, data):
     name = str(data.get("name") or bio.STATE.get("name") or "")
     sp = _spec_path(name)
     tab_name = str(data.get("tab") or bio.STATE.get("specs", {}).get(name) or bio.STATE.get("tab") or "")
-    if not name or not os.path.exists(sp) or tab_name not in tabs.ORDER:
-        return h._send_json({"error": "no form-built scene is open"}, 400)
+    if not name or not os.path.exists(sp):
+        return h._send_json({"error": "no scene is open"}, 400)
+    raw = yaml.safe_load(open(sp))
+    form = None
+    # A SPEC OPENED FROM A FILE IS PATCHABLE TOO. "form-built" was a bookkeeping flag, not a fact
+    # about the spec: `form_from_spec` reads any spec the tab understands, which is how the page
+    # fills its own form after OPEN. Try the named tab, then every other one, and remember which
+    # answered -- a driver asked to change the scene should not be told the scene is off limits.
+    for cand in ([tab_name] if tab_name in tabs.ORDER else []) + [x for x in tabs.ORDER if x != tab_name]:
+        try:
+            f = tabs.get(cand).form_from_spec(raw)
+            if not f:
+                continue
+            # A FORM IS ONLY THE RIGHT ONE IF IT REBUILDS THIS SPEC'S SETS. Every tab's reader
+            # returns a dict of defaults for any spec, so "the first that answers" chose the bio
+            # tab for a box of cubes and refused the patch for want of a protein species.
+            got = set((tabs.get(cand).build_spec(f).get("sets") or {}).keys())
+        except Exception:                                        # noqa: BLE001
+            continue
+        if got and got == set((raw.get("sets") or {}).keys()):
+            form, tab_name = f, cand
+            bio.STATE.setdefault("specs", {})[name] = cand
+            break
+    if form is None:
+        return h._send_json({"error": "no tab reads this spec back into a form; edit it with /api/scene/refine"}, 400)
     tab = tabs.get(tab_name)
-    try:
-        form = tab.form_from_spec(yaml.safe_load(open(sp)))
-    except Exception as e:                                       # noqa: BLE001
-        return h._send_json({"error": f"this spec does not read back into the form: {e}"}, 400)
     patch_form = dict(data.get("form") or {})
     # HOW MANY BODIES IS A PATCHABLE FIELD. "100 boxes, 10 of water" is one sentence and was two
     # impossibilities: `{"form": {"bodies": 100}}` put an int where the list goes and the handler
@@ -869,7 +900,7 @@ def p_patch(h, data):
             else:
                 b.pop("bulk_modulus", None)
     try:
-        return p_tab_build(h, form, tab_name)
+        return p_tab_build(h, form, tab_name, quiet=bool(data.get("quiet", True)))
     except Exception as e:                                       # noqa: BLE001 -- a bad patch is an answer, not a dead socket
         return h._send_json({"error": f"patch: {type(e).__name__}: {e}"[:400]}, 400)
 
