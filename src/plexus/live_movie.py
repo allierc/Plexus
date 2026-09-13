@@ -1860,6 +1860,27 @@ class LiveMovie:
         st = self.style or {}
         if not bool(st.get("contour_by_type", False)):
             return None
+        # A SURFACE PER BODY, WHEN THE SPEC SAYS WHICH BODY. Partitioned by TYPE, ten copies of one
+        # type reconstructed as ONE surface in one colour -- the ring came out a single doughnut and
+        # the ten rabbits one blob. When the scene colours by a scalar of its own (`color_field:
+        # copy`), that scalar IS the partition, and the colours come from its colormap.
+        _cf = str(st.get("color_field", "") or "")
+        _sch = getattr(lvl, "state_schema", None)
+        if _cf and _sch is not None and _cf in _sch and (_sch[_cf][1] - _sch[_cf][0]) == 1:
+            import matplotlib.pyplot as _plt
+            from matplotlib.colors import to_hex
+            a, b = _sch[_cf]
+            v = lvl.state[self.idx, a].detach().cpu().numpy()
+            tid = np.rint(v).astype(int)
+            ids = sorted(set(int(x) for x in np.unique(tid)))
+            rng = st.get("color_range") or [min(ids), max(ids)]
+            lo, hi = float(rng[0]), float(rng[1])
+            cm = _plt.get_cmap(st.get("field_cmap", "turbo"))
+            names = [f"{_cf} {i}" for i in ids]
+            remap = {v_: k for k, v_ in enumerate(ids)}
+            tid = np.vectorize(remap.get)(tid)
+            cols = {f"{_cf} {i}": to_hex(cm((i - lo) / max(hi - lo, 1e-9))[:3]) for i in ids}
+            return names, tid, cols
         own = getattr(lvl, "node_type", None); par = getattr(lvl, "parent", None)
         if own is not None:
             names = list(getattr(lvl, "type_names", []) or [])

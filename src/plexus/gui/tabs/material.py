@@ -317,7 +317,7 @@ def build_spec(form: dict) -> dict:
           "radius": radius}
     if launch > 0:
         mp["vel_init"] = launch
-    return {
+    out = {
         "general": {"name": name, "seed": seed, "n_frames": frames, "dt": dt, "boundary": "wall",
                     "dim": 3, "world": [world, world, world],
                     # THE RUN RECORDS ITS TRAJECTORY. Without it a finished run leaves a movie and
@@ -349,6 +349,14 @@ def build_spec(form: dict) -> dict:
                                  str(form.get("render", "small_dots")), str(form.get("light", "default")),
                                  str(form.get("color", "particles"))),
     }
+    # WHAT A REBUILD MUST NOT LOSE. A scene may colour by a scalar it defines (`copy`, which paints
+    # each body of a `repeat` its own hue) and may declare the state block that holds it; the form
+    # carried neither, so pressing BUILD threw both away and twelve spokes came back as one red ball.
+    for _k, _v in (form.get("keep_plotting") or {}).items():
+        out["plotting"][_k] = _v
+    if form.get("particle_state"):
+        out["sets"]["mpm_particle"]["state"] = form["particle_state"]
+    return out
 
 
 def write_spec(spec: dict, path: str) -> str:
@@ -395,7 +403,12 @@ def form_from_spec(spec: dict) -> dict:
     g = next((o.get("g", 9.81) for o in ops if o.get("op") == "gravity"), 9.81)
     gu = next((o for o in ops if o.get("op") == "mpm_grid_update"), {})
     pl = spec.get("plotting") or {}
-    return {"name": gen.get("name", ""), "world": (gen.get("world") or [0.5])[0], "n_frames": gen.get("n_frames", 800),
+    _pl = spec.get("plotting") or {}
+    # WHAT A REBUILD MUST NOT LOSE: the scalar a scene colours by, and the state block that holds it.
+    _keep = {k: _pl[k] for k in ("color_field", "field_cmap", "color_range") if _pl.get(k) is not None}
+    _pstate = ((spec.get("sets") or {}).get("mpm_particle") or {}).get("state")
+    return {"name": gen.get("name", ""), "keep_plotting": (_keep or None), "particle_state": _pstate,
+            "world": (gen.get("world") or [0.5])[0], "n_frames": gen.get("n_frames", 800),
             "render": render_of(pl), "light": str(pl.get("light", "default")), "color": color_of(pl),
             "dt": gen.get("dt", 1.0 / 1200.0), "gravity": g, "wall_damp": gu.get("wall_damp", 0.5),
             "friction": gu.get("wall_friction", 0.0), "launch": mp.get("vel_init", 0.0), "seed": gen.get("seed", 1),
