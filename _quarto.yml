@@ -12,8 +12,6 @@ website:
     left:
       - href: index.qmd
         text: Home
-      - href: language.qmd
-        text: Language
       - text: Library
         menu:
           - href: library_sets.qmd

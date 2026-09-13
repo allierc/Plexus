@@ -26,7 +26,7 @@ resources:
 ```
 
 
-Each operator belongs to one of the elementary **families** of the [operator algebra](language.qmd) &mdash; lateral, aggregate, broadcast, exchange, field, rewire, structural (divide and die) and seed; the logo marks which. The runtime also exposes a **field** kind, a field&rsquo;s own self-update.
+Each operator belongs to one of the elementary **families** of the [algebra of activities](index.qmd#the-language) &mdash; lateral, aggregate, broadcast, exchange, field, rewire, structural (divide and die) and seed; the logo marks which. The runtime also exposes a **field** kind, a field&rsquo;s own self-update.
 
 ## <img class="kind-h" src="figures/icons/lateral.png"> Lateral <span class="kind-sym">$\mathcal{O}_E$</span>
 

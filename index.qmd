@@ -87,7 +87,7 @@ expressed using a small number of kinds. Plexus has **eight**:
 The first five primarily change state while preserving the organization. Rewire changes
 relations; structural changes the entities themselves; seed establishes the starting
 condition. Together these activity kinds describe not only what a system does, but how its
-organization can change. Details in **[Language](language.qmd)**.
+organization can change.
 
 ## Organization in time
 
@@ -6063,27 +6063,6 @@ schedule: [squared_law]</pre></span></span>
   </figure>
 </div>
 ```
-
-## The same thing in four vocabularies
-
-Readers arrive from mathematics, physics and programming as often as from biology, and each
-field has its own word for every construct. The biological column is the one that says why
-the construct exists; the other three are ways of computing it.
-
-| Plexus | Biology | Mathematics | Physics | Programming |
-|---|---|---|---|---|
-| entities | a kind of part: cells, synapses, matrix | carrier set, indexed family | a species of particle | a table of entities |
-| state | physiological state, phenotype | a point in a product space | degrees of freedom | the columns of that table |
-| field | microenvironment, gradient, matrix | a function on a domain | a continuum field | a grid-backed resource |
-| part → whole map | compartment membership | a function whose fibres partition the parts | coarse-graining index | a foreign key |
-| relation | contact, junction, connectivity | a span between two sets | the interaction graph | a join table |
-| activity | what the parts do: one step of a mechanism | a typed morphism | interaction, coupling, source | a pure function |
-| model vs. implementation | competing hypotheses in one slot | a different function of the same type | a different constitutive law | a different program vs. a different compiler |
-| schedule | the order and tempo of activities | operator splitting | multi-rate integration | the program |
-| aggregate ↑ / broadcast ↓ | integration / top-down control | pushforward / pullback, an adjoint pair | coarse-graining / an imposed constraint | reduce / scatter |
-| rewire | remodelling, plasticity | graph rewriting | no analogue: the interaction graph is state | mutating the join table |
-| divide / die | proliferation / apoptosis, turnover | a change of carrier set | creation / annihilation | inserting / deleting rows |
-| seed | the set-up conditions, the pre-pattern | the initial condition | the initial condition | a constructor, run once |
 
 Machamer, P., Darden, L. &amp; Craver, C. F. (2000). Thinking about mechanisms.
 <i>Philosophy of Science</i> 67:1–25. <https://doi.org/10.1086/392759>.
