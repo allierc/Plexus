@@ -1,7 +1,7 @@
 {
  "archive": "/workspace/Plexus/graphs_data/tissue/ms6_apoptosis",
- "archived_on": "2026-09-12 16:29",
- "because": "size-cycle-align: the working-point mechanics (K_R 0, kappa_h 0.2) with the size rules on the cycle; notes/size_cycle/SIZE_CYCLE_PLAN.md",
+ "archived_on": "2026-09-13 00:47",
+ "because": "R5b: the async spread became the seed_cycle operator and the daughter hold now keys on ndiv, not age (finding 24); re-registered from the re-rendered archive",
  "checkpoints": {
   "0": {
    "area_mean": 1.5510858297348022,
@@ -108,7 +108,7 @@
  },
  "device": "archive",
  "family": "tissue",
- "generated_at_commit": "054536f9",
+ "generated_at_commit": "cd3882fd",
  "name": "ms6_apoptosis",
  "spec_sha256": "5c0e30c333b7ccdb",
  "timing": {
@@ -117,6 +117,6 @@
    20,
    150
   ],
-  "ms_per_frame": 547.9317626953125
+  "ms_per_frame": 545.8030090332031
  }
 }
