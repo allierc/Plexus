@@ -562,14 +562,31 @@ the ones that matter is worse than an honest true.
     phase fractions are withdrawn; its slopes are not (they read volumes, not phases), which is
     why the R4c table still stands.
 
+25. **The septum does no prism damage once the thickness field is stiff, so R3c is withdrawn.**
+    The rung asked what a division does to a cell's prism and whether `local_relax` should heal it.
+    Measured before `kappa_h` existed, a daughter went from 7 % trapezoidal as a mother to 16 % at
+    the cut and 20 % eight frames later, and never recovered. Measured on the working point over
+    201 divisions: 0.00 at every stage -- mother 0.94 cap-area ratio, daughter 0.94 at the cut,
+    1.01 after eight frames, 1.00 after forty, and 0.000 across the whole population at frame 400.
+    The septum was never the author of the damage; the energy's indifference between a prism and a
+    frustum was, and the daughters showed it first only because a cut is the largest kick a cell
+    gets. R3c is superseded rather than dropped, and `local_relax` stays off.
+
+**R3e is withdrawn too** (finding 22). A seed at rest in every degree of freedom needs the rest
+offset calibrated with the thickness free, which is a mechanics change with its own gate and would
+re-open every rung above it. The declared settle window covers the ramp it exists for -- 60 frames
+against a 56-78 frame settle -- and the size rules hold until then, so nothing downstream reads a
+shell that has not finished moving. If it is ever reopened it starts from finding 22, not from
+finding 7.
+
 ## 4. The ladder, v2
 
 | rung | layer | change | gate |
 |---|---|---|---|
 | R3b | 0 | `K_R 0` on the dividing specs; flip re-aims `sep` | gauge SPHEROID (shell + prism) for >= 3 doublings on `size_sizer`; the prism bands are the ones to watch |
-| R3c | 0 | the septum and `local_relax` on prisms; per-event prism damage | trapezoid fraction flat across a division wave |
+| R3c | 0 | WITHDRAWN, superseded by R3d (finding 25) | -- |
 | R3d | 0 | `kappa_h`, a stiffness on the thickness field (finding 18) | prism bands green on every arm for >= 3 doublings; shell bands too |
-| R3e | 0 | the seed at rest (findings 7, 22): calibrate the rest offset with the thickness free; `ref_frame` retired | frame-0 volumes within 5 % of frame-60 -- parked behind R5 |
+| R3e | 0 | WITHDRAWN (finding 22): there is no thickness to seed at while the rest offset is calibrated with `sep` frozen, and `ref_frame` covers the ramp | -- |
 | R4a-c | 2 | `cell_id`; the apoptosis rig; one "when" | DONE: R3d reproduced (8/10 within 0.16), CV(V_d) tighter everywhere |
 | R4b | 3 | the apoptosis rig | `death_report` rows for every arm; deaths never off a bent mesh |
 | R5a | eng | DONE: `kappa_h` in the warp kernels | warp = autograd to float32 round-off, 30x on the gradient |
