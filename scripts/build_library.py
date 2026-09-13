@@ -879,7 +879,7 @@ def render_operators() -> str:
     out = _page_header("Operators",
                        "How state moves &mdash; grouped by family, in the visual language of the operator algebra")
     out.append("Each operator belongs to one of the elementary **families** of the "
-               "[operator algebra](language.qmd) &mdash; lateral, aggregate, broadcast, exchange, "
+               "[algebra of activities](index.qmd#the-language) &mdash; lateral, aggregate, broadcast, exchange, "
                "field, rewire, structural (divide and die) and seed; the logo marks which. The "
                "runtime also exposes a **field** kind, a field&rsquo;s own self-update.")
     out.append("")
