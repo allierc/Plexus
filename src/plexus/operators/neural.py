@@ -524,9 +524,13 @@ class NeuralSeed(Seed):
         # Nanometres, not voxels: on an anisotropic dataset a voxel cube is a cuboid, so the
         # importer crops in nm and stores both. Placing neurons from `xyz_vox` would stretch the
         # region along the thin axis by the anisotropy ratio, with nothing to show for it.
-        xyz = np.asarray(z["xyz_nm"], np.float64)
-        lo = np.asarray(z["bounds_lo_nm"], np.float64)
-        side = float(z["bounds_side_nm"])
+        # TWO VINTAGES OF THE SAME TREE. The first regions wrote `xyz` and `bounds_side` in
+        # nanometres; the later importer writes `xyz_nm` beside `xyz_vox` and names the bounds
+        # `*_nm` to say which. Read either, since both are on disk and both are right.
+        _k = "xyz_nm" if "xyz_nm" in z.files else "xyz"
+        xyz = np.asarray(z[_k], np.float64)
+        lo = np.asarray(z["bounds_lo_nm" if "bounds_lo_nm" in z.files else "bounds_lo"], np.float64)
+        side = float(z["bounds_side_nm" if "bounds_side_nm" in z.files else "bounds_side"])
         n = xyz.shape[0]
         if n != lvl.n:
             raise ValueError(

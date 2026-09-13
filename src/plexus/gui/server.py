@@ -1048,6 +1048,15 @@ def p_layout(h, data):
     return h._send_json({"saved": True})
 
 
+def g_regions(h, q):
+    """The frozen neuprint regions on this host, for the neurons tab's source menu."""
+    from plexus.gui.tabs import neurons as N
+    try:
+        return h._send_json({"regions": N.regions()})
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"regions": [], "error": f"{type(e).__name__}: {e}"[:200]})
+
+
 def g_shot(h, q):
     """The picture AS A FILE, for an agent that can look at images but cannot hold a PNG body.
 
@@ -1101,7 +1110,7 @@ GET_ROUTES = {
     "/api/scene/artefacts": g_artefacts, "/api/scene/ls": g_ls, "/api/scene/open": g_open,
     "/api/scene/view": g_view, "/api/scene/seed": g_seed,
     "/api/catalog": g_catalog, "/api/specs": g_specs, "/media": g_media, "/api/spec": g_editor_spec,
-    "/api/scene/shot": g_shot, "/api/bio/shot": g_shot,
+    "/api/scene/shot": g_shot, "/api/bio/shot": g_shot, "/api/neurons/regions": g_regions,
 }
 for _x in ("state", "spec", "counts", "claude", "frames", "run", "artefacts", "ls", "open", "view", "seed"):
     GET_ROUTES[f"/api/bio/{_x}"] = GET_ROUTES[f"/api/scene/{_x}"]
