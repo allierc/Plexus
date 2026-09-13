@@ -292,9 +292,15 @@ def g_page(h, q):
     tab = _q1(q, "tab") or bio.STATE.get("tab") or "material"
     if tab not in tabs.ORDER:
         return h._send_json({"error": f"no tab {tab!r}; tabs are {', '.join(tabs.ORDER)}"}, 404)
-    if bio.STATE.get("tab") != tab:
+    if bio.STATE.get("tab") and bio.STATE["tab"] != tab:
         # A PAGE OPENED ON ANOTHER TAB THAN THE SERVER HOLDS IS A SWITCH: same re-initialisation.
+        # ONLY WHEN THE SERVER ALREADY HELD ONE, though: at boot `tab` is unset, so the FIRST page
+        # load counted as a switch and threw away the scene the server had just opened -- which the
+        # page then replaced with its own default. That is the "I see 27 cubes" of this session.
         _reset_scene(tab)
+    bio.STATE.setdefault("tab", tab)
+    if not bio.STATE.get("tab"):
+        bio.STATE["tab"] = tab
     return h._send_html(app.page(tab))
 
 
@@ -371,11 +377,28 @@ def g_run(h, q):
 def g_artefacts(h, q):
     """What the run wrote for this spec: the movie (a `/media` URL with a cache buster), the
     newest still, the folder."""
-    from plexus.gui import studio
+    from plexus.gui import bio_view, studio
     name = _q1(q, "name")
     if not name:
         return h._send_json({"error": "name?"}, 400)
     a = studio.artefacts(name)
+    # THE OPEN SCENE KNOWS WHERE ITS RUN LANDED (`View.run_dir`, which follows the spec's own
+    # folder); `studio.artefacts` only ever looks in the page's tree, so a spec opened from
+    # config/si_material showed no movie over a complete run.
+    _v = bio_view.current()
+    if not a.get("mp4") and _v is not None:
+        _d = _v.run_dir()
+        if _d and os.path.exists(os.path.join(_d, "movie.mp4")):
+            a = dict(a); a["dir"] = _d
+            a["mp4"] = os.path.join(_d, "movie.mp4"); a["mp4_mtime"] = os.path.getmtime(a["mp4"])
+            _png = os.path.join(_d, "3d.png")
+            if os.path.exists(_png):
+                a["png"], a["png_mtime"] = _png, os.path.getmtime(_png)
+            try:
+                import imageio.v3 as _iio
+                a["mp4_frames"] = sum(1 for _ in _iio.imiter(a["mp4"], plugin="pyav"))
+            except Exception:                                    # noqa: BLE001
+                pass
     out = {"dir": a.get("dir")}
     for k, mk in (("mp4", "mp4_mtime"), ("png", "png_mtime")):
         out[k] = ("/media?path=" + quote(a[k]) + f"&t={int(a.get(mk) or 0)}") if a.get(k) else None

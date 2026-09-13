@@ -126,7 +126,7 @@ def _unit_offsets(kind, n, D, H, device, aspect=2.0, hollow=0.0, axis=2):
     return u
 
 
-def _place(t, off, cps, n, D, H, device):
+def _place(t, off, cps, n, D, H, device, out=None):
     """A body's offsets, TURNED, then assigned to its copies. `rotate` is degrees about the body's
     own centre; the copies come from `repeat`/`pitch`, or from `scatter`, a box the centres are
     drawn in (a grain bed: many bodies of one type, nowhere in particular)."""
@@ -142,9 +142,25 @@ def _place(t, off, cps, n, D, H, device):
     else:
         c = cps
     if int(c.shape[0]) <= 1:
+        if out is not None:
+            out["copy"] = torch.zeros(n, device=device)
         return off
     which = torch.arange(n, device=device) % int(c.shape[0])  # the points split evenly among copies
+    if out is not None:
+        # WHICH COPY A POINT BELONGS TO, when the set asks for it (`state: {copy: {width: 1}}`).
+        # Colour is a TYPE property, so ten copies of one type were one colour; a per-particle copy
+        # index is the honest way to tell them apart -- `plotting.color_field: copy` then paints
+        # each body its own hue without splitting one type into ten.
+        out["copy"] = which.to(torch.float32)
     return off + c[which]
+
+
+def _write_copy(lvl, mask, sink):
+    """Record the copy index on the particles, if the set declared a `copy` block for it."""
+    if "copy" not in sink or "copy" not in getattr(lvl, "state_schema", {}):
+        return
+    a, b = lvl.state_schema["copy"]
+    lvl.state[mask, a:b] = sink["copy"].reshape(-1, 1).to(lvl.state.dtype)
 
 
 def _copies(t, D, device):
@@ -462,12 +478,16 @@ class MPMParticle:
                     # UNIFORM IN THE BODY, not in the radius: `_unit_offsets` draws a direction and
                     # a radius with the right power, so the density is flat before anything moves.
                     _off = _unit_offsets(_shape, nb, D, H, device, aspect=_asp, hollow=_hollow, axis=_ax) * _r
-                    pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device)
+                    _sink = {}
+                    pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device, out=_sink)
+                    _write_copy(lvl, bm, _sink)
                 elif _shape == "cube":
                     _side = (_volk / _fill_frac) ** (1.0 / D)
                     _off = _unit_offsets("cube", nb, D, H, device, hollow=_hollow) * _side
-                    pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device)
-                elif _shape in ("obj", "mesh"):
+                    _sink = {}
+                    pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device, out=_sink)
+                    _write_copy(lvl, bm, _sink)
+                elif _shape.startswith("mesh:") or _shape in ("obj", "mesh"):
                     # `shape: obj` -- THE VOLUME TAKES THE SHAPE OF A MESH FILE. Same contract as
                     # ball and cube: `V = per_parent * p_vol` is fixed by the mass, and the mesh is
                     # scaled so that ITS volume equals V, so a bunny and a cow of the same
@@ -480,11 +500,26 @@ class MPMParticle:
                     # once per spec however many bodies wear it, and the points are drawn with a
                     # numpy generator seeded from `H.rng`, so the run stays reproducible under the
                     # same seed it always had.
-                    _pts, _side = _obj_points(t, nb, _vol, D, H, device, _mesh_cache,
-                                              par=pidx[bm])
+                    if _shape.startswith("mesh:"):
+                        # THE LIBRARY, NOT A PATH. `form: mesh:<name>[/<part>]` asks `plexus.shapes`
+                        # for points inside that shape, scaled so ITS volume is the volume the mass
+                        # fixes -- the same contract cube and ball keep, and the same one `obj:`
+                        # had, now with a folder, a cache and a provenance behind the name.
+                        from plexus import shapes as _shapes
+                        import torch as _t
+                        _pp = _shapes.points(_shape.split(":", 1)[1], int(nb), float(_volk))
+                        _pts = _t.as_tensor(_pp, dtype=pos.dtype, device=device)
+                        _sink = {}
+                        _pts = _place(t, _pts, _cp, nb, D, H, device, out=_sink)
+                        _write_copy(lvl, bm, _sink)
+                        _side = float(abs(_pp).max() * 2.0)   # numpy is not imported in this module
+                    else:
+                        _pts, _side = _obj_points(t, nb, _vol, D, H, device, _mesh_cache,
+                                                  par=pidx[bm])
                     pos[bm] = cpos[bm] + _pts
                 else:
-                    raise ValueError(f"shape must be 'cube', 'ball' or 'obj', got {_shape!r}")
+                    raise ValueError(f"shape must be 'cube', 'ball', 'cylinder', 'obj' or "
+                                     f"'mesh:<name>', got {_shape!r}")
             if _side is not None:
                 print(f"[build] {lvl.name}: particle_mass {float(_pm):.4g} / density -> p_vol "
                       f"{float(_pm) / float(rho if not torch.is_tensor(rho) else 1.0):.4g}, "
