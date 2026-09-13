@@ -597,6 +597,40 @@ class View:
             return np.zeros((0, 3)), []
         return np.concatenate(P, 0), ids
 
+
+    # ---------------------------------------------------------------------------- the live surface
+    def _live_mesh(self):
+        """(pos, sep, E_srce, E_trgt, E_face) of the mesh the renderer is drawing, from the LIVE
+        hierarchy -- not from `self.scene`, which is the seed's geometry and goes stale the moment
+        the tissue grows or a recorded frame is replayed."""
+        lm = self.lm
+        for nm, lv in self.H.levels.items():
+            m = getattr(lv, "_mesh", None) or getattr(lv, "mesh", None)
+            if not m or not int(m.get("nF", 0) or 0):
+                continue
+            nv = int(m["Nv"])
+            _np_ = lambda v: (v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v))   # noqa: E731
+            pos = _np_(lv.get("pos"))[:nv].astype(float)
+            try:
+                sep = _np_(lv.get("sep"))[:nv].astype(float)
+            except Exception:                                    # noqa: BLE001
+                sep = np.zeros_like(pos)
+            es, et, ef = (_np_(m[k]).astype(int) for k in ("E_srce", "E_trgt", "E_face"))
+            live = (ef >= 0) & (ef < int(m["nF"])) & (es >= 0) & (et >= 0)
+            eocc = m.get("eocc", None)
+            if eocc is not None:
+                live &= _np_(eocc)[: es.shape[0]] > 0
+            sh = getattr(lm, "_shift", None)
+            if sh is not None:
+                pos = pos + np.asarray(sh, float)
+            return pos, sep, es[live], et[live], ef[live]
+        return None
+
+    def _cap_k(self):
+        """+1 apical, -1 basal, 0 mid: which surface the renderer draws (`plotting.mesh_surface`)."""
+        s = str(((self.lm.style if self.lm is not None else None) or {}).get("mesh_surface", "mid")).lower()
+        return {"apical": 1.0, "basal": -1.0}.get(s, 0.0)
+
     @staticmethod
     def _screen(A, P):
         """World points -> (screen x, screen y as fractions from the top-left, ndc depth, in front?)."""
@@ -611,16 +645,18 @@ class View:
         tolerance is involved -- a click anywhere on a cell names that cell, which is what a click
         on a tissue means. Nearest-centroid (what this did before) answered only when the click
         happened to fall within 1.2% of the screen of a centroid: one hit in six, measured."""
-        T = self.scene.get("tissue")
-        if not T:
+        mesh = self._live_mesh()
+        if mesh is None:
             return None
+        pos, sep, es, et, ef = mesh
         best, best_z = None, np.inf
-        for cap in ("apical", "basal"):
-            c = (T.get("caps") or {}).get(cap)
-            if not c:
-                continue
-            sx, sy, z, front = self._screen(A, np.asarray(c["verts"], float))
-            tri = np.asarray(c["tri"], int); face = np.asarray(c["face"], int)
+        for kcap in ({self._cap_k()} if self._cap_k() else {1.0, -1.0}):
+            X = pos + kcap * sep
+            cen = np.zeros((int(ef.max()) + 1, 3)); cnt = np.bincount(ef, minlength=cen.shape[0]).clip(1)
+            np.add.at(cen, ef, X[es]); cen /= cnt[:, None]
+            verts = np.concatenate([X, cen], 0)                  # ring vertices, then the face centroids
+            sx, sy, z, front = self._screen(A, verts)
+            tri = np.stack([len(X) + ef, es, et], 1); face = ef
             ax, ay = sx[tri[:, 0]], sy[tri[:, 0]]
             bx, by = sx[tri[:, 1]], sy[tri[:, 1]]
             cx, cy = sx[tri[:, 2]], sy[tri[:, 2]]
@@ -733,22 +769,26 @@ class View:
             # A TISSUE'S CELL IS A RING OF EDGES, not a set of contained points: its own apical and
             # basal cap edges plus the lateral edges joining them, drawn in yellow. That IS the
             # object -- the cell has no particles of its own to paint.
-            T = self.scene.get("tissue")
-            if T is not None:
+            # A TISSUE CELL IS OUTLINED BY ITS OWN EDGES, ON THE SURFACE THAT IS DRAWN. Taken from
+            # the scene dict and from both caps, the ring was the SEED's geometry and half of it
+            # belonged to a cap nobody draws, so the yellow hung in the air above the spheroid.
+            mesh = self._live_mesh()
+            if mesh is not None:
                 import pyvista as pv
-                seg, ring = [], set()
-                for cap in ("apical", "basal"):
-                    c = T["caps"][cap]
-                    for j, t in enumerate(c["tri"]):
-                        if c["face"][j] == k:
-                            seg.append((c["verts"][t[1]], c["verts"][t[2]])); ring.add(t[1])
-                for i in ring:
-                    seg.append((T["caps"]["apical"]["verts"][i], T["caps"]["basal"]["verts"][i]))
-                if seg:
+                pos, sep, es, et, ef = mesh
+                mine = ef == k
+                if mine.any():
+                    kcap = self._cap_k()
+                    X = pos + kcap * sep
+                    seg = [(X[a], X[b]) for a, b in zip(es[mine], et[mine])]
+                    if kcap == 0.0:                              # the mid-surface is drawn: show the prism
+                        A_, B_ = pos + sep, pos - sep
+                        seg += [(A_[a], B_[a]) for a in es[mine]]
                     pts = np.asarray([p for sg in seg for p in sg], float)
                     lines = np.concatenate([[2, 2 * j, 2 * j + 1] for j in range(len(seg))])
                     pd = pv.PolyData(pts); pd.lines = lines
-                    lm.p.add_mesh(pd, color="#ffee33", line_width=4, lighting=False, name="pick_cell")
+                    lm.p.add_mesh(pd, color="#ffee33", line_width=5, lighting=False,
+                                  render_lines_as_tubes=True, name="pick_cell")
                     self._paint_actor = "pick_cell"
                 return
             par = getattr(H_lvl, "parent", None)
@@ -984,4 +1024,14 @@ def open_view(spec_path: str, device: str = "cpu", carry: bool = False) -> View:
 
 
 def current() -> View | None:
-    return CURRENT.get("view")
+    """The session's view, WAITING for a rebuild in progress rather than reporting none.
+
+    `open_view` parks `CURRENT["view"]` at None while it builds the replacement, which takes
+    seconds; a request that arrived in that window was told "no scene is open" and its picture
+    never changed -- the slider counting up over a frozen image. The lock is the one `open_view`
+    holds while it builds, and it is re-entrant, so a call from the VTK thread still passes."""
+    v = CURRENT.get("view")
+    if v is not None:
+        return v
+    with LOCK:
+        return CURRENT.get("view")
