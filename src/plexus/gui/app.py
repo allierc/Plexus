@@ -58,7 +58,7 @@ SHELL = r"""<!doctype html>
   <div id="picklist" style="max-height:55vh;overflow:auto;background:#0e0e12;border:1px solid #2a2a30;padding:4px;font-size:12px"></div>
  </div>
 {form}
- <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button></div>
+ <div class="row"><button onclick="build()">BUILD</button><button class="dim" onclick="toggleYaml()">hide YAML</button></div>
  <div id="status">building the default scene...</div>
  <div class="row"><label>device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
  <div class="row"><button onclick="runGo()" id="runbtn" title="the form is applied first, then the run starts">RUN</button><button class="dim" onclick="runStop()">STOP</button></div>
@@ -69,7 +69,9 @@ SHELL = r"""<!doctype html>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button><button class="dim" onclick="claudeNew()" title="forget the conversation so far">NEW SESSION</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
  <div id="rstat" style="color:#9ab;min-height:14px"></div>
- <div id="yaml"><textarea id="yamltext"></textarea><div><button onclick="saveYaml()">SAVE YAML</button></div></div>
+ <div id="yaml" style="display:block"><div style="color:#778;font-size:11px">the spec on screen: edit it and SAVE to seed what you wrote</div>
+ <textarea id="yamltext" style="height:260px"></textarea>
+ <div><button onclick="saveYaml()">SAVE YAML</button><button class="dim" onclick="clearYaml()">DELETE YAML</button> <span id="ystat" style="color:#8c8;font-size:11px"></span></div></div>
  <div id="tree" style="margin-top:10px">(none)</div>
  <div id="info" style="margin-top:6px">click an object</div>
 </div>
@@ -115,7 +117,10 @@ window.reseed=async function(){{playStop();FRAME=null;if(!specName){{status('no 
   if(!nframes&&STORED){{$('frame').max=STORED-1;}}
   $('framelab').textContent=nframes?`${{nframes}} frames in memory`
     :(STORED?`${{STORED}} of ${{RECORDED}} recorded frames -- drag or PLAY to load them`:'');}}catch(e){{}}}};
-window.toggleYaml=function(){{const y=$('yaml');const on=getComputedStyle(y).display==='none';y.style.display=on?'block':'none';}};
+window.toggleYaml=function(){{const y=$('yaml');const on=getComputedStyle(y).display==='none';y.style.display=on?'block':'none';event.target.textContent=on?'hide YAML':'YAML';}};
+// DELETE YAML: the spec file goes, the page forgets it, the picture is cleared. The form stays,
+// so the next BUILD writes a fresh spec of the same name.
+window.clearYaml=async function(){{if(!specName){{$('ystat').textContent='nothing open';return;}}const j=await post('/api/scene/delete',{{name:specName}});if(j.error){{$('ystat').textContent=j.error;return;}}$('yamltext').value='';$('ystat').textContent='deleted '+j.deleted;specName=null;SCENE=null;}};
 window.saveYaml=async function(){{const j=await post('/api/scene/save',{{name:specName,raw:$('yamltext').value,tab:TAB}});if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();}};
 // THE PICTURE IS THE MOVIE RENDERER'S. Every camera change asks the server for a fresh screenshot;
 // at most one request is in flight and the newest camera wins, so dragging never queues up.

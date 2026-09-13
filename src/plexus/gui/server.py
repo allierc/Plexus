@@ -732,6 +732,24 @@ def p_nearside(h, data):
     return h._send_json({"near_side": on})
 
 
+def p_delete(h, data):
+    """Delete the spec on screen (config/studio/<name>.yaml) and forget it: the page's DELETE YAML."""
+    from plexus.gui import bio, bio_view
+    name = str(data.get("name") or bio.STATE.get("name") or "")
+    sp = _spec_path(name)
+    if not name or not os.path.exists(sp):
+        return h._send_json({"error": "no spec is open"}, 400)
+    os.remove(sp)
+    bio.STATE.get("specs", {}).pop(name, None)
+    bio.STATE["name"] = None
+    v = bio_view.current()
+    if v is not None:
+        bio_view._vtk(v.close)
+        bio_view.CURRENT["view"] = None
+    bio.claude_note(f"spec '{name}' deleted from config/studio")
+    return h._send_json({"deleted": os.path.basename(sp)})
+
+
 def p_style(h, data):
     """The render selector: replace the spec's render keys, keep everything else, bump so the
     page re-seeds through the renderer with the new style (which is also the movie's)."""
@@ -1042,7 +1060,7 @@ POST_ROUTES = {
     "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
     "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
     "/api/scene/style": p_style, "/api/scene/saveas": p_saveas, "/api/scene/curves": p_curves,
-    "/api/scene/loadrun": p_loadrun, "/api/scene/patch": p_patch, "/api/scene/nearside": p_nearside,
+    "/api/scene/loadrun": p_loadrun, "/api/scene/patch": p_patch, "/api/scene/nearside": p_nearside, "/api/scene/delete": p_delete,
     "/api/quit": p_quit, "/api/studio/quit": p_quit,
     "/api/validate": p_validate, "/api/save": p_editor_save, "/api/layout": p_layout,
 }
