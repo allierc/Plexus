@@ -28,6 +28,14 @@ from plexus.gui import studio
 
 REPO = studio.REPO
 MATERIALS = ("elastic", "liquid", "snow")
+# THE SHAPES A BODY'S VOLUME CAN BE ARRANGED INTO, and the keys that arrange it. The form edits
+# `ball` and `block` (the two it has a row for) and CARRIES the rest untouched, so a spec written
+# by hand or by Claude survives a press of BUILD. The seeder (`plexus.models.entities.provision`)
+# is the one that reads them; this tuple only says which keys are a body's placement rather than
+# its material, so that they are copied and not dropped.
+BODY_SHAPES = ("ball", "cube", "cylinder")
+PLACE_KEYS = ("shape", "form", "aspect", "axis", "hollow", "rotate", "repeat", "pitch",
+              "scatter", "ring", "shell", "orient", "fill", "obj")
 DEFAULT_COLORS = [[0.95, 0.25, 0.20], [0.30, 0.55, 1.00], [0.95, 0.95, 0.95], [1.00, 0.85, 0.30],
                   [0.85, 0.40, 0.95], [0.30, 0.90, 0.95]]
 # THE PAGE'S DEFAULT SCENE IS A FILE IN THE REPO. `config/si_material/si_three_balls.yaml` is this
@@ -134,8 +142,13 @@ BODY_PX = {"small_bodies": 1.0, "middle_bodies": 2.0, "large_bodies": 4.0}
 def render_style(mode: str = "small_dots", light: str = "default") -> dict:
     mode = str(mode or "small_dots").lower()
     light = str(light or "default").lower()
-    if mode not in RENDER_MODES:
-        raise ValueError(f"render must be one of {RENDER_MODES}")
+    # THE FLAT DOT SIZES ARE ACCEPTED THOUGH THE MENU DOES NOT OFFER THEM. `RENDER_MODES` is what
+    # the menu lists; `DOT_PX` is what a hand-written spec uses (`render_3d: dots` with no shading)
+    # and what `render_of` reads back off one. Validating against the menu alone meant that opening
+    # such a spec and pressing BUILD raised "render must be one of ..." and the scene could not be
+    # rebuilt at all -- four of the eight seeder scenes.
+    if mode not in RENDER_MODES and mode not in DOT_PX:
+        raise ValueError(f"render must be one of {RENDER_MODES + tuple(DOT_PX)}")
     if light not in LIGHT_MODES:
         raise ValueError(f"light must be one of {LIGHT_MODES}")
     if mode in BODY_PX:
@@ -265,12 +278,6 @@ def build_spec(form: dict) -> dict:
         if mat not in MATERIALS:
             raise ValueError(f"body {nm!r}: material must be one of {MATERIALS}")
         shape = str(b.get("shape", "ball")).lower()
-        if shape.startswith("mesh:"):
-            t["shape"] = str(b.get("shape"))                  # the library resolves the name
-            start.append([float(v) for v in (b.get("centre") or [world / 2, world * 0.7, world / 2])])
-            types[nm] = t
-            colors[nm] = [float(v) for v in (b.get("color") or DEFAULT_COLORS[i % len(DEFAULT_COLORS)])]
-            continue
         t = {"count": 1, "material": mat}
         if mat == "liquid":
             t["bulk_modulus"] = float(b.get("bulk_modulus", b.get("youngs", 1.0e5)))
@@ -279,22 +286,34 @@ def build_spec(form: dict) -> dict:
         t["density"] = float(b.get("density", 1000.0))
         if b.get("eta") is not None:
             t["eta"] = float(b["eta"])                       # per-body viscosity, Pa s (overrides mpm_viscosity's)
-        if shape == "block" and str(b.get("fill", "")).lower() == "lattice":
-            t["fill"] = "lattice"
-        if shape == "ball":
-            c = [float(v) for v in (b.get("centre") or [world / 2, world * 0.75, world / 2])]
-            if len(c) != 3:
-                raise ValueError(f"body {nm!r}: a ball needs a centre x y z")
-            t["shape"] = "ball"
-            start.append(c)
+        # THE PLACEMENT VOCABULARY RIDES THROUGH THE FORM UNTOUCHED. The form knows a ball, a block
+        # and a named mesh; the seeder knows twelve more keys (`aspect`, `hollow`, `rotate`,
+        # `repeat`, `shell`, `ring`, `orient`, ...). Read back into `place` and written out here
+        # verbatim, so pressing BUILD on a scene the form cannot describe REBUILDS IT rather than
+        # flattening it: 24 mitochondria on a shell came back as one ball before this.
+        for _pk, _pv in (b.get("place") or {}).items():
+            if _pk in PLACE_KEYS and _pv is not None:
+                t[_pk] = _pv
+        if shape.startswith("mesh:") or shape == "obj":
+            t["shape"] = str(b.get("shape"))                 # the library resolves the name
+            start.append([float(v) for v in (b.get("centre") or [world / 2, world * 0.7, world / 2])])
         elif shape == "block":
             blk = [float(v) for v in (b.get("block") or [0, 0, 0, world, 0.25 * world, world])]
             if len(blk) != 6:
                 raise ValueError(f"body {nm!r}: block needs 6 numbers x0 y0 z0 x1 y1 z1")
             t["block"] = blk
+            if str(b.get("fill", "")).lower() == "lattice":
+                t["fill"] = "lattice"
             start.append([0.5 * (blk[k] + blk[k + 3]) for k in range(3)])
+        elif shape in BODY_SHAPES:
+            c = [float(v) for v in (b.get("centre") or [world / 2, world * 0.75, world / 2])]
+            if len(c) != 3:
+                raise ValueError(f"body {nm!r}: a {shape} needs a centre x y z")
+            t["shape"] = shape
+            start.append(c)
         else:
-            raise ValueError(f"body {nm!r}: shape must be ball|block")
+            raise ValueError(f"body {nm!r}: shape must be one of {sorted(BODY_SHAPES)}, block, "
+                             f"or mesh:<name> from the shape library")
         types[nm] = t
         if b.get("color"):
             colors[nm] = [float(v) for v in b["color"]]
@@ -386,6 +405,12 @@ def form_from_spec(spec: dict) -> dict:
         if t.get("eta") is not None:
             b["eta"] = t["eta"]
         _sh = str(t.get("shape", "") or "")
+        # EVERY PLACEMENT KEY READ BACK, not only the two the form has a row for. `place` is the
+        # verbatim copy `build_spec` writes out again, so a shell of 24 mitochondria, a rotated
+        # ramp or a repeated lattice survives a rebuild instead of collapsing to a ball.
+        _place = {k: t[k] for k in PLACE_KEYS if t.get(k) is not None}
+        if _place:
+            b["place"] = _place
         if _sh.startswith("mesh:"):
             # A SHAPE FROM THE LIBRARY READS BACK AS ITSELF. Reported as a `ball`, the form then
             # REBUILT the scene as balls the moment any menu was touched -- the bunny became a
@@ -396,7 +421,8 @@ def form_from_spec(spec: dict) -> dict:
             if t.get("fill"):
                 b["fill"] = t["fill"]
         else:
-            b.update(shape="ball", centre=(starts[i] if i < len(starts) else None))
+            b.update(shape=(_sh if _sh in BODY_SHAPES else "ball"),
+                     centre=(starts[i] if i < len(starts) else None))
         bodies.append(b)
     gen = spec.get("general") or {}
     ops = spec.get("operators") or []
