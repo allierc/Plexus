@@ -172,8 +172,25 @@ def _ordered_spec(spec: dict) -> dict:
     return top
 
 
+def _tidy(v, sig: int = 6):
+    """Round every float to `sig` significant digits on the way out, and drop the ones that are
+    integers. A centre computed as the midpoint of two rounded corners comes out
+    0.33330000000000004, and a spec a person has to read should not carry the last bit of a
+    float's arithmetic: it says nothing, and thirty of them hide the three numbers that matter."""
+    if isinstance(v, dict):
+        return {k: _tidy(x, sig) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_tidy(x, sig) for x in v]
+    if isinstance(v, float):
+        if v != v or v in (float("inf"), float("-inf")):
+            return v
+        r = float(f"%.{sig}g" % v)
+        return r
+    return v
+
+
 def _dump_yaml(spec: dict) -> str:
-    return yaml.safe_dump(_ordered_spec(spec), sort_keys=False,
+    return yaml.safe_dump(_tidy(_ordered_spec(spec)), sort_keys=False,
                           default_flow_style=False, allow_unicode=True)
 
 
@@ -869,7 +886,7 @@ def _relay_bodies(bodies: list, n: int, world: float) -> list:
                     b["block"] = [a[0], a[1], a[2], round(a[0] + side, 4), round(a[1] + side, 4), round(a[2] + side, 4)]
                     b.pop("centre", None)
                 else:
-                    b["centre"] = [round(a[0] + 0.5 * side, 4), round(a[1] + 0.5 * side, 4), round(a[2] + 0.5 * side, 4)]
+                    b["centre"] = [float(f"%.6g" % (a[k] + 0.5 * side)) for k in range(3)]
                     b.pop("block", None)
                 out.append(b); i += 1
     return out
