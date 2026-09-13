@@ -1375,6 +1375,7 @@ class LiveMovie:
                           f"{getattr(self, '_sname', '?')!r}", flush=True)
                 break
         lvl = lq
+        self._curve_set = next((nm for nm, lv in H.levels.items() if lv is lvl), None)
         ntype = self._curve_types(H, lvl)
         # LIVE WHEN THE AXES ARE DECLARED. The replay has the whole clip and fixes each panel's
         # range from it; a live generate has only the current frame, so it can draw the same
@@ -1620,7 +1621,14 @@ class LiveMovie:
             t = min(int(tick), S.shape[0] - 1)
             if cv.get("live") and H is not None:
                 # THE ROW FOR THIS FRAME, from the live level, in the units the axis was declared in.
-                r = self._curve_row(H, cv["lvl"], cv["q"], cv["ntype"], cv["nt"])
+                # BY NAME, NOT BY OBJECT: `engine.run` builds and seeds its OWN hierarchy, so a panel
+                # holding the level of the seeded one read the same 200 cells for the whole run --
+                # the curve sat flat while the tissue divided in the picture beside it.
+                _lv = cv["lvl"]
+                _nm = getattr(self, "_curve_set", None)
+                if _nm and _nm in getattr(H, "levels", {}):
+                    _lv = H.level(_nm)
+                r = self._curve_row(H, _lv, cv["q"], cv["ntype"], cv["nt"])
                 S[t] = r * cv["scale"] if cv["scale"] else r
                 self._curve_follow(cv, S[t])
             if t < 1:
