@@ -1632,6 +1632,18 @@ class LiveMovie:
         """Reveal each series up to the current RECORDED row -- the band is mean-SD .. mean+SD."""
         for i, cv in enumerate(getattr(self, "_curves", []) or []):
             S = cv["S"]
+            # THE PANEL GROWS WITH THE RUN IT IS DRAWING, because the run can be longer than the
+            # clip the panel was built for. The page builds its view with `n_frames: 1` -- it only
+            # ever draws the seed -- and then sets `n_frames` to the run's length when RUN is
+            # pressed; the series had already been allocated with two rows, so `t` clamped at 1 and
+            # every one of 101 frames wrote the SAME row while the x axis stayed at [0, 1]. A run
+            # of any length then drew as a two-point line pinned to frame 1. Extend to whichever is
+            # longer, the tick or the declared length, and move the axis with it.
+            if cv.get("live") and int(tick) >= S.shape[0]:
+                _want = max(int(tick), int(self.n_frames)) + 1
+                S = cv["S"] = np.concatenate(
+                    [S, np.full((_want - S.shape[0],) + S.shape[1:], np.nan)], 0)
+                cv["ch"].x_axis.range = [0.0, float(S.shape[0] - 1)]
             t = min(int(tick), S.shape[0] - 1)
             if cv.get("live") and H is not None:
                 # THE ROW FOR THIS FRAME, from the live level, in the units the axis was declared in.
