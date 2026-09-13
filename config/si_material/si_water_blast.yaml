@@ -80,7 +80,7 @@ plotting:
   background: black
   up_axis: 1
   render_3d: contour
-  contour_by_type: true
+  contour_by_type: false
   surface_env: true
   surface_env_color: white
   surface_opacity: 0.5
@@ -95,8 +95,5 @@ plotting:
   floor: '#06102a'
   floor_opacity: 0.35
   hide_sets: [cell]
-  colors:
-    pool: &id001 [0.1, 0.35, 0.95]
-    jet_a: *id001
-    jet_b: [0.22, 0.52, 1.0]
   slow_motion: 4
+  surface_color: '#2a6fdc'
