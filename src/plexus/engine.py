@@ -1243,6 +1243,33 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
                     # `types: [jet]` -- ONLY THOSE BODIES ARE LAUNCHED, the rest start at rest.
                     # A pool and the jets leaving it are one set (they are one material); without
                     # this the pool takes the launch too and the whole tank moves.
+                    # `per_type: {jet_a: {speed: 8.5, spread_deg: 12}, ...}` -- ONE CONE PER TYPE.
+                    # A spray whose jets differ in strength and opening is several launches, and a
+                    # single `speed` cannot say it; the types are the bodies' own declaration.
+                    _pt = (_vi.get("per_type") if isinstance(_vi, dict) else None) or {}
+                    if _pt and _cone:
+                        tn = list(getattr(parent, "type_names", []) or [])
+                        pnt = getattr(parent, "node_type", None)
+                        for t, kw in _pt.items():
+                            if t not in tn or pnt is None:
+                                continue
+                            sel = (pnt == tn.index(t))
+                            if not bool(sel.any()):
+                                continue
+                            sp_t = float(kw.get("speed", sp))
+                            half_t = math.radians(float(kw.get("spread_deg", float(_vi.get("spread_deg", 30.0)))))
+                            th_t = torch.rand(int(sel.sum()), generator=H.rng, device=device) * half_t
+                            d = torch.zeros(int(sel.sum()), D, device=device)
+                            d[:, ax] = torch.cos(th_t)
+                            if len(lat) == 1:
+                                sg = torch.where(torch.rand(int(sel.sum()), generator=H.rng, device=device) < 0.5, -1.0, 1.0)
+                                d[:, lat[0]] = torch.sin(th_t) * sg
+                            else:
+                                ph = torch.rand(int(sel.sum()), generator=H.rng, device=device) * (2 * math.pi)
+                                d[:, lat[0]] = torch.sin(th_t) * torch.cos(ph)
+                                d[:, lat[1]] = torch.sin(th_t) * torch.sin(ph)
+                            mg = sp_t * (1.0 + jit * (torch.rand(int(sel.sum()), generator=H.rng, device=device) - 0.5) * 2.0)
+                            vc[sel] = d * mg[:, None]
                     _only = (_vi.get("types") if isinstance(_vi, dict) else None) or s.get("vel_init_types")
                     if _only:
                         tn = list(getattr(parent, "type_names", []) or [])
