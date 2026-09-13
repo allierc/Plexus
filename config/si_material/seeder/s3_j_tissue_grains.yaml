@@ -5,15 +5,15 @@
 # or material-specific: `shell` places 60 grains about a centre here exactly as it placed 24
 # mitochondria in s3_h_shell.
 #
-# WHAT IS AND IS NOT COUPLED. The vertex tissue and the material points are seeded together and
-# stepped by one schedule, and they share the world box, the frame clock and the movie. They do
-# NOT yet push on each other -- there is no operator that carries a force between a vertex mesh and
-# an MPM grid -- so the cyst grows THROUGH the matrix rather than against it. The rung is about the
-# seeder speaking one language for both, and says so rather than implying a coupling it lacks.
+# THEY ARE COUPLED, BOTH WAYS. `mesh_contact` (operators, below) carries force between the vertex
+# mesh and the material points: the cyst pushes the grains out of itself as it grows, and the
+# reaction lands on the mesh's own vertices. The seeder places both from one vocabulary; the
+# contact operator is what makes them one mechanical scene rather than two pictures in a box.
 #
 # LENGTHS ARE THE TISSUE'S: 1 unit = 10 um. The cyst is seeded at radius 5 units (50 um) and the
-# grains sit on a shell of radius 13 units (130 um) about the same centre, so nothing overlaps at
-# frame 0. Stiffness and density are in simulation units, chosen for the sound speed the substep
+# grains sit on a shell of radius 7 units (70 um) about the same centre -- the cyst's outer cap is at
+# 5.44 units (its vertex radius 5.0 plus the apico-basal half-thickness 0.44) and a grain's own
+# radius is 1.54, so they are 0.02 units apart at frame 0: touching, not overlapping. Stiffness and density are in simulation units, chosen for the sound speed the substep
 # has to resolve: c = sqrt(E/rho) = 1 unit per time unit, so the CFL limit 0.4*dx/c with
 # dx = 50/96 = 0.52 units is 0.198 -- a 0.125 substep, 8 per frame of dt 1.0. (The guard
 # measures c_max = 1.1 rather than the nominal 1.0, because a particle's own Lame moduli
@@ -21,9 +21,9 @@
 general:
   name: s3_j_tissue_grains
   seed: 0
-  n_frames: 101
+  n_frames: 601
   dt: 1.0
-  record_cap: 103
+  record_cap: 603
   boundary: wall
   dim: 3
   world:
@@ -105,7 +105,7 @@ sets:
     - [25.0, 25.0, 25.0]
     types:
       matrix: {count: 1, material: elastic, youngs: 1.0, density: 1.0, shape: ball,
-               shell: {n: 60, radius: 13.0}}
+               shell: {n: 60, radius: 7.0}}
   mpm_particle:
     parent: grain
     per_parent: 30000
@@ -159,6 +159,19 @@ operators:
 - op: topo_record
   at: vertex
   every: 1
+# THE TWO SUBSTRATES PUSH ON EACH OTHER HERE. `mesh_contact` is a particle-to-surface penalty
+# contact: a material point that has got behind its nearest face of the LIVE vertex mesh is pushed
+# back out along that face's normal, Coulomb friction acts on the tangential part of the relative
+# velocity, and the reaction is distributed to the face's three vertices by the same barycentric
+# weights that located the contact -- so the cyst feels the grains it presses on. `side: outside`
+# (the default) means the surface's INTERIOR is the solid one, which is the cyst. `k_frac` is the
+# penalty as a fraction of the largest the substep can carry stably, not a stiffness to calibrate,
+# and `dt`/`n_grid` are the substep and grid it computes that ceiling from. `centre: centroid` is
+# the star-shape reference the ray cast starts from, re-read each frame so it follows the cyst.
+# a_max 10 units per time unit squared is the cap on the contact acceleration: at the 0.125
+# substep it can move a point 0.08 units, a sixth of a grid cell (dx = 0.52).
+- {op: mesh_contact, model: centre, at: mpm_particle, surface: vertex, side: outside, k_frac: 0.45,
+   mu: 0.4, dt: 0.125, n_grid: 96, a_max: 10.0, centre: centroid}
 - {op: mpm_strain, at: mpm_particle}
 - {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
 - {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
@@ -170,7 +183,7 @@ schedule:
 - edge_flip
 - cell_divide
 - topo_record
-- {substep_dt: 0.125, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+- {substep_dt: 0.125, steps: [mesh_contact, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
 seed:
 - op: seed_mesh
   at: vertex
