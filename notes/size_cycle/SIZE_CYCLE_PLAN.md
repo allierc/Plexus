@@ -415,8 +415,23 @@ arm under each rung's mechanics, 1601 frames, so the story can be watched side b
 | `ms7_cycle_adder` | ms3 + the adder stated on the cycle (R4c) | SPHEROID; the "one when" form of the same rule |
 | `ms8_cycle_dilution` | ms3 + G1 ended by an inhibitor diluted to threshold | clean to 1600; slope -0.97 against the sizer's -1.03 -- a sizer with a molecule under it (Schmoller 2015, Zatulovskiy 2020) |
 | `ms9_cycle_hazard` | ms3 + G1 as a constant hazard | clean to 800, then the spread tells: slope +0.49, CV(V_d) 0.36, the widest of the family (Smith & Martin 1973) |
-| `ms10_grow_channel` | ms3 + a size-dependent growth RATE under a clock division | the other channel of size control, with no checkpoint anywhere (Ginzberg et al. 2018 eLife) |
-| `ms11_doubler_null` | ms3 + G1 ended at twice the cell's OWN birth volume | the null: it corrects nothing, and under asymmetric division it drives cells to zero volume and wrecks the mesh |
+| `ms10_grow_channel` | ms3 + a size-dependent growth RATE under a clock division | SPHEROID throughout; slope -0.24 with no cycle-length coupling at all (r = 0.02) -- size control by the growth channel alone (Ginzberg et al. 2018 eLife) |
+| `ms11_doubler_null` | ms3 + G1 ended at twice the cell's OWN birth volume | the null: slope +0.85, and by frame 1350 asphericity 0.44 with 30 % of cells inverted -- a relative rule under asymmetric division drives cells to zero volume and takes the mesh with them |
+
+Scored after R5b (`size_report --gauge`, polyhedron volumes, shell-gated window):
+
+| milestone | slope | r(L,V_b) | CV(V_d) | cells | gauge |
+|---|---|---|---|---|---|
+| ms5_two_channel | -1.08 | -0.77 | 0.08 | 1348 | SPHEROID |
+| ms8_cycle_dilution | -1.09 | -0.80 | 0.15 | 2123 | clean to 1600 |
+| ms9_cycle_hazard | +0.64 | 0.04 | 0.43 | 2130 | clean to 1250 |
+| ms10_grow_channel | -0.24 | 0.02 | 0.09 | 2054 | SPHEROID |
+| ms11_doubler_null | +0.85 | 0.32 | 0.29 | 1579 | wrecked from 1350 |
+
+The two channels of the review sit side by side here: `ms10` corrects size with no checkpoint
+anywhere (slope -0.24, cycle length uncorrelated with birth size), `ms8` corrects it with a
+checkpoint and a molecule (-1.09, r -0.80), and `ms5` runs both and is the tightest population of
+the ladder (CV of division volume 0.08).
 
 `ms3` is the working point: no pin, the thickness field stiff. `ms1` -> `ms3` is the mechanics
 story, `ms5`/`ms7`/`ms8`/`ms9` the rules story, `ms6`/`ms6b` the topology one. Four of them are
