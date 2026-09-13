@@ -1541,7 +1541,24 @@ def _selector_mask(H: Hierarchy, sel: Selector) -> torch.Tensor:
     if sel.attr is None:
         return lvl.active                              # all live nodes
     if sel.attr == "type":                             # type name -> node_type index
-        return lvl.active & (lvl.node_type == lvl.type_names.index(sel.val))
+        # A CONTAINED SET WEARS ITS PARENT'S TYPES. `mpm_particle` has no `types:` of its own --
+        # the bodies are typed on the cell -- so `at: mpm_particle[type=ramp]` died on a missing
+        # `node_type`, and the operator that was meant to hold the ramp never ran. A child's type
+        # is its parent's, which is what every other reader of these sets already assumes.
+        _nt, _names = getattr(lvl, "node_type", None), list(getattr(lvl, "type_names", []) or [])
+        if _nt is None or not _names:
+            _p = getattr(lvl, "parent_name", None)
+            _par = getattr(lvl, "parent", None)
+            while _p in H.levels and _par is not None:
+                _pl = H.level(_p)
+                if getattr(_pl, "node_type", None) is not None and (getattr(_pl, "type_names", []) or []):
+                    _nt, _names = _pl.node_type[_par], list(_pl.type_names)
+                    break
+                _par, _p = _pl.parent[_par] if getattr(_pl, "parent", None) is not None else None, getattr(_pl, "parent_name", None)
+        if _nt is None or sel.val not in _names:
+            raise ValueError(f"selector {sel.set!r}[type={sel.val!r}]: neither the set nor its parents "
+                             f"declare that type (they have {_names or 'none'})")
+        return lvl.active & (_nt == _names.index(sel.val))
     # general set[attr=val]: match a per-node buffer (e.g. cell[done=0] -> lvl.done == 0)
     if not hasattr(lvl, sel.attr):
         raise ValueError(f"selector {sel.set!r}[{sel.attr}={sel.val}] has no per-node "

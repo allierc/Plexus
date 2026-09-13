@@ -983,7 +983,17 @@ class View:
                 if fm is not None and len(fm) > 1:
                     self.RUN["ms_per_frame"] = float(np.mean(np.asarray(fm)[1:]))
             except Exception as e:                                   # noqa: BLE001
+                # A RUN THAT CANNOT START MUST SAY SO, not look like a stall. The message also goes
+                # to the session, because a reseed builds a new View and takes its RUN dict with it:
+                # the page then polled a fresh "frame 0, no error" and read it as a hang.
                 self.RUN["error"] = f"{type(e).__name__}: {e}"[:600]
+                try:
+                    from plexus.gui import bio
+                    bio.STATE["message"] = f"run failed: {self.RUN['error']}"
+                    bio.claude_note(f"run of '{os.path.basename(self.spec_path)}' failed: {self.RUN['error']}")
+                except Exception:                                    # noqa: BLE001
+                    pass
+                print(f"[view] run failed: {self.RUN['error']}", flush=True)
             finally:
                 self.RUN["running"] = False
                 self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
@@ -1038,6 +1048,17 @@ def open_view(spec_path: str, device: str = "cpu", carry: bool = False) -> View:
     rather than asking for the run again. The frames are level states, not pictures, which is
     what makes them re-drawable at all."""
     def _open():
+        old0 = CURRENT.get("view")
+        # A RESEED DURING A RUN KILLED THE RUN. `open_view` closes the old view, and the running
+        # generate then found its plotter gone and reported "stopped early" at frame 11 of 601 --
+        # from the page that looked like a run that produced two frames. Stop it first, and wait
+        # for the engine thread to notice, so the frames it did compute are kept.
+        if old0 is not None and (getattr(old0, "RUN", {}) or {}).get("running"):
+            old0.RUN["stop"] = True
+            t0 = time.time()
+            while old0.RUN.get("running") and time.time() - t0 < 10.0:
+                time.sleep(0.05)
+            print("[view] a run was in flight and was stopped so the scene could be re-seeded", flush=True)
         with LOCK:
             old = CURRENT.get("view")
             keep = None
