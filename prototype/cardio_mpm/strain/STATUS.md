@@ -576,7 +576,7 @@ model was silently re-initialised twice. `recording.continuous_window` + `model.
 give ONE rollout over beats 1–3 with the fitted clock firing once per beat; the model is never
 reset. It holds: R²(A) **0.844** over the three beats continuous, against 0.87 per beat with a
 reset — the drift across two beat boundaries costs 0.03. `out/movies/` now holds exactly two files,
-`cont_cells.mp4` and `cont_overlay_particles.mp4`, both 8 s, both continuous.
+`cont_cells.mp4` and `cont_overlay_particles.mp4`, both 6 s, both continuous.
 (`shortening` also had to be rewritten in closed form: cuSOLVER's batched eigenvalue path fails
 above ~70k matrices, and a three-beat window is 158 × 472 of them.)
 
