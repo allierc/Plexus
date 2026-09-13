@@ -67,7 +67,112 @@ def _connectivity(n_a: int, per: int, p_in: float, p_x: float, boost: float, see
     return edges, weights
 
 
+def _region_dir(name: str):
+    """`graphs_data/neural_regions/<name>`, the tree `plexus.io.neuprint` froze."""
+    from plexus.paths import graphs_data_path
+    return os.path.join(graphs_data_path(), "neural_regions", str(name))
+
+
+def regions() -> list:
+    """Every frozen region on this host, with what it carries: neurons, edges, meshes, skeletons."""
+    import json
+    from plexus.paths import graphs_data_path
+    root = os.path.join(graphs_data_path(), "neural_regions")
+    out = []
+    if not os.path.isdir(root):
+        return out
+    for nm in sorted(os.listdir(root)):
+        d = os.path.join(root, nm)
+        idx = os.path.join(d, "morphology_index.json")
+        if not os.path.exists(os.path.join(d, "neurons.npz")):
+            continue
+        n_mesh = n_skel = 0
+        if os.path.exists(idx):
+            try:
+                m = json.load(open(idx))
+                n_mesh, n_skel = len(m.get("meshes") or {}), len(m.get("skeletons") or {})
+            except Exception:                                    # noqa: BLE001
+                pass
+        try:
+            import numpy as _np
+            with _np.load(os.path.join(d, "neurons.npz"), allow_pickle=True) as z:
+                n = int(z["body_id"].shape[0])
+        except Exception:                                        # noqa: BLE001
+            n = 0
+        out.append({"name": nm, "neurons": n, "meshes": n_mesh, "skeletons": n_skel,
+                    "edges": os.path.exists(os.path.join(d, "connectome.npz"))})
+    return out
+
+
+def _region_spec(form: dict) -> dict:
+    """THE NEUPRINT SPEC THE GUI WRITES: real somata, that region's connectome, its own dynamics,
+    and -- when the region carries morphology -- the points of each neuron's own file, painted with
+    its voltage. The shape is `config/neural/hemibrain_cube_1000.yaml`, which was written by hand;
+    what the form changes is the region, the count, the dynamics and whether the morphology is
+    drawn."""
+    import json
+    import numpy as np
+    name = str(form.get("name") or "region_scene").strip()
+    reg = str(form.get("region") or "hemibrain_cube_1000")
+    d = _region_dir(reg)
+    with np.load(os.path.join(d, "neurons.npz"), allow_pickle=True) as z:
+        n_neuron = int(z["body_id"].shape[0])
+    # THE SIDE IN MICROMETRES COMES FROM THE MANIFEST, which states it: `neurons.npz` holds the
+    # bounds in whatever the importer of the day used (nanometres for the zebrafish trees,
+    # VOXELS for the first hemibrain cube), and `neural_seed` refuses a spec whose `length_um`
+    # disagrees with the region -- rightly, since every micrometre the run reports rides on it.
+    side_um = float(((json.load(open(os.path.join(d, "manifest.json"))).get("region") or {})
+                     .get("side_um")) or 100.0)
+    idx = {}
+    if os.path.exists(os.path.join(d, "morphology_index.json")):
+        idx = json.load(open(os.path.join(d, "morphology_index.json")))
+    has_mesh, has_skel = bool(idx.get("meshes")), bool(idx.get("skeletons"))
+    morph = str(form.get("render", "connectivity")) == "morphology" and (has_mesh or has_skel)
+    spec = {
+        "general": {"name": name, "seed": int(form.get("seed", 0)), "n_frames": int(form.get("n_frames", 400)),
+                    "dt": float(form.get("dt", 0.05)), "dim": 3, "world": [1.0, 1.0, 1.0],
+                    "boundary": "wall", "record_cap": int(form.get("n_frames", 400)) + 1,
+                    "units": {"length_um": round(side_um, 6), "time_s": 1.0}},
+        "sets": {
+            "brain": {"n": 1},
+            "assembly": {"parent": "brain", "per_parent": 1},
+            "neuron": {"parent": "assembly", "per_parent": n_neuron,
+                       "types": {"slow": {"fraction": 0.5, "p": [1.0, 0.0, float(form.get("gain", 1.2)), 0.5, 1.0, 0.0]},
+                                 "fast": {"fraction": 0.5, "p": [2.5, 0.0, float(form.get("gain", 1.2)), 1.6, 0.5, 0.0]}}},
+            "synapse": {"parent": "brain", "edge_set": True, "pre": "neuron", "post": "neuron",
+                        "edges_file": f"neural_regions/{reg}/connectome.npz"},
+        },
+        "seed": [{"op": "neural_seed", "at": "neuron", "region": reg, "v0_mean": 0.0,
+                  "v0_sd": float(form.get("v0_sd", 0.5))}],
+        "operators": [
+            {"op": "neuron_update", "at": "neuron", "model": "leaky_tanh", "noise": float(form.get("noise", 0.01))},
+            {"op": "neuron_signal", "at": "neuron", "model": "type_pairwise", "edge_set": "synapse",
+             "activation": "tanh"},
+        ],
+        "schedule": ["neuron_update", "neuron_signal"],
+        "plotting": {"renderer": "vtk_points", "background": "black", "point_size": 4.0,
+                     "color_field": "voltage", "color_range": [-1.5, 1.5],
+                     "max_frames": int(form.get("movie_frames", 300)), "stills": int(form.get("stills", 10)),
+                     "keep_stills": True},
+    }
+    if morph:
+        # THE MATTER OF EACH NEURON, from its own file: a mesh where the region has one, else the
+        # skeleton swollen to its radius. `paint_children` carries the soma's voltage onto them,
+        # which is what makes the picture the activity rather than the anatomy.
+        spec["sets"]["morphology"] = {
+            "entity": "points", "parent": "neuron",
+            "per_parent": {"budget": int(form.get("budget", 2_000_000)), "by": "span"},
+            "form": ("mesh:from_parent" if has_mesh else "swc:from_parent"),
+        }
+        spec["operators"].append({"op": "paint_children", "at": "morphology", "from": "neuron",
+                                  "field": "voltage"})
+        spec["schedule"].append("paint_children")
+    return spec
+
+
 def build_spec(form: dict) -> dict:
+    if str((form or {}).get("source", "assemblies")) == "region":
+        return _region_spec({k: v for k, v in (form or {}).items() if v is not None})
     # A FORM READ BACK OFF A SPEC HAS HOLES: `p_within`, `p_cross` and `boost` cannot be recovered
     # from a written connectome (the edges are there, the probabilities that drew them are not), so
     # the reader returns None and a patch of one unrelated field used to die on float(None).
@@ -178,6 +283,7 @@ def form_from_spec(spec: dict) -> dict:
 FORM_HTML = r'''
 
  <div class="row"><label>name</label><input id="name" value="ctrnn_gui"></div>
+ <div class="row"><label title="where the neurons come from: assemblies drawn here, or a region frozen from neuprint">source</label><select id="source" style="width:150px" onchange="srcChanged()"><option value="assemblies">synthetic assemblies</option><option value="region">neuprint region</option></select> <select id="region" style="width:170px" onchange="build()"></select></div>
  <div class="row"><label title="what the picture is: the circuit panel, or the neurons' own morphology coloured by their activity">render</label><select id="render" style="width:150px" onchange="setRender()"><option value="connectivity">connectivity panel</option><option value="morphology">3D morphology</option></select> <span style="color:#778;font-size:11px">morphology needs a spec whose neurons carry a region</span></div>
  <div class="row"><label>assemblies</label><input id="n_assemblies" class="short" value="3"> <label style="width:70px">neurons each</label><input id="per_assembly" class="short" value="16"></div>
  <div class="row"><label title="share of excitatory neurons; the rest are inhibitory">excitatory</label><input id="frac_exc" class="short" value="0.8"> <label style="width:70px" title="Dale's law: every synapse takes the sign of its presynaptic neuron"><input type="checkbox" id="dale" checked style="width:auto"> Dale</label> <label style="width:80px" title="an afferent E sub-population receives the drive"><input type="checkbox" id="afferent" checked style="width:auto"> afferent</label></div>
@@ -191,7 +297,16 @@ FORM_HTML = r'''
 '''
 
 FORM_JS = r'''
-const SEL=['render'];
+const SEL=['render','source','region'];
+// THE REGIONS ON THIS HOST, from the server: one entry per frozen neuprint tree, with what it
+// carries. A region with meshes can be drawn as morphology; one with only skeletons still can.
+async function fillRegions(){const j=await (await fetch('/api/neurons/regions')).json();const sel=$('region');sel.innerHTML='';
+ for(const r of (j.regions||[])){const o=document.createElement('option');o.value=r.name;
+  o.textContent=`${r.name}  (${r.neurons} neurons, ${r.meshes?r.meshes+' meshes':r.skeletons+' skeletons'})`;sel.appendChild(o);}
+ srcChanged();}
+window.srcChanged=function(){const on=$('source').value==='region';$('region').style.display=on?'':'none';
+ for(const id of ['n_assemblies','per_assembly','p_within','p_cross','boost','frac_exc'])if($(id))$(id).disabled=on;};
+fillRegions();
 window.setRender=async function(){await post('/api/scene/patch',{form:{render:$('render').value}});};
 const NUM=['n_assemblies','per_assembly','p_within','p_cross','boost','frac_exc','drive','gain','noise','seed','pulse_period','pulse_duration','pulse_radius','n_frames','dt','movie_frames','stills'];
 const CHK=['dale','afferent'];
