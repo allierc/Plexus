@@ -917,6 +917,13 @@ def p_patch(h, data):
             f = tabs.get(cand).form_from_spec(raw)
             if not f:
                 continue
+            # THE TAB THE PAGE NAMES IS THE TAB, no further argument: the rebuild test below is for
+            # GUESSING among tabs when nothing said which, and a tab whose builder adds or renames a
+            # set (the neurons tab's edge set) would fail its own spec.
+            if cand == tab_name:
+                form = f
+                bio.STATE.setdefault("specs", {})[name] = cand
+                break
             # A FORM IS ONLY THE RIGHT ONE IF IT REBUILDS THIS SPEC'S SETS. Every tab's reader
             # returns a dict of defaults for any spec, so "the first that answers" chose the bio
             # tab for a box of cubes and refused the patch for want of a protein species.
