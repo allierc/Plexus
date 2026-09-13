@@ -21,9 +21,9 @@
 general:
   name: s3_j_tissue_grains
   seed: 0
-  n_frames: 601
+  n_frames: 1201
   dt: 1.0
-  record_cap: 603
+  record_cap: 1203
   boundary: wall
   dim: 3
   world:
