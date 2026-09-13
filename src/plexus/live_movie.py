@@ -948,6 +948,19 @@ class LiveMovie:
         pos = _p.cpu().numpy().astype(np.float32)
         if pos.shape[1] == 2:                         # pad a 2D run into the z=0 plane
             pos = np.concatenate([pos, np.zeros((pos.shape[0], 1))], 1)
+        # `near_side` ON THE DRAWN CLOUD. Its colours are bound to a fixed-length array, so a point
+        # is hidden the way the cross-section hides one: put where the camera is not, not removed.
+        if (self.style or {}).get("near_side") is not None and (self.style or {}).get("near_side") is not False \
+                and len(pos) and getattr(self, "p", None) is not None:
+            f = (self.style or {}).get("near_side")
+            c = np.asarray(self.p.camera.position, float) - np.asarray(self.p.camera.focal_point, float)
+            n = c / max(float(np.linalg.norm(c)), 1e-12)
+            ctr = pos.mean(0)
+            d = (pos - ctr) @ n
+            cut = 0.0 if f is True else float(f) * float(np.abs(d).max() or 1.0)
+            far = d < cut
+            if far.any() and not far.all():
+                pos = np.where(far[:, None], pos[~far][:1], pos)
         return pos
 
     def __call__(self, H, tick):
@@ -2635,6 +2648,7 @@ class LiveMovie:
                                 render_lines_as_tubes=False,
                                 show_edges=_edges, edge_color=st.get("mesh_edge_color", "#2b2b2b"),
                                 edge_opacity=float(st.get("mesh_edge_opacity", 1.0)))
+                self._near_side_faces(pd)
                 self._meshes.append((name, nv, pd, sc, ct))
                 print(f"[live-movie] surface {name!r}: {int(m['nF']):,} faces, {nv:,} vertices, "
                       f"drawn as {style}", flush=True)
@@ -2835,6 +2849,7 @@ class LiveMovie:
                 self._edge_actor(H, lvl, m, first=False)
                 if self._mesh_is_subject:
                     self._mesh_face_rgb(m, pd)
+                self._near_side_faces(pd)
             except Exception:                        # noqa: BLE001
                 pass
 
@@ -3625,6 +3640,47 @@ class LiveMovie:
         H = getattr(self, "_glyph_H", None)
         if H is not None:
             self._glyph_update_all(H)
+
+    def _near_side_faces(self, pd):
+        """`near_side` on a SURFACE: keep the polygons whose centroid is in front of the plane
+        through the body's centre, normal to the view. A hollow shell drawn whole hides its own
+        interior and shows every far-side piece through it; cut, you look INTO the tissue."""
+        f = (self.style or {}).get("near_side")
+        if not f or pd is None or pd.n_points == 0:
+            return
+        full = getattr(pd, "_full_faces", None)
+        if full is None:
+            full = np.asarray(pd.faces).copy()
+            pd._full_faces = full
+        P = np.asarray(pd.points, float)
+        c = np.asarray(self.p.camera.position, float) - np.asarray(self.p.camera.focal_point, float)
+        n = c / max(float(np.linalg.norm(c)), 1e-12)
+        ctr = P.mean(0)
+        out, i, keep_n = [], 0, 0
+        span = float(np.abs((P - ctr) @ n).max() or 1.0)
+        cut = 0.0 if f is True else float(f) * span
+        while i < len(full):
+            k = int(full[i]); idx = full[i + 1:i + 1 + k]
+            if float(((P[idx].mean(0) - ctr) @ n)) >= cut:
+                out.append(full[i:i + 1 + k]); keep_n += 1
+            i += 1 + k
+        pd.faces = np.concatenate(out) if out else np.zeros(0, np.int64)
+
+    def near_side_refresh(self):
+        """Re-cut everything the view hides: the surfaces and the sphere glyphs. Called when the
+        switch is thrown and whenever the camera turns -- the cut is defined BY the camera."""
+        for _n, _nv, pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+            try:
+                if not (self.style or {}).get("near_side"):
+                    full = getattr(pd, "_full_faces", None)
+                    if full is not None:
+                        pd.faces = full
+                else:
+                    self._near_side_faces(pd)
+            except Exception:                                    # noqa: BLE001
+                pass
+        if getattr(self, "_glyphs", None) and getattr(self, "_glyph_H", None) is not None:
+            self._glyph_update_all(self._glyph_H)
 
     def _near_side(self, pts):
         """`plotting.near_side` -- KEEP ONLY WHAT FACES THE CAMERA. A shell of cells shows every
