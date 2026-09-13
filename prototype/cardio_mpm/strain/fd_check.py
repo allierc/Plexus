@@ -36,8 +36,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import model as M  # noqa: E402
 
-SMOKE_TIF = os.path.abspath(os.path.join(HERE, "..", "..", "cardio_cells", "algebraic",
-                                         "small_labels_full_472.tif"))
+SMOKE_TIF = os.path.join(HERE, "data", "cells_2560.tif")   # `--smoke` used a synthetic 472-cell
+# Voronoi map from prototype/cardio_cells/algebraic; that folder is gone, and the real map serves
+# the same purpose (the smoke test only checks the wiring, not the geometry)
 
 
 def planted(C, device, seed=0):

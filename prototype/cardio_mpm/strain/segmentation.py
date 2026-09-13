@@ -31,7 +31,7 @@ from skimage.feature import blob_log
 from skimage.segmentation import watershed
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CELLS = os.path.abspath(os.path.join(HERE, "..", "..", "cardio_cells"))
+CELLS = os.path.join(HERE, "seg")           # the five modules vendored from prototype/cardio_cells
 sys.path.insert(0, CELLS)
 import beat as B          # noqa: E402  the beat average and the axis PCA
 import seeded as SD       # noqa: E402  nuclei_on_grid / bnd_from / voronoi
