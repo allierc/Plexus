@@ -7,6 +7,10 @@ some carry prototype-local dependencies — importing the whole folder would err
 
 ## Inventory (76 operators total across the repo; the prototype ones are copied here)
 
+The `source` column is PROVENANCE, not a path you can follow: `prototype/ops/` and several other
+prototype folders were removed on 2026-09-13, and the copies here are the only ones left outside
+git history. Nothing below changed when they went; these files were already copies.
+
 | candidate file | source | operators |
 |---|---|---|
 | `adhesion.py` | prototype/ops/ | adhesion |
