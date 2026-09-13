@@ -132,6 +132,7 @@ def _place(t, off, cps, n, D, H, device, out=None):
     drawn in (a grain bed: many bodies of one type, nowhere in particular)."""
     if t.get("rotate") is not None:
         off = off @ _rot_matrix(t["rotate"], D, device).T
+    radial = str(t.get("orient", "")).lower() == "radial" and D == 3
     sc = t.get("scatter")
     if sc is not None:
         v = [float(x) for x in sc]
@@ -146,6 +147,22 @@ def _place(t, off, cps, n, D, H, device, out=None):
             out["copy"] = torch.zeros(n, device=device)
         return off
     which = torch.arange(n, device=device) % int(c.shape[0])  # the points split evenly among copies
+    if radial:
+        # EACH COPY TURNED TO FACE OUTWARD. A ring of rods all pointing the same way is a bundle;
+        # a rosette, a corolla or a shell of organelles means every piece's own axis points AWAY
+        # from the centre. Rotate each copy's offsets from the body axis onto its own radius --
+        # the shortest rotation, so nothing spins about its own length for no reason.
+        ax = {"x": 0, "y": 1, "z": 2}.get(str(t.get("axis", "z")).lower(), 2)
+        a = torch.zeros(D, device=device); a[ax] = 1.0
+        d = c / c.norm(dim=1, keepdim=True).clamp_min(1e-12)      # each copy's outward direction
+        v = torch.cross(a.expand_as(d), d, dim=1)
+        cth = (a.expand_as(d) * d).sum(1, keepdim=True)
+        K = torch.zeros(len(d), D, D, device=device)
+        K[:, 0, 1], K[:, 0, 2] = -v[:, 2], v[:, 1]
+        K[:, 1, 0], K[:, 1, 2] = v[:, 2], -v[:, 0]
+        K[:, 2, 0], K[:, 2, 1] = -v[:, 1], v[:, 0]
+        R = torch.eye(D, device=device).expand(len(d), D, D) + K + K @ K / (1.0 + cth).clamp_min(1e-9)[:, :, None]
+        off = torch.einsum("nij,nj->ni", R[which], off)
     if out is not None:
         # WHICH COPY A POINT BELONGS TO, when the set asks for it (`state: {copy: {width: 1}}`).
         # Colour is a TYPE property, so ten copies of one type were one colour; a per-particle copy
@@ -164,8 +181,26 @@ def _write_copy(lvl, mask, sink):
 
 
 def _copies(t, D, device):
-    """The centres of a type's copies, relative to its own centre: `repeat: [nx,ny,nz]` on a lattice
-    of `pitch` (a number or a triple), or a single copy. Returns [k, D]."""
+    """The centres of a type's copies, relative to its own centre. Returns [k, D].
+
+      repeat: [nx,ny,nz] (+ pitch)   a lattice of copies
+      ring: {n, radius, axis}        `n` copies evenly around a circle -- a rosette, a corolla, a
+                                     wheel of spokes, twelve organelles about a cell's centre
+    """
+    ring = t.get("ring")
+    if ring is not None:
+        r = dict(ring) if isinstance(ring, dict) else {"n": int(ring)}
+        n = max(1, int(r.get("n", 1)))
+        rad = float(r.get("radius", 1.0))
+        ax = {"x": 0, "y": 1, "z": 2}.get(str(r.get("axis", "y")).lower(), 1) % D
+        lat = [i for i in range(D) if i != ax]
+        th = torch.arange(n, device=device, dtype=torch.float32) * (2.0 * math.pi / n) \
+            + float(r.get("phase", 0.0)) * math.pi / 180.0
+        out = torch.zeros(n, D, device=device)
+        out[:, lat[0]] = rad * torch.cos(th)
+        if len(lat) > 1:
+            out[:, lat[1]] = rad * torch.sin(th)
+        return out
     rep = t.get("repeat")
     if rep is None:
         return torch.zeros(1, D, device=device)
