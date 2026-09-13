@@ -961,6 +961,7 @@ class LiveMovie:
             far = d < cut
             if far.any() and not far.all():
                 pos = np.where(far[:, None], pos[~far][:1], pos)
+            self._xyz_cut = far
         return pos
 
     def __call__(self, H, tick):
@@ -3592,12 +3593,16 @@ class LiveMovie:
         import torch
         own = getattr(lv, "node_type", None)
         occ = getattr(lv, "occ", None)
-        if subject:
+        if subject and not (self.style or {}).get("near_side"):
             nt = torch.as_tensor(own)[self.idx]
             sel = nt == tid
             if occ is not None:
                 sel = sel & (torch.as_tensor(occ)[self.idx].to(nt.device) > 0)
             return np.asarray(self.cloud.points)[sel.cpu().numpy()]
+        # WITH `near_side` ON, THE CLOUD IS ALREADY PARKED. `_xyz` hides a far point by moving it
+        # onto a near one (its colours are bound to a fixed-length array), so reading the glyphs
+        # off the cloud drew every far nucleus stacked on one near position -- the cut looked
+        # like no cut at all. The glyph actor has its own geometry, so it reads the real state.
         nt = torch.as_tensor(own)
         sel = nt == tid
         if occ is not None:
@@ -3666,6 +3671,32 @@ class LiveMovie:
             i += 1 + k
         pd.faces = np.concatenate(out) if out else np.zeros(0, np.int64)
 
+    def _light_inside(self, on: bool):
+        """A CUT SHELL SHOWS ITS INSIDE, whose normals point away from the camera: lit from the
+        front only, the interior came out almost black. Two-sided lighting and a lifted ambient
+        make the inner wall of the tissue read as the same material seen from within."""
+        for _n, _nv, pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+            act = None
+            for a in self.p.renderer.actors.values():
+                try:
+                    if a.GetMapper() is not None and a.GetMapper().GetInput() is pd:
+                        act = a
+                        break
+                except Exception:                                # noqa: BLE001
+                    continue
+            if act is None:
+                continue
+            p = act.GetProperty()
+            if on:
+                self._mesh_light = getattr(self, "_mesh_light", {})
+                self._mesh_light.setdefault(id(pd), (p.GetAmbient(), p.GetDiffuse(), p.GetOpacity()))
+                p.SetAmbient(0.55); p.SetDiffuse(0.55); p.SetBackfaceCulling(False)
+                p.SetOpacity(min(1.0, float(p.GetOpacity()) * 2.2))
+            else:
+                a0 = (getattr(self, "_mesh_light", {}) or {}).get(id(pd))
+                if a0:
+                    p.SetAmbient(a0[0]); p.SetDiffuse(a0[1]); p.SetOpacity(a0[2])
+
     def near_side_refresh(self):
         """Re-cut everything the view hides: the surfaces and the sphere glyphs. Called when the
         switch is thrown and whenever the camera turns -- the cut is defined BY the camera."""
@@ -3679,6 +3710,7 @@ class LiveMovie:
                     self._near_side_faces(pd)
             except Exception:                                    # noqa: BLE001
                 pass
+        self._light_inside(bool((self.style or {}).get("near_side")))
         if getattr(self, "_glyphs", None) and getattr(self, "_glyph_H", None) is not None:
             self._glyph_update_all(self._glyph_H)
 
