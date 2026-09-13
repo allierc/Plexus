@@ -1,5 +1,5 @@
 ---
-title: "cell"
+title: "protein_cluster"
 subtitle: "A set of particles/molecules; its position is an aggregate of its children."
 ---
 

@@ -74,6 +74,14 @@ $\partial_t c = D\,\nabla^2 c$ (3&times;3 in 2D, 3&times;3&times;3 in 3D).
 |---|---|---|
 | `rate` | diffusion_rate | 0.35 |
 
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `spectral` | The same diffusion, stepped exactly instead of approximately: in Fourier space the heat equation is diagonal, so one step is a multiplication rather than a stencil. | &ndash; |
+
 ## Minimal spec
 
 ```yaml

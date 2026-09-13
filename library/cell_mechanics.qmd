@@ -87,6 +87,24 @@ Curr. Biol. 17:2095-2104 (the area, perimeter and line-tension energy); Okuda, S
 | `smooth_iters` | &ndash; | 0 |
 | `smooth_w` | &ndash; | 0.0 |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `apicobasal` | R3 OF THE APICO-BASAL PROMOTION: the energy, written on the doubled degree-of-freedom set. | `k_v` (4.0), `kappa_s` (0.2), `kappa_h` (0.0), `sep_mu` (1.0), `surface` ("apical"), `sep_block` ("sep"), `gamma` (0.0), `rest_calibration` ("force_balance"), `mono_k` (None) |
+| `marinari` | The work function of Marinari et al., Nature 484:542 (2012), Supplementary p.1: | `K` (160.0), `crowding` (1.0) |
+| `monolayer` | The MONOLAYER implementation of the cell_mechanics contract (plexus2 sec. 5: same biological operator -- the mechanical force that shapes the epithelial vesicle -- different NUMERICS). | `k_v` (4.0), `kappa_s` (0.2), `h0` (0.4), `gamma` (0.0), `rest_calibration` ("force_balance"), `mono_k` (None) |
+
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `warp` | `cell_mechanics` with the shape-energy gradient in warp -- WHICH IS THE DEFAULT. | &ndash; |
+
 ## Minimal spec
 
 ```yaml
@@ -210,7 +228,7 @@ class ShapeEnergy3D(Lateral):
         i.e. block moves that push a face toward inversion, allow recovering moves. A few backtracks."""
         scale = torch.ones(x.shape[0], 1, device=x.device, dtype=x.dtype)
         for _ in range(5):
-            _, _, _, vf = face_geometry_3d(x + step * scale, es, et, ef, nF, eocc)
+            _, _, _, vf = face_geometry_3d(x + step * scale, es, et, ef, nF, eocc, apex=getattr(self, "_apex", None))
             bad = (vf < floor) & (vf < vf_ref)                   # per-face: inverting and getting worse
             if not bool(bad.any()):
                 break
@@ -266,7 +284,8 @@ class ShapeEnergy3D(Lateral):
                 p_e = p
             E = _shape_energy_core(p_e, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
                                    self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc,
-                                   self.K_bend, twin_face, self.K_lumen, myo_e, self.Gam_l)
+                                   self.K_bend, twin_face, self.K_lumen, myo_e, self.Gam_l,
+                                   apex=getattr(self, "_apex", None))
             g = torch.autograd.grad(E, p)[0]
         return torch.nan_to_num(g)
 
@@ -330,16 +349,17 @@ class ShapeEnergy3D(Lateral):
         eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
         twin = self._twin_faces(es, et, ef, Nv) if self.K_bend > 0 else None   # dihedral neighbour faces
         x = x0.clone()
+        self._apex = wedge_apex(m, x)                        # the wedge apex for this solve, see face_geometry_3d
         floor = None
         if self.antiinv > 0:                                 # anti-inversion floor = frac of median live wedge vol
-            _, _, _, vf0 = face_geometry_3d(x, es, et, ef, nF, eocc)
+            _, _, _, vf0 = face_geometry_3d(x, es, et, ef, nF, eocc, apex=self._apex)
             floor = self.antiinv * (vf0[vf0 > 0].median() if (vf0 > 0).any() else vf0.new_tensor(1e-9)).clamp(min=1e-9)
         for _ in range(max(1, self.relax_iters)):
             step = -(self.eta * self.mu) * self._grad_myo(m, x, es, et, ef, nF, m["A0"], m["P0"],
                                                       m["V0f"], m["alive"], R0t, eocc, vocc, twin)
             step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
             if floor is not None:                            # block any substep that drives a face toward inversion
-                _, _, _, vf_cur = face_geometry_3d(x, es, et, ef, nF, eocc)
+                _, _, _, vf_cur = face_geometry_3d(x, es, et, ef, nF, eocc, apex=self._apex)
                 step = step * self._antiinv_scale(x, step, es, et, ef, nF, eocc, vf_cur, floor)
             if self.plane_axis is not None:                   # 2D vertex model: no motion off the sheet
                 step[:, self.plane_axis] = 0.0

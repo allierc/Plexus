@@ -87,6 +87,16 @@ autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386.
 | `vth_frac` | &ndash; | 1.35 |
 | `conserve_amount` | &ndash; | True |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `balance` | Size emerges from a synthesis/degradation balance, with no size sensor anywhere. | `k_syn` (1.0), `k_deg` (1.0) |
+| `sizer` | Growth rate falls with the cell's own size: small cells grow faster, large ones slower. | `size_gain` (1.0), `f_max` (4.0) |
+| `timer` | Grow at whatever rate lands the cell on its target size after `cycle_frames` frames. | `cycle_frames` (100.0) |
+
 ## Minimal spec
 
 ```yaml
@@ -345,7 +355,13 @@ class Grow3D(Lateral):
         # run carries a separation, wedge where it does not. See `vertex_ops.cell_size`. `vth_frac`
         # is a multiple of this; measured in the wedge convention on an apicobasal run, the growth
         # ceiling would be stated in a volume the cell does not have.
-        v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))
+        # ONE READER: the cell's ACTUAL volume and the reference, both from `cell_size`, so the
+        # size-dependent growth rule compares what the cell has with what a typical cell had --
+        # it used to compare the TARGET `V0f` with the reference, two different quantities.
+        from plexus.operators.vertex_ops import cell_size
+        _v_now, v_ref = cell_size(vlvl, m, nF, H=H, at=self.at)
+        self._v_now = torch.as_tensor(np.asarray(_v_now, np.float64), device=dev,
+                                      dtype=m["V0f"].dtype)
         dt = float(getattr(H, "dt", 1.0))
         ds = self._rate(s_prev, hillv, m, v_ref)                  # <-- the rate law; models override THIS only
         # THE CEILING IS FOR A TISSUE WITH NO DIVIDER, AND ONLY FOR ONE.

@@ -1,0 +1,143 @@
+---
+title: "protein_seed"
+subtitle: "Place every species' starting clusters on its region, once, and write the cell's rates."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Place every species' starting clusters on its region, once, and write the cell's rates.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `tissue`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+_See source below._
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `tissue` | tissue_set | **required** |
+| `seed` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: protein_seed, at: particle, tissue: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`seed`]{.op-badge} [`protein_placement`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/protein_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/protein_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("protein_seed", family="seed", set="particle", kind="seed")
+class ProteinSeed(Seed):
+    """Place every species' starting clusters on its region, once, and write the cell's rates."""
+    REQUIRES_PARAMS = ["tissue"]
+    PARAM_ROLES = {"tissue": "tissue_set"}
+    SUPPORTED_DIMS = (3,)
+    READS = ["pos"]
+    WRITES = ["pos"]
+    MECHANISM_TAGS = ["seed", "protein_placement"]
+    REFERENCE = "Plexus (this work); cluster spacing after Changede & Sheetz (2017) Dev. Cell 40:1."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "protein")
+        self.tissue = str(params["tissue"])
+        self.seed = int(params.get("seed", 0))
+        self.params = dict(params)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        fans = _fans(H, self.tissue)
+        if fans is None:
+            raise ValueError(f"protein_seed: {self.tissue!r} carries no mesh at seed time; put seed_mesh before it")
+        if lvl.parent is None:
+            raise ValueError(f"protein_seed: set {self.at!r} declares no parent; it needs `parent: cell`")
+        species = _species(lvl, self.params)
+        dev = lvl.state.device
+        gen = torch.Generator(device=dev).manual_seed(self.seed)
+        nF = fans["nF"]
+        par = lvl.parent
+        blk = torch.bincount(par, minlength=int(par.max().item()) + 1)
+        offset = torch.cumsum(blk, 0) - blk
+        p0, p1 = lvl.state_schema["pos"]
+        lvl.occ[:] = 0.0
+        lvl.state[:, p0:p1] = PARK
+        for name in ("activated", "folded", "bound", "age"):
+            if name in lvl.state_schema:
+                a, b = lvl.state_schema[name]; lvl.state[:, a:b] = -1.0 if name == "bound" else 0.0
+        used = torch.zeros(nF, dtype=torch.long, device=dev)      # slots taken in each face's block so far
+        total = 0; refused = 0
+        for sp in species:
+            want = torch.round(_face_area(fans, sp["region"]) * sp["density"]).long()
+            room = (blk[:nF] - used).clamp_min(0)
+            take = torch.minimum(want, room)
+            refused += int((want - take).sum().item())
+            if int(take.sum().item()) == 0:
+                continue
+            faces = torch.repeat_interleave(torch.arange(nF, device=dev), take)
+            within = torch.cat([torch.arange(int(k), device=dev) for k in take.tolist() if k]) if take.sum() else torch.zeros(0, dtype=torch.long, device=dev)
+            slots = offset[faces] + used[faces] + within
+            used = used + take
+            lvl.occ[slots] = 1.0
+            lvl.node_type[slots] = sp["id"]
+            lvl.state[slots, p0:p1] = _sample(fans, faces, sp["region"], gen)
+            _set_block(lvl, "vel", slots, 0.0)
+            total += int(slots.numel())
+            print(f"[protein_seed] {int(slots.numel())} {sp['name']} clusters on {nF} {sp['region']} faces "
+                  f"({sp['density']:g} per unit area)", flush=True)
+        if refused:
+            print(f"[protein_seed] {refused} clusters refused by the per-cell block; declare a larger per_parent", flush=True)
+        # the cell's rates, one column per species, from the species' starting values
+        cs = resolve_cell_set(H, self.tissue, None); clvl = H.level(cs)
+        for key, field in (("protein_s", "s"), ("protein_tau", "tau")):
+            c0 = _cell_block(clvl, key, len(species))
+            if c0 is not None:
+                for sp in species:
+                    clvl.state[:, c0 + sp["id"]] = sp[field]
+        _write_count(H, lvl, self.tissue, species)
+        return {}
+```

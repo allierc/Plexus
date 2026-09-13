@@ -63,6 +63,16 @@ Reference: Okuda, S. et al. (2018). Sci. Rep. 8:2386 (the shape-chemistry loop t
 | `vertex_set` | &ndash; | "vertex" |
 | `rate` | &ndash; | 1.0 |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `apical_area` | The chemistry listens to APICAL AREA: crowding and density sensing. | &ndash; |
+| `pressure` | The chemistry listens to VOLUME-ELASTIC PRESSURE. | &ndash; |
+| `tension` | The chemistry listens to CORTICAL TENSION: mechanotransduction. | &ndash; |
+
 ## Minimal spec
 
 ```yaml

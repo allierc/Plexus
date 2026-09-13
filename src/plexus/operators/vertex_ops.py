@@ -5122,7 +5122,7 @@ class ApicoBasalShapeEnergy3D(Lateral):
     # `kappa_s` multiplies the cell's whole polyhedron SURFACE, so kappa_s * L^2 = F*L and
     # kappa_s = F/L: it IS a surface tension, which is why raising it holds a dying cell's ring
     # open against `k_v` and stalled 59 of the extrusions on `apop2_ab_half`.
-    PARAM_UNITS = {"k_v": "F/L^5", "kappa_s": "tension", "gamma": "tension",
+    PARAM_UNITS = {"k_v": "F/L^5", "kappa_s": "tension", "gamma": "tension", "kappa_h": "tension",
                    "Lambda": "line_tension", "K_R": "F/L", "mu": "mobility",
                    "sep_mu": "fraction", "eta": "fraction", "cap_frac": "fraction",
                    "relax_iters": "count"}
@@ -5145,7 +5145,7 @@ class ApicoBasalShapeEnergy3D(Lateral):
                  "with independent apical and basal surfaces); Okuda, S. et al. (2018). Sci. Rep. "
                  "8:2386 (the monolayer reduction this generalises).")
     PARAM_ROLES = {"k_v": "cell_volume_elasticity", "kappa_s": "surface_tension",
-                   "sep_mu": "apicobasal_mobility",
+                   "kappa_h": "thickness_field_stiffness", "sep_mu": "apicobasal_mobility",
                    "surface": "which surface the ring terms act on"}
 
     def __init__(self, params, device="cpu"):

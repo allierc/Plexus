@@ -1,0 +1,192 @@
+---
+title: "organelle_project"
+subtitle: "Carry every piece with its cell and keep it in its region; apply `on_divide` at a division."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Carry every piece with its cell and keep it in its region; apply `on_divide` at a division.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **structural**: change the entities themselves &mdash; divide, die, grow.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `tissue`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+_See source below._
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `tissue` | tissue_set | **required** |
+| `seed` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: organelle_project, at: particle, tissue: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`region_constraint`]{.op-badge} [`inheritance_at_division`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`topo_record`](topo_record.qmd), [`protein_project`](protein_project.qmd), [`protein_express`](protein_express.qmd), [`organelle_express`](organelle_express.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd).
+
+## Source
+
+[`src/plexus/operators/organelle_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/organelle_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("organelle_project", family="mechanics", set="particle", kind="structural")
+class OrganelleProject(Structural):
+    """Carry every piece with its cell and keep it in its region; apply `on_divide` at a division."""
+    REQUIRES_PARAMS = ["tissue"]
+    PARAM_ROLES = {"tissue": "tissue_set"}
+    OPTIONAL_TYPE_PROPS = ["count", "radius", "region", "on_divide", "body"]
+    SUPPORTED_DIMS = (3,)
+    READS = ["pos"]
+    WRITES = ["pos"]
+    MECHANISM_TAGS = ["region_constraint", "inheritance_at_division"]
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "organelle")
+        self.tissue = str(params["tissue"])
+        self.seed = int(params.get("seed", 0))
+        self.params = dict(params)
+        self._prev_live = None
+        self._prev_age = None
+        self._prev_cen = None
+        self._gen = None
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        fans = _fans(H, self.tissue)
+        if fans is None:
+            return {}
+        species = _species(lvl, self.params)
+        dev = lvl.state.device
+        if self._gen is None:
+            self._gen = torch.Generator(device=dev).manual_seed(self.seed)
+        cs = resolve_cell_set(H, self.tissue, None); clvl = H.level(cs)
+        nF = fans["nF"]
+        live_cells = clvl.occ[:nF] > 0 if getattr(clvl, "occ", None) is not None else torch.ones(nF, dtype=torch.bool, device=dev)
+        par = lvl.parent
+        p0, p1 = lvl.state_schema["pos"]
+        park = torch.full((3,), PARK, device=dev, dtype=lvl.state.dtype)
+        # ---- carried by the cell: the centroid's displacement since last frame ---------------
+        cen = fans["cen"]
+        if self._prev_cen is not None and self._prev_cen.shape[0] <= nF:
+            k = self._prev_cen.shape[0]
+            shift = torch.zeros(nF, 3, device=dev, dtype=cen.dtype)
+            shift[:k] = cen[:k] - self._prev_cen
+            occ = lvl.occ > 0
+            ok = occ & (par < nF)
+            lvl.state[ok, p0:p1] += shift[par[ok]]
+        # ---- division: the newborn face and its mother (age reset this frame, nearest) ---------
+        _m = getattr(H.level(self.tissue), "_mesh", None)
+        _age = _m.get("age") if _m is not None else None
+        age = (torch.as_tensor(_age, device=dev).reshape(-1)[:nF] if _age is not None
+               else (clvl.get("age")[:nF, 0] if "age" in clvl.state_schema else None))
+        if self._prev_live is not None and age is not None and self._prev_age is not None:
+            def _pad(v, fill):
+                out = torch.full((nF,), fill, dtype=v.dtype, device=dev); k = min(nF, v.shape[0]); out[:k] = v[:k]; return out
+            prev_live = _pad(self._prev_live, False); prev_age = _pad(self._prev_age, 0.0)
+            born = live_cells & ~prev_live
+            reset = live_cells & prev_live & (age < prev_age)
+            if bool(born.any()) and bool(reset.any()):
+                cand = torch.nonzero(reset).flatten()
+                for d in torch.nonzero(born).flatten().tolist():
+                    dist = (cen[cand] - cen[d]).norm(dim=1)
+                    mother = int(cand[dist.argmin()].item())
+                    if mother == d:
+                        continue
+                    self._divide(lvl, fans, species, mother, d, par, p0, p1, park)
+        self._prev_live = live_cells.clone()
+        self._prev_age = age.clone() if age is not None else None
+        self._prev_cen = cen.clone()
+        # ---- orphans retire, the rest are kept in their region ------------------------------
+        occ = lvl.occ > 0
+        orphan = occ & ((par >= nF) | (~live_cells[par.clamp(max=nF - 1)]))
+        if bool(orphan.any()):
+            lvl.kill(torch.nonzero(orphan).flatten(), park=park)
+            occ = lvl.occ > 0
+        for sp in species:
+            idx = torch.nonzero(occ & (lvl.node_type == sp["id"])).flatten()
+            if idx.numel():
+                lvl.state[idx, p0:p1] = _in_region(fans, par[idx], sp["region"], sp["radius"], lvl.state[idx, p0:p1])
+                _set_block(lvl, "vel", idx, 0.0)
+        _write_count(H, lvl, self.tissue, species)
+        return {}
+
+    def _divide(self, lvl, fans, species, mother, d, par, p0, p1, park):
+        """The mother's pieces go to the nearer daughter; then each species' rule."""
+        occ = lvl.occ > 0
+        cen = fans["cen"]
+        for sp in species:
+            mine = torch.nonzero(occ & (par == mother) & (lvl.node_type == sp["id"])).flatten()
+            if mine.numel() == 0:
+                continue
+            x = lvl.state[mine, p0:p1]
+            nearer_d = (x - cen[d]).norm(dim=1) < (x - cen[mother]).norm(dim=1)
+            if sp["rule"] == "halve" and mine.numel() >= 2:
+                # exactly half, the half nearest the daughter, as protein clusters are shared
+                dd = (x - cen[d]).norm(dim=1)
+                give = mine[torch.argsort(dd)[: mine.numel() // 2]]
+                par[give] = d
+            elif sp["rule"] == "duplicate":
+                par[mine[nearer_d]] = d
+                have_m = int((~nearer_d).sum().item()); have_d = int(nearer_d.sum().item())
+                for who, have in ((mother, have_m), (d, have_d)):
+                    need = sp["count"] - have
+                    if need <= 0:
+                        continue
+                    src = mine[:1].repeat(need)
+                    new, _ = lvl.spawn(src)
+                    if new.numel() == 0:
+                        print(f"[organelle_project] reserve exhausted: {sp['name']} not duplicated in cell {who}", flush=True)
+                        continue
+                    par[new] = who
+                    lvl.node_type[new] = sp["id"]
+                    faces = torch.full((new.numel(),), who, dtype=torch.long, device=x.device)
+                    lvl.state[new, p0:p1] = _sample(fans, faces, sp["region"], sp["radius"], self._gen)
+                    _set_block(lvl, "vel", new, 0.0)
+                    _set_block(lvl, "age", new, 0.0)
+            else:                                               # none: the daughter holding it keeps it
+                par[mine[nearer_d]] = d
+```
