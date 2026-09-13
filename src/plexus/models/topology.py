@@ -231,11 +231,11 @@ def face_collapse_3d(rings, pos, f, births=None):
         if len(ded) < 3:
             return False
         trial[g] = ded
-    # COMMIT ONLY IF THE SURFACE IS STILL THE SAME SURFACE. The gate used to be `_check_closed`
-    # with euler == 2, i.e. "the result is a sphere" -- which an OPEN sheet (`build_sheet_mesh`,
-    # every `sheet_*` spec) fails at frame 0, so on a sheet no cell was ever extruded: a dying cell
-    # shrank to nothing, was walked to a triangle by `edge_flip`, and stayed, and a patch of such
-    # cells buckled the sheet out of its plane (sheet_morphogen_die, 2026-09-09). The invariant
+    # COMMIT ONLY IF THE SURFACE IS STILL THE SAME SURFACE. Gating on `_check_closed` with
+    # euler == 2 -- "the result is a sphere" -- is wrong for an OPEN sheet (`build_sheet_mesh`,
+    # every `sheet_*` spec), which fails it at frame 0: no cell is ever extruded, a dying cell
+    # shrinks to nothing, is walked to a triangle by `edge_flip` and stays, and a patch of such
+    # cells buckles the sheet out of its plane. The invariant
     # that actually matters is that the collapse changes nothing but V-2, E-3, F-1: same Euler
     # characteristic, same number of rim loops, still edge-manifold. On a closed surface that is
     # the old test exactly (euler 2 -> 2, no rim); on a sheet it admits the collapse and still

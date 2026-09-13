@@ -791,7 +791,7 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
         # THE SHUFFLE STAYS INSIDE THE LIVE HEAD OF THE BLOCK. The reserve tail (dormant, type 0
         # until an operator wakes it) is appended AFTER the shuffle: shuffling the whole block
         # mixed the tail's type-0 padding into the live rows, so a cell declared with one nucleus
-        # and thirty mitochondria woke up with sixteen nuclei.
+        # and thirty mitochondria would wake up with sixteen nuclei.
         live_n = min(int(pat.numel()), per)
         if layout == "ordered":
             # THE DECLARED ORDER INSIDE EVERY BLOCK: type i's `count` rows first, then type i+1's.
@@ -1018,8 +1018,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             # and its `spawn_*` companions were read here, before any operator existed, so the one
             # thing a seed is for -- writing x_0 -- happened outside the algebra with no operator
             # responsible. `seed_positions` (operators/seed_ops.py) calls the same `_spawn` /
-            # `_spawn3d` / `_spawn_pair3d` below, and every spec that carried the keys was
-            # rewritten on 2026-09-09; a spec that still carries one is refused rather than half-run.
+            # `_spawn3d` / `_spawn_pair3d` below. A spec still carrying one of the old keys is
+            # refused rather than half-run, so nothing can migrate halfway.
             _legacy = [k for k in s if k == "spawn" or str(k).startswith("spawn_")]
             if _legacy:
                 raise ValueError(
@@ -1893,9 +1893,9 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # names the token once (the natural way to write "one grid solve per substep, with the parameter
     # changing at frame 400") bound occurrence 0 to instance 0 forever and NEVER RAN INSTANCE 1.
     #
-    # On `si_two_drops3d_cycle` -- sigma +0.018 before frame 400, -0.018 after -- the positive
-    # instance is called on every substep and the negative one never. The second stage
-    # of a two-stage run did not merely do the wrong thing, it did not exist -- and because
+    # The positive instance is then called on every substep and the negative one never: the
+    # second stage of a two-stage run does not merely do the wrong thing, it does not exist. And
+    # because
     # `mpm_grid_update` is the step that divides momentum by mass, the run also lost its grid solve
     # entirely for the whole second half.
     #

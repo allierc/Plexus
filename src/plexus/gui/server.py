@@ -834,8 +834,8 @@ def _relay_bodies(bodies: list, n: int, world: float) -> list:
 def p_patch(h, data):
     """Change a FEW FIELDS of the scene on screen, and rebuild: `{"form": {...}, "bodies": {"*": {...}}}`.
 
-    WHY A PATCH AND NOT THE WHOLE FORM. The page's driver used to be handed the form and asked to
-    post the edited copy back; on a 27-body scene that is 5,000 characters of JSON it must READ and
+    WHY A PATCH AND NOT THE WHOLE FORM. Handing the page's driver the form and asking it to post
+    the edited copy back means, on a 27-body scene, 5,000 characters of JSON it must READ and
     then WRITE, and generating them is most of a 50-second turn. "Change the material to water" is
     two fields. `bodies` keys are body names, or `*` for every body.
     """
