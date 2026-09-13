@@ -587,3 +587,35 @@ step, so memory stays at one rollout and cost scales with the number of beats. R
 `healthy_allbeats` (beats 1–3, 24 s/iteration) and `hcm_allbeats` (beats 1–4, 32 s/iteration).
 The per-beat R² of such a fit is a consistency check, not a generalisation claim, and the honest
 generalisation statement is the continuous rollout above.
+
+## The reporting models are now fitted on every beat (2026-09-11)
+
+`healthy_allbeats` (beats 1–3, 108 min) and `hcm_allbeats` (beats 1–4, 144 min), same model as
+before: per cell g, g2, φ, E, δ and its own excitation time course, plus two shared temporal modes,
+per-cell adhesion, λ_E = 0.3, 120 particles per cell, drag 150, band masked.
+
+| | healthy, beats 1 / 2 / 3 | HCM, beats 1 / 2 / 3 / 4 |
+|---|---|---|
+| R²(A) | 0.870 / 0.872 / 0.871 | 0.894 / 0.900 / 0.898 / 0.898 |
+| R²(u) | 0.935 / 0.937 / 0.935 | 0.949 / 0.958 / 0.958 / 0.958 |
+| shortening r | 0.94 | 0.97 |
+
+Every beat is in-sample now, so these are consistency numbers, not generalisation: the point is
+that one parameter set describes every beat equally well (spread 0.002 healthy, 0.006 HCM), which a
+set over-fitted to one beat could not. The generalisation statement is the continuous rollout:
+**R²(A) 0.849 over beats 1–3 in ONE rollout that is never reset** (`cont_cells.mp4`).
+
+Healthy against HCM, refitted on all beats — the earlier conclusions hold, with the excitation
+caveat of the previous section:
+
+| | healthy (331 cells) | HCM (298 cells) |
+|---|---|---|
+| fitted g | 0.037 | 0.063 |
+| g2 / g | −0.70 | −0.48 |
+| silent cells | 19% | 10% |
+| local axis alignment | 0.23 | 0.35 |
+| fitted E | 236 | 222 |
+| clock delay sd | 0.079 s | 0.076 s |
+
+`out/figures` (seven figures) and `out/movies` (`cont_cells.mp4`, `cont_overlay_particles.mp4`)
+were emptied and regenerated from these two fits.

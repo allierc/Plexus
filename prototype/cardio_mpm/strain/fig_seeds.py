@@ -8,8 +8,8 @@ plt.rcParams.update({"figure.facecolor": "black", "axes.facecolor": "black", "sa
                      "axes.labelcolor": WHITE, "xtick.color": WHITE, "ytick.color": WHITE, "text.color": WHITE, "font.size": 10,
                      "axes.spines.top": False, "axes.spines.right": False, "legend.frameon": False})
 import argparse
-_ap = argparse.ArgumentParser(); _ap.add_argument("--healthy", default="s4_live_r13_modes2_kappa,s4_live_r13b_seed1")
-_ap.add_argument("--hcm", default="hcm_r5_modes2,hcm_r5b_seed1"); _ap.add_argument("--out", default="fig7_seed_agreement.png")
+_ap = argparse.ArgumentParser(); _ap.add_argument("--healthy", default="healthy_allbeats,s4_live_r13b_seed1")
+_ap.add_argument("--hcm", default="hcm_allbeats,hcm_r5b_seed1"); _ap.add_argument("--out", default="fig7_seed_agreement.png")
 _A = _ap.parse_args()
 PAIRS = dict(healthy=tuple(_A.healthy.split(",")), hcm=tuple(_A.hcm.split(",")))
 fig, ax = plt.subplots(1, 4, figsize=(18, 4.4), gridspec_kw=dict(wspace=0.3)); table = {}

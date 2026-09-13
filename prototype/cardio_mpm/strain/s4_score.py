@@ -100,6 +100,7 @@ def main():
     fit_win = R.beat_window(rec, args.fit_beat)
     A_fit, u_fit = R.window_affine(rec, fit_win)
 
+    fitted = [int(b) for b in args.fit_beats.split(",")] if args.fit_beats else [args.fit_beat]
     results = {}
     for k in [int(b) for b in args.beats.split(",")]:
         win = R.beat_window(rec, k)
