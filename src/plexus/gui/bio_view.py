@@ -238,10 +238,10 @@ class View:
             self.p.renderer.ResetCameraClippingRange()
             self._scale_bar(cam, d)
             self._section_zoom()
-            # `near_side` CUTS BY THE VIEW, so the cut has to be re-made when the view turns.
-            if self.lm is not None and (self.lm.style or {}).get("near_side") \
-                    and getattr(self.lm, "_glyphs", None) and getattr(self.lm, "_glyph_H", None) is not None:
-                self.lm._glyph_update_all(self.lm._glyph_H)
+            # `near_side` CUTS BY THE VIEW, so the cut has to be re-made when the view turns --
+            # the surfaces as well as the pieces.
+            if self.lm is not None and hasattr(self.lm, "near_side_refresh"):
+                self.lm.near_side_refresh()
 
     def _section_zoom(self):
         """The section inset follows the view's zoom: its window is the declared span over the zoom,

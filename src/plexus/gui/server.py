@@ -728,8 +728,7 @@ def p_nearside(h, data):
         else:
             pl.pop("near_side", None)
         open(sp, "w").write(_dump_yaml(spec))
-    if getattr(v.lm, "_glyphs", None) and getattr(v.lm, "_glyph_H", None) is not None:
-        bio_view._vtk(v.lm._glyph_update_all, v.lm._glyph_H)
+    bio_view._vtk(v.lm.near_side_refresh)
     return h._send_json({"near_side": on})
 
 
@@ -909,6 +908,19 @@ def p_patch(h, data):
     form.update(patch_form)
     if n_want is not None:
         form["bodies"] = _relay_bodies(form.get("bodies") or [], int(n_want), float(form.get("world", 0.5)))
+    # ANY LIST THE FORM HAS, NOT ONLY `bodies`. A tissue's form carries `organelles` and `species`,
+    # and a patch that could name neither sent the driver back to a full rebuild to widen a nucleus.
+    for _key in ("organelles", "species"):
+        _p = data.get(_key) or {}
+        _lst = form.get(_key) or []
+        if not _p or not isinstance(_lst, list):
+            continue
+        for i, it in enumerate(_lst):
+            for k2, patch in _p.items():
+                if k2 == "*" or k2 == it.get("name") or k2 == str(i) \
+                        or ("-" in str(k2) and str(k2).replace("-", "").isdigit()
+                            and int(str(k2).split("-")[0]) <= i <= int(str(k2).split("-")[1])):
+                    it.update(patch)
     bp = data.get("bodies") or {}
     if bp:
         blist = form.get("bodies") or []
