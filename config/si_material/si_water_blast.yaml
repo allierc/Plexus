@@ -1034,8 +1034,8 @@ sets:
       jet09: {count: 100, shape: ball, material: liquid, bulk_modulus: 2200000.0, density: 1000.0, eta: 0.001}
   mpm_particle:
     parent: cell
-    per_parent: {pool: 60000000, jet00: 40000, jet01: 40000, jet02: 40000, jet03: 40000, jet04: 40000, jet05: 40000, jet06: 40000,
-      jet07: 40000, jet08: 40000, jet09: 40000}
+    per_parent: {pool: 6000000, jet00: 4000, jet01: 4000, jet02: 4000, jet03: 4000, jet04: 4000, jet05: 4000, jet06: 4000,
+      jet07: 4000, jet08: 4000, jet09: 4000}
     radius: 0.006
     density: 1000.0
     vel_init:
@@ -1057,17 +1057,17 @@ sets:
         jet08: {speed: 9.33, spread_deg: 19.4}
         jet09: {speed: 10.0, spread_deg: 15.0}
 fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 256}
+  mpm_grid: {frame: mpm_grid, n_grid: 160}
 operators:
 - {op: gravity, at: cell, g: 9.81}
 - {op: mpm_strain, at: mpm_particle, implementation: warp}
 - {op: mpm_viscosity, at: mpm_particle, eta: 0.001}
 - {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 4000.0, implementation: warp, polar: higham}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.4, wall_friction: 0.2, surface_tension: 6.0, csf_rho: 1000.0, csf_band: 0.3}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.4, wall_friction: 0.2, surface_tension: 0.8, csf_rho: 1000.0, csf_band: 0.3}
 - {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, vmax: 1000000000.0, implementation: warp}
 schedule:
 - gravity
-- substep_dt: 1.2e-05
+- substep_dt: 2.0e-05
   steps: [mpm_strain, mpm_viscosity, mpm_scatter, mpm_grid_update, mpm_gather]
 plotting:
   renderer: vtk_points
@@ -1082,7 +1082,7 @@ plotting:
   floor_opacity: 0.35
   hide_sets: [cell]
   slow_motion: 4
-  dot_size: 1.0
+  dot_size: 1.2
   dot_shading: true
   dot_specular: 0.25
   dot_specular_power: 16
