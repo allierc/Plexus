@@ -391,6 +391,8 @@ class View:
         step = max(max(1, -(-T // max_frames)), max(1, -(-(T * max(per_frame, 1)) // self.SNAP_BUDGET)))
         return T, len(range(0, T, step)), step
 
+    _stored_kept = 0                                             # what `stored_frames` last reported
+
     def stored_frames(self, max_frames: int = 300):
         """(recorded, kept) of this spec's run on disk, from the file's headers -- the page only
         wants the numbers until PLAY is pressed, and the positions are 500 MB."""
@@ -400,6 +402,7 @@ class View:
         try:
             with np.load(os.path.join(d, "trajectory.npz")) as z:
                 T, kept, _ = self._traj_shape(z, max_frames)
+                self._stored_kept = kept
                 return T, kept
         except Exception as e:                                   # noqa: BLE001
             print(f"[view] {d}: cannot read the trajectory header ({type(e).__name__}: {e})", flush=True)
@@ -495,7 +498,18 @@ class View:
             self.frame_shown = max(0, min(int(i), len(self.panel.hist) - 1)) if self.panel.hist else None
             return
         if not self.snaps:
-            return
+            # A FRAME WAS ASKED FOR AND NOTHING IS IN MEMORY: read the spec's recorded run, once.
+            # The page tried to do this in JS before each drag, which meant the FIRST picture of a
+            # freshly opened scene silently ignored `frame=` (the slider showed the seed at every
+            # position), and a drag started one load per input event. The server owns it now: the
+            # index is rescaled from the slider's span to what the read actually kept.
+            n_before = self._stored_kept
+            if not self.load_run_frames():
+                return
+            if n_before and len(self.snaps) and n_before != len(self.snaps):
+                i = int(round(int(i) * (len(self.snaps) - 1) / max(n_before - 1, 1)))
+            if not self.snaps:
+                return
         i = max(0, min(int(i), len(self.snaps) - 1))
         snap = self.snaps[i]
         with LOCK:
