@@ -12,37 +12,37 @@ sets:
   cell:
     n: 26
     start:
-    - [0.25, 0.07, 0.25]
-    - [0.1317, 0.09, 0.2364]
-    - [0.3332, 0.09, 0.2446]
-    - [0.0697, 0.09, 0.4135]
-    - [0.3798, 0.09, 0.1052]
-    - [0.299, 0.09, 0.1082]
-    - [0.1821, 0.09, 0.3458]
-    - [0.3678, 0.09, 0.183]
-    - [0.1063, 0.09, 0.3287]
-    - [0.2878, 0.09, 0.4162]
-    - [0.4301, 0.09, 0.1538]
-    - [0.0909, 0.09, 0.091]
-    - [0.1987, 0.09, 0.2264]
-    - [0.3501, 0.09, 0.3244]
-    - [0.4193, 0.09, 0.3382]
-    - [0.2003, 0.09, 0.0928]
-    - [0.3732, 0.09, 0.3889]
-    - [0.1922, 0.09, 0.4254]
-    - [0.257, 0.09, 0.3328]
-    - [0.1811, 0.09, 0.1532]
-    - [0.4275, 0.09, 0.2331]
-    - [0.0847, 0.09, 0.1806]
-    - [0.2615, 0.09, 0.1952]
-    - [0.0668, 0.09, 0.2476]
-    - [0.1352, 0.09, 0.3927]
-    - [0.434, 0.09, 0.4129]
+    - [0.25, 0.065, 0.25]
+    - [0.1266, 0.088, 0.2358]
+    - [0.3368, 0.088, 0.2444]
+    - [0.0619, 0.088, 0.4205]
+    - [0.3854, 0.088, 0.099]
+    - [0.3011, 0.088, 0.1021]
+    - [0.1791, 0.088, 0.35]
+    - [0.3729, 0.088, 0.1801]
+    - [0.1001, 0.088, 0.3321]
+    - [0.2884, 0.088, 0.2422]
+    - [0.2894, 0.088, 0.4234]
+    - [0.4379, 0.088, 0.1496]
+    - [0.084, 0.088, 0.0842]
+    - [0.169, 0.088, 0.4065]
+    - [0.363, 0.088, 0.2948]
+    - [0.1965, 0.088, 0.2254]
+    - [0.3399, 0.088, 0.065]
+    - [0.3089, 0.088, 0.3049]
+    - [0.4266, 0.088, 0.342]
+    - [0.4236, 0.088, 0.2931]
+    - [0.1981, 0.088, 0.086]
+    - [0.0645, 0.088, 0.2318]
+    - [0.3786, 0.088, 0.3949]
+    - [0.3831, 0.088, 0.2262]
+    - [0.2573, 0.088, 0.3364]
+    - [0.2298, 0.088, 0.4319]
     type_layout: ordered
     types:
       pool:
         count: 1
-        block: [0.03, 0.02, 0.03, 0.47, 0.12, 0.47]
+        block: [0.03, 0.02, 0.03, 0.47, 0.11, 0.47]
         material: liquid
         bulk_modulus: 2200000.0
         density: 1000.0
@@ -51,8 +51,8 @@ sets:
       jet_b: {count: 13, shape: ball, material: liquid, bulk_modulus: 2200000.0, density: 1000.0, eta: 0.001}
   mpm_particle:
     parent: cell
-    per_parent: {pool: 300000, jet_a: 8000, jet_b: 8000}
-    radius: 0.03
+    per_parent: {pool: 900000, jet_a: 24000, jet_b: 24000}
+    radius: 0.022
     density: 1000.0
     vel_init:
       mode: cone
@@ -62,18 +62,18 @@ sets:
       speed_jitter: 0.3
       types: [jet_a, jet_b]
 fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 128}
+  mpm_grid: {frame: mpm_grid, n_grid: 192}
 operators:
 - {op: gravity, at: cell, g: 9.81}
 - {op: mpm_strain, at: mpm_particle, implementation: warp}
 - {op: mpm_viscosity, at: mpm_particle, eta: 0.001}
 - {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 4000.0, implementation: warp, polar: higham}
-- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.4, wall_friction: 0.2, surface_tension: 2.0, csf_rho: 1000.0,
-  csf_band: 0.25}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.4, wall_friction: 0.2, surface_tension: 3.0, csf_rho: 1000.0,
+  csf_band: 0.3}
 - {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, vmax: 1000000000.0, implementation: warp}
 schedule:
 - gravity
-- substep_dt: 2.5e-05
+- substep_dt: 1.6e-05
   steps: [mpm_strain, mpm_viscosity, mpm_scatter, mpm_grid_update, mpm_gather]
 plotting:
   renderer: vtk_points
@@ -86,9 +86,9 @@ plotting:
   surface_opacity: 0.5
   surface_roughness: 0.07
   surface_metallic: 0.0
-  contour_ngrid: 192
-  contour_smooth: 12
-  max_frames: 450
+  contour_ngrid: 256
+  contour_smooth: 6
+  max_frames: 300
   stills: 12
   keep_stills: true
   box_frame: true
@@ -97,3 +97,5 @@ plotting:
   hide_sets: [cell]
   slow_motion: 4
   surface_color: '#2a6fdc'
+  contour_sigma: 0.85
+  contour_iso_frac: 0.22
