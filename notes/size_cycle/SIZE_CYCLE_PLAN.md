@@ -415,6 +415,8 @@ arm under each rung's mechanics, 1601 frames, so the story can be watched side b
 | `ms7_cycle_adder` | ms3 + the adder stated on the cycle (R4c) | SPHEROID; the "one when" form of the same rule |
 | `ms8_cycle_dilution` | ms3 + G1 ended by an inhibitor diluted to threshold | clean to 1600; slope -0.97 against the sizer's -1.03 -- a sizer with a molecule under it (Schmoller 2015, Zatulovskiy 2020) |
 | `ms9_cycle_hazard` | ms3 + G1 as a constant hazard | clean to 800, then the spread tells: slope +0.49, CV(V_d) 0.36, the widest of the family (Smith & Martin 1973) |
+| `ms10_grow_channel` | ms3 + a size-dependent growth RATE under a clock division | the other channel of size control, with no checkpoint anywhere (Ginzberg et al. 2018 eLife) |
+| `ms11_doubler_null` | ms3 + G1 ended at twice the cell's OWN birth volume | the null: it corrects nothing, and under asymmetric division it drives cells to zero volume and wrecks the mesh |
 
 `ms3` is the working point: no pin, the thickness field stiff. `ms1` -> `ms3` is the mechanics
 story, `ms5`/`ms7`/`ms8`/`ms9` the rules story, `ms6`/`ms6b` the topology one. Four of them are
@@ -524,6 +526,27 @@ gradient, and a kernel that gave it one would be the defect. Relative error 1.7e
 over 200 to 8,000 cells; 29-38x faster than the backward at every size. At 200 cells the frame is
 not gradient-bound and the two paths take the same wall clock, giving the same run.
 
+**R5b (2346cf92).** The async spread becomes `seed_cycle`, a seed operator in the spec's `seed:`
+block, and `cell_cycle` drops `MAY_MUTATE_INTEGRATED_STATE`: every quantity it produces is a delta
+the engine integrates, so the tick-0 integration invariant now covers it. `seed_async` is refused
+with the sentence that says where the spread went. `cell_mechanics[apicobasal]` refuses `p0` as
+well -- it has no perimeter term keyed to a target shape index, which is how `cv_shape_low` came to
+be a sweep arm identical to its own baseline (finding 1, closed).
+
+`cell_grow` keeps its flag, and the reason is in its own comment: of its three remaining writes,
+one is a baseline reset with no delta form, one is a change of variable the code argues must not be
+integrated, and one is a recorded readout. A flag that is false on most compositions and true on
+the ones that matter is worse than an honest true.
+
+24. **A seeded cell is not an unborn one.** R4c's hold -- a daughter's cycle starts when its birth
+    volume has been read -- keyed on `age <= 0`, which is true of every SEEDED cell until the first
+    division call increments it. Inside a settle window, where `cell_divide` does not run at all,
+    that pinned the whole population at `p = 0` and erased the spread `seed_cycle` had just drawn:
+    a run seeded 43/38/14/5 read 100 % G1 at frame 61. `ndiv >= 1` is what "was cut" means; the
+    same run now reads 48/37/14/0. Every `cycle_*` arm of R4c was a synchronised culture and its
+    phase fractions are withdrawn; its slopes are not (they read volumes, not phases), which is
+    why the R4c table still stands.
+
 ## 4. The ladder, v2
 
 | rung | layer | change | gate |
@@ -535,7 +558,7 @@ not gradient-bound and the two paths take the same wall clock, giving the same r
 | R4a-c | 2 | `cell_id`; the apoptosis rig; one "when" | DONE: R3d reproduced (8/10 within 0.16), CV(V_d) tighter everywhere |
 | R4b | 3 | the apoptosis rig | `death_report` rows for every arm; deaths never off a bent mesh |
 | R5a | eng | DONE: `kappa_h` in the warp kernels | warp = autograd to float32 round-off, 30x on the gradient |
-| R5b | eng | seed-time writes into seed ops; flags off; tick shims out; `p0` off the apico-basal contract | tick-0 invariant; flags 29 -> <= 20 |
+| R5b | eng | DONE: `seed_cycle`; `cell_cycle` delta-only; `p0` refused | the tick-0 invariant covers `cell_cycle`; `cell_grow`'s flag stays, with its reason |
 | R6 | -- | DONE: ms3/ms5/ms6/ms7 registered, `QUICK` re-pointed, the runner made deterministic (finding 23) | the registry green |
 
 Out of scope: MPM, ECM -- touched only through the shared reader, and gated there.
