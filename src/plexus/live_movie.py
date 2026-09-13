@@ -3626,15 +3626,40 @@ class LiveMovie:
         if H is not None:
             self._glyph_update_all(H)
 
+    def _near_side(self, pts):
+        """`plotting.near_side` -- KEEP ONLY WHAT FACES THE CAMERA. A shell of cells shows every
+        nucleus at once, the near ones and the far ones through the surface, and 120 spheres over
+        one another read as a cloud rather than as one per cell. The cut is the plane through the
+        drawn body's centre, normal to the view: a point behind it is on the side you are looking
+        at the back of. `near_side` may be true (the centre) or a fraction of the body's radius,
+        so 0.3 keeps a shallower cap and -0.2 keeps a little past the equator."""
+        f = (self.style or {}).get("near_side")
+        if not f or not len(pts):
+            return pts
+        c = np.asarray(self.p.camera.position, float) - np.asarray(self.p.camera.focal_point, float)
+        n = c / max(float(np.linalg.norm(c)), 1e-12)
+        ctr = np.asarray(getattr(self, "_glyph_centre", None) if getattr(self, "_glyph_centre", None) is not None
+                         else np.asarray(pts, float).mean(0), float)
+        d = (np.asarray(pts, float) - ctr) @ n
+        cut = 0.0 if f is True else float(f) * float(np.abs(d).max() or 1.0)
+        keep = d >= cut
+        return np.asarray(pts)[keep] if keep.any() else np.asarray(pts)[:0]
+
     def _glyph_update_all(self, H):
         g = getattr(self, "_glyphs", None)
         if not g:
             return
         self._glyph_H = H
         subject = getattr(self, "_sname", None)
+        # THE CENTRE THE CUT IS MEASURED FROM is the whole drawn body's, not each type's: the Golgi
+        # of one hemisphere must not be judged against the Golgi's own centre.
+        if (self.style or {}).get("near_side"):
+            _all = [self._glyph_points(H.level(ln), ti, ln == subject) for ln, ti, _c, _a in g.values()]
+            _all = [p for p in _all if len(p)]
+            self._glyph_centre = np.concatenate(_all, 0).mean(0) if _all else None
         for key, (lname, tid, col, actor) in list(g.items()):
             lv = H.level(lname)
-            pts = self._glyph_points(lv, tid, lname == subject)
+            pts = self._near_side(self._glyph_points(lv, tid, lname == subject))
             if actor is not None:
                 self.p.remove_actor(actor, render=False)
                 actor = None

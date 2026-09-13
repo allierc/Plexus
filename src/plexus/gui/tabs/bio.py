@@ -44,10 +44,12 @@ FORM_HTML = r'''
  <div class="row"><button class="dim" onclick="addSpecies()">+ species</button> <span style="color:#9ab">protein species</span></div>
  <div class="row" id="curves" style="color:#ccd">plots: <label style="width:auto;margin-right:8px"><input type="checkbox" value="cells" style="width:auto" onchange="setCurves()"> cells</label><label style="width:auto;margin-right:8px"><input type="checkbox" value="area" style="width:auto" onchange="setCurves()"> area</label><label style="width:auto;margin-right:8px"><input type="checkbox" value="volume" style="width:auto" onchange="setCurves()"> volume</label><label style="width:auto;margin-right:8px"><input type="checkbox" value="radius" style="width:auto" onchange="setCurves()"> radius</label><label style="width:auto;margin-right:8px"><input type="checkbox" value="phase" style="width:auto" onchange="setCurves()"> phase</label><label style="width:auto"><input type="checkbox" value="cycle_progress" style="width:auto" onchange="setCurves()"> cycle</label></div>
  <div style="color:#778;font-size:11px">up to three plots are drawn beside the tissue, live, and in the movie</div>
+ <div class="row"><label style="width:auto"><input type="checkbox" id="nearside" style="width:auto" onchange="setNearSide()"> near side only</label> <span style="color:#778;font-size:11px">draw the organelles and clusters that face the camera, not the ones behind the tissue</span></div>
  <table class="sp" id="species"><tr><th>name</th><th>region</th><th>density</th><th>s</th><th>tau</th><th></th></tr></table>
 '''
 
 FORM_JS = r'''
+window.setNearSide=async function(){const on=$('nearside').checked;await post('/api/scene/nearside',{on,name:specName});render();};
 window.addSpecies=function(sp){sp=sp||{};const tb=$('species');const tr=tb.insertRow(-1);
  tr.innerHTML=`<td><input value="${sp.name||''}"></td><td><select><option>basal</option><option>apical</option><option>mid</option><option>interior</option></select></td><td><input value="${sp.density??3}"></td><td><input value="${sp.s??0.02}"></td><td><input value="${sp.tau??300}"></td><td><button class="dim" onclick="this.closest('tr').remove()">x</button></td>`;
  tr.cells[1].firstChild.value=sp.region||'basal';};

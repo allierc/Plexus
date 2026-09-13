@@ -706,6 +706,33 @@ def p_refine(h, data):
                          "form": _form_of(name, spec, data.get("tab"))})
 
 
+def p_nearside(h, data):
+    """Show only the pieces that FACE THE CAMERA (`plotting.near_side`), or all of them again.
+
+    `{"on": true}` cuts at the body's centre; `{"on": 0.3}` keeps a shallower cap, `-0.2` a little
+    past the equator; `{"on": false}` shows everything. Applied to the open view at once -- no
+    reseed -- and written into the spec so the movie draws what the page shows."""
+    from plexus.gui import bio, bio_view
+    v = bio_view.current()
+    on = data.get("on", True)
+    if v is None or v.lm is None:
+        return h._send_json({"error": "no scene is open"}, 400)
+    v.lm.style["near_side"] = on
+    name = str(data.get("name") or bio.STATE.get("name") or "")
+    sp = _spec_path(name)
+    if name and os.path.exists(sp):
+        spec = yaml.safe_load(open(sp)) or {}
+        pl = spec.setdefault("plotting", {}) or {}
+        if on:
+            pl["near_side"] = on
+        else:
+            pl.pop("near_side", None)
+        open(sp, "w").write(_dump_yaml(spec))
+    if getattr(v.lm, "_glyphs", None) and getattr(v.lm, "_glyph_H", None) is not None:
+        bio_view._vtk(v.lm._glyph_update_all, v.lm._glyph_H)
+    return h._send_json({"near_side": on})
+
+
 def p_style(h, data):
     """The render selector: replace the spec's render keys, keep everything else, bump so the
     page re-seeds through the renderer with the new style (which is also the movie's)."""
@@ -1003,7 +1030,7 @@ POST_ROUTES = {
     "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
     "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
     "/api/scene/style": p_style, "/api/scene/saveas": p_saveas, "/api/scene/curves": p_curves,
-    "/api/scene/loadrun": p_loadrun, "/api/scene/patch": p_patch,
+    "/api/scene/loadrun": p_loadrun, "/api/scene/patch": p_patch, "/api/scene/nearside": p_nearside,
     "/api/quit": p_quit, "/api/studio/quit": p_quit,
     "/api/validate": p_validate, "/api/save": p_editor_save, "/api/layout": p_layout,
 }
