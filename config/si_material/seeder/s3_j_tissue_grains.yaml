@@ -221,14 +221,23 @@ plotting:
     mid: false
     points: false
   cross_section_height: 0.24
+  # A LIVE PANEL NEEDS ITS Y AXIS FIXED IN ADVANCE. A generate has only the current frame, so a
+  # curve without `ymin`/`ymax` would rescale under itself and the renderer refuses to draw the
+  # frame at all -- which silently cost this scene its whole movie and left PLAY with no frames.
+  # 0 to 600 cells covers the 200 seeded through several rounds of division; cell volume is in
+  # cubic length units (1 unit = 10 um), 0 to 5.
   curve:
   - quantity: cells
     xlabel: frame
     ylabel: cells
     ticks: 4
+    ymin: 0.0
+    ymax: 600.0
   - quantity: volume
     xlabel: frame
     ylabel: cell volume
     ticks: 4
+    ymin: 0.0
+    ymax: 5.0
   scale_bar_corner: right_face
   scale_bar_lift: -0.07
