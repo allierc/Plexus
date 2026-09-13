@@ -1,0 +1,234 @@
+# S3-J "a tissue of 200 cells in a matrix of grains" -- ONE spec, two substrates. Everything below
+# the marked blocks is config/tissue/ms4_round_prism_shell.yaml verbatim, the bio tab's own scene;
+# what this rung adds is a second body set and the MLS-MPM chain that steps it, in the same
+# `sets`/`operators`/`schedule` the tissue already uses. Nothing about the seeder is bio-specific
+# or material-specific: `shell` places 60 grains about a centre here exactly as it placed 24
+# mitochondria in s3_h_shell.
+#
+# WHAT IS AND IS NOT COUPLED. The vertex tissue and the material points are seeded together and
+# stepped by one schedule, and they share the world box, the frame clock and the movie. They do
+# NOT yet push on each other -- there is no operator that carries a force between a vertex mesh and
+# an MPM grid -- so the cyst grows THROUGH the matrix rather than against it. The rung is about the
+# seeder speaking one language for both, and says so rather than implying a coupling it lacks.
+#
+# LENGTHS ARE THE TISSUE'S: 1 unit = 10 um. The cyst is seeded at radius 5 units (50 um) and the
+# grains sit on a shell of radius 13 units (130 um) about the same centre, so nothing overlaps at
+# frame 0. Stiffness and density are in simulation units, chosen for the sound speed the substep
+# has to resolve: c = sqrt(E/rho) = 1 unit per time unit, so the CFL limit 0.4*dx/c with
+# dx = 50/96 = 0.52 units is 0.198 -- a 0.125 substep, 8 per frame of dt 1.0. (The guard
+# measures c_max = 1.1 rather than the nominal 1.0, because a particle's own Lame moduli
+# come from E at Poisson 0.2, so 0.2 was 1.01x over and was corrected to 0.167 on first run.)
+general:
+  name: s3_j_tissue_grains
+  seed: 0
+  n_frames: 101
+  dt: 1.0
+  record_cap: 103
+  boundary: wall
+  dim: 3
+  world:
+  - 50.0
+  - 50.0
+  - 50.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+sets:
+  cell:
+    n: 12800
+    state:
+      area:
+        width: 1
+      centroid:
+        width: 3
+      Vbirth:
+        width: 1
+        record: false
+      divjit:
+        width: 1
+        record: false
+      A0:
+        width: 1
+      P0:
+        width: 1
+      V0f:
+        width: 1
+      alive:
+        width: 1
+        record: false
+      age:
+        width: 1
+      ndiv:
+        width: 1
+      mg_scale:
+        width: 1
+        record: false
+      A0_init:
+        width: 1
+        record: false
+      P0_init:
+        width: 1
+        record: false
+      V0f_init:
+        width: 1
+        record: false
+      inhib_frac:
+        width: 1
+  vertex:
+    n: 25584
+    mesh: half_edge
+    state:
+      pos:
+        width: 3
+        role: coordinate
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        role: rate
+        integration: second_order_rate
+        record: false
+      sep:
+        width: 3
+        integration: first_order
+  half_edge:
+    n: 102400
+    maps:
+      srce: vertex
+      trgt: vertex
+      face: cell
+  # ---- the matrix: 60 grains on a shell about the cyst, and the points that are their material
+  grain:
+    entity: cell
+    n: 1
+    start:
+    - [25.0, 25.0, 25.0]
+    types:
+      matrix: {count: 1, material: elastic, youngs: 1.0, density: 1.0, shape: ball,
+               shell: {n: 60, radius: 13.0}}
+  mpm_particle:
+    parent: grain
+    per_parent: 30000
+    radius: 1.5
+    density: 1.0
+    particle_mass: 0.028
+    state:
+      pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}
+      vel: {width: 3, role: rate, integration: second_order_rate}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 96}
+operators:
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  rate: 0.000578
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
+- op: cell_mechanics
+  model: apicobasal
+  at: vertex
+  k_v: 4.0
+  kappa_s: 0.2
+  kappa_h: 0.2
+  gamma: 0.0
+  Lambda: 0.0
+  K_R: 0.1
+  mu: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  sep_mu: 1.0
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: cell_divide
+  at: vertex
+  every: 4
+  engine_clock: true
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  factor: 2.0
+- op: topo_record
+  at: vertex
+  every: 1
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_damp_mode: per_impact, vmax: 1000000.0}
+schedule:
+- cell_geometry
+- cell_grow
+- cell_mechanics
+- edge_flip
+- cell_divide
+- topo_record
+- {substep_dt: 0.125, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+seed:
+- op: seed_mesh
+  at: vertex
+  n_cells: 200
+  radius: 5.0
+  # THE BOX HAS A FLOOR NOW, SO THE TISSUE MOVES TO THE MIDDLE OF IT. `seed_mesh` builds its
+  # sphere about the origin, which is the corner of a walled box and the centre of a free one;
+  # the MLS-MPM grid spans [0, 50] in every axis, so the cyst and the matrix only share a world
+  # if the cyst is moved to 25, 25, 25 -- the same point the grain shell is placed about.
+  centre: [25.0, 25.0, 25.0]
+  jitter: 0.02
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+  model: apicobasal
+  h0: 0.88
+  ref_frame: 60
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  hide_sets:
+  - grain
+  colors:
+    matrix: [0.85, 0.72, 0.45]
+  dot_shading: body
+  box_frame: true
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  dot_size: 1.6
+  fps: 30
+  mesh_color: '#cfd8e3'
+  mesh_style: surface
+  mesh_edges: true
+  real_time: false
+  slow_motion: 2
+  cross_section:
+    axis: y
+    at: 0.5
+    thickness: 6
+    span: 34.0
+    walls: 64
+    loc:
+    - 0.015
+    - 0.035
+    wall_color: '#e8e8e8'
+    mid: false
+    points: false
+  cross_section_height: 0.24
+  curve:
+  - quantity: cells
+    xlabel: frame
+    ylabel: cells
+    ticks: 4
+  - quantity: volume
+    xlabel: frame
+    ylabel: cell volume
+    ticks: 4
+  scale_bar_corner: right_face
+  scale_bar_lift: -0.07

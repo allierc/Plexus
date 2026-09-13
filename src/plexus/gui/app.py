@@ -201,8 +201,16 @@ else{{
 // scene used to BUILD its default over it -- so every relaunch replaced whatever was being shown
 // with the tab's own 27 cubes, five times in one session. Wait, look again, and build only if the
 // session is still empty.
+// AND A PAGE THAT FINDS A SCENE ALREADY OPEN ADOPTS IT. Returning early left the form and the
+// YAML box holding the tab's DEFAULT bodies while the picture showed the open scene, so the next
+// rebuild -- a menu, a colour, anything -- wrote 27 cubes over it. Load the open scene's own spec
+// into the form instead, so what the page can rebuild is what the page is showing.
 (async()=>{{for(let i=0;i<8;i++){{
-  try{{const st=await (await fetch('/api/scene/state')).json();if(st.name||specName)return;}}catch(e){{}}
+  if(specName)return;
+  try{{const st=await (await fetch('/api/scene/state')).json();
+    if(st.name){{specName=st.name;
+      const j=await (await fetch('/api/scene/spec?name='+encodeURIComponent(st.name)+'&tab='+TAB)).json();
+      if(j.raw)$('yamltext').value=j.raw;if(j.form)fillForm(j.form);render();return;}}}}catch(e){{}}
   await new Promise(r=>setTimeout(r,400));}}
  if(DEFAULT_SPEC)openSpec(DEFAULT_SPEC);else build();}})();}}
 </script></body></html>
