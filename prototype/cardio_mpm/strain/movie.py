@@ -52,6 +52,11 @@ def main():
     ap.add_argument("--band", type=float, default=0.03)
     ap.add_argument("--amplify", type=float, default=12.0, help="displacement arrows are drawn this many times longer")
     ap.add_argument("--fps", type=int, default=8)
+    ap.add_argument("--seconds", type=float, default=0.0,
+                    help="play the whole window in this many seconds (sets the frame rate from the frame count); 0 keeps --fps. The reference cardio.mp4 plays the recording in 4.8 s")
+    ap.add_argument("--continuous", action="store_true",
+                    help="ONE rollout over beats 1-3, never reset: the window spans all three and the\n                         fitted clock fires once per beat (recording.continuous_window). Without it the\n                         movie is one rollout per beat, each from its own rest.")
+    ap.add_argument("--tag", default="", help="name the file progress_cells_<tag>.mp4 instead of by fit folder")
     ap.add_argument("--stride", type=int, default=5, help="arrows on every stride-th row and column of the node lattice")
     args = ap.parse_args()
     dev = args.device
@@ -63,10 +68,13 @@ def main():
     mode = str(z["clock_mode"]) if "clock_mode" in z.files else "sigmoid"
     P = M.Params(C, dev, clock_mode=mode, n_frames=int(z["psi"].shape[1]) if "psi" in z.files else (int(z["clock"].shape[0]) if mode == "free" else 0), n_modes=int(z["n_modes"]) if "n_modes" in z.files else 0)
     P.load({k: z[k] for k in z.files if k in P.leaves() or k == "clock"})
-    win = R.beat_window(rec, args.beat); T = len(win["frames"])
+    win = R.continuous_window(rec) if args.continuous else R.beat_window(rec, args.beat)
+    T = len(win["frames"])
     A_ref, u_ref = R.window_affine(rec, win)
-    trunc = (win["onset"] - win["span"][0]) - R.PRE
-    P.shift = -float(trunc)
+    if win.get("segments"):
+        P.segments = win["segments"]          # the clock fires once per beat inside one rollout
+    else:
+        P.shift = -float((win["onset"] - win["span"][0]) - R.PRE)
     kw = dict(n_grid=args.n_grid, per_parent=args.per_parent, n_frames=T - 1, n_cells=C, anchor_k=args.anchor, drag_k=args.drag, anchor_percell=args.anchor_percell)
     with torch.no_grad():
         r0 = M.rollout(M.load_sim(M.build_spec(label_tif=LTIF, differentiable=False, name="mv_rest", **dict(kw, n_frames=0))),
@@ -109,10 +117,10 @@ def main():
     ax = ax.ravel()
     imA = ax[0].imshow(cell_map(sr[0]), cmap="Greens", vmin=0, vmax=vmax, origin="lower", interpolation="nearest")
     imB = ax[1].imshow(cell_map(sm[0]), cmap="Greens", vmin=0, vmax=vmax, origin="lower", interpolation="nearest")
-    for a, s, name in ((ax[0], "A", "recording"), (ax[1], "B", "model, fitted on beat 3")):
+    for a, s, name in ((ax[0], "a", "recording"), (ax[1], "b", "model, fitted on beat 3")):
         a.set_xticks([]); a.set_yticks([])
         a.set_xlabel(f"{name}: shortening strain per cell")
-        a.text(-0.02, 1.01, s, transform=a.transAxes, fontsize=13, fontweight="bold", va="bottom", ha="right")
+        a.text(-0.02, 1.01, s, transform=a.transAxes, fontsize=13, va="bottom", ha="right")
     cb = fig.colorbar(imB, ax=ax[1], fraction=0.04, pad=0.02); cb.set_label("shortening strain (dimensionless)")
     a = ax[2]
     qr = a.quiver(ref_nodes[sel, 0], ref_nodes[sel, 1], disp_rec[0, sel, 0], disp_rec[0, sel, 1], color=GREEN,
@@ -123,17 +131,18 @@ def main():
     a.set_xticks([]); a.set_yticks([])
     a.set_xlabel(f"displacement from rest of one tracking node in {args.stride} per axis, sheet mean removed, "
                  f"drawn x{args.amplify:g}\n(green = recording, white = model; the outer band is prescribed from the recording)")
-    a.text(-0.02, 1.01, "C", transform=a.transAxes, fontsize=13, fontweight="bold", va="bottom", ha="right")
+    a.text(-0.02, 1.01, "c", transform=a.transAxes, fontsize=13, va="bottom", ha="right")
     a = ax[3]
     a.plot(t_s, sr.mean(1), color=GREEN, lw=2, label="recording")
     a.plot(t_s, sm.mean(1), color=WHITE, lw=2, label="model")
     a.fill_between(t_s, np.percentile(sr, 25, 1), np.percentile(sr, 75, 1), color=GREEN, alpha=0.18, lw=0)
     marker = a.axvline(0, color=GREY, lw=1)
-    a.set_xlabel(f"time in the window (s); beat {args.beat}, frames {win['span'][0]}-{win['span'][1]}"
-                 f"{' -- held out' if args.beat != 3 else ' -- the fit beat'}")
+    a.set_xlabel(f"time (s); frames {win['span'][0]}-{win['span'][1]}"
+                 + (", beats 1-3 in one rollout" if args.continuous else
+                    f", beat {args.beat}{' held out' if args.beat != 3 else ' fitted'}"))
     a.set_ylabel("shortening strain, mean over 472 cells\n(band = recording's 25-75% across cells)")
     a.legend(loc="upper right", fontsize=9)
-    a.text(-0.02, 1.01, "D", transform=a.transAxes, fontsize=13, fontweight="bold", va="bottom", ha="right")
+    a.text(-0.02, 1.01, "d", transform=a.transAxes, fontsize=13, va="bottom", ha="right")
     a.text(0.99, 0.02, f"per-cell strain maps, whole window, {int(inter.sum())} interior cells: R$^2$ = {r2A:.2f}", transform=a.transAxes,
            ha="right", va="bottom", fontsize=9)
     frame_txt = fig.text(0.5, 0.965, "", ha="center", fontsize=11)
@@ -142,11 +151,12 @@ def main():
     import imageio_ffmpeg
     od = os.path.join(HERE, "out", "movies"); os.makedirs(od, exist_ok=True)
     tag = os.path.basename(os.path.dirname(args.params))
-    path = os.path.join(od, f"{tag}_beat{args.beat}.mp4")
+    path = (os.path.join(od, f"progress_cells_{args.tag}.mp4") if args.tag
+            else os.path.join(od, f"{tag}_beat{args.beat}.mp4"))
     fig.canvas.draw()
     w, h = fig.canvas.get_width_height()
     w, h = w - w % 2, h - h % 2
-    writer = imageio_ffmpeg.write_frames(path, (w, h), fps=args.fps, quality=7)
+    writer = imageio_ffmpeg.write_frames(path, (w, h), fps=(max(1, round(T / args.seconds)) if args.seconds > 0 else args.fps), quality=7)
     writer.send(None)
     for t in range(T):
         imA.set_data(cell_map(sr[t])); imB.set_data(cell_map(sm[t]))

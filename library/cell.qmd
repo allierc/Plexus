@@ -6,7 +6,7 @@ subtitle: "A set of particles/molecules; its position is an aggregate of its chi
 ::: {.op-head}
 ![](../figures/icons/set.png){.op-logo}
 
-[`set`]{.op-badge} [`depth: 1`]{.op-badge}
+[`set`]{.op-badge} [`depth: 0`]{.op-badge}
 
 A set of particles/molecules; its position is an aggregate of its children.
 :::
@@ -33,7 +33,7 @@ A set of particles/molecules; its position is an aggregate of its children.
 
 ## Role in Plexus
 
-- **Depth** &mdash; `1` (0 = leaf, higher = container).
+- **Depth** &mdash; `0` (0 = leaf, higher = container).
 - **Is** &mdash; a set of nodes with the state schema below; operators act *within* it (`lateral`), *across* its containment (`aggregate` / `broadcast`), or *onto fields* (`exchange`).
 
 ## Source
@@ -41,6 +41,17 @@ A set of particles/molecules; its position is an aggregate of its children.
 [`src/plexus/models/entities.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/models/entities.py)
 
 ```python
+@register_entity(
+    # A PROTEIN CLUSTER IS A POINT, NOT MATTER: position and velocity, contained in a cell, no
+    # deformation gradient and no grid (see operators/protein_ops.py). `integrin` and `myosin`
+    # are the same layout under the names the specs use.
+    "protein_cluster", "integrin", "myosin", depth=0,
+    state_schema=spatial_schema,
+    reserve_factor=3,                        # dormant slots per seeded one, unless the spec says `grow_reserve`
+    render={"color_by": "node_type", "arrows": None},
+)
+
+
 @register_entity(
     "cell", depth=1,
     state_schema=spatial_schema,                 # dim -> StateSchema

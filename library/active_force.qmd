@@ -71,6 +71,14 @@ Reference: Marchetti, M. C. et al. (2013). Hydrodynamics of soft active matter. 
 | `channel` | &ndash; | 0 |
 | `along` | &ndash; | "inward" |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `directional` | `directional` MODEL of active_force -- the contraction follows a PRESCRIBED DIRECTION FIELD. | &ndash; |
+
 ## Minimal spec
 
 ```yaml

@@ -85,6 +85,15 @@ $\mathbf F$ and hardens via the plastic ratio $J_p$. Step 1 of the MLS-MPM decom
 | `dt_sub` | MLS-MPM substep dt | 2e-4 |
 | `liquid_volume` | &ndash; | "det" |
 
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `differentiable` | The material update with F rebound rather than written in place. | &ndash; |
+| `warp` | The deformation-gradient update and material response as one Warp kernel, elastic and liquid branches both. | &ndash; |
+
 ## Minimal spec
 
 ```yaml

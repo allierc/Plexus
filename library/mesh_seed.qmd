@@ -81,6 +81,14 @@ Reference: Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12(4):627-644.
 | `vseed_cv` | &ndash; | 0.0 |
 | `age_seed` | &ndash; | 0.0 |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `apicobasal` | `apicobasal` IMPLEMENTATION of seed_mesh -- the same epithelium, seeded WITH ITS THICKNESS. | `h0` (0.4), `sep_block` ("sep"), `apical` ("out"), `v0_from` ("wedge"), `ref_frame` (0) |
+
 ## Minimal spec
 
 ```yaml
@@ -94,7 +102,7 @@ operators:
 
 ## Related operators
 
-Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`seed_positions`](seed_positions.qmd).
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`seed_cycle`](seed_cycle.qmd).
 
 ## Source
 
@@ -253,7 +261,8 @@ class SeedMesh3D(Structural):
             occ = torch.zeros(Nbuf, device=dev); occ[:Nv] = 1.0; lvl.occ = occ
         est = torch.as_tensor(es, device=dev); ett = torch.as_tensor(et, device=dev)
         eft = torch.as_tensor(ef, device=dev)
-        area, perim, centroid, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
+        area, perim, centroid, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF,
+                                                     apex=torch.as_tensor(self.centre, device=dev, dtype=pos.dtype))
         A_seed = float(area.mean())
         A0 = A_seed * self.a0_scale; P0 = self.p0 * (A0 ** 0.5)
         if self.a0_scale != 1.0:
@@ -308,6 +317,7 @@ class SeedMesh3D(Structural):
                 print(f"[mesh_seed] type_layout={self.type_layout}: {nF} cells cut at the "
                       f"{'xyz'[_ax]} equator -> {_tally}", flush=True)
         seeded = dict(E_srce=est, E_trgt=ett, E_face=eft, nF=nF, Nv=Nv,
+                         centre=tuple(float(v) for v in self.centre),   # the wedge apex, see face_geometry_3d
                          A0=torch.full((nF,), A0, dtype=dt, device=dev),
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
@@ -351,5 +361,15 @@ class SeedMesh3D(Structural):
         _seed_cell_blocks(H, self.cell_set, nF, dt, dev,
                           Vbirth=vf.detach().cpu().numpy() * self.a0_scale ** 1.5,
                           divjit=np.asarray(dj, np.float64))
+        # IDENTITY (R4 of notes/size_cycle/SIZE_CYCLE_PLAN.md). `cell_id` is a number a cell keeps
+        # for its whole life and no other cell ever has; `parent_id` is its mother's, -1 for a
+        # seeded cell. Optional blocks: a spec that declares them gets lineage that survives every
+        # renumbering, and a report reads births and divisions off the ids instead of arguing
+        # from index stability. A spec that does not declare them is untouched.
+        if cell_block(H, self.cell_set, "cell_id", nF) is not None:
+            set_cell_block(H, self.cell_set, "cell_id", np.arange(nF, dtype=np.float64), nF)
+            m["next_id"] = int(nF)
+        if cell_block(H, self.cell_set, "parent_id", nF) is not None:
+            set_cell_block(H, self.cell_set, "parent_id", np.full(nF, -1.0), nF)
         return {}
 ```

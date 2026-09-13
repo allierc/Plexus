@@ -78,7 +78,7 @@ operators:
 
 ## Related operators
 
-Other **aggregate** operators: [`aggregate_centroid`](aggregate_centroid.qmd).
+Other **aggregate** operators: [`aggregate_centroid`](aggregate_centroid.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
 
 ## Source
 

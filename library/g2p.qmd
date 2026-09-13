@@ -92,6 +92,14 @@ applies wall restitution and the CFL cap, then advects. Step 4 of the MLS-MPM de
 | `from` | &ndash; | "mpm_grid" |
 | `wall_contact_cells` | &ndash; | 3.84 |
 
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `differentiable` | G2P writing a fresh state table instead of advecting in place. | &ndash; |
+
 ## Minimal spec
 
 ```yaml

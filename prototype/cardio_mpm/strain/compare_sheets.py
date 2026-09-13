@@ -87,28 +87,28 @@ def main():
     withE = H["E_free"] and D["E_free"]
     npan = 4 + int(withE) + int(np.std(H["g2"]) > 1e-6)
     fig, ax = plt.subplots(1, npan, figsize=(4.4 * npan + 1, 4.4), gridspec_kw=dict(wspace=0.32))
-    keys = [("peak_cell", "recorded peak shortening per cell (strain)"), ("g", "fitted g per cell (strain at full activation)"),
-            ("delay_s", "fitted clock delay per cell (s)")]
+    keys = [("peak_cell", "peak shortening (strain)"), ("g", "fitted g (strain)"),
+            ("delay_s", "clock delay (s)")]
     if withE:
-        keys.append(("logE", f"fitted log E per cell (80 = init; shrink lambda {H['E_shrink']:g})"))
+        keys.append(("logE", f"fitted log E"))
     if np.std(H["g2"]) > 1e-6:
-        keys.append(("g2", "fitted g2 per cell (strain across the fibre; < 0 = thickening)"))
+        keys.append(("g2", "fitted g2 (strain)"))
     for a, (key, xl) in zip(ax[:len(keys)], keys):
         lo = min(H[key].min(), D[key].min()); hi = max(np.percentile(H[key], 99), np.percentile(D[key], 99))
         bins = np.linspace(lo, hi, 36)
         a.hist(H[key], bins, histtype="step", lw=2, color=BLUE, density=True, label=f"healthy ({H['n_cells']} cells)")
         a.hist(D[key], bins, histtype="step", lw=2, color=RED, density=True, label=f"HCM ({D['n_cells']} cells)")
-        a.set_xlabel(xl); a.set_ylabel("density over interior cells")
+        a.set_xlabel(xl); a.set_ylabel("density")
     ax[0].legend(loc="upper right", fontsize=9)
     a = ax[-1]
     a.plot(H["t_s"], H["gamma"], color=BLUE, lw=2, label="healthy clock")
     a.plot(D["t_s"], D["gamma"], color=RED, lw=2, label="HCM clock")
     a.plot(H["t_s"], H["mean_curve"] / H["mean_curve"].max(), color=BLUE, lw=1, ls="--", label="healthy recorded (normalised)")
     a.plot(D["t_s"], D["mean_curve"] / D["mean_curve"].max(), color=RED, lw=1, ls="--", label="HCM recorded (normalised)")
-    a.set_xlabel("time in the beat window (s)"); a.set_ylabel("fitted clock gamma(t), 0-1\n(dashed: recorded mean shortening, normalised)")
+    a.set_xlabel("time (s)"); a.set_ylabel("clock gamma(t)")
     a.legend(loc="upper right", fontsize=8)
-    for a, s in zip(ax, "ABCDEF"):
-        a.text(-0.02, 1.01, s, transform=a.transAxes, fontsize=13, fontweight="bold", va="bottom", ha="right")
+    for a, s in zip(ax, "abcdef"):
+        a.text(-0.02, 1.01, s, transform=a.transAxes, fontsize=13, va="bottom", ha="right")
     os.makedirs(os.path.join(HERE, "out", "figures"), exist_ok=True)
     name = "fig5_healthy_vs_hcm" + ("_withE" if withE else "") + ("_g2" if np.std(H["g2"]) > 1e-6 else "")
     fig.savefig(os.path.join(HERE, "out", "figures", f"{name}.png"), dpi=130, bbox_inches="tight")

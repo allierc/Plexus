@@ -221,6 +221,7 @@ class MPMParticle:
         # and m_p fixes the volume; declaring N and a block fixes the mass. Both together is one
         # statement too many, which is what `_volume_conflict` below is for.
         _pm = s.get("particle_mass")
+        _mesh_cache: dict = {}                             # `shape: obj`: one load per file per build
         if _pm is not None and float(_pm) <= 0:
             raise ValueError(f"particle_mass must be > 0, got {_pm}")
         if _pm is not None:
@@ -255,8 +256,24 @@ class MPMParticle:
                     _side = _vol ** (1.0 / D)
                     _u = torch.rand(nb, D, generator=H.rng, device=device) - 0.5
                     pos[bm] = cpos[bm] + _u * _side           # a cube of the derived size
+                elif _shape in ("obj", "mesh"):
+                    # `shape: obj` -- THE VOLUME TAKES THE SHAPE OF A MESH FILE. Same contract as
+                    # ball and cube: `V = per_parent * p_vol` is fixed by the mass, and the mesh is
+                    # scaled so that ITS volume equals V, so a bunny and a cow of the same
+                    # `particle_mass` weigh the same and displace the same, whatever their extent.
+                    # Scaling to a longest axis instead -- what `morph.sample_inside` does for the
+                    # morphing script -- would make the density a function of the file's aspect
+                    # ratio, which is not a property of any material.
+                    #
+                    # `obj:` is a bare name under papers/morph_models, or a path. The mesh is loaded
+                    # once per spec however many bodies wear it, and the points are drawn with a
+                    # numpy generator seeded from `H.rng`, so the run stays reproducible under the
+                    # same seed it always had.
+                    _pts, _side = _obj_points(t, nb, _vol, D, H, device, _mesh_cache,
+                                              par=pidx[bm])
+                    pos[bm] = cpos[bm] + _pts
                 else:
-                    raise ValueError(f"shape must be 'cube' or 'ball', got {_shape!r}")
+                    raise ValueError(f"shape must be 'cube', 'ball' or 'obj', got {_shape!r}")
             if _side is not None:
                 print(f"[build] {lvl.name}: particle_mass {float(_pm):.4g} / density -> p_vol "
                       f"{float(_pm) / float(rho if not torch.is_tensor(rho) else 1.0):.4g}, "
@@ -275,6 +292,18 @@ class MPMParticle:
                 continue
             v = [float(x) for x in blk]
             lo = torch.tensor(v[:D], device=device); hi = torch.tensor(v[D:2 * D], device=device)
+            if str(t.get("fill", "random")).lower() == "lattice":
+                # `fill: lattice` -- THE POINTS ON A REGULAR GRID inside the box (the cube root of
+                # the count per axis, a small jitter so no two lie on one grid line of the MPM
+                # grid), which reads as a solid body where a uniform draw reads as a cloud.
+                k = max(1, int(round(nb ** (1.0 / D))))
+                ax = [(torch.arange(k, device=device, dtype=torch.float32) + 0.5) / k for _ in range(D)]
+                g = torch.stack(torch.meshgrid(*ax, indexing="ij"), -1).reshape(-1, D)
+                if g.shape[0] < nb:                      # the count is not a perfect power: pad at random
+                    g = torch.cat([g, torch.rand(nb - g.shape[0], D, generator=H.rng, device=device)], 0)
+                g = g[:nb] + (torch.rand(nb, D, generator=H.rng, device=device) - 0.5) * (0.2 / k)
+                pos[bm] = lo + g.clamp(0.0, 1.0) * (hi - lo)
+                continue
             u = torch.rand(nb, D, generator=H.rng, device=device)
             pos[bm] = lo + u * (hi - lo)
         lvl.state[:, px0:px1] = pos                              # commit block positions

@@ -95,6 +95,24 @@ extrusion from an epithelium, Rosenblatt, J., Raff, M. C. & Cramer, L. P. (2001)
 | `after_frame` | &ndash; | 0 |
 | `seed` | &ndash; | 0 |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `chem_low` | `chem_low` model of cell_die: below an absolute activator threshold, so cells die BETWEEN the spots of a pattern. | &ndash; |
+| `competition` | `competition` model of cell_die: a cell growing more slowly than its neighbours is out-proliferated and removed -- the Myc-style loser of cell competition. | &ndash; |
+| `crowded` | `crowded` model of cell_die: a cell with more neighbours than a trivalent sheet should give it -- density-driven extrusion. | &ndash; |
+| `dimmer` | `dimmer` model of cell_die: a cell carrying less activator than its neighbours -- the LOCAL form of `chem_low`, which compares against the whole tissue instead. | &ndash; |
+| `field` | `field` model of cell_die: death keyed to a per-cell quantity SOME OTHER operator published, so a new measurement needs no new branch here. | &ndash; |
+| `lonely` | `lonely` model of cell_die: a cell with fewer neighbours than a sheet should give it, so the tissue closes over a gap. | &ndash; |
+| `older` | `older` model of cell_die: a cell that has gone longer without dividing than its neighbours -- one that has stopped cycling while the tissue around it has not. | &ndash; |
+| `prescribed` | `prescribed` model of cell_die: the EXPERIMENTER ablates a patch, and the tissue did not choose it. | &ndash; |
+| `small` | `small` model of cell_die: below an ABSOLUTE volume threshold, not a relative one -- the one selection that is genuinely about the cell's own state and not about where it sits. | &ndash; |
+| `smaller` | `smaller` model of cell_die: a cell smaller than its neighbours is squeezed out by a tissue that can no longer accommodate it. | &ndash; |
+| `stalled` | `stalled` model of cell_die: below an absolute GROWTH-RATE threshold -- a cell that has stopped growing, judged against a number rather than against its neighbours. | &ndash; |
+
 ## Minimal spec
 
 ```yaml
@@ -321,15 +339,21 @@ class Apoptosis3D(Structural):
 
     def _q(self, m, H, nF, what):
         """The per-cell quantity a local mode compares."""
-        if what == "growth":                                  # fractional growth SINCE BIRTH
-            v = m.get("V0f"); vb = cell_block(H, self.cat, "Vbirth", nF)
-            if v is None or vb is None:
+        # A CELL IS SMALL BECAUSE IT IS SMALL, NOT BECAUSE IT ASKS TO BE (R4 of
+        # notes/size_cycle/SIZE_CYCLE_PLAN.md). `volume` and `growth` read the TARGET `V0f` until
+        # now, and since R1 every daughter's target is the mother's half exactly, so `small` and
+        # `smaller` could not see the asymmetry the septum actually produces (birth volumes CV
+        # 0.27) and `competition` compared a target with a measured `Vbirth`. All three read the
+        # measured volume through `cell_size` now -- one reader, the one the rules use.
+        if what in ("growth", "volume"):
+            lvl = H.level(self.at)
+            v_now, _ = cell_size(lvl, m, nF)
+            if what == "volume":
+                return np.asarray(v_now, np.float64)
+            vb = cell_block(H, self.cat, "Vbirth", nF)
+            if vb is None:
                 return None
-            return np.maximum(v.detach().cpu().numpy()[:nF]
-                              / np.maximum(vb, 1e-12) - 1.0, 0.0)
-        if what == "volume":
-            v = m.get("V0f")
-            return None if v is None else v.detach().cpu().numpy()[:nF]
+            return np.maximum(np.asarray(v_now, np.float64) / np.maximum(vb, 1e-12) - 1.0, 0.0)
         if what == "age":
             a = m.get("age")
             return None if a is None else a.detach().cpu().numpy()[:nF]
@@ -455,11 +479,10 @@ class Apoptosis3D(Structural):
             # v_ref -- the seed-time median -- is squeezed out, which is what an epithelium does
             # with a cell it can no longer accommodate. It re-evaluates for the same reason
             # `chem_low` does: a cell arrives in this set by shrinking, not by being pushed.
-            v = m.get("V0f")
-            if v is None:
+            vv = self._q(m, H, nF, "volume")                           # measured, see `_q`
+            if vv is None:
                 return set()
-            vv = v.detach().cpu().numpy()[:nF]
-            v_ref = float(m.get("v_ref_poly", m.get("v_ref", 1.0)))   # see `cell_size`
+            v_ref = size_ref(m)                                        # the same convention: see `cell_size`
             return set(np.where(vv < self.small_frac * v_ref)[0].tolist())
         if self.mode == "stalled":
             # CELL COMPETITION: a cell that is not growing while its neighbours are gets removed.
@@ -668,8 +691,21 @@ class Apoptosis3D(Structural):
         # `critical_frac * v_ref` IN THE CONVENTION `V0f` IS ACTUALLY IN -- see `cell_size`. It was
         # the wedge reference on every run, so an apicobasal cell was extruded at a fraction of a
         # volume it does not have.
-        _vn, v_ref = cell_size(lvl, m, nF, pos_t)
+        # THE CRITERION IS ON A TARGET, SO ITS REFERENCE IS THE TARGET'S. `size_tgt` below is `V0f`
+        # (or `A0` on a sheet), a quantity in the SEED's convention -- wedge on every apico-basal
+        # spec in the tree -- and `crit` is a fraction of it. `cell_size` reads the polyhedron for
+        # a set with a separation (R2b), which is right for what a cell HAS and wrong for what it
+        # ASKS: against the polyhedron median apop2_ks0p1 shed 325 cells by frame 37 where the
+        # working point sheds none. The reference here is the seed-time median in the target's
+        # own units, which is what it was before R2b.
+        _vn, _ = cell_size(lvl, m, nF, pos_t)
+        _by_area = m.get("size_convention") == "area"
+        v_ref = float(m.get("a_ref", 0.0)) if _by_area else float(m.get("v_ref", 1.0))
         crit = self.crit * v_ref
+        # THE TARGET THAT IS SHRUNK, IN THE SAME CONVENTION AS `crit`: the volume target on a
+        # shell, the area target on a flat sheet (where V0f is identically zero -- see
+        # `cell_size`). Read AFTER the shrink below, through `size_tgt()`.
+        _by_area = m.get("size_convention") == "area"
         # 1. SHRINK. cell_mechanics contracts the cell toward the smaller target; T1 then finds its
         #    edges short and sheds neighbours. Nothing is removed here.
         for f in marked:
@@ -678,6 +714,7 @@ class Apoptosis3D(Structural):
                 A0[f] = max(A0[f] * (1.0 - self.shrink) ** (2.0 / 3.0), 1e-9)
         m["V0f"] = torch.as_tensor(V0f, dtype=dt, device=dev)
         m["A0"] = torch.as_tensor(A0, dtype=dt, device=dev)
+        size_tgt = A0 if _by_area else V0f
         # THE SHRINK HAS TO SURVIVE `cell_grow`, AND WRITING `V0f` ALONE DOES NOT. `cell_grow`
         # recomputes the target wholesale every frame -- `m["V0f"] = m["V0f_init"] * s**3` -- from
         # the cell's own growth scale, so a shrink written only to `V0f` is DISCARDED on the next
@@ -732,14 +769,14 @@ class Apoptosis3D(Structural):
         for f in sorted(marked, reverse=True):
             if f >= nF or rings[f] is None or len(rings[f]) != 3:
                 continue
-            if V0f[f] > crit:
+            if size_tgt[f] > crit:
                 continue
             nbrs = [int(g) for g in self._ring_neighbours(rings, f) if g < nF]
             if face_collapse_3d(rings, pos_t, f, births=births):
                 gone += 1
                 if _has_chem and nbrs:
                     h0, h1 = clvl_c.state_schema["chem"]
-                    amt = clvl_c.state[f, h0:h1].detach().clone() * float(V0f[f])
+                    amt = clvl_c.state[f, h0:h1].detach().clone() * float(size_tgt[f])
                     _bequest.append((nbrs, amt))
         if gone == 0:
             return {}
@@ -753,7 +790,7 @@ class Apoptosis3D(Structural):
                 # concentration many orders of magnitude too large in one step, and a few of those
                 # compound. Without this guard the conservation rule above becomes an AMPLIFIER,
                 # by dividing by a number the model allows to reach zero.
-                live = [g for g in nbrs if float(V0f[g]) >= crit]
+                live = [g for g in nbrs if float(size_tgt[g]) >= crit]
                 if not live:
                     # every neighbour is on its way out too: the material leaves with the cell,
                     # which is what happened before conservation existed and is the honest
@@ -790,7 +827,7 @@ class Apoptosis3D(Structural):
                 # maximum. Each column is bounded by its own.
                 ceil = torch.nan_to_num(cs[:nF, h0:h1], nan=0.0).amax(dim=0) if nF else None
                 for g in live:
-                    inc = share / float(V0f[g])
+                    inc = share / float(size_tgt[g])       # the recipient's size, in the run's convention
                     if ceil is None:
                         cs[g, h0:h1] += inc
                         continue

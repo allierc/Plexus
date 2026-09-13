@@ -9,16 +9,16 @@ Prose and reasons are in `AB_TISSUE_README.md`.
 |---|---|---|---|---|---|---|
 | `mech_hexprism` | 8 | 1 | hexagon | -- | -- |  |
 | `mech_reduction_apicobasal` | 20 | 60 | disc | apicobasal | frozen | cell_mechanics |
-| `mech_reduction_monolayer` | 20 | 60 | disc | monolayer | -- | cell_mechanics |
 | `mech_shell_free` | 80 | 1280 | sphere | apicobasal | free | cell_mechanics |
 | `mech_shell_frozen` | 20 | 320 | sphere | apicobasal | frozen | cell_mechanics |
-| `mech_span_carried` | 60 | 200 | sphere | default | -- | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `mech_target_percell` | 400 | 200 | sphere | apicobasal | free | cell_mechanics |
+| `mech_uniform_target` | 400 | 200 | sphere | apicobasal | free | cell_mechanics |
 
 ## `divide_*` -- what makes a cell divide, and what the tissue does when it does
 
 | spec | frames | cells | shape | mechanics | sep | operators |
 |---|---|---|---|---|---|---|
-| `divide_growing_ball` | 401 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
+| `divide_growing_ball` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
 | `divide_sparse` | 480 | 1280 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
 | `divide_uniform_volume` | 480 | 1280 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide |
 
@@ -26,7 +26,10 @@ Prose and reasons are in `AB_TISSUE_README.md`.
 
 | spec | frames | cells | shape | mechanics | sep | operators |
 |---|---|---|---|---|---|---|
-| `cycle_phases` | 401 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `cycle_dilution` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `cycle_hazard` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `cycle_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `cycle_timer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
 
 ## `shape_*` -- seed geometry: one hypothesis, several surfaces
 
@@ -40,17 +43,83 @@ Prose and reasons are in `AB_TISSUE_README.md`.
 
 | spec | frames | cells | shape | mechanics | sep | operators |
 |---|---|---|---|---|---|---|
-| `apop_half` | 600 | 400 | plane | default | -- | cell_die, cell_mechanics, edge_flip |
-| `apop_many` | 600 | 2000 | plane | default | -- | cell_mechanics, cell_die, edge_flip |
-| `apop_one` | 600 | 2000 | plane | default | -- | cell_mechanics, cell_die, edge_flip |
-| `apop_patch_big` | 600 | 2000 | plane | default | -- | cell_mechanics, cell_die, edge_flip |
-| `apop_rings` | 600 | 2000 | plane | default | -- | cell_mechanics, cell_die, edge_flip |
+| `apop2_ab_half` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ab_many` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ab_one` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ab_patch` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ab_rings9` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_abfix_half` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_abfix_many` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_abfix_one` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_abfix_patch` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_abfix_rings9` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_crit062` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_flip060` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks0p0` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks0p05` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks0p1` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks0p2` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks0p4` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks2_0p02` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks2_0p035` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks2_0p05` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks2_0p08` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_ks2_0p1` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_sheet_half` | 600 | 2000 | sphere | default | -- | cell_mechanics, cell_die, edge_flip |
+| `apop2_sheet_many` | 600 | 2000 | sphere | default | -- | cell_mechanics, cell_die, edge_flip |
+| `apop2_sheet_one` | 600 | 2000 | sphere | default | -- | cell_mechanics, cell_die, edge_flip |
+| `apop2_sheet_patch` | 600 | 2000 | sphere | default | -- | cell_mechanics, cell_die, edge_flip |
+| `apop2_sheet_rings9` | 600 | 2000 | sphere | default | -- | cell_mechanics, cell_die, edge_flip |
+| `apop2_sr_0p1` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_sr_0p2` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
+| `apop2_sr_0p4` | 600 | 2000 | sphere | apicobasal | free | cell_mechanics, cell_die, edge_flip |
 
 ## pre-existing okuda runs, left as they were found
 
 | spec | frames | cells | shape | mechanics | sep | operators |
 |---|---|---|---|---|---|---|
 | `b_star` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_grow, cell_mechanics, interface_tension, cell_divide, edge_flip |
+| `ms10_grow_channel` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms11_doubler_null` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms1_pinned_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms2_unpinned_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms3_prism_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms4_round_prism_shell` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms5_two_channel` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms6_apoptosis` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `ms6b_apoptosis_noT1` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, cell_divide, cell_die |
+| `ms7_cycle_adder` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms8_cycle_dilution` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `ms9_cycle_hazard` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
 | `r010_00_ctrl` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_shape_probe, cell_grow, cell_mechanics, interface_tension, edge_flip, cell_divide |
 | `r020_00_ctrl` | 1800 | 2000 | sphere | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_chem_from_shape, cell_shape_probe, cell_grow, cell_mechanics, interface_tension, edge_flip, cell_divide |
+| `rig_apop_competition_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_crowded_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_crowded_sizer_noT1` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, cell_divide, cell_die |
+| `rig_apop_crowded_timer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_small_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_small_sizer_noT1` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, cell_divide, cell_die |
+| `rig_apop_small_timer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `rig_apop_smaller_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, cell_die |
+| `sheet_die` | 400 | 400 | disc | default | -- | cell_mechanics, cell_die, edge_flip |
+| `sheet_divide` | 400 | 400 | disc | default | -- | cell_grow, cell_mechanics, cell_divide, edge_flip |
+| `sheet_moebius` | 200 | 400 | moebius | default | -- | cell_mechanics, edge_flip |
+| `sheet_morphogen` | 400 | 400 | disc | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_grow, cell_mechanics, edge_flip |
+| `sheet_morphogen_die` | 400 | 400 | disc | default | -- | cell_neighbours, cell_chem_diffuse, cell_chem_react, cell_grow, cell_die, cell_mechanics, edge_flip |
+| `size_adder` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `size_doubler` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `size_grow_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `size_sizer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `size_timer` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `size_two_channel` | 1601 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_cycle, cell_divide |
+| `spheroid_ecm` | 400 | 400 | sphere | -- | -- | surface_drive, mesh_contact, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather, ecm_stress, mesh_inside |
+| `spheroid_ecm_04` | 401 | 200 | sphere | default | -- | cell_grow, cell_mechanics, edge_flip, cell_divide, mesh_contact, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather, ecm_stress, mesh_inside |
+| `spheroid_ecm_ab` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, mesh_contact, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather, ecm_stress, mesh_inside |
+| `spheroid_integrins` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, radius_graph, attraction_repulsion, protein_project, protein_express |
+| `spheroid_integrins_10x` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, radius_graph, attraction_repulsion, protein_project, protein_express |
+| `spheroid_myosin` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, radius_graph, attraction_repulsion, protein_project, protein_express |
+| `spheroid_organelles_mito` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, organelle_project, organelle_express |
+| `spheroid_organelles_nucleus` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, organelle_project |
+| `spheroid_organelles_polar` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, organelle_project, organelle_express |
+| `spheroid_proteins` | 801 | 200 | sphere | apicobasal | free | cell_grow, cell_mechanics, edge_flip, cell_divide, radius_graph, attraction_repulsion, protein_project, protein_express |
 

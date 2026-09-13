@@ -1,0 +1,134 @@
+---
+title: "organelle_seed"
+subtitle: "Place every live piece in its species' region of its cell, once, spread apart."
+---
+
+::: {.op-head}
+![](../figures/icons/seed.png){.op-logo}
+
+[`seed`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Place every live piece in its species' region of its cell, once, spread apart.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash;  **seed**: .
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `tissue`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+_See source below._
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `tissue` | tissue_set | **required** |
+| `seed` | &ndash; | 0 |
+| `spread_tries` | &ndash; | 8 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: organelle_seed, at: particle, tissue: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`seed`]{.op-badge} [`organelle_placement`]{.op-badge}  
+
+## Related operators
+
+Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd), [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd).
+
+## Source
+
+[`src/plexus/operators/organelle_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/organelle_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("organelle_seed", family="seed", set="particle", kind="seed")
+class OrganelleSeed(Seed):
+    """Place every live piece in its species' region of its cell, once, spread apart."""
+    REQUIRES_PARAMS = ["tissue"]
+    PARAM_ROLES = {"tissue": "tissue_set"}
+    OPTIONAL_TYPE_PROPS = ["count", "radius", "region", "on_divide", "body"]
+    SUPPORTED_DIMS = (3,)
+    READS = ["pos"]
+    WRITES = ["pos"]
+    MECHANISM_TAGS = ["seed", "organelle_placement"]
+    REFERENCE = "Plexus (this work); counts per cell after the cell atlas."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "organelle")
+        self.tissue = str(params["tissue"])
+        self.seed = int(params.get("seed", 0))
+        self.tries = int(params.get("spread_tries", 8))
+        self.params = dict(params)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        fans = _fans(H, self.tissue)
+        if fans is None:
+            raise ValueError(f"organelle_seed: {self.tissue!r} carries no mesh at seed time; put seed_mesh before it")
+        if lvl.parent is None:
+            raise ValueError(f"organelle_seed: set {self.at!r} declares no parent; it needs `parent: cell`")
+        species = _species(lvl, self.params)
+        dev = lvl.state.device
+        gen = torch.Generator(device=dev).manual_seed(self.seed)
+        nF = fans["nF"]
+        p0, p1 = lvl.state_schema["pos"]
+        live_cells = torch.zeros(lvl.parent.max().item() + 1, dtype=torch.bool, device=dev)
+        live_cells[:nF] = True
+        # a piece whose cell has no face (a dormant cell slot) is dormant too
+        occ = (lvl.occ > 0) & live_cells[lvl.parent]
+        lvl.occ[:] = 0.0
+        lvl.occ[occ] = 1.0
+        lvl.state[~occ, p0:p1] = PARK
+        placed = (torch.zeros(0, 3, device=dev, dtype=lvl.state.dtype), torch.zeros(0, dtype=torch.long, device=dev),
+                  torch.zeros(0, device=dev, dtype=lvl.state.dtype))
+        for sp in sorted(species, key=lambda s: -s["radius"]):     # the big ones first, the small ones fit around them
+            idx = torch.nonzero(occ & (lvl.node_type == sp["id"])).flatten()
+            if idx.numel() == 0:
+                continue
+            faces = lvl.parent[idx]
+            x = _sample(fans, faces, sp["region"], sp["radius"], gen)
+            x = _spread(fans, faces, sp["region"], sp["radius"], x, placed, self.tries, gen)
+            lvl.state[idx, p0:p1] = x
+            _set_block(lvl, "vel", idx, 0.0)
+            placed = (torch.cat([placed[0], x], 0), torch.cat([placed[1], faces], 0),
+                      torch.cat([placed[2], torch.full((idx.numel(),), sp["radius"], device=dev, dtype=lvl.state.dtype)], 0))
+            half = fans["csep"].norm(dim=1)
+            tight = int((half[: nF] < sp["radius"]).sum().item())
+            print(f"[organelle_seed] {int(idx.numel())} {sp['name']} pieces in {nF} cells "
+                  f"({sp['count']} per cell, radius {sp['radius']:g}, region {sp['region']})"
+                  + (f"; {tight} cells thinner than the radius, piece on the mid-surface" if tight else ""), flush=True)
+        _write_count(H, lvl, self.tissue, species)
+        return {}
+```
