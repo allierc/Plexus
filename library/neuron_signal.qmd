@@ -61,6 +61,15 @@ W @ phi(u) with no per-type term inside phi.
 | `field` | external_modulation_block | None |
 | `block` | membrane_state_block | "voltage" |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `type_pairwise` | The receiver sets the gain, the sender adds a term linear in its own state: | &ndash; |
+| `type_pre` | The sender's type sets both the scale and the threshold: | &ndash; |
+
 ## Minimal spec
 
 ```yaml

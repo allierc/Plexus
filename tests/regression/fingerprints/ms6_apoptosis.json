@@ -1,0 +1,122 @@
+{
+ "archive": "/workspace/Plexus/graphs_data/tissue/ms6_apoptosis",
+ "archived_on": "2026-09-13 00:47",
+ "because": "R5b: the async spread became the seed_cycle operator and the daughter hold now keys on ndiv, not age (finding 24); re-registered from the re-rendered archive",
+ "checkpoints": {
+  "0": {
+   "area_mean": 1.5510858297348022,
+   "cells": 200,
+   "centroid": [
+    0.000894184981007129,
+    -0.0005861315876245499,
+    0.00011713336425600573
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1188,
+   "ndiv_sum": 0,
+   "r_med": 4.918473720550537,
+   "r_p10": 4.909534454345703,
+   "r_p90": 4.925388336181641,
+   "roughness": 0.0012883507879450917,
+   "vertices": 396,
+   "z_sd": 2.8397276401519775
+  },
+  "112": {
+   "area_mean": 1.350624918937683,
+   "cells": 201,
+   "centroid": [
+    -0.010943830013275146,
+    0.018185198307037354,
+    0.002933969721198082
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1194,
+   "ndiv_sum": 2,
+   "r_med": 4.642979621887207,
+   "r_p10": 4.520613193511963,
+   "r_p90": 4.876473903656006,
+   "roughness": 0.027225123718380928,
+   "vertices": 398,
+   "z_sd": 2.823392391204834
+  },
+  "150": {
+   "area_mean": 1.4127330780029297,
+   "cells": 205,
+   "centroid": [
+    -0.03274550288915634,
+    0.03532283753156662,
+    -0.03254581615328789
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1218,
+   "ndiv_sum": 10,
+   "r_med": 4.79804801940918,
+   "r_p10": 4.64064884185791,
+   "r_p90": 5.0619635581970215,
+   "roughness": 0.032215144485235214,
+   "vertices": 406,
+   "z_sd": 2.9345703125
+  },
+  "37": {
+   "area_mean": 1.2421231269836426,
+   "cells": 200,
+   "centroid": [
+    0.0008530213381163776,
+    -0.0006748654413968325,
+    0.0005942570860497653
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1188,
+   "ndiv_sum": 0,
+   "r_med": 4.457746505737305,
+   "r_p10": 4.391912460327148,
+   "r_p90": 4.574089527130127,
+   "roughness": 0.014626427553594112,
+   "vertices": 396,
+   "z_sd": 2.651974678039551
+  },
+  "75": {
+   "area_mean": 1.2919918298721313,
+   "cells": 201,
+   "centroid": [
+    -0.010946108028292656,
+    0.018187789246439934,
+    0.0029340905603021383
+   ],
+   "deaths_or_net_loss": 0,
+   "half_edges": 1194,
+   "ndiv_sum": 2,
+   "r_med": 4.548069953918457,
+   "r_p10": 4.445413112640381,
+   "r_p90": 4.739930629730225,
+   "roughness": 0.023100022226572037,
+   "vertices": 398,
+   "z_sd": 2.74074387550354
+  }
+ },
+ "cut": {
+  "checkpoints": [
+   0,
+   37,
+   75,
+   112,
+   150
+  ],
+  "engine_frames": 150,
+  "n_frames": 150,
+  "record_stride": 1
+ },
+ "device": "archive",
+ "family": "tissue",
+ "generated_at_commit": "cd3882fd",
+ "name": "ms6_apoptosis",
+ "spec_sha256": "5c0e30c333b7ccdb",
+ "timing": {
+  "device": "archive",
+  "frames": [
+   20,
+   150
+  ],
+  "ms_per_frame": 545.8030090332031
+ }
+}

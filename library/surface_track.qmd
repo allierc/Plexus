@@ -80,7 +80,7 @@ operators:
 
 ## Related operators
 
-Other **structural** operators: [`topo_record`](topo_record.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd), [`cell_exclude`](cell_exclude.qmd), [`bm_secrete`](bm_secrete.qmd), [`integrin_track`](integrin_track.qmd).
+Other **structural** operators: [`topo_record`](topo_record.qmd), [`protein_project`](protein_project.qmd), [`protein_express`](protein_express.qmd), [`organelle_project`](organelle_project.qmd), [`organelle_express`](organelle_express.qmd), [`junction_myosin`](junction_myosin.qmd).
 
 ## Source
 

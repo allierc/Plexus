@@ -1,0 +1,162 @@
+---
+title: "reaction_rate"
+subtitle: "The mass-action rate of every reaction, from its substrates' concentrations."
+---
+
+::: {.op-head}
+![](../figures/icons/aggregate.png){.op-logo}
+
+[`aggregate`]{.op-badge} [`acts on: reaction`]{.op-badge} [`prediction: none`]{.op-badge}
+
+The mass-action rate of every reaction, from its substrates' concentrations.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\textstyle\sum_\pi$ **aggregate**: children &rarr; parent, up the containment $\pi$.
+- **Acts on** &mdash; `reaction` (the set the operator acts on).
+- **Reads** &mdash; `edge_set`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+(metabolite, stoich) -> reaction: lifts `conc` onto the substrate edges along `pre`, sums
+|S_ij| log c_i onto the reaction along `post`, writes `v` in place (a readout, not integrated).
+
+    v_j = k_j  prod_{i : S_ij < 0}  c_i ^ |S_ij|        computed as  exp( log k_j + SUM |S_ij| log c_i )
+
+k_j comes from the reaction's own `k` block when the set declares one (a per-reaction rate
+constant, the inverse model's target), else from the operator's `k`. `c_floor` is the
+concentration below which log c is held, so a species driven to zero stops a reaction rather
+than producing -inf. `rate_noise` fluctuates each k_j by that relative sd per tick
+(enzyme-activity noise; S still conserves mass every step).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `edge_set` | stoichiometry_as_edge_set | **required** |
+| `k` | rate_constant_default | 1.0 |
+| `c_floor` | concentration_floor_in_log | 1e-8 |
+| `rate_noise` | relative_rate_noise_sd | 0.0 |
+| `flux_limit_dt` | step_for_the_flux_limiter | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: reaction_rate, at: reaction, edge_set: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`mass_action`]{.op-badge} [`metabolism`]{.op-badge} [`kinetics`]{.op-badge}  
+
+## Related operators
+
+Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`metabolite_flux`](metabolite_flux.qmd).
+
+## Source
+
+[`src/plexus/operators/metabolism.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/metabolism.py) &mdash; the registered operator.
+
+```python
+@register_operator("reaction_rate", family="metabolism", set="reaction", kind="aggregate")
+class ReactionRate(Aggregate):
+    """The mass-action rate of every reaction, from its substrates' concentrations.
+
+    (metabolite, stoich) -> reaction: lifts `conc` onto the substrate edges along `pre`, sums
+    |S_ij| log c_i onto the reaction along `post`, writes `v` in place (a readout, not integrated).
+
+        v_j = k_j  prod_{i : S_ij < 0}  c_i ^ |S_ij|        computed as  exp( log k_j + SUM |S_ij| log c_i )
+
+    k_j comes from the reaction's own `k` block when the set declares one (a per-reaction rate
+    constant, the inverse model's target), else from the operator's `k`. `c_floor` is the
+    concentration below which log c is held, so a species driven to zero stops a reaction rather
+    than producing -inf. `rate_noise` fluctuates each k_j by that relative sd per tick
+    (enzyme-activity noise; S still conserves mass every step).
+    """
+
+    EMIT = None
+    INPUTS = ["metabolite", "stoich"]
+    OUTPUTS = ["reaction"]
+    READS = ["conc", "w", "k"]
+    WRITES = ["v"]
+    MAPS = ["pre", "post"]
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    MAY_MUTATE_INTEGRATED_STATE = True   # `v` is a derived readout written in place, as `omega` is
+    REQUIRES_PARAMS = ["edge_set"]
+    MECHANISM_TAGS = ["mass_action", "metabolism", "kinetics"]
+    PARAM_ROLES = {"edge_set": "stoichiometry_as_edge_set", "k": "rate_constant_default",
+                   "c_floor": "concentration_floor_in_log", "rate_noise": "relative_rate_noise_sd",
+                   "flux_limit_dt": "step_for_the_flux_limiter"}
+    REFERENCE = "MetabolismGraph generators/PDE_M1.py::forward (use_mass_action)"
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "reaction")
+        self.edge_set = params["edge_set"]
+        self.k = float(params.get("k", 1.0))
+        self.c_floor = float(params.get("c_floor", 1e-8))
+        self.rate_noise = float(params.get("rate_noise", 0.0))
+        # THE REFERENCE'S FLUX LIMITER, opt-in by naming the step. Explicit Euler over-consumes a
+        # substrate whose reactions would take more than it holds in one step and drives it
+        # negative; scaling every reaction so that no substrate is consumed past its concentration
+        # in `flux_limit_dt` keeps c >= 0 at that step. The operator does not know the engine's
+        # dt, so the spec states it (the form writes general.dt here).
+        self.flux_limit_dt = float(params.get("flux_limit_dt", 0.0))
+
+    def forward(self, H, mask=None):
+        rxn = H.level(self.at)
+        es = H.level(self.edge_set)
+        c_e = H.gather(self.edge_set, "pre", "conc")                # [E, 1] the metabolite's conc on its edge
+        s_e = es.get("w")                                           # [E, 1] signed S_ij
+        sub = (s_e < 0).to(c_e.dtype)                               # substrates only
+        log_term = sub * s_e.abs() * torch.log(c_e.clamp(min=self.c_floor))
+        log_prod = H.scatter_along(self.edge_set, "post", log_term)  # [R, 1] SUM |S| log c per reaction
+        k = rxn.get("k") if "k" in rxn.state_schema else torch.full_like(log_prod, self.k)
+        if self.rate_noise > 0:
+            k = k * (1.0 + self.rate_noise * torch.randn_like(k)).clamp(min=0.0)
+        v = k * torch.exp(log_prod) * rxn.occ[:, None]
+        if self.flux_limit_dt > 0:
+            v_e = v[es.post]                                        # [E, 1] each edge's reaction rate
+            consumed = sub * s_e.abs() * v_e * self.flux_limit_dt   # per edge, what the step takes
+            total = H.scatter_along(self.edge_set, "pre", consumed)  # [M, 1] per metabolite
+            c_m = H.level(es.pre_name).get("conc")
+            scale_m = torch.where(total > 1e-12, (c_m / total.clamp(min=1e-12)).clamp(max=1.0),
+                                  torch.ones_like(total))
+            edge_scale = scale_m[es.pre] * sub + (1.0 - sub)         # products do not limit
+            rxn_scale = torch.ones_like(v).scatter_reduce(0, es.post[:, None], edge_scale, reduce="amin",
+                                                          include_self=True)
+            v = v * rxn_scale
+        if mask is not None:
+            v = torch.where(mask[:, None], v, rxn.get("v"))
+        st = rxn.state.clone()                                      # clone-and-reassign: autograd-safe
+        a, b = rxn.state_schema["v"]
+        st[:, a:b] = v
+        rxn.state = st
+        return {}
+```

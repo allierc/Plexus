@@ -76,8 +76,13 @@ def main():
     ap.add_argument("--band", type=float, default=0.03)
     ap.add_argument("--nu", type=float, default=0.3)
     ap.add_argument("--fit-beat", type=int, default=3)
+    ap.add_argument("--fit-beats", default="", help="comma list of the beats the fit actually used, so the "
+                    "table says which rows are in-sample; overrides --fit-beat")
     ap.add_argument("--beats", default="0,1,2,3")
     ap.add_argument("--no-realign", action="store_true")
+    ap.add_argument("--fine-shift", type=float, default=0.0,
+                    help="step of the per-beat onset re-alignment in frames (0 = whole frames within +-3); "
+                         "e.g. 0.25 searches +-3 frames in quarter-frame steps")
     ap.add_argument("--specimen", default="healthy", choices=["healthy", "hcm"])
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
@@ -95,6 +100,7 @@ def main():
     fit_win = R.beat_window(rec, args.fit_beat)
     A_fit, u_fit = R.window_affine(rec, fit_win)
 
+    fitted = [int(b) for b in args.fit_beats.split(",")] if args.fit_beats else [args.fit_beat]
     results = {}
     for k in [int(b) for b in args.beats.split(",")]:
         win = R.beat_window(rec, k)
@@ -115,8 +121,12 @@ def main():
         # at frame 0, 2 frames before its onset): that known truncation shifts the clock and the
         # replay alike; the +-3 search around it is the only per-beat freedom
         trunc = (win["onset"] - win["span"][0]) - R.PRE                 # <= 0
-        shifts = [float(trunc)] if (args.no_realign or k == args.fit_beat) else \
-            [trunc + d for d in (-3, -2, -1, 0, 1, 2, 3)]
+        if args.no_realign or k == args.fit_beat:
+            shifts = [float(trunc)]
+        elif args.fine_shift > 0:
+            shifts = [trunc + d for d in np.arange(-3, 3 + 1e-9, args.fine_shift)]
+        else:
+            shifts = [trunc + d for d in (-3, -2, -1, 0, 1, 2, 3)]
         best = None
         for sh in shifts:
             with torch.no_grad():
@@ -131,11 +141,11 @@ def main():
         idx = torch.clamp(torch.arange(T, device=dev) + off, max=A_fit.shape[0] - 1)
         A_rep, u_rep = A_fit[idx], u_fit[idx]
         eye = torch.eye(2, device=dev)
-        results[k] = dict(window=win["span"], held_out=(k != args.fit_beat), t0_shift=best[0],
+        results[k] = dict(window=win["span"], held_out=(k not in fitted), t0_shift=best[0],
                           model=best[1], replay=score(A_rep, u_rep, A_ref, u_ref, interior),
                           nothing=score(eye.expand_as(A_ref).clone(), torch.zeros_like(u_ref), A_ref, u_ref, interior))
         m, rp = results[k]["model"], results[k]["replay"]
-        print(f"  beat {k} {'held-out' if k != args.fit_beat else 'FIT     '} window {win['span']}  "
+        print(f"  beat {k} {'held-out' if k not in fitted else 'FIT     '} window {win['span']}  "
               f"t0 shift {best[0]:+.0f}: model R2(A) {m['r2_A']:.3f} R2(u) {m['r2_u']:.3f} "
               f"short-corr {m['shortening_corr']:.3f} axis {m['axis_agreement']:.3f} | replay R2(A) "
               f"{rp['r2_A']:.3f} R2(u) {rp['r2_u']:.3f} short-corr {rp['shortening_corr']:.3f} axis "

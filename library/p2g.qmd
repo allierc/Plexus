@@ -101,6 +101,14 @@ weights $w_{ig}$. Step 2 of the MLS-MPM decomposition.
 | `polar` | &ndash; | "higham" |
 | `polar_iters` | &ndash; | 6 |
 
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `differentiable` | P2G with a grid that is REBUILT rather than zeroed and re-accumulated. | &ndash; |
+
 ## Minimal spec
 
 ```yaml

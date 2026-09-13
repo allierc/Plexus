@@ -71,6 +71,17 @@ patterns in a simple system. Science 261:189-192 (the (F, k) morphology map).
 | `kk` | kill_rate | **required** |
 | `rate` | reaction_time_scale | 1.0 |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `brusselator` | The Brusselator: the textbook activator-inhibitor system, and the one whose Turing condition is exactly solvable, so whether a pattern is possible can be checked before running. | `gamma` (**required**), `A` (**required**), `B` (**required**) |
+| `gierer_meinhardt` | Gierer-Meinhardt activator(a)-inhibitor(h) -- the RD OKUDA uses (ref 37). chem = [a, h]: da/dt = gm_rho * a^2/h - mu_a * a + a0     (SELF-ENHANCING activator: the a^2/h AUTOCATALYSIS is the Paired (in cell_chem_diffuse) with a FAST inhibitor (d_h >> d_a via chi) -> lateral inhibition -> a stable localised activator peak WITH A GRADIENT (Okuda's tip spot), unlike Brusselator (decays the seed) or Gray-Scott (substrate-depletion). | `gm_rho` (1.0), `mu_a` (1.0), `mu_h` (1.0), `a0` (0.01), `sat` (0.0) |
+| `gray_scott_coupled` | TWO Gray-Scott systems that compete for each other's activator. chem = [a1, u1, a2, u2]: | `F2` (self.F), `kk2` (self.kk), `gamma` (0.0) |
+| `rock_paper_scissor` | May-Leonard cyclic competition -- THREE species, each suppressing the next. chem = [u, v, w]: | `a` (0.6) |
+
 ## Minimal spec
 
 ```yaml

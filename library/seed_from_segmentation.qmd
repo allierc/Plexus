@@ -89,7 +89,7 @@ operators:
 
 ## Related operators
 
-Other **seed** operators: [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_positions`](seed_positions.qmd).
+Other **seed** operators: [`set_material`](set_material.qmd), [`ecm_seed`](ecm_seed.qmd), [`seed_ecm`](seed_ecm.qmd), [`seed_mesh`](seed_mesh.qmd), [`mesh_seed`](mesh_seed.qmd), [`seed_cycle`](seed_cycle.qmd).
 
 ## Source
 

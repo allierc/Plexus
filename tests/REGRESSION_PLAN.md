@@ -119,13 +119,12 @@ Initial registry (all exist as archives today; dates are the archive's):
 
 | name | family | what it is a working point of |
 |---|---|---|
-| cvd2_adder_tension (2026-09-07) | apicobasal | the adder division working point; 200 cells to frame 400 |
-| cvd_baseline (2026-09-06) | apicobasal | sizer-timer baseline, steady division |
-| cyc4_sizer, cyc4_timer (2026-09-07) | apicobasal | the two cycle models |
+| size_sizer, size_adder, size_timer (pending, branch size-cycle-align) | apicobasal | the three division rules of Ginzberg et al. 2015, registered once R1 of notes/size_cycle/SIZE_CYCLE_PLAN.md is accepted |
+| cycle_sizer, cycle_timer (pending) | apicobasal | the two cycle models at a growth rate of one doubling per cycle |
 | apop2_ks0p1, apop2_flip060 (2026-09-07) | apicobasal + cell_die | size-triggered death onset at frame ~45 |
 | apop2_sheet_one (2026-09-07), sheet_morphogen_die (2026-09-09) | open sheet | death on a sheet, area convention |
 | sheet_divide, sheet_moebius (2026-09-09) | open sheet | T1 and division on a sheet, non-orientable seed |
-| cv_kv_double, mech_uniform_target (2026-09-06) | mid-surface | mechanics-only controls, must stay exact |
+| mech_uniform_target (2026-09-06), mech_target_percell (pending) | apicobasal | mechanics-only controls, must stay exact |
 | divide_growing_ball (2026-09-06) | mid-surface | growth + division on the base model |
 | gate_00_spheroid / cellfix_B_new (2026-08-03) | mid-surface | the ECM ladder's tissue -- currently BROKEN on HEAD, register it red |
 | mesh_mpm_nominal_gel_contact | tissue + MPM | one-way contact into a gel, the layout stage one uses |
@@ -135,8 +134,8 @@ Initial registry (all exist as archives today; dates are the archive's):
 
 Cost: a 150-frame cut of a tissue working point takes 30-90 s on an A6000; the whole registry is
 10-15 minutes. That is a nightly job (`jobs/regression_nightly.sh`, bsub on gpu_l4) and a
-`pytest -m regression --quick` subset of the four cheapest (cvd2_adder_tension 60 frames,
-cv_kv_double, apop2_ks0p1 60 frames, adh_jelly_15c 100 frames) for a local run before pushing.
+`pytest -m regression --quick` subset of the cheapest (mech_uniform_target 60 frames,
+apop2_ks0p1 60 frames; size_adder 60 frames once registered) for a local run before pushing.
 
 ### Layer B. Compute time
 

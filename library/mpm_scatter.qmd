@@ -87,6 +87,17 @@ Z. & Schreyer, H. L. (1994). Comput. Methods Appl. Mech. Eng. 118:179-196.
 | `polar` | &ndash; | "higham" |
 | `polar_iters` | &ndash; | 6 |
 
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `differentiable` | P2G with a grid that is REBUILT rather than zeroed and re-accumulated. | &ndash; |
+| `triton` | The scatter as one fused Triton kernel. | &ndash; |
+| `triton_colour` | The scatter with no atomics at all, by partitioning the grid into 27 colours: cells of one colour cannot share a stencil node, so each colour's particles can be scattered in parallel without contention, at the cost of 27 sequential passes. | &ndash; |
+| `warp` | The scatter as one Warp kernel with global atomics: the same physics, one launch instead | &ndash; |
+
 ## Minimal spec
 
 ```yaml

@@ -82,6 +82,16 @@ Comput. Methods Appl. Mech. Eng. 118:179-196.
 | `from` | &ndash; | "mpm_grid" |
 | `wall_contact_cells` | &ndash; | 3.84 |
 
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `differentiable` | G2P writing a fresh state table instead of advecting in place. | &ndash; |
+| `torch_loop27` | The gather as 27 sequential passes over the stencil instead of one batched reduction. | &ndash; |
+| `warp` | The gather as one Warp kernel. | &ndash; |
+
 ## Minimal spec
 
 ```yaml

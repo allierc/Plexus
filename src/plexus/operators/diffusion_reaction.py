@@ -1108,8 +1108,13 @@ class Grow3D(Lateral):
         # run carries a separation, wedge where it does not. See `vertex_ops.cell_size`. `vth_frac`
         # is a multiple of this; measured in the wedge convention on an apicobasal run, the growth
         # ceiling would be stated in a volume the cell does not have.
-        from plexus.operators.vertex_ops import size_ref
-        v_ref = size_ref(m)
+        # ONE READER: the cell's ACTUAL volume and the reference, both from `cell_size`, so the
+        # size-dependent growth rule compares what the cell has with what a typical cell had --
+        # it used to compare the TARGET `V0f` with the reference, two different quantities.
+        from plexus.operators.vertex_ops import cell_size
+        _v_now, v_ref = cell_size(vlvl, m, nF, H=H, at=self.at)
+        self._v_now = torch.as_tensor(np.asarray(_v_now, np.float64), device=dev,
+                                      dtype=m["V0f"].dtype)
         dt = float(getattr(H, "dt", 1.0))
         ds = self._rate(s_prev, hillv, m, v_ref)                  # <-- the rate law; models override THIS only
         # THE CEILING IS FOR A TISSUE WITH NO DIVIDER, AND ONLY FOR ONE.
@@ -1251,7 +1256,7 @@ class Grow3DSizer(Grow3D):
         self.f_max = float(params.get("f_max", 4.0))
 
     def _rate(self, s_prev, hillv, m, v_ref):
-        v_now = m["V0f"].clamp(min=1e-9)
+        v_now = self._v_now.clamp(min=1e-9)                     # actual volume, from `cell_size`
         f = (v_ref / v_now) ** self.size_gain
         f = torch.clamp(f, 1.0 / max(self.f_max, 1e-9), self.f_max)
         return s_prev * self.rate * (self.rho + hillv) * f

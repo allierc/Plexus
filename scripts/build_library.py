@@ -686,6 +686,42 @@ def render_operator_page(name: str, cls) -> str:
             out.append(f"| `{r['name']}` | {r['role'] or '&ndash;'} | {r['default']} |")
         out.append("")
 
+    # ------------------------------------------------------------------ models
+    # THE VARIANTS ARE THE HYPOTHESES, and the library did not show them. `cell_cycle` has six
+    # ways for a cell to leave G1, `cell_die` ten reasons to die, `cell_divide` five triggers --
+    # each a different claim about the tissue, each with its own paper -- and the page listed only
+    # the default class, so the one thing a reader needs to choose between them was missing. An
+    # `implementation:` is a numerical route to the same biology and is listed separately for the
+    # same reason: knowing a fast path exists is not the same as knowing a different model does.
+    try:
+        contract = R.get_contract(name)
+    except Exception:                                                # noqa: BLE001
+        contract = None
+    if contract is not None:
+        for axis, keys, head, blurb in (
+                ("model", contract.models(), "Models",
+                 "One of these goes in the spec as `model:`; each is a different claim about the "
+                 "tissue, with its own reference. Omitting `model:` gives the operator described "
+                 "above, which is the default and is not repeated here."),
+                ("implementation", contract.impls(), "Implementations",
+                 "The same biology computed differently; `implementation:` selects one.")):
+            keys = [k for k in keys if contract.implementations.get(k) is not cls]
+            if not keys:
+                continue
+            out.append(f"## {head}")
+            out.append("")
+            out.append(blurb)
+            out.append("")
+            out.append("| " + axis + " | what it claims | its own parameters |")
+            out.append("|---|---|---|")
+            base_names = {r["name"] for r in rows}
+            for k in keys:
+                vcls = contract.implementations[k]
+                own = [r for r in parse_params(vcls) if r["name"] not in base_names]
+                own_s = ", ".join(f"`{r['name']}` ({r['default']})" for r in own) or "&ndash;"
+                out.append(f"| `{k}` | {first_sentence(clean_prose(vcls.__doc__ or ''))} | {own_s} |")
+            out.append("")
+
     # Minimal spec
     out.append("## Minimal spec")
     out.append("")

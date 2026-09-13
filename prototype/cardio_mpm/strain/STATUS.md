@@ -477,3 +477,145 @@ Movies rendered between 21:57 and the fix were discarded and re-rendered.
 R²(u) 0.943–0.961, shortening r 0.96, axis 0.95**. `s4_live_r13_modes2_kappa` (per-cell adhesion on
 top of r12): 0.866 / 0.913 — adhesion adds +0.004: not a lever. **Best models: healthy r13
 (0.87 / 0.91), HCM r5 (0.90 / 0.95).** All figures and movies regenerated from these two.
+
+### Displacement-focused round (2026-09-11 afternoon), routes 1–4
+
+| fit | change vs r13 | held-out R²(A) | R²(u) |
+|---|---|---|---|
+| r13 (reporting model) | – | 0.866 | 0.913 |
+| r13, quarter-frame onset re-alignment (route 4) | scorer only | 0.868 | 0.918 |
+| r14 | 3rd temporal mode + displacement weighted ×3 in the loss (routes 1–2) | 0.826 | 0.928 |
+| r15 | r14 + sheet-wide substrate stiffness learnable (route 3) | 0.826 | 0.928 |
+
+Displacement ceiling of the recording (fixed patterns, held-out): 0.86 / 0.935 / 0.959 for 1 / 2 / 3
+temporal modes. Verdict: routes 1–2 buy +0.015 on displacement at the price of −0.04 on the strain
+maps (the loss trades one for the other), route 3 learns κ back to 0.93× its hand-set value (it was
+right), route 4 is worth +0.005. **Displacement is at the two-mode ceiling; the balanced model r13
+stays the reporting model.** What remains (0.91 → 0.96) is the third temporal mode of the
+displacement, which the mechanics do not express through any per-cell number tried so far.
+
+### Seeds for the reporting models (2026-09-11)
+
+Second fits (optimiser seed 1, layout 121/cell): healthy `s4_live_r13b_seed1` held-out **0.859 /
+0.911** (seed 0: 0.866 / 0.913); HCM `hcm_r5b_seed1` **0.894–0.897 / 0.944–0.960** (seed 0:
+0.894–0.897 / 0.943–0.961). Predictions are seed-independent to 0.007. Per-cell agreement between
+the two seeds (`fig7_seed_agreement.png`, `out/seed_agreement.json`): healthy g r 0.91, g2 0.88,
+delay 0.88, axis 10.0°; HCM g 0.92, g2 0.93, delay 0.85, axis 7.1°; median cell-to-cell difference
+0.18–0.23 of each map's spread. Slightly looser than the simpler r8 / hcm_r3 pair (g 0.94–0.96,
+axis 5–7°): the richer time-course model buys prediction with a little per-cell reproducibility.
+These are the error bars on every map of the reporting models.
+
+## The training-progress movie set (2026-09-11)
+
+`render_progress.sh` renders, from ONE fit (`s4_live_r16_ckpt`, the reporting model re-run with
+`--checkpoints 0.2,0.5`; it reproduces r13 to 0.002 in held-out R²), the movies kept in
+`out/movies/`. Each clip runs the three beats end to end: 1 and 2 held out, then the fitted 3. Each
+beat is its own rollout from its own rest configuration; the clips are concatenated, so the joins
+are cuts and the model never runs across a beat boundary. Kept, all of the finished fit and all **8 s**: `progress_overlay_p100.mp4`,
+`progress_particles_p100.mp4`, `progress_cells_p100.mp4`, and
+**`progress_overlay_particles_p100.mp4`**, the two overlays side by side.
+`STAGES="020 050 100" ./render_progress.sh` regenerates the part-trained ones. The three views:
+
+| view | what |
+|---|---|
+| `overlay` | the raw microscope frames in green and the rest frame warped by the model in magenta, superposed (motion drawn x4); grey where they agree |
+| `particles` | the 18,769 tracking nodes (green) and the 56,640 MPM particles (blue), displacement from rest x10, superposed |
+| `cells` | the four-panel view: per-cell strain map recorded and modelled, the deformation arrows, and the mean curve |
+
+Held-out R²(A) by stage, read off the `cells` movies' json: **20%: 0.815 / 0.820** (beats 1, 2);
+**50%: 0.855 / 0.858**; **100%: 0.864 / 0.867** (fit beat 0.828 / 0.865 / 0.874). Most of the fit
+happens in the first fifth of the run; the last half is worth 0.01.
+
+`out/figures` and `out/movies` were emptied first, and every figure regenerated from this model
+(healthy) and `hcm_r5_modes2` (HCM).
+
+Timing: each three-beat clip is 8 s (21 fps), against the reference `cardio.mp4` which plays the
+whole recording in 4.8 s. `--seconds` on the three movie scripts sets the frame rate from the frame
+count; `render_progress.sh` uses it for the per-beat clips and then re-times the concatenation.
+
+### The relaxation difference (2026-09-11), measured without the model
+
+Cedric read panel f of fig5 correctly: the two activation curves are NOT the same, and the
+difference is in the FALL. Straight off the recordings, averaged over each sheet's beats, no model
+involved:
+
+| | healthy | HCM |
+|---|---|---|
+| contraction, 10% → peak | 0.29 s | 0.30 s |
+| time above half-peak | 0.60 s | 0.70 s |
+| relaxation, peak → 50% | 0.42 s | 0.49 s |
+| relaxation, peak → 10% | 0.67 s | **0.81 s** |
+| beat period | 2.11 s | 2.34 s |
+
+The rise is identical; relaxation is 17–21% slower and the sheet stays contracted longer. So the
+healthy/HCM difference has two parts: **per cell**, a 1.7× larger active shortening with the same
+transverse thickening (so the HCM cell loses area where the healthy one conserves it); **for the
+sheet**, a slower relaxation at an unchanged rate of contraction. The earlier summary line "the
+same excitation, different mechanics" was wrong on the first half and is withdrawn.
+
+## Two findings and a change of protocol (2026-09-11, late)
+
+**1. The excitation difference is NOT identifiable.** Cedric's test: freeze the HCM fit's shared
+clock at the HEALTHY sheet's fitted values and refit everything else. Against the control (the same
+fit with HCM's own clock frozen):
+
+| HCM fit, clock frozen at | held-out R²(A) | R²(u) | per-cell plateau scale, median |
+|---|---|---|---|
+| its own clock (plateau 20.4 frames) | 0.881–0.883 | 0.938–0.956 | ×0.78 → 15.9 frames |
+| the **healthy** clock (plateau 13.2) | 0.879–0.882 | 0.921–0.945 | ×1.15 → 15.2 frames |
+
+The two fits are equivalent (ΔR²(A) 0.002), and the per-cell plateau scaling moves to compensate
+almost exactly: the data determines the PRODUCT of the shared plateau and the per-cell scale, not
+either factor. So "the HCM sheet is driven by a longer excitation" is **not a claim this data can
+support**; what is observed, model-free, is that the tissue relaxes 20% more slowly (peak → 10% in
+0.81 s against 0.67 s). Where that slowness lives — in the excitation or in the cells' release — is
+undetermined. `fit.py --init-from <params.npz>` runs this test for any pair.
+
+**2. The movies were three rollouts stitched together.** Each beat started from its own rest, so the
+model was silently re-initialised twice. `recording.continuous_window` + `model.Params.segments`
+give ONE rollout over beats 1–3 with the fitted clock firing once per beat; the model is never
+reset. It holds: R²(A) **0.844** over the three beats continuous, against 0.87 per beat with a
+reset — the drift across two beat boundaries costs 0.03. `out/movies/` now holds exactly two files,
+`cont_cells.mp4` and `cont_overlay_particles.mp4`, both 6 s, both continuous.
+(`shortening` also had to be rewritten in closed form: cuSOLVER's batched eigenvalue path fails
+above ~70k matrices, and a three-beat window is 158 × 472 of them.)
+
+**3. This is a fit, not a learning task (Cedric).** The held-out split was inherited from the
+discovery loop's culture; for parameter estimation every beat is data. `fit.py --beats 1,2,3` now
+fits all beats at once — one rollout per beat from its own rest, gradients accumulated before the
+step, so memory stays at one rollout and cost scales with the number of beats. Running:
+`healthy_allbeats` (beats 1–3, 24 s/iteration) and `hcm_allbeats` (beats 1–4, 32 s/iteration).
+The per-beat R² of such a fit is a consistency check, not a generalisation claim, and the honest
+generalisation statement is the continuous rollout above.
+
+## The reporting models are now fitted on every beat (2026-09-11)
+
+`healthy_allbeats` (beats 1–3, 108 min) and `hcm_allbeats` (beats 1–4, 144 min), same model as
+before: per cell g, g2, φ, E, δ and its own excitation time course, plus two shared temporal modes,
+per-cell adhesion, λ_E = 0.3, 120 particles per cell, drag 150, band masked.
+
+| | healthy, beats 1 / 2 / 3 | HCM, beats 1 / 2 / 3 / 4 |
+|---|---|---|
+| R²(A) | 0.870 / 0.872 / 0.871 | 0.894 / 0.900 / 0.898 / 0.898 |
+| R²(u) | 0.935 / 0.937 / 0.935 | 0.949 / 0.958 / 0.958 / 0.958 |
+| shortening r | 0.94 | 0.97 |
+
+Every beat is in-sample now, so these are consistency numbers, not generalisation: the point is
+that one parameter set describes every beat equally well (spread 0.002 healthy, 0.006 HCM), which a
+set over-fitted to one beat could not. The generalisation statement is the continuous rollout:
+**R²(A) 0.849 over beats 1–3 in ONE rollout that is never reset** (`cont_cells.mp4`).
+
+Healthy against HCM, refitted on all beats — the earlier conclusions hold, with the excitation
+caveat of the previous section:
+
+| | healthy (331 cells) | HCM (298 cells) |
+|---|---|---|
+| fitted g | 0.037 | 0.063 |
+| g2 / g | −0.70 | −0.48 |
+| silent cells | 19% | 10% |
+| local axis alignment | 0.23 | 0.35 |
+| fitted E | 236 | 222 |
+| clock delay sd | 0.079 s | 0.076 s |
+
+`out/figures` (seven figures) and `out/movies` (`cont_cells.mp4`, `cont_overlay_particles.mp4`)
+were emptied and regenerated from these two fits.

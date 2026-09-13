@@ -59,6 +59,14 @@ rigidity transition in biological tissues. Nat. Phys. 11:1074-1079.
 | `field` | published_field_name | "elong" |
 | `vertex_set` | &ndash; | "vertex" |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `aspect` | "Thin and elongated" as a number: the aspect ratio of the cell's own vertex ring. | &ndash; |
+
 ## Minimal spec
 
 ```yaml
@@ -99,7 +107,7 @@ class ShapeIndexProbe(_ShapeProbeBase):
     def _measure(self, pos, m, es, et, ef, nF):
         pt = torch.as_tensor(pos)
         area, perim, _cen, _vf = face_geometry_3d(
-            pt, torch.as_tensor(es), torch.as_tensor(et), torch.as_tensor(ef), nF)
+            pt, torch.as_tensor(es), torch.as_tensor(et), torch.as_tensor(ef), nF, apex=wedge_apex(m, pt))
         a = _np(area)[:nF]; p = _np(perim)[:nF]
         out = np.full(nF, np.nan)
         ok = a > 1e-12
