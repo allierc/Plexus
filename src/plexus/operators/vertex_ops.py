@@ -42,7 +42,7 @@ import math
 import numpy as np
 import torch
 from scipy.spatial import SphericalVoronoi
-from plexus.models.base import Lateral, Structural
+from plexus.models.base import Lateral, Seed, Structural
 from plexus.models.mesh import MeshTable, declare_vertex_carry
 from plexus.models.registry import register_operator
 from plexus.models.base import Rewire
@@ -3218,6 +3218,86 @@ class Divide3DTimer(Divide3D):
         return age >= self.cycle * jit
 
 
+@register_operator("seed_cycle", set="vertex", kind="seed", family="population")
+class SeedCycle3D(Seed):
+    """Spread a seeded population over the cell cycle, once, before frame 0.
+
+    WHY IT IS A SEED OPERATOR AND NOT A BRANCH IN `cell_cycle` (R5b of
+    notes/size_cycle/SIZE_CYCLE_PLAN.md). Seeding every cell at (G1, 0) makes the tissue a
+    synchronised culture: the first generation divides in one wave, the second in a slightly broader
+    one, and the cell count comes out a staircase rather than a curve. A real tissue in steady state
+    has as many cells just born as about to divide. That is an INITIAL CONDITION, and it was the one
+    place `cell_cycle` still wrote integrated state directly -- it rescaled `V0f` and `Vbirth` on its
+    first call -- which is why that operator had to declare `MAY_MUTATE_INTEGRATED_STATE` while being,
+    in every other respect, a rate law. Here the write happens where writes belong.
+
+    THE THREE ARE DRAWN TOGETHER BECAUSE THEY ARE ONE QUANTITY. A cell's phase, its time in that
+    phase and its size are not independent -- a cell in G2 has been growing longer than one in G1 and
+    is bigger for it -- so drawing them separately would give a population desynchronised in the
+    clock and synchronised in size, which is not a tissue. One uniform draw `u` per cell over the
+    whole cycle sets all three:
+
+        u ~ U(0, 1)                  where this cell is through its cycle
+        phase, phase_t, p            the phase containing u*T, the offset into it, and u itself
+        V0f  <-  V0f (1 + u) / 1.5   volume grows v_b -> 2 v_b across the cycle, so a cell at
+                                     fraction u holds v_b (1 + u); the 1.5 is the mean over u, which
+                                     keeps the POPULATION's mean target where the seed put it
+
+    UNIFORM AND NOT GAUSSIAN: a phase is a position on a loop, and a bell would pile the population
+    mid-cycle and still divide in waves, only rounder ones.
+
+    The phase durations are stated here as well as on `cell_cycle` because this operator has to know
+    where the boundaries are to place a cell between them; they are the same numbers, and a spec that
+    disagrees with itself seeds a population into one set of phases and advances it through another.
+    """
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False
+    PARAM_UNITS = {"t_g1": "time", "t_s": "time", "t_g2": "time", "t_m": "time"}
+    MECHANISM_TAGS = ["cell_cycle", "asynchronous_seed", "initial_condition"]
+    REFERENCE = "Plexus (this work); the phase division is Howard & Pelc (1953) Heredity 6:261-273."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex"); self._cat = params.get("cell_set")
+        self.t = [float(params.get("t_g1", 110.0)), float(params.get("t_s", 80.0)),
+                  float(params.get("t_g2", 40.0)), float(params.get("t_m", 10.0))]
+        self.rescale = bool(params.get("rescale_volume", True))
+        self.seed = int(params.get("seed", 0))
+
+    def forward(self, H, mask=None):
+        cat = resolve_cell_set(H, self.at, self._cat)
+        lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        nF = int(m["nF"]); dev = lvl.state.device; dt = lvl.state.dtype
+        for blk in ("phase", "phase_t", "cyc_inhib", "cycle_progress"):
+            if cell_block(H, cat, blk, nF) is None:
+                raise KeyError(
+                    f"seed_cycle writes the per-cell block {blk!r}, which the set {cat!r} does not "
+                    f"declare. It seeds the blocks `cell_cycle` advances, so declare all of phase, "
+                    f"phase_t, cyc_inhib, cyc_vprev and cycle_progress under `sets.{cat}.state`.")
+        rng = np.random.default_rng(self.seed + 4242)
+        u = rng.random(nF)
+        tot = float(sum(self.t)) or 1.0
+        cut = np.cumsum(self.t) / tot
+        ph = np.searchsorted(cut, u, side="right").astype(np.float64).clip(0, 3)
+        lo = np.concatenate([[0.0], cut[:-1]])[ph.astype(int)]
+        pt = (u - lo) * tot
+        set_cell_block(H, cat, "phase", ph, nF)
+        set_cell_block(H, cat, "phase_t", pt, nF)
+        set_cell_block(H, cat, "cycle_progress", lo + pt / tot, nF)
+        set_cell_block(H, cat, "cyc_inhib", np.ones(nF), nF)
+        if self.rescale and m.get("V0f") is not None and len(m["V0f"]) == nF:
+            v0 = m["V0f"].detach().cpu().numpy().astype(np.float64)
+            m["V0f"] = torch.as_tensor(v0 * (1.0 + u) / 1.5, dtype=dt, device=dev)
+            vb = cell_block(H, cat, "Vbirth", nF)
+            if vb is not None and len(vb) == nF:
+                set_cell_block(H, cat, "Vbirth", vb / 1.5, nF)
+        print(f"[seed_cycle] spread {nF} cells over the cycle: G1 {int((ph == 0).sum())}, "
+              f"S {int((ph == 1).sum())}, G2 {int((ph == 2).sum())}, M {int((ph == 3).sum())}",
+              flush=True)
+        return {}
+
+
 @register_operator("cell_cycle", set="vertex", kind="lateral", family="population")
 class CellCycle3D(Lateral):
     """G1 -> S -> G2 -> M as per-cell STATE, advanced by a declared rule. It divides nothing.
@@ -3268,19 +3348,11 @@ class CellCycle3D(Lateral):
     irradiated cells and its relation to chromosome breakage. Heredity 6(suppl.):261-273 (the
     G1-S-G2-M division of the cycle this carries as state).
     """
-    # `MAY_MUTATE_INTEGRATED_STATE` IS STILL TRUE AFTER S4, AND THE DYNAMICS IS NO LONGER WHY.
-    # Every per-frame quantity this operator produces -- `cycle_progress`, `phase`, `phase_t`,
-    # `cyc_inhib`, `cyc_vprev`, `cyc_rate` -- is returned as a delta on a declared block and
-    # integrated by the engine. What is left in place is ONE thing, and it happens once:
-    #
-    #     `seed_async` draws the initial spread over the cycle and, with it, rescales `V0f` and
-    #     `Vbirth` so that a cell drawn mid-cycle has the volume of a cell mid-cycle. That is an
-    #     initial condition, not a rate, and it fires on tick 0 -- exactly the tick the invariant
-    #     checks. It belongs in `seed_mesh` and moving it is its own rung.
-    #
-    # So the flag now names a seeding write rather than a dynamics one, which is a much smaller
-    # claim than the one it used to make.
-    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    # NOT `MAY_MUTATE_INTEGRATED_STATE` ANY MORE (R5b): every quantity this operator produces is
+    # returned as a delta on a declared block and integrated by the engine, and the one write that
+    # was left -- the async spread's rescale of `V0f` and `Vbirth` -- belongs to `seed_cycle`. The
+    # tick-0 integration invariant therefore covers this operator.
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False
     # DURATIONS IN SIMULATION TIME AFTER S4, not counts of frames. The cycle is one continuous
     # coordinate whose rate is 1/T, so a phase of fraction f_k traversed at 1/T takes f_k*T, and
     # `t_g1`...`t_m` ARE those durations. `p_g1` is the hazard of leaving G1, a true 1/T whose
@@ -3304,7 +3376,7 @@ class CellCycle3D(Lateral):
                    "t_g2": "G2 duration, frames", "t_m": "M duration, frames",
                    "g1_size": "G1 exit threshold, in units of v_ref",
                    "phase_cv": "per-cell CV on the phase durations",
-                   "seed_async": "start the population spread over the cycle"}
+                   }
     G1, S, G2, M = 0, 1, 2, 3
 
     def __init__(self, params, device="cpu"):
@@ -3314,7 +3386,12 @@ class CellCycle3D(Lateral):
                   float(params.get("t_g2", 40.0)), float(params.get("t_m", 10.0))]
         self.g1_size = float(params.get("g1_size", 1.6))
         self.phase_cv = float(params.get("phase_cv", 0.0))
-        self.seed_async = bool(params.get("seed_async", True))
+        if "seed_async" in params:
+            raise ValueError(
+                "cell_cycle no longer takes `seed_async`: spreading a seeded population over the "
+                "cycle is an initial condition and belongs to the `seed_cycle` operator, which goes "
+                "in the spec's `seed:` block with the same phase durations. Without it every cell "
+                "starts at (G1, 0), which is what `seed_async: false` meant.")
         self.every = _engine_owns_clock(params, default=1)
         self.seed = int(params.get("seed", 0))
         self._rng = np.random.default_rng(self.seed + 4242)
@@ -3406,48 +3483,19 @@ class CellCycle3D(Lateral):
         # every cell at (G1, phase_t 0), the synchronised culture `seed_async` exists to avoid.
         # `cyc_vprev` is a volume: 0 is not a value any live cell can hold, and this operator is the
         # only writer, so it is the one array whose zero unambiguously means "never written".
+        # THE FIRST CALL INITIALISES, IT DOES NOT SEED. Spreading the population over the cycle is
+        # `seed_cycle`'s job (R5b of notes/size_cycle/SIZE_CYCLE_PLAN.md) -- it runs before frame 0,
+        # writes the four blocks and rescales the volumes, which is the one thing this operator used
+        # to do by writing integrated state directly. What is left here is the inhibitor's starting
+        # value, returned as a delta like everything else, so this operator no longer declares
+        # `MAY_MUTATE_INTEGRATED_STATE`. A run with no `seed_cycle` starts every cell at (G1, 0): a
+        # synchronised culture, which is a legitimate initial condition and an obvious one in the
+        # movie -- the population divides in waves.
         if not np.any(cell_block(H, self.cat, "cyc_vprev", nF) > 0.0):
             _seeded = True
-            # `seed_async` -- START THE POPULATION SOMEWHERE, NOT ALL AT THE SAME PLACE. Seeding
-            # every cell at (G1, phase_t 0) makes the tissue a synchronised culture: the first
-            # generation divides in one wave, the second in a slightly broader one, and the cell
-            # count comes out a staircase rather than a curve. A real tissue in steady state has as
-            # many cells just born as about to divide.
-            #
-            # THE THREE ARE DRAWN TOGETHER BECAUSE THEY ARE ONE QUANTITY. A cell's phase, its time
-            # in that phase and its size are not independent -- a cell in G2 has been growing
-            # longer than one in G1 and is bigger for it -- so drawing them separately would give a
-            # population that is desynchronised in the clock and synchronised in size, which is not
-            # a tissue and would make `cell_grow`'s first act a correction of the seed. One uniform
-            # draw `u` per cell over the WHOLE cycle sets all three:
-            #
-            #   u ~ U(0, 1)                  where this cell is through its cycle
-            #   phase, phase_t               the phase containing u * T, and the offset into it
-            #   V0f  <-  V0f * (1 + u) / 1.5 volume grows v_b -> 2 v_b across the cycle, so a cell
-            #                                at fraction u holds v_b (1 + u); the 1.5 is the mean
-            #                                over u, which keeps the POPULATION's mean target where
-            #                                the seed put it
-            #
-            # UNIFORM ON THE CYCLE AND NOT GAUSSIAN, for the reason `age_seed` is: a phase is a
-            # position on a loop, and a bell would pile the population mid-cycle and still divide
-            # in waves, only rounder ones.
-            u = (self._rng.random(nF) if self.seed_async else np.zeros(nF))
-            tot = float(sum(self.t)) or 1.0
-            cut = np.cumsum(self.t) / tot                    # phase boundaries as fractions of T
-            ph = np.searchsorted(cut, u, side="right").astype(np.float64).clip(0, self.M)
-            lo = np.concatenate([[0.0], cut[:-1]])[ph.astype(int)]
-            pt = (u - lo) * tot                              # frames already spent in that phase
-            cc = np.ones(nF)
-            if self.seed_async and "V0f" in m and m["V0f"] is not None:
-                v0 = m["V0f"].detach().cpu().numpy().astype(np.float64)
-                if len(v0) == nF:
-                    m["V0f"] = torch.as_tensor(v0 * (1.0 + u) / 1.5, dtype=dt, device=dev)
-                    vb = cell_block(H, self.cat, "Vbirth", nF)
-                    if vb is not None and len(vb) == nF:
-                        set_cell_block(H, self.cat, "Vbirth", vb / 1.5, nF)
-                print(f"[cell_cycle] seeded {nF} cells asynchronously: "
-                      f"G1 {int((ph == 0).sum())}, S {int((ph == 1).sum())}, "
-                      f"G2 {int((ph == 2).sum())}, M {int((ph == 3).sum())}", flush=True)
+            if not np.any(cell_block(H, self.cat, "cycle_progress", nF) > 0.0):
+                ph = np.zeros(nF); pt = np.zeros(nF)          # no seed_cycle: everyone at (G1, 0)
+            cc = np.where(cc > 0.0, cc, 1.0)
         if pt is None or len(pt) != nF:
             pt = np.zeros(nF)
         if cc is None or len(cc) != nF:
@@ -3545,7 +3593,7 @@ class CellCycle3D(Lateral):
         p_st = p.copy()
         # SEEDED FROM THE PHASES THE ASYNC DRAW ALREADY MADE, so `seed_async` keeps meaning what it
         # meant: a cell drawn into the middle of S starts at the `p` that IS the middle of S.
-        if _seeded:
+        if _seeded and not np.any(p > 0.0):
             lo = np.concatenate([[0.0], cut[:-1]])[ph.astype(int)]
             p = lo + pt / T                        # `pt` frames into a phase is pt/T of the cycle
         p = np.where(born, 0.0, p) if age is not None and len(age) == nF else p
@@ -3585,8 +3633,17 @@ class CellCycle3D(Lateral):
         # piece + delta, a fixed 1.5 v_ref, and scored as a sizer (slope -0.96 where the
         # divide-family adder on the re-read Vbirth scored -0.13). So the cycle holds at p = 0
         # until `age` is 1 -- the frames between the cut and the next divide call, four at most.
+        # A CELL THAT HAS NEVER DIVIDED IS NOT UNBORN. `age` is 0 both for a daughter cut on the
+        # previous call and for every SEEDED cell until the first division call increments it, so
+        # the hold below caught the whole seeded population and pinned it at p = 0 -- which, during
+        # a settle window where `cell_divide` does not run at all, erased the spread `seed_cycle`
+        # had just drawn and started every run as a synchronised culture (finding 24 of
+        # notes/size_cycle/SIZE_CYCLE_PLAN.md: 100 % of cells in G1 at frame 61 of a run seeded
+        # 43/38/14/5). `ndiv` counts divisions, so `ndiv >= 1` is what "was cut" means.
+        _nd = _np("ndiv")
         if age is not None and len(age) == nF:
-            unborn = (age <= 0)
+            unborn = (age <= 0) & ((_nd >= 1.0) if (_nd is not None and len(_nd) == nF)
+                                   else np.ones(nF, bool))
             rate = np.where(unborn, 0.0, rate)
             p = np.where(unborn, 0.0, p)
         # A CELL STOPS AT M'S DOORSTEP. `rate` is already zero once `p` is inside M, so the only
@@ -5097,6 +5154,17 @@ class ApicoBasalShapeEnergy3D(Lateral):
         self.sep_block = str(params.get("sep_block", "sep"))
         self.k_v = float(params.get("k_v", 4.0)); self.kappa_s = float(params.get("kappa_s", 0.2))
         self.kappa_h = float(params.get("kappa_h", 0.0))       # thickness-field stiffness; see the energy core
+        # `p0` IS NOT ON THIS CONTRACT, AND A SPEC THAT SETS IT IS REFUSED. The mid-surface model
+        # reads a target shape index; this energy has no perimeter term keyed to one -- its
+        # perimeter enters only through `gamma`, which is stated directly. A `p0` written here was
+        # silently ignored, which is how `cv_shape_low` came to be a sweep arm identical to its
+        # own baseline to four decimal places (finding 1 of notes/size_cycle/SIZE_CYCLE_PLAN.md).
+        if "p0" in params:
+            raise ValueError(
+                "cell_mechanics[apicobasal] does not read `p0`: this energy has no perimeter term "
+                "keyed to a target shape index, so the value would do nothing. Use `gamma` for the "
+                "cortical contractility. (`p0` on `cell_divide` and `cell_die` is a different "
+                "parameter -- it sets a fresh cell's P0 from its A0 -- and is read.)")
         self.gamma = float(params.get("gamma", 0.0))
         self.Lambda = float(params.get("Lambda", 0.0)); self.K_R = float(params.get("K_R", 0.0))
         self.mu = float(params.get("mu", 1.0)); self.dt = float(params.get("dt", 1.0))
