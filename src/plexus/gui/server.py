@@ -20,6 +20,8 @@ import errno
 import io
 import json
 import os
+
+import numpy as np
 import posixpath
 import re
 import subprocess
@@ -600,7 +602,9 @@ def p_claude(h, data):
                 f"Change it with ONE patch call and nothing else:\n"
                 f"  curl -s -X POST http://127.0.0.1:{{port}}/api/scene/patch -H 'Content-Type: application/json' "
                 f"-d '{{\"form\": {{...changed top-level fields...}}, \"bodies\": {{\"*\": {{...changed body fields...}}}}}}'\n"
-                f"Send only the fields that change. Do not read the scene first and do not send the whole form."
+                f"Send only the fields that change. Do not read the scene first and do not send the whole form.\n"
+                f"`form.n_bodies` changes HOW MANY bodies there are (the scene is re-laid on a lattice); a "
+                f"`bodies` key may be `*`, a name, an index, or a range like \"0-9\"."
                 f"\n\nTask: {task}")
     return h._send_json(bio.claude_start(task, int(h.server.server_address[1]),
                                          model=str(data.get("model") or "sonnet"), brief=brief, mode=mode))
@@ -775,6 +779,46 @@ def p_loadrun(h, data):
     return h._send_json({"n": n, "every": v._keep_every, "n_frames": v.RUN.get("n_frames")})
 
 
+def _relay_bodies(bodies: list, n: int, world: float) -> list:
+    """`n` bodies on a cubic lattice in the middle half of the box, properties tiled from the ones
+    on screen, sizes shrunk so a denser lattice still leaves gaps; a shrink keeps the first `n`."""
+    import matplotlib
+    n = max(1, int(n))
+    src = list(bodies) or [{"name": "b0", "shape": "ball", "material": "elastic"}]
+    if n <= len(src):
+        return src[:n]
+    k = int(np.ceil(n ** (1.0 / 3.0)))
+    while k ** 3 < n:
+        k += 1
+    pitch = 0.5 * world / k
+    side = 0.55 * pitch                                          # a body fills about half its cell
+    # a block's own size, if the scene has one, caps the new size so a patch never inflates bodies
+    for b in src:
+        if b.get("block") and len(b["block"]) == 6:
+            side = min(side, max(1e-6, float(b["block"][3]) - float(b["block"][0])))
+            break
+    x0 = 0.5 * world - 0.5 * k * pitch + 0.5 * (pitch - side)
+    cm_a, cm_b = matplotlib.colormaps["tab20"], matplotlib.colormaps["tab20b"]
+    out, i = [], 0
+    for iy in range(k):
+        for iz in range(k):
+            for ix in range(k):
+                if i >= n:
+                    break
+                b = dict(src[i % len(src)])
+                a = [round(x0 + ix * pitch, 4), round(0.40 * world + iy * pitch, 4), round(x0 + iz * pitch, 4)]
+                b["name"] = f"b{i:03d}"
+                b["color"] = [round(float(v), 3) for v in (cm_a(i % 20) if (i // 20) % 2 == 0 else cm_b(i % 20))[:3]]
+                if str(b.get("shape", "ball")).lower() == "block":
+                    b["block"] = [a[0], a[1], a[2], round(a[0] + side, 4), round(a[1] + side, 4), round(a[2] + side, 4)]
+                    b.pop("centre", None)
+                else:
+                    b["centre"] = [round(a[0] + 0.5 * side, 4), round(a[1] + 0.5 * side, 4), round(a[2] + 0.5 * side, 4)]
+                    b.pop("block", None)
+                out.append(b); i += 1
+    return out
+
+
 def p_patch(h, data):
     """Change a FEW FIELDS of the scene on screen, and rebuild: `{"form": {...}, "bodies": {"*": {...}}}`.
 
@@ -794,20 +838,40 @@ def p_patch(h, data):
         form = tab.form_from_spec(yaml.safe_load(open(sp)))
     except Exception as e:                                       # noqa: BLE001
         return h._send_json({"error": f"this spec does not read back into the form: {e}"}, 400)
-    form.update(data.get("form") or {})
+    patch_form = dict(data.get("form") or {})
+    # HOW MANY BODIES IS A PATCHABLE FIELD. "100 boxes, 10 of water" is one sentence and was two
+    # impossibilities: `{"form": {"bodies": 100}}` put an int where the list goes and the handler
+    # died mid-response ("Empty reply from server"), and nothing else could change the COUNT, so
+    # the driver had to rebuild the whole form. `n_bodies` (or `bodies` as a number) re-lays the
+    # scene: the existing bodies' properties are tiled over a cubic lattice of N, in the same half
+    # of the box the 27-cube default uses, with one colour each.
+    n_want = patch_form.pop("n_bodies", None)
+    if isinstance(patch_form.get("bodies"), (int, float)):
+        n_want = patch_form.pop("bodies")
+    form.update(patch_form)
+    if n_want is not None:
+        form["bodies"] = _relay_bodies(form.get("bodies") or [], int(n_want), float(form.get("world", 0.5)))
     bp = data.get("bodies") or {}
     if bp:
-        for b in form.get("bodies") or []:
-            for key in ("*", b.get("name")):
-                if key in bp:
-                    b.update(bp[key])
+        blist = form.get("bodies") or []
+        for i, b in enumerate(blist):
+            # `*`, the body's name, its index, or a range "0-9" -- so "ten of them are water" is
+            # one key rather than ten.
+            for key, patch in bp.items():
+                if key == "*" or key == b.get("name") or key == str(i) \
+                        or ("-" in str(key) and str(key).replace("-", "").isdigit()
+                            and int(str(key).split("-")[0]) <= i <= int(str(key).split("-")[1])):
+                    b.update(patch)
         # a material change carries its own stiffness key: drop the one that no longer applies
         for b in form.get("bodies") or []:
             if str(b.get("material", "")).lower() == "liquid":
                 b.pop("youngs", None)
             else:
                 b.pop("bulk_modulus", None)
-    return p_tab_build(h, form, tab_name)
+    try:
+        return p_tab_build(h, form, tab_name)
+    except Exception as e:                                       # noqa: BLE001 -- a bad patch is an answer, not a dead socket
+        return h._send_json({"error": f"patch: {type(e).__name__}: {e}"[:400]}, 400)
 
 
 def p_quit(h, data):

@@ -387,9 +387,14 @@ You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body 
                           render (small_splats|middle_splats|large_splats|surface|surface_specular|glassy),
                           light (default|headlight|sun|studio|flat), color (particles|deformation|stress|velocities).
                           A ball deforms visibly below ~30,000 Pa; 1,000,000 is rigid.
-  POST /api/scene/patch   {form: {...}, bodies: {"*"|<name>: {...}}} -> change a FEW fields of the
-                          scene on screen and rebuild. THE FIRST THING TO REACH FOR: it is one short
-                          call, where re-sending the whole form is thousands of characters.
+  POST /api/scene/patch   {form: {...}, bodies: {"*"|<name>|<index>|"<from>-<to>": {...}}} -> change a
+                          FEW fields of the scene on screen and rebuild. THE FIRST THING TO REACH FOR:
+                          one short call, where re-sending the whole form is thousands of characters.
+                          `form.n_bodies` sets HOW MANY bodies there are: the scene is re-laid on a
+                          cubic lattice, tiling the properties of the bodies already there. A body key
+                          may be `*`, a name, an index, or a range, so "100 boxes, 10 of them water" is
+                          {"form": {"n_bodies": 100}, "bodies": {"*": {"shape": "block", "material":
+                          "elastic"}, "0-9": {"material": "liquid", "bulk_modulus": 100000}}}.
   POST /api/scene/refine    {name, prompt} -> an English edit of the current spec (another Claude
                           applies it; 20-40 s)
   GET  /api/scene/counts?name= -> live count per set and per body type
