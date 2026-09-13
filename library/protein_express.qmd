@@ -1,0 +1,152 @@
+---
+title: "protein_express"
+subtitle: "Birth and retirement per species at the cell's rates: `dN/dt = s_i A_i - N / tau_i`."
+---
+
+::: {.op-head}
+![](../figures/icons/structural.png){.op-logo}
+
+[`structural`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Birth and retirement per species at the cell's rates: `dN/dt = s_i A_i - N / tau_i`.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $|S|$ **structural**: change the entities themselves &mdash; divide, die, grow.
+- **Acts on** &mdash; `particle` (the set the operator acts on).
+- **Reads** &mdash; `tissue`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+_See source below._
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `tissue` | tissue_set | **required** |
+| `seed` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: protein_express, at: particle, tissue: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`synthesis`]{.op-badge} [`turnover`]{.op-badge} [`cluster_number`]{.op-badge}  
+
+## Related operators
+
+Other **structural** operators: [`topo_record`](topo_record.qmd), [`protein_project`](protein_project.qmd), [`organelle_project`](organelle_project.qmd), [`organelle_express`](organelle_express.qmd), [`junction_myosin`](junction_myosin.qmd), [`cytokinetic_ring`](cytokinetic_ring.qmd).
+
+## Source
+
+[`src/plexus/operators/protein_ops.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/protein_ops.py) &mdash; the registered operator.
+
+```python
+@register_operator("protein_express", family="population", set="particle", kind="structural")
+class ProteinExpress(Structural):
+    """Birth and retirement per species at the cell's rates: `dN/dt = s_i A_i - N / tau_i`."""
+    REQUIRES_PARAMS = ["tissue"]
+    PARAM_ROLES = {"tissue": "tissue_set"}
+    SUPPORTED_DIMS = (3,)
+    READS = ["pos"]
+    WRITES = ["pos"]
+    MECHANISM_TAGS = ["synthesis", "turnover", "cluster_number"]
+    REFERENCE = ("The receptor rate law of discovery_okuda/ops/adhesion_ops.py (rung 05d, gate G30: "
+                 "receptor conserved under binding).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "protein")
+        self.tissue = str(params["tissue"])
+        self.seed = int(params.get("seed", 0))
+        self.params = dict(params)
+        self._carry = None
+        self._gen = None
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        fans = _fans(H, self.tissue)
+        if fans is None:
+            return {}
+        species = _species(lvl, self.params)
+        dev = lvl.state.device
+        if self._gen is None:
+            self._gen = torch.Generator(device=dev).manual_seed(self.seed)
+        dt = float(getattr(H, "dt", 1.0) or 1.0)
+        cs = resolve_cell_set(H, self.tissue, None); clvl = H.level(cs)
+        nF = fans["nF"]; n_cells = clvl.state.shape[0]
+        cs0 = _cell_block(clvl, "protein_s", len(species)); ct0 = _cell_block(clvl, "protein_tau", len(species))
+        par = lvl.parent
+        p0, p1 = lvl.state_schema["pos"]
+        if self._carry is None or self._carry.shape != (n_cells, len(species)):
+            self._carry = torch.zeros(n_cells, len(species), device=dev, dtype=lvl.state.dtype)
+        live_cells = clvl.occ[:nF] > 0 if getattr(clvl, "occ", None) is not None else torch.ones(nF, dtype=torch.bool, device=dev)
+        if "age" in lvl.state_schema:
+            a, b = lvl.state_schema["age"]; lvl.state[lvl.occ > 0, a:b] += dt
+        park = torch.full((3,), PARK, device=dev, dtype=lvl.state.dtype)
+        for sp in species:
+            i = sp["id"]
+            s = clvl.state[:, cs0 + i] if cs0 is not None else torch.full((n_cells,), sp["s"], device=dev)
+            tau = clvl.state[:, ct0 + i] if ct0 is not None else torch.full((n_cells,), sp["tau"], device=dev)
+            occ = lvl.occ > 0
+            mine = occ & (lvl.node_type == i)
+            # retirement
+            p_die = (dt / tau.clamp_min(1e-9))[par].clamp(0.0, 1.0)
+            u = torch.rand(par.shape[0], generator=self._gen, device=dev)
+            die = mine & (u < p_die)
+            if bool(die.any()):
+                lvl.kill(torch.nonzero(die).flatten(), park=park)
+            # birth, with a fractional carry per cell
+            want = (s[:nF] * _face_area(fans, sp["region"]) * dt) * live_cells.to(lvl.state.dtype) + self._carry[:nF, i]
+            k = torch.floor(want).long()
+            self._carry[:nF, i] = want - k.to(want.dtype)
+            total = int(k.sum().item())
+            if total:
+                free = lvl.free_slots(total)
+                n_born = int(free.numel())
+                if n_born:
+                    parents = torch.repeat_interleave(torch.arange(nF, device=dev), k)[:n_born]
+                    par[free] = parents
+                    lvl.occ[free] = 1.0
+                    lvl.node_type[free] = i
+                    lvl.state[free, p0:p1] = _sample(fans, parents, sp["region"], self._gen)
+                    _set_block(lvl, "vel", free, 0.0)
+                    _set_block(lvl, "age", free, 0.0)
+                    _set_block(lvl, "activated", free, 0.0)
+                    _set_block(lvl, "bound", free, -1.0)
+                if n_born < total and not getattr(self, "_said_full", False):
+                    print(f"[protein_express] {sp['name']}: buffer exhausted, {total - n_born} births refused this "
+                          f"frame (declare a larger grow_reserve)", flush=True)
+                    self._said_full = True
+        _write_count(H, lvl, self.tissue, species)
+        return {}
+```

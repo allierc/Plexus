@@ -76,6 +76,14 @@ chemical basis of morphogenesis. Phil. Trans. R. Soc. B 237:37-72.
 | `d_h` | substrate_diffusivity | &ndash; |
 | `norm` | &ndash; | True |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `interface_weighted` | `interface_weighted` MODEL of cell_chem_diffuse -- the OKUDA finite-volume form, and the MISSING HALF of the chemistry<->shape coupling. | `vol_floor` (0.05), `w_cap` (4.0), `vertex_set` ("vertex") |
+
 ## Minimal spec
 
 ```yaml

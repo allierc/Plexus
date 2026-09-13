@@ -84,6 +84,14 @@ not conserved across the interface. `mesh_contact` is the two-way form.
 | `damp` | contact_damping | 0.0 |
 | `centre` | &ndash; | [0.5, 0.5, 0.5] |
 
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `replay` | The same contact, against a real epithelium's recorded surface instead of a sphere. | `surface` (**required**), `scale` (1.0) |
+
 ## Minimal spec
 
 ```yaml

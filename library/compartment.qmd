@@ -56,7 +56,7 @@ level itself is plexus2 sec. Hierarchy, a parent holding several distinct sets a
 
 ```python
 @register_entity(
-    "compartment", "organelle", depth=1,
+    "compartment", depth=1,
     state_schema=spatial_schema,                 # dim -> StateSchema (pos|vel, D-wide each)
     render={"color_by": "node_type", "arrows": None},
 )

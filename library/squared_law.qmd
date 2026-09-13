@@ -90,13 +90,23 @@ rather than over a `radius_graph`.
 | `all_pairs` | sum over ALL pairs (O(N^2), long-range) vs the neighbour graph | False |
 | `clamp` | max |acceleration| (0 = unbounded) | 0.0 |
 
+## Implementations
+
+The same biology computed differently; `implementation:` selects one.
+
+| implementation | what it claims | its own parameters |
+|---|---|---|
+| `mesh` | Same law, solved on a grid instead of pair by pair: deposit the masses cloud-in-cell, solve Poisson in k-space, take the gradient in k-space, gather back with the same weights. reachable. | `n_grid` (256) |
+| `warp` | Same law, as one Warp kernel: still O(N^2) arithmetic, but O(N) memory, because each thread accumulates its own sum and no [N, N] array is ever allocated. | &ndash; |
+
 ## Minimal spec
 
 ```yaml
 sets:
-  star: {n: 25000, spawn: disk, spawn_radius: 1.5,
-         vel_init: {mode: circular_orbit, spin: 0.9, central_mass: 0.5},
+  star: {n: 25000, vel_init: {mode: circular_orbit, spin: 0.9, central_mass: 0.5},
          types: {s: {fraction: 1.0, mass: 0.00004}}}
+seed:
+  - {op: seed_positions, at: star, mode: disk, radius: 1.5}
 operators:
   - {op: squared_law, at: star, law: gravity, softening: 0.08, all_pairs: true}
 schedule: [squared_law]

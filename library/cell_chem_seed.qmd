@@ -83,6 +83,17 @@ Reference: Plexus (this work); cone seeding after Okuda, S. et al. (2018). Sci. 
 | `cone_deg` | &ndash; | 18.0 |
 | `seed_dir` | &ndash; | None |
 
+## Models
+
+One of these goes in the spec as `model:`; each is a different claim about the tissue, with its own reference. Omitting `model:` gives the operator described above, which is the default and is not repeated here.
+
+| model | what it claims | its own parameters |
+|---|---|---|
+| `cones` | `cones` MODEL of seed_cell_chem -- N FIXED radial activation cones (Okuda Fig 5's multi-tube) -- the strongest hand in the answer, and the honest place to declare it. | &ndash; |
+| `noise` | `noise` MODEL of seed_cell_chem -- the homogeneous steady state plus NOISE -- patterning from fluctuation alone, the strictest test that the pattern is emergent. | &ndash; |
+| `patch` | `patch` MODEL of seed_cell_chem -- a LOCALIZED activation source, placed by hand -- a bud/tube driver. | &ndash; |
+| `simplex` | `simplex` MODEL of seed_cell_chem -- three species normalised to a simplex -- the May-Leonard initial condition for cyclic competition. | &ndash; |
+
 ## Minimal spec
 
 ```yaml

@@ -162,6 +162,7 @@ class ReconnectT1_3D(Rewire):
         thr = self.l_th if self.l_th > 0 else self.l_th_frac * float(length.mean())
         order = np.argsort(length)                           # shortest interior edges first
         seen = set(); used = set(); ndone = 0                # `used` verts -> one flip per vertex / call
+        moved: set = set()               # the vertices a flip repositioned: their `sep` is re-aimed below
         for k in order:
             if ndone >= self.max_flips or length[k] >= thr:
                 break
@@ -172,6 +173,7 @@ class ReconnectT1_3D(Rewire):
             if t1_flip_3d(rings, pos, (a, b), new_len=thr, emap=emap, vf=vf,
                           plane_axis=_plane) is not None:
                 used.add(a); used.add(b); ndone += 1
+                moved.add(a); moved.add(b)
         # TRACED PER FRAME, because the RATE is the observable that separates a length-keyed myosin
         # feedback from a tension-keyed one. A length feedback homogenises junction lengths and should
         # SUPPRESS T1s; a tension feedback is the destabilising one the germband-extension literature
@@ -259,6 +261,29 @@ class ReconnectT1_3D(Rewire):
         px0, px1 = lvl.state_schema["pos"]                   # write the two moved verts back (like cell_divide)
         st = lvl.state.clone()
         st[:Nv, px0:px1] = torch.as_tensor(np.asarray(pos), dtype=dt, device=dev)
+        # A FLIP MOVES TWO VERTICES AND MUST RE-AIM THEIR THICKNESS VECTORS (R3 of
+        # notes/size_cycle/SIZE_CYCLE_PLAN.md, finding 16). `t1_flip_3d` places `u` and `v` on the
+        # rotated junction and back on the shell; their `sep` stayed what it was at the old
+        # positions, so after every flip two prisms carried a thickness vector aimed for somewhere
+        # else -- a trapezoid apiece, which the mechanics never straightened. Measured on the
+        # sweep's base arm: trapezoid fraction 0 at frame 0, 0.105 by frame 10 with 23 flips and
+        # not one division, climbing with the flip count for the whole run. Each moved vertex
+        # keeps its thickness and takes the direction of its ring neighbours' vectors.
+        if moved and "sep" in lvl.state_schema:
+            sx0, sx1 = lvl.state_schema["sep"]
+            sep = st[:Nv, sx0:sx1].detach().cpu().numpy().astype(np.float64)
+            es_np = es if isinstance(es, np.ndarray) else np.asarray(es)
+            et_np = et if isinstance(et, np.ndarray) else np.asarray(et)
+            for w in moved:
+                nb = et_np[es_np == w]
+                nb = nb[nb != w]
+                if nb.size == 0:
+                    continue
+                d = sep[nb].mean(axis=0); nrm = float(np.linalg.norm(d))
+                if nrm < 1e-12:
+                    continue
+                sep[w] = d / nrm * float(np.linalg.norm(sep[w]))
+            st[:Nv, sx0:sx1] = torch.as_tensor(sep, dtype=dt, device=dev)
         lvl.state = st
         m["n_t1"] = int(m.get("n_t1", 0)) + ndone
         return {}
