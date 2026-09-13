@@ -597,8 +597,56 @@ class View:
             return np.zeros((0, 3)), []
         return np.concatenate(P, 0), ids
 
-    def pick_at(self, fx: float, fy: float, tol: float = 0.012) -> str | None:
-        """The object under the click at screen fractions (fx from the left, fy from the top)."""
+    @staticmethod
+    def _screen(A, P):
+        """World points -> (screen x, screen y as fractions from the top-left, ndc depth, in front?)."""
+        X = np.concatenate([np.asarray(P, float), np.ones((len(P), 1))], 1) @ A.T
+        w = np.where(np.abs(X[:, 3]) < 1e-12, 1e-12, X[:, 3])
+        ndc = X[:, :3] / w[:, None]
+        return (ndc[:, 0] + 1) / 2, (1 - ndc[:, 1]) / 2, ndc[:, 2], w > 0
+
+    def _cell_at(self, fx, fy, A):
+        """The CELL whose cap the click lands on: the surface is drawn as triangles with a face id
+        each, so the answer is an inside test on the projected triangle, nearest the camera. No
+        tolerance is involved -- a click anywhere on a cell names that cell, which is what a click
+        on a tissue means. Nearest-centroid (what this did before) answered only when the click
+        happened to fall within 1.2% of the screen of a centroid: one hit in six, measured."""
+        T = self.scene.get("tissue")
+        if not T:
+            return None
+        best, best_z = None, np.inf
+        for cap in ("apical", "basal"):
+            c = (T.get("caps") or {}).get(cap)
+            if not c:
+                continue
+            sx, sy, z, front = self._screen(A, np.asarray(c["verts"], float))
+            tri = np.asarray(c["tri"], int); face = np.asarray(c["face"], int)
+            ax, ay = sx[tri[:, 0]], sy[tri[:, 0]]
+            bx, by = sx[tri[:, 1]], sy[tri[:, 1]]
+            cx, cy = sx[tri[:, 2]], sy[tri[:, 2]]
+            # barycentric of the click in each triangle
+            den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+            den = np.where(np.abs(den) < 1e-12, 1e-12, den)
+            l1 = ((by - cy) * (fx - cx) + (cx - bx) * (fy - cy)) / den
+            l2 = ((cy - ay) * (fx - cx) + (ax - cx) * (fy - cy)) / den
+            l3 = 1.0 - l1 - l2
+            eps = -1e-6
+            inside = (l1 >= eps) & (l2 >= eps) & (l3 >= eps) & front[tri].all(1)
+            if not inside.any():
+                continue
+            zt = (l1 * z[tri[:, 0]] + l2 * z[tri[:, 1]] + l3 * z[tri[:, 2]])
+            k = int(np.argmin(np.where(inside, zt, np.inf)))
+            if zt[k] < best_z:
+                best, best_z = int(face[k]), float(zt[k])
+        return None if best is None else f"cell:{best}"
+
+    def pick_at(self, fx: float, fy: float, tol: float = 0.03) -> str | None:
+        """The object under the click at screen fractions (fx from the left, fy from the top).
+
+        THE CELL FIRST. On a tissue a click means the cell it landed on, and that is an exact test
+        against the drawn surface; only a click that misses the tissue altogether falls through to
+        the nearest point (a material scene has no surface, so that is its only path). `tol` is the
+        fall-through radius, 3% of the screen width."""
         if self.panel is not None:
             return None
         def _proj():
@@ -606,18 +654,18 @@ class View:
             M = self.p.camera.GetCompositeProjectionTransformMatrix(float(W) / float(Hh), -1.0, 1.0)
             return W, Hh, np.array([[M.GetElement(i, j) for j in range(4)] for i in range(4)], float)
         W, Hh, A = _vtk(_proj)
+        hit = self._cell_at(fx, fy, A)
+        if hit is not None:
+            return hit
         P, ids = self._candidates()
         if not ids:
             return None
-        X = np.concatenate([P, np.ones((len(P), 1))], 1) @ A.T
-        w = np.where(np.abs(X[:, 3]) < 1e-12, 1e-12, X[:, 3])
-        ndc = X[:, :3] / w[:, None]
-        sx, sy = (ndc[:, 0] + 1) / 2, (1 - ndc[:, 1]) / 2
+        sx, sy, z, front = self._screen(A, P)
         d2 = (sx - fx) ** 2 + ((sy - fy) * Hh / W) ** 2
-        ok = (w > 0) & (d2 < tol ** 2)
+        ok = front & (d2 < tol ** 2)
         if not ok.any():
             return None
-        score = np.where(ok, d2 + 0.02 * tol ** 2 * ndc[:, 2], np.inf)     # nearer to the camera on a tie
+        score = np.where(ok, d2 + 0.02 * tol ** 2 * z, np.inf)             # nearer to the camera on a tie
         return ids[int(np.argmin(score))]
 
     def highlight(self, pick: str | None):
