@@ -137,7 +137,6 @@ operators:
   g1_size: 1.6
   phase_cv: 0.15
   seed: 0
-  seed_async: true
   model: transition_probability
 - op: cell_divide
   at: vertex
@@ -171,6 +170,13 @@ seed:
   model: apicobasal
   h0: 0.88
   ref_frame: 60
+- op: seed_cycle
+  at: vertex
+  t_g1: 183.3
+  t_s: 133.3
+  t_g2: 66.7
+  t_m: 16.7
+  seed: 0
 plotting:
   renderer: vtk_points
   background: black

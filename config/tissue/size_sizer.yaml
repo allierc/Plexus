@@ -136,7 +136,6 @@ operators:
   t_m: 0.0
   phase_cv: 0.15
   seed: 0
-  seed_async: false
   g1_size: 2.0
 - op: cell_divide
   at: vertex
