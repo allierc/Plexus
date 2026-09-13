@@ -513,6 +513,10 @@ You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body 
                           each frame; {stop: true} aborts.  GET /api/bio/run -> progress and the
                           live counts per set and species (poll it with sleep 2 between calls)
   GET  /api/bio/open?path=<spec.yaml or run folder> -> import an existing spec into the session
+  GET  /api/scene/shot?azim=&elev=&zoom=&frame=  -> WRITES THE PICTURE TO A FILE and returns its
+                          path. Use the Read tool on that path to LOOK at the scene: what you are
+                          building is a picture, and the counts do not tell you whether it looks
+                          right. Look after every change you make.
   GET  /api/bio/state     -> the session state
 The build form also takes organelles: [{name, count (per cell), radius, region
 (interior|apical_side|basal_side), on_divide (duplicate|halve|none), tau (optional, frames to
@@ -642,8 +646,10 @@ def claude_start(task: str, port: int, model: str = "sonnet", timeout: int = 900
         sess = ["--session-id", CLAUDE["session"]] if fresh else ["--resume", CLAUDE["session"]]
         cmd = [studio._claude_bin(), "-p", prompt, *sess,
                "--append-system-prompt", (brief or BIO_BRIEF).replace("{port}", str(port)) + SHORT,
-               "--allowedTools", "Bash(curl:*)", "Bash(sleep:*)", "Bash(jq:*)",
-               "--disallowedTools", "Write", "Edit", "NotebookEdit", "Read", "Glob", "Grep", "WebFetch", "WebSearch", "Task",
+               # Read is ALLOWED so the session can LOOK at the scene: `/api/scene/shot` writes the
+               # picture to a file and Read shows it. Everything that writes stays refused.
+               "--allowedTools", "Bash(curl:*)", "Bash(sleep:*)", "Bash(jq:*)", "Read",
+               "--disallowedTools", "Write", "Edit", "NotebookEdit", "Glob", "Grep", "WebFetch", "WebSearch", "Task",
                "--model", model, "--effort", "low",
                "--output-format", "stream-json", "--verbose"]
         t0 = time.time()

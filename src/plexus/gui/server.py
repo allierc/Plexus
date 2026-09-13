@@ -872,21 +872,38 @@ def p_layout(h, data):
     return h._send_json({"saved": True})
 
 
-# THE TABLES. `/api/scene/<x>` is canonical; `/api/bio/<x>` is the same handler under the name the
-# older Claude sessions were primed with.
-GET_ROUTES = {
-    "/": g_page, "/index.html": g_page, "/editor": g_editor,
-    "/api/scene/state": g_state, "/api/scene/spec": g_spec, "/api/scene/counts": g_counts,
-    "/api/scene/claude": g_claude, "/api/scene/frames": g_frames, "/api/scene/run": g_run,
-    "/api/scene/artefacts": g_artefacts, "/api/scene/ls": g_ls, "/api/scene/open": g_open,
-    "/api/scene/view": g_view, "/api/scene/seed": g_seed,
-    "/api/catalog": g_catalog, "/api/specs": g_specs, "/media": g_media, "/api/spec": g_editor_spec,
-}
-for _x in ("state", "spec", "counts", "claude", "frames", "run", "artefacts", "ls", "open", "view", "seed"):
-    GET_ROUTES[f"/api/bio/{_x}"] = GET_ROUTES[f"/api/scene/{_x}"]
-GET_ROUTES["/api/studio/spec"] = g_spec
-GET_ROUTES["/api/material/run"] = g_artefacts
-PICTURE_ROUTES = {f"/api/{p}/{x}" for p in ("scene", "bio") for x in ("render", "pick", "info", "snapshot")}
+def g_shot(h, q):
+    """The picture AS A FILE, for an agent that can look at images but cannot hold a PNG body.
+
+    `/api/scene/render` streams the bytes, which is what the browser wants and what a curl-only
+    session cannot use. This writes the same picture under log/gui_shots/ and returns its path, so
+    the session can read the image and SEE the scene it is building rather than infer it from counts.
+    """
+    import time as _t
+    from plexus.gui import bio_view, studio
+    v = bio_view.current()
+    if v is None:
+        return h._send_json({"error": "no scene is open; seed one first"}, 400)
+    try:
+        if q.get("azim") or q.get("elev") or q.get("zoom"):
+            v.set_camera(*(float((q.get(k) or [str(getattr(v, k))])[0]) for k in ("azim", "elev", "zoom")))
+        if q.get("frame"):
+            v.show_frame(int(q["frame"][0]))
+        png = v.png()
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"error": f"{type(e).__name__}: {e}"[:800]}, 400)
+    d = os.path.join(studio.REPO, "log", "gui_shots")
+    os.makedirs(d, exist_ok=True)
+    p = os.path.join(d, f"shot_{int(_t.time() * 1000)}.png")
+    with open(p, "wb") as f:
+        f.write(png)
+    for old in sorted(os.listdir(d))[:-40]:                      # keep the last 40
+        try:
+            os.remove(os.path.join(d, old))
+        except OSError:
+            pass
+    return h._send_json({"path": p, "bytes": len(png), "azim": v.azim, "elev": v.elev, "zoom": v.zoom,
+                         "frame": q.get("frame", [None])[0]})
 POST_ROUTES = {
     "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
     "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
@@ -897,6 +914,24 @@ POST_ROUTES = {
 }
 for _x in ("reset", "claude", "run", "visible", "save", "refine"):
     POST_ROUTES[f"/api/bio/{_x}"] = POST_ROUTES[f"/api/scene/{_x}"]
+
+
+# THE TABLES. `/api/scene/<x>` is canonical; `/api/bio/<x>` is the same handler under the name the
+# older Claude sessions were primed with.
+GET_ROUTES = {
+    "/": g_page, "/index.html": g_page, "/editor": g_editor,
+    "/api/scene/state": g_state, "/api/scene/spec": g_spec, "/api/scene/counts": g_counts,
+    "/api/scene/claude": g_claude, "/api/scene/frames": g_frames, "/api/scene/run": g_run,
+    "/api/scene/artefacts": g_artefacts, "/api/scene/ls": g_ls, "/api/scene/open": g_open,
+    "/api/scene/view": g_view, "/api/scene/seed": g_seed,
+    "/api/catalog": g_catalog, "/api/specs": g_specs, "/media": g_media, "/api/spec": g_editor_spec,
+    "/api/scene/shot": g_shot, "/api/bio/shot": g_shot,
+}
+for _x in ("state", "spec", "counts", "claude", "frames", "run", "artefacts", "ls", "open", "view", "seed"):
+    GET_ROUTES[f"/api/bio/{_x}"] = GET_ROUTES[f"/api/scene/{_x}"]
+GET_ROUTES["/api/studio/spec"] = g_spec
+GET_ROUTES["/api/material/run"] = g_artefacts
+PICTURE_ROUTES = {f"/api/{p}/{x}" for p in ("scene", "bio") for x in ("render", "pick", "info", "snapshot")}
 
 
 class Handler(BaseHTTPRequestHandler):
