@@ -68,6 +68,10 @@ def _connectivity(n_a: int, per: int, p_in: float, p_x: float, boost: float, see
 
 
 def build_spec(form: dict) -> dict:
+    # A FORM READ BACK OFF A SPEC HAS HOLES: `p_within`, `p_cross` and `boost` cannot be recovered
+    # from a written connectome (the edges are there, the probabilities that drew them are not), so
+    # the reader returns None and a patch of one unrelated field used to die on float(None).
+    form = {k: v for k, v in (form or {}).items() if v is not None}
     name = str(form.get("name") or "ctrnn").strip()
     n_a = int(form.get("n_assemblies", 3)); per = int(form.get("per_assembly", 16))
     if n_a < 1 or per < 1:
@@ -139,7 +143,10 @@ def build_spec(form: dict) -> dict:
         "fields": {"omega": {"frame": "grid", "res": 64, "components": 1}},
         "operators": ops,
         "schedule": sched,
-        "plotting": {"renderer": "neural_panel", "background": "black",
+        "plotting": {"renderer": ("vtk_points" if str(form.get("render", "connectivity")) == "morphology"
+                                  else "neural_panel"),
+                     "color_field": ("x" if str(form.get("render", "connectivity")) == "morphology" else None),
+                     "background": "black",
                      "panel": {k: v for k, v in panel.items() if v is not None},
                      "max_frames": int(form.get("movie_frames", 300)), "stills": int(form.get("stills", 10)),
                      "keep_stills": True},
@@ -148,6 +155,7 @@ def build_spec(form: dict) -> dict:
 
 def form_from_spec(spec: dict) -> dict:
     g = spec.get("general") or {}
+    _r = "morphology" if str(((spec.get("plotting") or {}).get("renderer") or "")) == "vtk_points" else "connectivity"
     sets = spec.get("sets") or {}
     ops = {o.get("op"): o for o in (spec.get("operators") or [])}
     pl = spec.get("plotting") or {}
@@ -157,7 +165,7 @@ def form_from_spec(spec: dict) -> dict:
     n = sum(int((t or {}).get("count", 0)) for t in ntypes.values()) or 1
     n_e = sum(int((t or {}).get("count", 0)) for t in ntypes.values() if str((t or {}).get("sign", "")).upper().startswith("E"))
     pulse = ops.get("activation_pulse") or {}
-    return {"name": g.get("name", ""), "n_assemblies": (sets.get("assembly") or {}).get("n", 3),
+    return {"name": g.get("name", ""), "render": _r, "n_assemblies": (sets.get("assembly") or {}).get("n", 3),
             "per_assembly": (sets.get("neuron") or {}).get("per_parent", 16), "p_within": None, "p_cross": None,
             "boost": None, "frac_exc": (n_e / n) if dale else 0.8, "dale": int(dale),
             "afferent": int("E_aff" in ntypes), "drive": (ops.get("neuron_drive") or {}).get("gain", 0.0),
@@ -170,6 +178,7 @@ def form_from_spec(spec: dict) -> dict:
 FORM_HTML = r'''
 
  <div class="row"><label>name</label><input id="name" value="ctrnn_gui"></div>
+ <div class="row"><label title="what the picture is: the circuit panel, or the neurons' own morphology coloured by their activity">render</label><select id="render" style="width:150px" onchange="setRender()"><option value="connectivity">connectivity panel</option><option value="morphology">3D morphology</option></select> <span style="color:#778;font-size:11px">morphology needs a spec whose neurons carry a region</span></div>
  <div class="row"><label>assemblies</label><input id="n_assemblies" class="short" value="3"> <label style="width:70px">neurons each</label><input id="per_assembly" class="short" value="16"></div>
  <div class="row"><label title="share of excitatory neurons; the rest are inhibitory">excitatory</label><input id="frac_exc" class="short" value="0.8"> <label style="width:70px" title="Dale's law: every synapse takes the sign of its presynaptic neuron"><input type="checkbox" id="dale" checked style="width:auto"> Dale</label> <label style="width:80px" title="an afferent E sub-population receives the drive"><input type="checkbox" id="afferent" checked style="width:auto"> afferent</label></div>
  <div class="row"><label title="current into the afferent neurons from the field pulse (0 = none)">drive</label><input id="drive" class="short" value="1.0"></div>
@@ -182,6 +191,8 @@ FORM_HTML = r'''
 '''
 
 FORM_JS = r'''
+const SEL=['render'];
+window.setRender=async function(){await post('/api/scene/patch',{form:{render:$('render').value}});};
 const NUM=['n_assemblies','per_assembly','p_within','p_cross','boost','frac_exc','drive','gain','noise','seed','pulse_period','pulse_duration','pulse_radius','n_frames','dt','movie_frames','stills'];
 const CHK=['dale','afferent'];
 window.tabForm=function(){const f={name:$('name').value};for(const k of NUM)f[k]=+$(k).value;for(const k of CHK)f[k]=$(k).checked?1:0;return f;};
