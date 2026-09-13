@@ -357,6 +357,23 @@ class View:
         from (`resolve_run`), or None."""
         name = os.path.splitext(os.path.basename(self.spec_path))[0]
         cands = []
+        # WHERE THE PIPELINE ACTUALLY WROTE IT. A run takes its output folder from the spec's OWN
+        # folder (`config/si_material/x.yaml` -> `graphs_data/si_material/x`), so a spec opened
+        # from anywhere but config/studio lands outside the page's own tree; the page then showed
+        # "no frames" over a complete run, or an older, aborted one that happened to sit in studio.
+        try:
+            import glob as _glob
+            from plexus.paths import graphs_data_path
+            pre = os.path.basename(os.path.dirname(os.path.abspath(self.spec_path)))
+            cands.append(os.path.join(graphs_data_path(), pre, name))
+            # AND WHEREVER IT LANDED. `/api/scene/open` copies a spec into config/studio, so the
+            # folder the page holds says "studio" while the run wrote under the spec's ORIGINAL
+            # type (config/si_material -> graphs_data/si_material). One glob finds it, and costs
+            # nothing next to reading the trajectory it points at.
+            cands += sorted(os.path.dirname(p) for p in
+                            _glob.glob(os.path.join(graphs_data_path(), "*", name, "trajectory.npz")))
+        except Exception:                                        # noqa: BLE001
+            pass
         try:
             from plexus.gui import studio
             cands.append(studio.out_dir(name))

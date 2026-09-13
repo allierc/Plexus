@@ -196,7 +196,15 @@ cpoll();
 // picked up by poll() instead.
 const q=new URLSearchParams(location.search);
 if(q.get('name')){{specName=q.get('name');fetch('/api/scene/spec?name='+encodeURIComponent(specName)+'&tab='+TAB).then(r=>r.json()).then(j=>{{if(j.raw){{$('yamltext').value=j.raw;}}if(j.form)fillForm(j.form);reseed();}});}}
-else{{fetch('/api/scene/state').then(r=>r.json()).then(st=>{{if(st.name)return;if(DEFAULT_SPEC)openSpec(DEFAULT_SPEC);else build();}}).catch(()=>{{}});}}
+else{{
+// THE DEFAULT IS A FALLBACK, NOT A GREETING. A page that loads while the server is still opening a
+// scene used to BUILD its default over it -- so every relaunch replaced whatever was being shown
+// with the tab's own 27 cubes, five times in one session. Wait, look again, and build only if the
+// session is still empty.
+(async()=>{{for(let i=0;i<8;i++){{
+  try{{const st=await (await fetch('/api/scene/state')).json();if(st.name||specName)return;}}catch(e){{}}
+  await new Promise(r=>setTimeout(r,400));}}
+ if(DEFAULT_SPEC)openSpec(DEFAULT_SPEC);else build();}})();}}
 </script></body></html>
 """
 

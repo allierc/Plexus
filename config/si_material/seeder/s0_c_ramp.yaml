@@ -4,10 +4,10 @@ general: {name: s0_c_ramp, seed: 1, n_frames: 600, dt: 0.002, boundary: wall, di
 sets:
   cell:
     n: 2
-    start: [[0.14, 0.42, 0.25], [0.25, 0.18, 0.25]]   # the ball starts over the ramp's high end; the ramp is placed by its `block`
+    start: [[0.14, 0.38, 0.25], [0.25, 0.18, 0.25]]   # the ball starts over the ramp's high end; the ramp is placed by its `block`
     types:
       ramp: {count: 1, material: elastic, youngs: 3000000.0, density: 2500.0, block: [0.06, 0.16, 0.12, 0.44, 0.20, 0.38], rotate: [0, 0, 18]}   # a SLAB, not a cube: a ramp needs an extent per axis, which `block` gives and `shape: cube` cannot
-      ball: {count: 1, material: elastic, youngs: 300000.0, density: 1000.0, shape: ball}
+      ball: {count: 1, material: elastic, youngs: 300000.0, density: 2200.0, shape: ball}   # denser -> smaller for the same mass: the ball used to poke through the ceiling
   mpm_particle: {parent: cell, per_parent: 14000, radius: 0.03, density: 1500.0, particle_mass: 2.0e-4}
 fields: {mpm_grid: {frame: mpm_grid, n_grid: 96}}
 operators:

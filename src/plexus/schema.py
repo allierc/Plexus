@@ -511,7 +511,7 @@ def load(path: str) -> Spec:
                         "material", "density", "tau", "bulk_modulus", "shape",
                         "eta",                        # per-type dynamic viscosity (mpm_viscosity)
                         "fill",                       # a block's point layout (entities: random | lattice)
-                        "sign", "role", "shape", "aspect", "axis", "hollow", "rotate", "repeat", "pitch", "scatter", "fill", "obj"} | used_props  # a neuron type's Dale sign and circuit role (neural_panel)
+                        "sign", "role", "shape", "form", "aspect", "axis", "hollow", "rotate", "repeat", "pitch", "scatter", "fill", "obj"} | used_props  # a neuron type's Dale sign and circuit role (neural_panel)
     for sname, s in raw["sets"].items():
         for tname, t in s.get("types", {}).items():
             for k in t:

@@ -175,9 +175,17 @@ _VALID_PRE_FOLDERS = {f for f, _ in _PRE_FOLDER_RULES}
 
 
 def validate_pre_folder(pre_folder: str) -> None:
+    """The folder a spec sits in must name a simulation type -- and may then say more.
+
+    A TYPE MAY HAVE SUBFOLDERS. `config/si_material/seeder/s0_a.yaml` is a si_material spec kept
+    in a drawer, and refusing it forced every scene of a series into one flat folder beside two
+    hundred others. The FIRST segment is the type (it decides the output tree and the loaders);
+    the rest is filing, and travels with the run so `graphs_data/si_material/seeder/s0_a` mirrors
+    where the spec lives.
+    """
     if not pre_folder:
         return
-    name = pre_folder.rstrip("/")
+    name = pre_folder.rstrip("/").split("/", 1)[0]
     assert name in _VALID_PRE_FOLDERS, (
         f"pre_folder {pre_folder!r} is not a known simulation type "
         f"(expected one of: {', '.join(sorted(_VALID_PRE_FOLDERS))})")
@@ -247,7 +255,13 @@ def resolve_config(config_name: str) -> tuple[str, str, str]:
     repo-relative bare/`type/`-prefixed name (folder inferred / explicit)."""
     if os.path.isfile(config_name) or os.path.isabs(config_name) or config_name.endswith(".yaml"):
         yaml_file = config_name if config_name.endswith(".yaml") else config_name + ".yaml"
-        pre_folder = os.path.basename(os.path.dirname(os.path.abspath(yaml_file))) + "/"
+        # THE FOLDER IS EVERYTHING UNDER `config/`, not just the last segment: a spec kept in
+        # `config/si_material/seeder/` is a si_material spec in a drawer, and taking only the
+        # parent read the drawer's name as the type and refused to run it.
+        _d = os.path.dirname(os.path.abspath(yaml_file))
+        _root = os.path.abspath(config_path(""))
+        pre_folder = (os.path.relpath(_d, _root) if _d.startswith(_root + os.sep) or _d == _root
+                      else os.path.basename(_d)) + "/"
         name = os.path.splitext(os.path.basename(yaml_file))[0]
         return yaml_file, pre_folder, name
     rel, pre_folder = add_pre_folder(config_name)

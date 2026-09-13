@@ -1,0 +1,22 @@
+# S1-E "a bunny of snow falling into water" -- `form: mesh:bunny`, the shape LIBRARY: a name, not a
+# path. The mesh is scaled so ITS volume equals the volume the particle mass fixes, so the bunny
+# weighs what a cube of the same mass would.
+general: {name: s1_e_bunny, seed: 1, n_frames: 500, dt: 0.002, boundary: wall, dim: 3, world: [0.5, 0.5, 0.5], save_data: true, record_cap: 301, units: {length_um: 1000000.0, time_s: 1.0, force_nN: 1000000000.0}}
+sets:
+  cell:
+    n: 2
+    start: [[0.25, 0.30, 0.25], [0.25, 0.30, 0.25]]
+    types:
+      bunny: {count: 1, material: snow, youngs: 900000.0, density: 400.0, shape: "mesh:bunny"}
+      pool:  {count: 1, material: liquid, bulk_modulus: 150000.0, density: 1000.0, eta: 0.001, block: [0.03, 0.02, 0.03, 0.47, 0.13, 0.47]}
+  mpm_particle: {parent: cell, per_parent: 25000, radius: 0.03, density: 1000.0, particle_mass: 2.0e-5}
+fields: {mpm_grid: {frame: mpm_grid, n_grid: 96}}
+operators:
+- {op: gravity, at: cell, g: 9.81}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_viscosity, at: mpm_particle, eta: 0.001}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.3, wall_damp_mode: per_impact, vmax: 1000000000.0}
+schedule: [gravity, {substep_dt: 2.0e-5, steps: [mpm_strain, mpm_viscosity, mpm_scatter, mpm_grid_update, mpm_gather]}]
+plotting: {renderer: vtk_points, background: black, up_axis: 1, box_frame: true, hide_sets: [cell], render_3d: dots, dot_size: 2.0, dot_shading: body, colors: {bunny: [0.95, 0.95, 0.98], pool: [0.3, 0.6, 1.0]}}
