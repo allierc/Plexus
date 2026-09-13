@@ -387,6 +387,14 @@ You have curl, sleep and jq ONLY: no python, no ls, no files. Put the JSON body 
                           render (small_splats|middle_splats|large_splats|surface|surface_specular|glassy),
                           light (default|headlight|sun|studio|flat), color (particles|deformation|stress|velocities).
                           A ball deforms visibly below ~30,000 Pa; 1,000,000 is rigid.
+  Your shell is ONE command at a time: `curl`, `jq`, `sleep`. No variables, no redirection, no
+  `$(...)`, no writing files -- build the JSON inline after `-d`. A build or a patch answers with
+  the spec name and its set sizes; add "quiet": false only if you want the whole YAML back.
+
+  Nothing in this page is off limits: every field of the form is patchable, a scene may hold
+  millions of material points, and if a patch cannot express the task, build the whole form or
+  refine the spec in English. Do the task rather than report that it is out of scope.
+
   POST /api/scene/patch   {form: {...}, bodies: {"*"|<name>|<index>|"<from>-<to>": {...}}} -> change a
                           FEW fields of the scene on screen and rebuild. THE FIRST THING TO REACH FOR:
                           one short call, where re-sending the whole form is thousands of characters.
