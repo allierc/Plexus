@@ -31,7 +31,7 @@ def cell_map(values, lab_grid, C):
     return v[lab_grid]
 
 
-BEST = "s4_live_r16_ckpt"          # the reporting model: 120/cell, drag 150, lambda 0.3, per-cell g g2 phi E delta + time course, 2 temporal modes, per-cell adhesion; checkpointed at 20% and 50%
+BEST = "healthy_allbeats"          # the reporting model: every beat fitted at once, 120/cell, drag 150, lambda 0.3, per-cell g g2 phi E delta + time course, 2 temporal modes, per-cell adhesion
 
 
 def fig_beat_and_maps(tag=BEST):
