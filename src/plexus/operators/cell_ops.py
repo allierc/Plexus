@@ -118,7 +118,7 @@ class Compartment:
 #                    `thickness` thick, tilted by `skew` -- the 9 triplet microtubules of a
 #                    centriole.
 #
-# WHY THE ORGANELLE SHAPES ARE NOT ALL DISCS AND CAPSULES. They were, and the picture said so: a
+# WHY THE ORGANELLE SHAPES ARE NOT ALL DISCS AND CAPSULES. Drawn that way the picture says so: a
 # Golgi drawn as one flat disc is indistinguishable from an ER cisterna drawn as one flat disc,
 # and a mitochondrion drawn as a straight cylinder is indistinguishable from a piece of
 # cytoskeleton. The shapes below are what makes the atlas an atlas rather than nine colours --

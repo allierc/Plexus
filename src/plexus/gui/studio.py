@@ -5,9 +5,9 @@ where the pipeline puts that spec's run; `artefacts(name)` is what the run wrote
 `author_spec` is the one Claude call the page makes on its own behalf -- an English EDIT of the
 spec on screen (`/api/scene/refine`), primed once per server with the reference corpus.
 
-The Studio page that used to live here -- prompt-to-scene, knobs, previews in a warm worker
-process -- is retired: the one page (`gui/app.py`) builds scenes from forms and runs them
-in-process through `plexus.pipeline.generate`.
+There is ONE page, `gui/app.py`: it builds scenes from forms and runs them in-process through
+`plexus.pipeline.generate`. This module is only what that page asks Claude for, and where the
+answers land.
 """
 from __future__ import annotations
 

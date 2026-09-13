@@ -914,8 +914,8 @@ def renumber_did_not_act(T, **kw):
 
     When a cell dies or a T1 drops a face the cells are renumbered, and every per-cell array must be
     permuted to match or the chemistry ends up on the wrong cells. `Hierarchy.renumber_set` does
-    that and returns False if it could not. On 23 August it returned False on EVERY call -- its
-    guard tested `hasattr(self.levels, "get")` and `levels` is an `nn.ModuleDict`, which has no
+    that and returns False if it could not. A guard testing `hasattr(self.levels, "get")` makes it
+    return False on EVERY call, `levels` being an `nn.ModuleDict`, which has no
     `.get` -- and both call sites discarded the bool. Nineteen twin rows stayed green while the
     chemistry of every run that killed a cell was scrambled; one run went half-NaN from frame 889
     and stamped itself `valid_evidence: True`.

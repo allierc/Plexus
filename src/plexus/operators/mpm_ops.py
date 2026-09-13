@@ -676,35 +676,24 @@ class MPMScatter(MPMWrites, Exchange):
         dpos_phys = (offsets[None] - fx[:, None, :]) * dx
         mom = mass[:, None, None] * V[:, None, :] + (affine[:, None] @ dpos_phys[..., None]).squeeze(-1)
         # THE GRID IS SHARED BY EVERY SET THAT SCATTERS INTO IT, so only the FIRST scatter of a
-        # micro-step may zero it. This used to allocate fresh zeros unconditionally and assign
-        # them, which meant a spec with two particle sets kept only the LAST one: nucleus momentum
-        # was deposited, then thrown away by the cytosol's scatter, and the grid solve ran on the
-        # cytosol alone.
+        # micro-step may zero it. Allocating fresh zeros unconditionally keeps only the LAST set:
+        # the nucleus deposits its momentum, the cytosol's scatter throws it away, and the grid
+        # solve runs on the cytosol alone.
         #
-        # WHAT IT LOOKED LIKE, because like the substep-binding defect it does not announce itself.
-        # A nucleus falling inside a cytosol shell fell SLOWER than gravity (z = 0.7061 at the tick
-        # free-fall puts at 0.6835) and was crushed from an rms thickness of 0.0248 to 0.0093 while
-        # still in mid-air, where nothing was touching it. The same nucleus with no cytosol tracked
-        # free-fall to four decimals and held 0.0248 exactly. It reads as "the nucleus is too soft"
-        # and it is actually "the nucleus is gathering a velocity field it never contributed to":
-        # inside the cavity the cytosol deposits no mass, so `gmv / gm.clamp(1e-10)` there is the
-        # B-spline tails divided by nearly nothing.
+        # IT DOES NOT ANNOUNCE ITSELF. The nucleus then falls SLOWER than gravity and is crushed
+        # in mid-air with nothing touching it, which reads as "the nucleus is too soft" and is
+        # actually "the nucleus is gathering a velocity field it never contributed to": inside the
+        # cavity the cytosol deposits no mass, so `gmv / gm.clamp(1e-10)` there is the B-spline
+        # tails divided by nearly nothing. It only bites on multi-SET MPM -- multi-material within
+        # one set uses `types:` and one scatter -- so single-set runs are unaffected.
         #
-        # WHY IT SURVIVED THIS LONG. Every MPM spec in the corpus scatters ONE set -- multi-material
-        # is done with `types:` inside a single `mpm_particle` set (see
-        # config/material/material_3d_multimaterial.yaml: jelly + water + snow, one set, one
-        # scatter). Multi-SET MPM is what the composed cell introduced, and it is the only thing
-        # this ever affected. With one set the stamp is always stale and the zeros are always
-        # fresh, so single-set runs stay bit-identical.
-        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. Deciding it from
-        # a per-substep counter -- a python int the engine advances, compared against a stamp on
-        # the field -- works, and it is a side effect no CUDA-graph replay can reproduce; it also
-        # makes dynamo recompile every substep, since it specialises on integer attributes of an
-        # nn.Module. The engine binds the i-th OCCURRENCE of a token to
-        # the i-th INSTANCE, so occurrence 0 of `mpm_scatter` for a given grid is ALWAYS the first
-        # one in a substep: the engine stamps `_zeroes_grid` on it when `inst` is built.
+        # WHICH SCATTER ZEROES IS STATIC, so it is not asked at run time: a per-substep counter
+        # would be a side effect no CUDA-graph replay can reproduce, and it would make dynamo
+        # recompile every substep by specialising on an integer attribute. The engine binds the
+        # i-th occurrence of a token to the i-th instance, so occurrence 0 for a given grid is
+        # always the first in a substep, and it stamps `_zeroes_grid` when `inst` is built.
         _fresh = getattr(self, "_zeroes_grid", True)
-        # STEP 2: WRITE INTO THE FIELD'S OWN BUFFERS, never a fresh allocation. Assigning
+        # WRITE INTO THE FIELD'S OWN BUFFERS, never a fresh allocation. Assigning
         # `g.m = torch.zeros(...)` rebinds the attribute to new storage every substep; a captured
         # graph holds the address it saw at capture time, so the replay silently writes somewhere
         # the rest of the run no longer reads. That failure is SILENT: capture succeeds, nothing
@@ -811,33 +800,29 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
         # the floor weakens it precisely where it is supposed to work, and progressively worse the
         # more particles a specification uses. Setting `csf_rho` makes this floor inert.
         self.csf_mass_floor = params.get("csf_mass_floor", None)   # None -> derived
-        # WHAT "COLOUR = 1" MEANS -- WHICH THIS BLOCK NEVER KNEW, AND THE REASON THE PARAGRAPH ABOVE
-        # IS TREATING A SYMPTOM. `mpm_scatter` deposits `weight * mass * is_liquid`, so `gc` is a
-        # liquid MASS PER NODE in absolute units, not the dimensionless volume fraction (0 in air,
-        # 1 in liquid) that Brackbill's f = sigma * kappa * grad(c) is written for. On an all-liquid
-        # spec the "colour" is bitwise the mass field: max |gc - gm| / gm over occupied nodes is
-        # 2.7e-7 on material_3d_water_drop and 2.5e-7 on material_3d_water_dam_20m.
+        # WHAT "COLOUR = 1" MEANS, and why the floor above is only treating a symptom.
+        # `mpm_scatter` deposits `weight * mass * is_liquid`, so `gc` is a liquid MASS PER NODE in
+        # absolute units -- on an all-liquid spec it is bitwise the mass field -- and not the
+        # dimensionless volume fraction (0 in air, 1 in liquid) that Brackbill's
+        # f = sigma * kappa * grad(c) is written for.
         #
-        # Setting `csf_rho` to the liquid's density divides it by the mass of one FULL liquid cell,
-        # rho * dx^D, and that single division is the repair. MEASURED COST OF NOT DOING IT: the
-        # delivered acceleration is short by exactly 1/(rho * dx^D) -- 8.887e5 at n_grid 96 against
-        # the predicted 96^3 = 884,736 (0.4%), and 7.356e6 at 192 against 192^3 = 7.078e6 (3.9%).
-        # So `surface_tension` is not a tension: it is a tension divided by a cell mass, and its
-        # PHYSICAL MEANING CHANGES WITH `n_grid`. `surface_tension: 60` on the dam at 192^3 is a
-        # physical sigma of 8.5e-6 against rho*g*R^2 = 0.092 for its 0.076-half-width blocks --
-        # BOND NUMBER 10,900, gravity beating capillarity by four orders of magnitude. That is the
-        # whole content of "sigma 0 -> 150 moves the centre of mass by 0.0001 of the box".
+        # Setting `csf_rho` to the liquid's density divides by the mass of one FULL liquid cell,
+        # rho * dx^D, and that single division is the repair. Without it the delivered acceleration
+        # is short by exactly that factor, so `surface_tension` is not a tension: it is a tension
+        # divided by a cell mass, and its PHYSICAL MEANING CHANGES WITH `n_grid`. At n_grid 192 a
+        # declared 60 is a physical sigma of order 1e-5, a Bond number in the thousands -- gravity
+        # beating capillarity by four orders of magnitude -- which is the whole content of "sigma
+        # 0 -> 150 moves the centre of mass by 0.0001 of the box".
         #
-        # DEFAULT 0.0 KEEPS THE OLD PATH BIT-IDENTICAL, because the branch is a static Python `if`
-        # and `range(0)` emits no ops, so CUDA-graph capture is unchanged. A spec that sets it MUST
-        # re-fit its own sigma -- sigma_new = sigma_old * rho * dx^D for parity, or from a Bond
-        # number for physics: rho*g*L^2 gives Bond 1 (0.64 on the drop at 96^3, 0.092 on the dam).
+        # DEFAULT 0.0 KEEPS THE OLD PATH BIT-IDENTICAL, the branch being a static Python `if` and
+        # `range(0)` emitting no ops, so CUDA-graph capture is unchanged. A spec that sets it MUST
+        # re-fit its sigma -- sigma_new = sigma_old * rho * dx^D for parity, or from a Bond number
+        # for physics, rho*g*L^2 giving Bond 1.
         self.csf_rho = float(params.get("csf_rho", 0.0))
         # THE INTERFACE TEST NEEDS THE SAME REFERENCE, and for want of it selects the bulk.
         # `gmag > 0.02 * gmag.max()` is a percentile of a running maximum with no absolute scale,
         # and the P2G shot noise at 8 particles per cell gives the BULK a |grad c| of the same order
-        # as the interface's, so a 2% cut admits everything: measured 98.1% OF OCCUPIED NODES on
-        # material_3d_water_drop and 97.7% on material_3d_water_dam_20m. It is an occupancy mask
+        # as the interface's, so a 2% cut admits nearly every occupied node. It is an occupancy mask
         # wearing an interface's name. An absolute band on the volume fraction cuts it to 21.7% and
         # 25.8% of occupied at `csf_band: 0.2`.
         #
@@ -931,34 +916,21 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
             print(f"[warn] {type(self).__name__}: wall_friction {self.wall_friction:g} is NOT applied "
                   f"by this implementation -- only the default mpm_grid_update imposes Coulomb "
                   f"friction at the walls. The run continues frictionless.", flush=True)
-        # A MOVING PLATEN, AS A GRID VELOCITY BOUNDARY CONDITION.
+        # A MOVING PLATEN, AS A GRID VELOCITY BOUNDARY CONDITION: clamp the normal grid velocity
+        # of every node beyond the plate to the PLATE'S OWN velocity, in the same place and the
+        # same way as the reflective domain walls.
         #
-        # WHY IT CANNOT BE A POSITION PROJECTION, which is what `plate_confine` does and what the
-        # first squash experiment used. In MPM the stress a material carries comes from its
-        # deformation gradient F, and `mpm_strain` updates F from the VELOCITY GRADIENT read off
-        # the grid. Teleporting a particle's position never enters that path: the constitutive
-        # model is never told it has been compressed, so no stress builds, nothing pushes back,
-        # and nothing bulges sideways. The body's height falls, its equatorial radius does not
-        # move and its volume falls with the height. That is a CROP, not a squash: matter
-        # displaced along the plate normal and never returned laterally.
+        # IT CANNOT BE A POSITION PROJECTION. Stress comes from the deformation gradient F, and
+        # `mpm_strain` updates F from the VELOCITY GRADIENT read off the grid, so teleporting a
+        # particle -- which is what `plate_confine` does, after the substep block -- never enters
+        # that path. The constitutive model is never told it has been compressed, so no stress
+        # builds and nothing bulges sideways: the body's height falls, its equatorial radius does
+        # not move, and its volume falls with the height. That is a CROP, not a squash.
         #
-        # Imposed here instead, in the same place and the same way as the reflective domain walls:
-        # clamp the normal grid velocity of every node beyond the plate to the PLATE'S OWN
-        # velocity. Compression then enters the velocity field, F contracts in z, the elastic
-        # model generates stress, and the lateral bulge and volume conservation come out of the
-        # physics rather than being hoped for.
-        #
-        # A MOVING PLATEN, IMPOSED ON THE GRID. `plate_confine` projects particle POSITIONS after
-        # the substep block, and a projection is invisible to the constitutive model: stress comes
-        # from F, F is updated from the velocity gradient, and teleporting a particle changes
-        # neither. The body is then cropped rather than squashed -- its height falls, its
-        # equatorial radius does not move, and its volume falls with its height.
-        #
-        # A rigid obstacle cannot fix it either: `_walls3d` zeroes grid velocity inside a solid,
+        # A rigid obstacle cannot do it either: `_walls3d` zeroes grid velocity inside a solid,
         # which stops material entering but cannot expel what is already there. A plate has to
-        # CARRY a velocity, so the nodes it covers move at the plate's speed, the field near it is
-        # compressive, F contracts along the axis, and the elastic response pushes material out
-        # sideways. That is the difference between squashing and clipping.
+        # CARRY a velocity, so the field near it is compressive, F contracts along the axis, and
+        # the lateral bulge and the volume conservation come out of the physics.
         self.plate_axis = params.get("plate_axis", None)
         self.plate_axis = None if self.plate_axis is None else int(self.plate_axis)
         self.plate_centre = float(params.get("plate_centre", 0.5))
@@ -1193,11 +1165,11 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
                 gv = gvv.view(nx * ny, 2)
             gv = torch.where(walls[:, None], torch.zeros_like(gv), gv)  # interior wall BC
         else:                                                       # --- 3D: CSF + reflective box walls ---
-            # SURFACE TENSION IN 3D. Until now this whole term lived inside the `D == 2` branch
-            # above, so `surface_tension: 60.0` in a `dim: 3` spec was read, stored, and never
-            # used. It cost a rung of the cell ladder: a liquid cytosol dropped onto the floor
-            # spread into a one-particle-thick puddle covering the entire domain, which reads as
-            # "the liquid is too soft" and is actually "there is no cohesion term at all". A liquid
+            # SURFACE TENSION IN 3D. With this term confined to the `D == 2` branch above,
+            # `surface_tension` in a `dim: 3` spec is read, stored and never used -- and a liquid
+            # cytosol dropped on the floor then spreads into a one-particle-thick puddle over the
+            # whole domain, which reads as "the liquid is too soft" and is actually "there is no
+            # cohesion term at all". A liquid
             # in MLS-MPM has mu = 0 by construction -- it resists volume change and nothing else --
             # so surface tension is not a refinement on top of the constitutive model, it is the
             # ONLY thing that makes a droplet a droplet.
@@ -1226,31 +1198,22 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
                 nrm = [gk / (gmag + eps) for gk in grad]
                 kappa = -sum((torch.roll(nrm[k], -1, k) - torch.roll(nrm[k], 1, k)) * (0.5 * inv_dx)
                              for k in range(D))
-                # ONLY WHERE THERE IS AN INTERFACE -- the comment was always right and the test never
-                # enforced it. `gmag > 0.02 * gmag.max()` selects 98.1% of OCCUPIED nodes on
-                # material_3d_water_drop; the band selects 21.7%. The mass clause is what makes
-                # `csf_mass_floor` inert rather than load-bearing: the lightest node admitted holds
-                # csf_band * rho * dx^D = 2.3e-7 at band 0.2 on the drop, 23x the 1e-8 floor, so
-                # masked nodes with gm == 0 go 2.6% -> 0.0% and floor-binding 16.6% -> 0.0%.
-                # THE BAND IS A GAIN, NOT ONLY A FILTER -- COMPENSATE FOR IT.
-                # The CSF force is f = sigma*kappa*grad(c), and the TOTAL impulse across an
-                # interface telescopes: int grad(c) dx = c_in - c_out. Restricting the force to
-                # `band < c < 1-band` therefore delivers exactly (1 - 2*band) OF THE TENSION,
-                # whatever the shape of the profile -- it is the fundamental theorem, not an
-                # approximation. The default band 0.2 was throwing away 40% of sigma by
-                # construction.
+                # ONLY WHERE THERE IS AN INTERFACE. A gradient-magnitude test admits nearly every
+                # occupied node; the colour band admits a fifth of them. The mass clause is also
+                # what makes `csf_mass_floor` inert rather than load-bearing -- the lightest node
+                # the band admits holds csf_band * rho * dx^D, orders above the floor.
                 #
-                # MEASURED on a Young-Laplace ladder (a sphere in zero gravity compresses until
-                # K(1-J) = 2 sigma/R, so mean(J) = 1 - 2 sigma/(R K), nothing fitted), R = 10 mm,
-                # sigma 0.072, K 1e4, delivered fraction of the declared tension:
-                #     band 0.20 -> 0.472      band 0.10 -> 0.736
-                #     band 0.05 -> 0.887      band 0.02 -> 0.972
-                # against the predicted 0.60 / 0.80 / 0.90 / 0.96. The trend is the band's, and it
-                # goes to 1 as the band closes.
+                # THE BAND IS A GAIN, NOT ONLY A FILTER, SO COMPENSATE FOR IT. The force is
+                # f = sigma*kappa*grad(c), and the total impulse across an interface telescopes:
+                # int grad(c) dx = c_in - c_out. Restricting it to `band < c < 1-band` therefore
+                # delivers exactly (1 - 2*band) of the tension, whatever the shape of the profile
+                # -- the fundamental theorem, not an approximation -- so a band of 0.2 throws away
+                # 40% of sigma by construction. A Young-Laplace ladder (mean(J) = 1 - 2 sigma/(R K),
+                # nothing fitted) follows that prediction and goes to 1 as the band closes.
                 #
-                # Dividing by (1 - 2*band) restores the magnitude while keeping the band doing its
-                # real job, which is to keep the force OFF the bulk: the interface test was never
-                # about how much tension to apply, only about where.
+                # Dividing by (1 - 2*band) restores the magnitude and leaves the band its real job,
+                # which is to keep the force OFF the bulk: the test was never about how much
+                # tension to apply, only about where.
                 _gain = 1.0 / max(1.0 - 2.0 * self.csf_band, 1e-6) if self.csf_band > 0 else 1.0
                 if self.csf_band > 0.0:
                     _mfull = self.csf_rho * dx ** D
@@ -1658,35 +1621,28 @@ class MPMStrain(MPMWrites, Lateral):
             if self.liquid_volume == "trace":
                 # A LIQUID AT REST BLEEDS ITS PRESSURE AWAY, and this is why.
                 #
-                # The liquid already drops SHAPE memory (F becomes isotropic below), so its whole
-                # state is the volume J -- and J is carried through F, i.e. multiplied by
-                # det(I + dt*C) every substep. The law it is discretising is dJ/dt = J*tr(C), whose
-                # exact step is J *= exp(dt*tr C). Those two agree to first order and NOT to second:
+                # A liquid drops SHAPE memory (F becomes isotropic below), so its whole state is
+                # the volume J -- carried through F, i.e. multiplied by det(I + dt*C) every substep.
+                # The law being discretised is dJ/dt = J*tr(C), whose exact step is J *= exp(dt*trC).
+                # Those agree to first order and NOT to second:
                 #
                 #     det(I + dt C)  = 1 + dt*trC + dt^2*(trC^2 - tr(C^2))/2 + dt^3*det C
                 #     exp(dt*trC)    = 1 + dt*trC + dt^2* trC^2            /2 + ...
                 #
-                # The difference is -dt^2*tr(C^2)/2, and tr(C^2) is a SUM OF SQUARES: it is positive
-                # whatever the sign of the noise, so it does not average out. Every substep multiplies
-                # J by slightly less than it should, and a column that is not moving at all loses its
-                # stored compression.
-                #
-                # MEASURED, on si_hydrostatic -- a 40 mm confined column whose free surface holds to
-                # 0.001 mm, i.e. mechanically dead still. The hydrostatic gradient dp/dd decays
-                # monotonically in TIME, -8.66% of rho*g at 0.33 s to -12.96% at 4.0 s: about
-                # 1.1% of the pressure per second, at rest.
+                # The difference is -dt^2*tr(C^2)/2, and tr(C^2) is a SUM OF SQUARES: positive
+                # whatever the sign of the noise, so it does not average out. Every substep
+                # multiplies J by slightly less than it should, and a column that is not moving at
+                # all loses its stored compression -- on the order of a percent per second.
                 #
                 # AND THE SCALING IDENTIFIES IT. Grid noise gives C ~ v_noise/dx and CFL gives
-                # dt ~ dx, so the accumulated bias over a fixed TIME goes as dt*tr(C^2) ~ v^2/dx --
-                # it gets WORSE as the mesh is refined. Measured -5.52% / -8.45% / -12.15% at
-                # n_grid 40 / 64 / 96, very nearly linear in 1/dx. It is also why `drag` HELPED
-                # (-8.44% with it, -12.11% without): drag suppresses exactly the v_noise that drives
-                # it. Wall contact was tested and is not involved (-8.44% vs -8.39% with it off).
+                # dt ~ dx, so the accumulated bias over a fixed TIME goes as dt*tr(C^2) ~ v^2/dx:
+                # it gets WORSE as the mesh is refined, very nearly linearly in 1/dx. It is also
+                # why `drag` helps, since drag suppresses exactly the v_noise that drives it.
                 #
-                # THE FIX, and it is what Taichi's mpm88/mpm99 do for water: advance the volume by
-                # its OWN first-order law, J *= 1 + dt*tr(C). That is no more accurate in dt than
-                # det(I + dt*C) -- both are first-order -- but it does not couple to the deviatoric
-                # part of C at all, so noise no longer has a preferred direction to push J in.
+                # THE FIX, which is what Taichi's mpm88/mpm99 do for water: advance the volume by
+                # its OWN first-order law, J *= 1 + dt*tr(C). No more accurate in dt -- both are
+                # first order -- but it does not couple to the deviatoric part of C at all, so
+                # noise has no preferred direction to push J in.
                 trC = p.C.diagonal(dim1=-2, dim2=-1).sum(-1)
                 J = torch.where(liquid, torch.linalg.det(p.F) * (1.0 + dt * trC), J)
             Jc = J.clamp(min=1e-6)
@@ -2394,9 +2350,7 @@ class MLSMPMMechanics(Exchange):
 
     # --- declared dependencies (no longer hidden inside the substep) ----- #
     REQUIRES_TYPE_PROPS = ["youngs"]
-    # a liquid has no Young's modulus (nu -> 1/2 makes E = 3K(1-2nu) -> 0); it has a bulk modulus,
-    # and for mu = 0 that IS lambda. Either spelling satisfies the requirement.
-    TYPE_PROP_ALTERNATIVES = {"youngs": ("bulk_modulus",)}                      # per-cell-type stiffness -> mu, la
+    TYPE_PROP_ALTERNATIVES = {"youngs": ("bulk_modulus",)}   # see `mpm_scatter`: for mu = 0, K IS lambda
     REQUIRES_BUFFERS = ["C", "F", "mass", "mu", "la", "p_vol"]  # per-particle (mpm_particle entity provisions them)
     REQUIRES_HSTATE = []                                  # body force = the PARENT set's accumulated delta (H.delta)
 
@@ -2422,24 +2376,17 @@ class MLSMPMMechanics(Exchange):
         self.substeps = int(params.get("substeps", 10))
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.a_max = float(params.get("a_max", 200.0))
-        # WHERE THE BODY FORCE IS APPLIED. "particle" (default, and every existing run) folds it
-        # into the particle velocity before P2G; "grid" hands the uniform part to the grid solve,
-        # which is where canonical MLS-MPM puts it. See _hand_body_force_to_grid for why the two
-        # are algebraically identical until the mass clamp binds, and for the measurement showing
-        # that on this spec family it does not.
+        # EVERY KNOB BELOW IS THE DECOMPOSED OPERATOR'S, AND MEANS WHAT IT MEANS THERE. This
+        # operator is the four steps fused, so it re-reads their parameters rather than defining
+        # any: `body_force` is `mpm_scatter`'s, `wall_damp` and `wall_contact_cells` are
+        # `mpm_gather`'s. Their docstrings and notes are the reference; duplicating them here
+        # would be a second copy free to drift from the bodies that are actually maintained.
         self.body_force = str(params.get("body_force", "particle"))
         if self.body_force not in ("particle", "grid"):
             raise ValueError(f"mpm_scatter: body_force must be 'particle' or 'grid', "
                              f"got {self.body_force!r}")    # clamp broadcast accel
         self.drag = float(params.get("drag", 40.0))       # Stokes drag (overdamped)
         self.wall_damp = float(params.get("wall_damp", 1.0))  # 1.0=elastic wall; <1 loses energy on bounce
-        # A LENGTH, AND THEREFORE A TRAP IN ANY BOX THAT IS NOT 1 UNIT WIDE. The contact test is
-        # `(x < cb) | (x > box[k] - cb)`, so in a 0.1 m box the historical 0.04 selects everything
-        # but a 0.02 m sliver -- the entire fluid reads as permanently in wall contact and is
-        # permanently damped. `wall_contact_cells` states it in the only scale the grid has:
-        # 0.04 / (1/96) = 3.84 cells, so the default reproduces 0.04 exactly at n_grid 96 and
-        # follows the world everywhere else. An explicit `wall_contact` still wins, for the specs
-        # that tuned it.
         self.wall_contact_cells = float(params.get("wall_contact_cells", 3.84))
         self.wall_contact = params.get("wall_contact", None)
         if self.wall_contact is not None:
@@ -2569,13 +2516,9 @@ def _wp_launch(kernel, dim, dev, inputs):
     THIS IS NOT A DETAIL. Warp launches on its OWN default stream for the device unless told
     otherwise, and PyTorch captures a CUDA graph on ITS current stream. Launched on a different
     stream, the warp kernels are simply NOT RECORDED into the graph: they run once, eagerly, while
-    the capture is being taken, and never again on any replay. The visible symptom is a simulation
-    that advances exactly one frame and then freezes -- `material_3d_ball_drop` sat at its seeded
-    mean height for all 640 frames, with the engine cheerfully reporting "substep captured as a
-    CUDA graph (4 operators, 21 replays/frame)".
-
-    Nothing caught it because `tools/mpm_warp_gate.py` sets `capture: false` on every spec it runs,
-    so the captured warp path had never once been compared against anything.
+    the capture is being taken, and never again on any replay. The symptom is a simulation that
+    advances exactly one frame and then freezes, while the engine cheerfully reports the substep
+    as captured. A gate that sets `capture: false` will never see it.
     """
     import torch as _t
     # `sync_enter=False`: ScopedStream's default is to make the new stream WAIT on the old one via

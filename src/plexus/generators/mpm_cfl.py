@@ -461,10 +461,10 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     # THE SUBSTEP COUNT IS ROUNDED AND THE STEP SIZE IS NOT. `engine.run` computes
     # `count = round(general.dt / substep_dt)` and then takes `count` steps of `substep_dt`, so the
     # frame advances `count * substep_dt` -- which equals `general.dt` only when the division is
-    # exact. It is silent otherwise, and it does not look like a clock error: measured on cell_02,
-    # substep_dt 2.0e-4 against dt 1.5e-3 rounds 7.5 up to 8 and advances 1.6e-3, 6.7% too much,
-    # which shows up as a 13.9% deviation in the fall trajectory and reads exactly like the
-    # integrator losing accuracy. Neighbouring values that DO divide evenly deviate by 0.1-0.2%.
+    # exact. It is silent otherwise, and it does not look like a clock error: substep_dt 2.0e-4
+    # against dt 1.5e-3 rounds 7.5 up to 8 and advances 1.6e-3, 6.7% too much, which shows up as a
+    # percent-level deviation in a fall trajectory and reads exactly like the integrator losing
+    # accuracy. Neighbouring values that DO divide evenly are two orders of magnitude closer.
     _dtf = float((spec.get("general") or {}).get("dt", 0.0)) if substeps is None else None
     if _dtf:
         _n = max(1, round(_dtf / micro_dt))
@@ -649,11 +649,10 @@ def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
 # PARTICLES PER CELL -- the other half of an MPM discretisation, and the one with no error message.
 #
 # `substep_dt` has the CFL check above; the grid resolution had nothing, so `n_grid` could be raised
-# without touching the particle count and the run would go quietly wrong. It cost a whole batch:
-# `material_3d_multimaterial` went from n_grid 64 to 192 at a fixed 100k particles per body, which
-# divides particles-per-cell by (192/64)^3 = 27 -- 43.3 to 1.61 -- and its snow block, which had
-# held its shape as a slightly compacted cube, collapsed into a flat pancake. That reads as a
-# material-parameter problem and is a sampling problem.
+# without touching the particle count and the run goes quietly wrong. Raising n_grid from 64 to
+# 192 at a fixed particle count divides particles-per-cell by (192/64)^3 = 27 -- tens per cell down
+# to one or two -- and a snow block that held its shape as a compacted cube collapses into a flat
+# pancake. That reads as a material-parameter problem and is a sampling problem.
 #
 # WHY 8. MPM carries the material on particles and solves on the grid, so a cell needs enough
 # particle samples to determine the local deformation: the convention is 2 per axis, hence 2^3 = 8

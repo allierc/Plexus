@@ -21,7 +21,9 @@ In the order they appear below:
     bm_secrete                  structural  new material as the surface it sits on grows
     bm_crosslink                rewire      new bonds between nodes that have drifted into range
     integrin_particle           entity      a material point of an integrin fibre
-    integrin_fibre_seed / _track / _pull   (renamed 2026-09-10: `integrin_*` now names the receptor clusters in integrin_ops.py)          fibres from the surface outward, bound at the tip
+    integrin_fibre_seed / _track / _pull    fibres from the surface outward, bound at the tip
+                                            (`integrin_*` names the receptor clusters, in
+                                            integrin_ops.py -- a different thing)
 
 THE TWO INTEGRIN FAMILIES ARE ONE HOP APART IN THE SAME CHAIN AND ARE NOT THE SAME THING.
 `integrin_adhesion` anchors the MEMBRANE to the EPITHELIUM. `integrin_seed`, `integrin_track` and

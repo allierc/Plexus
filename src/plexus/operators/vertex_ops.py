@@ -230,9 +230,9 @@ def cell_size(lvl, m, nF, pos_np=None, H=None, at="vertex"):
     # `centre`, which is the wedge apex, so every cone over it has zero volume: V0f, `V0` and
     # `v_ref` were all seeded at exactly 0 on every `sheet_*` run. Everything stated "as a fraction
     # of v_ref" then reads as a fraction of nothing -- `cell_die`'s extrusion threshold was 0, so a
-    # cell shrunk to the 1e-9 floor was never "small enough" and not one cell was ever extruded
-    # from a sheet (sheet_morphogen_die, 2026-09-09: 171 dying cells, 0 removed, and the patches
-    # of unremovable dead cells buckled the sheet). On a sheet the cell's size IS its area, the
+    # cell shrunk to the 1e-9 floor is never "small enough" and not one cell is ever extruded
+    # from a sheet, so the patches of unremovable dead cells buckle it (`sheet_morphogen_die` is
+    # the spec that shows it). On a sheet the cell's size IS its area, the
     # convention the paper's 2D model uses, and the reference is the seed-time median area,
     # cached at the first call exactly as `v_ref_poly` is. Decided by the geometry -- a seeded
     # wedge reference of zero -- and not by a parameter, like the other two conventions.
@@ -2066,12 +2066,11 @@ class Divide3D(Structural):
             carry = np.array([born.get(int(o), int(o)) for o in keep], np.int64)
         _carry_face_state(m, carry, dt, dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
-        # BIRTH VOLUME IS MEASURED, NOT BOOKKEPT (R1 of notes/size_cycle/SIZE_CYCLE_PLAN.md). The
-        # stored `Vbirth` used to be the arithmetic half `vf * p` of the mother, so in a converged
-        # population every cell's birth volume read `v_ref` and the adder's threshold
-        # `Vbirth + delta v_ref` was the sizer's `2 v_ref`: measured on the withdrawn
-        # cvd2_adder_tension, slope -1.05 of added volume on birth volume where an adder is 0,
-        # while the daughters the septum actually made varied by CV 0.27.
+        # BIRTH VOLUME IS MEASURED, NOT BOOKKEPT. Storing the arithmetic half `vf * p` of the
+        # mother makes every cell's birth volume read `v_ref` in a converged population, so the
+        # adder's threshold `Vbirth + delta v_ref` collapses into the sizer's `2 v_ref` -- a slope
+        # of -1 of added volume on birth volume where an adder is 0 -- while the daughters the
+        # septum actually made vary by a quarter.
         #
         # `Vbirth` IS THE ACTUAL VOLUME, in `cell_size`'s convention: provisionally the piece the
         # septum made, re-read at this operator's next call (see the top of forward) once the
@@ -4219,8 +4218,8 @@ def _face_ok_3d(ring, getp, normal=None):
     `normal` -- THE SHEET'S OWN NORMAL, for a flat tissue. "Outward" is a vesicle's word: the Newell
     normal is compared with the centroid, i.e. the radial from the origin. A sheet built by
     `build_sheet_mesh` lies IN the plane z = 0 through the origin, so that dot product is exactly
-    zero for every face and every T1 was refused as "inward-facing" -- the four `sheet_*` runs of
-    2026-09-09 flipped nothing while planar and only began to flip once they had buckled. With the
+    zero for every face and every T1 is refused as "inward-facing" -- a `sheet_*` run flips
+    nothing while it is planar and only begins to flip once it has buckled. With the
     plane declared (`cell_mechanics.plane_axis`), the orientation to keep is the one the builder
     fixed, CCW seen from +axis, and that is what `normal` compares against.
 
@@ -5156,9 +5155,8 @@ class ApicoBasalShapeEnergy3D(Lateral):
         self.kappa_h = float(params.get("kappa_h", 0.0))       # thickness-field stiffness; see the energy core
         # `p0` IS NOT ON THIS CONTRACT, AND A SPEC THAT SETS IT IS REFUSED. The mid-surface model
         # reads a target shape index; this energy has no perimeter term keyed to one -- its
-        # perimeter enters only through `gamma`, which is stated directly. A `p0` written here was
-        # silently ignored, which is how `cv_shape_low` came to be a sweep arm identical to its
-        # own baseline to four decimal places (finding 1 of notes/size_cycle/SIZE_CYCLE_PLAN.md).
+        # perimeter enters only through `gamma`, which is stated directly. Silently ignored, a
+        # `p0` written here makes a sweep arm identical to its own baseline to four decimals.
         if "p0" in params:
             raise ValueError(
                 "cell_mechanics[apicobasal] does not read `p0`: this energy has no perimeter term "
