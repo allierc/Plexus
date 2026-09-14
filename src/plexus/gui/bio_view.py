@@ -238,6 +238,10 @@ class View:
             self.p.renderer.ResetCameraClippingRange()
             self._scale_bar(cam, d)
             self._section_zoom()
+            # `near_side` CUTS BY THE VIEW, so the cut has to be re-made when the view turns --
+            # the surfaces as well as the pieces.
+            if self.lm is not None and hasattr(self.lm, "near_side_refresh"):
+                self.lm.near_side_refresh()
 
     def _section_zoom(self):
         """The section inset follows the view's zoom: its window is the declared span over the zoom,
@@ -353,6 +357,23 @@ class View:
         from (`resolve_run`), or None."""
         name = os.path.splitext(os.path.basename(self.spec_path))[0]
         cands = []
+        # WHERE THE PIPELINE ACTUALLY WROTE IT. A run takes its output folder from the spec's OWN
+        # folder (`config/si_material/x.yaml` -> `graphs_data/si_material/x`), so a spec opened
+        # from anywhere but config/studio lands outside the page's own tree; the page then showed
+        # "no frames" over a complete run, or an older, aborted one that happened to sit in studio.
+        try:
+            import glob as _glob
+            from plexus.paths import graphs_data_path
+            pre = os.path.basename(os.path.dirname(os.path.abspath(self.spec_path)))
+            cands.append(os.path.join(graphs_data_path(), pre, name))
+            # AND WHEREVER IT LANDED. `/api/scene/open` copies a spec into config/studio, so the
+            # folder the page holds says "studio" while the run wrote under the spec's ORIGINAL
+            # type (config/si_material -> graphs_data/si_material). One glob finds it, and costs
+            # nothing next to reading the trajectory it points at.
+            cands += sorted(os.path.dirname(p) for p in
+                            _glob.glob(os.path.join(graphs_data_path(), "*", name, "trajectory.npz")))
+        except Exception:                                        # noqa: BLE001
+            pass
         try:
             from plexus.gui import studio
             cands.append(studio.out_dir(name))
@@ -704,6 +725,37 @@ class View:
         score = np.where(ok, d2 + 0.02 * tol ** 2 * z, np.inf)             # nearer to the camera on a tie
         return ids[int(np.argmin(score))]
 
+    def _outline_contents(self, k: int):
+        """WHAT THE CELL HOLDS, RINGED IN THE SAME YELLOW: every piece or cluster whose parent is
+        this cell, drawn as a wireframe sphere of its own declared radius (`plotting.dot_radius`),
+        so a nucleus inside a picked cell is visible as a nucleus and not as a dot."""
+        import pyvista as pv
+        lm = self.lm
+        rad = (self.sim.plotting or {}).get("dot_radius") or {}
+        try:
+            lm.p.remove_actor("pick_inside", render=False)
+        except Exception:                                        # noqa: BLE001
+            pass
+        blocks = []
+        for name, st in (self.scene.get("sets") or {}).items():
+            par = st.get("parent")
+            if not par or not st.get("pos"):
+                continue
+            names = st.get("type_names") or []
+            nt = st.get("node_type") or [0] * len(par)
+            for i, p in enumerate(par):
+                if int(p) != int(k):
+                    continue
+                sp = names[nt[i]] if names else name
+                r = float(rad.get(sp, 0.0))
+                if r <= 0:
+                    continue
+                blocks.append(pv.Sphere(radius=r, center=st["pos"][i], theta_resolution=18, phi_resolution=12))
+        if not blocks:
+            return
+        body = blocks[0] if len(blocks) == 1 else blocks[0].merge(blocks[1:])
+        lm.p.add_mesh(body, color="#ffee33", style="wireframe", line_width=2, lighting=False, name="pick_inside")
+
     def highlight(self, pick: str | None):
         return _vtk(self._highlight, pick)
 
@@ -727,6 +779,10 @@ class View:
                 except Exception:                                # noqa: BLE001
                     pass
                 self._paint = None
+            try:
+                lm.p.remove_actor("pick_inside", render=False)
+            except Exception:                                    # noqa: BLE001
+                pass
             _pa = getattr(self, "_paint_actor", None)
             if _pa == "pick_cell":
                 try:
@@ -778,18 +834,22 @@ class View:
                 pos, sep, es, et, ef = mesh
                 mine = ef == k
                 if mine.any():
-                    kcap = self._cap_k()
-                    X = pos + kcap * sep
-                    seg = [(X[a], X[b]) for a, b in zip(es[mine], et[mine])]
-                    if kcap == 0.0:                              # the mid-surface is drawn: show the prism
-                        A_, B_ = pos + sep, pos - sep
-                        seg += [(A_[a], B_[a]) for a in es[mine]]
+                    # THE WHOLE CELL: both rings and the walls between them. Drawing only the cap
+                    # the renderer shows says where the cell is but not what it is -- an apico-basal
+                    # cell is a prism, and the apical ring is the half a picture of the basal
+                    # surface cannot show. The rings are the real caps, pos +- sep, so the outline
+                    # is the cell's own edges wherever the camera is.
+                    A_, B_ = pos + sep, pos - sep
+                    seg = [(A_[a], A_[b]) for a, b in zip(es[mine], et[mine])]      # apical ring
+                    seg += [(B_[a], B_[b]) for a, b in zip(es[mine], et[mine])]     # basal ring
+                    seg += [(A_[a], B_[a]) for a in es[mine]]                       # the lateral walls
                     pts = np.asarray([p for sg in seg for p in sg], float)
                     lines = np.concatenate([[2, 2 * j, 2 * j + 1] for j in range(len(seg))])
                     pd = pv.PolyData(pts); pd.lines = lines
                     lm.p.add_mesh(pd, color="#ffee33", line_width=5, lighting=False,
                                   render_lines_as_tubes=True, name="pick_cell")
                     self._paint_actor = "pick_cell"
+                    self._outline_contents(k)
                 return
             par = getattr(H_lvl, "parent", None)
             idx = getattr(lm, "idx", None)
@@ -940,7 +1000,17 @@ class View:
                 if fm is not None and len(fm) > 1:
                     self.RUN["ms_per_frame"] = float(np.mean(np.asarray(fm)[1:]))
             except Exception as e:                                   # noqa: BLE001
+                # A RUN THAT CANNOT START MUST SAY SO, not look like a stall. The message also goes
+                # to the session, because a reseed builds a new View and takes its RUN dict with it:
+                # the page then polled a fresh "frame 0, no error" and read it as a hang.
                 self.RUN["error"] = f"{type(e).__name__}: {e}"[:600]
+                try:
+                    from plexus.gui import bio
+                    bio.STATE["message"] = f"run failed: {self.RUN['error']}"
+                    bio.claude_note(f"run of '{os.path.basename(self.spec_path)}' failed: {self.RUN['error']}")
+                except Exception:                                    # noqa: BLE001
+                    pass
+                print(f"[view] run failed: {self.RUN['error']}", flush=True)
             finally:
                 self.RUN["running"] = False
                 self.RUN["seconds"] = round(time.time() - self.RUN["started"], 1)
@@ -995,6 +1065,17 @@ def open_view(spec_path: str, device: str = "cpu", carry: bool = False) -> View:
     rather than asking for the run again. The frames are level states, not pictures, which is
     what makes them re-drawable at all."""
     def _open():
+        old0 = CURRENT.get("view")
+        # A RESEED DURING A RUN KILLED THE RUN. `open_view` closes the old view, and the running
+        # generate then found its plotter gone and reported "stopped early" at frame 11 of 601 --
+        # from the page that looked like a run that produced two frames. Stop it first, and wait
+        # for the engine thread to notice, so the frames it did compute are kept.
+        if old0 is not None and (getattr(old0, "RUN", {}) or {}).get("running"):
+            old0.RUN["stop"] = True
+            t0 = time.time()
+            while old0.RUN.get("running") and time.time() - t0 < 10.0:
+                time.sleep(0.05)
+            print("[view] a run was in flight and was stopped so the scene could be re-seeded", flush=True)
         with LOCK:
             old = CURRENT.get("view")
             keep = None

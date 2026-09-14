@@ -1,0 +1,21 @@
+# S1-F "the same bunny, ten times, in a row" -- the library AND `repeat` in one type: the mesh is
+# fetched once, the points are split among the copies, and the volume contract holds, so ten
+# bunnies weigh what one did (each is a tenth of the mass, hence smaller).
+general: {name: s1_f_bunnies, seed: 1, n_frames: 400, dt: 0.002, boundary: wall, dim: 3, world: [0.5, 0.5, 0.5], save_data: true, record_cap: 301, units: {length_um: 1000000.0, time_s: 1.0, force_nN: 1000000000.0}}
+sets:
+  cell:
+    n: 1
+    start: [[0.25, 0.3, 0.25]]
+    types:
+      bunny: {count: 1, material: elastic, youngs: 700000.0, density: 900.0, shape: "mesh:bunny", repeat: [5, 1, 2], pitch: 0.085}
+  mpm_particle: {parent: cell, per_parent: 80000, radius: 0.03, density: 900.0, particle_mass: 1.0e-5,
+                 state: {pos: {width: 3, role: coordinate, integration: second_order_coordinate, boundary: world}, vel: {width: 3, role: rate, integration: second_order_rate}, copy: {width: 1}}}   # 20,000 points per rabbit; `copy` says which rabbit a point is in
+fields: {mpm_grid: {frame: mpm_grid, n_grid: 96}}
+operators:
+- {op: gravity, at: cell, g: 9.81}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.35, wall_damp_mode: per_impact, wall_friction: 0.4, vmax: 1000000000.0}
+schedule: [gravity, {substep_dt: 2.0e-5, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}]
+plotting: {renderer: vtk_points, background: black, up_axis: 1, box_frame: true, hide_sets: [cell], render_3d: dots, dot_size: 2.0, dot_shading: body, color_field: copy, field_cmap: tab10, color_range: [0, 9], colors: {bunny: [0.95, 0.8, 0.45]}}

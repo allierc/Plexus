@@ -1,0 +1,24 @@
+# S0-C "a slab tilted 18 degrees, a ball dropped on it" -- `rotate`, which a spec accepted and
+# IGNORED before this stage: the slab came out axis-aligned and nothing ever rolled.
+general: {name: s0_c_ramp, seed: 1, n_frames: 600, dt: 0.002, boundary: wall, dim: 3, world: [0.5, 0.5, 0.5], save_data: true, record_cap: 301, units: {length_um: 1000000.0, time_s: 1.0, force_nN: 1000000000.0}}
+sets:
+  cell:
+    n: 2
+    start: [[0.14, 0.38, 0.25], [0.25, 0.18, 0.25]]   # the ball starts over the ramp's high end; the ramp is placed by its `block`
+    types:
+      ramp: {count: 1, material: elastic, youngs: 3000000.0, density: 2500.0, block: [0.06, 0.16, 0.12, 0.44, 0.20, 0.38], rotate: [0, 0, 18]}   # a SLAB, not a cube: a ramp needs an extent per axis, which `block` gives and `shape: cube` cannot
+      ball: {count: 1, material: elastic, youngs: 300000.0, density: 2200.0, shape: ball}   # denser -> smaller for the same mass: the ball used to poke through the ceiling
+  mpm_particle: {parent: cell, per_parent: 14000, radius: 0.03, density: 1500.0, particle_mass: 2.0e-4}
+fields: {mpm_grid: {frame: mpm_grid, n_grid: 96}}
+operators:
+- {op: gravity, at: cell, g: 9.81}
+# THE RAMP MUST BE HELD. A free elastic slab under gravity is not a ramp: it falls with the ball,
+# which is what the first run showed (both sank to the floor and the ball drifted 29 px). The
+# anchor is a spring to each particle's seeded position, applied to the ramp's particles only.
+- {op: mpm_anchor, at: "mpm_particle[type=ramp]", k: 400000.0, applies_to: substrate}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.3, wall_damp_mode: per_impact, wall_friction: 0.4, vmax: 1000000000.0}
+schedule: [gravity, {substep_dt: 2.0e-5, steps: [mpm_anchor, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}]
+plotting: {renderer: vtk_points, background: black, up_axis: 1, box_frame: true, hide_sets: [cell], render_3d: dots, dot_size: 1.6, colors: {ramp: [0.6, 0.65, 0.7], ball: [0.95, 0.45, 0.2]}}

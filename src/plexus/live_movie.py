@@ -948,6 +948,20 @@ class LiveMovie:
         pos = _p.cpu().numpy().astype(np.float32)
         if pos.shape[1] == 2:                         # pad a 2D run into the z=0 plane
             pos = np.concatenate([pos, np.zeros((pos.shape[0], 1))], 1)
+        # `near_side` ON THE DRAWN CLOUD. Its colours are bound to a fixed-length array, so a point
+        # is hidden the way the cross-section hides one: put where the camera is not, not removed.
+        if (self.style or {}).get("near_side") is not None and (self.style or {}).get("near_side") is not False \
+                and len(pos) and getattr(self, "p", None) is not None:
+            f = (self.style or {}).get("near_side")
+            c = np.asarray(self.p.camera.position, float) - np.asarray(self.p.camera.focal_point, float)
+            n = c / max(float(np.linalg.norm(c)), 1e-12)
+            ctr = pos.mean(0)
+            d = (pos - ctr) @ n
+            cut = 0.0 if f is True else float(f) * float(np.abs(d).max() or 1.0)
+            far = d < cut
+            if far.any() and not far.all():
+                pos = np.where(far[:, None], pos[~far][:1], pos)
+            self._xyz_cut = far
         return pos
 
     def __call__(self, H, tick):
@@ -1618,6 +1632,18 @@ class LiveMovie:
         """Reveal each series up to the current RECORDED row -- the band is mean-SD .. mean+SD."""
         for i, cv in enumerate(getattr(self, "_curves", []) or []):
             S = cv["S"]
+            # THE PANEL GROWS WITH THE RUN IT IS DRAWING, because the run can be longer than the
+            # clip the panel was built for. The page builds its view with `n_frames: 1` -- it only
+            # ever draws the seed -- and then sets `n_frames` to the run's length when RUN is
+            # pressed; the series had already been allocated with two rows, so `t` clamped at 1 and
+            # every one of 101 frames wrote the SAME row while the x axis stayed at [0, 1]. A run
+            # of any length then drew as a two-point line pinned to frame 1. Extend to whichever is
+            # longer, the tick or the declared length, and move the axis with it.
+            if cv.get("live") and int(tick) >= S.shape[0]:
+                _want = max(int(tick), int(self.n_frames)) + 1
+                S = cv["S"] = np.concatenate(
+                    [S, np.full((_want - S.shape[0],) + S.shape[1:], np.nan)], 0)
+                cv["ch"].x_axis.range = [0.0, float(S.shape[0] - 1)]
             t = min(int(tick), S.shape[0] - 1)
             if cv.get("live") and H is not None:
                 # THE ROW FOR THIS FRAME, from the live level, in the units the axis was declared in.
@@ -1846,6 +1872,27 @@ class LiveMovie:
         st = self.style or {}
         if not bool(st.get("contour_by_type", False)):
             return None
+        # A SURFACE PER BODY, WHEN THE SPEC SAYS WHICH BODY. Partitioned by TYPE, ten copies of one
+        # type reconstructed as ONE surface in one colour -- the ring came out a single doughnut and
+        # the ten rabbits one blob. When the scene colours by a scalar of its own (`color_field:
+        # copy`), that scalar IS the partition, and the colours come from its colormap.
+        _cf = str(st.get("color_field", "") or "")
+        _sch = getattr(lvl, "state_schema", None)
+        if _cf and _sch is not None and _cf in _sch and (_sch[_cf][1] - _sch[_cf][0]) == 1:
+            import matplotlib.pyplot as _plt
+            from matplotlib.colors import to_hex
+            a, b = _sch[_cf]
+            v = lvl.state[self.idx, a].detach().cpu().numpy()
+            tid = np.rint(v).astype(int)
+            ids = sorted(set(int(x) for x in np.unique(tid)))
+            rng = st.get("color_range") or [min(ids), max(ids)]
+            lo, hi = float(rng[0]), float(rng[1])
+            cm = _plt.get_cmap(st.get("field_cmap", "turbo"))
+            names = [f"{_cf} {i}" for i in ids]
+            remap = {v_: k for k, v_ in enumerate(ids)}
+            tid = np.vectorize(remap.get)(tid)
+            cols = {f"{_cf} {i}": to_hex(cm((i - lo) / max(hi - lo, 1e-9))[:3]) for i in ids}
+            return names, tid, cols
         own = getattr(lvl, "node_type", None); par = getattr(lvl, "parent", None)
         if own is not None:
             names = list(getattr(lvl, "type_names", []) or [])
@@ -2165,6 +2212,7 @@ class LiveMovie:
                         or sel.size < int(st.get("surface_min_points", 400)):
                     self._skins.append(self._dots_for(Xg, sel, nm, pal, opa, _dflt_op,
                                                       (_per.get(nm) or {}).get("point_size"),
+                                                      every=int((_per.get(nm) or {}).get("every", 1)),
                                                       set_name=(nm if tid is None else None)))
                     continue
                 step = max(1, sel.size // max(nsub, 1))
@@ -2239,12 +2287,23 @@ class LiveMovie:
                   f"drawing the point cloud instead", flush=True)
             return False
 
-    def _dots_for(self, X, sel, nm, pal, opa, dflt_op, point_size=None, set_name=None):
-        """A compartment kept as points: its own PolyData, its own hue, its own opacity."""
+    def _dots_for(self, X, sel, nm, pal, opa, dflt_op, point_size=None, set_name=None, every=1):
+        """A compartment kept as points: its own PolyData, its own hue, its own opacity.
+
+        `every: k` DRAWS ONE POINT IN k, and it is what makes CO-LOCATED species legible. Five
+        protein species are five balls of the cell's own radius -- a species is a concentration,
+        not a place -- so drawn translucent they BLEND (yellow over blue over pink over violet over
+        green averages to grey: measured, zero saturated pixels) and drawn opaque the last one
+        simply covers the other four (measured, one hue). Neither is a palette bug and neither is
+        fixed by choosing better colours. Thinning each species is what lets all five show through,
+        and it changes no number in the model -- only how many of its points are drawn.
+        """
         import numpy as np
         from matplotlib.colors import to_rgb
         if sel.size == 0:
             return None
+        if int(every) > 1:
+            sel = sel[:: int(every)]
         pd = self.pv.PolyData(np.asarray(X[sel], np.float32))
         col = to_rgb(tuple(pal[nm])) if nm in pal else (0.8, 0.8, 0.8)
         _ps = float(point_size if point_size is not None
@@ -2635,6 +2694,7 @@ class LiveMovie:
                                 render_lines_as_tubes=False,
                                 show_edges=_edges, edge_color=st.get("mesh_edge_color", "#2b2b2b"),
                                 edge_opacity=float(st.get("mesh_edge_opacity", 1.0)))
+                self._near_side_faces(pd)
                 self._meshes.append((name, nv, pd, sc, ct))
                 print(f"[live-movie] surface {name!r}: {int(m['nF']):,} faces, {nv:,} vertices, "
                       f"drawn as {style}", flush=True)
@@ -2835,6 +2895,7 @@ class LiveMovie:
                 self._edge_actor(H, lvl, m, first=False)
                 if self._mesh_is_subject:
                     self._mesh_face_rgb(m, pd)
+                self._near_side_faces(pd)
             except Exception:                        # noqa: BLE001
                 pass
 
@@ -3577,12 +3638,16 @@ class LiveMovie:
         import torch
         own = getattr(lv, "node_type", None)
         occ = getattr(lv, "occ", None)
-        if subject:
+        if subject and not (self.style or {}).get("near_side"):
             nt = torch.as_tensor(own)[self.idx]
             sel = nt == tid
             if occ is not None:
                 sel = sel & (torch.as_tensor(occ)[self.idx].to(nt.device) > 0)
             return np.asarray(self.cloud.points)[sel.cpu().numpy()]
+        # WITH `near_side` ON, THE CLOUD IS ALREADY PARKED. `_xyz` hides a far point by moving it
+        # onto a near one (its colours are bound to a fixed-length array), so reading the glyphs
+        # off the cloud drew every far nucleus stacked on one near position -- the cut looked
+        # like no cut at all. The glyph actor has its own geometry, so it reads the real state.
         nt = torch.as_tensor(own)
         sel = nt == tid
         if occ is not None:
@@ -3626,15 +3691,108 @@ class LiveMovie:
         if H is not None:
             self._glyph_update_all(H)
 
+    def _near_side_faces(self, pd):
+        """`near_side` on a SURFACE: keep the polygons whose centroid is in front of the plane
+        through the body's centre, normal to the view. A hollow shell drawn whole hides its own
+        interior and shows every far-side piece through it; cut, you look INTO the tissue."""
+        f = (self.style or {}).get("near_side")
+        if not f or pd is None or pd.n_points == 0:
+            return
+        full = getattr(pd, "_full_faces", None)
+        if full is None:
+            full = np.asarray(pd.faces).copy()
+            pd._full_faces = full
+        P = np.asarray(pd.points, float)
+        c = np.asarray(self.p.camera.position, float) - np.asarray(self.p.camera.focal_point, float)
+        n = c / max(float(np.linalg.norm(c)), 1e-12)
+        ctr = P.mean(0)
+        out, i, keep_n = [], 0, 0
+        span = float(np.abs((P - ctr) @ n).max() or 1.0)
+        cut = 0.0 if f is True else float(f) * span
+        while i < len(full):
+            k = int(full[i]); idx = full[i + 1:i + 1 + k]
+            if float(((P[idx].mean(0) - ctr) @ n)) >= cut:
+                out.append(full[i:i + 1 + k]); keep_n += 1
+            i += 1 + k
+        pd.faces = np.concatenate(out) if out else np.zeros(0, np.int64)
+
+    def _light_inside(self, on: bool):
+        """A CUT SHELL SHOWS ITS INSIDE, whose normals point away from the camera: lit from the
+        front only, the interior came out almost black. Two-sided lighting and a lifted ambient
+        make the inner wall of the tissue read as the same material seen from within."""
+        for _n, _nv, pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+            act = None
+            for a in self.p.renderer.actors.values():
+                try:
+                    if a.GetMapper() is not None and a.GetMapper().GetInput() is pd:
+                        act = a
+                        break
+                except Exception:                                # noqa: BLE001
+                    continue
+            if act is None:
+                continue
+            p = act.GetProperty()
+            if on:
+                self._mesh_light = getattr(self, "_mesh_light", {})
+                self._mesh_light.setdefault(id(pd), (p.GetAmbient(), p.GetDiffuse(), p.GetOpacity()))
+                p.SetAmbient(0.55); p.SetDiffuse(0.55); p.SetBackfaceCulling(False)
+                p.SetOpacity(min(1.0, float(p.GetOpacity()) * 2.2))
+            else:
+                a0 = (getattr(self, "_mesh_light", {}) or {}).get(id(pd))
+                if a0:
+                    p.SetAmbient(a0[0]); p.SetDiffuse(a0[1]); p.SetOpacity(a0[2])
+
+    def near_side_refresh(self):
+        """Re-cut everything the view hides: the surfaces and the sphere glyphs. Called when the
+        switch is thrown and whenever the camera turns -- the cut is defined BY the camera."""
+        for _n, _nv, pd, _sc, _ct in getattr(self, "_meshes", []) or []:
+            try:
+                if not (self.style or {}).get("near_side"):
+                    full = getattr(pd, "_full_faces", None)
+                    if full is not None:
+                        pd.faces = full
+                else:
+                    self._near_side_faces(pd)
+            except Exception:                                    # noqa: BLE001
+                pass
+        self._light_inside(bool((self.style or {}).get("near_side")))
+        if getattr(self, "_glyphs", None) and getattr(self, "_glyph_H", None) is not None:
+            self._glyph_update_all(self._glyph_H)
+
+    def _near_side(self, pts):
+        """`plotting.near_side` -- KEEP ONLY WHAT FACES THE CAMERA. A shell of cells shows every
+        nucleus at once, the near ones and the far ones through the surface, and 120 spheres over
+        one another read as a cloud rather than as one per cell. The cut is the plane through the
+        drawn body's centre, normal to the view: a point behind it is on the side you are looking
+        at the back of. `near_side` may be true (the centre) or a fraction of the body's radius,
+        so 0.3 keeps a shallower cap and -0.2 keeps a little past the equator."""
+        f = (self.style or {}).get("near_side")
+        if not f or not len(pts):
+            return pts
+        c = np.asarray(self.p.camera.position, float) - np.asarray(self.p.camera.focal_point, float)
+        n = c / max(float(np.linalg.norm(c)), 1e-12)
+        ctr = np.asarray(getattr(self, "_glyph_centre", None) if getattr(self, "_glyph_centre", None) is not None
+                         else np.asarray(pts, float).mean(0), float)
+        d = (np.asarray(pts, float) - ctr) @ n
+        cut = 0.0 if f is True else float(f) * float(np.abs(d).max() or 1.0)
+        keep = d >= cut
+        return np.asarray(pts)[keep] if keep.any() else np.asarray(pts)[:0]
+
     def _glyph_update_all(self, H):
         g = getattr(self, "_glyphs", None)
         if not g:
             return
         self._glyph_H = H
         subject = getattr(self, "_sname", None)
+        # THE CENTRE THE CUT IS MEASURED FROM is the whole drawn body's, not each type's: the Golgi
+        # of one hemisphere must not be judged against the Golgi's own centre.
+        if (self.style or {}).get("near_side"):
+            _all = [self._glyph_points(H.level(ln), ti, ln == subject) for ln, ti, _c, _a in g.values()]
+            _all = [p for p in _all if len(p)]
+            self._glyph_centre = np.concatenate(_all, 0).mean(0) if _all else None
         for key, (lname, tid, col, actor) in list(g.items()):
             lv = H.level(lname)
-            pts = self._glyph_points(lv, tid, lname == subject)
+            pts = self._near_side(self._glyph_points(lv, tid, lname == subject))
             if actor is not None:
                 self.p.remove_actor(actor, render=False)
                 actor = None

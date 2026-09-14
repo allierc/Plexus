@@ -172,8 +172,25 @@ def _ordered_spec(spec: dict) -> dict:
     return top
 
 
+def _tidy(v, sig: int = 6):
+    """Round every float to `sig` significant digits on the way out, and drop the ones that are
+    integers. A centre computed as the midpoint of two rounded corners comes out
+    0.33330000000000004, and a spec a person has to read should not carry the last bit of a
+    float's arithmetic: it says nothing, and thirty of them hide the three numbers that matter."""
+    if isinstance(v, dict):
+        return {k: _tidy(x, sig) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_tidy(x, sig) for x in v]
+    if isinstance(v, float):
+        if v != v or v in (float("inf"), float("-inf")):
+            return v
+        r = float(f"%.{sig}g" % v)
+        return r
+    return v
+
+
 def _dump_yaml(spec: dict) -> str:
-    return yaml.safe_dump(_ordered_spec(spec), sort_keys=False,
+    return yaml.safe_dump(_tidy(_ordered_spec(spec)), sort_keys=False,
                           default_flow_style=False, allow_unicode=True)
 
 
@@ -275,9 +292,15 @@ def g_page(h, q):
     tab = _q1(q, "tab") or bio.STATE.get("tab") or "material"
     if tab not in tabs.ORDER:
         return h._send_json({"error": f"no tab {tab!r}; tabs are {', '.join(tabs.ORDER)}"}, 404)
-    if bio.STATE.get("tab") != tab:
+    if bio.STATE.get("tab") and bio.STATE["tab"] != tab:
         # A PAGE OPENED ON ANOTHER TAB THAN THE SERVER HOLDS IS A SWITCH: same re-initialisation.
+        # ONLY WHEN THE SERVER ALREADY HELD ONE, though: at boot `tab` is unset, so the FIRST page
+        # load counted as a switch and threw away the scene the server had just opened -- which the
+        # page then replaced with its own default. That is the "I see 27 cubes" of this session.
         _reset_scene(tab)
+    bio.STATE.setdefault("tab", tab)
+    if not bio.STATE.get("tab"):
+        bio.STATE["tab"] = tab
     return h._send_html(app.page(tab))
 
 
@@ -354,11 +377,28 @@ def g_run(h, q):
 def g_artefacts(h, q):
     """What the run wrote for this spec: the movie (a `/media` URL with a cache buster), the
     newest still, the folder."""
-    from plexus.gui import studio
+    from plexus.gui import bio_view, studio
     name = _q1(q, "name")
     if not name:
         return h._send_json({"error": "name?"}, 400)
     a = studio.artefacts(name)
+    # THE OPEN SCENE KNOWS WHERE ITS RUN LANDED (`View.run_dir`, which follows the spec's own
+    # folder); `studio.artefacts` only ever looks in the page's tree, so a spec opened from
+    # config/si_material showed no movie over a complete run.
+    _v = bio_view.current()
+    if not a.get("mp4") and _v is not None:
+        _d = _v.run_dir()
+        if _d and os.path.exists(os.path.join(_d, "movie.mp4")):
+            a = dict(a); a["dir"] = _d
+            a["mp4"] = os.path.join(_d, "movie.mp4"); a["mp4_mtime"] = os.path.getmtime(a["mp4"])
+            _png = os.path.join(_d, "3d.png")
+            if os.path.exists(_png):
+                a["png"], a["png_mtime"] = _png, os.path.getmtime(_png)
+            try:
+                import imageio.v3 as _iio
+                a["mp4_frames"] = sum(1 for _ in _iio.imiter(a["mp4"], plugin="pyav"))
+            except Exception:                                    # noqa: BLE001
+                pass
     out = {"dir": a.get("dir")}
     for k, mk in (("mp4", "mp4_mtime"), ("png", "png_mtime")):
         out[k] = ("/media?path=" + quote(a[k]) + f"&t={int(a.get(mk) or 0)}") if a.get(k) else None
@@ -706,6 +746,50 @@ def p_refine(h, data):
                          "form": _form_of(name, spec, data.get("tab"))})
 
 
+def p_nearside(h, data):
+    """Show only the pieces that FACE THE CAMERA (`plotting.near_side`), or all of them again.
+
+    `{"on": true}` cuts at the body's centre; `{"on": 0.3}` keeps a shallower cap, `-0.2` a little
+    past the equator; `{"on": false}` shows everything. Applied to the open view at once -- no
+    reseed -- and written into the spec so the movie draws what the page shows."""
+    from plexus.gui import bio, bio_view
+    v = bio_view.current()
+    on = data.get("on", True)
+    if v is None or v.lm is None:
+        return h._send_json({"error": "no scene is open"}, 400)
+    v.lm.style["near_side"] = on
+    name = str(data.get("name") or bio.STATE.get("name") or "")
+    sp = _spec_path(name)
+    if name and os.path.exists(sp):
+        spec = yaml.safe_load(open(sp)) or {}
+        pl = spec.setdefault("plotting", {}) or {}
+        if on:
+            pl["near_side"] = on
+        else:
+            pl.pop("near_side", None)
+        open(sp, "w").write(_dump_yaml(spec))
+    bio_view._vtk(v.lm.near_side_refresh)
+    return h._send_json({"near_side": on})
+
+
+def p_delete(h, data):
+    """Delete the spec on screen (config/studio/<name>.yaml) and forget it: the page's DELETE YAML."""
+    from plexus.gui import bio, bio_view
+    name = str(data.get("name") or bio.STATE.get("name") or "")
+    sp = _spec_path(name)
+    if not name or not os.path.exists(sp):
+        return h._send_json({"error": "no spec is open"}, 400)
+    os.remove(sp)
+    bio.STATE.get("specs", {}).pop(name, None)
+    bio.STATE["name"] = None
+    v = bio_view.current()
+    if v is not None:
+        bio_view._vtk(v.close)
+        bio_view.CURRENT["view"] = None
+    bio.claude_note(f"spec '{name}' deleted from config/studio")
+    return h._send_json({"deleted": os.path.basename(sp)})
+
+
 def p_style(h, data):
     """The render selector: replace the spec's render keys, keep everything else, bump so the
     page re-seeds through the renderer with the new style (which is also the movie's)."""
@@ -825,7 +909,7 @@ def _relay_bodies(bodies: list, n: int, world: float) -> list:
                     b["block"] = [a[0], a[1], a[2], round(a[0] + side, 4), round(a[1] + side, 4), round(a[2] + side, 4)]
                     b.pop("centre", None)
                 else:
-                    b["centre"] = [round(a[0] + 0.5 * side, 4), round(a[1] + 0.5 * side, 4), round(a[2] + 0.5 * side, 4)]
+                    b["centre"] = [float(f"%.6g" % (a[k] + 0.5 * side)) for k in range(3)]
                     b.pop("block", None)
                 out.append(b); i += 1
     return out
@@ -856,6 +940,13 @@ def p_patch(h, data):
             f = tabs.get(cand).form_from_spec(raw)
             if not f:
                 continue
+            # THE TAB THE PAGE NAMES IS THE TAB, no further argument: the rebuild test below is for
+            # GUESSING among tabs when nothing said which, and a tab whose builder adds or renames a
+            # set (the neurons tab's edge set) would fail its own spec.
+            if cand == tab_name:
+                form = f
+                bio.STATE.setdefault("specs", {})[name] = cand
+                break
             # A FORM IS ONLY THE RIGHT ONE IF IT REBUILDS THIS SPEC'S SETS. Every tab's reader
             # returns a dict of defaults for any spec, so "the first that answers" chose the bio
             # tab for a box of cubes and refused the patch for want of a protein species.
@@ -882,6 +973,19 @@ def p_patch(h, data):
     form.update(patch_form)
     if n_want is not None:
         form["bodies"] = _relay_bodies(form.get("bodies") or [], int(n_want), float(form.get("world", 0.5)))
+    # ANY LIST THE FORM HAS, NOT ONLY `bodies`. A tissue's form carries `organelles` and `species`,
+    # and a patch that could name neither sent the driver back to a full rebuild to widen a nucleus.
+    for _key in ("organelles", "species"):
+        _p = data.get(_key) or {}
+        _lst = form.get(_key) or []
+        if not _p or not isinstance(_lst, list):
+            continue
+        for i, it in enumerate(_lst):
+            for k2, patch in _p.items():
+                if k2 == "*" or k2 == it.get("name") or k2 == str(i) \
+                        or ("-" in str(k2) and str(k2).replace("-", "").isdigit()
+                            and int(str(k2).split("-")[0]) <= i <= int(str(k2).split("-")[1])):
+                    it.update(patch)
     bp = data.get("bodies") or {}
     if bp:
         blist = form.get("bodies") or []
@@ -967,6 +1071,15 @@ def p_layout(h, data):
     return h._send_json({"saved": True})
 
 
+def g_regions(h, q):
+    """The frozen neuprint regions on this host, for the neurons tab's source menu."""
+    from plexus.gui.tabs import neurons as N
+    try:
+        return h._send_json({"regions": N.regions()})
+    except Exception as e:                                       # noqa: BLE001
+        return h._send_json({"regions": [], "error": f"{type(e).__name__}: {e}"[:200]})
+
+
 def g_shot(h, q):
     """The picture AS A FILE, for an agent that can look at images but cannot hold a PNG body.
 
@@ -1003,7 +1116,7 @@ POST_ROUTES = {
     "/api/scene/reset": p_reset, "/api/scene/claude": p_claude, "/api/scene/run": p_run,
     "/api/scene/visible": p_visible, "/api/scene/save": p_save, "/api/scene/refine": p_refine,
     "/api/scene/style": p_style, "/api/scene/saveas": p_saveas, "/api/scene/curves": p_curves,
-    "/api/scene/loadrun": p_loadrun, "/api/scene/patch": p_patch,
+    "/api/scene/loadrun": p_loadrun, "/api/scene/patch": p_patch, "/api/scene/nearside": p_nearside, "/api/scene/delete": p_delete,
     "/api/quit": p_quit, "/api/studio/quit": p_quit,
     "/api/validate": p_validate, "/api/save": p_editor_save, "/api/layout": p_layout,
 }
@@ -1020,7 +1133,7 @@ GET_ROUTES = {
     "/api/scene/artefacts": g_artefacts, "/api/scene/ls": g_ls, "/api/scene/open": g_open,
     "/api/scene/view": g_view, "/api/scene/seed": g_seed,
     "/api/catalog": g_catalog, "/api/specs": g_specs, "/media": g_media, "/api/spec": g_editor_spec,
-    "/api/scene/shot": g_shot, "/api/bio/shot": g_shot,
+    "/api/scene/shot": g_shot, "/api/bio/shot": g_shot, "/api/neurons/regions": g_regions,
 }
 for _x in ("state", "spec", "counts", "claude", "frames", "run", "artefacts", "ls", "open", "view", "seed"):
     GET_ROUTES[f"/api/bio/{_x}"] = GET_ROUTES[f"/api/scene/{_x}"]

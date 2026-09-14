@@ -28,6 +28,14 @@ from plexus.gui import studio
 
 REPO = studio.REPO
 MATERIALS = ("elastic", "liquid", "snow")
+# THE SHAPES A BODY'S VOLUME CAN BE ARRANGED INTO, and the keys that arrange it. The form edits
+# `ball` and `block` (the two it has a row for) and CARRIES the rest untouched, so a spec written
+# by hand or by Claude survives a press of BUILD. The seeder (`plexus.models.entities.provision`)
+# is the one that reads them; this tuple only says which keys are a body's placement rather than
+# its material, so that they are copied and not dropped.
+BODY_SHAPES = ("ball", "cube", "cylinder", "torus")
+PLACE_KEYS = ("shape", "form", "aspect", "axis", "hollow", "rotate", "repeat", "pitch",
+              "scatter", "ring", "shell", "orient", "fill", "obj")
 DEFAULT_COLORS = [[0.95, 0.25, 0.20], [0.30, 0.55, 1.00], [0.95, 0.95, 0.95], [1.00, 0.85, 0.30],
                   [0.85, 0.40, 0.95], [0.30, 0.90, 0.95]]
 # THE PAGE'S DEFAULT SCENE IS A FILE IN THE REPO. `config/si_material/si_three_balls.yaml` is this
@@ -110,10 +118,11 @@ REFERENCE = os.path.join(REPO, "config", "si_material", "si_multimaterial_27.yam
 # diffuse, matte coat -- shading only; `surface_specular` is the same surface with a low
 # roughness, the white-sky reflection and VTK's shadow pass; `glassy` is the dielectric under
 # the white sky at half opacity.
-RENDER_KEYS = ("render_3d", "dot_size", "dot_shading", "dot_specular", "dot_specular_power", "contour_by_type",
+RENDER_KEYS = ("surface_sample", "render_3d", "dot_size", "dot_shading", "dot_specular", "dot_specular_power", "contour_by_type",
                "surface_env", "surface_env_color", "surface_opacity", "surface_roughness", "surface_metallic",
                "surface_pbr", "shadows", "light", "edl", "contour_ngrid", "contour_smooth")
-RENDER_MODES = ("small_splats", "middle_splats", "large_splats", "surface", "surface_specular", "glassy")
+RENDER_MODES = ("small_splats", "middle_splats", "large_splats", "small_bodies", "middle_bodies",
+                "large_bodies", "surface", "surface_specular", "glassy")
 LIGHT_MODES = ("default", "headlight", "sun", "studio", "flat")
 # FLAT PIXELS ARE STILL A RENDER, just not a menu entry: `render_3d: dots` with a `dot_size` is
 # what a hand-written spec uses and what `render_of` reads back when one is opened. The menu lists
@@ -123,15 +132,30 @@ DOT_PX = {"small_dots": 1.0, "middle_dots": 2.0, "large_dots": 4.0}
 # THE SPLAT SIZES, in pixels: a lit sphere imposter per point, so the size is the ball's diameter
 # on screen and the three sizes are the three densities a body is worth drawing at.
 SPLAT_PX = {"small_splats": 4.0, "middle_splats": 7.0, "large_splats": 11.0}
+# `dot_shading: body` -- A CLOUD LIT BY ITS OWN DEPTH, which is what si_obj_spot was rendered
+# with and what the menu could not say: a splat is a sphere imposter per particle, a BODY is
+# shaded by how deep each particle sits in its own body, so a bunny reads as a bunny rather
+# than as ten thousand beads.
+BODY_PX = {"small_bodies": 1.0, "middle_bodies": 2.0, "large_bodies": 4.0}
 
 
 def render_style(mode: str = "small_dots", light: str = "default") -> dict:
     mode = str(mode or "small_dots").lower()
     light = str(light or "default").lower()
-    if mode not in RENDER_MODES:
-        raise ValueError(f"render must be one of {RENDER_MODES}")
+    # THE FLAT DOT SIZES ARE ACCEPTED THOUGH THE MENU DOES NOT OFFER THEM. `RENDER_MODES` is what
+    # the menu lists; `DOT_PX` is what a hand-written spec uses (`render_3d: dots` with no shading)
+    # and what `render_of` reads back off one. Validating against the menu alone meant that opening
+    # such a spec and pressing BUILD raised "render must be one of ..." and the scene could not be
+    # rebuilt at all -- four of the eight seeder scenes.
+    if mode not in RENDER_MODES and mode not in DOT_PX:
+        raise ValueError(f"render must be one of {RENDER_MODES + tuple(DOT_PX)}")
     if light not in LIGHT_MODES:
         raise ValueError(f"light must be one of {LIGHT_MODES}")
+    if mode in BODY_PX:
+        st = {"render_3d": "dots", "dot_size": BODY_PX[mode], "dot_shading": "body"}
+        if light != "default":
+            st["light"] = light
+        return st
     if mode in SPLAT_PX:
         # THE ONE IN BETWEEN: big dots drawn as lit sphere imposters (VTK's point sprites,
         # `render_points_as_spheres` + `dot_shading: true`) -- each point a shaded ball at the cost
@@ -145,7 +169,10 @@ def render_style(mode: str = "small_dots", light: str = "default") -> dict:
         # THE SURFACE, AT PAGE SPEED: a 96^3 density grid and 8 smoothing passes where the movie's
         # default is 176^3 and 35 -- a coarser skin, a few times faster to rebuild per frame.
         st = {"render_3d": "contour", "contour_by_type": True, "surface_metallic": 0.0,
-              "contour_ngrid": 96, "contour_smooth": 8}
+              # A SURFACE IS ONLY AS FINE AS ITS GRID. 96^3 over a 0.5 m box is a 5 mm voxel, and a
+              # bunny's ears are thinner than that, so the reconstruction came out lumpy. 192^3 is
+              # 2.6 mm and costs one contour pass per frame, which is already the expensive part.
+              "contour_ngrid": 192, "contour_smooth": 12, "surface_sample": 200000}
     if light != "default":
         st["light"] = light
     if mode in DOT_PX or mode in SPLAT_PX:
@@ -175,6 +202,13 @@ def apply_color(plotting: dict, color: str = "particles") -> dict:
     color = str(color or "particles").lower()
     if color not in COLOR_MODES:
         raise ValueError(f"color must be one of {tuple(COLOR_MODES)}")
+    # A COLOUR THE SPEC CHOSE IS NOT THE MENU'S TO THROW AWAY. `color_field` may name a scalar the
+    # scene defines -- `copy`, which paints each body of a `repeat` its own hue -- and the menu's
+    # four entries are physical fields, none of which is "whatever this spec meant". Picking a
+    # render sends `color: particles` along with it, and that silently erased the ten colours.
+    _cf = str((plotting or {}).get("color_field", "") or "")
+    if color == "particles" and _cf and _cf not in COLOR_MODES.values():
+        return dict(plotting or {})
     out = {k: v for k, v in (plotting or {}).items() if k not in COLOR_KEYS}
     if COLOR_MODES[color]:
         # BLUE - WHITE - RED for a mechanical field (`coolwarm`): the eye reads white as the
@@ -188,6 +222,12 @@ def apply_color(plotting: dict, color: str = "particles") -> dict:
 def color_of(plotting: dict) -> str:
     cf = str((plotting or {}).get("color_field", "") or "").lower()
     return next((k for k, v in COLOR_MODES.items() if v == cf), "particles")
+
+
+def keeps_own_colour(plotting: dict) -> bool:
+    """True when the spec colours by a scalar of its own (not one of the menu's physical fields)."""
+    cf = str((plotting or {}).get("color_field", "") or "")
+    return bool(cf) and cf not in COLOR_MODES.values()
 
 
 def apply_render(plotting: dict, mode: str, light: str = "default", color: str | None = None) -> dict:
@@ -207,7 +247,8 @@ def render_of(plotting: dict) -> str:
             return "glassy"
         return "surface_specular" if pl.get("surface_env") else "surface"
     px = float(pl.get("dot_size", 1.0) or 1.0)
-    table = SPLAT_PX if pl.get("dot_shading") is True else DOT_PX
+    _sh = pl.get("dot_shading")
+    table = BODY_PX if str(_sh).lower() == "body" else (SPLAT_PX if _sh is True else DOT_PX)
     return min(table, key=lambda k: abs(table[k] - px))
 
 
@@ -245,22 +286,34 @@ def build_spec(form: dict) -> dict:
         t["density"] = float(b.get("density", 1000.0))
         if b.get("eta") is not None:
             t["eta"] = float(b["eta"])                       # per-body viscosity, Pa s (overrides mpm_viscosity's)
-        if shape == "block" and str(b.get("fill", "")).lower() == "lattice":
-            t["fill"] = "lattice"
-        if shape == "ball":
-            c = [float(v) for v in (b.get("centre") or [world / 2, world * 0.75, world / 2])]
-            if len(c) != 3:
-                raise ValueError(f"body {nm!r}: a ball needs a centre x y z")
-            t["shape"] = "ball"
-            start.append(c)
+        # THE PLACEMENT VOCABULARY RIDES THROUGH THE FORM UNTOUCHED. The form knows a ball, a block
+        # and a named mesh; the seeder knows twelve more keys (`aspect`, `hollow`, `rotate`,
+        # `repeat`, `shell`, `ring`, `orient`, ...). Read back into `place` and written out here
+        # verbatim, so pressing BUILD on a scene the form cannot describe REBUILDS IT rather than
+        # flattening it: 24 mitochondria on a shell came back as one ball before this.
+        for _pk, _pv in (b.get("place") or {}).items():
+            if _pk in PLACE_KEYS and _pv is not None:
+                t[_pk] = _pv
+        if shape.startswith("mesh:") or shape == "obj":
+            t["shape"] = str(b.get("shape"))                 # the library resolves the name
+            start.append([float(v) for v in (b.get("centre") or [world / 2, world * 0.7, world / 2])])
         elif shape == "block":
             blk = [float(v) for v in (b.get("block") or [0, 0, 0, world, 0.25 * world, world])]
             if len(blk) != 6:
                 raise ValueError(f"body {nm!r}: block needs 6 numbers x0 y0 z0 x1 y1 z1")
             t["block"] = blk
+            if str(b.get("fill", "")).lower() == "lattice":
+                t["fill"] = "lattice"
             start.append([0.5 * (blk[k] + blk[k + 3]) for k in range(3)])
+        elif shape in BODY_SHAPES:
+            c = [float(v) for v in (b.get("centre") or [world / 2, world * 0.75, world / 2])]
+            if len(c) != 3:
+                raise ValueError(f"body {nm!r}: a {shape} needs a centre x y z")
+            t["shape"] = shape
+            start.append(c)
         else:
-            raise ValueError(f"body {nm!r}: shape must be ball|block")
+            raise ValueError(f"body {nm!r}: shape must be one of {sorted(BODY_SHAPES)}, block, "
+                             f"or mesh:<name> from the shape library")
         types[nm] = t
         if b.get("color"):
             colors[nm] = [float(v) for v in b["color"]]
@@ -283,7 +336,7 @@ def build_spec(form: dict) -> dict:
           "radius": radius}
     if launch > 0:
         mp["vel_init"] = launch
-    return {
+    out = {
         "general": {"name": name, "seed": seed, "n_frames": frames, "dt": dt, "boundary": "wall",
                     "dim": 3, "world": [world, world, world],
                     # THE RUN RECORDS ITS TRAJECTORY. Without it a finished run leaves a movie and
@@ -315,6 +368,14 @@ def build_spec(form: dict) -> dict:
                                  str(form.get("render", "small_dots")), str(form.get("light", "default")),
                                  str(form.get("color", "particles"))),
     }
+    # WHAT A REBUILD MUST NOT LOSE. A scene may colour by a scalar it defines (`copy`, which paints
+    # each body of a `repeat` its own hue) and may declare the state block that holds it; the form
+    # carried neither, so pressing BUILD threw both away and twelve spokes came back as one red ball.
+    for _k, _v in (form.get("keep_plotting") or {}).items():
+        out["plotting"][_k] = _v
+    if form.get("particle_state"):
+        out["sets"]["mpm_particle"]["state"] = form["particle_state"]
+    return out
 
 
 def write_spec(spec: dict, path: str) -> str:
@@ -343,19 +404,37 @@ def form_from_spec(spec: dict) -> dict:
              "youngs": t.get("youngs", t.get("bulk_modulus")), "color": colors.get(nm)}
         if t.get("eta") is not None:
             b["eta"] = t["eta"]
-        if t.get("block"):
+        _sh = str(t.get("shape", "") or "")
+        # EVERY PLACEMENT KEY READ BACK, not only the two the form has a row for. `place` is the
+        # verbatim copy `build_spec` writes out again, so a shell of 24 mitochondria, a rotated
+        # ramp or a repeated lattice survives a rebuild instead of collapsing to a ball.
+        _place = {k: t[k] for k in PLACE_KEYS if t.get(k) is not None}
+        if _place:
+            b["place"] = _place
+        if _sh.startswith("mesh:"):
+            # A SHAPE FROM THE LIBRARY READS BACK AS ITSELF. Reported as a `ball`, the form then
+            # REBUILT the scene as balls the moment any menu was touched -- the bunny became a
+            # sphere, and before that the whole scene was replaced by the form's default.
+            b.update(shape=_sh, centre=(starts[i] if i < len(starts) else None))
+        elif t.get("block"):
             b.update(shape="block", block=t["block"])
             if t.get("fill"):
                 b["fill"] = t["fill"]
         else:
-            b.update(shape="ball", centre=(starts[i] if i < len(starts) else None))
+            b.update(shape=(_sh if _sh in BODY_SHAPES else "ball"),
+                     centre=(starts[i] if i < len(starts) else None))
         bodies.append(b)
     gen = spec.get("general") or {}
     ops = spec.get("operators") or []
     g = next((o.get("g", 9.81) for o in ops if o.get("op") == "gravity"), 9.81)
     gu = next((o for o in ops if o.get("op") == "mpm_grid_update"), {})
     pl = spec.get("plotting") or {}
-    return {"name": gen.get("name", ""), "world": (gen.get("world") or [0.5])[0], "n_frames": gen.get("n_frames", 800),
+    _pl = spec.get("plotting") or {}
+    # WHAT A REBUILD MUST NOT LOSE: the scalar a scene colours by, and the state block that holds it.
+    _keep = {k: _pl[k] for k in ("color_field", "field_cmap", "color_range") if _pl.get(k) is not None}
+    _pstate = ((spec.get("sets") or {}).get("mpm_particle") or {}).get("state")
+    return {"name": gen.get("name", ""), "keep_plotting": (_keep or None), "particle_state": _pstate,
+            "world": (gen.get("world") or [0.5])[0], "n_frames": gen.get("n_frames", 800),
             "render": render_of(pl), "light": str(pl.get("light", "default")), "color": color_of(pl),
             "dt": gen.get("dt", 1.0 / 1200.0), "gravity": g, "wall_damp": gu.get("wall_damp", 0.5),
             "friction": gu.get("wall_friction", 0.0), "launch": mp.get("vel_init", 0.0), "seed": gen.get("seed", 1),
@@ -437,7 +516,7 @@ FORM_HTML = r'''
  <div style="color:#778;font-size:11px">a ball is placed at its centre with the shared radius above; a block spans its six numbers (metres). Bodies keep their order: the first body is at the first centre. stiffness = Young's modulus (elastic, snow) or bulk modulus (liquid), Pa; eta the viscosity, Pa s; colour r g b in 0-1 (blank = automatic).</div>
  </div>
 
- <div class="row"><label>render</label><select id="render" style="width:130px" onchange="setStyle()"><option value="small_splats">small splats</option><option value="middle_splats">middle splats</option><option value="large_splats">large splats</option><option value="surface">surface</option><option value="surface_specular">surface specular</option><option value="glassy">glassy</option></select> <label style="width:40px">light</label><select id="light" style="width:100px" onchange="setStyle()"><option value="default">default</option><option value="headlight">headlight</option><option value="sun">sun</option><option value="studio">studio</option><option value="flat">flat</option></select></div>
+ <div class="row"><label>render</label><select id="render" style="width:130px" onchange="setStyle()"><option value="small_splats">small splats</option><option value="middle_splats">middle splats</option><option value="large_splats">large splats</option><option value="small_bodies">small bodies</option><option value="middle_bodies">middle bodies</option><option value="large_bodies">large bodies</option><option value="surface">surface</option><option value="surface_specular">surface specular</option><option value="glassy">glassy</option></select> <label style="width:40px">light</label><select id="light" style="width:100px" onchange="setStyle()"><option value="default">default</option><option value="headlight">headlight</option><option value="sun">sun</option><option value="studio">studio</option><option value="flat">flat</option></select></div>
  <div class="row"><label>colour</label><select id="color" style="width:130px" onchange="setStyle()"><option value="particles">particles</option><option value="deformation">deformation</option><option value="stress">stress</option><option value="velocities">velocities</option></select> <span style="color:#778;font-size:11px">render, light and colour apply now and to the movie</span></div>
 '''
 

@@ -413,7 +413,8 @@ class SeedCellAtlas(Seed):
         return d * r[:, None], d
 
     # -- where the points inside one piece go ------------------------------------------------ #
-    def _fill(self, row: dict, n_pieces: int, per: int, R: float,
+    @staticmethod
+    def _fill(row: dict, n_pieces: int, per: int, R: float,
               centroid: torch.Tensor, e1, e2, e3, gen) -> torch.Tensor:
         """World positions [n_pieces * per, 3] of the material points of these pieces.
 
@@ -789,6 +790,52 @@ class SeedCellAtlas(Seed):
 
 
 # --------------------------------------------------------------------------- the aggregate
+def form_points(shape: str, n: int, params: dict, volume: float, copies: int = 1,
+                device="cpu", seed: int = 0):
+    """`n` points of an ATLAS FORM, centred on the origin and scaled so ONE piece has `volume`.
+
+    THE TEN SHAPES WERE LOCKED INSIDE ONE OPERATOR. `seed_cell_atlas` owns closed-form samplers for
+    a patch, a sheet, a rod, a ball, a filament, a bowed fenestrated cisterna, a branching tubule
+    network, a Golgi stack, a bent mitochondrion with cristae and a nine-fold barrel -- each with a
+    closed-form volume, which is exactly what the material seeder's contract needs (`V = per_parent
+    * p_vol` fixes the size, the shape only arranges it). A spec that wanted a filament of jelly,
+    or a stack for anything but a Golgi, could not have one: the repertoire was reachable only
+    through a compartment hierarchy laid out about a cell centre.
+
+    This is the door in. `plexus.models.entities.provision` calls it for `shape: <one of these>`,
+    so the same sampler serves the atlas and any MPM body, and there is one implementation of a
+    bent capsule rather than two. What stays behind in the operator is the ATLAS itself -- which
+    organelle is which shape, at what radius, in what numbers -- because that is cell biology and
+    not geometry.
+
+    `copies` pieces are generated INDEPENDENTLY (a filament is a random walk; two copies of one
+    walk would be a crystal) and interleaved to match `_place`, which sends point i to copy i % k.
+    """
+    import torch as _t
+    row = {k: v for k, v in dict(params or {}).items() if k not in ("count", "fraction")}
+    row["shape"] = str(shape)
+    V1 = float(SeedCellAtlas._piece_volume(row, 1.0))
+    if not (V1 > 0):
+        raise ValueError(f"form {shape!r}: its closed-form volume is {V1}; check `size`/`thickness`")
+    k = max(int(copies), 1)
+    per = max(int(n) // k, 1)
+    gen = _t.Generator(device="cpu").manual_seed(int(seed))
+    # THE SAMPLERS RUN ON THE CPU because their generator does; the points are moved once, after.
+    e3 = _unit(_t.randn(k, 3, generator=gen))
+    e1, e2 = _ortho(e3)
+    pts = SeedCellAtlas._fill(row, k, per, 1.0, _t.zeros(k, 3), e1, e2, e3, gen)
+    pts = pts.reshape(k, per, 3)
+    pts = pts - pts.mean(dim=1, keepdim=True)                    # each piece on its own centre
+    pts = pts.transpose(0, 1).reshape(-1, 3)                     # interleave: point i -> copy i % k
+    out = pts * (float(volume) / V1) ** (1.0 / 3.0)
+    if out.shape[0] < n:                                         # a count that does not divide evenly
+        out = _t.cat([out, out[: n - out.shape[0]]], 0)
+    return out[:n].to(device)
+
+
+ATLAS_FORMS = _SHAPES
+
+
 @register_operator("aggregate_centroid", family="hierarchy", set="compartment", kind="aggregate")
 class AggregateCentroid(Aggregate):
     """A parent's position as the mass-weighted mean of its children's: sum_pi, and nothing else.
