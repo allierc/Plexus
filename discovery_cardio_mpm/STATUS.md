@@ -12,8 +12,9 @@ operational summary: what was done, what it cost, what is measured, and what is 
 ## 1. What this loop is for
 
 The third agentic loop, and the first pointed at a **real measurement** rather than a paper.
-`discovery_okuda/` searches for a mechanism nobody wrote down; `atlas_jax/` and `atlas_cc3d/`
-decompose published code into the operator algebra. **This one fits a differentiable MPM model of
+`discovery_okuda/` searches for a mechanism nobody wrote down; the atlas loops (`atlas_jax/`,
+`atlas_cc3d/`, both since removed) decomposed published code into the operator algebra.
+**This one fits a differentiable MPM model of
 a beating cardiomyocyte sheet to microscope tracking data**, and asks which mechanisms the data can
 actually support.
 

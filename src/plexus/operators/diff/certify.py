@@ -7,19 +7,24 @@ condemned `agent_divide`, and making the level's own tensor the leaf condemned e
 operator. A single-source measurement that keeps doing this is not a measurement.
 
 So this is the second source, and it shares NO code path with the first. It takes a real spec out
-of `config/atlas/` -- the same file the differ ran -- promotes the operator's parameters to tensor
-leaves in the spec itself, and runs the whole thing through `engine.run(grad=True)`: real build,
-real schedule, real state blocks, real neighbours, real events, N frames. Then it asks autograd.
+of `config/atlas/` -- the minisite scenes, the same files the differ ran -- promotes the
+operator's parameters to tensor leaves in the spec itself, and runs the whole thing through
+`engine.run(grad=True)`: real build, real schedule, real state blocks, real neighbours, real
+events, N frames. Then it asks autograd.
 
 That closes every hole the synthetic harness had, because there is no harness: the configuration
-IS the one the atlas runs.
+IS one the site actually runs.
 
 A verdict is CERTIFIED only when both routes agree. Where they disagree the certifier wins -- it
 is running the real thing -- and the disagreement is printed rather than reconciled quietly.
 
     python -m plexus.operators.diff.certify                       # every spec in config/atlas
-    python -m plexus.operators.diff.certify --spec mechanical_relaxation
+    python -m plexus.operators.diff.certify --spec turing2d_rps
     python -m plexus.operators.diff.certify --audit _state/diff_audit_atlas.json
+
+The jax-morph corpus this was first built against (`config/atlas_jax/`, and the sixteen
+`candidates/jax_morph_*` operators its specs resolved against) has been removed, so the four
+`config/atlas/` scenes are the whole corpus and they run on the promoted vocabulary.
 """
 from __future__ import annotations
 
@@ -40,14 +45,17 @@ SKIP_PARAMS = {"to", "from", "_at", "at", "op", "implementation", "emit", "every
                "after_frame", "before_frame", "n_frames", "substeps", "seed"}
 
 
-def load_candidates():
-    """The atlas's operators are in the anti-chamber; `plexus.operators` will not import them."""
-    import importlib
+def load_operators():
+    """Register the promoted vocabulary. Importing `plexus.operators` is the whole of it.
+
+    THERE WAS A SECOND HALF HERE. It walked `plexus/operators/candidates/` and imported every
+    `jax_morph_*.py` and `atlas_*.py`, because the jax-morph atlas kept its extracted operators
+    in that anti-chamber and `config/atlas/`'s specs resolved against them -- `grow_radius` to
+    `jax_morph_saturating_cell_growth`, `agent_divide` to implementation `volume_conserving`.
+    That atlas and those sixteen operators are gone, so the specs now resolve against the
+    promoted defaults, which is what they name.
+    """
     import plexus.operators  # noqa: F401
-    import plexus.operators.candidates as C
-    for fn in sorted(os.listdir(os.path.dirname(C.__file__))):
-        if fn.startswith(("jax_morph_", "atlas_")) and fn.endswith(".py"):
-            importlib.import_module(f"plexus.operators.candidates.{fn[:-3]}")
 
 
 def live_loss(H):
@@ -105,7 +113,7 @@ def main():
     ap.add_argument("--device", default="cpu")
     a = ap.parse_args()
 
-    load_candidates()
+    load_operators()
     names = [a.spec] if a.spec else sorted(
         f[:-5] for f in os.listdir(CONFIG) if f.endswith(".yaml") and not f.startswith("_"))
 
