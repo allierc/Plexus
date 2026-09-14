@@ -49,7 +49,15 @@ sets:
     density: 1050.0
     particle_mass: 4.133e-6          # p_vol = mass / 1050 = 3.936e-9 m^3, x 4,000 = the strap's 1.575e-5
 fields: {mpm_grid: {frame: mpm_grid, n_grid: 96}}
+# IT HAS TO DO SOMETHING. As first written this scene had no gravity, no initial velocity and no
+# contraction: two elastic bodies at rest, which seeded correctly and then sat there. The rung is
+# about placement, but a spec that cannot move is not a simulation. Gravity acts on both bodies,
+# the box has a floor, and the globe falls 0.17 m onto it -- about 93 frames at dt 0.002 -- with
+# the strap riding on its shoulder and whipping as it lands. The two feel each other exactly where
+# they touch, through the one `mpm_grid` both scatter into.
 operators:
+- {op: gravity, at: globe, g: 9.81}
+- {op: gravity, at: muscle, g: 9.81}
 - {op: mpm_strain, at: globe_pt}
 - {op: mpm_strain, at: muscle_pt}
 - {op: mpm_scatter, at: globe_pt, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
@@ -57,7 +65,7 @@ operators:
 - {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
 - {op: mpm_gather, at: globe_pt, from: mpm_grid, wall_damp: 0.5, wall_damp_mode: per_impact, vmax: 1000000.0}
 - {op: mpm_gather, at: muscle_pt, from: mpm_grid, wall_damp: 0.5, wall_damp_mode: per_impact, vmax: 1000000.0}
-schedule: [{substep_dt: 1.0e-4, steps: [mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather]}]
+schedule: [gravity, gravity, {substep_dt: 1.0e-4, steps: [mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather]}]
 # TWO PARTICLE SETS NEED THE COMPARTMENT RENDERER. `render_3d: dots` draws the SUBJECT -- the
 # largest set carrying positions -- so the strap (4,000 points against the globe's 30,000) was
 # simply absent from the picture. `compartments` draws each named set with its own style, which is
