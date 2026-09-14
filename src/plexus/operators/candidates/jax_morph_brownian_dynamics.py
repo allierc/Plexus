@@ -84,7 +84,6 @@ class Agitate(Lateral):
     OUTPUTS = ["cell"]
     READS = ["pos", "alive"]
     WRITES = ["pos"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]                      # isotropic kick is dimension-generic (reads D = pos.shape[-1])
     REQUIRES_PARAMS = []                         # every knob optional (kT/gamma default to the source's 0.1 / 1.0)
     MECHANISM_TAGS = ["thermal_noise", "brownian_motion", "langevin_bath",

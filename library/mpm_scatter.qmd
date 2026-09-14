@@ -362,35 +362,24 @@ class MPMScatter(MPMWrites, Exchange):
         dpos_phys = (offsets[None] - fx[:, None, :]) * dx
         mom = mass[:, None, None] * V[:, None, :] + (affine[:, None] @ dpos_phys[..., None]).squeeze(-1)
         # THE GRID IS SHARED BY EVERY SET THAT SCATTERS INTO IT, so only the FIRST scatter of a
-        # micro-step may zero it. This used to allocate fresh zeros unconditionally and assign
-        # them, which meant a spec with two particle sets kept only the LAST one: nucleus momentum
-        # was deposited, then thrown away by the cytosol's scatter, and the grid solve ran on the
-        # cytosol alone.
+        # micro-step may zero it. Allocating fresh zeros unconditionally keeps only the LAST set:
+        # the nucleus deposits its momentum, the cytosol's scatter throws it away, and the grid
+        # solve runs on the cytosol alone.
         #
-        # WHAT IT LOOKED LIKE, because like the substep-binding defect it does not announce itself.
-        # A nucleus falling inside a cytosol shell fell SLOWER than gravity (z = 0.7061 at the tick
-        # free-fall puts at 0.6835) and was crushed from an rms thickness of 0.0248 to 0.0093 while
-        # still in mid-air, where nothing was touching it. The same nucleus with no cytosol tracked
-        # free-fall to four decimals and held 0.0248 exactly. It reads as "the nucleus is too soft"
-        # and it is actually "the nucleus is gathering a velocity field it never contributed to":
-        # inside the cavity the cytosol deposits no mass, so `gmv / gm.clamp(1e-10)` there is the
-        # B-spline tails divided by nearly nothing.
+        # IT DOES NOT ANNOUNCE ITSELF. The nucleus then falls SLOWER than gravity and is crushed
+        # in mid-air with nothing touching it, which reads as "the nucleus is too soft" and is
+        # actually "the nucleus is gathering a velocity field it never contributed to": inside the
+        # cavity the cytosol deposits no mass, so `gmv / gm.clamp(1e-10)` there is the B-spline
+        # tails divided by nearly nothing. It only bites on multi-SET MPM -- multi-material within
+        # one set uses `types:` and one scatter -- so single-set runs are unaffected.
         #
-        # WHY IT SURVIVED THIS LONG. Every MPM spec in the corpus scatters ONE set -- multi-material
-        # is done with `types:` inside a single `mpm_particle` set (see
-        # config/material/material_3d_multimaterial.yaml: jelly + water + snow, one set, one
-        # scatter). Multi-SET MPM is what the composed cell introduced, and it is the only thing
-        # this ever affected. With one set the stamp is always stale and the zeros are always
-        # fresh, so single-set runs stay bit-identical.
-        # STEP 3: WHO ZEROES THE GRID IS STATIC, so it is not asked at run time. Deciding it from
-        # a per-substep counter -- a python int the engine advances, compared against a stamp on
-        # the field -- works, and it is a side effect no CUDA-graph replay can reproduce; it also
-        # makes dynamo recompile every substep, since it specialises on integer attributes of an
-        # nn.Module. The engine binds the i-th OCCURRENCE of a token to
-        # the i-th INSTANCE, so occurrence 0 of `mpm_scatter` for a given grid is ALWAYS the first
-        # one in a substep: the engine stamps `_zeroes_grid` on it when `inst` is built.
+        # WHICH SCATTER ZEROES IS STATIC, so it is not asked at run time: a per-substep counter
+        # would be a side effect no CUDA-graph replay can reproduce, and it would make dynamo
+        # recompile every substep by specialising on an integer attribute. The engine binds the
+        # i-th occurrence of a token to the i-th instance, so occurrence 0 for a given grid is
+        # always the first in a substep, and it stamps `_zeroes_grid` when `inst` is built.
         _fresh = getattr(self, "_zeroes_grid", True)
-        # STEP 2: WRITE INTO THE FIELD'S OWN BUFFERS, never a fresh allocation. Assigning
+        # WRITE INTO THE FIELD'S OWN BUFFERS, never a fresh allocation. Assigning
         # `g.m = torch.zeros(...)` rebinds the attribute to new storage every substep; a captured
         # graph holds the address it saw at capture time, so the replay silently writes somewhere
         # the rest of the run no longer reads. That failure is SILENT: capture succeeds, nothing

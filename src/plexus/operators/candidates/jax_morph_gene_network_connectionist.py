@@ -94,14 +94,13 @@ class RegulateConnectionist(Exchange):
     EMIT = "velocity"                  # the gene block is first-order; the delta is the dt-increment expressed as inc/dt
     INTEGRAND = "gene"                 # writes a NON-coordinate block (the evolving gene vector), not the spatial pos
     # typed signature (Plexus2 sec. 2.1): a morphism cell -> cell that reads the cell's own
-    # gene state + its fixed sensed drive and writes the gene state. MAPS=[] is load-bearing:
+    # gene state + its fixed sensed drive and writes the gene state. It traverses NO relation:
     # no incidence map, no neighbour edge -- each cell integrates in isolation (the
     # intracellular identity that distinguishes `regulate` from the lateral `signal`).
     INPUTS = ["cell", "drive"]
     OUTPUTS = ["cell"]
     READS = ["gene", "drive"]   # evolving gene vector g (state) + fixed driver u (read-only)
     WRITES = ["gene"]                         # the dt-increment of the gene vector
-    MAPS = []                                 # intracellular: no gather/scatter, zero cell-to-cell coupling
     SUPPORTED_DIMS = [2, 3]                    # acts on per-cell state; ignores spatial dimension
     DIFFERENTIABLE = True                     # pure-torch vector field + RK4; grads flow through for the inverse problem
     REQUIRES_PARAMS = []                       # all params optional (zeros defaults, like the source's _resolve_param)

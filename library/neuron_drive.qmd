@@ -93,7 +93,6 @@ class NeuronDrive(Exchange):
     OUTPUTS = ["neuron"]
     READS = ["pos"]
     WRITES = ["voltage"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = []

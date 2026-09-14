@@ -8,12 +8,14 @@ imported first defined the contract's signature permanently.
 
 `cell_chem_diffuse` is the live instance. Its contract carried `graph_laplacian`'s
 
-    {inputs: [cell], reads: [chem], maps: [edge_index]}
+    {inputs: [cell], reads: [chem]}
 
-while `interface_weighted` declares INPUTS = ["cell", "vertex"], READS = ["chem", "pos"],
-MAPS = ["E_srce", "E_trgt", "E_face"] -- a second SET, a second state BLOCK and three different
-MAPS, none of which appeared anywhere in the contract that `plexus2.tex` says registration records
-and that the atlas and the validator read as truth.
+while `interface_weighted` declares INPUTS = ["cell", "vertex"], READS = ["chem", "pos"] -- a
+second SET and a second state BLOCK, neither of which appeared anywhere in the contract that
+`plexus2.tex` says registration records and that the atlas and the validator read as truth.
+(The two also declared different traversed relations, one against three; that was the `MAPS`
+field, since removed -- see the note in `base.Operator`. The divergence this file exists for
+is unaffected: a second set and a second block are enough to make the two signatures differ.)
 
 WHY IT BLOCKS THE PROMOTION. Every apico-basal variant widens its signature the same way:
 `cell_mechanics[model: apicobasal]` reads and writes a second block (`sep`) on the vertex set.
@@ -41,7 +43,7 @@ def test_the_shipped_divergence_is_now_visible():
     assert gl["inputs"] == ["cell"]
     assert iw["inputs"] == ["cell", "vertex"], "the second SET is still invisible"
     assert iw["reads"] == ["chem", "pos"], "the second state BLOCK is still invisible"
-    assert iw["maps"] == ["E_srce", "E_trgt", "E_face"], "the three MAPS are still invisible"
+    assert "maps" not in iw, "the removed `maps` field is back in the signature"
     assert gl != iw, (
         "the two variants read different things; a single shared signature cannot be right for "
         "both, and before this change the contract carried whichever registered first")

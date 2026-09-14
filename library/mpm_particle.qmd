@@ -241,22 +241,90 @@ class MPMParticle:
                 # what you want for anything thrown, dropped or rolled. Either way the VOLUME is
                 # the derived quantity and the shape only decides how it is arranged.
                 _shape = str(t.get("shape", "cube")).lower()
-                if _shape in ("ball", "sphere"):
-                    _r = (_vol * 3.0 / (4.0 * math.pi)) ** (1.0 / 3.0) if D == 3 \
-                        else (_vol / math.pi) ** 0.5
-                    # UNIFORM IN THE BALL, not in the radius: a direction on the sphere times
-                    # r * u^(1/D). Scattering r uniformly would pile the particles at the centre
-                    # and give the wrong density profile before anything had moved.
-                    _n = torch.randn(nb, D, generator=H.rng, device=device)
-                    _n = _n / _n.norm(dim=1, keepdim=True).clamp(min=1e-12)
-                    _u = torch.rand(nb, 1, generator=H.rng, device=device) ** (1.0 / D)
-                    pos[bm] = cpos[bm] + _n * _u * _r
-                    _side = 2.0 * _r                          # reported as the extent
+                # THE VOLUME IS THE CONTRACT, THE SHAPE ONLY ARRANGES IT. `V = per_parent * p_vol`
+                # is fixed by the mass; `repeat` divides both the points and the volume among the
+                # copies, so nine cubes of one type weigh what one did.
+                _cp = _copies(t, D, device)
+                _k = int(_cp.shape[0])
+                _volk = _vol / _k
+                _hollow = float(t.get("hollow", 0.0) or 0.0)
+                _fill_frac = max(1.0 - _hollow ** D, 1e-6)    # a shell holds less than its envelope
+                if _shape in ("ball", "sphere", "cylinder", "torus"):
+                    if _shape == "torus":
+                        # `aspect` IS THE TUBE, as a fraction of the ring radius: 0.3 is a doughnut,
+                        # 0.05 a wire hoop. V = 2 pi^2 R a^2 (1 - h^2) with a = aspect * R, so the
+                        # ring radius follows from the volume the mass already fixed.
+                        _asp = float(t.get("aspect", 0.3))
+                        _ax = {"x": 0, "y": 1, "z": 2}.get(str(t.get("axis", "z")).lower(), 2)
+                        _r = (_volk / (2.0 * math.pi ** 2 * _asp ** 2
+                                       * max(1.0 - _hollow ** 2, 1e-6))) ** (1.0 / 3.0)
+                        _side = 2.0 * _r * (1.0 + _asp)      # the outer diameter of the doughnut
+                    elif _shape == "cylinder":
+                        _asp = float(t.get("aspect", 2.0))
+                        _ax = {"x": 0, "y": 1, "z": 2}.get(str(t.get("axis", "z")).lower(), 2)
+                        # V = pi r^2 L (1 - h^2), L = 2 * aspect * r
+                        _r = (_volk / (2.0 * math.pi * _asp * max(1.0 - _hollow ** 2, 1e-6))) ** (1.0 / 3.0) \
+                            if D == 3 else (_volk / (4.0 * _asp * max(1.0 - _hollow, 1e-6))) ** 0.5
+                        _side = 2.0 * _r * _asp
+                    else:
+                        _r = (_volk * 3.0 / (4.0 * math.pi * _fill_frac)) ** (1.0 / 3.0) if D == 3 \
+                            else (_volk / (math.pi * _fill_frac)) ** 0.5
+                        _side = 2.0 * _r
+                        _asp, _ax = 2.0, 2
+                    # UNIFORM IN THE BODY, not in the radius: `_unit_offsets` draws a direction and
+                    # a radius with the right power, so the density is flat before anything moves.
+                    _off = _unit_offsets(_shape, nb, D, H, device, aspect=_asp, hollow=_hollow, axis=_ax) * _r
+                    _sink = {}
+                    pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device, out=_sink)
+                    _write_copy(lvl, bm, _sink)
                 elif _shape == "cube":
-                    _side = _vol ** (1.0 / D)
-                    _u = torch.rand(nb, D, generator=H.rng, device=device) - 0.5
-                    pos[bm] = cpos[bm] + _u * _side           # a cube of the derived size
-                elif _shape in ("obj", "mesh"):
+                    _side = (_volk / _fill_frac) ** (1.0 / D)
+                    if str(t.get("fill", "")).lower() == "lattice" and _k > 1:
+                        # EVERY COPY GETS THE SAME LATTICE, which is what 27 hand-written blocks
+                        # were. Building one lattice over the whole body and letting `_place` deal
+                        # it out gives each copy a SCATTERED SUBSET of a 33^3 grid rather than its
+                        # own 11^3 one: same count, same volume, and a body 3% wider whose points
+                        # do not sit in planes. `_place` sends point i to copy i % k, so the
+                        # per-copy lattice is interleaved to match.
+                        _per = max(int(nb) // _k, 1)
+                        _u = _unit_offsets("cube", _per, D, H, device, hollow=_hollow, fill="lattice")
+                        _off = _u.repeat_interleave(_k, 0)[:nb] * _side
+                        if _off.shape[0] < nb:                   # a count that does not divide evenly
+                            _off = torch.cat([_off, _off[: nb - _off.shape[0]]], 0)
+                    else:
+                        _off = _unit_offsets("cube", nb, D, H, device, hollow=_hollow,
+                                             fill=t.get("fill")) * _side
+                    _sink = {}
+                    pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device, out=_sink)
+                    _write_copy(lvl, bm, _sink)
+                elif _shape in _ATLAS_FORMS():
+                    # THE ATLAS'S OWN SHAPES, AVAILABLE TO ANY BODY. `patch`, `sheet`, `rod`,
+                    # `filament`, `cisterna`, `tubule`, `stack`, `mito` and `barrel` are closed-form
+                    # samplers with closed-form volumes, written for `seed_cell_atlas` and reachable
+                    # only through it; `plexus.operators.cell_ops.form_points` is the door in, so a
+                    # material body can BE a filament or a Golgi stack and there is one
+                    # implementation of each rather than two. The volume contract is untouched: the
+                    # sampler is asked for a piece of volume `_volk` and returns it.
+                    # THE FORM'S OWN WORDS LIVE UNDER `form:`, AND THEY HAVE TO. `layers` already
+                    # means concentric MATERIAL bands on a type (`layers: [{frac, youngs}]`) and a
+                    # Golgi stack means it as a count of discs -- one word, two meanings, and the
+                    # spec cannot hold both at the top level. A nested block also keeps the
+                    # schema's "property read by no operator" check honest: `bend`, `cristae` and
+                    # `skew` are read HERE, by the sampler, not by any operator.
+                    from plexus.operators.cell_ops import form_points
+                    _fp = t.get("form")
+                    if not isinstance(_fp, dict):
+                        raise ValueError(
+                            f"shape: {_shape} takes its proportions from a `form:` block -- e.g. "
+                            f"`form: {{size: 0.3, thickness: 0.08}}`. `size` and `thickness` are "
+                            f"the piece's PROPORTIONS; its absolute scale comes from the volume.")
+                    _off = form_points(_shape, nb, _fp, _volk, copies=_k, device=device,
+                                       seed=int(getattr(H, "seed", 0)) + tid).to(pos.dtype)
+                    _side = 2.0 * float(_off.abs().max()) if nb else 0.0
+                    _sink = {}
+                    pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device, out=_sink)
+                    _write_copy(lvl, bm, _sink)
+                elif _shape.startswith("mesh:") or _shape in ("obj", "mesh"):
                     # `shape: obj` -- THE VOLUME TAKES THE SHAPE OF A MESH FILE. Same contract as
                     # ball and cube: `V = per_parent * p_vol` is fixed by the mass, and the mesh is
                     # scaled so that ITS volume equals V, so a bunny and a cow of the same
@@ -269,11 +337,26 @@ class MPMParticle:
                     # once per spec however many bodies wear it, and the points are drawn with a
                     # numpy generator seeded from `H.rng`, so the run stays reproducible under the
                     # same seed it always had.
-                    _pts, _side = _obj_points(t, nb, _vol, D, H, device, _mesh_cache,
-                                              par=pidx[bm])
+                    if _shape.startswith("mesh:"):
+                        # THE LIBRARY, NOT A PATH. `form: mesh:<name>[/<part>]` asks `plexus.shapes`
+                        # for points inside that shape, scaled so ITS volume is the volume the mass
+                        # fixes -- the same contract cube and ball keep, and the same one `obj:`
+                        # had, now with a folder, a cache and a provenance behind the name.
+                        from plexus import shapes as _shapes
+                        import torch as _t
+                        _pp = _shapes.points(_shape.split(":", 1)[1], int(nb), float(_volk))
+                        _pts = _t.as_tensor(_pp, dtype=pos.dtype, device=device)
+                        _sink = {}
+                        _pts = _place(t, _pts, _cp, nb, D, H, device, out=_sink)
+                        _write_copy(lvl, bm, _sink)
+                        _side = float(abs(_pp).max() * 2.0)   # numpy is not imported in this module
+                    else:
+                        _pts, _side = _obj_points(t, nb, _vol, D, H, device, _mesh_cache,
+                                                  par=pidx[bm])
                     pos[bm] = cpos[bm] + _pts
                 else:
-                    raise ValueError(f"shape must be 'cube', 'ball' or 'obj', got {_shape!r}")
+                    raise ValueError(f"shape must be 'cube', 'ball', 'cylinder', 'obj' or "
+                                     f"'mesh:<name>', got {_shape!r}")
             if _side is not None:
                 print(f"[build] {lvl.name}: particle_mass {float(_pm):.4g} / density -> p_vol "
                       f"{float(_pm) / float(rho if not torch.is_tensor(rho) else 1.0):.4g}, "
@@ -292,6 +375,15 @@ class MPMParticle:
                 continue
             v = [float(x) for x in blk]
             lo = torch.tensor(v[:D], device=device); hi = torch.tensor(v[D:2 * D], device=device)
+            # A BOX IS A CUBE WITH A SIZE PER AXIS, so it takes the same four words. Turned or
+            # tiled, the points are built as offsets from the box's centre and put back.
+            if t.get("hollow") or t.get("rotate") is not None or t.get("repeat") is not None or t.get("scatter"):
+                ctr, half = 0.5 * (lo + hi), 0.5 * (hi - lo)
+                _cp = _copies(t, D, device)
+                _u = _unit_offsets("cube", nb, D, H, device, hollow=float(t.get("hollow", 0.0) or 0.0))
+                _u = _u / max(int(_cp.shape[0]), 1) ** (1.0 / D)      # the copies share the box
+                pos[bm] = ctr + _place(t, _u * (2.0 * half), _cp, nb, D, H, device)   # pitch is a world length
+                continue
             if str(t.get("fill", "random")).lower() == "lattice":
                 # `fill: lattice` -- THE POINTS ON A REGULAR GRID inside the box (the cube root of
                 # the count per axis, a small jitter so no two lie on one grid line of the MPM

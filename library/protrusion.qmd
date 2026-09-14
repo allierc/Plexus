@@ -124,7 +124,6 @@ class Protrusion(Lateral):
     REQUIRES_PARAMS = ["f", "cell_set", "radius"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["pos", "polarity"]; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["motility", "protrusion", "active_stress"]
     PARAM_ROLES = {"f": "drive_per_unit_mass", "radius": "cell_radius_world",
                    "gate": "phase_gate",

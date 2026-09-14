@@ -446,7 +446,7 @@ class CellDiffuse(Lateral):
     N_SPECIES = 2
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["chi"]
-    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = ["edge_index"]
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]
     MECHANISM_TAGS = ["diffusion", "graph_laplacian", "turing"]
     REFERENCE = "Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72."
     PARAM_ROLES = {"d_a": "activator_diffusivity", "d_h": "substrate_diffusivity", "chi": "spatial_scale"}
@@ -578,7 +578,6 @@ class CellDiffuseInterfaceWeighted(Lateral):
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["d_a", "d_h", "chi"]
     INPUTS = ["cell", "vertex"]; OUTPUTS = ["cell"]; READS = ["chem", "pos"]; WRITES = ["chem"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["diffusion", "finite_volume", "interface_weighted", "turing", "cross_scale"]
     REFERENCE = ("Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous "
                  "multicellular morphogenesis of the tissue. Sci. Rep. 8:2386 (Appendix A: inter-cellular "
@@ -679,7 +678,7 @@ class CellReactGrayScott(Lateral):
     N_SPECIES = 2
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["F", "kk"]
-    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]
     MECHANISM_TAGS = ["reaction", "autocatalysis", "turing", "gray_scott"]
     PARAM_ROLES = {"F": "feed_rate", "kk": "kill_rate", "rate": "reaction_time_scale"}
     REFERENCE = "Gray, P. & Scott, S. K. (1984). Chem. Eng. Sci. 39:1087-1097; Pearson, J. E. (1993). Science 261:189-192."
@@ -738,7 +737,7 @@ class CellReactRPS(Lateral):
     """
     N_SPECIES = 3
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
-    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]
     MECHANISM_TAGS = ["reaction", "competition", "cyclic_dominance", "non_transitive",
                       "may_leonard", "rock_paper_scissor"]
     PARAM_ROLES = {"a": "cyclic_suppression", "rate": "reaction_time_scale"}
@@ -796,7 +795,7 @@ class CellReactGrayScottCoupled(Lateral):
     N_SPECIES = 4
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["F", "kk"]
-    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]
     MECHANISM_TAGS = ["reaction", "autocatalysis", "turing", "gray_scott", "competition", "coupled"]
     PARAM_ROLES = {"F": "feed_rate", "kk": "kill_rate", "F2": "feed_rate_2", "kk2": "kill_rate_2",
                    "gamma": "cross_suppression", "rate": "reaction_time_scale"}
@@ -835,7 +834,7 @@ class CellReactGiererMeinhardt(Lateral):
     localised activator peak WITH A GRADIENT (Okuda's tip spot), unlike Brusselator (decays the seed) or
     Gray-Scott (substrate-depletion). `rate` time-scales the reaction; a0 is a small basal activator source."""
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
-    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]
     MECHANISM_TAGS = ["reaction", "autocatalysis", "self_enhancing", "turing", "gierer_meinhardt"]
     PARAM_ROLES = {"gm_rho": "production", "mu_a": "activator_decay", "mu_h": "inhibitor_decay", "a0": "basal_source"}
     REFERENCE = "Gierer, A. & Meinhardt, H. (1972). A theory of biological pattern formation. Kybernetik 12:30-39."
@@ -1363,7 +1362,6 @@ class InterfaceLineTension3D(Lateral):
     """
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["interface_tension", "purse_string", "tube", "oriented", "cross_scale"]
     PARAM_ROLES = {"K_purse": "interface_line_tension", "a_sw": "red_threshold"}
     REFERENCE = "Plexus (this work); purse-string / apical-constriction tubulation after Okuda, S. et al. (2018). Sci. Rep. 8:2386."
@@ -1466,7 +1464,6 @@ class ExtrusionForcing3D(Lateral):
     """
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["extrusion", "forcing", "control_only", "disqualified"]
     PARAM_ROLES = {"K_extrude": "normal_extrusion_forcing", "a_sw": "red_threshold"}
     REFERENCE = "Plexus (this work) -- a forcing term retained only as an explicit control."
@@ -1538,7 +1535,7 @@ class CellReactBrusselator(Lateral):
     """
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["gamma", "A", "B"]
-    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]
     MECHANISM_TAGS = ["reaction", "activator_inhibitor", "turing", "brusselator"]
     REFERENCE = "Prigogine, I. & Lefever, R. (1968). Symmetry breaking instabilities in dissipative systems. J. Chem. Phys. 48:1695-1700."
     PARAM_ROLES = {"gamma": "reaction_rate", "A": "feed", "B": "conversion"}
@@ -1611,7 +1608,6 @@ class _ShapeToChemBase(Lateral):
     """The contract. Subclasses supply `_feature(...) -> per-cell scalar` and nothing else."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = False
     INPUTS = ["cell", "vertex"]; OUTPUTS = ["cell"]; READS = ["chem", "pos"]; WRITES = ["chem"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     REQUIRES_PARAMS = ["beta"]
     MECHANISM_TAGS = ["shape_to_chemistry", "mechanochemical_feedback", "cross_scale", "closes_the_loop"]
     REFERENCE = ("Okuda, S. et al. (2018). Sci. Rep. 8:2386 (the shape-chemistry loop this closes); "
@@ -1985,7 +1981,6 @@ class _ShapeProbeBase(Lateral):
     """Compute one scalar per cell and publish it on the mesh under `field`. No state is touched."""
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False
     INPUTS = ["cell", "vertex"]; OUTPUTS = []; READS = ["pos"]; WRITES = []
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     REQUIRES_PARAMS = []
     MECHANISM_TAGS = ["measurement", "cell_shape", "publishes_field"]
     REFERENCE = ("Bi, D. et al. (2015). Nat. Phys. 11:1074-1079 (the shape index as the tissue's "

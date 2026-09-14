@@ -140,7 +140,6 @@ class PolarActiveStress(Lateral):
     REQUIRES_PARAMS = ["cell_set"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["polarity", "phase"]; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["active_stress", "motility", "protrusion", "cytoskeleton"]
     PARAM_ROLES = {"amplitude": "active_stress", "amplitude_frac": "target_strain",
                    "offset": "cycle_phase_offset", "cell_set": "polarity_owner",

@@ -102,7 +102,6 @@ class BroadcastLift(Broadcast):
     OUTPUTS = ["particle"]                       # the child set it lifts onto
     READS = ["pos"]
     WRITES = ["pos"]                             # velocity delta pulling each child toward its parent
-    MAPS = ["parent"]                            # lift along the parent (containment) map
     SUPPORTED_DIMS = [2, 3]                     # dimension-generic: the lift is `stiffness*(parent_pos - child_pos)` in N-D
     REQUIRES_PARAMS = ["stiffness"]
     MECHANISM_TAGS = ["containment", "hierarchical_coupling", "spring"]

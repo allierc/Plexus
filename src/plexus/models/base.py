@@ -718,16 +718,28 @@ class Operator(nn.Module):
     SET: Optional[str] = None
     # --- typed signature (Plexus2 sec. 2.1): an operator is a typed MORPHISM between
     # sets. Declarative metadata, like MECHANISM_TAGS -- the validator, atlas and docs
-    # read it; the engine does not. Maps are PART of the signature: Plexus2 folds maps
-    # INTO the operator (there is no standalone Map primitive), so an operator names the
-    # maps it traverses here rather than the language carrying a separate `M`. Defaults
-    # describe a single-set morphism on SET; fill INPUTS/OUTPUTS/READS/WRITES/MAPS on
-    # operators that gather/scatter along maps (signal, aggregate, deposit, ...).
+    # read it; the engine does not. Defaults describe a single-set morphism on SET; fill
+    # INPUTS/OUTPUTS/READS/WRITES on operators that touch more than their own set.
+    #
+    # THERE WAS A `MAPS` HERE, AND IT WAS REMOVED. It declared the named relations an
+    # operator traversed -- ["pre", "post"], ["parent"], ["E_srce", "E_trgt", "E_face"].
+    # Nothing executed on it, and it was declared on 23 of ~150 registered operators, so
+    # it could not be read as truth either way: an operator that simply inherited the
+    # empty default was indistinguishable from one that had been checked and found to
+    # traverse nothing. A signature field that is right a sixth of the time is worse than
+    # an absent one, because it invites exactly the query it cannot answer.
+    #
+    # The relations themselves are UNAFFECTED and still execute. A spec's
+    # `sets.<name>.maps` (engine.py `lvl.maps`, validated in schema.py) is a different
+    # thing that happens to share the word: it declares the functions out of a set
+    # (half_edge -> {srce: vertex, trgt: vertex, face: cell}), and `H.gather` /
+    # `H.scatter_along` walk them at runtime. What an operator traverses is therefore
+    # still knowable -- by reading its gathers, or by instrumenting those two calls --
+    # just no longer claimed in a field nobody maintained.
     INPUTS: list = []                   # input sets (empty => [SET])
     OUTPUTS: list = []                  # output sets (empty => [SET])
     READS: list = []                    # state blocks consumed, by name, e.g. ["voltage", "w"]
     WRITES: list = []                   # state blocks produced, by name, e.g. ["voltage"]
-    MAPS: list = []                     # named maps traversed, e.g. ["pre", "post"] or ["parent"]
     # Which state BLOCK this operator's returned delta integrates into. `None` (default) =>
     # the set's coordinate block (the common case; unchanged). Set it to a NON-coordinate
     # dynamical block (e.g. "chem", "a0") so one set can carry several independently-
@@ -820,17 +832,18 @@ class Operator(nn.Module):
     @classmethod
     def signature(cls) -> dict:
         """The operator's typed signature (Plexus2 sec. 2.1): the sets it maps
-        between, the state it reads/writes, and the maps it traverses. `inputs`/
-        `outputs` default to the single acting set `SET` when not declared. This is
-        the machine-readable form of "operator as typed morphism between sets"; the
-        atlas and (later) the OperatorContract read it -- the engine never does."""
+        between and the state it reads/writes. `inputs`/`outputs` default to the
+        single acting set `SET` when not declared. This is the machine-readable form
+        of "operator as typed morphism between sets"; the atlas and (later) the
+        OperatorContract read it -- the engine never does.
+
+        No `maps` key: see the note on the class attributes for why it went."""
         one = [cls.SET] if cls.SET else []
         return {
             "inputs":  list(cls.INPUTS) or one,
             "outputs": list(cls.OUTPUTS) or one,
             "reads":   list(cls.READS),
             "writes":  list(cls.WRITES),
-            "maps":    list(cls.MAPS),
         }
 
 

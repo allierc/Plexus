@@ -85,7 +85,6 @@ class RegulateMWC(Exchange):
     OUTPUTS = ["cell"]
     READS = ["gene", "drive"]           # own gene concentrations + the fixed sensed driver block
     WRITES = ["gene"]                    # dg/dt on the gene block
-    MAPS = []                            # intracellular: no edge-set, no gather/scatter
     SUPPORTED_DIMS = [2, 3]              # gene state is scalar-per-gene; spatial dimension is irrelevant
     DIFFERENTIABLE = True               # pure-torch vector field; grads flow through for the inverse problem
     REQUIRES_PARAMS = []                # every knob optional (all params default to zeros = an inert circuit)

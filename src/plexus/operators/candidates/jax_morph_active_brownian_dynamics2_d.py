@@ -86,7 +86,6 @@ class Reorient(Exchange):
     OUTPUTS = ["cell"]
     READS = ["heading"]
     WRITES = ["heading"]
-    MAPS = []                                   # single-body: no gather map, no neighbour coupling
     SUPPORTED_DIMS = [2]                        # planar rotation of a scalar heading angle (3-D needs an axis)
     REQUIRES_PARAMS = []                        # no required params — rot_diffusion optional (default in __init__)
     MECHANISM_TAGS = ["rotational_diffusion", "orientational_decorrelation", "active_brownian", "persistence"]

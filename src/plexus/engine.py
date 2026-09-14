@@ -478,7 +478,7 @@ def _resolve_schema(s: dict, D: int, sname: str | None = None) -> StateSchema:
     #
     # An empty schema is the honest layout: no columns, `has_pos` False, no seeding, no `__pos` in
     # the trajectory, and therefore invisible to every consumer that finds sets by asking which
-    # ones carry positions. The relation's content is its MAPS, which the topology operators own.
+    # ones carry positions. The relation's content is its `maps:`, which the topology operators own.
     if s.get("maps"):
         return StateSchema([])
     if sname is not None:

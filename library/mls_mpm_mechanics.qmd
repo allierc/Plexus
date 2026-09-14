@@ -140,9 +140,7 @@ class MLSMPMMechanics(Exchange):
 
     # --- declared dependencies (no longer hidden inside the substep) ----- #
     REQUIRES_TYPE_PROPS = ["youngs"]
-    # a liquid has no Young's modulus (nu -> 1/2 makes E = 3K(1-2nu) -> 0); it has a bulk modulus,
-    # and for mu = 0 that IS lambda. Either spelling satisfies the requirement.
-    TYPE_PROP_ALTERNATIVES = {"youngs": ("bulk_modulus",)}                      # per-cell-type stiffness -> mu, la
+    TYPE_PROP_ALTERNATIVES = {"youngs": ("bulk_modulus",)}   # see `mpm_scatter`: for mu = 0, K IS lambda
     REQUIRES_BUFFERS = ["C", "F", "mass", "mu", "la", "p_vol"]  # per-particle (mpm_particle entity provisions them)
     REQUIRES_HSTATE = []                                  # body force = the PARENT set's accumulated delta (H.delta)
 
@@ -168,24 +166,17 @@ class MLSMPMMechanics(Exchange):
         self.substeps = int(params.get("substeps", 10))
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.a_max = float(params.get("a_max", 200.0))
-        # WHERE THE BODY FORCE IS APPLIED. "particle" (default, and every existing run) folds it
-        # into the particle velocity before P2G; "grid" hands the uniform part to the grid solve,
-        # which is where canonical MLS-MPM puts it. See _hand_body_force_to_grid for why the two
-        # are algebraically identical until the mass clamp binds, and for the measurement showing
-        # that on this spec family it does not.
+        # EVERY KNOB BELOW IS THE DECOMPOSED OPERATOR'S, AND MEANS WHAT IT MEANS THERE. This
+        # operator is the four steps fused, so it re-reads their parameters rather than defining
+        # any: `body_force` is `mpm_scatter`'s, `wall_damp` and `wall_contact_cells` are
+        # `mpm_gather`'s. Their docstrings and notes are the reference; duplicating them here
+        # would be a second copy free to drift from the bodies that are actually maintained.
         self.body_force = str(params.get("body_force", "particle"))
         if self.body_force not in ("particle", "grid"):
             raise ValueError(f"mpm_scatter: body_force must be 'particle' or 'grid', "
                              f"got {self.body_force!r}")    # clamp broadcast accel
         self.drag = float(params.get("drag", 40.0))       # Stokes drag (overdamped)
         self.wall_damp = float(params.get("wall_damp", 1.0))  # 1.0=elastic wall; <1 loses energy on bounce
-        # A LENGTH, AND THEREFORE A TRAP IN ANY BOX THAT IS NOT 1 UNIT WIDE. The contact test is
-        # `(x < cb) | (x > box[k] - cb)`, so in a 0.1 m box the historical 0.04 selects everything
-        # but a 0.02 m sliver -- the entire fluid reads as permanently in wall contact and is
-        # permanently damped. `wall_contact_cells` states it in the only scale the grid has:
-        # 0.04 / (1/96) = 3.84 cells, so the default reproduces 0.04 exactly at n_grid 96 and
-        # follows the world everywhere else. An explicit `wall_contact` still wins, for the specs
-        # that tuned it.
         self.wall_contact_cells = float(params.get("wall_contact_cells", 3.84))
         self.wall_contact = params.get("wall_contact", None)
         if self.wall_contact is not None:

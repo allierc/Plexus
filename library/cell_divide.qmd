@@ -531,12 +531,11 @@ class Divide3D(Structural):
             carry = np.array([born.get(int(o), int(o)) for o in keep], np.int64)
         _carry_face_state(m, carry, dt, dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
-        # BIRTH VOLUME IS MEASURED, NOT BOOKKEPT (R1 of notes/size_cycle/SIZE_CYCLE_PLAN.md). The
-        # stored `Vbirth` used to be the arithmetic half `vf * p` of the mother, so in a converged
-        # population every cell's birth volume read `v_ref` and the adder's threshold
-        # `Vbirth + delta v_ref` was the sizer's `2 v_ref`: measured on the withdrawn
-        # cvd2_adder_tension, slope -1.05 of added volume on birth volume where an adder is 0,
-        # while the daughters the septum actually made varied by CV 0.27.
+        # BIRTH VOLUME IS MEASURED, NOT BOOKKEPT. Storing the arithmetic half `vf * p` of the
+        # mother makes every cell's birth volume read `v_ref` in a converged population, so the
+        # adder's threshold `Vbirth + delta v_ref` collapses into the sizer's `2 v_ref` -- a slope
+        # of -1 of added volume on birth volume where an adder is 0 -- while the daughters the
+        # septum actually made vary by a quarter.
         #
         # `Vbirth` IS THE ACTUAL VOLUME, in `cell_size`'s convention: provisionally the piece the
         # septum made, re-read at this operator's next call (see the top of forward) once the

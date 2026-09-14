@@ -85,7 +85,6 @@ class ReactionSeed(Seed):
     OUTPUTS = ["reaction"]
     READS = []
     WRITES = ["k", "v"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = False
     MAY_MUTATE_INTEGRATED_STATE = True

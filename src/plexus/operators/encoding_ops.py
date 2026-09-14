@@ -121,7 +121,6 @@ class HashEncoding(FieldUpdate):
     OUTPUTS: list = []
     READS: list = []
     WRITES: list = []
-    MAPS: list = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["n_levels", "log2_hashmap_size", "px_per_finest_cell"]
@@ -285,7 +284,6 @@ class Voxelize(Exchange):
     OUTPUTS = []                       # a field, not a set
     READS = ["pos", "voltage"]
     WRITES = []                        # the field's grid; not a state block on any set
-    MAPS = []                          # positional coupling, not a named map
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True              # index_add of a Gaussian weight: gradients flow to x_i
     REQUIRES_PARAMS = []               # the field is the spec's `to:`; every knob has a default

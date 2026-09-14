@@ -126,7 +126,6 @@ class Deposit(Exchange):
     OUTPUTS = []                               # writes the `to:` field, no set-state output
     READS = ["pos"]
     WRITES = []                                # no set-state block written (the grid is mutated in place)
-    MAPS = ["field"]                           # Exchange: a scatter map onto the `to:` field
     SUPPORTED_DIMS = [2, 3]                     # N-D scatter onto the grid field
     REQUIRES_PARAMS = ["to"]
     MECHANISM_TAGS = ["deposition", "stigmergy", "field_write"]

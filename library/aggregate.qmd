@@ -102,7 +102,6 @@ class Centroid(Aggregate):
     OUTPUTS = ["cell"]                             # the parent set it writes
     READS = ["pos"]
     WRITES = ["pos"]                               # parent centroid position (a derived readout)
-    MAPS = ["parent"]                              # reduce along the parent (containment) map
     SUPPORTED_DIMS = [2, 3]                         # occupancy-weighted centroid is dimension-generic
     REQUIRES_PARAMS = []                            # no required params — `child` defaults to the first contained set
     MECHANISM_TAGS = ["centroid", "reduction", "hierarchical_readout"]

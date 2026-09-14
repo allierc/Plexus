@@ -65,12 +65,11 @@ class Apoptose(Structural):
     EMIT = None                                       # structural: retires live slots, mutates occ in place; returns {} — no integrable delta
     # typed signature (Plexus2 sec. 2.1): a morphism cell -> cell that reads the heritable
     # per-cell death hazard and writes the alive mask (occupancy) + the per-step death record.
-    # MAPS=[] -- each cell draws in isolation, no gather/scatter, no cell-to-cell coupling.
+    # It traverses no relation: each cell draws in isolation, no gather/scatter, no coupling.
     INPUTS = ["cell"]
     OUTPUTS = ["cell"]
     READS = ["death_rate"]                            # the heritable per-cell hazard rate (a STATE field, not a param)
     WRITES = ["alive", "death"]                       # flips occupancy; writes the per-step float death record
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]                            # acts on occupancy/hazard; dimension-agnostic
     REQUIRES_PARAMS = []                              # no required params — `rate` falls back to per-cell death_rate else 0 (no-op)
     MECHANISM_TAGS = ["apoptosis", "cell_death", "stochastic_removal", "population_decline"]

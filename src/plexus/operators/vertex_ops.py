@@ -1392,7 +1392,6 @@ class ShapeEnergy3D(Lateral):
     BLOCK_UNITS = {"V0f": "volume[wedge]", "A0": "area[midsurface]", "P0": "length"}
     REQUIRES_PARAMS = ["p0"]
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["vertex_model", "shape_energy", "cell_volume_elasticity", "vesicle", "force_balance"]
     # THE SECOND CITATION WAS THE WRONG OKUDA 2015, AND THE PAGES WERE WRONG TOO. It read
     # "Biomech. Model. Mechanobiol. 14:413-421 (3D volume/surface)": that paper is 413-425,
@@ -4891,7 +4890,6 @@ class MonolayerShapeEnergy3D(Lateral):
     apical, basal and lateral surfaces this sums)."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["vertex_model", "monolayer", "cell_3d_volume", "surface_tension", "emergent_bending", "force_balance"]
     REFERENCE = "Okuda, S. et al. (2018). Sci. Rep. 8:2386 (monolayer 3D vertex model, Eq. 3)."
     PARAM_ROLES = {"k_v": "cell_volume_elasticity", "kappa_s": "surface_tension", "h0": "cell_thickness"}
@@ -5137,7 +5135,6 @@ class ApicoBasalShapeEnergy3D(Lateral):
     # division, death AND the energy -- is AB_R7R8_TODO section 0a and is deliberately out of scope.
     BLOCK_UNITS = {"V0f": "volume[polyhedron]"}
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos", "sep"]; WRITES = ["pos", "sep"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["vertex_model", "apicobasal", "cell_polyhedron", "cell_3d_volume",
                       "surface_tension", "emergent_bending", "force_balance"]
     REFERENCE = ("Okuda, S. et al. (2013). Biomech. Model. Mechanobiol. 12:627-644 (3D vertex model "

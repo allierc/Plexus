@@ -48,7 +48,6 @@ class MetaboliteSeed(Seed):
     OUTPUTS = ["metabolite"]
     READS = []
     WRITES = ["conc", "c0"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = False
     MAY_MUTATE_INTEGRATED_STATE = True
@@ -101,7 +100,6 @@ class ReactionRate(Aggregate):
     OUTPUTS = ["reaction"]
     READS = ["conc", "w", "k"]
     WRITES = ["v"]
-    MAPS = ["pre", "post"]
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     MAY_MUTATE_INTEGRATED_STATE = True   # `v` is a derived readout written in place, as `omega` is
@@ -173,7 +171,6 @@ class MetaboliteFlux(Aggregate):
     OUTPUTS = ["metabolite"]
     READS = ["v", "w"]
     WRITES = ["conc"]
-    MAPS = ["pre", "post"]
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["edge_set"]
@@ -214,7 +211,6 @@ class MetaboliteHomeostasis(Lateral):
     OUTPUTS = ["metabolite"]
     READS = ["conc", "c0"]
     WRITES = ["conc"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = []
@@ -258,7 +254,6 @@ class ReactionSeed(Seed):
     OUTPUTS = ["reaction"]
     READS = []
     WRITES = ["k", "v"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = False
     MAY_MUTATE_INTEGRATED_STATE = True

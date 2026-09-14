@@ -164,7 +164,6 @@ class PolymerizeTips(Structural):
     REQUIRES_BUFFERS = ["F", "occ"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["polarity", "phase"]; WRITES = ["pos", "vel"]
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["polymerization", "protrusion", "motility", "cytoskeleton", "growth"]
     PARAM_ROLES = {"rate": "points_per_fibre_per_frame", "compress": "insertion_stretch",
                    "confine": "barrier_set", "margin": "barrier_standoff",

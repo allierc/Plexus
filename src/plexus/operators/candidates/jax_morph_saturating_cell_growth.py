@@ -83,7 +83,6 @@ class GrowRadius(Lateral):
     OUTPUTS = ["cell"]
     READS = ["radius", "growth_rate"]  # current size r + the heritable per-cell rate k (a STATE field, default 0)
     WRITES = ["radius"]                # the dt-increment of the radius
-    MAPS = []                          # per-cell autonomous ODE: no gather/scatter, zero cell-to-cell coupling
     SUPPORTED_DIMS = [2, 3]            # acts on a per-cell scalar; independent of spatial dimension
     DIFFERENTIABLE = True              # pure torch (exp/mul) -> autograd flows through r, k, and the target R
     REQUIRES_PARAMS = []               # all optional: no growth_rate + rate=0 -> k=0 -> byte no-op

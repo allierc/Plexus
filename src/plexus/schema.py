@@ -217,7 +217,7 @@ def load(path: str) -> Spec:
         # is the codomain of a declared map, so `edge_flip` cannot renumber a set the spec never
         # said it touches, and no operator has to be told a relation the mesh already states.
         #
-        # WHY THE MAPS ARE NOT `pre`/`post`. An edge-set is built from a STATIC `edges:` list or an
+        # WHY THESE `maps:` ARE NOT `pre`/`post`. An edge-set is built from a STATIC `edges:` list or an
         # npz -- the connectome is given and does not change. A half-edge table is rewritten by
         # every division and every T1, so its maps are OWNED BY THE TOPOLOGY OPERATORS, and its `n:`
         # is a capacity rather than a count. Same idea, different lifetime; sharing the `pre`/`post`

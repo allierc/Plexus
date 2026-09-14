@@ -118,7 +118,6 @@ class MorphogenFreeSpace(Exchange):
     OUTPUTS = ["cell"]
     READS = ["secretion_rate", "pos", "radius", "alive"]
     WRITES = ["chemical"]
-    MAPS = ["pairwise"]                         # dense all-pairs superposition (no edge set, no grid)
     SUPPORTED_DIMS = [1, 2, 3]                  # dimension-selected kernel (segment / disk / sphere); 2-D/3-D are the Plexus worlds
     DIFFERENTIABLE = True                       # pure-torch (incl. the ported Bessel series); grads flow for the inverse problem
     REQUIRES_PARAMS = []                        # every knob optional (all default: D=K=1, secretion_rate -> chemical)

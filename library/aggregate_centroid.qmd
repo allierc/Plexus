@@ -103,7 +103,7 @@ operators:
 
 ## Related operators
 
-Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
+Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`paint_children`](paint_children.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
 
 ## Source
 
@@ -162,7 +162,6 @@ class AggregateCentroid(Aggregate):
     MAY_MUTATE_INTEGRATED_STATE = True
     REQUIRES_PARAMS = ["child"]
     INPUTS = ["child"]; OUTPUTS = ["parent"]; READS = ["pos"]; WRITES = ["pos"]
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["aggregate", "centroid", "cross_scale"]
     PARAM_ROLES = {"child": "descendant_set", "weight": "mass_weighted_or_uniform"}
     REFERENCE = "Plexus (this work)."

@@ -102,7 +102,6 @@ class NeuralODERegulate(Exchange):
     OUTPUTS = ["cell"]
     READS = ["gene", "drive"]          # evolving gene vector g (state) + fixed driver u (inputs, read-only)
     WRITES = ["gene"]                  # the dt-increment of the gene vector
-    MAPS = []                          # intracellular: no gather/scatter, zero cell-to-cell coupling
     SUPPORTED_DIMS = [2, 3]            # acts on per-cell state; ignores spatial dimension
     DIFFERENTIABLE = True              # the RK steps are plain torch ops -> autograd flows (matches diffrax/equinox)
     REQUIRES_PARAMS = []               # all params optional (an untrained MLP is a valid, inert-ish circuit)
