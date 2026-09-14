@@ -96,9 +96,10 @@ def _rot_matrix(deg, D, device):
 
 
 def _unit_offsets(kind, n, D, H, device, aspect=2.0, hollow=0.0, axis=2):
-    """`n` points in a unit body centred on the origin: a cube of side 1, a ball of radius 1, or a
-    cylinder of radius 1 and length `aspect` * 2 along `axis`. `hollow` empties the inner fraction,
-    so 0.7 on a ball is a shell and on a cylinder a pipe. Scaled by the caller to the body's size."""
+    """`n` points in a unit body centred on the origin: a cube of side 1, a ball of radius 1, a
+    cylinder of radius 1 and length `aspect` * 2 along `axis`, or a torus of ring radius 1 and tube
+    radius `aspect` about `axis`. `hollow` empties the inner fraction, so 0.7 on a ball is a shell,
+    on a cylinder a pipe, and on a torus a doughnut whose dough is a pipe. Scaled by the caller."""
     h = min(max(float(hollow), 0.0), 0.98)
     if kind in ("ball", "sphere"):
         u = torch.randn(n, D, generator=H.rng, device=device)
@@ -106,6 +107,38 @@ def _unit_offsets(kind, n, D, H, device, aspect=2.0, hollow=0.0, axis=2):
         f = torch.rand(n, 1, generator=H.rng, device=device)
         r = (h ** D + (1.0 - h ** D) * f) ** (1.0 / D)        # uniform in the shell h..1
         return u * r
+    if kind == "torus":
+        # A DOUGHNUT: a ring of radius 1 about `axis`, of tube radius `aspect` (in units of that
+        # ring radius), and `hollow` empties the tube's own core -- so 0.6 is a doughnut whose
+        # dough is itself a pipe. The hole points along `axis`.
+        if D != 3:
+            raise ValueError("shape: torus is a 3D body; in 2D a ring is `shape: ball` with `hollow`")
+        ax = int(axis) % D
+        lat = [i for i in range(D) if i != ax]
+        a = max(float(aspect), 1e-6)
+        # UNIFORM IN VOLUME, NOT IN THE TUBE ANGLE. The ring of material at tube angle th sits at
+        # distance 1 + a cos(th) from the axis, so its circumference -- and the volume it carries --
+        # is proportional to that. Drawing th uniformly would pile mass on the INSIDE of the
+        # doughnut, where the circumference is smallest, which an MPM run reads as a density step.
+        # One rejection pass with acceptance (1 + a cos th) / (1 + a) fixes it.
+        th = torch.empty(0, device=device)
+        for _ in range(24):
+            if int(th.numel()) >= n:
+                break
+            cand = torch.rand(int((n - int(th.numel())) * 1.6) + 32, generator=H.rng,
+                              device=device) * 2.0 * math.pi
+            u = torch.rand(int(cand.numel()), generator=H.rng, device=device)
+            th = torch.cat([th, cand[u <= (1.0 + a * torch.cos(cand)) / (1.0 + a)]])
+        th = th[:n]
+        phi = torch.rand(n, generator=H.rng, device=device) * 2.0 * math.pi
+        f = torch.rand(n, generator=H.rng, device=device)
+        r = a * (h ** 2 + (1.0 - h ** 2) * f) ** 0.5          # the annulus h..1 ACROSS THE TUBE
+        rad = 1.0 + r * torch.cos(th)
+        out = torch.zeros(n, D, device=device)
+        out[:, lat[0]] = rad * torch.cos(phi)
+        out[:, lat[1]] = rad * torch.sin(phi)
+        out[:, ax] = r * torch.sin(th)
+        return out
     if kind == "cylinder":
         ax = int(axis) % D
         lat = [i for i in range(D) if i != ax]
@@ -187,6 +220,25 @@ def _copies(t, D, device):
       ring: {n, radius, axis}        `n` copies evenly around a circle -- a rosette, a corolla, a
                                      wheel of spokes, twelve organelles about a cell's centre
     """
+    sh = t.get("shell")
+    if sh is not None:
+        # COPIES OVER A SPHERE, on a Fibonacci spiral. A random draw on a sphere clumps -- the atlas
+        # says so and uses the spiral for exactly this -- and a shell of organelles that clumps
+        # reads as a scatter, not as a lining.
+        r = dict(sh) if isinstance(sh, dict) else {"n": int(sh)}
+        n = max(1, int(r.get("n", 1)))
+        rad = float(r.get("radius", 1.0))
+        i = torch.arange(n, device=device, dtype=torch.float32) + 0.5
+        phi = torch.acos(1.0 - 2.0 * i / n)                       # uniform in area
+        gold = math.pi * (1.0 + 5.0 ** 0.5)
+        th = gold * i
+        out = torch.zeros(n, D, device=device)
+        out[:, 0] = rad * torch.cos(th) * torch.sin(phi)
+        if D > 1:
+            out[:, 1] = rad * torch.cos(phi)
+        if D > 2:
+            out[:, 2] = rad * torch.sin(th) * torch.sin(phi)
+        return out
     ring = t.get("ring")
     if ring is not None:
         r = dict(ring) if isinstance(ring, dict) else {"n": int(ring)}
@@ -497,8 +549,17 @@ class MPMParticle:
                 _volk = _vol / _k
                 _hollow = float(t.get("hollow", 0.0) or 0.0)
                 _fill_frac = max(1.0 - _hollow ** D, 1e-6)    # a shell holds less than its envelope
-                if _shape in ("ball", "sphere", "cylinder"):
-                    if _shape == "cylinder":
+                if _shape in ("ball", "sphere", "cylinder", "torus"):
+                    if _shape == "torus":
+                        # `aspect` IS THE TUBE, as a fraction of the ring radius: 0.3 is a doughnut,
+                        # 0.05 a wire hoop. V = 2 pi^2 R a^2 (1 - h^2) with a = aspect * R, so the
+                        # ring radius follows from the volume the mass already fixed.
+                        _asp = float(t.get("aspect", 0.3))
+                        _ax = {"x": 0, "y": 1, "z": 2}.get(str(t.get("axis", "z")).lower(), 2)
+                        _r = (_volk / (2.0 * math.pi ** 2 * _asp ** 2
+                                       * max(1.0 - _hollow ** 2, 1e-6))) ** (1.0 / 3.0)
+                        _side = 2.0 * _r * (1.0 + _asp)      # the outer diameter of the doughnut
+                    elif _shape == "cylinder":
                         _asp = float(t.get("aspect", 2.0))
                         _ax = {"x": 0, "y": 1, "z": 2}.get(str(t.get("axis", "z")).lower(), 2)
                         # V = pi r^2 L (1 - h^2), L = 2 * aspect * r
