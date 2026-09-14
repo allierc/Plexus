@@ -1,0 +1,82 @@
+# S2-I "an eye's globe and its lateral rectus, from the scan" -- the rung that comes from a FILE
+# rather than from four words. `mesh:eye/globe` and `mesh:eye/lateral_rectus` name parts of the
+# shape library's `eye` folder, which is `260802_s2_EYE_MUSCLES_MODEL.blend` cut by Blender once
+# and cached; `names.json` in that folder says which of the blend's `Cylinder.00N` is the lateral
+# rectus, a mapping the eye prototype MEASURED and wrote down rather than guessed.
+#
+# THE TWO BODIES ARE ONE MEASUREMENT, not two placements. The library returns each part centred on
+# its own centroid, so the scan's relative geometry survives only if the spec restates it: the
+# strap's centroid sits 0.6694 blend units from the globe's, along (-0.2193, +0.6321, +0.0225),
+# and every length here is that blend scaled by k = 0.17083 -- the factor that makes the globe's
+# equivalent-sphere radius 0.08 m, a sixth of the box. So `start` differs by k * that offset, and
+# the volumes differ by k^3 * their own: 0.43006 -> 2.144e-3 m^3 for the globe, 3.1585e-3 ->
+# 1.575e-5 for the strap, a ratio of 136 which is what the scan says.
+#
+# WHAT IS STILL MANUAL, and it is the next stage rather than a defect: the offset is WRITTEN HERE.
+# Stage S5's `place: {frame: measured}` is what reads it from the shape folder instead, so that a
+# second eye, or the other five muscles, cost no arithmetic.
+#
+# TWO PARTICLE SETS, ONE GRID. `per_parent` and `particle_mass` live on a particle set, so two
+# bodies whose volumes differ by 136x cannot share one: the globe gets 30,000 points and the strap
+# 4,000, each with its own mass, and both scatter into the same `mpm_grid` -- which is how a
+# composed body is said in Plexus (see config/cell/grow_in_cage.yaml).
+general: {name: s2_i_eye_scan, seed: 1, n_frames: 200, dt: 0.002, boundary: wall, dim: 3, world: [0.5, 0.5, 0.5], save_data: true, record_cap: 201, units: {length_um: 1000000.0, time_s: 1.0, force_nN: 1000000000.0}}
+sets:
+  globe:
+    entity: cell
+    n: 1
+    start: [[0.25, 0.25, 0.25]]
+    types:
+      sclera: {count: 1, material: elastic, youngs: 200000.0, density: 1000.0, shape: "mesh:eye/globe"}
+  globe_pt:
+    parent: globe
+    entity: mpm_particle
+    per_parent: 30000
+    radius: 0.03
+    density: 1000.0
+    particle_mass: 7.147e-5          # p_vol = mass / 1000 = 7.147e-8 m^3, x 30,000 = the globe's 2.144e-3
+  muscle:
+    entity: cell
+    n: 1
+    start: [[0.21254, 0.35798, 0.25384]]
+    types:
+      lateral_rectus: {count: 1, material: elastic, youngs: 40000.0, density: 1050.0, shape: "mesh:eye/lateral_rectus"}
+  muscle_pt:
+    parent: muscle
+    entity: mpm_particle
+    per_parent: 4000
+    radius: 0.03
+    density: 1050.0
+    particle_mass: 4.133e-6          # p_vol = mass / 1050 = 3.936e-9 m^3, x 4,000 = the strap's 1.575e-5
+fields: {mpm_grid: {frame: mpm_grid, n_grid: 96}}
+operators:
+- {op: mpm_strain, at: globe_pt}
+- {op: mpm_strain, at: muscle_pt}
+- {op: mpm_scatter, at: globe_pt, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_scatter, at: muscle_pt, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
+- {op: mpm_gather, at: globe_pt, from: mpm_grid, wall_damp: 0.5, wall_damp_mode: per_impact, vmax: 1000000.0}
+- {op: mpm_gather, at: muscle_pt, from: mpm_grid, wall_damp: 0.5, wall_damp_mode: per_impact, vmax: 1000000.0}
+schedule: [{substep_dt: 1.0e-4, steps: [mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather]}]
+# TWO PARTICLE SETS NEED THE COMPARTMENT RENDERER. `render_3d: dots` draws the SUBJECT -- the
+# largest set carrying positions -- so the strap (4,000 points against the globe's 30,000) was
+# simply absent from the picture. `compartments` draws each named set with its own style, which is
+# what the composed-cell scenes use; the globe is dropped to a quarter opacity so the muscle,
+# which sits against its outside, can be seen at all.
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  box_frame: true
+  hide_sets: [globe, muscle]
+  render_3d: compartments
+  compartment_sets: [globe_pt, muscle_pt]
+  surface:
+    globe_pt: {render: dots, point_size: 1.2}
+    muscle_pt: {render: dots, point_size: 3.0}
+  opacity: {globe_pt: 0.25, muscle_pt: 1.0}
+  colors:
+    sclera: [0.86, 0.88, 0.92]
+    lateral_rectus: [0.9, 0.25, 0.22]
+    globe_pt: [0.86, 0.88, 0.92]
+    muscle_pt: [0.9, 0.25, 0.22]

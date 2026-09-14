@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 
 import numpy as np
@@ -105,12 +106,19 @@ def _build_cache(folder: str) -> dict:
     if src is None:
         raise FileNotFoundError(f"shape folder {folder} holds no `source.*` and no parts.npz")
     if src.endswith(".blend"):
-        raise NotImplementedError(
-            f"{src}: a .blend is cut into parts by Blender's own loader; that step is the eye "
-            f"prototype's `read_blend.py`, not yet promoted (plan S2)")
-    parts = _parts_from_obj(src)
-    np.savez_compressed(npz, **{f"{n}__{k}": v for n, (V, F) in parts.items()
-                                for k, v in (("V", V), ("F", F))})
+        # A .blend IS CUT BY BLENDER, ONCE, IN ANOTHER INTERPRETER. `bpy` ships its own Python and
+        # its own numpy, so this process cannot import it; `plexus/shapes_blend.py` re-executes
+        # itself under the bpy interpreter and writes the same `parts.npz` the .obj path writes.
+        # After that the shape is a cache like any other and no Blender is needed to use it --
+        # which is what lets a cluster job seed a scanned body.
+        _cut_blend(src, npz)
+        z = np.load(npz, allow_pickle=False)
+        parts = {k[: -len("__V")]: (z[k], z[k[: -len("__V")] + "__F"])
+                 for k in z.files if k.endswith("__V")}
+    else:
+        parts = _parts_from_obj(src)
+        np.savez_compressed(npz, **{f"{n}__{k}": v for n, (V, F) in parts.items()
+                                    for k, v in (("V", V), ("F", F))})
     meta = {n: {"volume": float(_volume(V, F)), "centroid": V.mean(0).tolist(),
                 "extent": (V.max(0) - V.min(0)).tolist(), "n_vertices": int(len(V)), "n_faces": int(len(F))}
             for n, (V, F) in parts.items()}
@@ -120,10 +128,39 @@ def _build_cache(folder: str) -> dict:
     return parts
 
 
+def _cut_blend(src: str, npz: str) -> None:
+    """One subprocess under the bpy interpreter, writing `npz`. Raises with what it printed."""
+    import subprocess
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shapes_blend.py")
+    print(f"[shapes] cutting {os.path.basename(src)} with Blender (once; cached afterwards)", flush=True)
+    r = subprocess.run([sys.executable, script, "--blend", src, "--out", npz],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.exists(npz):
+        raise RuntimeError(f"cutting {src} failed ({r.returncode}):\n"
+                           + (r.stderr or r.stdout or "")[-1500:])
+    print((r.stdout or "").strip(), flush=True)
+
+
 def _volume(V, F) -> float:
     """The enclosed volume by the divergence theorem: sum of signed tetrahedra on the origin."""
     a, b, c = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
     return abs(float(np.einsum("ij,ij->i", a, np.cross(b, c)).sum()) / 6.0)
+
+
+def aliases(folder: str) -> dict:
+    """`names.json` in a shape folder: a friendly name for a part the cutter named mechanically.
+
+    Blender calls the six extraocular muscles `Cylinder.001..006`, and which one is the lateral
+    rectus is an ANATOMICAL measurement -- the eye prototype makes it (`read_blend.py` measures
+    which end sits on the globe and which on cartilage) and writes it down. The library does not
+    repeat that reasoning; it reads the answer. So a spec says `mesh:eye/lateral_rectus` and the
+    folder says what that is, in a file a person can edit without touching any code.
+    """
+    f = os.path.join(folder if os.path.isdir(folder) else os.path.dirname(folder), "names.json")
+    try:
+        return {str(k): str(v) for k, v in json.load(open(f)).items()} if os.path.isfile(f) else {}
+    except Exception:                                            # noqa: BLE001  a broken map is not a crash
+        return {}
 
 
 def parts(name: str) -> dict:
@@ -155,7 +192,8 @@ def points(name: str, n: int, volume: float, oversample: float = 3.0) -> np.ndar
     volume equals `volume`. Rejection against the surface; the batch is grown until `n` are kept."""
     import pyvista as pv
     P = parts(name)
-    _, part = resolve(name)
+    folder, part = resolve(name)
+    part = aliases(folder).get(part, part) if part else part
     if part is None:
         part = sorted(P)[0] if len(P) == 1 else None
         if part is None:
