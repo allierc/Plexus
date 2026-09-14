@@ -364,62 +364,61 @@ window.Quarto = {
 </header>
 
 
-<p>A mechanism, in the account of philosophers of biology, is entities and activities organized so that they produce a regular change from a set-up condition to a termination condition (Machamer, Darden &amp; Craver, 2000, p.&nbsp;3). Entities have properties and stand in relations. Activities are what entities do: they are the producers of change.</p>
-<p>The important word is <em>organized</em>. A mechanism is not just a collection of things and operations. Its entities are organized in space, in time, and across levels: parts interact with one another, activities occur in an order and at different rates, and what the parts do at one level can constitute what the whole does at another. This is the structure that a biologist sketches with named parts, arrows and boxes inside boxes.</p>
-<p><strong>Plexus</strong> turns that mechanistic sketch into an executable model. A model states a biological hypothesis in two complementary parts.</p>
-<p><em>What exists</em>: the <strong>entities</strong>, in as many kinds as the hypothesis needs (receptors, cells, neurons, vertices of a sheet, material points of a tissue), the <strong>state</strong> each entity carries, the <strong>relations</strong> between entities, and the <strong>fields</strong> that make up their microenvironment.</p>
-<p><em>What happens</em>: the <strong>activities</strong>, one for each mechanism (adhesion, diffusion, secretion, division, death), declared by the entities on which they act, the state they read and write, the relations they traverse, and their numerical implementation.</p>
-<p>The <strong>organization</strong> is part of the model too. In space, it is expressed by positions, contacts and fields. In time, by the order and tempo of activities. Across levels, by explicit part-to-whole relations, with <strong>aggregate ↑</strong> carrying information from parts to wholes and <strong>broadcast ↓</strong> carrying influence from wholes to parts.</p>
-<p>Plexus therefore does not describe a tissue as one undifferentiated collection of variables. It describes a mechanism as an organized system of entities and activities.</p>
-<p>The research programme has three objectives. First, an <strong>algebra of activities</strong>: a small number of activity kinds from which mechanisms can be composed. Second, to <strong>decompose existing simulation models</strong> into this language, turning programs into reusable descriptions of entities, activities and organization. Third, to provide <strong>differentiable implementations</strong> so that a mechanistic hypothesis can be fitted to observations. A persistent residual can then suggest a missing activity rather than merely a wrong parameter.</p>
-<p>The language guarantees that a hypothesis is structurally well formed. Whether it is actually productive of the observed change is what running it establishes.</p>
+<p>A mechanism is entities and activities organized so that they produce a regular change from a set-up condition to a termination condition (Machamer, Darden &amp; Craver, 2000, p.&nbsp;3). Entities have properties and stand in relations. Activities are what entities do.</p>
+<p>The important word is <em>organized</em>. The entities are arranged in space, the activities run in an order and at different rates, and what the parts do at one level constitutes what the whole does at the next. This is the structure a biologist sketches with parts, arrows and boxes inside boxes.</p>
+<p><strong>Plexus</strong> turns that sketch into an executable model, stating a hypothesis in two parts.</p>
+<p><em>What exists</em>: the <strong>entities</strong> (cells, neurons, vertices of a sheet), the <strong>state</strong> each carries, the <strong>relations</strong> between them, and the <strong>fields</strong> they live in.</p>
+<p><em>What happens</em>: the <strong>activities</strong>, one per mechanism (adhesion, diffusion, division, death), each declaring the entities, state and relations it needs, and its implementation.</p>
+<p>The <strong>organization</strong> is declared too: in space by positions, contacts and fields, in time by the order and tempo of activities, across levels by part-to-whole relations, with <strong>aggregate ↑</strong> carrying information up and <strong>broadcast ↓</strong> influence down.</p>
+<p>Three objectives follow. An <strong>algebra of activities</strong>, a small number of kinds from which mechanisms compose. The <strong>decomposition of existing simulation models</strong> into that language. And <strong>differentiable implementations</strong>, so a hypothesis can be fitted to observations and a stubborn residual points to a missing activity rather than a wrong parameter.</p>
+<p>The language guarantees a well-formed hypothesis. Whether it is productive of the observed change is what running it establishes.</p>
 <section id="the-language" class="level2">
 <h2 class="anchored" data-anchor-id="the-language">The language</h2>
-<p>Plexus separates the mechanistic description from the numerical code that executes it. The description has four main kinds of object.</p>
-<p><strong>Entities</strong> come in kinds, each occupying a level of organization: proteins, cells, neurons, synapses, vertices of a cell sheet. <strong>State</strong> is what each entity carries: position, membrane voltage, polarity, gene expression.</p>
-<p>A <strong>field</strong> is a continuous quantity over space, part of the microenvironment in which entities act: a morphogen, pressure, matrix density or chemical concentration.</p>
-<p>An <strong>activity</strong> describes what entities do. It specifies the entities involved, the state it reads and writes, the relations it traverses, and how the transformation is computed. In a Plexus specification an activity is written as an operator; the two words refer to the same object at different levels of description.</p>
-<p>The central hypothesis is that the activities found throughout simulation models can be expressed using a small number of kinds. Plexus has <strong>eight</strong>:</p>
+<p>The description is separated from the code that runs it, and has four kinds of object.</p>
+<p><strong>Entities</strong> come in kinds, each at a level of organization: proteins, cells, neurons, the vertices of a sheet. <strong>State</strong> is what each carries: position, voltage, polarity, gene expression.</p>
+<p>A <strong>field</strong> is a continuous quantity over space, the microenvironment entities act in: a morphogen, a pressure, a matrix density.</p>
+<p>An <strong>activity</strong> is what entities do. It names the entities involved, the state it reads and writes, the relations it traverses, and how the change is computed. In a specification it is written as an operator.</p>
+<p>The activities of the simulation literature reduce to eight kinds:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/fig_ops.png" class="img-fluid quarto-figure quarto-figure-center figure-img" style="width:100.0%"></p>
 </figure>
 </div>
 <ul>
-<li><strong>lateral</strong>: entities affect neighbouring entities of the same kind. Adhesion, tension, juxtacrine signalling and synaptic transmission.</li>
-<li><strong>aggregate ↑</strong>: a whole integrates information from its parts. A neuron integrates its synaptic inputs; a cell obtains its geometry from its vertices.</li>
-<li><strong>broadcast ↓</strong>: a whole influences its parts. A cell distributes polarity to its cytoskeleton; a tissue imposes a constraint on its cells.</li>
-<li><strong>exchange</strong>: entities interact with their microenvironment. Secretion, uptake, sensing and mechanical loading are all exchanges.</li>
-<li><strong>field</strong>: the microenvironment changes through its own dynamics. Transport, decay and extracellular reaction are field activities.</li>
-<li><strong>rewire</strong>: the organization changes while the entities remain. Neighbours exchange, junctions turn over, synapses are remodelled.</li>
-<li><strong>structural</strong>: the entities themselves change. Cells divide, die, appear or disappear.</li>
-<li><strong>seed</strong>: the mechanism is given its initial organization and state. Positions, concentrations, pre-patterns and initial conditions are established here.</li>
+<li><strong>lateral</strong>: entities affect neighbours of their own kind. Adhesion, tension, synapses.</li>
+<li><strong>aggregate ↑</strong>: a whole integrates its parts. A neuron sums its synaptic inputs; a cell takes its geometry from its vertices.</li>
+<li><strong>broadcast ↓</strong>: a whole influences its parts. A cell hands polarity to its cytoskeleton; a tissue constrains its cells.</li>
+<li><strong>exchange</strong>: entities interact with their microenvironment. Secretion, uptake, sensing.</li>
+<li><strong>field</strong>: the microenvironment changes under its own dynamics. Transport, decay, extracellular reaction.</li>
+<li><strong>rewire</strong>: the organization changes while the entities remain. Neighbours exchange, junctions turn over.</li>
+<li><strong>structural</strong>: the entities themselves change. Cells divide and die.</li>
+<li><strong>seed</strong>: the mechanism is given its set-up condition. Positions, concentrations.</li>
 </ul>
-<p>The first five primarily change state while preserving the organization. Rewire changes relations; structural changes the entities themselves; seed establishes the starting condition. Together these activity kinds describe not only what a system does, but how its organization can change.</p>
+<p>The first five change state and leave the organization intact. Rewire changes relations, structural changes the entities, seed establishes the starting condition. The kinds cover not only what a system does but how its organization changes.</p>
 </section>
 <section id="organization-in-time" class="level2">
 <h2 class="anchored" data-anchor-id="organization-in-time">Organization in time</h2>
-<p>A mechanism is not only a set of activities; it is an organized temporal process. A Plexus model therefore gives its activities a <strong>schedule</strong>: an order and a tempo.</p>
-<p>Formally, one step is the composition <span class="math inline">\(\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1\)</span> of the activities, and repeating it generates the dynamics <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>, where <span class="math inline">\(x\)</span> contains the state of every entity and field.</p>
-<p>Different mechanisms can operate at different rates. Mechanics may act every step, diffusion every step, while growth or division occurs less often. A model is therefore a <em>multi-rate</em> organization of mechanisms, not simply one numerical solver.</p>
-<p>Activities are <strong>pure</strong>: they do not modify state in place. Each contributes a change <span class="math inline">\(\Delta_i\)</span>, and the complete update <span class="math inline">\(\Delta = \sum_i \Delta_i\)</span> is assembled from these contributions. Adding a mechanism therefore means adding an activity rather than modifying the implementation of another one.</p>
-<p>This separation also makes the complete mechanism <strong>differentiable</strong>. The same composition that expresses the biological hypothesis can therefore be used for simulation, parameter fitting and comparison with observations.</p>
+<p>A mechanism is also temporal, so a model gives its activities a <strong>schedule</strong>: an order and a tempo.</p>
+<p>One step is the composition <span class="math inline">\(\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1\)</span>, and repeating it generates <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>, where <span class="math inline">\(x\)</span> is the state of every entity and field.</p>
+<p>Mechanisms run at different rates, mechanics every step and division less often, so a model is a <em>multi-rate</em> organization rather than one solver.</p>
+<p>Activities are <strong>pure</strong>: none modifies state in place. Each contributes a change <span class="math inline">\(\Delta_i\)</span> and the update <span class="math inline">\(\Delta = \sum_i \Delta_i\)</span> is assembled from them, so adding a mechanism means adding an activity.</p>
+<p>It also makes the mechanism <strong>differentiable</strong>, so the same composition serves for fitting.</p>
 </section>
 <section id="organization-across-levels" class="level2">
 <h2 class="anchored" data-anchor-id="organization-across-levels">Organization across levels</h2>
-<p>Biological organization is inherently hierarchical. A cell contains parts; a tissue contains cells; an organism contains tissues. But a whole can contain several different kinds of parts at once.</p>
-<p>In Plexus, entities of one kind may therefore belong to entities of another through an explicit part-to-whole map. A cell can contain receptors, signalling proteins, cytoskeletal elements and material points without any of them losing its own state or activities.</p>
-<p>This lets different descriptions coexist at the same level of organization. A cell can simultaneously be represented by its internal biochemical state and by the geometry of its vertices. These are not competing models of the cell: they are different kinds of parts in the same organized mechanism.</p>
-<p>Activities can act within a level or connect levels. Within a cell, receptors can influence signalling proteins and signalling proteins can influence the cytoskeleton. Across levels, <strong>aggregate ↑</strong> integrates the parts into a whole, while <strong>broadcast ↓</strong> carries influence from the whole back to its parts.</p>
-<p>Causation therefore runs in both directions. Parts can determine properties of the whole, and the whole can constrain what its parts do. Both directions are represented by activities.</p>
-<p>Fields belong to levels as well. A protein concentration inside a cell, a morphogen field between cells and a mechanical field beneath a tissue can coexist as distinct objects. Proteins → cells → tissues is therefore not a sequence of separate simulators. It is one compositional organization, with activities connecting entities locally and aggregate and broadcast activities connecting levels.</p>
-<p>The same eight activity kinds apply at every level. Adding another level of biological organization requires no new computational machinery.</p>
+<p>Biological organization is hierarchical: a cell contains parts, a tissue cells, an organism tissues. But a whole holds several kinds of parts at once.</p>
+<p>Entities of one kind belong to another through an explicit part-to-whole map. A cell holds receptors, signalling proteins and material points, none losing its own state or activities.</p>
+<p>Different descriptions therefore coexist at one level: a cell can be both its biochemistry and the geometry of its vertices, different kinds of parts in one mechanism.</p>
+<p>Activities act within a level or across it. Within a cell, receptors influence signalling proteins and those the cytoskeleton. Across levels, <strong>aggregate ↑</strong> integrates parts into a whole and <strong>broadcast ↓</strong> carries influence back down.</p>
+<p>Causation runs both ways, and both directions are activities.</p>
+<p>Fields belong to levels too: a concentration inside a cell, a morphogen between cells, a mechanical field beneath a tissue. Proteins → cells → tissues is therefore not a chain of simulators but one organization.</p>
+<p>The same eight kinds apply at every level. Another level needs no new machinery.</p>
 </section>
 <section id="examples" class="level2">
 <h2 class="anchored" data-anchor-id="examples">Examples</h2>
-<p>The examples below show the same idea in action: a biological mechanism is first decomposed into entities, activities and organization, then perturbed by changing one part of that mechanism.</p>
-<p>Every clip was generated from the specification shown when you hover over (or tab to) its title. Within each family, the first card gives the decomposition. The following cards change one mechanistic ingredient: an activity, a parameter, a population, or a relation.</p>
-<p>The captions therefore describe not only what the simulation looks like, but which part of the mechanism was changed. Each sequence is a small perturbation experiment: change one part of the mechanistic hypothesis and observe what the organization produces.</p>
+<p>Each example decomposes a mechanism into entities, activities and organization, then perturbs one part of it.</p>
+<p>Every clip comes from the specification shown when you hover over (or tab to) its title. The first card of a family is the decomposition, the rest change one ingredient.</p>
+<p>The captions say which part changed. Each family is a perturbation experiment on the hypothesis.</p>
 <style>
 /* Four clips per row everywhere. `g3` is kept as an alias of `g4` rather than deleted from the
    markup, because three of the galleries below are rewritten wholesale by
@@ -445,7 +444,7 @@ window.Quarto = {
 </style>
 
 <h3 class="anchored">A pattern-forming mechanism: two chemistries</h3>
-<p class="opk">One kind of entity, a cell carrying two chemical states, is enough to express the mechanism. Cells exchange chemistry with their neighbours through a lateral activity, while another lateral activity transforms one chemical state into another. The complete mechanism also contains the seed activities that establish the cells and their chemistry, and a rewire activity that establishes their neighbourhoods. The patterns therefore do not come from a special pattern-forming primitive. They emerge from the organization of entities, relations and activities. Changing one parameter, adding another chemistry or changing the reaction changes the resulting organization without changing the underlying machinery. Shown on a disc of 4,000 cells: stripes, spots, coupled chemistries and cyclic competition.</p>
+<p class="opk">One kind of entity, a cell carrying two chemical states, expresses the mechanism. A lateral activity exchanges chemistry between neighbours and another transforms one state into the other, while seeds establish the cells and their chemistry and a rewire establishes who neighbours whom. The patterns come from no special primitive but from the organization of entities, relations and activities. Shown on a disc of 4,000 cells: stripes, spots, coupled chemistries and cyclic competition.</p>
 <p class="opk-ref">Reference: the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card figure">
@@ -733,7 +732,7 @@ plotting:
 </div>
 
 <h3 class="anchored">A tissue that remodels itself: the vertex model</h3>
-<p class="opk">A sheet contains two kinds of entity at two levels: vertices and the cells that own them. The mechanism is therefore not merely mechanical. A cell obtains its shape from its vertices through aggregate ↑. A lateral activity moves the vertices according to the tissue’s mechanical interactions. Rewire remodels the junctions between neighbouring cells. Structural activity removes or creates cells. The important point is the organization: the same cell participates simultaneously in geometry, mechanics, chemistry, growth and turnover because these mechanisms are connected through the part-to-whole structure. Shown on a flat disc: cell death and tissue closure, morphogen-controlled growth, growth with division, and morphogen-controlled removal.</p>
+<p class="opk">A sheet holds two kinds of entity at two levels: vertices and the cells that own them. A cell takes its shape from its vertices through aggregate ↑, a lateral activity moves the vertices under the tissue’s mechanics, rewire remodels the junctions between neighbours, and structural activity removes or creates cells. One cell therefore takes part in geometry, mechanics, chemistry, growth and turnover, all through the part-to-whole structure. Shown on a flat disc: death and closure, morphogen-controlled growth, growth with division, morphogen-controlled removal.</p>
 <p class="opk-ref">Reference: active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
@@ -1396,7 +1395,7 @@ plotting:
      the three generated blocks (shapes / rate / second-field) each opened their own grid and
      drew a short row. No longer regenerated by discovery_okuda/ops/minisite_section.py. -->
 <h3 class="anchored">Pattern and growth composed</h3>
-<p class="opk">The two mechanisms above, composed into one. The chemistry now runs on cells that grow, divide and die under their own mechanics, and nothing had to be added to make them meet: division redraws the neighbour relations diffusion runs over, and the chemistry gates which cells grow, so the coupling runs both ways through relations the entities already had. Each clip differs from its neighbour by one line: a constant, a rate, a lateral tension added or removed. In the last two a second gate that sends cells to die instead of to grow.</p>
+<p class="opk">The two mechanisms above, composed. The chemistry now runs on cells that grow, divide and die under their own mechanics: division redraws the relations diffusion runs over, and the chemistry gates which cells grow. Each clip differs from its neighbour by one line, and in the last two a second gate sends cells to die instead of to grow.</p>
 <p class="opk-ref">Reference: this is the experiment of <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018), <i>Sci. Rep.</i> 8:2386</a>, Turing patterning on a 3D vertex model, rebuilt as Plexus activities on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> mesh; the chemistry is the Gray–Scott system cited in the Turing section above.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card figure">
@@ -3372,7 +3371,7 @@ _sculpt:
   </figure>
 </div>
 <h3 class="anchored">Deformable matter: the microenvironment as a continuum</h3>
-<p class="opk">The matter a tissue pushes on, shown on its own before a tissue touches it. Material points are the entities, a grid is their field, and the activities are those of any continuum: a point turns its deformation into a stress (a constitutive law, a lateral), hands it to the grid (an exchange), the grid advances under its own dynamics (a field) and hands the result back (a second exchange), while an aggregate builds each cell from the points it owns. Six activities over two kinds of entities and one field, the material point method of the reference. Elastic, fluid and granular matter are constitutive laws named in the spec. First row: what one line of the spec changes. Second row: only the size, from 1.3&nbsp;million points to a billion.</p>
+<p class="opk">The matter a tissue pushes on, on its own. Material points are the entities, a grid is their field, and six activities make the continuum: a point turns its deformation into a stress (lateral), hands it to the grid (exchange), the grid advances under its own dynamics (field) and hands the result back (a second exchange). Elastic, fluid and granular matter are laws named in the spec. First row: one line of the spec. Second row: only the size, from 1.3&nbsp;million points to a billion.</p>
 <p class="opk-ref">Reference: the MLS-MPM solver is our PyTorch port (<a href="https://github.com/saalfeldlab/MPM_pytorch">saalfeldlab/MPM_pytorch</a>) of Yuanming&nbsp;Hu’s <a href="https://github.com/yuanming-hu/taichi_mpm">taichi_mpm</a>, implementing MLS-MPM (Hu et&nbsp;al. 2018).</p>
 <div class="sim-gallery g4">
   <figure class="sim-card figure">
@@ -4985,7 +4984,7 @@ sets:
 </div>
 <!-- vertex-mpm: hand-authored 2026-09-07 from graphs_data/mesh_mpm; no longer generated by discovery_okuda/ops/minisite_section.py -->
 <h3 class="anchored">A tissue against its matrix: vertex + continuum</h3>
-<p class="opk">A cell sheet and the deformable matter around it, kept as two kinds of entities with their own states and their own activities. One activity joins them, contact, an exchange carrying force across the interface in both directions, so neither has to become the other to touch it. Only the sheet differs between clips: a plate, a sphere, a shell that reaches the matter by inflating, and a tissue that reaches it by dividing. All four are coloured by deviatoric strain in the matter, so the load each sheet puts in can be read off the clip.</p>
+<p class="opk">A cell sheet and the deformable matter around it, two kinds of entities with their own states and activities. One activity joins them: contact, an exchange carrying force across the interface both ways. Only the sheet differs between clips: a plate, a sphere, a shell that reaches the matter by inflating, a tissue that reaches it by dividing. Colour is deviatoric strain, so each sheet’s load can be read off the clip.</p>
 <p class="opk-ref">Reference: contact:
 <a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>).</p>
 <div class="sim-gallery g4">
@@ -5728,7 +5727,7 @@ schedule:
 
 <!-- BEGIN spheroid-bm-ecm (generated by discovery_okuda/ops/minisite_section.py) -->
 <h3 class="anchored">A layer on its membrane: cells, basement membrane, matrix</h3>
-<p class="opk">The pieces recomposed into one organized whole: epithelial cells, a basement membrane with its own nodes and faces, the adhesion plaques that bind the two, and the proteins carried on the membrane. Four kinds of entities across three levels, joined by integration upward (aggregates) and control downward (broadcasts). No kind gives up its own representation to take part. Between clips only one activity differs, the protease chemistry that degrades the membrane: absent, many sources, one source, and degradation left unopposed.</p>
+<p class="opk">The pieces recomposed into one organized whole: epithelial cells, a basement membrane, the adhesion plaques binding the two, and the proteins carried on the membrane. Four kinds of entities across three levels, joined by integration upward and control downward. No kind gives up its own representation. Between clips only the protease chemistry that degrades the membrane differs: absent, many sources, one source, and degradation left unopposed.</p>
 <p class="opk-ref">Reference: load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
@@ -6150,7 +6149,7 @@ run:
 <!-- END spheroid-bm-ecm -->
 
 <h3 class="anchored">Other mechanisms</h3>
-<p class="opk">The same decomposition applies beyond cell biology. The examples on the <a href="other.html">other models</a> page show stigmergy as activities connecting entities and a field, a chaotic flow as one activity on a cloud, agent sorting as rewire plus lateral interaction, and gravity as a lateral interaction over a population of entities. The biological terminology is still useful here. The entities need not be cells. What matters is that the model can be described by what exists, what the entities do, and how those entities and activities are organized.</p>
+<p class="opk">The same decomposition applies beyond cell biology. The <a href="other.html">other models</a> page shows stigmergy as activities connecting entities and a field, agent sorting as rewire plus lateral, and gravity as a lateral over a population. The entities need not be cells. What matters is what exists, what the entities do, and how both are organized.</p>
 <div class="sim-gallery g4">
   <figure class="sim-card figure">
     <video src="gallery/slime_s.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
