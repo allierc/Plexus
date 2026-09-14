@@ -660,6 +660,90 @@ def _entity_class(sname: str, entity: str | None = None):
         return None
 
 
+def _measured_centers(sname, s, n, device):
+    """Body centres READ FROM THE SCAN instead of written down: `frame:` on a set, `place: measured`
+    on its types.
+
+    WHY A SPEC SHOULD NOT CARRY THE ARITHMETIC. The eye scene placed its two bodies by hand --
+    "the strap's centroid sits 0.6694 blend units from the globe's, along (-0.2193, 0.6321,
+    0.0225), and every length is that blend scaled by 0.17083" -- three numbers a person had to
+    compute, and six more for each further muscle. The shape folder already knows every part's
+    centroid, because the cutter measured it. `frame:` says how that folder's coordinates reach
+    this world, once:
+
+        frame: {shape: eye, origin: globe, at: [0.25, 0.25, 0.25], scale: {part: globe, radius: 0.08}}
+
+      shape   the library shape whose parts are being placed
+      origin  the part the frame is pinned to -- it lands exactly on `at`
+      at      where that part goes, in world units
+      scale   a number, or {part, radius}: the factor that makes THAT part's equivalent-sphere
+              radius equal `radius`, so a spec states a size it can measure in the picture rather
+              than a ratio it had to divide out
+
+    A type with `place: measured` is then placed at `at + scale * (its centroid - the origin's)`.
+    A type without one keeps whatever `start` gives it, so the two can be mixed.
+    """
+    import numpy as _np
+    import torch as _t
+    from plexus import shapes as _sh
+    fr = dict(s["frame"] or {})
+    shape = str(fr.get("shape") or "")
+    if not shape:
+        raise ValueError(f"sets.{sname}.frame: needs `shape: <a shape in the library>`")
+    folder, _ = _sh.resolve(shape)
+    alias = _sh.aliases(folder)
+    P = _sh.parts(shape)
+
+    def _part(nm):
+        nm = alias.get(str(nm), str(nm))
+        if nm not in P:
+            raise ValueError(f"sets.{sname}.frame: shape {shape!r} has no part {nm!r} "
+                             f"(it has {', '.join(sorted(P))})")
+        return P[nm]
+
+    o_name = fr.get("origin")
+    if o_name is None:
+        raise ValueError(f"sets.{sname}.frame: needs `origin: <the part the frame is pinned to>`")
+    o_cen = _part(o_name)[0].mean(0)
+    at = _np.asarray(fr.get("at", [0.0, 0.0, 0.0]), float)
+    sc = fr.get("scale", 1.0)
+    if isinstance(sc, dict):
+        V, F = _part(sc.get("part", o_name))
+        r_now = (3.0 * _sh._volume(V, F) / (4.0 * _np.pi)) ** (1.0 / 3.0)
+        sc = float(sc["radius"]) / max(r_now, 1e-30)
+    sc = float(sc)
+    rows = []
+    for tname, t in (s.get("types") or {}).items():
+        t = t or {}
+        cnt = int(t.get("count", 1))
+        shp = str(t.get("shape", "") or "")
+        if str(t.get("place", "")).lower() == "measured":
+            if not shp.startswith("mesh:"):
+                raise ValueError(f"sets.{sname}.{tname}: `place: measured` reads the part's own "
+                                 f"centroid, so the type must name one (`shape: mesh:{shape}/...`)")
+            c = at + sc * (_part(shp.split("/", 1)[-1] if "/" in shp else tname)[0].mean(0) - o_cen)
+        else:
+            c = at
+        rows += [c] * cnt
+    if len(rows) < n:
+        rows += [at] * (n - len(rows))
+    # THE SCAN ALSO SAYS HOW BIG EACH BODY IS. Under a measured frame the volume is not free: a
+    # part's own volume times scale^3 IS the body's, so six muscles of different sizes need six
+    # type lines and not six `particle_mass` numbers. `provision` reads this off the parent level.
+    vols = {}
+    for tname, t in (s.get("types") or {}).items():
+        t = t or {}
+        shp = str(t.get("shape", "") or "")
+        if str(t.get("place", "")).lower() == "measured" and shp.startswith("mesh:"):
+            V, F = _part(shp.split("/", 1)[-1] if "/" in shp else tname)
+            vols[tname] = float(_sh._volume(V, F)) * sc ** 3
+    print(f"[frame] {sname}: {shape} scaled by {sc:.5g}, {len(rows)} bodies placed from the scan "
+          f"about {o_name!r} at {_np.round(at, 4).tolist()}"
+          + (f"; volumes " + ", ".join(f"{k} {v:.4g}" for k, v in vols.items()) if vols else ""),
+          flush=True)
+    return _t.tensor(_np.asarray(rows[:n], _np.float32), device=device), {"scale": sc, "volume": vols}
+
+
 def _start_centers(start, n: int, rng, device: str) -> torch.Tensor:
     """Explicit top-level placement from a spec `start`: either a list of D-point
     coords (deterministic, tiled to n) or a flat region box [lo..., hi...] (2*D values,
@@ -999,6 +1083,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
 
     # pass 1: top-level sets (no parent) -- positions seeded across the domain.
     for sname, s in sim.sets.items():
+        _frame_meta = None            # set by `frame:`; hung on the Level below
         if "parent" in s:
             continue
         n = int(s["n"])
@@ -1030,7 +1115,9 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
                     f"radius: {s.get('spawn_radius', '...')}}}\n"
                     f"(`two_disks` takes separation / offset / tilt / thickness / arms; the set keeps "
                     f"`n`, `state`, `types`, `vel_init`.)")
-            if "start" in s:
+            if s.get("frame") is not None and "start" not in s:
+                pos, _frame_meta = _measured_centers(sname, s, n, device)
+            elif "start" in s:
                 pos = _start_centers(s["start"], n, H.rng, device)  # known locations (e.g. an MPM blob)
             else:
                 pos = torch.rand(n, D, generator=H.rng, device=device) * H.world_size   # uniform in the box
@@ -1043,6 +1130,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         # the runtime SET object: wraps the state tensor [buffer, 2D] (pos|vel columns per the
         # schema) + the live-mask `occ` + the schema; operators read/write it via H.level(name).
         lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema)
+        lvl.frame = _frame_meta                                 # None unless the set declared `frame:`
         lvl.render = render
         lvl.vmax = float(s["vmax"]) if "vmax" in s else None    # optional per-tick cell speed cap
         lvl.maps = dict(s.get("maps") or {})    # declared functions OUT of this set (role -> set)
@@ -1541,7 +1629,24 @@ def _selector_mask(H: Hierarchy, sel: Selector) -> torch.Tensor:
     if sel.attr is None:
         return lvl.active                              # all live nodes
     if sel.attr == "type":                             # type name -> node_type index
-        return lvl.active & (lvl.node_type == lvl.type_names.index(sel.val))
+        # A CONTAINED SET WEARS ITS PARENT'S TYPES. `mpm_particle` has no `types:` of its own --
+        # the bodies are typed on the cell -- so `at: mpm_particle[type=ramp]` died on a missing
+        # `node_type`, and the operator that was meant to hold the ramp never ran. A child's type
+        # is its parent's, which is what every other reader of these sets already assumes.
+        _nt, _names = getattr(lvl, "node_type", None), list(getattr(lvl, "type_names", []) or [])
+        if _nt is None or not _names:
+            _p = getattr(lvl, "parent_name", None)
+            _par = getattr(lvl, "parent", None)
+            while _p in H.levels and _par is not None:
+                _pl = H.level(_p)
+                if getattr(_pl, "node_type", None) is not None and (getattr(_pl, "type_names", []) or []):
+                    _nt, _names = _pl.node_type[_par], list(_pl.type_names)
+                    break
+                _par, _p = _pl.parent[_par] if getattr(_pl, "parent", None) is not None else None, getattr(_pl, "parent_name", None)
+        if _nt is None or sel.val not in _names:
+            raise ValueError(f"selector {sel.set!r}[type={sel.val!r}]: neither the set nor its parents "
+                             f"declare that type (they have {_names or 'none'})")
+        return lvl.active & (_nt == _names.index(sel.val))
     # general set[attr=val]: match a per-node buffer (e.g. cell[done=0] -> lvl.done == 0)
     if not hasattr(lvl, sel.attr):
         raise ValueError(f"selector {sel.set!r}[{sel.attr}={sel.val}] has no per-node "

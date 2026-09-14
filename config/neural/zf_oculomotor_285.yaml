@@ -1,0 +1,76 @@
+# zf_oculomotor_285 -- the zebrafish velocity-to-position integrator, from the colleagues' pickle.
+#
+# WHAT IS MEASURED HERE AND WHAT IS NOT, because the two must not be confused:
+#   MEASURED   the cells and the wiring. 285 neurons and 5,013 edges read out of
+#              Oculomotor_sortedData_081126.pkl (2,949 cells, 42 types) by selecting the eight
+#              types the circuit is defined by. Edge weights are synapse AREA, as the pickle's
+#              `adjacency_matrix_size` gives them. Density 6.2% against 0.51% for the whole graph.
+#   NOT        the positions. The pickle carries no soma coordinates and the anatomy fetch
+#              (figures/zebrafish/fetch_zebrafish_anatomy_OCULO.py) needs a neuprint-fish2 token,
+#              so the layout is a SCHEMATIC, one disc PER TYPE: the stage along z (afferent at 0,
+#              integrator at 1.1, output at 2.2), the hemisphere along x, which type within the
+#              stage along y, and inside a disc a golden-angle spiral ordered by total degree so
+#              the hubs sit at its centre. A blob is therefore ONE TYPE OF ONE HEMISPHERE -- the
+#              first version gave every type of a stage the same centre, so the four integrator
+#              types were superimposed and the picture showed six blobs for eight types.
+#
+# THE THREE STAGES, and the reason this circuit is worth seeing at all:
+#   afferent    AF5_ipsi (29) + AF5_contra (12) = 41    the optokinetic input
+#   integrator  INTG_ipsi_m/i, INTG_contra_m/i = 117    the velocity-to-position integrator
+#   output      AMN (92) + AIN (35)            = 127    the motor and internuclear output
+# AF5 reads as afferent from the wiring, not by assumption: 88.2% of its outgoing weight enters
+# the INTG/AMN/AIN core and it receives 1/178th as much back.
+#
+# NO CSV ANYWHERE. The pickle was converted once into the region tree's two npz files --
+# neurons.npz (xyz, body_id, type_id, role_id) and connectome.npz (edge_index, weights) -- which
+# `neural_seed` and `edges_file` read directly. 57 kB for the whole circuit.
+general:
+  name: zf_oculomotor_285
+  seed: 0
+  n_frames: 400
+  dt: 0.05
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 401
+  units:
+    length_um: 94.5      # the schematic's own box, from the manifest (region.side_um)
+    time_s: 1.0          # a CHOICE: one time unit is one second, so dt = 0.05 is a 50 ms step
+sets:
+  brain: {n: 1}
+  assembly: {parent: brain, per_parent: 1}
+  neuron:
+    parent: assembly
+    per_parent: 285      # must equal the manifest's count -- neural_seed refuses a mismatch
+    # DYNAMICAL types, not the eight anatomical ones: p = [a, b, g, s, w, h]. The anatomical type
+    # of every cell is recorded by the seed as `cell_type_id`, which is what the picture colours by.
+    types:
+      slow: {fraction: 0.5, p: [1.0, 0.0, 1.2, 0.5, 1.0, 0.0]}
+      fast: {fraction: 0.5, p: [2.5, 0.0, 1.2, 0.5, 2.0, 0.0]}
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/zf_oculomotor_285/connectome.npz
+fields: {}
+seed:
+- {op: neural_seed, at: neuron, region: zf_oculomotor_285, v0_mean: 0.0, v0_sd: 0.5}
+operators:
+- {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.01}
+- {op: neuron_signal, at: neuron, model: type_pairwise, edge_set: synapse, activation: tanh}
+schedule: [neuron_update, neuron_signal]
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  render_3d: dots
+  dot_size: 9.0
+  dot_shading: true
+  color_field: voltage
+  field_cmap: coolwarm
+  color_range: [-1.0, 1.0]
+  max_frames: 300
+  stills: 10
+  keep_stills: true

@@ -27,6 +27,10 @@ def main(argv=None):
     ap.add_argument("--editor", action="store_true", help="open the spec node editor instead of the page")
     args = ap.parse_args(argv)
 
+    # THE SERVER'S TAB, FROM THE FLAG. Without it the first page load looked like a tab switch and
+    # reset the scene (see `g_page`).
+    from plexus.gui import bio as _bio
+    _bio.STATE["tab"] = args.tab
     httpd = serve(args.host, args.port)
     url = f"http://{args.host}:{args.port}/" + ("editor" if args.editor else f"?tab={args.tab}")
     if args.spec and args.editor:

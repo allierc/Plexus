@@ -524,9 +524,13 @@ class NeuralSeed(Seed):
         # Nanometres, not voxels: on an anisotropic dataset a voxel cube is a cuboid, so the
         # importer crops in nm and stores both. Placing neurons from `xyz_vox` would stretch the
         # region along the thin axis by the anisotropy ratio, with nothing to show for it.
-        xyz = np.asarray(z["xyz_nm"], np.float64)
-        lo = np.asarray(z["bounds_lo_nm"], np.float64)
-        side = float(z["bounds_side_nm"])
+        # TWO VINTAGES OF THE SAME TREE. The first regions wrote `xyz` and `bounds_side` in
+        # nanometres; the later importer writes `xyz_nm` beside `xyz_vox` and names the bounds
+        # `*_nm` to say which. Read either, since both are on disk and both are right.
+        _k = "xyz_nm" if "xyz_nm" in z.files else "xyz"
+        xyz = np.asarray(z[_k], np.float64)
+        lo = np.asarray(z["bounds_lo_nm" if "bounds_lo_nm" in z.files else "bounds_lo"], np.float64)
+        side = float(z["bounds_side_nm" if "bounds_side_nm" in z.files else "bounds_side"])
         n = xyz.shape[0]
         if n != lvl.n:
             raise ValueError(
@@ -556,6 +560,8 @@ class NeuralSeed(Seed):
                                                             device=dev))
         lvl.cell_type_names = [str(t) for t in np.asarray(z["type_names"], dtype=object)]
         lvl.region_manifest = man
+        lvl.region_name = self.region     # `morphology_seed` needs the FOLDER, and a manifest
+        #                                   need not name itself; the operator that read it does.
         r = man["region"]
         # The region's physical size lands in two places, and both matter.
         H.region = r                                # (1) on the Hierarchy, so every downstream
@@ -599,3 +605,226 @@ class NeuralSeed(Seed):
                 f"region it loads is {side:.6f} um across. The world box IS the cube, so these "
                 f"are the same number; they differ by a factor {got / side:.4f}, which is the "
                 f"factor by which every micrometre this run reports would be wrong.")
+
+
+@register_operator("morphology_seed", family="seed", set="points", kind="seed")
+class MorphologySeed(Seed):
+    """Fill every neuron's child set with the points of ITS OWN morphology file.
+
+    points -> points: writes `pos`, once, before frame 0.
+
+    WHY A SPEC CANNOT NAME 160,000 FILES. A frozen region holds one `.swc` and one `.obj` per
+    neuron (`morphology_index.json` maps body id -> path), and the whole point of a population is
+    that the spec names the POPULATION. This operator reads the index the parent set was seeded
+    from -- `neural_seed` leaves the manifest and the body ids on the level -- and fills each
+    child block from the file of the parent it belongs to. One line in the spec, 1,002 files.
+
+    A SKELETON IS A TREE OF SEGMENTS, NOT A CLOUD. Each row of an `.swc` is (id, type, x, y, z,
+    radius, parent), so the skeleton is a set of segments joined at their endpoints. Points are
+    drawn ALONG those segments, in proportion to their length, and pushed off the centreline by
+    the row's own radius -- so a thick primary neurite reads as thick and a fine terminal as fine,
+    which is the whole reason a skeleton is preferred to a soma dot. Sampling the ROWS instead
+    would put most of the points where the tracing happened to be dense.
+
+    THE SAME BOX THE SOMATA ARE IN. The coordinates are the region's own (8 nm voxels for
+    hemibrain, nanometres for the zebrafish fetches), and they are mapped by the identical affine
+    `neural_seed` used -- (x - bounds_lo) / bounds_side -- so a neuron's morphology lands on its
+    own soma and not beside it. The units of the file are declared by the manifest, not guessed.
+
+    Reference: the SWC format, Cannon, R. C. et al. (1998). An on-line archive of reconstructed
+    hippocampal neurons. J. Neurosci. Methods 84:49-54.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["parent"]
+    PARAM_ROLES = {"parent": "the_neuron_set", "kind": "skeleton_or_mesh"}
+    MECHANISM_TAGS = ["morphology", "initial_condition", "population"]
+    REFERENCE = ("SWC format: Cannon, R. C. et al. (1998). J. Neurosci. Methods 84:49-54. "
+                 "Region frozen by plexus.io.neuprint from a NeuPrint server.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "morphology")
+        self.parent = params["parent"]
+        self.kind = str(params.get("kind", "skeleton")).lower()
+        self.region = params.get("region", None)          # else taken from the parent level
+        self.seed = int(params.get("seed", 0))
+
+    @staticmethod
+    def _swc(path):
+        """(xyz [n,3], radius [n], parent [n]) from an `.swc`, parents as row indices or -1."""
+        rows = np.loadtxt(path, comments="#", ndmin=2)
+        if rows.size == 0:
+            return np.zeros((0, 3)), np.zeros(0), np.zeros(0, np.int64)
+        ids = rows[:, 0].astype(np.int64)
+        pos = {int(i): k for k, i in enumerate(ids)}
+        par = np.array([pos.get(int(p), -1) for p in rows[:, 6]], np.int64)
+        return rows[:, 2:5].astype(np.float64), rows[:, 5].astype(np.float64), par
+
+    @staticmethod
+    def _points_mesh(path, n, rng):
+        """`n` points on a neuron mesh's SURFACE, one triangle drawn per point in proportion to
+        its area.
+
+        WHY THE SURFACE AND NOT THE INTERIOR. Filling a closed mesh needs a watertight test per
+        candidate point, and a hemibrain neuron mesh is 675 kB of a thin branching tube: the
+        interior is a few percent of its bounding box, so rejection throws away 95+ of every 100
+        candidates, and the mesh has to be closed for the test to mean anything at all. The
+        surface IS the picture here -- nothing is being filled with material -- so the points are
+        drawn on it: uniform per unit AREA, which is a barycentric sample of a triangle chosen in
+        proportion to its own area.
+        """
+        import pyvista as pv
+        m = pv.read(path).triangulate()
+        V = np.asarray(m.points, np.float64)
+        F = np.asarray(m.faces).reshape(-1, 4)[:, 1:]
+        if not len(F):
+            return np.zeros((n, 3))
+        a, b, c = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
+        area = 0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1)
+        k = rng.choice(len(F), size=n, p=area / max(area.sum(), 1e-30))
+        u, v = rng.random(n), rng.random(n)
+        over = u + v > 1.0
+        u[over], v[over] = 1.0 - u[over], 1.0 - v[over]
+        return a[k] + (b[k] - a[k]) * u[:, None] + (c[k] - a[k]) * v[:, None]
+
+    def _points_for(self, path, n, rng):
+        """`n` points along a skeleton's segments, off-centreline by the local radius."""
+        xyz, rad, par = self._swc(path)
+        ok = par >= 0
+        if not ok.any() or n <= 0:
+            return np.tile(xyz[:1] if len(xyz) else np.zeros((1, 3)), (max(n, 0), 1))
+        a, b = xyz[par[ok]], xyz[ok]
+        ra, rb = rad[par[ok]], rad[ok]
+        L = np.linalg.norm(b - a, axis=1)
+        w = L / max(L.sum(), 1e-30)
+        k = rng.choice(len(L), size=n, p=w)                # a segment, in proportion to its LENGTH
+        t = rng.random(n)[:, None]
+        p = a[k] * (1 - t) + b[k] * t
+        r = (ra[k] * (1 - t[:, 0]) + rb[k] * t[:, 0])
+        u = rng.normal(size=(n, 3))
+        u /= np.linalg.norm(u, axis=1, keepdims=True).clip(1e-12)
+        return p + u * (r[:, None] * rng.random((n, 1)) ** (1.0 / 3.0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        par = H.level(self.parent)
+        man = getattr(par, "region_manifest", None)
+        bid = getattr(par, "body_id", None)
+        if man is None or bid is None:
+            raise ValueError(
+                f"morphology_seed: the set {self.parent!r} was not seeded from a region -- declare "
+                f"`neural_seed` on it FIRST, in the same `seed:` block, so the manifest and the "
+                f"body ids are on the level when this runs.")
+        from plexus.io.neuprint import region_path
+        root = region_path(self.region or man.get("name") or man["source"].get("region")
+                           or getattr(par, "region_name", ""))
+        idx = json.load(open(os.path.join(root, "morphology_index.json")))
+        table = idx.get("meshes" if self.kind == "mesh" else "skeletons") or {}
+        if not table:
+            raise ValueError(f"morphology_seed: the region {root} carries no {self.kind}s")
+        z = np.load(os.path.join(root, "neurons.npz"), allow_pickle=True)
+        lo = np.asarray(z["bounds_lo_nm" if "bounds_lo_nm" in z.files else "bounds_lo"], np.float64)
+        side = float(z["bounds_side_nm" if "bounds_side_nm" in z.files else "bounds_side"])
+        bids = np.asarray(bid.detach().cpu().numpy() if hasattr(bid, "detach") else bid).astype(np.int64)
+        pidx = lvl.parent.detach().cpu().numpy().astype(np.int64)
+        # THE FILE'S UNITS ARE THE REGION'S, AND THEY ARE NOT ALWAYS NANOMETRES. A hemibrain `.swc`
+        # is in 8 nm VOXELS and a zebrafish fetch writes nm; the somata were converted on import,
+        # so a morphology read raw lands in a different frame from its own cell body -- measured:
+        # the arbours came out eight times too small and sitting outside the box. The manifest
+        # declares `region.voxel_size_nm`; it is applied here, once.
+        _vox = float((man.get("region") or {}).get("voxel_size_nm", 1.0) or 1.0)
+        rng = np.random.default_rng(self.seed)
+        st = lvl.state.clone()
+        px0, px1 = lvl.state_schema["pos"]
+        out = np.zeros((lvl.n, 3))
+        missing = 0
+        for p in np.unique(pidx):
+            rows = np.where(pidx == p)[0]
+            f = table.get(str(int(bids[p])))
+            if f is None:
+                missing += 1
+                continue
+            _f = os.path.join(root, f)
+            if self.kind == "mesh":
+                pts = self._points_mesh(_f, len(rows), rng)
+            elif self.kind == "soma_skeleton":
+                # SOMA AND ARBOUR IN ONE SET, because two sets would be two renders and the page
+                # draws one subject. A quarter of the points fill the soma ball -- the radius the
+                # region measured -- and the rest run along the skeleton, so the cell body reads
+                # as a body and the processes as processes.
+                n_s = max(int(0.25 * len(rows)), 1)
+                # IN THE FILE'S UNITS, because everything returned here is scaled by `_vox` once,
+                # below. The soma centre comes from `neurons.npz`, which is already in nanometres,
+                # so it has to be divided back into voxels first -- taking it as-is made the soma
+                # points eight times too large and the whole cloud spilled to nine box widths.
+                ctr = np.asarray(z["xyz_nm" if "xyz_nm" in z.files else "xyz"], np.float64)[p] / _vox
+                rr = (float(np.asarray(z["soma_radius"], np.float64)[p]) if "soma_radius" in z.files
+                      else side * 0.004) / _vox
+                u = rng.normal(size=(n_s, 3)); u /= np.linalg.norm(u, axis=1, keepdims=True).clip(1e-12)
+                soma = ctr + u * (rr * rng.random((n_s, 1)) ** (1.0 / 3.0))
+                pts = np.concatenate([soma, self._points_for(_f, len(rows) - n_s, rng)], 0)
+            else:
+                pts = self._points_for(_f, len(rows), rng)
+            out[rows] = (pts * _vox - lo) / side
+        st[:, px0:px1] = torch.as_tensor(out[:, :H.dim], dtype=st.dtype, device=lvl.state.device)
+        # PAINTED BEFORE ANYTHING RUNS, with the parent's CELL TYPE. A morphology seeded and not
+        # yet stepped has voltage 0 everywhere, so the first picture -- the one a person looks at
+        # after pressing BUILD -- was 600,000 points of a single colour, which says nothing about
+        # 1,002 neurons. The type is a fact of the region and is there at seed time; the run
+        # overwrites `paint` with the voltage on the first frame (`paint_children`), which is the
+        # picture the movie is for.
+        if "paint" in lvl.state_schema:
+            _ct = getattr(par, "cell_type_id", None)
+            _v = (_ct[lvl.parent].to(st.dtype) if _ct is not None
+                  else lvl.parent.to(st.dtype))
+            c0, c1 = lvl.state_schema["paint"]
+            st[:, c0:c1] = _v.reshape(-1, 1)
+        lvl.state = st
+        print(f"[morphology_seed] {self.at}: {lvl.n:,} points over {len(np.unique(pidx)):,} "
+              f"{self.kind}s of {os.path.basename(root)}"
+              + (f"; {missing} neurons had no file" if missing else ""), flush=True)
+        return {}
+
+
+@register_operator("paint_children", family="observation", set="points", kind="aggregate")
+class PaintChildren(Exchange):
+    """Copy a parent's scalar onto every point that draws it, each frame.
+
+    points -> points: writes `block` from the parent's `parent_block`.
+
+        paint_i = x_{parent(i)}
+
+    THE PICTURE IS THE ACTIVITY, NOT THE ANATOMY. A neuron's skeleton is fixed geometry; what
+    changes is its voltage, and a morphology render is worth its 400,000 points only if those
+    points carry it. This is an OBSERVATION -- it moves nothing and no dynamics reads `paint` --
+    which is why it is a copy and not a coupling.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    # `parent:`, NOT `from:`. The engine reads `from:` as a FIELD reference (a grid the
+    # operator consumes), so naming the parent set there made the spec refuse to load with
+    # "references unknown field 'neuron'" -- a true statement about a key that meant
+    # something else.
+    REQUIRES_PARAMS = ["parent"]
+    PARAM_ROLES = {"parent": "the_parent_set", "block": "child_block", "parent_block": "parent_block"}
+    MECHANISM_TAGS = ["observation", "rendering"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "morphology")
+        self.src = params["parent"]
+        self.block = str(params.get("block", "paint"))
+        self.parent_block = str(params.get("parent_block", "voltage"))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); par = H.level(self.src)
+        a0, a1 = par.state_schema[self.parent_block]
+        b0, b1 = lvl.state_schema[self.block]
+        v = par.state[:, a0:a1]
+        st = lvl.state.clone()
+        st[:, b0:b1] = v[lvl.parent]
+        lvl.state = st
+        return {}

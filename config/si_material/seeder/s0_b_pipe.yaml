@@ -1,0 +1,20 @@
+# S0-B "a hollow pipe standing on the floor" -- `form: cylinder` with `axis` and `hollow`, none of
+# which a spec could say before: a column was impossible and `hollow` was accepted and ignored.
+general: {name: s0_b_pipe, seed: 1, n_frames: 400, dt: 0.002, boundary: wall, dim: 3, world: [0.5, 0.5, 0.5], save_data: true, record_cap: 301, units: {length_um: 1000000.0, time_s: 1.0, force_nN: 1000000000.0}}
+sets:
+  cell:
+    n: 2
+    start: [[0.25, 0.42, 0.25], [0.25, 0.18, 0.25]]   # rows are typed by a shuffled draw: row 0 is the plug here
+    types:
+      pipe: {count: 1, material: elastic, youngs: 3000000.0, density: 1200.0, shape: cylinder, aspect: 3.0, axis: y, hollow: 0.65}
+      plug: {count: 1, material: elastic, youngs: 200000.0, density: 1000.0, shape: ball}
+  mpm_particle: {parent: cell, per_parent: 12000, radius: 0.03, density: 1000.0, particle_mass: 1.0e-4}
+fields: {mpm_grid: {frame: mpm_grid, n_grid: 96}}
+operators:
+- {op: gravity, at: cell, g: 9.81}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_damp_mode: per_impact, vmax: 1000000000.0}
+schedule: [gravity, {substep_dt: 3.921569e-05, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}]
+plotting: {renderer: vtk_points, background: black, up_axis: 1, box_frame: true, hide_sets: [cell], render_3d: dots, dot_size: 1.6, colors: {pipe: [0.95, 0.4, 0.25], plug: [0.35, 0.65, 1.0]}}

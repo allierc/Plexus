@@ -58,7 +58,7 @@ SHELL = r"""<!doctype html>
   <div id="picklist" style="max-height:55vh;overflow:auto;background:#0e0e12;border:1px solid #2a2a30;padding:4px;font-size:12px"></div>
  </div>
 {form}
- <div class="row"><button onclick="build()">BUILD + SEED</button><button class="dim" onclick="toggleYaml()">YAML</button></div>
+ <div class="row"><button onclick="build()">BUILD</button><button class="dim" onclick="toggleYaml()">hide YAML</button></div>
  <div id="status">building the default scene...</div>
  <div class="row"><label>device</label><select id="run_device" style="width:80px"><option>cuda:0</option><option>cuda:1</option><option>cpu</option></select> </div>
  <div class="row"><button onclick="runGo()" id="runbtn" title="the form is applied first, then the run starts">RUN</button><button class="dim" onclick="runStop()">STOP</button></div>
@@ -69,7 +69,9 @@ SHELL = r"""<!doctype html>
  <div class="row"><button onclick="claudeGo()" id="cbtn" class="claude"><svg viewBox="0 0 24 24"><path d="M12 1.5l1.6 6.4 5.6-3.6-3.6 5.6 6.4 1.6-6.4 1.6 3.6 5.6-5.6-3.6L12 22.5l-1.6-6.4-5.6 3.6 3.6-5.6L1.5 12l6.9-1.6-3.6-5.6 5.6 3.6z"/></svg>CLAUDE</button><button class="dim" onclick="claudeStop()">STOP</button><button class="dim" onclick="claudeNew()" title="forget the conversation so far">NEW SESSION</button> <span id="cstat" style="color:#8c8"></span></div>
  <pre id="claude"></pre>
  <div id="rstat" style="color:#9ab;min-height:14px"></div>
- <div id="yaml"><textarea id="yamltext"></textarea><div><button onclick="saveYaml()">SAVE YAML</button></div></div>
+ <div id="yaml" style="display:block"><div style="color:#778;font-size:11px">the spec on screen: edit it and SAVE to seed what you wrote</div>
+ <textarea id="yamltext" style="height:260px"></textarea>
+ <div><button onclick="saveYaml()">SAVE YAML</button><button class="dim" onclick="clearYaml()">DELETE YAML</button> <span id="ystat" style="color:#8c8;font-size:11px"></span></div></div>
  <div id="tree" style="margin-top:10px">(none)</div>
  <div id="info" style="margin-top:6px">click an object</div>
 </div>
@@ -115,7 +117,10 @@ window.reseed=async function(){{playStop();FRAME=null;if(!specName){{status('no 
   if(!nframes&&STORED){{$('frame').max=STORED-1;}}
   $('framelab').textContent=nframes?`${{nframes}} frames in memory`
     :(STORED?`${{STORED}} of ${{RECORDED}} recorded frames -- drag or PLAY to load them`:'');}}catch(e){{}}}};
-window.toggleYaml=function(){{const y=$('yaml');const on=getComputedStyle(y).display==='none';y.style.display=on?'block':'none';}};
+window.toggleYaml=function(){{const y=$('yaml');const on=getComputedStyle(y).display==='none';y.style.display=on?'block':'none';event.target.textContent=on?'hide YAML':'YAML';}};
+// DELETE YAML: the spec file goes, the page forgets it, the picture is cleared. The form stays,
+// so the next BUILD writes a fresh spec of the same name.
+window.clearYaml=async function(){{if(!specName){{$('ystat').textContent='nothing open';return;}}const j=await post('/api/scene/delete',{{name:specName}});if(j.error){{$('ystat').textContent=j.error;return;}}$('yamltext').value='';$('ystat').textContent='deleted '+j.deleted;specName=null;SCENE=null;}};
 window.saveYaml=async function(){{const j=await post('/api/scene/save',{{name:specName,raw:$('yamltext').value,tab:TAB}});if(j.error){{status(j.error+(j.detail?'\n'+j.detail:''),true);return;}}if(j.form)fillForm(j.form);status('saved; seeding...');await reseed();}};
 // THE PICTURE IS THE MOVIE RENDERER'S. Every camera change asks the server for a fresh screenshot;
 // at most one request is in flight and the newest camera wins, so dragging never queues up.
@@ -191,7 +196,23 @@ cpoll();
 // picked up by poll() instead.
 const q=new URLSearchParams(location.search);
 if(q.get('name')){{specName=q.get('name');fetch('/api/scene/spec?name='+encodeURIComponent(specName)+'&tab='+TAB).then(r=>r.json()).then(j=>{{if(j.raw){{$('yamltext').value=j.raw;}}if(j.form)fillForm(j.form);reseed();}});}}
-else{{fetch('/api/scene/state').then(r=>r.json()).then(st=>{{if(st.name)return;if(DEFAULT_SPEC)openSpec(DEFAULT_SPEC);else build();}}).catch(()=>{{}});}}
+else{{
+// THE DEFAULT IS A FALLBACK, NOT A GREETING. A page that loads while the server is still opening a
+// scene used to BUILD its default over it -- so every relaunch replaced whatever was being shown
+// with the tab's own 27 cubes, five times in one session. Wait, look again, and build only if the
+// session is still empty.
+// AND A PAGE THAT FINDS A SCENE ALREADY OPEN ADOPTS IT. Returning early left the form and the
+// YAML box holding the tab's DEFAULT bodies while the picture showed the open scene, so the next
+// rebuild -- a menu, a colour, anything -- wrote 27 cubes over it. Load the open scene's own spec
+// into the form instead, so what the page can rebuild is what the page is showing.
+(async()=>{{for(let i=0;i<8;i++){{
+  if(specName)return;
+  try{{const st=await (await fetch('/api/scene/state')).json();
+    if(st.name){{specName=st.name;
+      const j=await (await fetch('/api/scene/spec?name='+encodeURIComponent(st.name)+'&tab='+TAB)).json();
+      if(j.raw)$('yamltext').value=j.raw;if(j.form)fillForm(j.form);render();return;}}}}catch(e){{}}
+  await new Promise(r=>setTimeout(r,400));}}
+ if(DEFAULT_SPEC)openSpec(DEFAULT_SPEC);else build();}})();}}
 </script></body></html>
 """
 

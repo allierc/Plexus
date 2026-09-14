@@ -1,0 +1,49 @@
+# S4-M "the atlas's shapes, as matter" -- five bodies dropped on a floor, and not one of them is a
+# cube, a ball or a cylinder. `filament`, `cisterna`, `stack`, `mito` and `barrel` are samplers
+# written for `seed_cell_atlas`: a persistent random walk, a bowed disc with fenestrations, six
+# bowed discs stacked and tapering, a bent capsule with transverse cristae, and nine rods on a
+# circle. Each has a CLOSED-FORM VOLUME, which is the only thing the material seeder needs from a
+# shape -- `V = per_parent * p_vol` fixes the size and the shape only arranges it -- so they
+# needed no rewriting, only a door out of the operator they were locked inside.
+#
+# WHAT EACH SHAPE'S OWN WORDS MEAN, and why they sit in a `form:` block of their own: `layers`
+# already means concentric MATERIAL bands on a type, and a Golgi stack means it as a count of
+# discs. `size` and `thickness` are the piece's proportions; their
+# ABSOLUTE scale comes from the volume, so changing `per_parent` grows a body without changing
+# what it is. `persistence` 0 is a freely-jointed coil and 1 a straight rod; `bow` is how far a
+# disc sags along its own normal, as a fraction of its radius; `holes` and `hole_r` punch
+# fenestrations; `layers`, `gap` and `taper` build the Golgi stack; `bend` 0 is a straight
+# mitochondrion and 1 a half-circle; `blades`, `length` and `skew` are the centriole's nine
+# triplet microtubules.
+#
+# Every body holds the same 12,000 points and the same 5.0e-5 m^3 of elastic material -- a cube of
+# side 0.037 m if it were a cube -- so what the picture shows is SHAPE and nothing else. The five
+# sit on a 3 + 2 layout rather than a row because a filament of that volume is 0.17 m long and a
+# row 0.08 m apart had them threaded through each other before the first frame.
+general: {name: s4_m_forms, seed: 4, n_frames: 400, dt: 0.002, boundary: wall, dim: 3, world: [0.5, 0.5, 0.5], save_data: true, record_cap: 401, units: {length_um: 1000000.0, time_s: 1.0, force_nN: 1000000000.0}}
+sets:
+  cell:
+    n: 5
+    start: [[0.12, 0.34, 0.14], [0.25, 0.36, 0.14], [0.38, 0.34, 0.14], [0.17, 0.36, 0.36], [0.33, 0.34, 0.36]]
+    types:
+      filament: {count: 1, material: elastic, youngs: 300000.0, density: 1000.0, shape: filament,
+                 form: {size: 0.6, thickness: 0.03, persistence: 0.9}}
+      cisterna: {count: 1, material: elastic, youngs: 300000.0, density: 1000.0, shape: cisterna,
+                 form: {size: 0.3, thickness: 0.02, bow: 0.35, holes: 9, hole_r: 0.16}}
+      stack:    {count: 1, material: elastic, youngs: 300000.0, density: 1000.0, shape: stack,
+                 form: {size: 0.2, thickness: 0.02, layers: 6, gap: 0.3, bow: 0.4, taper: 0.62}}
+      mito:     {count: 1, material: elastic, youngs: 300000.0, density: 1000.0, shape: mito,
+                 form: {size: 0.3, thickness: 0.08, bend: 0.55, cristae: 7, crista_frac: 0.4}}
+      barrel:   {count: 1, material: elastic, youngs: 300000.0, density: 1000.0, shape: barrel,
+                 form: {size: 0.2, thickness: 0.04, blades: 9, length: 4.5, skew: 0.3}}
+  mpm_particle: {parent: cell, per_parent: 12000, radius: 0.03, density: 1000.0, particle_mass: 4.17e-6}
+fields: {mpm_grid: {frame: mpm_grid, n_grid: 96}}
+operators:
+- {op: gravity, at: cell, g: 9.81}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.3, wall_damp_mode: per_impact, wall_friction: 0.5, vmax: 1000000.0}
+schedule: [gravity, {substep_dt: 1.0e-4, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}]
+plotting: {renderer: vtk_points, background: black, up_axis: 1, box_frame: true, hide_sets: [cell], render_3d: dots, dot_size: 2.0, dot_shading: body,
+           colors: {filament: [0.35, 0.85, 0.45], cisterna: [0.2, 0.6, 0.65], stack: [0.96, 0.62, 0.2], mito: [0.9, 0.2, 0.15], barrel: [0.85, 0.95, 0.2]}}
