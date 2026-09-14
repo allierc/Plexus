@@ -82,6 +82,15 @@ _NU = 0.2                          # Poisson ratio (shared; near-incompressible 
 # All four act on OFFSETS from a body's centre, which is why they compose: a hollow rotated
 # cylinder repeated nine times is four words, and nothing about the volume contract changes --
 # `V = per_parent * p_vol` still fixes the size, `repeat` divides the points among the copies.
+def _ATLAS_FORMS():
+    """The atlas's shape names, imported lazily: `models` must not import `operators` at load."""
+    try:
+        from plexus.operators.cell_ops import ATLAS_FORMS
+        return tuple(n for n in ATLAS_FORMS if n not in ("ball",))   # `ball` is the seeder's own
+    except Exception:                                                # noqa: BLE001
+        return ()
+
+
 def _rot_matrix(deg, D, device):
     r = [math.radians(float(v)) for v in (list(deg) + [0.0, 0.0, 0.0])[:3]]
     if D == 2:
@@ -608,6 +617,33 @@ class MPMParticle:
                     else:
                         _off = _unit_offsets("cube", nb, D, H, device, hollow=_hollow,
                                              fill=t.get("fill")) * _side
+                    _sink = {}
+                    pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device, out=_sink)
+                    _write_copy(lvl, bm, _sink)
+                elif _shape in _ATLAS_FORMS():
+                    # THE ATLAS'S OWN SHAPES, AVAILABLE TO ANY BODY. `patch`, `sheet`, `rod`,
+                    # `filament`, `cisterna`, `tubule`, `stack`, `mito` and `barrel` are closed-form
+                    # samplers with closed-form volumes, written for `seed_cell_atlas` and reachable
+                    # only through it; `plexus.operators.cell_ops.form_points` is the door in, so a
+                    # material body can BE a filament or a Golgi stack and there is one
+                    # implementation of each rather than two. The volume contract is untouched: the
+                    # sampler is asked for a piece of volume `_volk` and returns it.
+                    # THE FORM'S OWN WORDS LIVE UNDER `form:`, AND THEY HAVE TO. `layers` already
+                    # means concentric MATERIAL bands on a type (`layers: [{frac, youngs}]`) and a
+                    # Golgi stack means it as a count of discs -- one word, two meanings, and the
+                    # spec cannot hold both at the top level. A nested block also keeps the
+                    # schema's "property read by no operator" check honest: `bend`, `cristae` and
+                    # `skew` are read HERE, by the sampler, not by any operator.
+                    from plexus.operators.cell_ops import form_points
+                    _fp = t.get("form")
+                    if not isinstance(_fp, dict):
+                        raise ValueError(
+                            f"shape: {_shape} takes its proportions from a `form:` block -- e.g. "
+                            f"`form: {{size: 0.3, thickness: 0.08}}`. `size` and `thickness` are "
+                            f"the piece's PROPORTIONS; its absolute scale comes from the volume.")
+                    _off = form_points(_shape, nb, _fp, _volk, copies=_k, device=device,
+                                       seed=int(getattr(H, "seed", 0)) + tid).to(pos.dtype)
+                    _side = 2.0 * float(_off.abs().max()) if nb else 0.0
                     _sink = {}
                     pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device, out=_sink)
                     _write_copy(lvl, bm, _sink)
