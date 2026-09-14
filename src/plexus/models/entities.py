@@ -95,7 +95,7 @@ def _rot_matrix(deg, D, device):
     return Rz @ Ry @ Rx
 
 
-def _unit_offsets(kind, n, D, H, device, aspect=2.0, hollow=0.0, axis=2):
+def _unit_offsets(kind, n, D, H, device, aspect=2.0, hollow=0.0, axis=2, fill=None):
     """`n` points in a unit body centred on the origin: a cube of side 1, a ball of radius 1, a
     cylinder of radius 1 and length `aspect` * 2 along `axis`, or a torus of ring radius 1 and tube
     radius `aspect` about `axis`. `hollow` empties the inner fraction, so 0.7 on a ball is a shell,
@@ -151,6 +151,20 @@ def _unit_offsets(kind, n, D, H, device, aspect=2.0, hollow=0.0, axis=2):
             out[:, lat[1]] = r * torch.sin(th)
         out[:, ax] = (torch.rand(n, generator=H.rng, device=device) - 0.5) * 2.0 * float(aspect)
         return out
+    if str(fill or "").lower() == "lattice":
+        # `fill: lattice` ON A SHAPE, not only on a `block`. The block path has had it since the
+        # 27-cube scene was written; saying the same 27 cubes as ONE type with `repeat` meant
+        # asking for a cube whose points sit on a grid, and `shape: cube` could only draw them at
+        # random -- which is a different first frame, not a different spelling of the same one.
+        # Same construction as the block path: k = round(n^(1/D)) per axis, points at the cell
+        # CENTRES, and a jitter of a fifth of a cell so no two land on one line of the MPM grid.
+        k = max(1, int(round(n ** (1.0 / D))))
+        ax = [(torch.arange(k, device=device, dtype=torch.float32) + 0.5) / k for _ in range(D)]
+        g = torch.stack(torch.meshgrid(*ax, indexing="ij"), -1).reshape(-1, D)
+        if g.shape[0] < n:                                         # not a perfect power: pad at random
+            g = torch.cat([g, torch.rand(n - g.shape[0], D, generator=H.rng, device=device)], 0)
+        g = g[:n] + (torch.rand(n, D, generator=H.rng, device=device) - 0.5) * (0.2 / k)
+        return g.clamp(0.0, 1.0) - 0.5
     u = torch.rand(n, D, generator=H.rng, device=device) - 0.5     # a cube of side 1
     if h > 0:                                                     # a box shell: push points outward
         k = u.abs().max(dim=1, keepdim=True).values.clamp(min=1e-9)
@@ -579,7 +593,21 @@ class MPMParticle:
                     _write_copy(lvl, bm, _sink)
                 elif _shape == "cube":
                     _side = (_volk / _fill_frac) ** (1.0 / D)
-                    _off = _unit_offsets("cube", nb, D, H, device, hollow=_hollow) * _side
+                    if str(t.get("fill", "")).lower() == "lattice" and _k > 1:
+                        # EVERY COPY GETS THE SAME LATTICE, which is what 27 hand-written blocks
+                        # were. Building one lattice over the whole body and letting `_place` deal
+                        # it out gives each copy a SCATTERED SUBSET of a 33^3 grid rather than its
+                        # own 11^3 one: same count, same volume, and a body 3% wider whose points
+                        # do not sit in planes. `_place` sends point i to copy i % k, so the
+                        # per-copy lattice is interleaved to match.
+                        _per = max(int(nb) // _k, 1)
+                        _u = _unit_offsets("cube", _per, D, H, device, hollow=_hollow, fill="lattice")
+                        _off = _u.repeat_interleave(_k, 0)[:nb] * _side
+                        if _off.shape[0] < nb:                   # a count that does not divide evenly
+                            _off = torch.cat([_off, _off[: nb - _off.shape[0]]], 0)
+                    else:
+                        _off = _unit_offsets("cube", nb, D, H, device, hollow=_hollow,
+                                             fill=t.get("fill")) * _side
                     _sink = {}
                     pos[bm] = cpos[bm] + _place(t, _off, _cp, nb, D, H, device, out=_sink)
                     _write_copy(lvl, bm, _sink)

@@ -1,0 +1,74 @@
+# S3-L "the twenty-seven cubes, said once" -- the test that closes stage S3, and the reason the
+# stage exists. config/si_material/si_multimaterial_27.yaml is 632 lines: 27 `start` rows and 27
+# type blocks, each naming the same material and its own `block` of six numbers. Nothing in it
+# varies but the position, and the position is a 3x3x3 lattice. Here it is one type and two words.
+#
+#   repeat: [3, 3, 3]     the body tiled into 27 copies, the points and the volume divided evenly
+#   pitch: [dx, dy, dz]   the spacing between copies, in world units -- measured off the original
+#
+# THE VOLUME CONTRACT DOES THE REST. The original set each cube's geometry by hand with `block`;
+# here `V = per_parent * p_vol` fixes it: 35,937 points at p_vol = 4.8085e-8 m^3 is 1.728e-3 m^3
+# of material, divided among 27 copies is 6.4e-5 each, which is a cube of side 0.04 m -- the side
+# the original's blocks spell out. `fill: lattice` puts the 1,331 points of each copy on an 11^3
+# grid, as the original's block fill did.
+general:
+  name: s3_l_lattice27
+  seed: 1
+  n_frames: 400
+  dt: 0.002
+  boundary: wall
+  dim: 3
+  world: [0.5, 0.5, 0.5]
+  save_data: true
+  units: {length_um: 1000000.0, time_s: 1.0, force_nN: 1000000000.0}
+  record_cap: 401
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.25, 0.30335, 0.25]
+    types:
+      cube:
+        count: 1
+        material: elastic
+        youngs: 20000000.0
+        density: 1000.0
+        shape: cube
+        fill: lattice
+        repeat: [3, 3, 3]
+        pitch: [0.0833, 0.08335, 0.0833]
+  mpm_particle: {parent: cell, per_parent: 35937, density: 1000.0, radius: 0.03, vel_init: 1.0, particle_mass: 4.8085e-05}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 96}
+operators:
+- {op: gravity, at: cell, g: 9.81}
+- {op: mpm_strain, at: mpm_particle, implementation: warp}
+- {op: mpm_viscosity, at: mpm_particle, eta: 0.001}
+- {op: mpm_scatter, at: mpm_particle, implementation: warp, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9, wall_friction: 0.2, surface_tension: 0.072, csf_rho: 1000.0, csf_band: 0.2}
+- {op: mpm_gather, at: mpm_particle, implementation: warp, from: mpm_grid, wall_damp: 1.0, vmax: 1000000000.0}
+schedule:
+- gravity
+- substep_dt: 1.388889e-05
+  steps: [mpm_strain, mpm_viscosity, mpm_scatter, mpm_grid_update, mpm_gather]
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  max_frames: 400
+  stills: 10
+  keep_stills: true
+  splat_res: 600
+  box_frame: true
+  hide_sets: [cell]
+  floor: '#0b1a3a'
+  floor_opacity: 0.25
+  colors:
+    cube: [0.45, 0.7, 0.95]
+  slow_motion: 4
+  render_3d: dots
+  dot_size: 7.0
+  dot_shading: true
