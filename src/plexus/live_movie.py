@@ -2212,6 +2212,7 @@ class LiveMovie:
                         or sel.size < int(st.get("surface_min_points", 400)):
                     self._skins.append(self._dots_for(Xg, sel, nm, pal, opa, _dflt_op,
                                                       (_per.get(nm) or {}).get("point_size"),
+                                                      every=int((_per.get(nm) or {}).get("every", 1)),
                                                       set_name=(nm if tid is None else None)))
                     continue
                 step = max(1, sel.size // max(nsub, 1))
@@ -2286,12 +2287,23 @@ class LiveMovie:
                   f"drawing the point cloud instead", flush=True)
             return False
 
-    def _dots_for(self, X, sel, nm, pal, opa, dflt_op, point_size=None, set_name=None):
-        """A compartment kept as points: its own PolyData, its own hue, its own opacity."""
+    def _dots_for(self, X, sel, nm, pal, opa, dflt_op, point_size=None, set_name=None, every=1):
+        """A compartment kept as points: its own PolyData, its own hue, its own opacity.
+
+        `every: k` DRAWS ONE POINT IN k, and it is what makes CO-LOCATED species legible. Five
+        protein species are five balls of the cell's own radius -- a species is a concentration,
+        not a place -- so drawn translucent they BLEND (yellow over blue over pink over violet over
+        green averages to grey: measured, zero saturated pixels) and drawn opaque the last one
+        simply covers the other four (measured, one hue). Neither is a palette bug and neither is
+        fixed by choosing better colours. Thinning each species is what lets all five show through,
+        and it changes no number in the model -- only how many of its points are drawn.
+        """
         import numpy as np
         from matplotlib.colors import to_rgb
         if sel.size == 0:
             return None
+        if int(every) > 1:
+            sel = sel[:: int(every)]
         pd = self.pv.PolyData(np.asarray(X[sel], np.float32))
         col = to_rgb(tuple(pal[nm])) if nm in pal else (0.8, 0.8, 0.8)
         _ps = float(point_size if point_size is not None
