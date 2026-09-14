@@ -2019,20 +2019,40 @@ class MPMSpin(Lateral):
         self.axis = params.get("axis", [0.0, 0.0, 1.0])    # 3D rotation axis
         self.at = params.get("_at", "particle")
 
+    def _const(self, key, values, dev, dtype):
+        """A constant vector of this operator's, built ONCE per device and cached.
+
+        BUILDING IT PER CALL BREAKS CUDA GRAPH CAPTURE. `torch.tensor([...], device=cuda)` is a
+        host-to-device copy, and a copy from pageable host memory is not permitted while a stream
+        is capturing: the engine captures the whole substep as one graph (engine.py, `torch.cuda.
+        graph`), so the first spun scene died with `cudaErrorStreamCaptureUnsupported` inside
+        `capture_end` -- reported as "operation failed due to a previous error during capture",
+        which names neither the operator nor the line. The centre and the axis are specification
+        constants; they are built on the first call, which the engine makes OUTSIDE the capture as
+        its warm-up iteration, and replayed from the cache thereafter.
+        """
+        ck = (key, str(dev), str(dtype))
+        t = getattr(self, "_cvec", None)
+        if t is None:
+            t = self._cvec = {}
+        if ck not in t:
+            t[ck] = torch.tensor([float(v) for v in values], device=dev, dtype=dtype)
+        return t[ck]
+
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device
         X = lvl.get("pos"); V = lvl.get("vel")
         D = X.shape[1]
         if self.center is not None:
-            c = torch.tensor([float(x) for x in self.center][:D], device=dev)
+            c = self._const("centre", list(self.center)[:D], dev, X.dtype)
         else:                                              # domain centre: axis 0 = width, rest = 1
             box = [float(b) for b in getattr(H, "world_size", [getattr(H, "world_width", 1.0)] + [1.0] * (D - 1))][:D]
-            c = 0.5 * torch.tensor(box, device=dev)
+            c = 0.5 * self._const("box", box, dev, X.dtype)
         rel = X - c
         if D == 2:
             v_rot = self.omega * torch.stack([-rel[:, 1], rel[:, 0]], dim=1)
         else:
-            ax = torch.tensor([float(a) for a in self.axis][:3], device=dev)
+            ax = self._const("axis", list(self.axis)[:3], dev, X.dtype)
             ax = ax / ax.norm().clamp(min=1e-9)
             v_rot = self.omega * torch.cross(ax.expand_as(rel), rel, dim=1)
         acc = self.spin_k * (v_rot - V) * lvl.occ[:, None]

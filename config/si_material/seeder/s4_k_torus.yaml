@@ -1,0 +1,31 @@
+# S4-K "a hollow torus of jelly, spun, dropped" -- the last rung of the ladder, and it adds one word:
+# `shape: torus`. `aspect` is the tube's radius as a fraction of the ring's (0.35 here, a fat
+# doughnut), `axis` is where the hole points, and `hollow: 0.55` empties the middle 55% of the
+# TUBE's own radius, so the dough is itself a pipe. `rotate` tips it 15 degrees about x so it lands
+# on an edge rather than flat, and `mpm_spin` turns it about the same y axis it was built on -- a
+# controller, not a constraint, so the ring is free to deform while it turns. The substep is 1e-4,
+# 20 per frame of dt 0.002, just under the 1.14e-4 stability limit 0.4*dx/c with c = 18.3 m/s the
+# sound speed sqrt(E/rho) of the jelly and dx = 5.21 mm the grid cell.
+#
+# THE VOLUME IS STILL THE CONTRACT: V = per_parent * p_vol = 40,000 * 4.2e-8 = 1.68e-3 m^3, and the
+# ring radius follows from it -- V = 2 pi^2 R a^2 (1 - h^2) with a = aspect * R gives R = 0.10 m,
+# tube radius 0.035 m, outer radius 0.135 m in a 0.5 m box.
+general: {name: s4_k_torus, seed: 2, n_frames: 500, dt: 0.002, boundary: wall, dim: 3, world: [0.5, 0.5, 0.5], save_data: true, record_cap: 501, units: {length_um: 1000000.0, time_s: 1.0, force_nN: 1000000000.0}}
+sets:
+  cell:
+    n: 1
+    start: [[0.25, 0.33, 0.25]]
+    types:
+      jelly: {count: 1, material: elastic, youngs: 300000.0, density: 1000.0, shape: torus,
+              aspect: 0.35, axis: y, hollow: 0.55, rotate: [15.0, 0.0, 0.0]}
+  mpm_particle: {parent: cell, per_parent: 40000, radius: 0.03, density: 1000.0, particle_mass: 4.2e-5}
+fields: {mpm_grid: {frame: mpm_grid, n_grid: 96}}
+operators:
+- {op: gravity, at: cell, g: 9.81}
+- {op: mpm_spin, at: mpm_particle, omega: 8.0, spin_k: 30.0, axis: [0.0, 1.0, 0.0], center: [0.25, 0.33, 0.25]}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200.0, polar: higham}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 1.0}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.35, wall_damp_mode: per_impact, wall_friction: 0.4, vmax: 1000000000.0}
+schedule: [gravity, {substep_dt: 1.0e-4, steps: [mpm_spin, mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}]
+plotting: {renderer: vtk_points, background: black, up_axis: 1, box_frame: true, hide_sets: [cell], render_3d: dots, dot_size: 2.0, dot_shading: body, colors: {jelly: [0.96, 0.45, 0.25]}}

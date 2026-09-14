@@ -33,7 +33,7 @@ MATERIALS = ("elastic", "liquid", "snow")
 # by hand or by Claude survives a press of BUILD. The seeder (`plexus.models.entities.provision`)
 # is the one that reads them; this tuple only says which keys are a body's placement rather than
 # its material, so that they are copied and not dropped.
-BODY_SHAPES = ("ball", "cube", "cylinder")
+BODY_SHAPES = ("ball", "cube", "cylinder", "torus")
 PLACE_KEYS = ("shape", "form", "aspect", "axis", "hollow", "rotate", "repeat", "pitch",
               "scatter", "ring", "shell", "orient", "fill", "obj")
 DEFAULT_COLORS = [[0.95, 0.25, 0.20], [0.30, 0.55, 1.00], [0.95, 0.95, 0.95], [1.00, 0.85, 0.30],
