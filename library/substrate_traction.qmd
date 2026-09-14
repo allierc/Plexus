@@ -130,7 +130,6 @@ class SubstrateTraction(Lateral):
     REQUIRES_PARAMS = ["f", "cell_set"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["pos", "polarity"]; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["motility", "traction", "adhesion", "substrate"]
     PARAM_ROLES = {"f": "traction_per_unit_mass", "contact": "contact_layer_thickness",
                    "gate": "phase_gate",

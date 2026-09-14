@@ -216,7 +216,6 @@ class Relax(Lateral):
     OUTPUTS = ["cell"]
     READS = ["pos", "radius", "alive"]      # + `epsilon_field` when the coupling is per-cell
     WRITES = ["pos"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]                       # energy + minimum_image are dimension-generic (D = pos.shape[-1])
     # This IMPLEMENTATION is forward-only: gradients do NOT flow through the FIRE path, and the
     # source's implicit-diff equilibrium adjoint is not reproduced here (a follow-up). An inverse

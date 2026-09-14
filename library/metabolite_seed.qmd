@@ -85,7 +85,6 @@ class MetaboliteSeed(Seed):
     OUTPUTS = ["metabolite"]
     READS = []
     WRITES = ["conc", "c0"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = False
     MAY_MUTATE_INTEGRATED_STATE = True

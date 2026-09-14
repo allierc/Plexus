@@ -888,7 +888,6 @@ class AggregateCentroid(Aggregate):
     MAY_MUTATE_INTEGRATED_STATE = True
     REQUIRES_PARAMS = ["child"]
     INPUTS = ["child"]; OUTPUTS = ["parent"]; READS = ["pos"]; WRITES = ["pos"]
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["aggregate", "centroid", "cross_scale"]
     PARAM_ROLES = {"child": "descendant_set", "weight": "mass_weighted_or_uniform"}
     REFERENCE = "Plexus (this work)."
@@ -1175,7 +1174,6 @@ class SubstrateTraction(Lateral):
     REQUIRES_PARAMS = ["f", "cell_set"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["pos", "polarity"]; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["motility", "traction", "adhesion", "substrate"]
     PARAM_ROLES = {"f": "traction_per_unit_mass", "contact": "contact_layer_thickness",
                    "gate": "phase_gate",
@@ -1244,7 +1242,6 @@ class Protrusion(Lateral):
     REQUIRES_PARAMS = ["f", "cell_set", "radius"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["pos", "polarity"]; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["motility", "protrusion", "active_stress"]
     PARAM_ROLES = {"f": "drive_per_unit_mass", "radius": "cell_radius_world",
                    "gate": "phase_gate",
@@ -1419,7 +1416,6 @@ class PolarActiveStress(Lateral):
     REQUIRES_PARAMS = ["cell_set"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["polarity", "phase"]; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["active_stress", "motility", "protrusion", "cytoskeleton"]
     PARAM_ROLES = {"amplitude": "active_stress", "amplitude_frac": "target_strain",
                    "offset": "cycle_phase_offset", "cell_set": "polarity_owner",
@@ -1530,7 +1526,6 @@ class PolarGrowth(Lateral):
     REQUIRES_BUFFERS = ["F"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["polarity", "phase"]; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["growth", "motility", "protrusion", "cytoskeleton", "rest_shape"]
     PARAM_ROLES = {"stretch": "peak_elongation_factor", "cell_set": "polarity_owner",
                    "offset": "cycle_phase_offset", "max_rate": "per_frame_log_stretch_cap"}
@@ -1716,7 +1711,6 @@ class PolymerizeTips(Structural):
     REQUIRES_BUFFERS = ["F", "occ"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["polarity", "phase"]; WRITES = ["pos", "vel"]
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["polymerization", "protrusion", "motility", "cytoskeleton", "growth"]
     PARAM_ROLES = {"rate": "points_per_fibre_per_frame", "compress": "insertion_stretch",
                    "confine": "barrier_set", "margin": "barrier_standoff",
@@ -2030,7 +2024,6 @@ class Depolymerize(Structural):
     REQUIRES_BUFFERS = ["occ"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["polarity"]; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["depolymerization", "treadmilling", "volume_conservation", "motility"]
     PARAM_ROLES = {"volume_rate": "world_volume_per_frame", "behind": "region_along_polarity",
                    "region": "removal_region", "lateral": "girth_inner_radius",
@@ -2148,7 +2141,6 @@ class CorticalTension(Lateral):
     REQUIRES_PARAMS = ["cell_set", "tension"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = []; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["cortical_tension", "contractility", "surface_tension", "morphogenesis"]
     PARAM_ROLES = {"tension": "in_plane_cortical_tension", "cell_set": "cell_owner",
                    "mode": "stress_form",

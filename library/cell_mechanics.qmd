@@ -163,7 +163,6 @@ class ShapeEnergy3D(Lateral):
     BLOCK_UNITS = {"V0f": "volume[wedge]", "A0": "area[midsurface]", "P0": "length"}
     REQUIRES_PARAMS = ["p0"]
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["vertex_model", "shape_energy", "cell_volume_elasticity", "vesicle", "force_balance"]
     # THE SECOND CITATION WAS THE WRONG OKUDA 2015, AND THE PAGES WERE WRONG TOO. It read
     # "Biomech. Model. Mechanobiol. 14:413-421 (3D volume/surface)": that paper is 413-425,

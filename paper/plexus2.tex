@@ -187,15 +187,24 @@ specify \emph{how} it is numerically realized. The signature specifies
 \begin{itemize}
 \item the entities the activity acts on,
 \item the entities it changes,
-\item the state variables consumed and produced,
-\item the maps relating the participating entities.
+\item the state variables consumed and produced.
 \end{itemize}
 
-Maps define the relations required by the mechanism. They determine, for example,
-which particle belongs to which cell, which synapses connect which neurons, or how
-cells relate to a continuous field. Plexus incorporates maps into the activity, making
-activities typed morphisms between kinds of entities, so that the spatial organization
-of the mechanism is declared with the activity rather than assumed by the code.
+Activities are therefore typed morphisms between kinds of entities. What an activity does
+\emph{not} carry is the relation it acts through. Maps define the relations a mechanism
+requires --- which particle belongs to which cell, which synapses connect which neurons, how
+cells relate to a continuous field --- and each is declared once, with the structure that
+carries it: the containment map $\pi$ of a set, or the two legs of a relation given entity
+status (Section~\ref{sec:hierarchy}). An activity reaches the relations it needs by traversing
+those declarations at run time, through the gather and scatter primitives the language
+provides, rather than by restating them in its own signature.
+
+The separation is what makes activities reusable across organizations. One adhesion acts over
+a neighbour graph, a mesh half-edge table or a contact list without being rewritten, and a
+Rewire that changes the relation changes which entities participate without touching the
+activity at all. It also keeps the two declarations from drifting apart, which they do as soon
+as both exist: a signature that names the maps it walks is a second copy of a fact the
+structure already states, and the copy is only as good as the discipline maintaining it.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Entities}

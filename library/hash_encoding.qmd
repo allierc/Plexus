@@ -159,7 +159,6 @@ class HashEncoding(FieldUpdate):
     OUTPUTS: list = []
     READS: list = []
     WRITES: list = []
-    MAPS: list = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["n_levels", "log2_hashmap_size", "px_per_finest_cell"]

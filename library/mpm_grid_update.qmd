@@ -197,33 +197,29 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
         # the floor weakens it precisely where it is supposed to work, and progressively worse the
         # more particles a specification uses. Setting `csf_rho` makes this floor inert.
         self.csf_mass_floor = params.get("csf_mass_floor", None)   # None -> derived
-        # WHAT "COLOUR = 1" MEANS -- WHICH THIS BLOCK NEVER KNEW, AND THE REASON THE PARAGRAPH ABOVE
-        # IS TREATING A SYMPTOM. `mpm_scatter` deposits `weight * mass * is_liquid`, so `gc` is a
-        # liquid MASS PER NODE in absolute units, not the dimensionless volume fraction (0 in air,
-        # 1 in liquid) that Brackbill's f = sigma * kappa * grad(c) is written for. On an all-liquid
-        # spec the "colour" is bitwise the mass field: max |gc - gm| / gm over occupied nodes is
-        # 2.7e-7 on material_3d_water_drop and 2.5e-7 on material_3d_water_dam_20m.
+        # WHAT "COLOUR = 1" MEANS, and why the floor above is only treating a symptom.
+        # `mpm_scatter` deposits `weight * mass * is_liquid`, so `gc` is a liquid MASS PER NODE in
+        # absolute units -- on an all-liquid spec it is bitwise the mass field -- and not the
+        # dimensionless volume fraction (0 in air, 1 in liquid) that Brackbill's
+        # f = sigma * kappa * grad(c) is written for.
         #
-        # Setting `csf_rho` to the liquid's density divides it by the mass of one FULL liquid cell,
-        # rho * dx^D, and that single division is the repair. MEASURED COST OF NOT DOING IT: the
-        # delivered acceleration is short by exactly 1/(rho * dx^D) -- 8.887e5 at n_grid 96 against
-        # the predicted 96^3 = 884,736 (0.4%), and 7.356e6 at 192 against 192^3 = 7.078e6 (3.9%).
-        # So `surface_tension` is not a tension: it is a tension divided by a cell mass, and its
-        # PHYSICAL MEANING CHANGES WITH `n_grid`. `surface_tension: 60` on the dam at 192^3 is a
-        # physical sigma of 8.5e-6 against rho*g*R^2 = 0.092 for its 0.076-half-width blocks --
-        # BOND NUMBER 10,900, gravity beating capillarity by four orders of magnitude. That is the
-        # whole content of "sigma 0 -> 150 moves the centre of mass by 0.0001 of the box".
+        # Setting `csf_rho` to the liquid's density divides by the mass of one FULL liquid cell,
+        # rho * dx^D, and that single division is the repair. Without it the delivered acceleration
+        # is short by exactly that factor, so `surface_tension` is not a tension: it is a tension
+        # divided by a cell mass, and its PHYSICAL MEANING CHANGES WITH `n_grid`. At n_grid 192 a
+        # declared 60 is a physical sigma of order 1e-5, a Bond number in the thousands -- gravity
+        # beating capillarity by four orders of magnitude -- which is the whole content of "sigma
+        # 0 -> 150 moves the centre of mass by 0.0001 of the box".
         #
-        # DEFAULT 0.0 KEEPS THE OLD PATH BIT-IDENTICAL, because the branch is a static Python `if`
-        # and `range(0)` emits no ops, so CUDA-graph capture is unchanged. A spec that sets it MUST
-        # re-fit its own sigma -- sigma_new = sigma_old * rho * dx^D for parity, or from a Bond
-        # number for physics: rho*g*L^2 gives Bond 1 (0.64 on the drop at 96^3, 0.092 on the dam).
+        # DEFAULT 0.0 KEEPS THE OLD PATH BIT-IDENTICAL, the branch being a static Python `if` and
+        # `range(0)` emitting no ops, so CUDA-graph capture is unchanged. A spec that sets it MUST
+        # re-fit its sigma -- sigma_new = sigma_old * rho * dx^D for parity, or from a Bond number
+        # for physics, rho*g*L^2 giving Bond 1.
         self.csf_rho = float(params.get("csf_rho", 0.0))
         # THE INTERFACE TEST NEEDS THE SAME REFERENCE, and for want of it selects the bulk.
         # `gmag > 0.02 * gmag.max()` is a percentile of a running maximum with no absolute scale,
         # and the P2G shot noise at 8 particles per cell gives the BULK a |grad c| of the same order
-        # as the interface's, so a 2% cut admits everything: measured 98.1% OF OCCUPIED NODES on
-        # material_3d_water_drop and 97.7% on material_3d_water_dam_20m. It is an occupancy mask
+        # as the interface's, so a 2% cut admits nearly every occupied node. It is an occupancy mask
         # wearing an interface's name. An absolute band on the volume fraction cuts it to 21.7% and
         # 25.8% of occupied at `csf_band: 0.2`.
         #
@@ -317,34 +313,21 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
             print(f"[warn] {type(self).__name__}: wall_friction {self.wall_friction:g} is NOT applied "
                   f"by this implementation -- only the default mpm_grid_update imposes Coulomb "
                   f"friction at the walls. The run continues frictionless.", flush=True)
-        # A MOVING PLATEN, AS A GRID VELOCITY BOUNDARY CONDITION.
+        # A MOVING PLATEN, AS A GRID VELOCITY BOUNDARY CONDITION: clamp the normal grid velocity
+        # of every node beyond the plate to the PLATE'S OWN velocity, in the same place and the
+        # same way as the reflective domain walls.
         #
-        # WHY IT CANNOT BE A POSITION PROJECTION, which is what `plate_confine` does and what the
-        # first squash experiment used. In MPM the stress a material carries comes from its
-        # deformation gradient F, and `mpm_strain` updates F from the VELOCITY GRADIENT read off
-        # the grid. Teleporting a particle's position never enters that path: the constitutive
-        # model is never told it has been compressed, so no stress builds, nothing pushes back,
-        # and nothing bulges sideways. The body's height falls, its equatorial radius does not
-        # move and its volume falls with the height. That is a CROP, not a squash: matter
-        # displaced along the plate normal and never returned laterally.
+        # IT CANNOT BE A POSITION PROJECTION. Stress comes from the deformation gradient F, and
+        # `mpm_strain` updates F from the VELOCITY GRADIENT read off the grid, so teleporting a
+        # particle -- which is what `plate_confine` does, after the substep block -- never enters
+        # that path. The constitutive model is never told it has been compressed, so no stress
+        # builds and nothing bulges sideways: the body's height falls, its equatorial radius does
+        # not move, and its volume falls with the height. That is a CROP, not a squash.
         #
-        # Imposed here instead, in the same place and the same way as the reflective domain walls:
-        # clamp the normal grid velocity of every node beyond the plate to the PLATE'S OWN
-        # velocity. Compression then enters the velocity field, F contracts in z, the elastic
-        # model generates stress, and the lateral bulge and volume conservation come out of the
-        # physics rather than being hoped for.
-        #
-        # A MOVING PLATEN, IMPOSED ON THE GRID. `plate_confine` projects particle POSITIONS after
-        # the substep block, and a projection is invisible to the constitutive model: stress comes
-        # from F, F is updated from the velocity gradient, and teleporting a particle changes
-        # neither. The body is then cropped rather than squashed -- its height falls, its
-        # equatorial radius does not move, and its volume falls with its height.
-        #
-        # A rigid obstacle cannot fix it either: `_walls3d` zeroes grid velocity inside a solid,
+        # A rigid obstacle cannot do it either: `_walls3d` zeroes grid velocity inside a solid,
         # which stops material entering but cannot expel what is already there. A plate has to
-        # CARRY a velocity, so the nodes it covers move at the plate's speed, the field near it is
-        # compressive, F contracts along the axis, and the elastic response pushes material out
-        # sideways. That is the difference between squashing and clipping.
+        # CARRY a velocity, so the field near it is compressive, F contracts along the axis, and
+        # the lateral bulge and the volume conservation come out of the physics.
         self.plate_axis = params.get("plate_axis", None)
         self.plate_axis = None if self.plate_axis is None else int(self.plate_axis)
         self.plate_centre = float(params.get("plate_centre", 0.5))
@@ -579,11 +562,11 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
                 gv = gvv.view(nx * ny, 2)
             gv = torch.where(walls[:, None], torch.zeros_like(gv), gv)  # interior wall BC
         else:                                                       # --- 3D: CSF + reflective box walls ---
-            # SURFACE TENSION IN 3D. Until now this whole term lived inside the `D == 2` branch
-            # above, so `surface_tension: 60.0` in a `dim: 3` spec was read, stored, and never
-            # used. It cost a rung of the cell ladder: a liquid cytosol dropped onto the floor
-            # spread into a one-particle-thick puddle covering the entire domain, which reads as
-            # "the liquid is too soft" and is actually "there is no cohesion term at all". A liquid
+            # SURFACE TENSION IN 3D. With this term confined to the `D == 2` branch above,
+            # `surface_tension` in a `dim: 3` spec is read, stored and never used -- and a liquid
+            # cytosol dropped on the floor then spreads into a one-particle-thick puddle over the
+            # whole domain, which reads as "the liquid is too soft" and is actually "there is no
+            # cohesion term at all". A liquid
             # in MLS-MPM has mu = 0 by construction -- it resists volume change and nothing else --
             # so surface tension is not a refinement on top of the constitutive model, it is the
             # ONLY thing that makes a droplet a droplet.
@@ -612,31 +595,22 @@ class MPMGridUpdate(MPMWrites, FieldUpdate):
                 nrm = [gk / (gmag + eps) for gk in grad]
                 kappa = -sum((torch.roll(nrm[k], -1, k) - torch.roll(nrm[k], 1, k)) * (0.5 * inv_dx)
                              for k in range(D))
-                # ONLY WHERE THERE IS AN INTERFACE -- the comment was always right and the test never
-                # enforced it. `gmag > 0.02 * gmag.max()` selects 98.1% of OCCUPIED nodes on
-                # material_3d_water_drop; the band selects 21.7%. The mass clause is what makes
-                # `csf_mass_floor` inert rather than load-bearing: the lightest node admitted holds
-                # csf_band * rho * dx^D = 2.3e-7 at band 0.2 on the drop, 23x the 1e-8 floor, so
-                # masked nodes with gm == 0 go 2.6% -> 0.0% and floor-binding 16.6% -> 0.0%.
-                # THE BAND IS A GAIN, NOT ONLY A FILTER -- COMPENSATE FOR IT.
-                # The CSF force is f = sigma*kappa*grad(c), and the TOTAL impulse across an
-                # interface telescopes: int grad(c) dx = c_in - c_out. Restricting the force to
-                # `band < c < 1-band` therefore delivers exactly (1 - 2*band) OF THE TENSION,
-                # whatever the shape of the profile -- it is the fundamental theorem, not an
-                # approximation. The default band 0.2 was throwing away 40% of sigma by
-                # construction.
+                # ONLY WHERE THERE IS AN INTERFACE. A gradient-magnitude test admits nearly every
+                # occupied node; the colour band admits a fifth of them. The mass clause is also
+                # what makes `csf_mass_floor` inert rather than load-bearing -- the lightest node
+                # the band admits holds csf_band * rho * dx^D, orders above the floor.
                 #
-                # MEASURED on a Young-Laplace ladder (a sphere in zero gravity compresses until
-                # K(1-J) = 2 sigma/R, so mean(J) = 1 - 2 sigma/(R K), nothing fitted), R = 10 mm,
-                # sigma 0.072, K 1e4, delivered fraction of the declared tension:
-                #     band 0.20 -> 0.472      band 0.10 -> 0.736
-                #     band 0.05 -> 0.887      band 0.02 -> 0.972
-                # against the predicted 0.60 / 0.80 / 0.90 / 0.96. The trend is the band's, and it
-                # goes to 1 as the band closes.
+                # THE BAND IS A GAIN, NOT ONLY A FILTER, SO COMPENSATE FOR IT. The force is
+                # f = sigma*kappa*grad(c), and the total impulse across an interface telescopes:
+                # int grad(c) dx = c_in - c_out. Restricting it to `band < c < 1-band` therefore
+                # delivers exactly (1 - 2*band) of the tension, whatever the shape of the profile
+                # -- the fundamental theorem, not an approximation -- so a band of 0.2 throws away
+                # 40% of sigma by construction. A Young-Laplace ladder (mean(J) = 1 - 2 sigma/(R K),
+                # nothing fitted) follows that prediction and goes to 1 as the band closes.
                 #
-                # Dividing by (1 - 2*band) restores the magnitude while keeping the band doing its
-                # real job, which is to keep the force OFF the bulk: the interface test was never
-                # about how much tension to apply, only about where.
+                # Dividing by (1 - 2*band) restores the magnitude and leaves the band its real job,
+                # which is to keep the force OFF the bulk: the test was never about how much
+                # tension to apply, only about where.
                 _gain = 1.0 / max(1.0 - 2.0 * self.csf_band, 1e-6) if self.csf_band > 0 else 1.0
                 if self.csf_band > 0.0:
                     _mfull = self.csf_rho * dx ** D

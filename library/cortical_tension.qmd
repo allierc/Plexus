@@ -155,7 +155,6 @@ class CorticalTension(Lateral):
     REQUIRES_PARAMS = ["cell_set", "tension"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = []; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["cortical_tension", "contractility", "surface_tension", "morphogenesis"]
     PARAM_ROLES = {"tension": "in_plane_cortical_tension", "cell_set": "cell_owner",
                    "mode": "stress_form",

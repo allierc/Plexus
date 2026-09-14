@@ -255,7 +255,8 @@ class SeedCellAtlas(Seed):
         return d * r[:, None], d
 
     # -- where the points inside one piece go ------------------------------------------------ #
-    def _fill(self, row: dict, n_pieces: int, per: int, R: float,
+    @staticmethod
+    def _fill(row: dict, n_pieces: int, per: int, R: float,
               centroid: torch.Tensor, e1, e2, e3, gen) -> torch.Tensor:
         """World positions [n_pieces * per, 3] of the material points of these pieces.
 

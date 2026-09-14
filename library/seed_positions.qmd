@@ -110,15 +110,15 @@ Other **seed** operators: [`seed_from_segmentation`](seed_from_segmentation.qmd)
 # -*- coding: utf-8 -*-
 """seed_positions -- WHERE THE ENTITIES OF A SET START, as a seed operator.
 
-Placement used to be a property of the set: `sets.cell.spawn: sunflower` and `spawn_radius`,
-read by the engine while it built the level, before any operator existed. That put the one
-thing a seed is for -- writing x_0 -- outside the operator algebra: a reader of the spec saw a
-disc of cells appear with no operator responsible, and the page's own vocabulary ("seed: the
-initial state, written once and never again") had nothing to point at. This operator is that
-seed. The set declares how many entities it holds; the seed declares where they are.
+Placement is not a property of the set. Declaring it there -- `sets.cell.spawn: sunflower` and
+`spawn_radius`, read by the engine as it builds the level, before any operator exists -- puts the
+one thing a seed is for, writing x_0, outside the operator algebra: a reader of the spec sees a
+disc of cells appear with no operator responsible, and the vocabulary's own "seed: the initial
+state, written once and never again" has nothing to point at. This operator is that seed. The set
+declares how many entities it holds; the seed declares where they are.
 
 The set-level `spawn*` keys are REFUSED by the engine (`build` raises, naming this operator), so
-a spec cannot half-migrate: every archived spec that carried them was rewritten on 2026-09-09.
+a spec cannot half-migrate.
 """
 from __future__ import annotations
 

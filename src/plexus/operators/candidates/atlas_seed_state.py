@@ -31,7 +31,6 @@ class SeedState(Operator):
     OUTPUTS = ["cell"]
     READS: list = []
     WRITES: list = []                            # set per instance from `values:` (see below)
-    MAPS: list = []
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["values"]
     MECHANISM_TAGS: list = []                    # none: this is not a mechanism

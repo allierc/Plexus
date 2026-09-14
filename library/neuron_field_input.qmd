@@ -126,7 +126,6 @@ class NeuronFieldInput(Exchange):
     OUTPUTS = ["neuron"]
     READS = ["pos"]
     WRITES = ["omega"]
-    MAPS = []                          # the set<->field coupling is positional, not a named map
     SUPPORTED_DIMS = [2]               # `Field.sample` is a 2D bilinear grid read
     DIFFERENTIABLE = True
     MAY_MUTATE_INTEGRATED_STATE = True

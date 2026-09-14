@@ -162,7 +162,6 @@ class Mechanosense(Lateral):
     OUTPUTS = ["cell"]
     READS = ["pos", "radius", "alive"]           # + the potential's coupling (epsilon), when field-driven
     WRITES = ["stress"]                          # the per-cell virial pressure (a transient sensing scalar)
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]                        # dimension-generic: reads d = pos.shape[-1]; V_i branches on d (also d=1)
     DIFFERENTIABLE = True                         # dU/dr by autodiff; `stress` stays differentiable through the coupling epsilon
     REQUIRES_PARAMS = []                          # every knob optional -- defaults to the paper's Morse mechanics

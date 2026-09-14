@@ -87,14 +87,13 @@ class Regulate(Exchange):
     EMIT = "velocity"                  # the gene block is first-order; the delta is dg/dt-equivalent (inc/dt)
     INTEGRAND = "gene"                 # writes a NON-coordinate block (the evolving gene vector), not pos
     # typed signature (Plexus2 sec. 2.1): a morphism cell -> cell that reads the cell's
-    # own gene state + its fixed sensed drive and writes the gene state. MAPS=[] is
-    # load-bearing: there is no incidence map and no neighbour edge -- each cell integrates
-    # in isolation (the intracellular identity that distinguishes it from `signal`).
+    # own gene state + its fixed sensed drive and writes the gene state. It traverses NO
+    # relation -- no incidence map, no neighbour edge -- so each cell integrates in isolation
+    # (the intracellular identity that distinguishes it from `signal`).
     INPUTS = ["cell"]
     OUTPUTS = ["cell"]
     READS = ["gene", "drive"]          # evolving gene vector g (state) + fixed driver u (inputs, read-only)
     WRITES = ["gene"]                  # the dt-increment of the gene vector
-    MAPS = []                          # intracellular: no gather/scatter, zero cell-to-cell coupling
     SUPPORTED_DIMS = [2, 3]            # acts on per-cell state; ignores spatial dimension
     REQUIRES_PARAMS = []               # all params optional (zeros defaults, like the source's _resolve_param)
     MECHANISM_TAGS = ["gene_regulatory_network", "internal_state_ode",

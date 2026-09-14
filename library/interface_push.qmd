@@ -127,7 +127,6 @@ class ExtrusionForcing3D(Lateral):
     """
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["extrusion", "forcing", "control_only", "disqualified"]
     PARAM_ROLES = {"K_extrude": "normal_extrusion_forcing", "a_sw": "red_threshold"}
     REFERENCE = "Plexus (this work) -- a forcing term retained only as an explicit control."

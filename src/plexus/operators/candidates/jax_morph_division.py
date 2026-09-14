@@ -76,13 +76,12 @@ class CellDivideVolumeConserving(Structural):
     EMIT = None                                       # structural: wakes dormant slots, mutates occ/state in place; returns {} — no integrable delta
     # typed signature (Plexus2 sec. 2.1): a morphism cell -> cell. The widened read/write set the
     # entry costs -- reads the heritable per-cell hazard + orientation axis + radius/position, writes
-    # position/radius/alive, the lineage records, and the global overflow diagnostic. MAPS=[] --
-    # each cell draws in isolation (the slot allocation is bookkeeping, not a cell-to-cell coupling).
+    # position/radius/alive, the lineage records, and the global overflow diagnostic. It traverses
+    # no relation -- each cell draws in isolation (slot allocation is bookkeeping, not coupling).
     INPUTS = ["cell"]
     OUTPUTS = ["cell"]
     READS = ["division_rate", "division_axis", "radius", "pos", "alive"]
     WRITES = ["pos", "radius", "alive", "celltype", "born", "mother", "division_overflow"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]                            # m = 2^(-1/d) reads the world dim; jax-morph also allows 1D
     REQUIRES_PARAMS = []                              # no required params — `rate` falls back to per-cell division_rate else 0 (inert)
     MECHANISM_TAGS = ["proliferation", "mitosis", "growth", "oriented_division",

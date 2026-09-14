@@ -97,9 +97,15 @@ def test_contracts_and_signatures():
     assert s.models() == ["shared", "type_pairwise", "type_pre"] and s.impls() == []
     with pytest.raises(KeyError):
         get_operator("neuron_signal", implementation="type_pre")
-    # the maps are part of the signature: phi traverses none, psi traverses the incidence pair.
-    assert get_operator("neuron_update").signature()["maps"] == []
-    assert get_operator("neuron_signal").signature()["maps"] == ["pre", "post"]
+    # The signature carries the sets and the state blocks, and no longer a `maps` field.
+    # What each half traverses is still the distinction that matters -- phi reads one neuron's
+    # own voltage, psi gathers along an edge set -- and it shows in what they REQUIRE: psi
+    # cannot be built without being told which edge set to walk.
+    for key in ("inputs", "outputs", "reads", "writes"):
+        assert key in get_operator("neuron_update").signature()
+    assert "maps" not in get_operator("neuron_update").signature()
+    assert get_operator("neuron_update").REQUIRES_PARAMS == []
+    assert get_operator("neuron_signal").REQUIRES_PARAMS == ["edge_set"]
 
 
 def test_neuron_schema_comes_from_the_registry():

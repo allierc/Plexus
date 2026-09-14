@@ -56,9 +56,15 @@ s is what takes the circuit through the transition studied in the reference: at 
 neuron relaxes to the fixed point b/a, and as s grows past a the isolated neuron acquires
 its own bistability before any coupling is added at all.
 
-The kind is `lateral` and it traverses no map. Lateral means within a set, and a per-member
-law with an empty relation is the degenerate case of that rather than a different kind;
-`MAPS = []` says so in the signature, which is where a reader should be able to see it.
+IT IS REGISTERED `lateral` AND THAT IS THE WRONG WORD. Lateral means what neighbours do to
+each other; this law has no neighbour in it. For neuron i it reads neuron i's own voltage
+and nothing else -- no gather, no scatter, the synapse set untouched. Compare the equation
+at the top of this module: the index j appears only in `neuron_signal`'s half.
+
+It is filed under `lateral` because `KINDS` has no name for an entity's own dynamics, and a
+good few operators are in the same position -- `drag`, `gravity`, `glide`, `velocity_cruise`
+in motion_ops, `metabolite_homeostasis`, the `cell_cycle` timers. Naming that kind is open;
+until it is named, this comment is where the distinction lives.
 
 Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
 the activity of neural assemblies, eqn. (simulation); the NeuralGraph PDE_N4 generator.
@@ -111,9 +117,15 @@ class NeuronUpdate(Lateral):
     neuron relaxes to the fixed point b/a, and as s grows past a the isolated neuron acquires
     its own bistability before any coupling is added at all.
 
-    The kind is `lateral` and it traverses no map. Lateral means within a set, and a per-member
-    law with an empty relation is the degenerate case of that rather than a different kind;
-    `MAPS = []` says so in the signature, which is where a reader should be able to see it.
+    IT IS REGISTERED `lateral` AND THAT IS THE WRONG WORD. Lateral means what neighbours do to
+    each other; this law has no neighbour in it. For neuron i it reads neuron i's own voltage
+    and nothing else -- no gather, no scatter, the synapse set untouched. Compare the equation
+    at the top of this module: the index j appears only in `neuron_signal`'s half.
+
+    It is filed under `lateral` because `KINDS` has no name for an entity's own dynamics, and a
+    good few operators are in the same position -- `drag`, `gravity`, `glide`, `velocity_cruise`
+    in motion_ops, `metabolite_homeostasis`, the `cell_cycle` timers. Naming that kind is open;
+    until it is named, this comment is where the distinction lives.
 
     Reference: Allier, C. et al. Graph neural networks uncover structure and function underlying
     the activity of neural assemblies, eqn. (simulation); the NeuralGraph PDE_N4 generator.
@@ -124,7 +136,6 @@ class NeuronUpdate(Lateral):
     OUTPUTS = ["neuron"]
     READS = ["voltage"]
     WRITES = ["voltage"]
-    MAPS = []                          # no relation: each neuron's own state only
     SUPPORTED_DIMS = [2, 3]            # acts on a scalar state; ignores the spatial dimension
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = []               # every knob has a default, or comes from the type table

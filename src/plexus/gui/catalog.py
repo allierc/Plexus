@@ -137,7 +137,6 @@ def _impl_entry(cls):
         "params": _param_schema(cls),
         "reads": list(sig.get("reads", [])),
         "writes": list(sig.get("writes", [])),
-        "maps": list(sig.get("maps", [])),
         "inputs": list(sig.get("inputs", [])),
         "outputs": list(sig.get("outputs", [])),
         "emit": getattr(cls, "EMIT", None),

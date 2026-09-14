@@ -120,7 +120,6 @@ class Deposit(Exchange):
     OUTPUTS = []                               # writes the `to:` field, no set-state output
     READS = ["pos"]
     WRITES = []                                # no set-state block written (the grid is mutated in place)
-    MAPS = ["field"]                           # Exchange: a scatter map onto the `to:` field
     SUPPORTED_DIMS = [2, 3]                     # N-D scatter onto the grid field
     REQUIRES_PARAMS = ["to"]
     MECHANISM_TAGS = ["deposition", "stigmergy", "field_write"]
@@ -518,7 +517,6 @@ class Chemotax(Exchange):
     OUTPUTS = ["particle"]
     READS = ["pos"]
     WRITES = ["pos"]                            # gain*grad(field) as a velocity (or mpm_acceleration)
-    MAPS = ["field"]                            # Exchange: a gather map from the `from:` field
     SUPPORTED_DIMS = [2]                         # Field.grad_at is 2D for now (N-D is a follow-up)
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["gradient_following", "field_templated_aggregation", "field_templated_flow"]
@@ -813,7 +811,6 @@ class Signal(Lateral):
     OUTPUTS = ["neuron"]
     READS = ["voltage", "w"]              # neuron membrane voltage; synapse weight block W_e
     WRITES = ["voltage"]                  # returns dv/dt on the neuron voltage
-    MAPS = ["pre", "post"]                # gather phi(v) along `pre`; aggregate current along `post`
     SUPPORTED_DIMS = [2, 3]               # voltage is scalar -- the operator ignores spatial dimension
     REQUIRES_PARAMS = ["tau", "edge_set"]
     MECHANISM_TAGS = ["signal_propagation", "connectome", "recurrent"]

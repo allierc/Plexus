@@ -132,7 +132,6 @@ class Signal(Lateral):
     OUTPUTS = ["neuron"]
     READS = ["voltage", "w"]              # neuron membrane voltage; synapse weight block W_e
     WRITES = ["voltage"]                  # returns dv/dt on the neuron voltage
-    MAPS = ["pre", "post"]                # gather phi(v) along `pre`; aggregate current along `post`
     SUPPORTED_DIMS = [2, 3]               # voltage is scalar -- the operator ignores spatial dimension
     REQUIRES_PARAMS = ["tau", "edge_set"]
     MECHANISM_TAGS = ["signal_propagation", "connectome", "recurrent"]

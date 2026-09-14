@@ -108,7 +108,6 @@ class AdhereHarmonic(Lateral):
     OUTPUTS = ["cell"]
     READS = ["pos", "radius", "alive"]
     WRITES = ["pos"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]                       # dimension-generic: reads D = pos.shape[-1], no hard-coded 2
     REQUIRES_PARAMS = []                          # every knob optional (k / r_cutoff_frac / radius default to the source's)
     MECHANISM_TAGS = ["excluded_volume", "cell_adhesion", "pairwise_potential",

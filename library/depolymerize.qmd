@@ -148,7 +148,6 @@ class Depolymerize(Structural):
     REQUIRES_BUFFERS = ["occ"]
     INPUTS = ["particle", "cell"]; OUTPUTS = ["particle"]
     READS = ["polarity"]; WRITES = []
-    MAPS = ["parent"]
     MECHANISM_TAGS = ["depolymerization", "treadmilling", "volume_conservation", "motility"]
     PARAM_ROLES = {"volume_rate": "world_volume_per_frame", "behind": "region_along_polarity",
                    "region": "removal_region", "lateral": "girth_inner_radius",

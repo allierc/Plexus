@@ -143,7 +143,6 @@ class StillingerWeber(Lateral):
     DIFFERENTIABLE = True                        # force = -grad E by autograd
     INPUTS = ["particle"]; OUTPUTS = ["particle"]
     READS = ["pos"]; WRITES = ["vel"]
-    MAPS = []                                    # builds its own min-image neighbour list (implicit rewire)
     REQUIRES_PARAMS = []                         # all params default to mW water; none mandatory
     MECHANISM_TAGS = ["tetrahedral_network", "three_body", "angular_interaction",
                       "stillinger_weber", "monatomic_water", "directional_bonding",

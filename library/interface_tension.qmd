@@ -120,7 +120,6 @@ class InterfaceLineTension3D(Lateral):
     """
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
-    MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["interface_tension", "purse_string", "tube", "oriented", "cross_scale"]
     PARAM_ROLES = {"K_purse": "interface_line_tension", "a_sw": "red_threshold"}
     REFERENCE = "Plexus (this work); purse-string / apical-constriction tubulation after Okuda, S. et al. (2018). Sci. Rep. 8:2386."

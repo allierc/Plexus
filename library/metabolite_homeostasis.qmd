@@ -93,7 +93,6 @@ class MetaboliteHomeostasis(Lateral):
     OUTPUTS = ["metabolite"]
     READS = ["conc", "c0"]
     WRITES = ["conc"]
-    MAPS = []
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = []

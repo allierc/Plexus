@@ -76,7 +76,7 @@ operators:
 
 ## Related operators
 
-Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`metabolite_flux`](metabolite_flux.qmd).
+Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`paint_children`](paint_children.qmd), [`metabolite_flux`](metabolite_flux.qmd).
 
 ## Source
 
@@ -104,7 +104,6 @@ class ReactionRate(Aggregate):
     OUTPUTS = ["reaction"]
     READS = ["conc", "w", "k"]
     WRITES = ["v"]
-    MAPS = ["pre", "post"]
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     MAY_MUTATE_INTEGRATED_STATE = True   # `v` is a derived readout written in place, as `omega` is
