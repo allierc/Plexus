@@ -949,6 +949,25 @@ class Cell:
     """A set of particles/molecules; its position is an aggregate of its children."""
 
 
+@register_entity(
+    # A DRAWN POINT AND NOTHING ELSE: position, velocity, and a `paint` scalar the renderer can
+    # colour by. This is what a neuron's own morphology is made of -- the points sampled along its
+    # skeleton or inside its mesh -- and it deliberately carries no deformation gradient, no mass
+    # and no grid, because nothing integrates it. The parent neuron is the mechanism; these are its
+    # picture, filled once by `morphology_seed` and painted every frame by `paint_children`.
+    "points", depth=0,
+    reserve_factor=0,      # nothing spawns a drawn point; the reserve would be dead rows
+    state_schema=lambda D: StateSchema([Block("pos", D, role="coordinate", integration="none"),
+                                        Block("vel", D, role="rate", integration="none", record=False),
+                                        Block("paint", 1, integration="none")]),
+    render={"color_by": "paint", "arrows": None},
+)
+class DrawnPoints:
+    """The points a parent entity is DRAWN as: its skeleton swollen to its radius, or its mesh
+    filled. Geometry, not mechanism -- no operator integrates them."""
+
+
+
 # --------------------------------------------------------------------------- #
 #  The neural sets: neuron, the assembly that contains them, and the synapse.
 #

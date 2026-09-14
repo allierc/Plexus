@@ -1,0 +1,48 @@
+general:
+  name: hemi_mesh_1000
+  seed: 0
+  n_frames: 200
+  dt: 0.05
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 401
+  units: {length_um: 44.509375, time_s: 1.0}
+sets:
+  brain: {n: 1}
+  assembly: {parent: brain, per_parent: 1}
+  neuron:
+    parent: assembly
+    per_parent: 1002
+    types:
+      slow:
+        fraction: 0.5
+        p: [1.0, 0.0, 1.2, 0.5, 1.0, 0.0]
+      fast:
+        fraction: 0.5
+        p: [2.5, 0.0, 1.2, 1.6, 0.5, 0.0]
+  synapse: {parent: brain, edge_set: true, pre: neuron, post: neuron, edges_file: neural_regions/hemibrain_cube_1000/connectome.npz}
+  morphology: {entity: points, parent: neuron, per_parent: 300}
+seed:
+- {op: neural_seed, at: neuron, region: hemibrain_cube_1000, v0_mean: 0.0, v0_sd: 0.5}
+- {op: morphology_seed, at: morphology, parent: neuron, region: hemibrain_cube_1000, kind: mesh, seed: 0}
+operators:
+- {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.01}
+- {op: neuron_signal, at: neuron, model: type_pairwise, edge_set: synapse, activation: tanh}
+- {op: paint_children, at: morphology, parent: neuron, block: paint, parent_block: voltage}
+schedule: [neuron_update, neuron_signal, paint_children]
+fields: {}
+plotting:
+  renderer: vtk_points
+  background: black
+  dot_size: 1.6
+  dot_shading: false
+  box_frame: true
+  up_axis: 2
+  color_field: paint
+  color_range: [0.0, 130.0]
+  max_frames: 300
+  stills: 10
+  keep_stills: true
+  subject: morphology
+  field_cmap: tab20
