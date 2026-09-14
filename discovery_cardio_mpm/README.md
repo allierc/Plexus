@@ -61,5 +61,6 @@ Phase 3); the trainer hand-rolls its own step, as the inherited one did.
 ## Related
 
 - `../discovery_okuda/` — the Okuda loop this forks in spirit; `ROLES.md` there is the roster discipline.
-- `../atlas_jax/`, `../atlas_cc3d/` — the sibling atlases; same note template and phase ladder.
+  (The sibling atlas loops, `../atlas_jax/` and `../atlas_cc3d/`, supplied the same note template
+  and phase ladder; both have been removed from the repository.)
 - `../prototype/cardio_mpm/` — the previous campaign. Apparatus and defect patterns only.

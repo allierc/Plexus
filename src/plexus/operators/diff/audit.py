@@ -309,24 +309,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", default=None)
     ap.add_argument("--device", default="cpu")
-    ap.add_argument("--candidates", action="store_true",
-                    help="also audit the anti-chamber (candidates/jax_morph_*, atlas_*), which "
-                         "`plexus.operators` deliberately does not auto-import")
     ap.add_argument("--only-impl", default=None,
                     help="restrict to implementations whose name contains this substring")
     a = ap.parse_args()
 
+    # THERE WAS A `--candidates` FLAG HERE. It imported the anti-chamber's `jax_morph_*` and
+    # `atlas_*` modules, because the jax-morph atlas's specs resolved against those rather than
+    # against the promoted defaults -- `grow_radius` to jax_morph_saturating_cell_growth,
+    # `agent_divide` to implementation `volume_conserving` -- so auditing `plexus.operators`
+    # alone measured a set that atlas never ran. Both the atlas and those sixteen operators are
+    # gone, so what is registered here is now the whole of what anything runs.
     import plexus.operators  # noqa: F401   self-registers the library
-    if a.candidates:
-        # The atlas's specs run on THESE, not on the promoted defaults: `grow_radius` resolves to
-        # jax_morph_saturating_cell_growth, `agent_divide` to implementation `volume_conserving`.
-        # Auditing only `plexus.operators` measures a set the atlas never runs.
-        import importlib
-        import os as _os
-        import plexus.operators.candidates as C
-        for fn in sorted(_os.listdir(_os.path.dirname(C.__file__))):
-            if fn.startswith(("jax_morph_", "atlas_")) and fn.endswith(".py"):
-                importlib.import_module(f"plexus.operators.candidates.{fn[:-3]}")
 
     rows, na = [], []
     for name in sorted(_OP_CONTRACTS):
