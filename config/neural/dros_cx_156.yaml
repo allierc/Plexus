@@ -1,0 +1,81 @@
+# dros_cx_156 -- the Drosophila central-complex head-direction circuit of docs/drosophila.tex,
+# as a forward model: the measured connectome, the seven cell types, and the ring it forms.
+#
+# WHAT THE PAPER SPECIFIES (Methods, eq. 1-3) and what this spec is:
+#   tau dh_i/dt = -h_i + SUM_j W_rec_ij sigma(h_j) + SUM_l W_in_il u_l + b_i
+# with sigma the sigmoid, tau = 0.1 s, dt = 0.01 s, the recurrent matrix SIGN-LOCKED to the
+# hemibrain template, and the angular-velocity input gated onto the four PEN subpopulations.
+# This spec runs that equation FORWARD on the measured template. It does not train: the paper's
+# learnable magnitudes, the four PEN gate scalars and the (cos, sin) readout are what the RNN and
+# GNN fit, and none of them is a property of the circuit -- they are a property of the fitting.
+#
+# WHERE THE NUMBERS COME FROM. `connectome_loaders.load_drosophila_cx_connectome` on the hemibrain
+# v1.2 exported traced adjacencies: EPG, EPGt, PEN_a, PEN_b, Delta7, PEG (152 cells) plus the four
+# ER6, with the Delta7 and ER6 COLUMNS made inhibitory (x -5) and the whole matrix normalised to a
+# spectral radius of 0.9, exactly as the paper's Methods describe. 156 neurons, 10,263 edges.
+#
+#   EPG 46   EPGt 4   PEN_a 20   PEN_b 22   Delta7 42   PEG 18   ER6 4
+#
+# THE TYPES ARE THE ANATOMY'S, not four dynamical classes: the region's rows are grouped by type
+# in this order, so `type_layout: ordered` makes the spec's type boundaries the cell types'. That
+# is what lets an operator address `neuron[type=PEN_a]` -- the anatomical gate of eq. 4.
+#
+# THE LAYOUT IS THE ELLIPSOID BODY AS A RING, because that is what the circuit is: the 46 EPG sit
+# at their own PB-glomerulus angle on a unit circle (the ring permutation the paper's TV prior
+# uses), PEN outside and above it, PEG outside and below, Delta7 and ER6 within. It is a
+# SCHEMATIC, not anatomy -- figures/drosophila_cx/fetch_cx_anatomy.py writes the real skeletons.
+general:
+  name: dros_cx_156
+  seed: 0
+  n_frames: 600
+  dt: 0.01              # the paper's integration step, in seconds
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 601
+  units:
+    length_um: 38.6208  # the schematic box the region declares (manifest.region.side_um)
+    time_s: 1.0         # one time unit is one second, so dt = 0.01 is the paper's 10 ms step
+fields: {}
+sets:
+  brain: {n: 1}
+  assembly: {parent: brain, per_parent: 1}
+  neuron:
+    parent: assembly
+    per_parent: 156
+    type_layout: ordered      # the type blocks ARE the region's row groups, in this order
+    # p = [a, b, g, s, w, h]; a = 1/tau = 10 per second is the paper's tau = 0.1 s.
+    types:
+      EPG:    {count: 46, p: [10.0, 0.0, 1.0, 0.5, 1.0, 0.0]}
+      EPGt:   {count: 4,  p: [10.0, 0.0, 1.0, 0.5, 1.0, 0.0]}
+      PEN_a:  {count: 20, p: [10.0, 0.0, 1.0, 0.5, 1.0, 0.0]}
+      PEN_b:  {count: 22, p: [10.0, 0.0, 1.0, 0.5, 1.0, 0.0]}
+      Delta7: {count: 42, p: [10.0, 0.0, 1.0, 0.5, 1.0, 0.0]}
+      PEG:    {count: 18, p: [10.0, 0.0, 1.0, 0.5, 1.0, 0.0]}
+      ER6:    {count: 4,  p: [10.0, 0.0, 1.0, 0.5, 1.0, 0.0]}
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/dros_cx_156/connectome.npz
+seed:
+- {op: neural_seed, at: neuron, region: dros_cx_156, v0_mean: 0.0, v0_sd: 0.5}
+operators:
+- {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.005}
+- {op: neuron_signal, at: neuron, model: type_pairwise, edge_set: synapse, activation: tanh}
+schedule: [neuron_update, neuron_signal]
+plotting:
+  renderer: vtk_points
+  background: black
+  up_axis: 2
+  box_frame: true
+  render_3d: dots
+  dot_size: 11.0
+  dot_shading: true
+  color_field: voltage
+  field_cmap: coolwarm
+  color_range: [-1.0, 1.0]
+  max_frames: 300
+  stills: 10
+  keep_stills: true
