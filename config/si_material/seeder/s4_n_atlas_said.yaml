@@ -7,6 +7,22 @@
 # This is config/cell/adh_base.yaml with those fifteen blocks filled in from `cell_ops.ATLAS`, and
 # the point of the exercise is that the two seeds agree: same piece counts, same positions, same
 # volumes. Once a table can be said in a spec, the Python copy is a DEFAULT rather than the truth.
+# WHY THE PROTEINS ARE OPAQUE. The five species are co-located balls of the cell's own radius --
+# they are a concentration, not a place -- so five translucent clouds of different hues BLEND, and
+# yellow over blue over pink over violet over green averages to grey. Measured: zero saturated
+# pixels at 0.85 opacity. Drawn opaque, the nearest dot wins and the cytoplasm reads as a speckle
+# of five colours, which is what five species mixed at the same point actually looks like.
+#
+# AND THINNED, for the same reason. Opaque and complete, the LAST species drawn covers the other
+# four -- 12,500 points of one hue over the same ball is an opaque wall, and the picture went from
+# grey to uniformly green. `surface_sample: 2200` draws a fifth of each compartment, so all five
+# show through each other. It is a drawing decision and changes no number in the model.
+# EVERY ATLAS SEED OPERATOR GETS ITS OWN `seed`, and it matters more than it looks. The five
+# protein species are five balls of the cell's own radius drawn from the same distribution, and
+# `seed_cell_atlas` defaults to `seed: 0` -- so all five drew the SAME 12,500 points. Measured:
+# max |difference| between protein_a and each of b, c, d, e was 0 m, exactly. Sixty-two thousand
+# material points stacked in five identical copies, which is one cloud with five labels and five
+# times the mass in the same place. A distinct seed per operator is what makes them five species.
 general:
   name: s4_n_atlas_said
   seed: 1
@@ -142,6 +158,7 @@ seed:
   vel_init: 0.0
   geometry:
     plasma_membrane: {place: shell, r: 1.0, axis: radial, shape: patch, size: 0.105, thickness: 0.1}
+  seed: 0
 - op: seed_cell_atlas
   at: cytoskeleton
   particles: cytoskeleton_node
@@ -149,6 +166,7 @@ seed:
   vel_init: 0.0
   geometry:
     cytoskeleton: {place: ball, r_in: 0.62, r_out: 0.78, axis: radial, shape: filament, size: 0.6, thickness: 0.006, persistence: 0.88}
+  seed: 1
 - op: seed_cell_atlas
   at: nuclear_envelope
   particles: nuclear_envelope_node
@@ -156,6 +174,7 @@ seed:
   vel_init: 0.0
   geometry:
     nucleus: {place: shell, r: 0.42, axis: radial, shape: patch, size: 0.078, thickness: 0.04}
+  seed: 2
 - op: seed_cell_atlas
   at: chromatin
   particles: chromatin_node
@@ -163,6 +182,7 @@ seed:
   vel_init: 0.0
   geometry:
     chromatin: {place: ball, r_in: 0.05, r_out: 0.24, axis: random, shape: filament, size: 0.34, thickness: 0.018, persistence: 0.25}
+  seed: 3
 - op: seed_cell_atlas
   at: nucleolus
   particles: nucleolus_node
@@ -170,6 +190,7 @@ seed:
   vel_init: 0.0
   geometry:
     nucleolus: {place: ball, r_in: 0.06, r_out: 0.2, axis: random, shape: ball, size: 0.085}
+  seed: 4
 - op: seed_cell_atlas
   at: rough_er
   particles: rough_er_node
@@ -178,6 +199,7 @@ seed:
   geometry:
     rough_er: {place: ball, r_in: 0.52, r_out: 0.7, axis: radial, shape: cisterna, size: 0.26, thickness: 0.012, bow: 0.35,
       holes: 9, hole_r: 0.16}
+  seed: 5
 - op: seed_cell_atlas
   at: smooth_er
   particles: smooth_er_node
@@ -186,6 +208,7 @@ seed:
   geometry:
     smooth_er: {place: ball, r_in: 0.54, r_out: 0.78, axis: random, shape: tubule, size: 0.9, thickness: 0.01, segments: 16,
       branch: 0.45, persistence: 0.55}
+  seed: 6
 - op: seed_cell_atlas
   at: golgi
   particles: golgi_node
@@ -194,6 +217,7 @@ seed:
   geometry:
     golgi: {place: ball, r_in: 0.52, r_out: 0.68, axis: radial, shape: stack, size: 0.075, thickness: 0.008, layers: 6,
       gap: 0.3, bow: 0.4, taper: 0.62}
+  seed: 7
 - op: seed_cell_atlas
   at: mitochondria
   particles: mitochondria_node
@@ -202,6 +226,7 @@ seed:
   geometry:
     mitochondria: {place: ball, r_in: 0.52, r_out: 0.8, axis: random, shape: mito, size: 0.12, thickness: 0.025, bend: 0.55,
       cristae: 7, crista_frac: 0.4}
+  seed: 8
 - op: seed_cell_atlas
   at: centriole
   particles: centriole_node
@@ -210,6 +235,7 @@ seed:
   geometry:
     centriole: {place: ball, r_in: 0.5, r_out: 0.58, axis: random, shape: barrel, size: 0.011, thickness: 0.0026, blades: 9,
       length: 4.5, skew: 0.3}
+  seed: 9
 - op: seed_cell_atlas
   at: protein_a
   particles: protein_a_node
@@ -217,6 +243,7 @@ seed:
   vel_init: 0.0
   geometry:
     protein_a: {place: ball, r_in: 0.0, r_out: 0.0, axis: random, shape: ball, size: 0.95, volume_frac: 0.12}
+  seed: 10
 - op: seed_cell_atlas
   at: protein_b
   particles: protein_b_node
@@ -224,6 +251,7 @@ seed:
   vel_init: 0.0
   geometry:
     protein_b: {place: ball, r_in: 0.0, r_out: 0.0, axis: random, shape: ball, size: 0.95, volume_frac: 0.12}
+  seed: 11
 - op: seed_cell_atlas
   at: protein_c
   particles: protein_c_node
@@ -231,6 +259,7 @@ seed:
   vel_init: 0.0
   geometry:
     protein_c: {place: ball, r_in: 0.0, r_out: 0.0, axis: random, shape: ball, size: 0.95, volume_frac: 0.12}
+  seed: 12
 - op: seed_cell_atlas
   at: protein_d
   particles: protein_d_node
@@ -238,6 +267,7 @@ seed:
   vel_init: 0.0
   geometry:
     protein_d: {place: ball, r_in: 0.0, r_out: 0.0, axis: random, shape: ball, size: 0.95, volume_frac: 0.12}
+  seed: 13
 - op: seed_cell_atlas
   at: protein_e
   particles: protein_e_node
@@ -245,6 +275,7 @@ seed:
   vel_init: 0.0
   geometry:
     protein_e: {place: ball, r_in: 0.0, r_out: 0.0, axis: random, shape: ball, size: 0.95, volume_frac: 0.12}
+  seed: 14
 - {op: seed_state_random, at: mitochondria, block: voltage, lo: 0.0, hi: 1.0, seed: 1}
 operators:
 - {op: gravity, at: cell, g: 1.5}
@@ -352,7 +383,6 @@ plotting:
   dot_size: 0.9
   fps: 60
   slow_motion: 2
-  surface_sample: 60000
   surface_max_cells: 80000000
   hide_sets: [cell, plasma_membrane, cytoskeleton, nuclear_envelope, chromatin, nucleolus, rough_er, smooth_er, golgi, mitochondria,
     centriole, protein_a, protein_b, protein_c, protein_d, protein_e]
@@ -371,14 +401,14 @@ plotting:
     golgi_node: {render: dots, point_size: 0.9}
     mitochondria_node: {render: dots, point_size: 0.9}
     centriole_node: {render: dots, point_size: 0.9}
-    protein_a_node: {render: dots, point_size: 0.9}
-    protein_b_node: {render: dots, point_size: 0.9}
-    protein_c_node: {render: dots, point_size: 0.9}
-    protein_d_node: {render: dots, point_size: 0.9}
-    protein_e_node: {render: dots, point_size: 0.9}
-  opacity: {plasma_membrane_node: 0.38, cytoskeleton_node: 0.28, nuclear_envelope_node: 0.28, chromatin_node: 0.196, nucleolus_node: 0.196,
-    rough_er_node: 0.196, smooth_er_node: 0.196, golgi_node: 0.196, mitochondria_node: 0.196, centriole_node: 0.196, protein_a_node: 0.08,
-    protein_b_node: 0.08, protein_c_node: 0.08, protein_d_node: 0.08, protein_e_node: 0.08}
+    protein_a_node: {render: dots, point_size: 3.4, every: 6}
+    protein_b_node: {render: dots, point_size: 3.4, every: 6}
+    protein_c_node: {render: dots, point_size: 3.4, every: 6}
+    protein_d_node: {render: dots, point_size: 3.4, every: 6}
+    protein_e_node: {render: dots, point_size: 3.4, every: 6}
+  opacity: {plasma_membrane_node: 0.05, cytoskeleton_node: 0.1, nuclear_envelope_node: 0.08, chromatin_node: 0.12, nucleolus_node: 0.12,
+    rough_er_node: 0.12, smooth_er_node: 0.12, golgi_node: 0.12, mitochondria_node: 0.12, centriole_node: 0.12, protein_a_node: 1.0,
+    protein_b_node: 1.0, protein_c_node: 1.0, protein_d_node: 1.0, protein_e_node: 1.0}
   colors:
     plasma_membrane: &id001 [0.62, 0.82, 0.96]
     cytoskeleton: &id002 [0.3, 0.85, 0.4]
@@ -390,11 +420,11 @@ plotting:
     golgi: &id008 [0.96, 0.62, 0.2]
     mitochondria: &id009 [0.9, 0.16, 0.12]
     centriole: &id010 [0.85, 1.0, 0.15]
-    protein_a: &id011 [0.95, 0.78, 0.25]
-    protein_b: &id012 [0.45, 0.78, 0.98]
-    protein_c: &id013 [0.98, 0.45, 0.62]
-    protein_d: &id014 [0.66, 0.48, 0.96]
-    protein_e: &id015 [0.55, 0.95, 0.82]
+    protein_a: &id011 [1.0, 0.85, 0.1]
+    protein_b: &id012 [0.2, 0.55, 1.0]
+    protein_c: &id013 [1.0, 0.25, 0.45]
+    protein_d: &id014 [0.65, 0.35, 1.0]
+    protein_e: &id015 [0.2, 0.95, 0.7]
     plasma_membrane_node: *id001
     cytoskeleton_node: *id002
     nuclear_envelope_node: *id003

@@ -12,9 +12,10 @@
 # the volumes differ by k^3 * their own: 0.43006 -> 2.144e-3 m^3 for the globe, 3.1585e-3 ->
 # 1.575e-5 for the strap, a ratio of 136 which is what the scan says.
 #
-# WHAT IS STILL MANUAL, and it is the next stage rather than a defect: the offset is WRITTEN HERE.
-# Stage S5's `place: {frame: measured}` is what reads it from the shape folder instead, so that a
-# second eye, or the other five muscles, cost no arithmetic.
+# NOTHING IS WRITTEN DOWN ANY MORE. `frame:` on a set and `place: measured` on a type read the
+# part's own centroid from the shape folder, where the cutter measured it, so the spec states the
+# ANCHOR and the SIZE and the scan supplies the rest. What follows is what the hand-written version
+# computed, kept here because it is the check: 0.6694 blend units of separation, k = 0.17083.
 #
 # TWO PARTICLE SETS, ONE GRID. `per_parent` and `particle_mass` live on a particle set, so two
 # bodies whose volumes differ by 136x cannot share one: the globe gets 30,000 points and the strap
@@ -25,9 +26,14 @@ sets:
   globe:
     entity: cell
     n: 1
-    start: [[0.25, 0.25, 0.25]]
+    # THE FRAME IS DECLARED ONCE AND THE SCAN IS READ, rather than three offsets being written down.
+    # `origin: globe` pins the frame to the globe's own centroid, `at` says where that goes, and
+    # `scale: {part: globe, radius: 0.08}` is the factor that makes the globe's equivalent-sphere
+    # radius 0.08 m -- a length measurable in the picture, not a ratio someone had to divide out.
+    frame: {shape: eye, origin: globe, at: [0.25, 0.25, 0.25], scale: {part: globe, radius: 0.08}}
     types:
-      sclera: {count: 1, material: elastic, youngs: 200000.0, density: 1000.0, shape: "mesh:eye/globe"}
+      sclera: {count: 1, material: elastic, youngs: 200000.0, density: 1000.0, shape: "mesh:eye/globe",
+               place: measured}
   globe_pt:
     parent: globe
     entity: mpm_particle
@@ -38,9 +44,13 @@ sets:
   muscle:
     entity: cell
     n: 1
-    start: [[0.21254, 0.35798, 0.25384]]
+    # THE SAME FRAME, so the strap lands where the scan has it relative to the globe. This is the
+    # line the hand-written `start: [[0.21254, 0.35798, 0.25384]]` used to be, and the five other
+    # muscles now cost one type each and no arithmetic at all.
+    frame: {shape: eye, origin: globe, at: [0.25, 0.25, 0.25], scale: {part: globe, radius: 0.08}}
     types:
-      lateral_rectus: {count: 1, material: elastic, youngs: 40000.0, density: 1050.0, shape: "mesh:eye/lateral_rectus"}
+      lateral_rectus: {count: 1, material: elastic, youngs: 40000.0, density: 1050.0,
+                       shape: "mesh:eye/lateral_rectus", place: measured}
   muscle_pt:
     parent: muscle
     entity: mpm_particle
