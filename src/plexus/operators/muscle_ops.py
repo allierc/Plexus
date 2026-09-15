@@ -153,7 +153,47 @@ class Muscle:
 
 
 # --------------------------------------------------------------------------- the coefficients
-def _load_fit(path):
+def _coefficients(params, need):
+    """The plant's numbers, from a `fit:` json OR written out in the spec. Exactly one.
+
+    A FILE IS THE HONEST FORM FOR A MEASUREMENT and stays the default: `fit:` names the
+    characterisation the coefficients came from, so two runs of one spec read the same eye and
+    the provenance is a path rather than 99 anonymous floats. But a spec that carries its own
+    numbers is SELF-CONTAINED -- it runs on a clone with no characterisation archive anywhere --
+    and for a rig that is being handed to someone else that is worth more than the provenance.
+    So both are accepted and giving both is refused, because a spec that names a file AND
+    restates its contents is a spec whose author believes two things about which eye it runs.
+
+    `need` is the keys this caller actually reads, so `muscle_gaze_map` may be given `beta`
+    alone and `eye_mechanics` `C` and `K` alone.
+    """
+    inline = [k for k in ("beta", "C", "K") if k in params]
+    if "fit" in params and inline:
+        raise ValueError(
+            f"eye coefficients given twice: `fit: {params['fit']!r}` and also {inline} written "
+            f"out in the spec. Name one -- the file, or the numbers.")
+    if "fit" in params:
+        return _load_fit(params["fit"], need)
+    missing = [k for k in need if k not in params]
+    if missing:
+        raise ValueError(
+            f"this operator needs {list(need)}; the spec gives neither `fit:` nor {missing}. "
+            f"Either name a characterisation json or write the coefficients out.")
+    return {k: _check(params[k], k, (N_QUAD, 3) if k == "beta" else (3, 3), "the spec")
+            for k in need}
+
+
+def _check(value, key, shape, where):
+    arr = np.asarray(value, np.float64)
+    if arr.shape != shape:
+        raise ValueError(
+            f"{where}: {key!r} is {arr.shape}, expected {shape}. For `beta` that is "
+            f"{N_MUSCLE} linear + {N_MUSCLE} square + {len(PAIRS)} cross terms per axis, in "
+            f"the muscle order {MUSCLES}.")
+    return arr
+
+
+def _load_fit(path, need=("beta", "C", "K")):
     """The characterisation's json: `beta` (27, 3), `C` (3, 3), `K` (3, 3).
 
     Resolved relative to the repository root when not absolute, so a spec names the file the way
@@ -171,16 +211,11 @@ def _load_fit(path):
             f"both, or they describe two different eyes.")
     with open(path) as f:
         spec = json.load(f)
-    for key, shape in (("beta", (N_QUAD, 3)), ("C", (3, 3)), ("K", (3, 3))):
+    for key in need:
         if key not in spec:
-            raise ValueError(f"eye fit {path!r} has no {key!r}; it needs beta, C and K.")
-        arr = np.asarray(spec[key], np.float64)
-        if arr.shape != shape:
-            raise ValueError(
-                f"eye fit {path!r}: {key!r} is {arr.shape}, expected {shape}. For `beta` that is "
-                f"{N_MUSCLE} linear + {N_MUSCLE} square + {len(PAIRS)} cross terms per axis, in "
-                f"the muscle order {MUSCLES}.")
-        spec[key] = arr
+            raise ValueError(f"eye fit {path!r} has no {key!r}.")
+        spec[key] = _check(spec[key], key, (N_QUAD, 3) if key == "beta" else (3, 3),
+                           f"eye fit {path!r}")
     return spec
 
 
@@ -230,9 +265,10 @@ class MuscleGazeMap(Aggregate):
     SUPPORTED_DIMS = [2, 3]            # acts on angles, not on the world's coordinates
     DIFFERENTIABLE = True
     MAY_MUTATE_INTEGRATED_STATE = True  # writes a block on the parent -- that is what it is for
-    REQUIRES_PARAMS = ["fit"]
+    REQUIRES_PARAMS = []               # `fit:` OR inline coefficients; see `_coefficients`
     MECHANISM_TAGS = ["oculomotor", "muscle", "static_map", "hammerstein", "quadratic_synergy"]
-    PARAM_ROLES = {"fit": "eye_characterisation_json", "parent": "eye_set_name",
+    PARAM_ROLES = {"fit": "eye_characterisation_json", "beta": "inline_static_map_coefficients",
+                   "parent": "eye_set_name",
                    "gain": "scale_on_every_coefficient"}
     REFERENCE = ("The static half of a Hammerstein cascade -- a measured memoryless "
                  "nonlinearity ahead of a linear body. Coefficients fitted from the soft-body "
@@ -243,7 +279,7 @@ class MuscleGazeMap(Aggregate):
         self.at = params.get("_at", "muscle")
         self.parent = params.get("parent", "eye")
         self.gain = float(params.get("gain", 1.0))       # one scalar on every coefficient
-        spec = _load_fit(params["fit"])
+        spec = _coefficients(params, ("beta",))
         beta = torch.as_tensor(spec["beta"], dtype=torch.float32, device=device)
         self.register_buffer_like = None                  # operators are not nn.Modules here
         self._beta = beta * self.gain                     # (27, 3), FROZEN
@@ -353,10 +389,11 @@ class EyeMechanics(Lateral):
     WRITES = ["gaze"]
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
-    REQUIRES_PARAMS = ["fit"]
+    REQUIRES_PARAMS = []               # `fit:` OR inline coefficients; see `_coefficients`
     MECHANISM_TAGS = ["oculomotor", "plant", "second_order", "damped_oscillator",
                       "hammerstein"]
-    PARAM_ROLES = {"fit": "eye_characterisation_json",
+    PARAM_ROLES = {"fit": "eye_characterisation_json", "C": "inline_damping_matrix",
+                   "K": "inline_stiffness_matrix",
                    "damping_scale": "multiplier_on_C", "stiffness_scale": "multiplier_on_K"}
     REFERENCE = ("The linear half of a Hammerstein cascade. C and K fitted to the step "
                  "responses of the soft-body eye in Plexus prototype/eye/.")
@@ -364,7 +401,7 @@ class EyeMechanics(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "eye")
-        spec = _load_fit(params["fit"])
+        spec = _coefficients(params, ("C", "K"))
         c_s = float(params.get("damping_scale", 1.0))
         k_s = float(params.get("stiffness_scale", 1.0))
         self._C = torch.as_tensor(spec["C"], dtype=torch.float32, device=device) * c_s
