@@ -12,10 +12,11 @@
 # THE HIERARCHY IS ORDINARY CONTAINMENT, and that is the point of running this model here at all:
 #
 #     brain -> assembly -> neuron        the same `parent` map that relates particles to a cell
-#     synapse                            an EDGE-SET whose elements are connections (pre/post)
+#     connectivity                       an EDGE-SET whose elements are connections (pre/post)
 #
 # An assembly is not a new primitive; it is a set at another scale. The connectivity matrix is not
-# a dense tensor inside an operator; it is the `w` state of the synapse set.
+# a dense tensor inside an operator; it is the `w` state of the connectivity set. It is called
+# `connectivity` and not `synapse` because these weights are DRAWN, not measured.
 #
 # UNITS: none declared -- this run is dimensionless. tau, g and dt are numbers, and no result from
 # it may be quoted with a unit. Stated here rather than left to be inferred from a plot axis.
@@ -60,9 +61,10 @@ sets:
 
   # the connectivity matrix, in the language: one element per connection, joined to the neuron
   # set by the `pre`/`post` incidence maps, carrying W_e in its `w` block.
-  synapse:
+  connectivity:
     parent: brain
     edge_set: true
+    entity: connection
     pre: neuron
     post: neuron
     edges:
@@ -329,7 +331,7 @@ operators:
   - op: neuron_signal             # psi: g * Omega * SUM_e W_e psi(x_pre)
     at: neuron
     model: type_pairwise          # the receiver's width, the sender's threshold and linear term
-    edge_set: synapse
+    edge_set: connectivity
     activation: tanh
     field: omega
 

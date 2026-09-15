@@ -22,19 +22,19 @@ sets:
         p: [2.0, 0.0, 2.0, 0.0, 1.0, 0.0]
   eye: {parent: head, per_parent: 1}
   muscle: {parent: eye, per_parent: 6}
-  afferent: {parent: head, edge_set: true, entity: synapse, pre: retina, post: neuron, edges_file: neural/ctrnn_eyeG_rig_win.npz}
-  synapse: {parent: head, edge_set: true, pre: neuron, post: neuron, edges_file: neural/ctrnn_eyeG_rig_rec.npz}
-  junction: {parent: head, edge_set: true, entity: synapse, pre: neuron, post: muscle, edges_file: neural/ctrnn_eyeG_rig_wout.npz}
+  afferent: {parent: head, edge_set: true, entity: connection, pre: retina, post: neuron, edges_file: neural/ctrnn_eyeG_rig_win.npz}
+  recurrent: {parent: head, edge_set: true, entity: connection, pre: neuron, post: neuron, edges_file: neural/ctrnn_eyeG_rig_rec.npz}
+  junction: {parent: head, edge_set: true, entity: connection, pre: neuron, post: muscle, edges_file: neural/ctrnn_eyeG_rig_wout.npz}
 fields: {}
 seed:
 - {op: seed_state_random, at: retina, block: signal, lo: 0.35, hi: 0.35}
 operators:
 - {op: project, at: neuron, edge_set: afferent, block: signal, gain: 2.0}
 - {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.0}
-- {op: neuron_signal, at: neuron, model: shared, edge_set: synapse, activation: tanh}
+- {op: neuron_signal, at: neuron, model: shared, edge_set: recurrent, activation: tanh}
 - {op: readout, at: muscle, edge_set: junction, block: voltage, into: drive, send: tanh,
     activation: softplus}
-- op: muscle_gaze_map
+- op: muscle_pose_map
   at: muscle
   parent: eye
   beta:
@@ -65,7 +65,7 @@ operators:
   - [2.6171, -1.167, 0.8602]
   - [0.0602, -0.6024, -0.0362]
   - [3.0914, 0.1449, 0.3962]
-- op: eye_mechanics
+- op: organ_mechanics
   at: eye
   C:
   - [4.6191, -0.0448, 0.1727]
@@ -75,5 +75,5 @@ operators:
   - [37.4987, 6.3437, 4.9042]
   - [6.3437, 44.6684, 5.3534]
   - [4.9042, 5.3534, 42.6988]
-schedule: [project, neuron_update, neuron_signal, readout, muscle_gaze_map, eye_mechanics]
+schedule: [project, neuron_update, neuron_signal, readout, muscle_pose_map, organ_mechanics]
 plotting: {renderer: none, max_frames: 0}

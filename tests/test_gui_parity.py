@@ -139,14 +139,14 @@ def test_metabolism_operators_conserve_what_the_stoichiometry_says():
 
 # ----------------------------------------------------------------- the circuit panel
 def test_dale_weights_take_the_presynaptic_sign():
-    """Under `dale: 1` every synapse's sign is its presynaptic neuron's, E first then I inside
+    """Under `dale: 1` every connection's sign is its presynaptic neuron's, E first then I inside
     every assembly block (`type_layout: ordered`), and the I weights carry the n_E/n_I balance."""
     from plexus.gui.tabs import neurons as N
     spec = N.build_spec(N.DEFAULT_FORM)
     types = spec["sets"]["neuron"]["types"]
     per = spec["sets"]["neuron"]["per_parent"]
     n_e = sum(t["count"] for nm, t in types.items() if t["sign"] == "E")
-    for (pre, post), w in zip(spec["sets"]["synapse"]["edges"], spec["sets"]["synapse"]["weights"]):
+    for (pre, post), w in zip(spec["sets"]["connectivity"]["edges"], spec["sets"]["connectivity"]["weights"]):
         assert (w > 0) == ((pre % per) < n_e), (pre, w)
 
 

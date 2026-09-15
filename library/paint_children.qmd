@@ -72,7 +72,7 @@ operators:
 
 ## Related operators
 
-Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`muscle_gaze_map`](muscle_gaze_map.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
+Other **aggregate** operators: [`cell_geometry`](cell_geometry.qmd), [`aggregate_centroid`](aggregate_centroid.qmd), [`muscle_pose_map`](muscle_pose_map.qmd), [`reaction_rate`](reaction_rate.qmd), [`metabolite_flux`](metabolite_flux.qmd).
 
 ## Source
 
