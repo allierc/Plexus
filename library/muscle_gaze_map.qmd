@@ -35,7 +35,7 @@ G, the static map: where the eye would come to rest if these six drives were hel
 
 - **Kind** &mdash; $\textstyle\sum_\pi$ **aggregate**: children &rarr; parent, up the containment $\pi$.
 - **Acts on** &mdash; `muscle` (the set the operator acts on).
-- **Reads** &mdash; `fit`
+- **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
 - **Dimensions** &mdash; 2D, 3D.
@@ -78,7 +78,8 @@ raised anywhere, so the count is checked here and the order is stated in `MUSCLE
 
 | parameter | role | default |
 |---|---|---|
-| `fit` | eye_characterisation_json | **required** |
+| `fit` | eye_characterisation_json | &ndash; |
+| `beta` | inline_static_map_coefficients | &ndash; |
 | `parent` | eye_set_name | "eye" |
 | `gain` | scale_on_every_coefficient | 1.0 |
 
@@ -86,7 +87,7 @@ raised anywhere, so the count is checked here and the order is stated in `MUSCLE
 
 ```yaml
 operators:
-  - {op: muscle_gaze_map, at: muscle, fit: ...}
+  - {op: muscle_gaze_map, at: muscle}
 ```
 
 ## Mechanism-search tags
@@ -147,9 +148,10 @@ class MuscleGazeMap(Aggregate):
     SUPPORTED_DIMS = [2, 3]            # acts on angles, not on the world's coordinates
     DIFFERENTIABLE = True
     MAY_MUTATE_INTEGRATED_STATE = True  # writes a block on the parent -- that is what it is for
-    REQUIRES_PARAMS = ["fit"]
+    REQUIRES_PARAMS = []               # `fit:` OR inline coefficients; see `_coefficients`
     MECHANISM_TAGS = ["oculomotor", "muscle", "static_map", "hammerstein", "quadratic_synergy"]
-    PARAM_ROLES = {"fit": "eye_characterisation_json", "parent": "eye_set_name",
+    PARAM_ROLES = {"fit": "eye_characterisation_json", "beta": "inline_static_map_coefficients",
+                   "parent": "eye_set_name",
                    "gain": "scale_on_every_coefficient"}
     REFERENCE = ("The static half of a Hammerstein cascade -- a measured memoryless "
                  "nonlinearity ahead of a linear body. Coefficients fitted from the soft-body "
@@ -160,7 +162,7 @@ class MuscleGazeMap(Aggregate):
         self.at = params.get("_at", "muscle")
         self.parent = params.get("parent", "eye")
         self.gain = float(params.get("gain", 1.0))       # one scalar on every coefficient
-        spec = _load_fit(params["fit"])
+        spec = _coefficients(params, ("beta",))
         beta = torch.as_tensor(spec["beta"], dtype=torch.float32, device=device)
         self.register_buffer_like = None                  # operators are not nn.Modules here
         self._beta = beta * self.gain                     # (27, 3), FROZEN

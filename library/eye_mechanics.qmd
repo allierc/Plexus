@@ -35,7 +35,7 @@ The plant: a damped second-order body pulled toward the commanded equilibrium.
 
 - **Kind** &mdash; $\mathcal{O}_E$ **lateral**: within-set interaction over a relation $E$.
 - **Acts on** &mdash; `eye` (the set the operator acts on).
-- **Reads** &mdash; `fit`
+- **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
 - **Dimensions** &mdash; 2D, 3D.
@@ -96,7 +96,9 @@ the fit's own residual, the choice is genuinely free and the run may say so.
 
 | parameter | role | default |
 |---|---|---|
-| `fit` | eye_characterisation_json | **required** |
+| `fit` | eye_characterisation_json | &ndash; |
+| `C` | inline_damping_matrix | &ndash; |
+| `K` | inline_stiffness_matrix | &ndash; |
 | `damping_scale` | multiplier_on_C | 1.0 |
 | `stiffness_scale` | multiplier_on_K | 1.0 |
 
@@ -112,7 +114,7 @@ The same biology computed differently; `implementation:` selects one.
 
 ```yaml
 operators:
-  - {op: eye_mechanics, at: eye, fit: ...}
+  - {op: eye_mechanics, at: eye}
 ```
 
 ## Mechanism-search tags
@@ -193,10 +195,11 @@ class EyeMechanics(Lateral):
     WRITES = ["gaze"]
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
-    REQUIRES_PARAMS = ["fit"]
+    REQUIRES_PARAMS = []               # `fit:` OR inline coefficients; see `_coefficients`
     MECHANISM_TAGS = ["oculomotor", "plant", "second_order", "damped_oscillator",
                       "hammerstein"]
-    PARAM_ROLES = {"fit": "eye_characterisation_json",
+    PARAM_ROLES = {"fit": "eye_characterisation_json", "C": "inline_damping_matrix",
+                   "K": "inline_stiffness_matrix",
                    "damping_scale": "multiplier_on_C", "stiffness_scale": "multiplier_on_K"}
     REFERENCE = ("The linear half of a Hammerstein cascade. C and K fitted to the step "
                  "responses of the soft-body eye in Plexus prototype/eye/.")
@@ -204,7 +207,7 @@ class EyeMechanics(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "eye")
-        spec = _load_fit(params["fit"])
+        spec = _coefficients(params, ("C", "K"))
         c_s = float(params.get("damping_scale", 1.0))
         k_s = float(params.get("stiffness_scale", 1.0))
         self._C = torch.as_tensor(spec["C"], dtype=torch.float32, device=device) * c_s

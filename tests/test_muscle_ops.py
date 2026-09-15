@@ -193,3 +193,69 @@ def test_a_missing_or_malformed_fit_is_refused(tmp_path):
                                "C": np.eye(3).tolist(), "K": np.eye(2).tolist()}))
     with pytest.raises(ValueError, match="expected"):
         get_operator("eye_mechanics")({"fit": str(bad), "_at": "eye"})
+
+
+# --------------------------------------------------------------------------- #
+#  the whole rig, as a spec
+# --------------------------------------------------------------------------- #
+def test_the_ctrnn_rig_spec_reproduces_CTRNNEyeG():
+    """config/neural/ctrnn_eyeG_rig.yaml against the forward loop it was transcribed from.
+
+    The spec is the FIRST rig of the oculomotor work -- `CTRNNEyeG` in
+    `prototype/dot_tracking/train_eyeG.py`: a free 64-unit continuous-time circuit between a
+    two-channel velocity input and the six muscle drives of the fitted eye. It is the whole
+    chain in one file, W_in -> circuit -> W_out -> organ, and the point of the test is that the
+    chain is ARITHMETICALLY the reference's, not merely shaped like it.
+
+    Skipped where the edge-set npz are absent, since they live in graphs_data rather than in the
+    repository; nothing else here needs them.
+    """
+    import os
+    import numpy as np
+    from plexus.schema import load
+    from plexus import engine
+    from plexus.paths import graphs_data_path
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    spec_path = os.path.join(root, "config", "neural", "ctrnn_eyeG_rig.yaml")
+    d = os.path.join(graphs_data_path(), "neural")
+    files = [f"ctrnn_eyeG_rig_{k}.npz" for k in ("win", "rec", "wout")]
+    if not all(os.path.exists(os.path.join(d, f)) for f in files):
+        pytest.skip("the rig's edge sets are not on this host")
+
+    def mat(f, r, c):
+        z = np.load(os.path.join(d, f))
+        M = np.zeros((r, c))
+        M[z["edge_index"][1], z["edge_index"][0]] = z["weights"]
+        return M
+
+    Win, W, Wout = mat(files[0], 64, 2), mat(files[1], 64, 64), mat(files[2], 6, 64)
+    sim = load(spec_path)
+    # The coefficients are IN the spec, so the reference reads them from there rather than from
+    # a characterisation file -- which is the property being relied on, not a convenience.
+    ops = {o.op: o.params for o in sim.operators}
+    beta = np.asarray(ops["muscle_gaze_map"]["beta"], float)
+    C, K = (np.asarray(ops["eye_mechanics"][k], float) for k in ("C", "K"))
+    dt, tau, T = float(sim.dt), 0.5, int(sim.n_frames)
+    drive_in = float(sim.seed[0].params["lo"]) if getattr(sim, "seed", None) else 0.35
+
+    minv = np.linalg.inv(np.eye(3) + dt * C)
+    I = Win @ np.full(2, drive_in)
+    v, u, ud = np.zeros(64), np.zeros(3), np.zeros(3)
+    for _ in range(T):
+        r = np.tanh(v)                                   # the RATES are what W_out sees
+        m = np.log1p(np.exp(Wout @ r))                   # softplus: a muscle pulls or does nothing
+        cross = np.array([m[i] * m[j] for i, j in PAIRS])
+        u_inf = np.concatenate([m, m ** 2, cross]) @ beta
+        ud = (ud + dt * (K @ (u_inf - u))) @ minv.T
+        u = u + dt * ud
+        v = v + dt * ((1.0 / tau) * (-v + W @ r + I))     # a = g = 1/tau, the spec's p row
+
+    H, _ = engine.run(sim, device="cpu", progress=False)
+    got = H.level("eye").get("gaze")[0].detach().numpy().astype(np.float64)
+    err = np.abs(got - u).max()
+    assert abs(u[0]) > 1.0, f"the rig barely moves the eye (theta {u[0]:.3f} deg); vacuous"
+    assert err < 1e-3, (
+        f"the spec departs from CTRNNEyeG by {err:.3e} deg of gaze over {T} frames. The chain "
+        f"is W_in -> circuit -> W_out -> organ; a mismatch here means one link is not the "
+        f"reference's arithmetic.")
