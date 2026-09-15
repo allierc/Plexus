@@ -1,6 +1,6 @@
 """The oculomotor plant, against the reference rollout it was transcribed from.
 
-The two operators of `plexus.operators.eye_ops` reproduce one specific implementation:
+The two operators of `plexus.operators.muscle_ops` reproduce one specific implementation:
 `prototype/dot_tracking/train_eyeG.py` in the connectome-gnn repository, whose `EyeG.equilibrium`
 is the quadratic static map and whose `rollout` is the damped second-order body, semi-implicit in
 the spring and implicit in the damping. A controller trained through THAT eye can only be replayed
@@ -23,7 +23,7 @@ import torch
 
 import plexus.operators                                        # noqa: F401  self-registers
 from plexus.models.registry import get_operator
-from plexus.operators.eye_ops import MUSCLES, N_MUSCLE, N_QUAD, PAIRS
+from plexus.operators.muscle_ops import MUSCLES, N_MUSCLE, N_QUAD, PAIRS
 
 DT = 1.0 / 60.0                    # the rate the reference controller is trained at
 T = 240                            # 4 s, long enough for the plant's ~1 Hz ringing to show
