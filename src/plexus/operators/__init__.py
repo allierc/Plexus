@@ -21,8 +21,10 @@ other is how anyone can tell which one a specification is getting.
     encoding_ops         fields that REPRESENT rather than simulate: hash_encoding, voxelize
     interaction_ops      pairwise laws, and the relation they act over
     field_ops            a continuum bound to a set: deposit / diffuse / decay / sense
-    eye_ops              the oculomotor plant: six muscle drives to three gaze angles, as a
-                         measured static map and the damped body that has to travel to it
+    muscle_ops           the oculomotor plant, reduced: six muscle drives to three gaze
+                         angles, as a measured static map and the damped body that travels
+                         to it. A fit of the MPM eye in prototype/eye/, cheap enough to
+                         train a controller through
     neural               a recurrent circuit: the seed that places a connectome region, the
                          local update, the signalling through W, and the field modulating it
 
@@ -68,9 +70,9 @@ from . import io_ops               # noqa: F401  load_run -- x_0 from a finished
 from . import cell_ops             # noqa: F401  compartment (entity), seed_cell_atlas,
 #                                                 aggregate_centroid, state_diffuse, and the
 #                                                 motility pair: substrate_traction, protrusion
-from . import eye_ops               # noqa: F401  the oculomotor plant: muscle_gaze_map (the
-#                                                 measured static map g) + eye_mechanics (the
-#                                                 damped second-order body), and the eye/muscle sets
+from . import muscle_ops            # noqa: F401  the reduced oculomotor plant: muscle_gaze_map
+#                                                 (the measured static map g) + eye_mechanics
+#                                                 (the damped body), and the eye/muscle sets
 from . import neural                # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
 from . import metabolism            # noqa: F401  metabolite_seed, reaction_rate, metabolite_flux,
                                     #             metabolite_homeostasis -- mass action over a stoichiometric edge-set
@@ -86,4 +88,4 @@ from plexus import continuous_engine   # noqa: F401  mpm_emit / mpm_drain
 
 __all__ = ["encoding_ops", "interaction_ops", "motion_ops", "field_ops", "mpm_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "cell_ops", "io_ops", "eye_ops", "neural", "continuous_engine"]
+           "contact_ops", "cell_ops", "io_ops", "muscle_ops", "neural", "continuous_engine"]

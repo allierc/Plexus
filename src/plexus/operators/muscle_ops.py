@@ -1,4 +1,4 @@
-"""The oculomotor plant: six muscle drives in, three gaze angles out.
+"""The oculomotor plant, REDUCED: six muscle drives in, three gaze angles out.
 
 An eye is a body on springs, not a lookup table. A muscle drive does not produce a gaze angle;
 it produces a gaze angle the eye then has to TRAVEL to. That one fact is why this module has two
@@ -13,6 +13,29 @@ The two entities they act on are registered here as well:
 
     eye       gaze (3) | gaze_rate (3) | gaze_inf (3)     one eye
     muscle    drive (1)                                    six per eye, its extraocular muscles
+
+THIS IS A SURROGATE, AND THE THING IT STANDS IN FOR IS IN `prototype/eye/`. There, an eye is a
+deformable MLS-MPM body: a set `eye` holding the globe, its tissue as `mpm_particle`, six
+`muscle`s whose own tissue is `muscle_particle`, all coupled through ONE shared `mpm_grid`
+field. Its own `muscle_ops.py` states the rule outright -- "no operator applies a force to the
+eye; the globe rotates because a muscle got shorter" -- and there `gaze` is an integration:none
+READOUT, aggregated from the globe's material points by `eye_pose`, while a muscle carries an
+integrated activation `act` and reports `length` and `tension`.
+
+Here `gaze` is instead an integrated second-order coordinate of a three-angle rigid body, and a
+muscle carries a `drive` and nothing else. That is a deliberately poorer model and it exists for
+one reason: a controller cannot be trained through the MPM eye. Fitting a circuit to a tracking
+task is thousands of trials of hundreds of frames, and differentiating an MLS-MPM rollout that
+many times is not affordable, whereas these two operators are a matmul and a 3x3 solve. So the
+expensive mechanism is characterised ONCE, offline, and what is trained against is this fit of
+it -- the same move `prototype/dot_tracking/train_eyeG.py` makes, and the reason `fit:` names a
+measured file rather than exposing parameters to tune.
+
+The consequence to keep in view: a result obtained here is a result about the FIT. Where the fit
+is good the two agree by construction; where it is not, only the MPM eye is evidence. The names
+`eye` and `muscle` are shared with the prototype on purpose, because they are the same biology
+at two resolutions, and a spec's own inline `state:` block always outranks the schemas declared
+below (`engine._resolve_schema` step 1), so declaring the richer MPM layout still gets it.
 
 THE COEFFICIENTS ARE MEASURED, NOT ASSUMED. Both operators read one `fit:` json, the result of
 characterising a soft-body eye: 27 coefficients per axis for the static map, and a 3x3 damping C
