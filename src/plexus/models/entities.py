@@ -1100,12 +1100,24 @@ class NeuralAssembly:
 
 
 @register_entity(
-    "synapse", depth=0,
+    "connection", "synapse", depth=0,
     state_schema=synapse_schema,
     render={"color_by": "node_type", "arrows": None},
 )
-class Synapse:
-    """A connection between two neurons: an EDGE-SET element carrying the weight W_e."""
+class Connection:
+    """One weighted link between two sets: an EDGE-SET element carrying the weight W_e.
+
+    `synapse` IS AN ALIAS, and the general name leads for a reason. What this entity provides is
+    a `w` block on a relation, which is what EVERY weighted map needs -- a sensor population into
+    a circuit, a circuit into an effector, one circuit into another, or a free matrix with no
+    anatomy in it at all. Only some of those are synapses. A free 64x64 recurrent matrix in a
+    prototype is a CONNECTIVITY matrix and calling it a synapse overclaims: a synapse is a
+    measured thing, and the word should stay available for when the weights actually came from
+    tissue.
+
+    So a spec names its set for what that set is -- `recurrent`, `afferent`, `junction`,
+    `synapse` -- and points `entity:` here for the state. The set's NAME is what it is; the
+    entity is what provides its layout."""
 
 
 # default for any set whose name is not a registered entity. Kept as the legacy dict

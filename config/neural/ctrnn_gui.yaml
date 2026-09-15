@@ -55,9 +55,10 @@ sets:
         - 2.0
         - 0.0
     type_layout: ordered
-  synapse:
+  connectivity:
     parent: brain
     edge_set: true
+    entity: connection
     pre: neuron
     post: neuron
     edges:
@@ -1529,7 +1530,7 @@ operators:
 - op: neuron_signal
   at: neuron
   model: type_pairwise
-  edge_set: synapse
+  edge_set: connectivity
   activation: tanh
   field: omega
 schedule:

@@ -95,15 +95,15 @@ class _H:
 
 def _run(fit, m, dt, implementation=None):
     """Step the two operators the way the engine steps a second-order set."""
-    eye = _Lvl(1, {"gaze": (0, 3), "gaze_rate": (3, 6), "gaze_inf": (6, 9)}, 9, "eye")
+    eye = _Lvl(1, {"pose": (0, 3), "pose_rate": (3, 6), "pose_target": (6, 9)}, 9, "eye")
     mus = _Lvl(N_MUSCLE, {"drive": (0, 1)}, 1, "muscle")
     H = _H(eye, mus, dt)
-    gmap = get_operator("muscle_gaze_map")({"fit": fit, "_at": "muscle", "parent": "eye"})
-    mech = get_operator("eye_mechanics", implementation=implementation)({"fit": fit, "_at": "eye"})
+    gmap = get_operator("muscle_pose_map")({"fit": fit, "_at": "muscle", "parent": "eye"})
+    mech = get_operator("organ_mechanics", implementation=implementation)({"fit": fit, "_at": "eye"})
     out = []
     for t in range(m.shape[0]):
         mus.state[:, 0:1] = torch.as_tensor(m[t], dtype=torch.float32)[:, None]
-        gmap.forward(H)                                     # -> gaze_inf on the parent
+        gmap.forward(H)                                     # -> pose_target on the parent
         a = mech.forward(H)["eye"]                          # the emitted acceleration
         eye.state[:, 3:6] = eye.state[:, 3:6] + dt * a      # v += dt a
         eye.state[:, 0:3] = eye.state[:, 0:3] + dt * eye.state[:, 3:6]   # u += dt v
@@ -174,10 +174,10 @@ def test_the_measured_eye_is_far_inside_the_explicit_stability_limit():
 def test_the_muscle_count_is_checked(tmp_path):
     """A fit is a map from EXACTLY six drives, in a stated order."""
     fit, _ = _synthetic_fit(tmp_path)
-    eye = _Lvl(1, {"gaze": (0, 3), "gaze_rate": (3, 6), "gaze_inf": (6, 9)}, 9, "eye")
+    eye = _Lvl(1, {"pose": (0, 3), "pose_rate": (3, 6), "pose_target": (6, 9)}, 9, "eye")
     mus = _Lvl(N_MUSCLE - 1, {"drive": (0, 1)}, 1, "muscle")      # five muscles
     H = _H(eye, mus, DT)
-    gmap = get_operator("muscle_gaze_map")({"fit": fit, "_at": "muscle", "parent": "eye"})
+    gmap = get_operator("muscle_pose_map")({"fit": fit, "_at": "muscle", "parent": "eye"})
     with pytest.raises(ValueError, match="muscles for"):
         gmap.forward(H)
     assert len(MUSCLES) == N_MUSCLE == 6
@@ -187,12 +187,12 @@ def test_the_muscle_count_is_checked(tmp_path):
 def test_a_missing_or_malformed_fit_is_refused(tmp_path):
     """Both operators read the same file, so a wrong one must not be read as a plausible eye."""
     with pytest.raises(FileNotFoundError, match="eye fit"):
-        get_operator("eye_mechanics")({"fit": str(tmp_path / "nope.json"), "_at": "eye"})
+        get_operator("organ_mechanics")({"fit": str(tmp_path / "nope.json"), "_at": "eye"})
     bad = tmp_path / "bad.json"
     bad.write_text(json.dumps({"beta": np.zeros((N_QUAD, 3)).tolist(),
                                "C": np.eye(3).tolist(), "K": np.eye(2).tolist()}))
     with pytest.raises(ValueError, match="expected"):
-        get_operator("eye_mechanics")({"fit": str(bad), "_at": "eye"})
+        get_operator("organ_mechanics")({"fit": str(bad), "_at": "eye"})
 
 
 # --------------------------------------------------------------------------- #
@@ -234,8 +234,8 @@ def test_the_ctrnn_rig_spec_reproduces_CTRNNEyeG():
     # The coefficients are IN the spec, so the reference reads them from there rather than from
     # a characterisation file -- which is the property being relied on, not a convenience.
     ops = {o.op: o.params for o in sim.operators}
-    beta = np.asarray(ops["muscle_gaze_map"]["beta"], float)
-    C, K = (np.asarray(ops["eye_mechanics"][k], float) for k in ("C", "K"))
+    beta = np.asarray(ops["muscle_pose_map"]["beta"], float)
+    C, K = (np.asarray(ops["organ_mechanics"][k], float) for k in ("C", "K"))
     dt, tau, T = float(sim.dt), 0.5, int(sim.n_frames)
     drive_in = float(sim.seed[0].params["lo"]) if getattr(sim, "seed", None) else 0.35
 
@@ -252,7 +252,7 @@ def test_the_ctrnn_rig_spec_reproduces_CTRNNEyeG():
         v = v + dt * ((1.0 / tau) * (-v + W @ r + I))     # a = g = 1/tau, the spec's p row
 
     H, _ = engine.run(sim, device="cpu", progress=False)
-    got = H.level("eye").get("gaze")[0].detach().numpy().astype(np.float64)
+    got = H.level("eye").get("pose")[0].detach().numpy().astype(np.float64)
     err = np.abs(got - u).max()
     assert abs(u[0]) > 1.0, f"the rig barely moves the eye (theta {u[0]:.3f} deg); vacuous"
     assert err < 1e-3, (

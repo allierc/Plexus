@@ -1,5 +1,5 @@
 ---
-title: "eye"
+title: "organ"
 subtitle: "A body its effectors move: a pose, the rate that pose is changing, and the pose being commanded."
 ---
 

@@ -254,7 +254,7 @@ def build_spec(form: dict) -> dict:
          "center": [0.3, 0.5]},
         {"op": "neuron_field_input", "at": "neuron", "from": "omega", "offset": 1.0},
         {"op": "neuron_update", "at": "neuron", "model": "leaky_tanh", "noise": float(form.get("noise", 0.02))},
-        {"op": "neuron_signal", "at": "neuron", "model": "type_pairwise", "edge_set": "synapse",
+        {"op": "neuron_signal", "at": "neuron", "model": "type_pairwise", "edge_set": "connectivity",
          "activation": "tanh", "field": "omega"},
     ]
     sched = ["pacemaker", "activation_pulse", "neuron_field_input", "neuron_update", "neuron_signal"]
@@ -272,8 +272,13 @@ def build_spec(form: dict) -> dict:
             # contained assembly is placed at random and a whole group could sit against the wall.
             "assembly": {"n": n_a, "start": _ring(n_a, 0.30 if n_a > 1 else 0.0), "radius": 0.12},
             "neuron": {"parent": "assembly", "per_parent": per, "radius": 0.10, "types": types, **neuron_extra},
-            "synapse": {"parent": "brain", "edge_set": True, "pre": "neuron", "post": "neuron",
-                        "edges": edges, "weights": weights},
+            # `connectivity`, NOT `synapse`. These weights are N(0, 1/sqrt N) draws, not
+            # measurements; a synapse is a measured thing and the word should stay available
+            # for when the weights actually came from tissue (`_region_spec` above, which does
+            # call its set `synapse`). `entity: connection` gives it the same `w` block.
+            "connectivity": {"parent": "brain", "edge_set": True, "entity": "connection",
+                             "pre": "neuron", "post": "neuron",
+                             "edges": edges, "weights": weights},
         },
         "fields": {"omega": {"frame": "grid", "res": 64, "components": 1}},
         "operators": ops,

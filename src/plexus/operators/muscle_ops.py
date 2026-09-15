@@ -11,10 +11,10 @@ eye arrives, the target has moved.
 
 The two entities they act on are registered here as well:
 
-    eye       gaze (3) | gaze_rate (3) | gaze_inf (3)     one eye
+    eye       gaze (3) | pose_rate (3) | pose_target (3)     one eye
     muscle    drive (1)                                    six per eye, its extraocular muscles
 
-THIS IS A SURROGATE, AND THE THING IT STANDS IN FOR IS IN `prototype/eye/`. There, an eye is a
+THE EYE THIS WAS FITTED FROM IS IN `prototype/eye/`, AND IT IS A RICHER OBJECT. There, an eye is a
 deformable MLS-MPM body: a set `eye` holding the globe, its tissue as `mpm_particle`, six
 `muscle`s whose own tissue is `muscle_particle`, all coupled through ONE shared `mpm_grid`
 field. Its own `muscle_ops.py` states the rule outright -- "no operator applies a force to the
@@ -22,7 +22,7 @@ eye; the globe rotates because a muscle got shorter" -- and there `gaze` is an i
 READOUT, aggregated from the globe's material points by `eye_pose`, while a muscle carries an
 integrated activation `act` and reports `length` and `tension`.
 
-Here `gaze` is instead an integrated second-order coordinate of a three-angle rigid body, and a
+Here `pose` is instead an integrated second-order coordinate of a three-angle rigid body, and a
 muscle carries a `drive` and nothing else. That is a deliberately poorer model and it exists for
 one reason: a controller cannot be trained through the MPM eye. Fitting a circuit to a tracking
 task is thousands of trials of hundreds of frames, and differentiating an MLS-MPM rollout that
@@ -85,28 +85,28 @@ AXES = ("theta", "phi", "psi")                           # horizontal, vertical,
 
 
 # --------------------------------------------------------------------------- the entities
-def eye_schema(dim: int) -> StateSchema:
-    """`gaze` | `gaze_rate` | `gaze_inf`, three degrees each, whatever the world's dimension.
+def organ_schema(dim: int) -> StateSchema:
+    """`gaze` | `pose_rate` | `pose_target`, three degrees each, whatever the world's dimension.
 
-    THE WIDTH IS 3 AND IT IS NOT `dim`. An eye rotates about three axes no matter how many
+    THE WIDTH IS 3 AND IT IS NOT `dim`. A rigid body has three rotational degrees of freedom no matter how many
     spatial dimensions the run declares, so these blocks do not narrow to 2 in a 2-D world the
     way `pos` does. The third angle is torsion, and it is not decoration: on a real eye the
     muscle synergies leak into it hard enough that a two-angle plant cannot be fitted.
 
-    `gaze` is the coordinate and `gaze_rate` its rate, paired as a second-order block so the
-    engine integrates `gaze_rate += dt * a; gaze += dt * gaze_rate` from whatever
+    `gaze` is the coordinate and `pose_rate` its rate, paired as a second-order block so the
+    engine integrates `pose_rate += dt * a; gaze += dt * pose_rate` from whatever
     `eye_mechanics` emits. `boundary` is FREE on both, because these are DEGREES and not
     positions -- wrapping them into the world box would fold the gaze back on itself.
 
-    `gaze_inf` is where the eye is heading, not where it is: the equilibrium the current drives
+    `pose_target` is where the eye is heading, not where it is: the equilibrium the current drives
     command, written each frame by `muscle_gaze_map` and integrated by nothing.
     """
     return StateSchema([
-        Block("gaze", 3, role="coordinate", integration=SECOND_ORDER_COORDINATE,
+        Block("pose", 3, role="coordinate", integration=SECOND_ORDER_COORDINATE,
               boundary=BOUNDARY_FREE, unit=None),
-        Block("gaze_rate", 3, role="rate", integration=SECOND_ORDER_RATE,
+        Block("pose_rate", 3, role="rate", integration=SECOND_ORDER_RATE,
               boundary=BOUNDARY_FREE, record=False),
-        Block("gaze_inf", 3, role="readout", integration=NONE, boundary=BOUNDARY_FREE),
+        Block("pose_target", 3, role="readout", integration=NONE, boundary=BOUNDARY_FREE),
     ])
 
 
@@ -129,13 +129,19 @@ def muscle_schema(dim: int) -> StateSchema:
     ])
 
 
-@register_entity("eye", depth=1, state_schema=eye_schema,
+@register_entity("organ", "eye", depth=1, state_schema=organ_schema,
                  render={"color_by": "node_type", "arrows": None})
-class Eye:
-    """One eye: a globe on springs, carrying three angles and the equilibrium it is heading to.
+class Organ:
+    """A body its effectors move: a pose, the rate that pose is changing, and the pose being
+    commanded.
 
-    `depth=1` because it holds a contained set (its six muscles), the same hint `cell` carries.
-    Nothing dispatches on depth; the containment the engine actually traverses is `parent`.
+    `eye` IS AN ALIAS, not a separate entity. An eye is one organ of this shape -- a mass on
+    springs whose muscles ask it to go somewhere -- and so are a jaw, a limb segment and a fin.
+    Naming the general kind and letting a spec call its own set `eye` keeps the vocabulary
+    honest without making every spec say `organ` when it means an eye.
+
+    `depth=1` because it holds a contained set (its effectors), the same hint `cell` carries.
+    Nothing dispatches on depth; the containment the engine traverses is `parent`.
     """
 
 
@@ -220,11 +226,11 @@ def _load_fit(path, need=("beta", "C", "K")):
 
 
 # --------------------------------------------------------------------------- g -- the static map
-@register_operator("muscle_gaze_map", family="oculomotor", set="muscle", kind="aggregate")
-class MuscleGazeMap(Aggregate):
+@register_operator("muscle_pose_map", family="mechanics", set="muscle", kind="aggregate")
+class MusclePoseMap(Aggregate):
     """g, the static map: where the eye would come to rest if these six drives were held.
 
-    muscle -> eye: reads every muscle's `drive`, writes its parent eye's `gaze_inf`. The relation
+    muscle -> eye: reads every muscle's `drive`, writes its parent eye's `pose_target`. The relation
     traversed is the containment map from a muscle to the eye that owns it.
 
         g^k(m) = sum_i a^k_i m_i  +  sum_{i<=j} b^k_ij m_i m_j,     k in (theta, phi, psi)
@@ -257,18 +263,18 @@ class MuscleGazeMap(Aggregate):
     raised anywhere, so the count is checked here and the order is stated in `MUSCLES`.
     """
 
-    EMIT = None                        # writes the parent's gaze_inf; no integrable delta
+    EMIT = None                        # writes the parent's pose_target; no integrable delta
     INPUTS = ["muscle"]
-    OUTPUTS = ["eye"]
+    OUTPUTS = ["organ"]
     READS = ["drive"]
-    WRITES = ["gaze_inf"]
+    WRITES = ["pose_target"]
     SUPPORTED_DIMS = [2, 3]            # acts on angles, not on the world's coordinates
     DIFFERENTIABLE = True
     MAY_MUTATE_INTEGRATED_STATE = True  # writes a block on the parent -- that is what it is for
     REQUIRES_PARAMS = []               # `fit:` OR inline coefficients; see `_coefficients`
     MECHANISM_TAGS = ["oculomotor", "muscle", "static_map", "hammerstein", "quadratic_synergy"]
     PARAM_ROLES = {"fit": "eye_characterisation_json", "beta": "inline_static_map_coefficients",
-                   "parent": "eye_set_name",
+                   "parent": "organ_set_name",
                    "gain": "scale_on_every_coefficient"}
     REFERENCE = ("The static half of a Hammerstein cascade -- a measured memoryless "
                  "nonlinearity ahead of a linear body. Coefficients fitted from the soft-body "
@@ -277,7 +283,7 @@ class MuscleGazeMap(Aggregate):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "muscle")
-        self.parent = params.get("parent", "eye")
+        self.parent = params.get("parent", "organ")
         self.gain = float(params.get("gain", 1.0))       # one scalar on every coefficient
         spec = _coefficients(params, ("beta",))
         beta = torch.as_tensor(spec["beta"], dtype=torch.float32, device=device)
@@ -309,31 +315,31 @@ class MuscleGazeMap(Aggregate):
             m = m * mask.reshape(eye.n, N_MUSCLE).to(m.dtype)
         cross = m[:, self._pairs[:, 0]] * m[:, self._pairs[:, 1]]            # (n_eye, 15)
         design = torch.cat([m, m ** 2, cross], dim=-1)                       # (n_eye, 27)
-        gaze_inf = design @ beta                                             # (n_eye, 3), degrees
-        g0, g1 = eye.state_schema["gaze_inf"]
+        pose_target = design @ beta                                             # (n_eye, 3), degrees
+        g0, g1 = eye.state_schema["pose_target"]
         if torch.is_grad_enabled():
             # Clone-and-reassign so the tape keeps the previous state alive; see
             # `aggregate_centroid` for why the forward path must NOT do this.
             st = eye.state.clone()
-            st[:, g0:g1] = gaze_inf
+            st[:, g0:g1] = pose_target
             eye.state = st
         else:
-            eye.state[:, g0:g1] = gaze_inf
+            eye.state[:, g0:g1] = pose_target
         _ = pidx                                          # the fibre is the reshape; kept for the check above
         return {}
 
 
 # --------------------------------------------------------------------------- the body
-@register_operator("eye_mechanics", family="oculomotor", set="eye", kind="lateral")
-class EyeMechanics(Lateral):
+@register_operator("organ_mechanics", family="mechanics", set="organ", kind="lateral")
+class OrganMechanics(Lateral):
     """The plant: a damped second-order body pulled toward the commanded equilibrium.
 
-    eye -> eye: reads `gaze`, `gaze_rate` and `gaze_inf`, emits the gaze acceleration.
+    eye -> eye: reads `gaze`, `pose_rate` and `pose_target`, emits the gaze acceleration.
 
         u_ddot + C u_dot + K u = K u_inf      i.e.      u_ddot = K (u_inf - u) - C u_dot
 
     u is `gaze`, the three angles (theta horizontal, phi vertical, psi torsion) in degrees;
-    u_dot is `gaze_rate`, in degrees per second; u_inf is `gaze_inf`, the equilibrium
+    u_dot is `pose_rate`, in degrees per second; u_inf is `pose_target`, the equilibrium
     `muscle_gaze_map` wrote, in degrees. K is the stiffness, a 3x3 in inverse seconds squared --
     how hard the eye is pulled toward u_inf. C is the damping, a 3x3 in inverse seconds -- how
     hard it resists moving. Both are full matrices and not diagonal: the axes are coupled, which
@@ -354,7 +360,7 @@ class EyeMechanics(Lateral):
 
     SECOND ORDER, AND THE ENGINE OWNS THE INTEGRATION. `EMIT = "acceleration"` is the whole of
     this operator's contract with the clock: it hands back u_ddot and the engine advances
-    `gaze_rate += dt * a; gaze += dt * gaze_rate`. Getting that wrong is not subtle -- a
+    `pose_rate += dt * a; gaze += dt * pose_rate`. Getting that wrong is not subtle -- a
     first-order eye has no overshoot, no ringing and almost no lag, and the control problem it
     poses stops being the one a real eye poses.
 
@@ -381,12 +387,12 @@ class EyeMechanics(Lateral):
     the fit's own residual, the choice is genuinely free and the run may say so.
     """
 
-    EMIT = "acceleration"              # second-order: the eye has inertia
-    INTEGRAND = "gaze"                 # not the set's spatial coordinate -- the angles
-    INPUTS = ["eye"]
-    OUTPUTS = ["eye"]
-    READS = ["gaze", "gaze_rate", "gaze_inf"]
-    WRITES = ["gaze"]
+    EMIT = "acceleration"              # second-order: an organ has inertia
+    INTEGRAND = "pose"                 # not the set's spatial coordinate -- the angles
+    INPUTS = ["organ"]
+    OUTPUTS = ["organ"]
+    READS = ["pose", "pose_rate", "pose_target"]
+    WRITES = ["pose"]
     SUPPORTED_DIMS = [2, 3]
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = []               # `fit:` OR inline coefficients; see `_coefficients`
@@ -400,7 +406,7 @@ class EyeMechanics(Lateral):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.at = params.get("_at", "eye")
+        self.at = params.get("_at", "organ")
         spec = _coefficients(params, ("C", "K"))
         c_s = float(params.get("damping_scale", 1.0))
         k_s = float(params.get("stiffness_scale", 1.0))
@@ -419,9 +425,9 @@ class EyeMechanics(Lateral):
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
-        u = lvl.get("gaze")
-        u_dot = lvl.get("gaze_rate")
-        u_inf = lvl.get("gaze_inf")
+        u = lvl.get("pose")
+        u_dot = lvl.get("pose_rate")
+        u_inf = lvl.get("pose_target")
         dt = float(getattr(H.config, "dt", 1.0)) or 1.0
         a = self._accel(u, u_dot, u_inf, dt) * lvl.occ[:, None]
         if mask is not None:
@@ -429,9 +435,9 @@ class EyeMechanics(Lateral):
         return {self.at: a}
 
 
-@register_operator("eye_mechanics", family="oculomotor", set="eye", kind="lateral",
+@register_operator("organ_mechanics", family="mechanics", set="organ", kind="lateral",
                    implementation="explicit")
-class EyeMechanicsExplicit(EyeMechanics):
+class OrganMechanicsExplicit(OrganMechanics):
     """The same mechanics with the damping taken EXPLICITLY: -C u_dot at the rate the eye has.
 
     Same biology, same C and same K; only the discretisation differs, so this is an

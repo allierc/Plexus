@@ -1,5 +1,5 @@
 ---
-title: "synapse"
+title: "connection"
 subtitle: "One weighted link between two sets: an EDGE-SET element carrying the weight W_e."
 ---
 
